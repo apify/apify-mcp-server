@@ -1,6 +1,7 @@
 import log from '@apify/log';
 
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../types.js';
+import { getConsoleLinkContext } from '../utils/console_link.js';
 import { redactSkyfirePayId } from '../utils/logging.js';
 import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './core/actor_run_response.js';
 import { buildGetActorRunSuccessResponse } from './core/get_actor_run_common.js';
@@ -65,6 +66,7 @@ export const actorExecutor: ActorExecutor = {
             abortSignal,
             mcpSessionId,
             onAbort: abortRunOnSignal,
+            linkContext: await getConsoleLinkContext(apifyClient.token, apifyClient),
         });
 
         if ('aborted' in fetchResult) {

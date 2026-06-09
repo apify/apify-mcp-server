@@ -5,6 +5,13 @@ import log from '@apify/log';
 import type { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
+import type { ConsoleLinkContext } from '../../types.js';
+import {
+    buildConsoleDatasetUrl,
+    buildConsoleKeyValueStoreUrl,
+    buildConsoleRunUrl,
+    VERBATIM_LINKS_NUDGE,
+} from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
@@ -65,6 +72,8 @@ async function raceAbort<T>(promise: Promise<T>, abortSignal: AbortSignal | unde
 
 export type RunDataset = {
     id: string;
+    /** Personalized Apify Console link; set only for Console UI token sessions. */
+    consoleUrl?: string;
     name?: string;
     title?: string;
     itemCount?: number;
@@ -86,6 +95,8 @@ export type RunDataset = {
 
 export type RunKeyValueStore = {
     id: string;
+    /** Personalized Apify Console link; set only for Console UI token sessions. */
+    consoleUrl?: string;
     name?: string;
     title?: string;
     keyCount?: number;
@@ -110,6 +121,8 @@ export type RunStorages = {
  */
 export type RunResponse = {
     runId: string;
+    /** Personalized Apify Console link to the run; set only for Console UI token sessions. */
+    consoleUrl?: string;
     actorId: string;
     actorName?: string;
     status: string;
@@ -227,6 +240,30 @@ function buildRunKeyValueStore(
 
 function errMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/** Mints Console links into a run response (run + default storages) for Console UI token sessions. */
+function applyConsoleUrls(response: RunResponse, linkContext: ConsoleLinkContext | undefined): void {
+    if (!linkContext) return;
+    response.consoleUrl = buildConsoleRunUrl(linkContext, response.runId);
+    const dataset = response.storages.datasets?.default;
+    if (dataset) dataset.consoleUrl = buildConsoleDatasetUrl(linkContext, dataset.id);
+    const keyValueStore = response.storages.keyValueStores?.default;
+    if (keyValueStore) keyValueStore.consoleUrl = buildConsoleKeyValueStoreUrl(linkContext, keyValueStore.id);
+}
+
+/**
+ * Narrative-text suffix listing the minted Console links plus the verbatim nudge.
+ * Empty string when the response carries no Console links (non-Console sessions).
+ */
+export function consoleLinksText(response: RunResponse): string {
+    if (!response.consoleUrl) return '';
+    const parts = [`run ${response.consoleUrl}`];
+    const datasetUrl = response.storages.datasets?.default.consoleUrl;
+    if (datasetUrl) parts.push(`dataset ${datasetUrl}`);
+    const keyValueStoreUrl = response.storages.keyValueStores?.default.consoleUrl;
+    if (keyValueStoreUrl) parts.push(`key-value store ${keyValueStoreUrl}`);
+    return `\nConsole: ${parts.join(' | ')}\n${VERBATIM_LINKS_NUDGE}`;
 }
 
 /**
@@ -603,8 +640,9 @@ export function buildStartRunResponse(params: {
     actorName: string;
     actorRun: ActorRun;
     widget?: boolean;
+    linkContext?: ConsoleLinkContext;
 }): ReturnType<typeof buildMCPResponse> {
-    const { actorName, actorRun, widget } = params;
+    const { actorName, actorRun, widget, linkContext } = params;
 
     const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
     const keyValueStore = actorRun.defaultKeyValueStoreId ? { id: actorRun.defaultKeyValueStoreId } : undefined;
@@ -630,6 +668,7 @@ export function buildStartRunResponse(params: {
         summary,
         nextStep,
     };
+    applyConsoleUrls(structuredContent, linkContext);
 
     const widgetMeta = widget
         ? {
@@ -639,7 +678,7 @@ export function buildStartRunResponse(params: {
         : undefined;
 
     return buildMCPResponse({
-        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}`],
+        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinksText(structuredContent)}`],
         structuredContent,
         ...(widgetMeta && { _meta: widgetMeta }),
     });
@@ -672,6 +711,7 @@ export async function fetchActorRunData(params: {
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
+    linkContext?: ConsoleLinkContext;
 }): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
     const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
 
@@ -771,6 +811,7 @@ export async function fetchActorRunData(params: {
         summary,
         nextStep,
     };
+    applyConsoleUrls(structuredContent, params.linkContext);
 
     return { result: { run, structuredContent } };
 }

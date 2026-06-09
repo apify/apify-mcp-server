@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { extractDotPrefixes, getDatasetItems } from '../../src/tools/common/get_dataset_items.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+
+// Only Console UI token sessions reach the users/me lookup.
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
 
 describe('extractDotPrefixes', () => {
     it('returns empty list when no fields contain a dot', () => {
@@ -137,5 +144,40 @@ describe('get-dataset-items', () => {
         expect(datasetSpy).toHaveBeenCalledWith('user~my-dataset');
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
         expect(structuredContent.datasetId).toBe('user~my-dataset');
+    });
+
+    it('adds the dataset Console link to structuredContent and content for Console UI token sessions', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue({
+            userId: 'USER_ID',
+            userPlanTier: 'FREE',
+            isOrganization: false,
+        });
+
+        const result = await (getDatasetItems as HelperTool).call({
+            ...stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+            apifyToken: 'apify_ui_test',
+        });
+        const { structuredContent, content } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(structuredContent.consoleUrl).toBe('https://console.apify.com/storage/datasets/ds-1');
+        expect(content).toHaveLength(2);
+        expect(content[1].text).toBe(
+            `Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
+        );
+    });
+
+    it('keeps the response link-free for API tokens', async () => {
+        const result = await (getDatasetItems as HelperTool).call({
+            ...stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+            apifyToken: 'apify_api_test',
+        });
+        const { structuredContent, content } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(structuredContent.consoleUrl).toBeUndefined();
+        expect(content).toHaveLength(1);
     });
 });

@@ -320,6 +320,10 @@ export const getActorRunOutputSchema = {
     type: 'object' as const,
     properties: {
         runId: { type: 'string', description: 'Actor run ID' },
+        consoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the run; present only for Console sessions',
+        },
         actorId: { type: 'string', description: 'Stable Apify Actor ID from the run record' },
         actorName: { type: 'string', description: '"username/actor-name"' },
         status: {
@@ -358,6 +362,11 @@ export const getActorRunOutputSchema = {
                             type: 'object' as const,
                             properties: {
                                 id: { type: 'string', description: 'Dataset ID' },
+                                consoleUrl: {
+                                    type: 'string',
+                                    description:
+                                        'Personalized Apify Console link to the dataset; present only for Console sessions',
+                                },
                                 name: { type: 'string' },
                                 title: { type: 'string' },
                                 itemCount: { type: 'number' },
@@ -386,6 +395,11 @@ export const getActorRunOutputSchema = {
                             type: 'object' as const,
                             properties: {
                                 id: { type: 'string', description: 'Key-value store ID' },
+                                consoleUrl: {
+                                    type: 'string',
+                                    description:
+                                        'Personalized Apify Console link to the store; present only for Console sessions',
+                                },
                                 name: { type: 'string' },
                                 title: { type: 'string' },
                                 keyCount: {
@@ -456,6 +470,10 @@ export const datasetItemsOutputSchema = {
     type: 'object' as const,
     properties: {
         datasetId: { type: 'string', description: 'Dataset ID' },
+        consoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the dataset; present only for Console sessions',
+        },
         items: { type: 'array' as const, items: { type: 'object' as const }, description: 'Dataset items' },
         itemCount: { type: 'number', description: 'Number of items returned' },
         totalItemCount: { type: 'number', description: 'Total items in dataset' },

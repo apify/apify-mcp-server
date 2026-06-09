@@ -5,11 +5,12 @@ import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { wrapJsonText } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound } from './storage_helpers.js';
+import { buildConsoleLinkContent, buildStorageNotFound } from './storage_helpers.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
@@ -90,7 +91,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = getDatasetItemsArgs.parse(args);
 
         const fields = parseCommaSeparatedList(parsed.fields);
@@ -124,8 +125,11 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
 
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
+        const consoleUrl = linkContext ? buildConsoleDatasetUrl(linkContext, datasetId) : undefined;
         const structuredContent = {
             datasetId,
+            consoleUrl,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
@@ -133,6 +137,9 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             limit: effectiveLimit,
         };
 
-        return { content: [{ type: 'text', text: wrapJsonText(v) }], structuredContent };
+        return {
+            content: [{ type: 'text', text: wrapJsonText(v) }, ...buildConsoleLinkContent(consoleUrl)],
+            structuredContent,
+        };
     },
 } as const);

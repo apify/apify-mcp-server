@@ -5,10 +5,11 @@ import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { wrapJsonText } from '../../utils/mcp.js';
-import { buildStorageNotFound } from './storage_helpers.js';
+import { buildConsoleLinkContent, buildStorageNotFound } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -47,7 +48,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
         // `listKeys()` throws ApifyApiError on a missing store (the SDK only soft-catches
@@ -64,6 +65,14 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         if (!keys) {
             return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
         }
-        return { content: [{ type: 'text', text: wrapJsonText(keys) }] };
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
+        return {
+            content: [
+                { type: 'text', text: wrapJsonText(keys) },
+                ...buildConsoleLinkContent(
+                    linkContext ? buildConsoleKeyValueStoreUrl(linkContext, keyValueStoreId) : undefined,
+                ),
+            ],
+        };
     },
 } as const);

@@ -19,6 +19,7 @@ import type { PaymentProvider } from '../../payments/types.js';
 import type { ActorInfo, ApifyToken, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
@@ -640,9 +641,11 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             return {};
         }
 
+        const linkContext = await getConsoleLinkContext(toolArgs.apifyToken, apifyClient);
+
         // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
         if (waitSecs === 0) {
-            const response = buildStartRunResponse({ actorName: baseActorName, actorRun });
+            const response = buildStartRunResponse({ actorName: baseActorName, actorRun, linkContext });
             return { ...response, toolTelemetry: { actorId: resolvedActorId } };
         }
 
@@ -655,6 +658,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             abortSignal,
             mcpSessionId: toolArgs.mcpSessionId,
             onAbort: abortRunOnSignal,
+            linkContext,
         });
 
         if ('aborted' in fetchResult) return {};

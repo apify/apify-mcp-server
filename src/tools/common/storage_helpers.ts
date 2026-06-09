@@ -1,6 +1,16 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../const.js';
+import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+
+/**
+ * Optional extra text content item carrying the storage's personalized Console link
+ * (Console UI token sessions only). Spread into the tool's `content` array.
+ */
+export function buildConsoleLinkContent(consoleUrl: string | undefined): { type: 'text'; text: string }[] {
+    if (!consoleUrl) return [];
+    return [{ type: 'text', text: `Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}` }];
+}
 
 /**
  * Soft-fail not-found response for storage tools. Centralizes

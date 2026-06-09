@@ -5,9 +5,10 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { wrapJsonText } from '../../utils/mcp.js';
-import { buildStorageNotFound, normalizeRecordKey } from './storage_helpers.js';
+import { buildConsoleLinkContent, buildStorageNotFound, normalizeRecordKey } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -41,7 +42,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
         const recordKey = normalizeRecordKey(parsed.recordKey);
@@ -55,6 +56,14 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 : `Key-value store '${keyValueStoreId}' not found.`;
             return buildStorageNotFound(text);
         }
-        return { content: [{ type: 'text', text: wrapJsonText(record) }] };
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
+        return {
+            content: [
+                { type: 'text', text: wrapJsonText(record) },
+                ...buildConsoleLinkContent(
+                    linkContext ? buildConsoleKeyValueStoreUrl(linkContext, keyValueStoreId) : undefined,
+                ),
+            ],
+        };
     },
 } as const);

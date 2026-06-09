@@ -1,4 +1,5 @@
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
+import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import { fetchActorRunData } from '../core/actor_run_response.js';
 import {
@@ -14,7 +15,7 @@ import {
 export const defaultGetActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, progressTracker, mcpSessionId, extra } = toolArgs;
+        const { args, apifyClient: client, apifyToken, progressTracker, mcpSessionId, extra } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
         try {
@@ -25,6 +26,7 @@ export const defaultGetActorRun: ToolEntry = Object.freeze({
                 progressTracker,
                 abortSignal: extra?.signal,
                 mcpSessionId,
+                linkContext: await getConsoleLinkContext(apifyToken, client),
             });
 
             // Per MCP spec, receivers SHOULD NOT send a response for a cancelled request:
