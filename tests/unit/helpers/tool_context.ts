@@ -1,13 +1,25 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { decode as decodeToon } from '@toon-format/toon';
 import { expect } from 'vitest';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
-import { JSON_FENCE_PREFIX, JSON_FENCE_SUFFIX } from '../../../src/utils/mcp.js';
+import { FENCES } from '../../../src/utils/encode_text.js';
 
 /** Inverse of `wrapJsonText`; imports prod's fence constants so the two halves can't drift. */
 export function parseFencedJson(text: string): unknown {
-    return JSON.parse(text.slice(JSON_FENCE_PREFIX.length, -JSON_FENCE_SUFFIX.length));
+    return JSON.parse(text.slice(FENCES.json.prefix.length, -FENCES.json.suffix.length));
+}
+
+/**
+ * Inverse of `encodeToon` — decodes the fenced tool text whether it shipped TOON or fell back to
+ * JSON. For flat payloads (what the array-endpoint mocks use) the TOON round-trip is exact.
+ */
+export function decodeFencedToolText(text: string): unknown {
+    if (text.startsWith(FENCES.toon.prefix)) {
+        return decodeToon(text.slice(FENCES.toon.prefix.length, -FENCES.toon.suffix.length));
+    }
+    return parseFencedJson(text);
 }
 
 /**

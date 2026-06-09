@@ -5,7 +5,8 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { wrapJsonText } from '../../utils/mcp.js';
+import { encodeToon } from '../../utils/encode_text.js';
+import { keyValueStoreListOutputSchema } from '../structured_output_schemas.js';
 
 const getUserKeyValueStoresListArgs = z.object({
     offset: z
@@ -51,6 +52,7 @@ export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
         - user_input: List my last 10 key-value stores (newest first)
         - user_input: List unnamed key-value stores`,
     inputSchema: z.toJSONSchema(getUserKeyValueStoresListArgs) as ToolInputSchema,
+    outputSchema: keyValueStoreListOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getUserKeyValueStoresListArgs)),
     annotations: {
         title: 'Get user key-value stores list',
@@ -68,6 +70,6 @@ export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
             desc: parsed.desc,
             unnamed: parsed.unnamed,
         });
-        return { content: [{ type: 'text', text: wrapJsonText(stores) }] };
+        return { content: [{ type: 'text', text: encodeToon(stores) }], structuredContent: stores };
     },
 } as const);
