@@ -7,15 +7,6 @@ export const ACTOR_MAX_DESCRIPTION_LENGTH = 500;
 // Actor run const
 export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of memory, free users can't run actors-mcp-server and requested Actor
 
-// Tool output
-/**
- * Usual tool output limit is 25k tokens where 1 token =~ 4 characters
- * thus 50k chars so we have some buffer because there was some issue with Claude code Actor call output token count.
- * This is primarily used for Actor tool call output, but we can then
- * reuse this in other tools as well.
- */
-export const TOOL_MAX_OUTPUT_CHARS = 50000;
-
 // MCP Server
 /** When `false`, `resolveServerMode('auto', ...)` forces {@link ServerMode.DEFAULT} regardless of client capabilities. */
 export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
