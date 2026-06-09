@@ -59,6 +59,42 @@ export type X402PaymentRequirements = {
     accepts?: X402PaymentAccept[];
 };
 
+/**
+ * JSON Schema for the x402 `PaymentRequired` object a paid tool returns in
+ * `structuredContent` on a 402, per the x402 MCP transport spec
+ * (coinbase/x402 `specs/transports-v2/mcp.md` → "Server Requirements").
+ * `required: [x402Version, accepts]` are the spec-required fields we use as the branch
+ * discriminator. `accepts[]` item internals are left unconstrained — the payload is
+ * forwarded verbatim from the trusted Apify API and may carry scheme-specific extras.
+ */
+export const X402_PAYMENT_REQUIRED_OUTPUT_SCHEMA = {
+    type: 'object' as const,
+    properties: {
+        x402Version: { type: 'number' as const },
+        error: { type: 'string' as const },
+        resource: { type: 'object' as const },
+        accepts: { type: 'array' as const, items: { type: 'object' as const } },
+    },
+    required: ['x402Version', 'accepts'],
+} as const;
+
+/**
+ * True if `schema` already carries the x402 PaymentRequired branch — i.e. it was
+ * produced by a previous {@link X402PaymentProvider.decorateToolSchema} pass.
+ * Keeps re-decoration idempotent (the server may decorate an already-decorated tool).
+ */
+function hasPaymentRequiredBranch(schema: Record<string, unknown> | undefined): boolean {
+    const { anyOf } = schema ?? {};
+    if (!Array.isArray(anyOf)) return false;
+    // Derive the discriminator from the schema itself so the two can't drift: a drifted
+    // guard would miss our own output and silently double-wrap (nested anyOf).
+    const discriminator = X402_PAYMENT_REQUIRED_OUTPUT_SCHEMA.required;
+    return anyOf.some((branch) => {
+        const req = (branch as { required?: unknown })?.required;
+        return Array.isArray(req) && discriminator.every((key) => req.includes(key));
+    });
+}
+
 // Module-level cache for X402 payment requirements.
 // We cache the Promise itself (rather than just the JSON result) to prevent the "thundering herd"
 // problem during server startup, where multiple concurrent incoming requests might otherwise
@@ -225,6 +261,23 @@ export class X402PaymentProvider implements PaymentProvider {
         // Append x402 instructions to description (idempotent)
         if (cloned.description && !cloned.description.includes(X402_TOOL_INSTRUCTIONS)) {
             cloned.description += `\n\n${X402_TOOL_INSTRUCTIONS}`;
+        }
+
+        // A paid tool's output is a sum type: its declared success shape OR a 402
+        // PaymentRequired object (carried in `structuredContent` per the x402 MCP spec).
+        // The MCP SDK *client* validates `structuredContent` against the advertised
+        // `outputSchema` even when `isError: true`, so a tool that declares only the
+        // success shape makes strict clients (e.g. Cursor) reject the 402 with -32602
+        // before the agent sees the payment hint (issue #917). Advertise both shapes via
+        // `anyOf` of two disjoint-`required` branches so the spec-mandated PaymentRequired
+        // validates while a success payload missing required keys is still rejected.
+        // `structuredClone` keeps each tool's schema self-owned — the const is never aliased.
+        const outputSchema = cloned.outputSchema as Record<string, unknown> | undefined;
+        if (outputSchema && !hasPaymentRequiredBranch(outputSchema)) {
+            cloned.outputSchema = {
+                type: 'object',
+                anyOf: [outputSchema, structuredClone(X402_PAYMENT_REQUIRED_OUTPUT_SCHEMA)],
+            } as typeof cloned.outputSchema;
         }
 
         return Object.freeze(cloned);
