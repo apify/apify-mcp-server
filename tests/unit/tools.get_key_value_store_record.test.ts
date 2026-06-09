@@ -1,7 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { getApifyAPIBaseUrl } from '../../src/apify_client.js';
 import { HelperTools } from '../../src/const.js';
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -18,9 +17,11 @@ const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
 function stubApifyClient(opts: { record: unknown; store?: unknown }): InternalToolArgs['apifyClient'] {
     const { record, store } = opts;
     return {
-        keyValueStore: (_id: string) => ({
+        keyValueStore: (id: string) => ({
             getRecord: async (_key: string) => record,
             get: async () => store,
+            getRecordPublicUrl: async (key: string) =>
+                `https://api.apify.com/v2/key-value-stores/${id}/records/${key}?signature=signed`,
         }),
     } as unknown as InternalToolArgs['apifyClient'];
 }
@@ -91,7 +92,7 @@ describe('get-key-value-store-record', () => {
         });
     });
 
-    it('returns an embedded resource block for other binary records', async () => {
+    it('returns an embedded resource block with the SDK-signed URL for other binary records', async () => {
         const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF magic bytes
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
@@ -105,7 +106,7 @@ describe('get-key-value-store-record', () => {
         expect(content[0]).toEqual({
             type: 'resource',
             resource: {
-                uri: `${getApifyAPIBaseUrl()}/v2/key-value-stores/kv-1/records/report.pdf`,
+                uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/report.pdf?signature=signed',
                 blob: bytes.toString('base64'),
                 mimeType: 'application/pdf',
             },

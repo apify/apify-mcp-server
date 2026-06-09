@@ -1,7 +1,6 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { getApifyAPIBaseUrl } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
@@ -67,7 +66,8 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             if (mimeType?.startsWith('audio/')) {
                 return { content: [{ type: 'audio', data, mimeType }] };
             }
-            const uri = `${getApifyAPIBaseUrl()}/v2/key-value-stores/${keyValueStoreId}/records/${recordKey}`;
+            // getRecordPublicUrl signs the URL when the client can read the store's signing key, so it works for private records.
+            const uri = await store.getRecordPublicUrl(recordKey);
             return { content: [{ type: 'resource', resource: { uri, blob: data, ...(mimeType && { mimeType }) } }] };
         }
         if (typeof value === 'string') {
