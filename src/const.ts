@@ -16,6 +16,14 @@ export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of me
  */
 export const TOOL_MAX_OUTPUT_CHARS = 50000;
 
+/**
+ * Binary key-value store records larger than this are returned as a fetchable link instead of
+ * inline base64. base64 inflates the payload ~33%, so inlining large binaries (images, audio,
+ * other files) would blow up the context window. Text and JSON records are not capped — the
+ * model reads them directly.
+ */
+export const KV_RECORD_MAX_INLINE_BYTES = 256 * 1024;
+
 // MCP Server
 /** When `false`, `resolveServerMode('auto', ...)` forces {@link ServerMode.DEFAULT} regardless of client capabilities. */
 export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;

@@ -1,7 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../src/const.js';
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
@@ -111,6 +111,41 @@ describe('get-key-value-store-record', () => {
                 mimeType: 'application/pdf',
             },
         });
+    });
+
+    it('returns a fetchable link instead of inlining a binary record over the size limit', async () => {
+        const bytes = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'big.png' },
+                stubApifyClient({ record: { key: 'big.png', value: bytes, contentType: 'image/png' } }),
+            ),
+        );
+        const { content, isError } = result as TextToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0].type).toBe('text');
+        expect(content[0].text).toContain(
+            'https://api.apify.com/v2/key-value-stores/kv-1/records/big.png?signature=signed',
+        );
+        // The base64 bytes must NOT be inlined — that is the whole point of the link.
+        expect(content[0].text).not.toContain(bytes.toString('base64'));
+    });
+
+    it('inlines a large JSON record (text/JSON is not size-capped)', async () => {
+        const record = {
+            key: 'big.json',
+            value: { blob: 'x'.repeat(KV_RECORD_MAX_INLINE_BYTES) },
+            contentType: 'application/json',
+        };
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1', recordKey: 'big.json' }, stubApifyClient({ record })),
+        );
+        const { content, isError } = result as TextToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0].type).toBe('text');
+        expect(parseFencedJson(content[0].text)).toEqual(record);
     });
 
     it('returns a plain text content block for a text record', async () => {

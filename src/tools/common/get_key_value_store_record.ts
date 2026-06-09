@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -59,6 +59,21 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         const { value, contentType } = record;
         const mimeType = contentType?.split(';')[0].trim();
         if (Buffer.isBuffer(value)) {
+            if (value.length > KV_RECORD_MAX_INLINE_BYTES) {
+                // base64-inlining a large binary would blow up the context window; return a link instead.
+                const uri = await store.getRecordPublicUrl(recordKey);
+                const sizeKb = Math.round(value.length / 1024);
+                const limitKb = KV_RECORD_MAX_INLINE_BYTES / 1024;
+                const mimeSuffix = mimeType ? ` (${mimeType})` : '';
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: `Record '${recordKey}' is ${sizeKb} KB${mimeSuffix}, over the ${limitKb} KB inline limit. Retrieve it directly:\n${uri}`,
+                        },
+                    ],
+                };
+            }
             const data = value.toString('base64');
             if (mimeType?.startsWith('image/')) {
                 return { content: [{ type: 'image', data, mimeType }] };
