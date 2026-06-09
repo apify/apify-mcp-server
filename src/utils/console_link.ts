@@ -57,12 +57,9 @@ function buildConsoleUrl(context: ConsoleLinkContext, path: string): string {
     return `${base}${orgPrefix}${path}`;
 }
 
-/**
- * Builds the Console Actor detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/<actorIdOrSlug>`.
- * `actorIdOrSlug` may be an Actor id or a `username~name` slug — Console resolves both.
- */
-export function buildConsoleActorUrl(context: ConsoleLinkContext, actorIdOrSlug: string): string {
-    return buildConsoleUrl(context, `/actors/${actorIdOrSlug}`);
+/** Builds the Console Actor detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/<actorId>`. */
+export function buildConsoleActorUrl(context: ConsoleLinkContext, actorId: string): string {
+    return buildConsoleUrl(context, `/actors/${actorId}`);
 }
 
 /** Builds the Console run detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/runs/<runId>`. */
