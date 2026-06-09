@@ -64,10 +64,8 @@ export function wrapJsonText(value: unknown): string {
 
 /**
  * Computes tool response payload bytes, split by payload side:
- * `contentBytes` sums the UTF-8 byte length of every `text` item in `content[]` (conversational text);
- * `fileBytes` sums returned file/record payloads in `content[]` — image/audio base64 `data` and
- * embedded `resource` `blob`/`text` — kept separate so binary/file size doesn't skew the text metric;
- * `structuredContentBytes` is the UTF-8 byte length of JSON-stringified `structuredContent` (if present).
+ * `fileBytes` sums the UTF-8 byte length of file/record payload strings in `content[]` — image/audio base64 `data` and
+ * embedded `resource` base64 `blob` / inline `text` — kept separate so binary/file payloads don't skew the text metric;
  * Kept separate because clients consume only one side — newer read `structuredContent`, older read
  * `content[]` — so summing them double-counts mirrored payloads. Other fields (`isError`, `_meta`, etc.)
  * are not counted.
