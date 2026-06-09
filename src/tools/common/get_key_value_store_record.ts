@@ -66,7 +66,6 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             if (mimeType?.startsWith('audio/')) {
                 return { content: [{ type: 'audio', data, mimeType }] };
             }
-            // getRecordPublicUrl signs the URL when the client can read the store's signing key, so it works for private records.
             const uri = await store.getRecordPublicUrl(recordKey);
             return { content: [{ type: 'resource', resource: { uri, blob: data, ...(mimeType && { mimeType }) } }] };
         }
