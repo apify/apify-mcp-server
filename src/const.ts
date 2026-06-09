@@ -22,6 +22,8 @@ export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
 
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
+export const SERVER_DESCRIPTION =
+    'Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store ⚡';
 export enum HelperTools {
     ACTOR_ADD = 'add-actor',
     ACTOR_CALL = 'call-actor',

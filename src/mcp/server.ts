@@ -50,13 +50,16 @@ import { parseBooleanOrNull } from '@apify/utilities';
 import { ApifyClient } from '../apify_client.js';
 import {
     ALLOWED_TASK_TOOL_EXECUTION_MODES,
+    APIFY_FAVICON_URL,
     APIFY_MCP_URL,
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     FAILURE_CATEGORY,
     HelperTools,
     HTTP_PAYMENT_REQUIRED,
+    SERVER_DESCRIPTION,
     SERVER_NAME,
+    SERVER_TITLE,
     TOOL_STATUS,
 } from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
@@ -232,7 +235,10 @@ export class ActorsMcpServer {
         const { setupSigintHandler = true } = options;
         this.server = new Server(
             {
+                description: SERVER_DESCRIPTION,
+                icons: [{ src: APIFY_FAVICON_URL }],
                 name: SERVER_NAME,
+                title: SERVER_TITLE,
                 version: getPackageVersion()!,
                 websiteUrl: APIFY_MCP_URL,
             },

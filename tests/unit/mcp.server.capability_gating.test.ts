@@ -3,7 +3,14 @@ import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyClient } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { HelperTools, SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../src/const.js';
+import {
+    APIFY_FAVICON_URL,
+    HelperTools,
+    SERVER_DESCRIPTION,
+    SERVER_MODE_AUTO_DETECTION_ENABLED,
+    SERVER_NAME,
+    SERVER_TITLE,
+} from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import { appsCallActor } from '../../src/tools/apps/call_actor.js';
@@ -65,6 +72,23 @@ describe('ActorsMcpServer initialize handler', () => {
         servers.push(server);
         return server;
     };
+
+    describe('serverInfo', () => {
+        it('includes rich implementation metadata', () => {
+            const server = track(makeServer(ServerMode.DEFAULT));
+
+            const info = (server.server as unknown as { _serverInfo: Record<string, unknown> })._serverInfo;
+            const icons = info.icons as { src: string }[];
+
+            expect(info.name).toBe(SERVER_NAME);
+            expect(info.title).toBe(SERVER_TITLE);
+            expect(info.description).toBe(SERVER_DESCRIPTION);
+            expect(Array.isArray(info.icons)).toBe(true);
+            expect(icons.length).toBeGreaterThan(0);
+            expect(icons[0].src).toBe(APIFY_FAVICON_URL);
+            expect(icons[0].src).toMatch(/^https:\/\//);
+        });
+    });
 
     describe('mode resolution', () => {
         const cases: { option: ServerModeOption; supportsUi: boolean; expectedMode: ServerMode }[] = [
