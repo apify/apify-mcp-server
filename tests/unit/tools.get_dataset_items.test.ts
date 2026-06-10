@@ -192,8 +192,8 @@ describe('get-dataset-items', () => {
         expect(structuredContent.summary).toBe('Fetched all 1 items.');
         expect(structuredContent.nextStep).toContain(HelperTools.DATASET_SCHEMA_GET);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
-        // summary + nextStep follow the fenced data in the single text block.
-        expect(content[0].text.endsWith(`\n\n${structuredContent.summary}\n${structuredContent.nextStep}`)).toBe(true);
+        // summary + nextStep ship as a separate text block after the fenced data.
+        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
     it('emits a pagination nextStep when more items remain', async () => {
