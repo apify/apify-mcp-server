@@ -5,20 +5,10 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { stripQuoteWrappers } from '../../utils/generic.js';
+import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
 import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound, buildStorageResponse, normalizeRecordKey } from './storage_helpers.js';
 
-/** Best-effort byte size of a stored value for the summary. */
-function computeValueBytes(value: unknown): number | undefined {
-    if (Buffer.isBuffer(value)) return value.length;
-    if (typeof value === 'string') return Buffer.byteLength(value);
-    try {
-        return Buffer.byteLength(JSON.stringify(value));
-    } catch {
-        return undefined;
-    }
-}
 
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
