@@ -3,7 +3,7 @@
 */
 
 import { ApifyClient } from './apify_client.js';
-import { APIFY_FAVICON_URL, defaults, HelperTools, SERVER_NAME, SERVER_TITLE } from './const.js';
+import { APIFY_FAVICON_SVG_URL, APIFY_FAVICON_URL, defaults, HelperTools, SERVER_NAME, SERVER_TITLE } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import type { PaymentProvider } from './payments/types.js';
@@ -26,6 +26,7 @@ import { getToolPublicFieldOnly } from './utils/tools.js';
 import { TTLLRUCache } from './utils/ttl_lru.js';
 
 export {
+    APIFY_FAVICON_SVG_URL,
     APIFY_FAVICON_URL,
     ApifyClient,
     getExpectedToolNamesByCategories,
