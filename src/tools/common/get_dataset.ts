@@ -61,7 +61,7 @@ export const getDataset: ToolEntry = Object.freeze({
         const normalized = dataset.fields ? { ...dataset, fields: normalizeDatasetFields(dataset.fields) } : dataset;
         const fieldCount = Array.isArray(normalized.fields) ? normalized.fields.length : undefined;
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
-        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items.`;
+        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items.`;
         return buildStorageResponse({
             structuredContent: normalized as unknown as Record<string, unknown>,
             summary,
