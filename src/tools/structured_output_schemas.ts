@@ -593,7 +593,7 @@ export const storageListOutputSchema = {
         summary: summaryProperty,
         nextStep: nextStepProperty,
     },
-    required: ['items', 'total', 'count', 'summary', 'nextStep'],
+    required: ['items', 'total', 'count', 'offset', 'limit', 'summary', 'nextStep'],
 };
 
 /**
@@ -626,6 +626,7 @@ export const keyValueStoreKeysOutputSchema = {
                     key: { type: 'string', description: 'Record key' },
                     size: { type: 'number', description: 'Value size in bytes' },
                 },
+                required: ['key', 'size'],
             },
             description: 'Keys with value sizes',
         },
@@ -638,7 +639,7 @@ export const keyValueStoreKeysOutputSchema = {
         summary: summaryProperty,
         nextStep: nextStepProperty,
     },
-    required: ['keyValueStoreId', 'items', 'summary', 'nextStep'],
+    required: ['keyValueStoreId', 'items', 'count', 'isTruncated', 'nextExclusiveStartKey', 'summary', 'nextStep'],
 };
 
 /**
