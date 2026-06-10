@@ -6,9 +6,9 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
+import { encodeToon } from '../../utils/encode_text.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { wrapJsonText } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import { buildConsoleLinkContent, buildStorageNotFound } from './storage_helpers.js';
 
@@ -138,7 +138,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         };
 
         return {
-            content: [{ type: 'text', text: wrapJsonText(v) }, ...buildConsoleLinkContent(consoleUrl)],
+            content: [{ type: 'text', text: encodeToon(structuredContent) }, ...buildConsoleLinkContent(consoleUrl)],
             structuredContent,
         };
     },

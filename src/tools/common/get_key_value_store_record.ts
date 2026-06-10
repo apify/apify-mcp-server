@@ -6,8 +6,8 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
+import { wrapJsonText } from '../../utils/encode_text.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
-import { wrapJsonText } from '../../utils/mcp.js';
 import { buildConsoleLinkContent, buildStorageNotFound, normalizeRecordKey } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({

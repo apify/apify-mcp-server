@@ -109,12 +109,12 @@ for (const test of tests) {
 while (turnNumber < maxTurns) {
     // Call LLM with current tools
     const llmResponse = await llmClient.callLlm(messages, model, tools);
-    
+
     // Execute tool calls
     for (const toolCall of llmResponse.toolCalls) {
         await mcpClient.callTool(toolCall);
     }
-    
+
     // Refresh tools for next turn
     tools = mcpToolsToOpenAiTools(mcpClient.getTools());
 }
@@ -170,8 +170,8 @@ AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 
 ### 6. Agent vs Judge Models
 
-**Agent:** `anthropic/claude-haiku-4.5` (fast, good at tools)  
-**Judge:** `x-ai/grok-4.1-fast` (strong reasoning)
+**Agent:** `anthropic/claude-haiku-4.5` (fast, good at tools)<br>
+**Judge:** `deepseek/deepseek-v4-flash` (strong reasoning)
 
 Separation allows independent optimization for speed vs evaluation quality.
 
@@ -244,7 +244,7 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 | `--verbose` | | Show detailed conversation logs | `false` |
 | `--test-cases-path <path>` | | Custom test cases file path | `test_cases.json` |
 | `--agent-model <model>` | | Override agent model | `anthropic/claude-haiku-4.5` |
-| `--judge-model <model>` | | Override judge model | `x-ai/grok-4.1-fast` |
+| `--judge-model <model>` | | Override judge model | `deepseek/deepseek-v4-flash` |
 | `--tool-timeout <seconds>` | | Tool call timeout | `60` |
 | `--concurrency <number>` | `-c` | Number of tests to run in parallel | `4` |
 | `--output` | `-o` | Save results to JSON file | `false` |
@@ -494,19 +494,19 @@ Format must be exact for LLM context understanding.
 ## Common Issues
 
 ### Tests interfere with each other
-**Symptom:** Test 2 fails after Test 1, passes alone.  
+**Symptom:** Test 2 fails after Test 1, passes alone.<br>
 **Solution:** ✅ Isolated MCP instances per test.
 
 ### LLM can't use newly added tool
-**Symptom:** Agent uses `add-actor` but can't call new tool.  
+**Symptom:** Agent uses `add-actor` but can't call new tool.<br>
 **Solution:** ✅ Dynamic tool fetching per turn.
 
 ### Judge too strict/lenient
-**Symptom:** Incorrect verdicts.  
+**Symptom:** Incorrect verdicts.<br>
 **Solution:** Tune `JUDGE_PROMPT_TEMPLATE` in `config.ts`.
 
 ### Tests timeout (hit maxTurns)
-**Symptom:** Conversations don't complete.  
+**Symptom:** Conversations don't complete.
 **Solutions:**
 - Review agent system prompt
 - Check tool results are helpful

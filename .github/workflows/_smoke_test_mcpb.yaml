@@ -1,0 +1,49 @@
+name: Smoke test MCPB package
+
+on:
+    workflow_call:
+        inputs:
+            artifact_name:
+                description: Name of the uploaded artifact holding apify-mcp-server.mcpb.
+                required: false
+                type: string
+                default: mcpb-packages
+
+jobs:
+    smoke_test:
+        name: Smoke test MCPB package
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Download MCPB artifact
+                uses: actions/download-artifact@v4
+                with:
+                    name: ${{ inputs.artifact_name }}
+
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
+                with:
+                    node-version: 24
+
+            -   name: Install mcpc
+                run: |
+                    mkdir -p smoke-test && cd smoke-test
+                    npm init -y
+                    npm install @apify/mcpc
+
+            -   name: Smoke test MCPB server via mcpc
+                # Launch the packed .mcpb the way a client does and exercise it over MCP.
+                # Catches packaging regressions where the bundle builds but can't start —
+                # e.g. a pruned peer-dep top-level module raising ERR_MODULE_NOT_FOUND at
+                # import (#862). Manifest validation and file listings miss this; only
+                # launching the asset does. Runs against the uploaded artifact, the exact
+                # file attached to the release.
+                working-directory: smoke-test
+                run: |
+                    unzip -q ../apify-mcp-server.mcpb -d mcpb
+                    echo '{"mcpServers":{"mcpb":{"command":"node","args":["mcpb/dist/stdio.js","--tools","docs,search-actors,fetch-actor-details","--telemetry-enabled","false"]}}}' > .mcp.json
+                    npx mcpc connect .mcp.json:mcpb @mcpb
+                    npx mcpc @mcpb ping
+                    npx mcpc --json @mcpb tools-list | jq -e 'length > 0'
+                    npx mcpc --json @mcpb tools-call search-actors keywords:="web scraper" | jq -e '.content[0].text'
+                    npx mcpc --json @mcpb tools-call fetch-actor-details actor:="apify/web-scraper" | jq -e '.content[0].text'
+                    npx mcpc @mcpb close

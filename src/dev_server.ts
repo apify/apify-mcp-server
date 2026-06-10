@@ -21,6 +21,11 @@ import { resolvePaymentProvider } from './payments/index.js';
 import type { ApifyRequestParams } from './types.js';
 import { parseServerMode } from './utils/server_mode.js';
 
+// This is the local dev/standby-emulation server only; production runs dist/stdio.js.
+// Default telemetry to the DEV Segment source so local tool calls never land in PROD
+// analytics. Still overridable by an explicit TELEMETRY_ENV (e.g. PROD) in the env.
+process.env.TELEMETRY_ENV ??= 'DEV';
+
 enum TransportType {
     HTTP = 'HTTP',
     SSE = 'SSE',

@@ -6,8 +6,8 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
+    decodeFencedToolText,
     expectSoftFailInvalidInput,
-    parseFencedJson,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -45,7 +45,7 @@ describe('get-key-value-store-keys', () => {
         expect(getKeyValueStoreKeys.name).toBe(HelperTools.KEY_VALUE_STORE_KEYS_GET);
     });
 
-    it('returns the keys response as JSON in a fenced code block', async () => {
+    it('returns the keys response as fenced text (json or toon) that round-trips to the data', async () => {
         const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
@@ -53,7 +53,18 @@ describe('get-key-value-store-keys', () => {
         );
         const { content } = result as TextToolResult;
 
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_KEYS);
+        expect(decodeFencedToolText(content[0].text)).toEqual(MOCK_KEYS);
+    });
+
+    it('mirrors the keys response in structuredContent and declares an outputSchema', async () => {
+        const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
+
+        const result = await (getKeyValueStoreKeys as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+        );
+
+        expect((result as TextToolResult).structuredContent).toEqual(MOCK_KEYS);
+        expect((getKeyValueStoreKeys as HelperTool).outputSchema).toMatchObject({ type: 'object' });
     });
 
     it('forwards exclusiveStartKey and limit to listKeys', async () => {

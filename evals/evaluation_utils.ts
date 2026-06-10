@@ -42,7 +42,9 @@ export function loadTestCases(filePath: string): TestData {
 
 export async function loadTools(): Promise<ToolBase[]> {
     const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
-    const urlTools = await processParamsGetTools('', apifyClient);
+    // Expose the storage category so dataset/KV tool-selection cases have their tools available;
+    // the default toolset only auto-injects get-dataset-items and get-key-value-store-record.
+    const urlTools = await processParamsGetTools('?tools=actors,docs,storage', apifyClient);
     return urlTools.map((t: ToolEntry) => getToolPublicFieldOnly(t)) as ToolBase[];
 }
 

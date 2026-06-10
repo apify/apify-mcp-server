@@ -645,6 +645,8 @@ export type StructuredActorCard = {
     modifiedAt?: string;
     isDeprecated: boolean;
     inputFields?: ActorStoreInputSchema;
+    inputFieldsTruncated?: boolean;
+    inputFieldsTotalCount?: number;
 };
 
 /**

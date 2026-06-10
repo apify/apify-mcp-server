@@ -19,7 +19,7 @@ export const MODELS = {
     agent: 'anthropic/claude-haiku-4.5',
 
     // Judge model - evaluates conversation quality
-    judge: 'x-ai/grok-4.1-fast',
+    judge: 'deepseek/deepseek-v4-flash',
 };
 
 /**

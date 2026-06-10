@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.10.12",
+  "version": "0.10.13",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -55,6 +55,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "@segment/analytics-node": "^2.3.0",
     "@sentry/node": "^10.38.0",
+    "@toon-format/toon": "2.3.0",
     "ajv": "^8.17.1",
     "algoliasearch": "^5.31.0",
     "apify-client": "^2.22.1",

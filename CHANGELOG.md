@@ -2,15 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.12 - **not yet released**
+## [0.10.13](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.13) (2026-06-10)
+
+### 🚀 Features
+
+- **tools:** TOON-encode list responses with structuredContent + outputSchema ([#950](https://github.com/apify/apify-mcp-server/pull/950)) ([9ddda0e](https://github.com/apify/apify-mcp-server/commit/9ddda0ebc0ed3b7b1bfe698c26af007702249cb5)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- **payments:** Widen paid-tool outputSchema to accept x402 PaymentRequired (#917) ([#956](https://github.com/apify/apify-mcp-server/pull/956)) ([7874ce2](https://github.com/apify/apify-mcp-server/commit/7874ce279e7bfd87102c783f83ceb042eb123dbf)) by [@MQ37](https://github.com/MQ37), closes [#917](https://github.com/apify/apify-mcp-server/issues/917)
+- Expose stdio CLI version ([#963](https://github.com/apify/apify-mcp-server/pull/963)) ([fd289f0](https://github.com/apify/apify-mcp-server/commit/fd289f04cd335a9992316f9bea2f50c6ab9472a8)) by [@wowsofine](https://github.com/wowsofine)
+- Wrong default telemetry for isError without classification ([#961](https://github.com/apify/apify-mcp-server/pull/961)) ([a48d2b3](https://github.com/apify/apify-mcp-server/commit/a48d2b3b2f0d22fa04db820d1fd11d3a0af8d423)) by [@mvanhorn](https://github.com/mvanhorn), closes [#936](https://github.com/apify/apify-mcp-server/issues/936)
+
+
+## [0.10.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.12) (2026-06-04)
+
+### 🚀 Features
+
+- Truncate inputFields in search-actors structured output ([#947](https://github.com/apify/apify-mcp-server/pull/947)) ([afbe963](https://github.com/apify/apify-mcp-server/commit/afbe9630f4b3018637e1cabcb688b51b6dc471ea)) by [@mvanhorn](https://github.com/mvanhorn), closes [#888](https://github.com/apify/apify-mcp-server/issues/888)
 
 ### 🐛 Bug Fixes
 
 - Remove x-apify-authorization header support from dev server ([#934](https://github.com/apify/apify-mcp-server/pull/934)) ([bf2d5a2](https://github.com/apify/apify-mcp-server/commit/bf2d5a2bc6f8c29a021b386ef6980272b5cdab3d)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.11](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.11) (2026-05-28)
 
 ### 🐛 Bug Fixes

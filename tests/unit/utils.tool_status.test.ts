@@ -169,10 +169,27 @@ describe('extractToolTelemetry', () => {
         expect(res.content).toBe('ok');
     });
 
-    it('defaults to SOFT_FAIL when isError without toolTelemetry', () => {
+    it('defaults to FAILED when isError without toolTelemetry', () => {
         const { toolStatus, callDiagnostics } = extractToolTelemetry({ isError: true }, undefined, undefined);
-        expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
+        expect(toolStatus).toBe(TOOL_STATUS.FAILED);
         expect(callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
+    });
+
+    it('keeps explicit telemetry when isError is true', () => {
+        const { toolStatus, callDiagnostics } = extractToolTelemetry(
+            {
+                isError: true,
+                toolTelemetry: {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                },
+            },
+            undefined,
+            undefined,
+        );
+
+        expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
+        expect(callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
     });
 
     it('returns SUCCEEDED when no error signals', () => {

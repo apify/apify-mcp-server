@@ -49,19 +49,6 @@ export function buildMCPResponse(options: {
     };
 }
 
-/** Markdown JSON code-fence prefix used by `wrapJsonText` and the test-side `parseFencedJson`. */
-export const JSON_FENCE_PREFIX = '```json\n';
-/** Markdown JSON code-fence suffix used by `wrapJsonText` and the test-side `parseFencedJson`. */
-export const JSON_FENCE_SUFFIX = '\n```';
-
-/**
- * Wrap a JSON-serializable value in a Markdown ` ```json ` code fence.
- * Used by any tool that returns SDK payloads to the LLM.
- */
-export function wrapJsonText(value: unknown): string {
-    return `${JSON_FENCE_PREFIX}${JSON.stringify(value)}${JSON_FENCE_SUFFIX}`;
-}
-
 /**
  * Computes tool response payload bytes, split by payload side:
  * `contentBytes` sums the UTF-8 byte length of every text item in `content[]`;
