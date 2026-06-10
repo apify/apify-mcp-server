@@ -31,7 +31,7 @@ describe('get-key-value-store-record', () => {
         expect(getKeyValueStoreRecord.name).toBe(HelperTools.KEY_VALUE_STORE_RECORD_GET);
     });
 
-    it('returns the record as JSON in a fenced code block', async () => {
+    it('returns the record value as JSON in a fenced code block', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'kv-1', recordKey: 'INPUT' },
@@ -41,10 +41,10 @@ describe('get-key-value-store-record', () => {
         const { content, isError } = result as TextToolResult;
 
         expect(isError).not.toBe(true);
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_RECORD);
+        expect(parseFencedJson(content[0].text)).toEqual(MOCK_RECORD.value);
     });
 
-    it('returns a JSON array record as JSON in a fenced code block', async () => {
+    it('returns a JSON array record value as JSON in a fenced code block', async () => {
         const record = { key: 'results.json', value: [{ id: 1 }, { id: 2 }], contentType: 'application/json' };
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1', recordKey: 'results.json' }, stubApifyClient({ record })),
@@ -53,7 +53,7 @@ describe('get-key-value-store-record', () => {
 
         expect(isError).not.toBe(true);
         expect(content[0].type).toBe('text');
-        expect(parseFencedJson(content[0].text)).toEqual(record);
+        expect(parseFencedJson(content[0].text)).toEqual(record.value);
     });
 
     it('returns an image content block for a binary image record', async () => {
@@ -150,7 +150,7 @@ describe('get-key-value-store-record', () => {
         expect(content[0].text).not.toContain(bytes.toString('base64'));
     });
 
-    it('inlines a large JSON record (text/JSON is not size-capped)', async () => {
+    it('inlines a large JSON record value (text/JSON is not size-capped)', async () => {
         const record = {
             key: 'big.json',
             value: { blob: 'x'.repeat(KV_RECORD_MAX_INLINE_BYTES) },
@@ -163,7 +163,7 @@ describe('get-key-value-store-record', () => {
 
         expect(isError).not.toBe(true);
         expect(content[0].type).toBe('text');
-        expect(parseFencedJson(content[0].text)).toEqual(record);
+        expect(parseFencedJson(content[0].text)).toEqual(record.value);
     });
 
     it('returns a plain text content block for a text record', async () => {

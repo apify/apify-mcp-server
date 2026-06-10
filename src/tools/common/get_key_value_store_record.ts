@@ -97,6 +97,6 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         if (typeof value === 'string') {
             return { content: [{ type: 'text', text: value }] };
         }
-        return { content: [{ type: 'text', text: wrapJsonText(record) }] };
+        return { content: [{ type: 'text', text: wrapJsonText(value) }] };
     },
 } as const);
