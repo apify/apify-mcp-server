@@ -21,10 +21,10 @@ implementations, not by importing from here.
 
 ## Gotchas & invariants
 
-- **Tool names: 64-char cap + 4-char hash dedupe.** Names are capped at
-  `MAX_TOOL_NAME_LENGTH`; over-length or colliding names get a `TOOL_NAME_HASH_LENGTH`
-  hash suffix so the exposed set stays unique within the limit. Never widen the cap —
-  downstream clients assume 64.
+- **Tool names: capped + hash-deduped.** Names are capped at `MAX_TOOL_NAME_LENGTH`;
+  over-length or colliding names get a `TOOL_NAME_HASH_LENGTH` hash suffix so the
+  exposed set stays unique within the limit (the hashing is in `../tools/utils.ts`).
+  Never widen the cap — downstream clients depend on it.
 - **Proxy server IDs are keyed by URL, not Actor ID.** `getMCPServerID(url)` is
   `sha256(url)` sliced to `SERVER_ID_LENGTH`. One Actor can expose both an SSE and a
   streamable endpoint; keying by URL keeps those distinct. Keying by Actor ID would

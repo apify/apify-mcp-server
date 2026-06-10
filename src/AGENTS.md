@@ -15,8 +15,8 @@ directory you're editing.
   that import order.
 - `dev_server.ts` — Express server for local dev / standby Actor mode.
 - `main.ts` — Apify Actor entry. `input.ts` — Actor input processing.
-- `apify_client.ts` — the only place that talks to the Apify API (never call it
-  directly elsewhere). `state.ts` — TTL caches. `const.ts`, `errors.ts`,
+- `apify_client.ts` — the Apify API client wrapper; use it rather than calling the
+  API directly. `state.ts` — TTL caches. `const.ts`, `errors.ts`,
   `types.ts`, `telemetry.ts`, `instrument.ts`, `server_card.ts` — shared spine.
 
 ## Subdirectories
