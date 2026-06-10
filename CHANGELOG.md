@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.10.14 - **not yet released**
 
+### 🚀 Features
+
+- Extract server info into reusable getServerInfo() function ([#957](https://github.com/apify/apify-mcp-server/pull/957)) ([477b7b3](https://github.com/apify/apify-mcp-server/commit/477b7b3ffb988cc8be42f093aaef94f64f269cf3)) by [@jirispilka](https://github.com/jirispilka), closes [#955](https://github.com/apify/apify-mcp-server/issues/955)
+
 ### ⚙️ Miscellaneous Tasks
 
 - [**breaking**] Remove legacy SSE server transport ([#960](https://github.com/apify/apify-mcp-server/pull/960)) ([7e6bb1a](https://github.com/apify/apify-mcp-server/commit/7e6bb1a5750120104e2065632025942cab3da15b)) by [@MQ37](https://github.com/MQ37), closes [#162](https://github.com/apify/apify-mcp-server/issues/162)
