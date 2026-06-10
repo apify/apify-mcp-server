@@ -42,9 +42,10 @@ describe('get-dataset-list', () => {
         expect(structuredContent.summary).toBe('Listed 2 of 2 datasets.');
         // Not truncated → nextStep points at inspecting a dataset, not pagination.
         expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
-        // content[0] ships TOON (or JSON fallback) and round-trips to the full structuredContent.
-        expect(decodeFencedToolText(content[0].text)).toEqual(structuredContent);
-        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
+        // content[0] ships the TOON-fenced data (no summary/nextStep) followed by the prose summary.
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(decodeFencedToolText(content[0].text)).toEqual(data);
+        expect(content[0].text.endsWith(`\n\n${summary}\n${nextStep}`)).toBe(true);
     });
 
     it('emits a pagination nextStep when more datasets remain', async () => {

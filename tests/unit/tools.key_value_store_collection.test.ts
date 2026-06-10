@@ -41,9 +41,10 @@ describe('get-key-value-store-list', () => {
         expect(structuredContent).toMatchObject(MOCK_LIST);
         expect(structuredContent.summary).toBe('Listed 2 of 2 key-value stores.');
         expect(structuredContent.nextStep).toContain(HelperTools.KEY_VALUE_STORE_GET);
-        // content[0] ships TOON (or JSON fallback) and round-trips to the full structuredContent.
-        expect(decodeFencedToolText(content[0].text)).toEqual(structuredContent);
-        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
+        // content[0] ships the TOON-fenced data (no summary/nextStep) followed by the prose summary.
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(decodeFencedToolText(content[0].text)).toEqual(data);
+        expect(content[0].text.endsWith(`\n\n${summary}\n${nextStep}`)).toBe(true);
     });
 
     it('emits a pagination nextStep when more stores remain', async () => {

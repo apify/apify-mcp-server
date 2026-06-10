@@ -18,14 +18,15 @@ export function buildStorageNotFound(text: string) {
 
 /**
  * Build a storage tool response, mirroring `actor_run_response.ts`:
- * `structuredContent` carries the data plus `summary` (and `nextStep` unless terminal);
- * `content[0]` is the encoded dump of `structuredContent` (spec compat for clients that read
- * `content[]`), `content[1]` is the human-readable `summary`/`nextStep`.
+ * `structuredContent` carries the data plus `summary` (and `nextStep` unless terminal).
  * `nextStep` is omitted for terminal responses (e.g. get-key-value-store-record).
  *
- * `toon: true` TOON-encodes `content[0]` (token-cheaper for the uniform-row arrays the list
- * tools return); single-object tools leave it off and ship raw JSON. Either way `structuredContent`
- * is the lossless source of truth — programmatic consumers read it, not `content[0]`.
+ * `toon: true` (the list tools) emits a single text: the data TOON-encoded in a ```toon fence
+ * (token-cheaper for uniform-row arrays; `summary`/`nextStep` are prose, not tabular, so they
+ * stay out of the fence) followed by `summary`/`nextStep` as plain text. Single-object tools
+ * leave it off and ship `content[0]` as the raw-JSON dump of `structuredContent` plus
+ * `content[1]` with `summary`/`nextStep`. Either way `structuredContent` is the lossless source
+ * of truth — programmatic consumers read it, not `content[]`.
  */
 export function buildStorageResponse(params: {
     structuredContent: Record<string, unknown>;
@@ -35,11 +36,11 @@ export function buildStorageResponse(params: {
 }) {
     const { structuredContent, summary, nextStep, toon } = params;
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
+    const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
     return buildMCPResponse({
-        texts: [
-            toon ? encodeToon(full) : JSON.stringify(full),
-            nextStep !== undefined ? `${summary}\n${nextStep}` : summary,
-        ],
+        texts: toon
+            ? [`${encodeToon(structuredContent)}\n\n${summaryText}`]
+            : [JSON.stringify(full), summaryText],
         structuredContent: full,
     });
 }

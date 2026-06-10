@@ -73,13 +73,14 @@ describe('get-dataset-items', () => {
         expect(structuredContent.itemCount).toBe(MOCK_ITEMS.length);
     });
 
-    it('encodes the same payload into content text as structuredContent', async () => {
+    it('encodes the data payload (without summary/nextStep) into the fenced content text', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
         );
         const { content, structuredContent } = result as TextToolResult;
 
-        expect(decodeFencedToolText(content[0].text)).toEqual(structuredContent);
+        const { summary, nextStep, ...data } = structuredContent as Record<string, unknown>;
+        expect(decodeFencedToolText(content[0].text)).toEqual(data);
     });
 
     it('content round-trips to structuredContent for nested items (dot-flattened when TOON wins)', async () => {
@@ -99,11 +100,12 @@ describe('get-dataset-items', () => {
         const { content, structuredContent } = result as TextToolResult;
         const [{ text }] = content;
 
-        // Uniform nested rows favour TOON; assert the lift actually happened, then that the text
-        // round-trips to the dot-flattened structuredContent (its true on-the-wire equivalent).
+        // Uniform nested rows favour TOON; assert the lift actually happened, then that the fenced
+        // text round-trips to the dot-flattened data (summary/nextStep stay outside the fence).
+        const { summary, nextStep, ...data } = structuredContent as Record<string, unknown>;
         expect(text.startsWith('```toon\n')).toBe(true);
         expect(text).toContain('metadata.httpStatus');
-        expect(decodeFencedToolText(text)).toEqual(dotFlatten(JSON.parse(JSON.stringify(structuredContent))));
+        expect(decodeFencedToolText(text)).toEqual(dotFlatten(JSON.parse(JSON.stringify(data))));
     });
 
     it('defaults `limit` to 20 when caller omits it', async () => {
@@ -190,8 +192,8 @@ describe('get-dataset-items', () => {
         expect(structuredContent.summary).toBe('Fetched all 1 items.');
         expect(structuredContent.nextStep).toContain(HelperTools.DATASET_SCHEMA_GET);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
-        // content[1] mirrors summary + nextStep for text-only clients.
-        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
+        // summary + nextStep follow the fenced data in the single text block.
+        expect(content[0].text.endsWith(`\n\n${structuredContent.summary}\n${structuredContent.nextStep}`)).toBe(true);
     });
 
     it('emits a pagination nextStep when more items remain', async () => {
@@ -209,7 +211,7 @@ describe('get-dataset-items', () => {
         );
     });
 
-    it('content[0] mirrors structuredContent and does not echo the desc input param', async () => {
+    it('content[0] mirrors the structuredContent data and does not echo the desc input param', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
         );
@@ -217,7 +219,8 @@ describe('get-dataset-items', () => {
             structuredContent: Record<string, unknown>;
         };
 
-        expect(decodeFencedToolText(content[0].text)).toEqual(structuredContent);
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(decodeFencedToolText(content[0].text)).toEqual(data);
         expect(structuredContent).not.toHaveProperty('desc');
     });
 });

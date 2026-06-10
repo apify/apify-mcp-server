@@ -13,13 +13,14 @@ export function parseFencedJson(text: string): unknown {
 
 /**
  * Inverse of `encodeToon` — decodes the fenced tool text whether it shipped TOON or fell back to
- * JSON. For flat payloads (what the array-endpoint mocks use) the TOON round-trip is exact.
+ * JSON. Tolerates prose after the closing fence (storage list tools append summary/nextStep).
+ * For flat payloads (what the array-endpoint mocks use) the TOON round-trip is exact.
  */
 export function decodeFencedToolText(text: string): unknown {
-    if (text.startsWith(FENCES.toon.prefix)) {
-        return decodeToon(text.slice(FENCES.toon.prefix.length, -FENCES.toon.suffix.length));
-    }
-    return parseFencedJson(text);
+    const format = text.startsWith(FENCES.toon.prefix) ? 'toon' : 'json';
+    const { prefix, suffix } = FENCES[format];
+    const body = text.slice(prefix.length, text.indexOf(suffix, prefix.length));
+    return format === 'toon' ? decodeToon(body) : JSON.parse(body);
 }
 
 /**
