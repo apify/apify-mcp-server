@@ -12,7 +12,8 @@ implementations, not by importing from here.
 
 - `server.ts` — `ActorsMcpServer`: tool/prompt/resource/task registration, the
   `initialize` handshake, MCP Apps capability detection, `CallToolRequest` handling.
-  Defaults to the SDK `InMemoryTaskStore`; the internal repo injects a Redis one.
+  Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
+  a task store (the internal repo injects a Redis one) or the constructor throws.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.

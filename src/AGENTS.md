@@ -14,7 +14,7 @@ directory you're editing.
 - `stdio.ts` — CLI entry (used for Docker). **Sentry must be imported first** — keep
   that import order.
 - `dev_server.ts` — Express server for local dev / standby Actor mode.
-- `input.ts` — Actor input processing (consumed by `dev_server.ts` in standby Actor mode).
+- `input.ts` — input processing (`processInput`, used by `stdio.ts` and the HTTP URL-param parser in `mcp/utils.ts`).
 - `apify_client.ts` — the Apify API client wrapper; use it rather than calling the
   API directly. `state.ts` — TTL caches. `const.ts`, `errors.ts`,
   `types.ts`, `telemetry.ts`, `instrument.ts`, `server_card.ts` — shared spine.

@@ -22,7 +22,7 @@ The cross-file invariant no single file shows you:
   tools in `SKYFIRE_ENABLED_TOOLS`; forwards it as a header.
 - `x402.ts` — reads payment from the JSON-RPC `_meta` key `x402/payment`; HTTP 402
   flow; forwards the `PAYMENT-SIGNATURE` header.
-- `const.ts` — `PAYMENT_PROTOCOL_HEADER` and the provider instruction strings.
+- `const.ts` — `PAYMENT_PROTOCOL_HEADER` and the Skyfire instruction strings (x402's live in `x402.ts`).
 - `helpers.ts` — `prepareToolCallContext`: the choke point that strips payment fields
   before AJV, redacts them for logging, and builds the client.
 
@@ -33,7 +33,7 @@ The cross-file invariant no single file shows you:
   already gone.
 - **Add a new pay-eligible tool by adding it to `SKYFIRE_ENABLED_TOOLS`**, not by
   hand-injecting the schema field elsewhere.
-- A redactor must descend into nested args — top-level-only is a credential leak.
+- `skyfire-pay-id` is injected only at the top level, so `redactSkyfirePayId` redacts top-level only; if you ever nest a payment field, make the redactor recursive or it leaks.
 
 ## Local commands
 

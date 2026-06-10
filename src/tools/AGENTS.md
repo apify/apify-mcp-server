@@ -12,10 +12,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 - `actor_executor.ts` — direct actor-tool executor; mode-agnostic.
 - `categories.ts` — tool categories and the tools in each (`index.ts` re-exports them).
-- `build.ts` — builds tool entries from pruned Actor definitions.
+- `build.ts` — fetches and prunes an Actor's definition (`getActorDefinition`).
 - `structured_output_schemas.ts` — shared JSON-schema definitions for structured
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
+- The bulk of tool implementations live in `apps/`, `common/`, `core/`, `default/`,
+  registered through `categories.ts`.
 
 ## Rules when editing here
 
