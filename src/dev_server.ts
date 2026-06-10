@@ -6,9 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -18,7 +16,6 @@ import { parseBooleanOrNull } from '@apify/utilities';
 import { ApifyClient } from './apify_client.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { resolvePaymentProvider } from './payments/index.js';
-import type { ApifyRequestParams } from './types.js';
 import { parseServerMode } from './utils/server_mode.js';
 
 // This is the local dev/standby-emulation server only; production runs dist/stdio.js.
@@ -28,13 +25,10 @@ process.env.TELEMETRY_ENV ??= 'DEV';
 
 enum TransportType {
     HTTP = 'HTTP',
-    SSE = 'SSE',
 }
 
 enum Routes {
     MCP = '/',
-    SSE = '/sse',
-    MESSAGE = '/message',
 }
 
 /**
@@ -93,7 +87,6 @@ function resolveRequestAuth(
 export function createExpressApp(): express.Express {
     const app = express();
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
-    const transportsSSE: { [sessionId: string]: SSEServerTransport } = {};
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
     const taskStore = new InMemoryTaskStore();
 
@@ -121,124 +114,7 @@ export function createExpressApp(): express.Express {
         }
     }
 
-    app.get(Routes.SSE, async (req: Request, res: Response) => {
-        try {
-            log.info('MCP API', {
-                mth: req.method,
-                rt: Routes.SSE,
-                tr: TransportType.SSE,
-            });
-            // Extract telemetry query parameters
-            const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
-            const telemetryEnabledParam = urlParams.get('telemetry-enabled');
-            // URL param > env var > default (true)
-            const telemetryEnabled =
-                parseBooleanOrNull(telemetryEnabledParam) ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ?? true;
-
-            const uiParam = urlParams.get('ui');
-            const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
-
-            // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
-            const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
-
-            // Mirror production: no token required in payment mode, else require Bearer header
-            const auth = resolveRequestAuth(req, res, paymentProvider);
-            if (!auth) return;
-            const { apifyToken } = auth;
-
-            const mcpServer = new ActorsMcpServer({
-                taskStore,
-                setupSigintHandler: false,
-                transportType: 'sse',
-                telemetry: {
-                    enabled: telemetryEnabled,
-                },
-                serverMode,
-                paymentProvider,
-                token: apifyToken,
-            });
-            const transport = new SSEServerTransport(Routes.MESSAGE, res);
-
-            // Generate a unique session ID for this SSE connection
-            const mcpSessionId = transport.sessionId;
-
-            const apifyClient = new ApifyClient({ token: apifyToken });
-            // Fetch actor metadata and queue mode-agnostic sources. Composed with
-            // the final mode inside the initialize request handler.
-            await mcpServer.loadToolsFromUrl(req.url, apifyClient);
-
-            transportsSSE[transport.sessionId] = transport;
-            mcpServers[transport.sessionId] = mcpServer;
-
-            await mcpServer.connect(transport);
-
-            const sdkOnMessage = transport.onmessage as ((msg: JSONRPCMessage, extra?: unknown) => void) | undefined;
-            transport.onmessage = (message, extra) => {
-                const msgRecord = message as Record<string, unknown>;
-                if (!msgRecord.params || typeof msgRecord.params !== 'object' || Array.isArray(msgRecord.params)) {
-                    msgRecord.params = {};
-                }
-                const params = msgRecord.params as ApifyRequestParams;
-                params._meta ??= {};
-                params._meta.mcpSessionId = mcpSessionId;
-                sdkOnMessage?.(message, extra);
-            };
-
-            res.on('close', () => {
-                log.info('Connection closed, cleaning up', {
-                    mcpSessionId: transport.sessionId,
-                });
-                delete transportsSSE[transport.sessionId];
-                delete mcpServers[transport.sessionId];
-            });
-        } catch (error) {
-            respondWithError(res, error, `Error in GET ${Routes.SSE}`);
-        }
-    });
-
-    app.post(Routes.MESSAGE, async (req: Request, res: Response) => {
-        try {
-            log.info('MCP API', {
-                mth: req.method,
-                rt: Routes.MESSAGE,
-                tr: TransportType.HTTP,
-            });
-            const sessionId = new URL(req.url, `http://${req.headers.host}`).searchParams.get('sessionId');
-            if (!sessionId) {
-                log.softFail('No session ID provided in POST request', { statusCode: 400 });
-                res.status(400).json({
-                    jsonrpc: '2.0',
-                    error: {
-                        code: -32000,
-                        message: 'Bad Request: No session ID provided',
-                    },
-                    id: null,
-                });
-                return;
-            }
-            const transport = transportsSSE[sessionId];
-            if (transport) {
-                await transport.handlePostMessage(req, res);
-            } else {
-                log.softFail('Server is not connected to the client.', { statusCode: 404 });
-                res.status(404).json({
-                    jsonrpc: '2.0',
-                    error: {
-                        code: -32000,
-                        message:
-                            'Not Found: Server is not connected to the client. ' +
-                            'Connect to the server with GET request to /sse endpoint',
-                    },
-                    id: null,
-                });
-            }
-        } catch (error) {
-            respondWithError(res, error, `Error in POST ${Routes.MESSAGE}`);
-        }
-    });
-
-    // express.json() middleware to parse JSON bodies.
-    // It must be used before the POST / route but after the GET /sse route :shrug:
+    // express.json() middleware to parse JSON bodies, before the POST / route.
     app.use(express.json());
     app.post(Routes.MCP, async (req: Request, res: Response) => {
         log.info('Received MCP request:', req.body);
@@ -366,7 +242,7 @@ export function createExpressApp(): express.Express {
         if (transport) {
             log.info('MCP API', {
                 mth: req.method,
-                rt: Routes.MESSAGE,
+                rt: Routes.MCP,
                 tr: TransportType.HTTP,
                 mcpSessionId: sessionId,
             });

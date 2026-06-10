@@ -589,9 +589,8 @@ export type ActorsMcpServerOptions = {
      *  which is different for local and remote server based on the transport type.
      * - 'stdio': Direct/local stdio connection
      * - 'http': Remote HTTP streamable connection
-     * - 'sse': Remote Server-Sent Events (SSE) connection (deprecated, removal on 2026-04-01)
      */
-    transportType?: 'stdio' | 'http' | 'sse';
+    transportType?: 'stdio' | 'http';
     /**
      * Apify API token for authentication
      * Primarily used by stdio transport when token is read from ~/.apify/auth.json file
