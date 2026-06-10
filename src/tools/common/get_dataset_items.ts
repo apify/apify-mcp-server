@@ -8,36 +8,8 @@ import { compileSchema } from '../../utils/ajv.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
-
+import { buildStorageNotFound, buildStorageResponse, buildDatasetItemsSummaryNextStep } from './storage_helpers.js';
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
-
-/**
- * Pagination-aware {summary, nextStep}: when more items remain, point at the next page;
- * otherwise point at get-dataset-schema for structure inspection.
- */
-function buildDatasetItemsSummaryNextStep(params: {
-    datasetId: string;
-    itemCount: number;
-    totalItemCount: number;
-    offset: number;
-}): { summary: string; nextStep: string } {
-    const { datasetId, itemCount, totalItemCount, offset } = params;
-    if (offset + itemCount < totalItemCount) {
-        return {
-            summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`,
-            nextStep: `Call ${HelperTools.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`,
-        };
-    }
-    const summary =
-        offset === 0 && itemCount === totalItemCount
-            ? `Fetched all ${itemCount} items.`
-            : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
-    return {
-        summary,
-        nextStep: `Use ${HelperTools.DATASET_SCHEMA_GET} with datasetId=${datasetId} to inspect structure if needed.`,
-    };
-}
 
 /** Top-level dot prefixes of `fields`. Apify's `flatten` recurses, so the first segment suffices. */
 export function extractDotPrefixes(fields: string[]): string[] {

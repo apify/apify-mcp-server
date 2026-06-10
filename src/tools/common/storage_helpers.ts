@@ -2,6 +2,7 @@ import { FAILURE_CATEGORY, TOOL_STATUS } from '../../const.js';
 import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { HelperTools } from '../../const.js';
 
 /**
  * Soft-fail not-found response for storage tools. Centralizes
@@ -64,6 +65,33 @@ export function buildStorageListSummaryNextStep(params: {
             offset + count < total
                 ? `Call ${listToolName} again with offset=${offset + count} to fetch the next page.`
                 : inspectHint,
+    };
+}
+
+/**
+ * Pagination-aware {summary, nextStep}: when more items remain, point at the next page;
+ * otherwise point at get-dataset-schema for structure inspection.
+ */
+export function buildDatasetItemsSummaryNextStep(params: {
+    datasetId: string;
+    itemCount: number;
+    totalItemCount: number;
+    offset: number;
+}): { summary: string; nextStep: string } {
+    const { datasetId, itemCount, totalItemCount, offset } = params;
+    if (offset + itemCount < totalItemCount) {
+        return {
+            summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`,
+            nextStep: `Call ${HelperTools.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`,
+        };
+    }
+    const summary =
+        offset === 0 && itemCount === totalItemCount
+            ? `Fetched all ${itemCount} items.`
+            : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
+    return {
+        summary,
+        nextStep: `Use ${HelperTools.DATASET_SCHEMA_GET} with datasetId=${datasetId} to inspect structure if needed.`,
     };
 }
 
