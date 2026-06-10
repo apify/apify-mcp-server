@@ -8,7 +8,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { keyValueStoreKeysOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
+import { buildKvsKeysSummaryNextStep, buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -65,12 +65,13 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         if (!keys) {
             return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
         }
-        const n = keys.items.length;
-        const summary = `Listed ${n} ${n === 1 ? 'key' : 'keys'}${keys.isTruncated ? ' (more available)' : ''}.`;
-        const firstKey = keys.items[0]?.key;
-        const nextStep = firstKey
-            ? `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${keyValueStoreId} and recordKey=${firstKey} to read a value.`
-            : `Use ${HelperTools.KEY_VALUE_STORE_GET} with keyValueStoreId=${keyValueStoreId} to inspect the store.`;
+        const { summary, nextStep } = buildKvsKeysSummaryNextStep({
+            keyValueStoreId,
+            count: keys.items.length,
+            isTruncated: keys.isTruncated,
+            nextExclusiveStartKey: keys.nextExclusiveStartKey,
+            firstKey: keys.items[0]?.key,
+        });
         return buildStorageResponse({
             structuredContent: { keyValueStoreId, ...keys },
             summary,

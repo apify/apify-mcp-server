@@ -96,6 +96,34 @@ export function buildDatasetItemsSummaryNextStep(params: {
 }
 
 /**
+ * {summary, nextStep} for cursor-paginated key-value store key listings.
+ * When truncated, nextStep points at the next page; otherwise at inspecting a record or the store.
+ */
+export function buildKvsKeysSummaryNextStep(params: {
+    keyValueStoreId: string;
+    count: number;
+    isTruncated: boolean;
+    nextExclusiveStartKey?: string;
+    firstKey?: string;
+}): { summary: string; nextStep: string } {
+    const { keyValueStoreId, count, isTruncated, nextExclusiveStartKey, firstKey } = params;
+    const noun = count === 1 ? 'key' : 'keys';
+    const summary = `Listed ${count} ${noun}${isTruncated ? ' (more available)' : ''}.`;
+    if (isTruncated && nextExclusiveStartKey) {
+        return {
+            summary,
+            nextStep: `Call ${HelperTools.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=${nextExclusiveStartKey} to fetch the next page.`,
+        };
+    }
+    return {
+        summary,
+        nextStep: firstKey
+            ? `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${keyValueStoreId} and recordKey=${firstKey} to read a value.`
+            : `Use ${HelperTools.KEY_VALUE_STORE_GET} with keyValueStoreId=${keyValueStoreId} to inspect the store.`,
+    };
+}
+
+/**
  * Normalize a key-value store record key before SDK lookup.
  *
  * Strips the same LLM-leaked wrapper chars as `stripQuoteWrappers` (shared

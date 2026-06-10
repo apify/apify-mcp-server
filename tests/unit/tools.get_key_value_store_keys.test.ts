@@ -78,8 +78,12 @@ describe('get-key-value-store-keys', () => {
         expect(validate(structuredContent)).toBe(true);
     });
 
-    it('flags truncation in the summary when more keys are available', async () => {
-        const listKeysSpy = vi.fn().mockResolvedValue({ ...MOCK_KEYS, isTruncated: true });
+    it('flags truncation in the summary and points to the next page when more keys are available', async () => {
+        const listKeysSpy = vi.fn().mockResolvedValue({
+            ...MOCK_KEYS,
+            isTruncated: true,
+            nextExclusiveStartKey: 'OUTPUT',
+        });
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
@@ -87,6 +91,9 @@ describe('get-key-value-store-keys', () => {
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
         expect(structuredContent.summary).toBe('Listed 2 keys (more available).');
+        expect(structuredContent.nextStep).toBe(
+            `Call ${HelperTools.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=OUTPUT to fetch the next page.`,
+        );
     });
 
     it('points at inspecting the store when it has no keys', async () => {
