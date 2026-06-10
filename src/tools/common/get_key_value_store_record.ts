@@ -71,9 +71,12 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 return {
                     content: [
                         {
-                            type: 'text',
-                            text: `Record '${recordKey}' is ${sizeKb} KB${mimeSuffix}, over the ${limitKb} KB inline limit. Retrieve it directly:\n${uri}`,
-                        } satisfies TextContent,
+                            type: 'resource_link',
+                            uri,
+                            name: recordKey,
+                            size: value.length,
+                            ...(mimeType && { mimeType }),
+                        } satisfies ResourceLink,
                     ],
                 };
             }
