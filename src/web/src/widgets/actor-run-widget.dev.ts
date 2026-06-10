@@ -257,7 +257,8 @@ export function setupActorRunWidgetDev(): void {
                     },
                 },
                 summary: `SUCCEEDED in 12s. ${mockPreviewItems.length} items; 3 fields available.`,
-                nextStep: 'Use get-dataset-items with datasetId=test_dataset_456 and limit (for example 20) to fetch items.',
+                nextStep:
+                    'Use get-dataset-items with datasetId=test_dataset_456 and limit (for example 20) to fetch items.',
             },
         });
     }, LOADING_DELAY_MS);

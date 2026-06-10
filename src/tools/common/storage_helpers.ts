@@ -1,8 +1,8 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../const.js';
+import { HelperTools } from '../../const.js';
 import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { HelperTools } from '../../const.js';
 
 /**
  * Soft-fail not-found response for storage tools. Centralizes
@@ -39,9 +39,7 @@ export function buildStorageResponse(params: {
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
     const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
     return buildMCPResponse({
-        texts: toon
-            ? [`${encodeToon(structuredContent)}\n\n${summaryText}`]
-            : [JSON.stringify(full), summaryText],
+        texts: toon ? [`${encodeToon(structuredContent)}\n\n${summaryText}`] : [JSON.stringify(full), summaryText],
         structuredContent: full,
     });
 }

@@ -9,7 +9,6 @@ import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
 import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound, buildStorageResponse, normalizeRecordKey } from './storage_helpers.js';
 
-
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
     recordKey: z.string().min(1).describe('Key of the record to retrieve.'),
