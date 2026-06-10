@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.13 - **not yet released**
+## [0.10.13](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.13) (2026-06-10)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - Wrong default telemetry for isError without classification ([#961](https://github.com/apify/apify-mcp-server/pull/961)) ([a48d2b3](https://github.com/apify/apify-mcp-server/commit/a48d2b3b2f0d22fa04db820d1fd11d3a0af8d423)) by [@mvanhorn](https://github.com/mvanhorn), closes [#936](https://github.com/apify/apify-mcp-server/issues/936)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.12) (2026-06-04)
 
 ### 🚀 Features
