@@ -36,5 +36,7 @@ WORKDIR /app
 COPY --from=builder /app /build
 RUN cd /build && pnpm deploy --legacy --filter "@apify/actors-mcp-server" --prod /app && rm -rf /build
 COPY --from=builder /app/dist ./dist
+# server_card.ts reads server.json at load (resolved as dist/../server.json).
+COPY server.json ./
 
 ENTRYPOINT ["node", "dist/stdio.js"]

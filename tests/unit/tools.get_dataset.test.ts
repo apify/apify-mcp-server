@@ -3,12 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { getDataset } from '../../src/tools/common/get_dataset.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import {
-    expectSoftFailInvalidInput,
-    parseFencedJson,
-    stubToolCallContext,
-    type TextToolResult,
-} from './helpers/tool_context.js';
+import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_DATASET = {
     id: 'ds-1',
@@ -29,14 +24,24 @@ describe('get-dataset', () => {
         expect(getDataset.name).toBe(HelperTools.DATASET_GET);
     });
 
-    it('returns dataset metadata as JSON in a fenced code block', async () => {
+    it('returns dataset metadata plus a summary and nextStep in structuredContent', async () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET)),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
         expect(isError).not.toBe(true);
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_DATASET);
+        // structuredContent preserves the metadata and adds the narrative fields.
+        expect(structuredContent).toMatchObject(MOCK_DATASET);
+        expect(structuredContent.summary).toBe("Dataset 'my-dataset' has 42 items, 2 fields.");
+        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
+        expect(structuredContent.nextStep).toContain('datasetId=ds-1');
+        // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(JSON.parse(content[0].text)).toEqual(data);
+        expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
     it('returns isError with a not-found message when the dataset does not exist', async () => {
@@ -75,12 +80,8 @@ describe('get-dataset fields normalization', () => {
                 }),
             ),
         );
-        const { content } = result as TextToolResult;
-        expect((parseFencedJson(content[0].text) as { fields: string[] }).fields).toEqual([
-            'crawl.httpStatusCode',
-            'metadata.url',
-            'markdown',
-        ]);
+        const { structuredContent } = result as { structuredContent: { fields: string[] } };
+        expect(structuredContent.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
     });
 
     it('collapses array-index segments and dedupes', async () => {
@@ -105,8 +106,8 @@ describe('get-dataset fields normalization', () => {
                 }),
             ),
         );
-        const { content } = result as TextToolResult;
-        expect((parseFencedJson(content[0].text) as { fields: string[] }).fields).toEqual([
+        const { structuredContent } = result as { structuredContent: { fields: string[] } };
+        expect(structuredContent.fields).toEqual([
             'latestComments.id',
             'latestComments.text',
             'latestComments.owner.username',
@@ -126,8 +127,8 @@ describe('get-dataset fields normalization', () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(raw)),
         );
-        const { content } = result as TextToolResult;
-        expect(parseFencedJson(content[0].text)).toEqual({
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+        expect(structuredContent).toMatchObject({
             id: 'ds-1',
             name: null,
             userId: 'u-1',
@@ -142,9 +143,8 @@ describe('get-dataset fields normalization', () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-empty' }, stubApifyClient(raw)),
         );
-        const { content } = result as TextToolResult;
-        const json = parseFencedJson(content[0].text) as Record<string, unknown>;
-        expect(json).toEqual(raw);
-        expect(json).not.toHaveProperty('fields');
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+        expect(structuredContent).toMatchObject(raw);
+        expect(structuredContent).not.toHaveProperty('fields');
     });
 });

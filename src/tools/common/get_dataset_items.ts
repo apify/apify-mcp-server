@@ -5,12 +5,10 @@ import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { encodeToon } from '../../utils/encode_text.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound } from './storage_helpers.js';
-
+import { buildStorageNotFound, buildStorageResponse, buildDatasetItemsSummaryNextStep } from './storage_helpers.js';
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
 /** Top-level dot prefixes of `fields`. Apify's `flatten` recurses, so the first segment suffices. */
@@ -124,15 +122,22 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
 
+        const offset = parsed.offset ?? 0;
         const structuredContent = {
             datasetId,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
-            offset: parsed.offset ?? 0,
+            offset,
             limit: effectiveLimit,
         };
 
-        return { content: [{ type: 'text', text: encodeToon(structuredContent) }], structuredContent };
+        const { summary, nextStep } = buildDatasetItemsSummaryNextStep({
+            datasetId,
+            itemCount: v.items.length,
+            totalItemCount: v.total,
+            offset,
+        });
+        return buildStorageResponse({ structuredContent, summary, nextStep, toon: true });
     },
 } as const);

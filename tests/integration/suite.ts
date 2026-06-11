@@ -41,7 +41,7 @@ function findToolByName(name: string, mode: ServerMode): ToolEntry | undefined {
 
 type IntegrationTestsSuiteOptions = {
     suiteName: string;
-    transport: 'sse' | 'streamable-http' | 'stdio';
+    transport: 'streamable-http' | 'stdio';
     createClientFn: (options?: McpClientOptions) => Promise<Client>;
     beforeAllFn?: () => Promise<void>;
     afterAllFn?: () => Promise<void>;
@@ -1993,6 +1993,11 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     });
                     expect(kvResult.isError).not.toBe(true);
                     expect((kvResult.content as { text: string }[])[0].text).toContain('firstNumber');
+                    // Reading a record is terminal: summary present, no nextStep.
+                    const kvSc = (kvResult as { structuredContent?: { summary?: string; nextStep?: string } })
+                        .structuredContent;
+                    expect(kvSc?.summary).toContain("Read 'INPUT'");
+                    expect(kvSc).not.toHaveProperty('nextStep');
                     await client.close();
                 });
 
@@ -2007,6 +2012,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(text).toContain(datasetId);
                     expect(text).toContain('firstNumber');
                     expect(text).toContain('sum');
+                    const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } })
+                        .structuredContent;
+                    expect(sc?.summary).toContain('items');
+                    expect(sc?.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
                     await client.close();
                 });
 
@@ -2022,6 +2031,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     // `math` is a nested object in the default-dataset item; its presence in the schema
                     // proves the inference walks nested shapes, not just top-level fields.
                     expect(text).toContain('math');
+                    const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } })
+                        .structuredContent;
+                    expect(sc?.summary).toContain('Schema inferred');
+                    expect(sc?.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
                     await client.close();
                 });
 
@@ -2035,6 +2048,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     const { text } = (result.content as { text: string }[])[0];
                     // desc=true → newest first, so the run's dataset is on page 1.
                     expect(text).toContain(datasetId);
+                    const sc = (result as { structuredContent?: { summary?: string } }).structuredContent;
+                    expect(sc?.summary).toContain('datasets');
                     await client.close();
                 });
 
@@ -2047,6 +2062,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(result.isError).not.toBe(true);
                     const { text } = (result.content as { text: string }[])[0];
                     expect(text).toContain(defaultKvId);
+                    const sc = (result as { structuredContent?: { nextStep?: string } }).structuredContent;
+                    expect(sc?.nextStep).toContain(HelperTools.KEY_VALUE_STORE_KEYS_GET);
                     await client.close();
                 });
 
@@ -2063,6 +2080,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(text).toContain('STATS');
                     expect(text).toContain('LOG');
                     expect(text).toContain('COVER');
+                    const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } })
+                        .structuredContent;
+                    expect(sc?.summary).toContain('keys');
+                    expect(sc?.nextStep).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
                     await client.close();
                 });
 
@@ -2075,6 +2096,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(result.isError).not.toBe(true);
                     const { text } = (result.content as { text: string }[])[0];
                     expect(text).toContain(defaultKvId);
+                    const sc = (result as { structuredContent?: { summary?: string } }).structuredContent;
+                    expect(sc?.summary).toContain('key-value stores');
                     await client.close();
                 });
 

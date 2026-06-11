@@ -6,9 +6,9 @@ import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { wrapJsonText } from '../../utils/encode_text.js';
-import { stripQuoteWrappers } from '../../utils/generic.js';
-import { buildStorageNotFound, normalizeRecordKey } from './storage_helpers.js';
+import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
+import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
+import { buildStorageNotFound, buildStorageResponse, normalizeRecordKey } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -32,6 +32,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         - user_input: Get record INPUT from store abc123
         - user_input: Get record data.json from store username~my-store`,
     inputSchema: z.toJSONSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
+    outputSchema: keyValueStoreRecordOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreRecordArgs)),
     paymentRequired: true,
     annotations: {
@@ -59,9 +60,11 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         // The SDK already parsed the body by Content-Type (JSON -> object, text/xml -> string, else -> Buffer);
         // branch on the resulting JS type, not on the MIME type.
         const { value, contentType } = record;
-        // Content-Type is case-insensitive; lowercase so the image/audio checks below don't miss `Image/PNG`.
-        const mimeType = contentType?.split(';')[0].trim().toLowerCase();
+        // Binary values can't go in structuredContent (a Buffer serializes to useless {"type":"Buffer",...});
+        // return MCP content blocks instead.
         if (Buffer.isBuffer(value)) {
+            // Content-Type is case-insensitive; lowercase so the image/audio checks below don't miss `Image/PNG`.
+            const mimeType = contentType?.split(';')[0].trim().toLowerCase();
             if (value.length > KV_RECORD_MAX_INLINE_BYTES) {
                 // base64-inlining a large binary would blow up the context window; return a link instead.
                 const uri = await store.getRecordPublicUrl(recordKey);
@@ -94,9 +97,14 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 ],
             };
         }
-        if (typeof value === 'string') {
-            return { content: [{ type: 'text', text: value }] };
-        }
-        return { content: [{ type: 'text', text: wrapJsonText(value) }] };
+        // Text/JSON values serialize cleanly — return them as structuredContent per the storage-tool contract.
+        const bytes = computeValueBytes(value);
+        const details = [
+            contentType ? `contentType=${contentType}` : undefined,
+            bytes !== undefined ? `${bytes} bytes` : undefined,
+        ].filter(Boolean);
+        const summary = `Read '${recordKey}'${details.length ? ` (${details.join(', ')})` : ''}.`;
+        // Reading a record is terminal — no nextStep.
+        return buildStorageResponse({ structuredContent: { keyValueStoreId, ...record }, summary });
     },
 } as const);

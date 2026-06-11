@@ -28,26 +28,38 @@ describe('get-dataset-list', () => {
         expect(getUserDatasetsList.name).toBe(HelperTools.DATASET_LIST_GET);
     });
 
-    it('returns the list response as fenced text (json or toon) that round-trips to the data', async () => {
+    it('returns the list response plus a summary and nextStep in structuredContent', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
         const result = await (getUserDatasetsList as HelperTool).call(
             stubToolCallContext({}, stubApifyClient(listSpy)),
         );
-        const { content } = result as TextToolResult;
+        const { content, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
-        expect(decodeFencedToolText(content[0].text)).toEqual(MOCK_LIST);
+        expect(structuredContent).toMatchObject(MOCK_LIST);
+        expect(structuredContent.summary).toBe('Listed 2 of 2 datasets.');
+        // Not truncated → nextStep points at inspecting a dataset, not pagination.
+        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
+        // content[0] ships the TOON-fenced data; content[1] carries the prose summary + nextStep.
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(decodeFencedToolText(content[0].text)).toEqual(data);
+        expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
-    it('mirrors the list response in structuredContent and declares an outputSchema', async () => {
-        const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
+    it('emits a pagination nextStep when more datasets remain', async () => {
+        const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total: 25 });
 
         const result = await (getUserDatasetsList as HelperTool).call(
             stubToolCallContext({}, stubApifyClient(listSpy)),
         );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
-        expect((result as TextToolResult).structuredContent).toEqual(MOCK_LIST);
-        expect((getUserDatasetsList as HelperTool).outputSchema).toMatchObject({ type: 'object' });
+        expect(structuredContent.summary).toBe('Listed 2 of 25 datasets.');
+        expect(structuredContent.nextStep).toBe(
+            `Call ${HelperTools.DATASET_LIST_GET} again with offset=2 to fetch the next page.`,
+        );
     });
 
     it('forwards pagination params (limit, offset, desc, unnamed) to ApifyClient', async () => {

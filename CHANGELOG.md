@@ -3,7 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.10.13 - **not yet released**
+## 0.10.14 - **not yet released**
+
+### 🚀 Features
+
+- Extract server info into reusable getServerInfo() function ([#957](https://github.com/apify/apify-mcp-server/pull/957)) ([477b7b3](https://github.com/apify/apify-mcp-server/commit/477b7b3ffb988cc8be42f093aaef94f64f269cf3)) by [@jirispilka](https://github.com/jirispilka), closes [#955](https://github.com/apify/apify-mcp-server/issues/955)
+- Add structured output to remaining storage tools ([#965](https://github.com/apify/apify-mcp-server/pull/965)) ([2be856e](https://github.com/apify/apify-mcp-server/commit/2be856e7dab09ae34f1fb113e814e9ebf58afe00)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#884](https://github.com/apify/apify-mcp-server/issues/884)
+
+### ⚙️ Miscellaneous Tasks
+
+- [**breaking**] Remove legacy SSE server transport ([#960](https://github.com/apify/apify-mcp-server/pull/960)) ([7e6bb1a](https://github.com/apify/apify-mcp-server/commit/7e6bb1a5750120104e2065632025942cab3da15b)) by [@MQ37](https://github.com/MQ37), closes [#162](https://github.com/apify/apify-mcp-server/issues/162)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.10.13](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.13) (2026-06-10)
 
 ### 🚀 Features
 
@@ -16,7 +29,6 @@ All notable changes to this project will be documented in this file.
 - Wrong default telemetry for isError without classification ([#961](https://github.com/apify/apify-mcp-server/pull/961)) ([a48d2b3](https://github.com/apify/apify-mcp-server/commit/a48d2b3b2f0d22fa04db820d1fd11d3a0af8d423)) by [@mvanhorn](https://github.com/mvanhorn), closes [#936](https://github.com/apify/apify-mcp-server/issues/936)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.12) (2026-06-04)
 
 ### 🚀 Features

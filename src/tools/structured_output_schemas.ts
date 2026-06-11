@@ -458,6 +458,17 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
     return clone;
 }
 
+/** Past-tense state summary; emitted by every storage tool. */
+export const summaryProperty = {
+    type: 'string' as const,
+    description: 'Summary of the result',
+};
+/** One primary follow-up action; emitted by every non-terminal storage tool. */
+export const nextStepProperty = {
+    type: 'string' as const,
+    description: 'One follow-up action with tool name',
+};
+
 /**
  * Builds the Apify `PaginatedList` envelope schema (offset-based pagination) shared by the
  * run and storage list tools. `itemsSchema` describes one array element; mirrors `PaginatedList`
@@ -508,113 +519,6 @@ const actorRunListItemSchema = {
 /** Schema for get-actor-run-list output (paginated list of runs). */
 export const actorRunListOutputSchema = paginatedListOutputSchema(actorRunListItemSchema, 'Actor runs.');
 
-/** Schema for one dataset in get-dataset-list (apify-client `Dataset`). */
-const datasetListItemSchema = {
-    type: 'object' as const,
-    properties: {
-        id: { type: 'string', description: 'Dataset ID.' },
-        name: { type: ['string', 'null'], description: 'Dataset name; null for unnamed datasets.' },
-        title: { type: ['string', 'null'], description: 'Human-readable dataset title; null when unset.' },
-        userId: { type: 'string', description: 'ID of the owning user.' },
-        createdAt: { type: 'string', description: 'ISO timestamp when the dataset was created.' },
-        modifiedAt: { type: 'string', description: 'ISO timestamp when the dataset was last modified.' },
-        accessedAt: { type: 'string', description: 'ISO timestamp when the dataset was last accessed.' },
-        itemCount: { type: 'number', description: 'Total number of items in the dataset.' },
-        cleanItemCount: { type: 'number', description: 'Number of non-empty, non-hidden items.' },
-        actId: { type: ['string', 'null'], description: 'ID of the Actor that created the dataset; null otherwise.' },
-        actRunId: {
-            type: ['string', 'null'],
-            description: 'ID of the Actor run that created the dataset; null otherwise.',
-        },
-        fields: { type: 'array' as const, items: { type: 'string' }, description: 'Field names present in items.' },
-        stats: {
-            type: 'object' as const,
-            description: 'Dataset usage statistics.',
-            properties: {
-                readCount: { type: 'number' },
-                writeCount: { type: 'number' },
-                deleteCount: { type: 'number' },
-                storageBytes: { type: 'number' },
-            },
-        },
-    },
-    required: ['id', 'userId', 'itemCount', 'cleanItemCount'],
-};
-
-/** Schema for get-dataset-list output (paginated list of datasets). */
-export const datasetListOutputSchema = paginatedListOutputSchema(datasetListItemSchema, 'Datasets.');
-
-/** Schema for one store in get-key-value-store-list (apify-client `KeyValueStore`). */
-const keyValueStoreListItemSchema = {
-    type: 'object' as const,
-    properties: {
-        id: { type: 'string', description: 'Key-value store ID.' },
-        name: { type: ['string', 'null'], description: 'Store name; null for unnamed stores.' },
-        title: { type: ['string', 'null'], description: 'Human-readable store title; null when unset.' },
-        userId: { type: 'string', description: 'ID of the owning user.' },
-        createdAt: { type: 'string', description: 'ISO timestamp when the store was created.' },
-        modifiedAt: { type: 'string', description: 'ISO timestamp when the store was last modified.' },
-        accessedAt: { type: 'string', description: 'ISO timestamp when the store was last accessed.' },
-        actId: { type: ['string', 'null'], description: 'ID of the Actor that created the store; null otherwise.' },
-        actRunId: {
-            type: ['string', 'null'],
-            description: 'ID of the Actor run that created the store; null otherwise.',
-        },
-        stats: {
-            type: 'object' as const,
-            description: 'Store usage statistics.',
-            properties: {
-                readCount: { type: 'number' },
-                writeCount: { type: 'number' },
-                deleteCount: { type: 'number' },
-                listCount: { type: 'number' },
-                storageBytes: { type: 'number' },
-            },
-        },
-    },
-    required: ['id', 'userId'],
-};
-
-/** Schema for get-key-value-store-list output (paginated list of stores). */
-export const keyValueStoreListOutputSchema = paginatedListOutputSchema(
-    keyValueStoreListItemSchema,
-    'Key-value stores.',
-);
-
-/**
- * Schema for get-key-value-store-keys output (apify-client `KeyValueClientListKeysResult`).
- * Uses key-cursor pagination (exclusiveStartKey), not the offset envelope of the list tools above.
- */
-export const keyValueStoreKeysOutputSchema = {
-    type: 'object' as const,
-    properties: {
-        count: { type: 'number', description: 'Number of keys returned in this page.' },
-        limit: { type: 'number', description: 'Maximum number of keys requested.' },
-        exclusiveStartKey: {
-            type: ['string', 'null'],
-            description: 'Key after which this listing started (exclusive); null on the first page.',
-        },
-        isTruncated: { type: 'boolean', description: 'Whether more keys are available beyond this page.' },
-        nextExclusiveStartKey: {
-            type: ['string', 'null'],
-            description: 'Pass as exclusiveStartKey to fetch the next page; null when isTruncated is false.',
-        },
-        items: {
-            type: 'array' as const,
-            description: 'Keys in the store with the byte size of each stored value.',
-            items: {
-                type: 'object' as const,
-                properties: {
-                    key: { type: 'string', description: 'Record key.' },
-                    size: { type: 'number', description: 'Size of the stored value in bytes.' },
-                },
-                required: ['key', 'size'],
-            },
-        },
-    },
-    required: ['count', 'limit', 'isTruncated', 'items'],
-};
-
 /**
  * Schema for dataset items retrieval tools (get-dataset-items).
  * Contains dataset items with pagination and count information.
@@ -628,6 +532,127 @@ export const datasetItemsOutputSchema = {
         totalItemCount: { type: 'number', description: 'Total items in dataset' },
         offset: { type: 'number', description: 'Offset used for pagination' },
         limit: { type: 'number', description: 'Limit used for pagination' },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
     },
-    required: ['datasetId', 'items', 'itemCount'],
+    // offset/limit/totalItemCount and summary/nextStep are always emitted by the tool.
+    required: ['datasetId', 'items', 'itemCount', 'totalItemCount', 'offset', 'limit', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for dataset metadata (get-dataset). Documents the fields the LLM acts on; the raw API
+ * response carries more keys (stats, schema, access settings), allowed as additional properties.
+ */
+export const datasetMetadataOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Dataset ID' },
+        name: { type: ['string', 'null'], description: 'Dataset name (null for unnamed datasets)' },
+        itemCount: { type: 'number', description: 'Number of items in the dataset' },
+        fields: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Field paths in dot notation (e.g. ["metadata.url"])',
+        },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['id', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for dataset schema inference (get-dataset-schema).
+ */
+export const datasetSchemaOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        datasetId: { type: 'string', description: 'Dataset ID' },
+        schema: { type: 'object' as const, description: 'Inferred JSON schema describing dataset item structure' },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['datasetId', 'schema', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for storage collection listings (get-dataset-list, get-key-value-store-list).
+ * Mirrors the Apify paginated-list response shape plus the narrative fields.
+ */
+export const storageListOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        total: { type: 'number', description: 'Total number of items available for the user' },
+        count: { type: 'number', description: 'Number of items returned in this page' },
+        offset: { type: 'number', description: 'Offset used for pagination' },
+        limit: { type: 'number', description: 'Limit used for pagination' },
+        items: {
+            type: 'array' as const,
+            items: { type: 'object' as const },
+            description: 'Storage metadata objects',
+        },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['items', 'total', 'count', 'offset', 'limit', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for key-value store metadata (get-key-value-store). The raw API response carries more
+ * keys (stats, access settings), allowed as additional properties.
+ */
+export const keyValueStoreOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Key-value store ID' },
+        name: { type: ['string', 'null'], description: 'Store name (null for unnamed stores)' },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['id', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for key listing (get-key-value-store-keys).
+ */
+export const keyValueStoreKeysOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        keyValueStoreId: { type: 'string', description: 'Key-value store ID' },
+        items: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    key: { type: 'string', description: 'Record key' },
+                    size: { type: 'number', description: 'Value size in bytes' },
+                },
+                required: ['key', 'size'],
+            },
+            description: 'Keys with value sizes',
+        },
+        count: { type: 'number', description: 'Number of keys returned' },
+        isTruncated: { type: 'boolean', description: 'Whether more keys are available' },
+        nextExclusiveStartKey: {
+            type: ['string', 'null'],
+            description: 'Pass as exclusiveStartKey to fetch the next page of keys; null when not truncated',
+        },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['keyValueStoreId', 'items', 'count', 'isTruncated', 'nextExclusiveStartKey', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for a single record (get-key-value-store-record). Terminal: no nextStep.
+ */
+export const keyValueStoreRecordOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        keyValueStoreId: { type: 'string', description: 'Key-value store ID' },
+        key: { type: 'string', description: 'Record key' },
+        value: { description: 'The stored value (JSON, text, or binary)' },
+        contentType: { type: 'string', description: 'MIME type of the stored value' },
+        summary: summaryProperty,
+    },
+    required: ['keyValueStoreId', 'key', 'value', 'summary'],
 };

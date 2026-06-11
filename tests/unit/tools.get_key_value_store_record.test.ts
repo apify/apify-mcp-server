@@ -4,12 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../src/const.js';
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import {
-    expectSoftFailInvalidInput,
-    parseFencedJson,
-    stubToolCallContext,
-    type TextToolResult,
-} from './helpers/tool_context.js';
+import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
@@ -31,29 +26,43 @@ describe('get-key-value-store-record', () => {
         expect(getKeyValueStoreRecord.name).toBe(HelperTools.KEY_VALUE_STORE_RECORD_GET);
     });
 
-    it('returns the record value as JSON in a fenced code block', async () => {
+    it('returns a JSON record plus a terminal summary (no nextStep) in structuredContent', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'kv-1', recordKey: 'INPUT' },
                 stubApifyClient({ record: MOCK_RECORD }),
             ),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
         expect(isError).not.toBe(true);
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_RECORD.value);
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', ...MOCK_RECORD });
+        // {"query":"hello"} serializes to 17 bytes.
+        expect(structuredContent.summary).toBe("Read 'INPUT' (contentType=application/json, 17 bytes).");
+        // Reading a record is terminal — no nextStep, and content[1] is the summary alone.
+        expect(structuredContent).not.toHaveProperty('nextStep');
+        expect(content).toHaveLength(2);
+        expect(content[1].text).toBe(structuredContent.summary);
+        // content[0] is the data-only JSON dump (no narrative summary).
+        const { summary, ...data } = structuredContent;
+        expect(JSON.parse(content[0].text)).toEqual(data);
     });
 
-    it('returns a JSON array record value as JSON in a fenced code block', async () => {
-        const record = { key: 'results.json', value: [{ id: 1 }, { id: 2 }], contentType: 'application/json' };
+    it('returns a text record value in structuredContent', async () => {
+        const record = { key: 'note.txt', value: 'hello world\nsecond line', contentType: 'text/plain; charset=utf-8' };
         const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1', recordKey: 'results.json' }, stubApifyClient({ record })),
+            stubToolCallContext({ keyValueStoreId: 'kv-1', recordKey: 'note.txt' }, stubApifyClient({ record })),
         );
-        const { content, isError } = result as TextToolResult;
+        const { isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
         expect(isError).not.toBe(true);
-        expect(content[0].type).toBe('text');
-        expect(parseFencedJson(content[0].text)).toEqual(record.value);
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', ...record });
+        // 'hello world\nsecond line' is 23 ASCII bytes.
+        expect(structuredContent.summary).toBe("Read 'note.txt' (contentType=text/plain; charset=utf-8, 23 bytes).");
     });
 
     it('returns an image content block for a binary image record', async () => {
@@ -168,36 +177,6 @@ describe('get-key-value-store-record', () => {
             name: 'blob',
             size: KV_RECORD_MAX_INLINE_BYTES + 1,
         });
-    });
-
-    it('inlines a large JSON record value (text/JSON is not size-capped)', async () => {
-        const record = {
-            key: 'big.json',
-            value: { blob: 'x'.repeat(KV_RECORD_MAX_INLINE_BYTES) },
-            contentType: 'application/json',
-        };
-        const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1', recordKey: 'big.json' }, stubApifyClient({ record })),
-        );
-        const { content, isError } = result as TextToolResult;
-
-        expect(isError).not.toBe(true);
-        expect(content[0].type).toBe('text');
-        expect(parseFencedJson(content[0].text)).toEqual(record.value);
-    });
-
-    it('returns a plain text content block for a text record', async () => {
-        const text = 'hello world\nsecond line';
-        const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'note.txt' },
-                stubApifyClient({ record: { key: 'note.txt', value: text, contentType: 'text/plain; charset=utf-8' } }),
-            ),
-        );
-        const { content, isError } = result as TextToolResult;
-
-        expect(isError).not.toBe(true);
-        expect(content[0]).toEqual({ type: 'text', text });
     });
 
     it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {

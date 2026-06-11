@@ -129,6 +129,7 @@ export const ALLOWED_DOC_DOMAINS = ['https://docs.apify.com', 'https://crawlee.d
 
 export const APIFY_STORE_URL = 'https://apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
+export const APIFY_LOGO_URL = `${APIFY_STORE_URL}/apple-icon.png`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
 export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/platform/integrations/mcp';
 
