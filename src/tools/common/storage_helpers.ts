@@ -38,7 +38,7 @@ export function buildStorageResponse(params: {
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
     const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
     return buildMCPResponse({
-        texts: toon ? [encodeToon(structuredContent), summaryText] : [JSON.stringify(full), summaryText],
+        texts: toon ? [encodeToon(structuredContent), summaryText] : [JSON.stringify(structuredContent), summaryText],
         structuredContent: full,
     });
 }

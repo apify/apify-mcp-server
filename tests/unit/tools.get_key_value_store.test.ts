@@ -35,8 +35,10 @@ describe('get-key-value-store', () => {
         expect(structuredContent.summary).toBe("Key-value store 'my-store'.");
         expect(structuredContent.nextStep).toContain(HelperTools.KEY_VALUE_STORE_KEYS_GET);
         expect(structuredContent.nextStep).toContain('keyValueStoreId=kv-1');
-        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
-        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
+        // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(JSON.parse(content[0].text)).toEqual(data);
+        expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
     it('includes the byte count in the summary when stats are present', async () => {

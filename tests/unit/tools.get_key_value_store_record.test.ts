@@ -42,7 +42,9 @@ describe('get-key-value-store-record', () => {
         expect(structuredContent).not.toHaveProperty('nextStep');
         expect(content).toHaveLength(2);
         expect(content[1].text).toBe(structuredContent.summary);
-        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        // content[0] is the data-only JSON dump (no narrative summary).
+        const { summary, ...data } = structuredContent;
+        expect(JSON.parse(content[0].text)).toEqual(data);
     });
 
     it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {
