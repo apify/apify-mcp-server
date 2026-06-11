@@ -160,12 +160,15 @@ function expectNormalModeTestStructuredContent(result: unknown): void {
         structuredContent?: {
             runId?: string;
             status?: string;
+            consoleUrl?: string;
             storages?: {
-                datasets?: { default?: { id?: string; fields?: string[] } };
+                datasets?: { default?: { id?: string; fields?: string[]; consoleUrl?: string } };
+                keyValueStores?: { default?: { consoleUrl?: string } };
             };
             summary?: string;
             nextStep?: string;
         };
+        content?: { type: string; text?: string }[];
     };
     const sc = resultWithStructured.structuredContent;
     expect(sc).toBeDefined();
@@ -177,6 +180,15 @@ function expectNormalModeTestStructuredContent(result: unknown): void {
     );
     expect(sc?.summary).toBeDefined();
     expect(sc?.nextStep).toBeDefined();
+
+    // Console links are gated on a Console UI token (apify_ui_...); integration tests authenticate
+    // with an API token, so the run/storage responses must carry no consoleUrl and no Console nudge.
+    // The positive (UI-token) path is covered by unit tests — CI has no UI token to exercise it.
+    expect(sc?.consoleUrl).toBeUndefined();
+    expect(sc?.storages?.datasets?.default?.consoleUrl).toBeUndefined();
+    expect(sc?.storages?.keyValueStores?.default?.consoleUrl).toBeUndefined();
+    const narrative = resultWithStructured.content?.map((c) => c.text ?? '').join('\n') ?? '';
+    expect(narrative).not.toContain('Apify Console:');
 }
 
 /** Validates that the result contains Apify usage cost metadata with expected structure. */
