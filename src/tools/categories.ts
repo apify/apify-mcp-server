@@ -45,14 +45,6 @@ import { defaultFetchActorDetails } from './default/fetch_actor_details.js';
 import { defaultGetActorRun } from './default/get_actor_run.js';
 import { defaultSearchActors } from './default/search_actors.js';
 
-/**
- * A mode map: maps one or more ServerMode keys to their ToolEntry variant.
- * - All modes present → each mode gets its own implementation
- * - Subset of modes → tool is only included for those modes
- *
- * Currently used only by call-actor, whose variants differ only in description.
- * Do not add new mode-map entries for non-widget tools (see the invariant above).
- */
 type ModeMap = Partial<Record<ServerMode, ToolEntry>>;
 
 /** A category tool entry: plain ToolEntry (mode-independent) or a mode map. */
