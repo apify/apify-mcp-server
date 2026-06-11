@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Extract server info into reusable getServerInfo() function ([#957](https://github.com/apify/apify-mcp-server/pull/957)) ([477b7b3](https://github.com/apify/apify-mcp-server/commit/477b7b3ffb988cc8be42f093aaef94f64f269cf3)) by [@jirispilka](https://github.com/jirispilka), closes [#955](https://github.com/apify/apify-mcp-server/issues/955)
+- Add structured output to remaining storage tools ([#965](https://github.com/apify/apify-mcp-server/pull/965)) ([2be856e](https://github.com/apify/apify-mcp-server/commit/2be856e7dab09ae34f1fb113e814e9ebf58afe00)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#884](https://github.com/apify/apify-mcp-server/issues/884)
 
 ### ⚙️ Miscellaneous Tasks
 
