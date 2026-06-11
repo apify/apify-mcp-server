@@ -12,6 +12,14 @@ import { getUserInfoCached } from './userid_cache.js';
  * served from cache to anyone but its owner — otherwise a different token on the same process reads it
  * with no authorization check. Non-owners get a cache miss and re-fetch with their own token, which the
  * platform authorizes (or 404s).
+ *
+ * Correctness rests on two invariants — break either and this gate inverts into a leak:
+ *   1. `info.userId` is the Actor OWNER (platform-set, independent of the fetching token). This is what
+ *      keeps re-fetch-and-overwrite safe: a non-owner's fetch can't change the cached ownership.
+ *   2. The caller's identity is resolved with the SAME effective identity the platform authorizes with
+ *      (`user('me')` under the caller's token), and `null` stays the sole non-identity sentinel — so a
+ *      cache hit can never grant more than a bare re-fetch would. Don't swap in a cheaper identity
+ *      source or drop the `!== null` guard.
  */
 async function callerMaySeeCachedActor(cached: ActorDefinitionWithInfo, apifyClient: ApifyClient): Promise<boolean> {
     if (cached.info.isPublic) return true;

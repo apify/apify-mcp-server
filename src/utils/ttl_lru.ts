@@ -66,4 +66,9 @@ export class TTLLRUCache<T> {
         this.cache.remove(key); // Remove expired entry
         return null;
     }
+
+    /** Drop every entry. Primarily for test isolation between cases that share a module-level cache. */
+    clear() {
+        this.cache.clear();
+    }
 }
