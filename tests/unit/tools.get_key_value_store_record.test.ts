@@ -131,7 +131,7 @@ describe('get-key-value-store-record', () => {
         });
     });
 
-    it('returns a fetchable link instead of inlining a binary record over the size limit', async () => {
+    it('returns a resource_link instead of inlining a binary record over the size limit', async () => {
         const bytes = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
@@ -139,15 +139,35 @@ describe('get-key-value-store-record', () => {
                 stubApifyClient({ record: { key: 'big.png', value: bytes, contentType: 'image/png' } }),
             ),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError } = result as CallToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0].type).toBe('text');
-        expect(content[0].text).toContain(
-            'https://api.apify.com/v2/key-value-stores/kv-1/records/big.png?signature=signed',
+        expect(content[0]).toEqual({
+            type: 'resource_link',
+            uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/big.png?signature=signed',
+            name: 'big.png',
+            size: KV_RECORD_MAX_INLINE_BYTES + 1,
+            mimeType: 'image/png',
+        });
+    });
+
+    it('returns a resource_link without mimeType when the record has no Content-Type', async () => {
+        const bytes = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'blob' },
+                stubApifyClient({ record: { key: 'blob', value: bytes, contentType: undefined } }),
+            ),
         );
-        // The base64 bytes must NOT be inlined — that is the whole point of the link.
-        expect(content[0].text).not.toContain(bytes.toString('base64'));
+        const { content, isError } = result as CallToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0]).toEqual({
+            type: 'resource_link',
+            uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/blob?signature=signed',
+            name: 'blob',
+            size: KV_RECORD_MAX_INLINE_BYTES + 1,
+        });
     });
 
     it('inlines a large JSON record value (text/JSON is not size-capped)', async () => {

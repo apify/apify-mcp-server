@@ -1,4 +1,4 @@
-import type { AudioContent, EmbeddedResource, ImageContent, TextContent } from '@modelcontextprotocol/sdk/types.js';
+import type { AudioContent, EmbeddedResource, ImageContent, ResourceLink } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -65,9 +65,6 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             if (value.length > KV_RECORD_MAX_INLINE_BYTES) {
                 // base64-inlining a large binary would blow up the context window; return a link instead.
                 const uri = await store.getRecordPublicUrl(recordKey);
-                const sizeKb = Math.round(value.length / 1024);
-                const limitKb = KV_RECORD_MAX_INLINE_BYTES / 1024;
-                const mimeSuffix = mimeType ? ` (${mimeType})` : '';
                 return {
                     content: [
                         {
