@@ -1,9 +1,23 @@
 import type { ApifyClient } from '../apify_client.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
-import { actorDefinitionCache, mcpServerCache } from '../state.js';
+import { actorDefinitionCache } from '../state.js';
 import { getActorDefinition } from '../tools/build.js';
 import type { ActorDefinitionStorage, ActorDefinitionWithInfo, DatasetItem } from '../types.js';
 import { getValuesByDotKeys } from './generic.js';
+import { getUserInfoCached } from './userid_cache.js';
+
+/**
+ * `actorDefinitionCache` is process-wide and shared across every caller/tenant. Public Actor metadata
+ * is safe to share, but a private Actor's definition (input schema, README, run options) must never be
+ * served from cache to anyone but its owner — otherwise a different token on the same process reads it
+ * with no authorization check. Non-owners get a cache miss and re-fetch with their own token, which the
+ * platform authorizes (or 404s).
+ */
+async function callerMaySeeCachedActor(cached: ActorDefinitionWithInfo, apifyClient: ApifyClient): Promise<boolean> {
+    if (cached.info.isPublic) return true;
+    const { userId } = await getUserInfoCached(apifyClient.token, apifyClient);
+    return userId !== null && userId === cached.info.userId;
+}
 
 /**
  * Returns the cached Actor definition + info, fetching from the platform on miss
@@ -17,52 +31,26 @@ export async function getActorDefinitionCached(
     apifyClient: ApifyClient,
 ): Promise<ActorDefinitionWithInfo | null> {
     const cached = actorDefinitionCache.get(actorIdOrName);
-    if (cached) return cached;
+    if (cached && (await callerMaySeeCachedActor(cached, apifyClient))) return cached;
     const fetched = await getActorDefinition(actorIdOrName, apifyClient);
     if (fetched) actorDefinitionCache.set(actorIdOrName, fetched);
     return fetched;
 }
 
 /**
- * Resolve and cache the MCP server URL for the given Actor.
+ * Resolve the MCP server URL for the given Actor.
  * - Returns a string URL when the Actor exposes an MCP server
  * - Returns false when the Actor is not an MCP server
- * Uses a TTL LRU cache to avoid repeated API calls.
+ *
+ * The URL is a pure function of the Actor definition (`getActorMCPServerURL` does no I/O), so this rides
+ * the authorization-gated `getActorDefinitionCached` instead of a separate cache — which would otherwise
+ * leak a private Actor's MCP URL across tenants.
  */
 export async function getActorMcpUrlCached(actorIdOrName: string, apifyClient: ApifyClient): Promise<string | false> {
-    const cached = mcpServerCache.get(actorIdOrName);
-    if (cached !== null && cached !== undefined) {
-        return cached as string | false;
-    }
-
-    try {
-        const actorDefinitionWithInfo = await getActorDefinitionCached(actorIdOrName, apifyClient);
-        const definition = actorDefinitionWithInfo?.definition;
-        const mcpPath = definition && getActorMCPServerPath(definition);
-        if (mcpPath) {
-            const url = await getActorMCPServerURL(definition.id, mcpPath);
-            mcpServerCache.set(actorIdOrName, url);
-            return url;
-        }
-
-        mcpServerCache.set(actorIdOrName, false);
-        return false;
-    } catch (error) {
-        // Check if it's a "not found" error (404 or 400 status codes)
-        const isNotFound =
-            typeof error === 'object' &&
-            error !== null &&
-            'statusCode' in error &&
-            (error.statusCode === 404 || error.statusCode === 400);
-
-        if (isNotFound) {
-            // Actor doesn't exist - cache false and return false
-            mcpServerCache.set(actorIdOrName, false);
-            return false;
-        }
-        // Real server error - don't cache, let it propagate
-        throw error;
-    }
+    const definition = (await getActorDefinitionCached(actorIdOrName, apifyClient))?.definition;
+    const mcpPath = definition && getActorMCPServerPath(definition);
+    if (!mcpPath) return false;
+    return getActorMCPServerURL(definition.id, mcpPath);
 }
 
 /**
