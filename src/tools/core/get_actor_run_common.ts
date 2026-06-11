@@ -97,7 +97,7 @@ export function buildGetActorRunSuccessResponse(
     const { run, structuredContent, widget, linkContext } = params;
 
     if (!widget) {
-        // Mints the `consoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
+        // Mints the `apifyConsoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
         const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
         return buildMCPResponse({
             texts: [

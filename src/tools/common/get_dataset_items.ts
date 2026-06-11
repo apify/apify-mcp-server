@@ -126,10 +126,10 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         }
 
         const linkContext = await getConsoleLinkContext(apifyToken, client);
-        const consoleUrl = linkContext ? buildConsoleDatasetUrl(linkContext, datasetId) : undefined;
+        const apifyConsoleUrl = linkContext ? buildConsoleDatasetUrl(linkContext, datasetId) : undefined;
         const structuredContent = {
             datasetId,
-            consoleUrl,
+            apifyConsoleUrl,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
@@ -138,7 +138,10 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         };
 
         return {
-            content: [{ type: 'text', text: encodeToon(structuredContent) }, ...buildConsoleLinkContent(consoleUrl)],
+            content: [
+                { type: 'text', text: encodeToon(structuredContent) },
+                ...buildConsoleLinkContent(apifyConsoleUrl),
+            ],
             structuredContent,
         };
     },

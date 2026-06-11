@@ -200,7 +200,7 @@ describe('get-dataset-items', () => {
             structuredContent: Record<string, unknown>;
         };
 
-        expect(structuredContent.consoleUrl).toBe('https://console.apify.com/storage/datasets/ds-1');
+        expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/ds-1');
         expect(content).toHaveLength(2);
         expect(content[1].text).toBe(
             `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
@@ -216,7 +216,7 @@ describe('get-dataset-items', () => {
             structuredContent: Record<string, unknown>;
         };
 
-        expect(structuredContent.consoleUrl).toBeUndefined();
+        expect(structuredContent.apifyConsoleUrl).toBeUndefined();
         expect(content).toHaveLength(1);
     });
 });

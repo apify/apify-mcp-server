@@ -73,7 +73,7 @@ async function raceAbort<T>(promise: Promise<T>, abortSignal: AbortSignal | unde
 export type RunDataset = {
     id: string;
     /** Personalized Apify Console link; set only for Console UI token sessions. */
-    consoleUrl?: string;
+    apifyConsoleUrl?: string;
     name?: string;
     title?: string;
     itemCount?: number;
@@ -96,7 +96,7 @@ export type RunDataset = {
 export type RunKeyValueStore = {
     id: string;
     /** Personalized Apify Console link; set only for Console UI token sessions. */
-    consoleUrl?: string;
+    apifyConsoleUrl?: string;
     name?: string;
     title?: string;
     keyCount?: number;
@@ -122,7 +122,7 @@ export type RunStorages = {
 export type RunResponse = {
     runId: string;
     /** Personalized Apify Console link to the run; set only for Console UI token sessions. */
-    consoleUrl?: string;
+    apifyConsoleUrl?: string;
     actorId: string;
     actorName?: string;
     status: string;
@@ -245,23 +245,23 @@ function errMessage(error: unknown): string {
 }
 
 /**
- * For Console UI token sessions, sets the Apify Console `consoleUrl` on the run and its default
+ * For Console UI token sessions, sets the Apify Console `apifyConsoleUrl` on the run and its default
  * storages and returns the narrative suffix (the links + the verbatim nudge) in a single pass.
  * No-op returning `''` for non-Console sessions (`linkContext` undefined).
  */
 export function applyConsoleLinks(response: RunResponse, linkContext: ConsoleLinkContext | undefined): string {
     if (!linkContext) return '';
-    response.consoleUrl = buildConsoleRunUrl(linkContext, response.runId);
-    const parts = [`run ${response.consoleUrl}`];
+    response.apifyConsoleUrl = buildConsoleRunUrl(linkContext, response.runId);
+    const parts = [`run ${response.apifyConsoleUrl}`];
     const dataset = response.storages.datasets?.default;
     if (dataset) {
-        dataset.consoleUrl = buildConsoleDatasetUrl(linkContext, dataset.id);
-        parts.push(`dataset ${dataset.consoleUrl}`);
+        dataset.apifyConsoleUrl = buildConsoleDatasetUrl(linkContext, dataset.id);
+        parts.push(`dataset ${dataset.apifyConsoleUrl}`);
     }
     const keyValueStore = response.storages.keyValueStores?.default;
     if (keyValueStore) {
-        keyValueStore.consoleUrl = buildConsoleKeyValueStoreUrl(linkContext, keyValueStore.id);
-        parts.push(`key-value store ${keyValueStore.consoleUrl}`);
+        keyValueStore.apifyConsoleUrl = buildConsoleKeyValueStoreUrl(linkContext, keyValueStore.id);
+        parts.push(`key-value store ${keyValueStore.apifyConsoleUrl}`);
     }
     return `\nApify Console: ${parts.join(' | ')}\n${VERBATIM_LINKS_NUDGE}`;
 }

@@ -505,11 +505,11 @@ describe('get-actor-run default response', () => {
                 content: { type: string; text: string }[];
             };
 
-            expect(structuredContent.consoleUrl).toBe('https://console.apify.com/actors/runs/run-1');
-            expect(structuredContent.storages.datasets?.default.consoleUrl).toBe(
+            expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/actors/runs/run-1');
+            expect(structuredContent.storages.datasets?.default.apifyConsoleUrl).toBe(
                 'https://console.apify.com/storage/datasets/dataset-xyz',
             );
-            expect(structuredContent.storages.keyValueStores?.default.consoleUrl).toBe(
+            expect(structuredContent.storages.keyValueStores?.default.apifyConsoleUrl).toBe(
                 'https://console.apify.com/storage/key-value-stores/kv-xyz',
             );
 
@@ -533,7 +533,7 @@ describe('get-actor-run default response', () => {
             };
 
             expect(getUserInfoCached).not.toHaveBeenCalled();
-            expect(structuredContent.consoleUrl).toBeUndefined();
+            expect(structuredContent.apifyConsoleUrl).toBeUndefined();
             expect(content[1].text).not.toContain('console.apify.com');
         });
     });
@@ -592,11 +592,13 @@ describe('buildStartRunResponse()', () => {
             content: { type: string; text: string }[];
         };
 
-        expect(structuredContent.consoleUrl).toBe('https://console.apify.com/organization/ORG_ID/actors/runs/run-abc');
-        expect(structuredContent.storages.datasets?.default.consoleUrl).toBe(
+        expect(structuredContent.apifyConsoleUrl).toBe(
+            'https://console.apify.com/organization/ORG_ID/actors/runs/run-abc',
+        );
+        expect(structuredContent.storages.datasets?.default.apifyConsoleUrl).toBe(
             'https://console.apify.com/organization/ORG_ID/storage/datasets/dataset-abc',
         );
-        expect(structuredContent.storages.keyValueStores?.default.consoleUrl).toBe(
+        expect(structuredContent.storages.keyValueStores?.default.apifyConsoleUrl).toBe(
             'https://console.apify.com/organization/ORG_ID/storage/key-value-stores/kv-abc',
         );
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
