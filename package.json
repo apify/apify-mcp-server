@@ -101,6 +101,7 @@
     "lint:fix": "oxlint . --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
+    "check:agents": "node scripts/check-agents-links.mjs",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "typecheck": "pnpm run type-check",
     "check": "pnpm run type-check && pnpm run lint",
