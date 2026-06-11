@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.14 - **not yet released**
+## [0.11.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.0) (2026-06-11)
 
 ### 🚀 Features
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Remove legacy SSE server transport ([#960](https://github.com/apify/apify-mcp-server/pull/960)) ([7e6bb1a](https://github.com/apify/apify-mcp-server/commit/7e6bb1a5750120104e2065632025942cab3da15b)) by [@MQ37](https://github.com/MQ37), closes [#162](https://github.com/apify/apify-mcp-server/issues/162)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.13](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.13) (2026-06-10)
 
 ### 🚀 Features
