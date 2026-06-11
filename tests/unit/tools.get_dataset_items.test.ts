@@ -203,7 +203,7 @@ describe('get-dataset-items', () => {
         expect(structuredContent.consoleUrl).toBe('https://console.apify.com/storage/datasets/ds-1');
         expect(content).toHaveLength(2);
         expect(content[1].text).toBe(
-            `Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
+            `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
         );
     });
 

@@ -9,7 +9,7 @@ import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 import {
-    consoleLinksText,
+    applyConsoleLinks,
     type FetchActorRunResult,
     WAIT_SECS_MAX,
     WIDGET_NO_POLL_NEXT_STEP,
@@ -94,13 +94,15 @@ export function buildGetActorRunError(runId: string, error: unknown): ReturnType
 export function buildGetActorRunSuccessResponse(
     params: FetchActorRunResult & { widget: boolean },
 ): ReturnType<typeof buildMCPResponse> {
-    const { run, structuredContent, widget } = params;
+    const { run, structuredContent, widget, linkContext } = params;
 
     if (!widget) {
+        // Mints the `consoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
+        const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
         return buildMCPResponse({
             texts: [
                 JSON.stringify(structuredContent),
-                `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinksText(structuredContent)}`,
+                `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinks}`,
             ],
             structuredContent,
             _meta: buildUsageMeta(run),

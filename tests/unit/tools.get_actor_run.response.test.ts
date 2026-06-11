@@ -516,7 +516,7 @@ describe('get-actor-run default response', () => {
             // content[0] JSON mirror carries the links; content[1] narrative lists them + nudge.
             expect(JSON.parse(content[0].text)).toEqual(structuredContent);
             expect(content[1].text).toContain(
-                'Console: run https://console.apify.com/actors/runs/run-1 | dataset https://console.apify.com/storage/datasets/dataset-xyz | key-value store https://console.apify.com/storage/key-value-stores/kv-xyz',
+                'Apify Console: run https://console.apify.com/actors/runs/run-1 | dataset https://console.apify.com/storage/datasets/dataset-xyz | key-value store https://console.apify.com/storage/key-value-stores/kv-xyz',
             );
             expect(content[1].text).toContain(VERBATIM_LINKS_NUDGE);
         });
@@ -584,7 +584,7 @@ describe('buildStartRunResponse()', () => {
         const result = buildStartRunResponse({
             actorName: 'apify/rag-web-browser',
             actorRun,
-            linkContext: { consoleBaseUrl: 'https://console.apify.com', organizationId: 'ORG_ID' },
+            linkContext: { organizationId: 'ORG_ID' },
         });
 
         const { structuredContent, content } = result as {
@@ -600,7 +600,7 @@ describe('buildStartRunResponse()', () => {
             'https://console.apify.com/organization/ORG_ID/storage/key-value-stores/kv-abc',
         );
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
-        expect(content[1].text).toContain('Console: run https://console.apify.com/organization/ORG_ID');
+        expect(content[1].text).toContain('Apify Console: run https://console.apify.com/organization/ORG_ID');
         expect(content[1].text).toContain(VERBATIM_LINKS_NUDGE);
     });
 

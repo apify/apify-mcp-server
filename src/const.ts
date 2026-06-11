@@ -119,8 +119,12 @@ export const DOCS_SOURCES = [
 export const ALLOWED_DOC_DOMAINS = ['https://docs.apify.com', 'https://crawlee.dev'] as const;
 
 export const APIFY_STORE_URL = 'https://apify.com';
-/** Apify Console origin. Overridable via the CONSOLE_BASE_URL env var (local dev). */
+/** Apify Console origin (production). */
 export const CONSOLE_BASE_URL = 'https://console.apify.com';
+/** Apify Console origin on the staging cluster, selected when running on the staging MCP host. */
+export const CONSOLE_BASE_URL_STAGING = 'https://console-securitybyobscurity.apify.com';
+/** Staging MCP host; mirrors the check in `getActorMCPServerURL` to pick staging vs production origins. */
+export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
 export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/platform/integrations/mcp';

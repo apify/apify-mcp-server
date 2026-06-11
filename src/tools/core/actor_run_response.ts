@@ -143,6 +143,8 @@ export type RunResponse = {
 export type FetchActorRunResult = {
     run: ActorRun;
     structuredContent: RunResponse;
+    /** Console link context resolved for the request; forwarded so the response builder mints links in one pass. */
+    linkContext?: ConsoleLinkContext;
 };
 
 // -----------------------------------------------------------------------------
@@ -242,28 +244,26 @@ function errMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
-/** Mints Console links into a run response (run + default storages) for Console UI token sessions. */
-function applyConsoleUrls(response: RunResponse, linkContext: ConsoleLinkContext | undefined): void {
-    if (!linkContext) return;
-    response.consoleUrl = buildConsoleRunUrl(linkContext, response.runId);
-    const dataset = response.storages.datasets?.default;
-    if (dataset) dataset.consoleUrl = buildConsoleDatasetUrl(linkContext, dataset.id);
-    const keyValueStore = response.storages.keyValueStores?.default;
-    if (keyValueStore) keyValueStore.consoleUrl = buildConsoleKeyValueStoreUrl(linkContext, keyValueStore.id);
-}
-
 /**
- * Narrative-text suffix listing the minted Console links plus the verbatim nudge.
- * Empty string when the response carries no Console links (non-Console sessions).
+ * For Console UI token sessions, sets the Apify Console `consoleUrl` on the run and its default
+ * storages and returns the narrative suffix (the links + the verbatim nudge) in a single pass.
+ * No-op returning `''` for non-Console sessions (`linkContext` undefined).
  */
-export function consoleLinksText(response: RunResponse): string {
-    if (!response.consoleUrl) return '';
+export function applyConsoleLinks(response: RunResponse, linkContext: ConsoleLinkContext | undefined): string {
+    if (!linkContext) return '';
+    response.consoleUrl = buildConsoleRunUrl(linkContext, response.runId);
     const parts = [`run ${response.consoleUrl}`];
-    const datasetUrl = response.storages.datasets?.default.consoleUrl;
-    if (datasetUrl) parts.push(`dataset ${datasetUrl}`);
-    const keyValueStoreUrl = response.storages.keyValueStores?.default.consoleUrl;
-    if (keyValueStoreUrl) parts.push(`key-value store ${keyValueStoreUrl}`);
-    return `\nConsole: ${parts.join(' | ')}\n${VERBATIM_LINKS_NUDGE}`;
+    const dataset = response.storages.datasets?.default;
+    if (dataset) {
+        dataset.consoleUrl = buildConsoleDatasetUrl(linkContext, dataset.id);
+        parts.push(`dataset ${dataset.consoleUrl}`);
+    }
+    const keyValueStore = response.storages.keyValueStores?.default;
+    if (keyValueStore) {
+        keyValueStore.consoleUrl = buildConsoleKeyValueStoreUrl(linkContext, keyValueStore.id);
+        parts.push(`key-value store ${keyValueStore.consoleUrl}`);
+    }
+    return `\nApify Console: ${parts.join(' | ')}\n${VERBATIM_LINKS_NUDGE}`;
 }
 
 /**
@@ -668,7 +668,7 @@ export function buildStartRunResponse(params: {
         summary,
         nextStep,
     };
-    applyConsoleUrls(structuredContent, linkContext);
+    const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
 
     const widgetMeta = widget
         ? {
@@ -678,7 +678,7 @@ export function buildStartRunResponse(params: {
         : undefined;
 
     return buildMCPResponse({
-        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinksText(structuredContent)}`],
+        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinks}`],
         structuredContent,
         ...(widgetMeta && { _meta: widgetMeta }),
     });
@@ -811,7 +811,8 @@ export async function fetchActorRunData(params: {
         summary,
         nextStep,
     };
-    applyConsoleUrls(structuredContent, params.linkContext);
 
-    return { result: { run, structuredContent } };
+    // Console links are minted once at the response-building layer (buildGetActorRunSuccessResponse),
+    // so forward the context rather than mutating here.
+    return { result: { run, structuredContent, linkContext: params.linkContext } };
 }

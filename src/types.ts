@@ -651,12 +651,11 @@ export type StructuredActorCard = {
 
 /**
  * Context for minting Apify Console links instead of public website links.
- * Resolved from the session token by `resolveConsoleLinkContext` — set only for
- * Console UI token sessions. When absent, tools mint public `https://apify.com/...` links.
+ * Resolved from the session token by `resolveConsoleLinkContext` — present only for
+ * Console UI token sessions (its presence is the signal to mint Console links). The
+ * Console origin is global per cluster, so it lives in the builders, not here.
  */
 export type ConsoleLinkContext = {
-    /** Console origin, e.g. `https://console.apify.com`. Trailing slashes are ignored. */
-    consoleBaseUrl: string;
     /** Org user id when the session is org-scoped; adds the `/organization/<orgId>` path prefix. */
     organizationId?: string;
 };

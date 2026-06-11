@@ -117,7 +117,7 @@ describe('get-key-value-store-record', () => {
 
         expect(content).toHaveLength(2);
         expect(content[1].text).toBe(
-            `Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
+            `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
         );
     });
 });

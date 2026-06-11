@@ -1,7 +1,12 @@
 import type { ApifyClient } from '../apify_client.js';
-import { CONSOLE_BASE_URL } from '../const.js';
+import { CONSOLE_BASE_URL, CONSOLE_BASE_URL_STAGING, STAGING_MCP_HOSTNAME } from '../const.js';
 import type { ConsoleLinkContext } from '../types.js';
 import { type CachedUserInfo, getUserInfoCached } from './userid_cache.js';
+
+/** Console origin for the current cluster: staging when on the staging MCP host, production otherwise. */
+function getConsoleBaseUrl(): string {
+    return process.env.HOSTNAME === STAGING_MCP_HOSTNAME ? CONSOLE_BASE_URL_STAGING : CONSOLE_BASE_URL;
+}
 
 /** Prefix of Apify Console UI (session) tokens, as opposed to `apify_api_...` API tokens. */
 const UI_TOKEN_PREFIX = 'apify_ui_';
@@ -32,10 +37,7 @@ export function resolveConsoleLinkContext(
     userInfo: CachedUserInfo,
 ): ConsoleLinkContext | undefined {
     if (!isConsoleUiToken(apifyToken)) return undefined;
-    return {
-        consoleBaseUrl: process.env.CONSOLE_BASE_URL || CONSOLE_BASE_URL,
-        organizationId: userInfo.isOrganization && userInfo.userId ? userInfo.userId : undefined,
-    };
+    return { organizationId: userInfo.isOrganization && userInfo.userId ? userInfo.userId : undefined };
 }
 
 /**
@@ -52,9 +54,8 @@ export async function getConsoleLinkContext(
 
 /** Builds `<consoleBaseUrl>[/organization/<orgId>]<path>`. */
 function buildConsoleUrl(context: ConsoleLinkContext, path: string): string {
-    const base = context.consoleBaseUrl.replace(/\/+$/, '');
     const orgPrefix = context.organizationId ? `/organization/${context.organizationId}` : '';
-    return `${base}${orgPrefix}${path}`;
+    return `${getConsoleBaseUrl()}${orgPrefix}${path}`;
 }
 
 /** Builds the Console Actor detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/<actorId>`. */

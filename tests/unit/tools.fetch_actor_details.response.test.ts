@@ -109,7 +109,7 @@ describe('buildActorDetailsTextResponse()', () => {
     });
 
     describe('with a Console link context', () => {
-        const linkContext = { consoleBaseUrl: 'https://console.apify.com' };
+        const linkContext = {};
         const inputSchemaOnlyOutput = {
             ...actorDetailsOutputDefaults,
             description: false,
@@ -188,7 +188,7 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(getUserInfoCached).toHaveBeenCalledOnce();
         // linkContext is forwarded to the card formatters.
         expect(vi.mocked(fetchActorDetails).mock.calls[0][2]).toMatchObject({
-            linkContext: { consoleBaseUrl: 'https://console.apify.com' },
+            linkContext: {},
         });
         expect(content[0].text).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');
         expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);

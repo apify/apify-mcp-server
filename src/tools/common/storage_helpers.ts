@@ -9,7 +9,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
  */
 export function buildConsoleLinkContent(consoleUrl: string | undefined): { type: 'text'; text: string }[] {
     if (!consoleUrl) return [];
-    return [{ type: 'text', text: `Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}` }];
+    return [{ type: 'text', text: `Apify Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}` }];
 }
 
 /**
