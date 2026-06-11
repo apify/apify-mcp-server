@@ -3,12 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import {
-    expectSoftFailInvalidInput,
-    parseFencedJson,
-    stubToolCallContext,
-    type TextToolResult,
-} from './helpers/tool_context.js';
+import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
@@ -28,17 +23,28 @@ describe('get-key-value-store-record', () => {
         expect(getKeyValueStoreRecord.name).toBe(HelperTools.KEY_VALUE_STORE_RECORD_GET);
     });
 
-    it('returns the record as JSON in a fenced code block', async () => {
+    it('returns the record plus a terminal summary (no nextStep) in structuredContent', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'kv-1', recordKey: 'INPUT' },
                 stubApifyClient({ record: MOCK_RECORD }),
             ),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
         expect(isError).not.toBe(true);
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_RECORD);
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', ...MOCK_RECORD });
+        // {"query":"hello"} serializes to 17 bytes.
+        expect(structuredContent.summary).toBe("Read 'INPUT' (contentType=application/json, 17 bytes).");
+        // Reading a record is terminal — no nextStep, and content[1] is the summary alone.
+        expect(structuredContent).not.toHaveProperty('nextStep');
+        expect(content).toHaveLength(2);
+        expect(content[1].text).toBe(structuredContent.summary);
+        // content[0] is the data-only JSON dump (no narrative summary).
+        const { summary, ...data } = structuredContent;
+        expect(JSON.parse(content[0].text)).toEqual(data);
     });
 
     it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {

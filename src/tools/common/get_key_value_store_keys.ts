@@ -5,11 +5,10 @@ import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { encodeToon } from '../../utils/encode_text.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { keyValueStoreKeysOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound } from './storage_helpers.js';
+import { buildKvsKeysSummaryNextStep, buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -66,6 +65,18 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         if (!keys) {
             return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
         }
-        return { content: [{ type: 'text', text: encodeToon(keys) }], structuredContent: keys };
+        const { summary, nextStep } = buildKvsKeysSummaryNextStep({
+            keyValueStoreId,
+            count: keys.items.length,
+            isTruncated: keys.isTruncated,
+            nextExclusiveStartKey: keys.nextExclusiveStartKey,
+            firstKey: keys.items[0]?.key,
+        });
+        return buildStorageResponse({
+            structuredContent: { keyValueStoreId, ...keys },
+            summary,
+            nextStep,
+            toon: true,
+        });
     },
 } as const);

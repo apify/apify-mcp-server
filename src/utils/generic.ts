@@ -112,6 +112,17 @@ export function stripQuoteWrappers(s: string): string {
     return s.trim().replace(STRIP_QUOTE_WRAPPERS_REGEX, '').trim();
 }
 
+/** Best-effort byte size of a value for summaries. */
+export function computeValueBytes(value: unknown): number | undefined {
+    if (Buffer.isBuffer(value)) return value.length;
+    if (typeof value === 'string') return Buffer.byteLength(value);
+    try {
+        return Buffer.byteLength(JSON.stringify(value));
+    } catch {
+        return undefined;
+    }
+}
+
 /**
  * Validates whether a given string is a well-formed URL.
  *

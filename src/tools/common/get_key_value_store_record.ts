@@ -5,9 +5,9 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { wrapJsonText } from '../../utils/encode_text.js';
-import { stripQuoteWrappers } from '../../utils/generic.js';
-import { buildStorageNotFound, normalizeRecordKey } from './storage_helpers.js';
+import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
+import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
+import { buildStorageNotFound, buildStorageResponse, normalizeRecordKey } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -31,6 +31,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         - user_input: Get record INPUT from store abc123
         - user_input: Get record data.json from store username~my-store`,
     inputSchema: z.toJSONSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
+    outputSchema: keyValueStoreRecordOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreRecordArgs)),
     paymentRequired: true,
     annotations: {
@@ -55,6 +56,13 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 : `Key-value store '${keyValueStoreId}' not found.`;
             return buildStorageNotFound(text);
         }
-        return { content: [{ type: 'text', text: wrapJsonText(record) }] };
+        const bytes = computeValueBytes(record.value);
+        const details = [
+            record.contentType ? `contentType=${record.contentType}` : undefined,
+            bytes !== undefined ? `${bytes} bytes` : undefined,
+        ].filter(Boolean);
+        const summary = `Read '${recordKey}'${details.length ? ` (${details.join(', ')})` : ''}.`;
+        // Reading a record is terminal — no nextStep.
+        return buildStorageResponse({ structuredContent: { keyValueStoreId, ...record }, summary });
     },
 } as const);

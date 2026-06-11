@@ -5,10 +5,10 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { wrapJsonText } from '../../utils/encode_text.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { normalizeDatasetFields } from '../core/actor_run_response.js';
-import { buildStorageNotFound } from './storage_helpers.js';
+import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
+import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -33,6 +33,7 @@ export const getDataset: ToolEntry = Object.freeze({
         - user_input: Show info for dataset xyz123
         - user_input: What fields does username~my-dataset have?`,
     inputSchema: z.toJSONSchema(getDatasetArgs) as ToolInputSchema,
+    outputSchema: datasetMetadataOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getDatasetArgs)),
     paymentRequired: true,
     annotations: {
@@ -58,6 +59,13 @@ export const getDataset: ToolEntry = Object.freeze({
         // normalization `buildRunDataset` applies so this tool's `fields` matches
         // the structured `storages.datasets.default.fields` shape.
         const normalized = dataset.fields ? { ...dataset, fields: normalizeDatasetFields(dataset.fields) } : dataset;
-        return { content: [{ type: 'text', text: wrapJsonText(normalized) }] };
+        const fieldCount = Array.isArray(normalized.fields) ? normalized.fields.length : undefined;
+        const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
+        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items.`;
+        return buildStorageResponse({
+            structuredContent: normalized as unknown as Record<string, unknown>,
+            summary,
+            nextStep,
+        });
     },
 } as const);
