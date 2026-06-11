@@ -395,6 +395,33 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.keyValueStores?.default.keyCount).toBeUndefined();
     });
 
+    it('surfaces aliased storages from run.storageIds: default stays enriched, aliases ship id-only', async () => {
+        const run = mockSucceededRun({
+            storageIds: {
+                datasets: { default: 'dataset-xyz', results: 'dataset-results' },
+                keyValueStores: { default: 'kv-xyz', screenshots: 'kv-screenshots' },
+            },
+        });
+        const result = await (defaultGetActorRun as HelperTool).call(
+            stubToolCallContext(
+                { runId: 'run-1', waitSecs: 0 },
+                stubClient({
+                    run,
+                    dataset: mockDataset(),
+                    listKeys: { items: [{ key: 'OUTPUT' }], isTruncated: false },
+                }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        // The storageIds `default` entry must not clobber the metadata-enriched default.
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
+        expect(structuredContent.storages.keyValueStores?.default.keys).toEqual(['OUTPUT']);
+        // Aliased entries are bare { id } — no metadata fetches for them.
+        expect(structuredContent.storages.datasets?.results).toEqual({ id: 'dataset-results' });
+        expect(structuredContent.storages.keyValueStores?.screenshots).toEqual({ id: 'kv-screenshots' });
+    });
+
     it('emits progress with formatted status messages on wait + terminal flip', async () => {
         // RUNNING with a non-terminal statusMessage at start; SUCCEEDED with a terminal statusMessage
         // at end. formatRunStatusMessage suppresses non-terminal-marked statusMessages on terminal
@@ -515,6 +542,28 @@ describe('buildStartRunResponse()', () => {
 
         // Non-widget path: no widget _meta.
         expect(_meta).toBeUndefined();
+    });
+
+    it('emits id-only entries for aliased storages from run.storageIds', () => {
+        const runWithAliases = {
+            ...actorRun,
+            storageIds: {
+                datasets: { default: 'dataset-abc', errors: 'dataset-errors' },
+                keyValueStores: { default: 'kv-abc', debug: 'kv-debug' },
+            },
+        } as unknown as ActorRun;
+
+        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun: runWithAliases });
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.storages.datasets).toEqual({
+            default: { id: 'dataset-abc' },
+            errors: { id: 'dataset-errors' },
+        });
+        expect(structuredContent.storages.keyValueStores).toEqual({
+            default: { id: 'kv-abc' },
+            debug: { id: 'kv-debug' },
+        });
     });
 
     it('includes widget metadata and no-poll nextStep when widget=true', () => {

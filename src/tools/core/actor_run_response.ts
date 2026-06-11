@@ -225,6 +225,19 @@ function buildRunKeyValueStore(
     return cleanEmptyProperties({ id: run.defaultKeyValueStoreId, keys, keyCount }) as RunKeyValueStore;
 }
 
+/**
+ * Bare `{ id }` entries for the run's aliased (non-default) storages from `run.storageIds`.
+ * Only `default` gets metadata enrichment; agents fetch aliased storage details via the
+ * dataset / KV tools when needed.
+ */
+function buildAliasedStorageEntries(aliasIds?: Record<string, string>): Record<string, { id: string }> {
+    const entries: Record<string, { id: string }> = {};
+    for (const [alias, id] of Object.entries(aliasIds ?? {})) {
+        if (alias !== 'default') entries[alias] = { id };
+    }
+    return entries;
+}
+
 function errMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
@@ -624,8 +637,15 @@ export function buildStartRunResponse(params: {
         status: actorRun.status,
         startedAt: toIsoString(actorRun.startedAt),
         storages: {
-            ...(dataset && { datasets: { default: dataset } }),
-            ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),
+            ...(dataset && {
+                datasets: { default: dataset, ...buildAliasedStorageEntries(actorRun.storageIds?.datasets) },
+            }),
+            ...(keyValueStore && {
+                keyValueStores: {
+                    default: keyValueStore,
+                    ...buildAliasedStorageEntries(actorRun.storageIds?.keyValueStores),
+                },
+            }),
         },
         summary,
         nextStep,
@@ -765,8 +785,15 @@ export async function fetchActorRunData(params: {
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
         storages: {
-            ...(dataset && { datasets: { default: dataset } }),
-            ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),
+            ...(dataset && {
+                datasets: { default: dataset, ...buildAliasedStorageEntries(run.storageIds?.datasets) },
+            }),
+            ...(keyValueStore && {
+                keyValueStores: {
+                    default: keyValueStore,
+                    ...buildAliasedStorageEntries(run.storageIds?.keyValueStores),
+                },
+            }),
         },
         summary,
         nextStep,
