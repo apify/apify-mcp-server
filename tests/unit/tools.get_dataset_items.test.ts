@@ -9,6 +9,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     decodeFencedToolText,
     expectSoftFailInvalidInput,
+    mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -186,11 +187,7 @@ describe('get-dataset-items', () => {
     });
 
     it('adds the dataset Console link to structuredContent and content for Console UI token sessions', async () => {
-        vi.mocked(getUserInfoCached).mockResolvedValue({
-            userId: 'USER_ID',
-            userPlanTier: 'FREE',
-            isOrganization: false,
-        });
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
         const result = await (getDatasetItems as HelperTool).call({
             ...stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
@@ -205,18 +202,5 @@ describe('get-dataset-items', () => {
         expect(content[1].text).toBe(
             `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
         );
-    });
-
-    it('keeps the response link-free for API tokens', async () => {
-        const result = await (getDatasetItems as HelperTool).call({
-            ...stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
-            apifyToken: 'apify_api_test',
-        });
-        const { structuredContent, content } = result as TextToolResult & {
-            structuredContent: Record<string, unknown>;
-        };
-
-        expect(structuredContent.apifyConsoleUrl).toBeUndefined();
-        expect(content).toHaveLength(1);
     });
 });

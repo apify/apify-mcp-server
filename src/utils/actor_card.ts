@@ -121,9 +121,7 @@ type ExtractedActorData = {
  */
 function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptions): ExtractedActorData {
     const actorFullName = `${actor.username}/${actor.name}`;
-    const actorUrl = options.linkContext
-        ? buildConsoleActorUrl(options.linkContext, actor.id)
-        : `${APIFY_STORE_URL}/${actorFullName}`;
+    const actorUrl = buildConsoleActorUrl(options.linkContext, actor.id) ?? `${APIFY_STORE_URL}/${actorFullName}`;
 
     const data: ExtractedActorData = {
         actorFullName,

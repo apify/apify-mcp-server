@@ -125,8 +125,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
 
-        const linkContext = await getConsoleLinkContext(apifyToken, client);
-        const apifyConsoleUrl = linkContext ? buildConsoleDatasetUrl(linkContext, datasetId) : undefined;
+        const apifyConsoleUrl = buildConsoleDatasetUrl(await getConsoleLinkContext(apifyToken, client), datasetId);
         const structuredContent = {
             datasetId,
             apifyConsoleUrl,

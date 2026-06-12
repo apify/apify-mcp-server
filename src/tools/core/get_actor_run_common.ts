@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { HelperTool, ToolInputSchema } from '../../types.js';
+import type { ConsoleLinkContext, HelperTool, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
@@ -92,7 +92,7 @@ export function buildGetActorRunError(runId: string, error: unknown): ReturnType
  * `nextStep` in default mode, a short pointer in widget mode.
  */
 export function buildGetActorRunSuccessResponse(
-    params: FetchActorRunResult & { widget: boolean },
+    params: FetchActorRunResult & { widget: boolean; linkContext?: ConsoleLinkContext },
 ): ReturnType<typeof buildMCPResponse> {
     const { run, structuredContent, widget, linkContext } = params;
 

@@ -658,14 +658,13 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             abortSignal,
             mcpSessionId: toolArgs.mcpSessionId,
             onAbort: abortRunOnSignal,
-            linkContext,
         });
 
         if ('aborted' in fetchResult) return {};
         if ('error' in fetchResult) return fetchResult.error;
 
         return {
-            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false }),
+            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false, linkContext }),
             toolTelemetry: { actorId: resolvedActorId },
         };
     } catch (error) {

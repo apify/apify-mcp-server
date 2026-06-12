@@ -8,40 +8,49 @@ import {
     buildConsoleKeyValueStoreUrl,
     buildConsoleRunUrl,
     getConsoleLinkContext,
-    isConsoleUiToken,
-    resolveConsoleLinkContext,
 } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { mockUserInfo } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/userid_cache.js', () => ({
     getUserInfoCached: vi.fn(),
 }));
 
+describe('getConsoleLinkContext', () => {
+    const client = {} as ApifyClient;
 
-describe('resolveConsoleLinkContext', () => {
-    const personalUser = { userId: 'USER_ID', userPlanTier: 'FREE' as const, isOrganization: false };
-    const orgUser = { userId: 'ORG_ID', userPlanTier: 'FREE' as const, isOrganization: true };
-
-    it('returns undefined for API tokens', () => {
-        expect(resolveConsoleLinkContext('apify_api_abc', personalUser)).toBeUndefined();
-        expect(resolveConsoleLinkContext('apify_api_abc', orgUser)).toBeUndefined();
+    beforeEach(() => {
+        vi.mocked(getUserInfoCached).mockReset();
     });
 
-    it('returns undefined for a missing token', () => {
-        expect(resolveConsoleLinkContext(undefined, personalUser)).toBeUndefined();
+    it('returns undefined for API tokens without a users/me lookup', async () => {
+        expect(await getConsoleLinkContext('apify_api_abc', client)).toBeUndefined();
+        expect(await getConsoleLinkContext('legacy-token-format', client)).toBeUndefined();
+        expect(getUserInfoCached).not.toHaveBeenCalled();
     });
 
-    it('returns a context without organizationId for a personal UI token', () => {
-        expect(resolveConsoleLinkContext('apify_ui_abc', personalUser)).toEqual({ organizationId: undefined });
+    it('returns undefined for a missing or empty token', async () => {
+        expect(await getConsoleLinkContext(undefined, client)).toBeUndefined();
+        expect(await getConsoleLinkContext('', client)).toBeUndefined();
+        expect(getUserInfoCached).not.toHaveBeenCalled();
     });
 
-    it('returns the acting account as organizationId for an org-scoped UI token', () => {
-        expect(resolveConsoleLinkContext('apify_ui_abc', orgUser)).toEqual({ organizationId: 'ORG_ID' });
+    it('returns a context without organizationId for a personal UI token', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+        expect(await getConsoleLinkContext('apify_ui_abc', client)).toEqual({ organizationId: undefined });
     });
 
-    it('omits organizationId when the user lookup failed (anonymous fallback)', () => {
-        const anonymous = { userId: null, userPlanTier: 'FREE' as const, isOrganization: false };
-        expect(resolveConsoleLinkContext('apify_ui_abc', anonymous)).toEqual({ organizationId: undefined });
+    it('returns the acting account as organizationId for an org-scoped UI token', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: 'ORG_ID', isOrganization: true }));
+
+        expect(await getConsoleLinkContext('apify_ui_abc', client)).toEqual({ organizationId: 'ORG_ID' });
+    });
+
+    it('omits organizationId when the user lookup failed (anonymous fallback)', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
+
+        expect(await getConsoleLinkContext('apify_ui_abc', client)).toEqual({ organizationId: undefined });
     });
 });
 
@@ -70,6 +79,13 @@ describe('buildConsole*Url (production host)', () => {
             'https://console.apify.com/organization/ORG_ID/storage/key-value-stores/STORE_ID',
         );
     });
+
+    it('returns undefined without a context (non-Console session)', () => {
+        expect(buildConsoleActorUrl(undefined, 'ACTOR_ID')).toBeUndefined();
+        expect(buildConsoleRunUrl(undefined, 'RUN_ID')).toBeUndefined();
+        expect(buildConsoleDatasetUrl(undefined, 'DATASET_ID')).toBeUndefined();
+        expect(buildConsoleKeyValueStoreUrl(undefined, 'STORE_ID')).toBeUndefined();
+    });
 });
 
 describe('buildConsole*Url (staging host)', () => {
@@ -89,28 +105,5 @@ describe('buildConsole*Url (staging host)', () => {
         expect(buildConsoleDatasetUrl({ organizationId: 'ORG_ID' }, 'DATASET_ID')).toBe(
             'https://console-securitybyobscurity.apify.com/organization/ORG_ID/storage/datasets/DATASET_ID',
         );
-    });
-});
-
-describe('getConsoleLinkContext', () => {
-    const client = {} as ApifyClient;
-
-    beforeEach(() => {
-        vi.mocked(getUserInfoCached).mockReset();
-    });
-
-    it('returns undefined for API tokens without a users/me lookup', async () => {
-        expect(await getConsoleLinkContext('apify_api_abc', client)).toBeUndefined();
-        expect(getUserInfoCached).not.toHaveBeenCalled();
-    });
-
-    it('resolves the context for UI tokens via the cached users/me lookup', async () => {
-        vi.mocked(getUserInfoCached).mockResolvedValue({
-            userId: 'ORG_ID',
-            userPlanTier: 'FREE',
-            isOrganization: true,
-        });
-
-        expect(await getConsoleLinkContext('apify_ui_abc', client)).toEqual({ organizationId: 'ORG_ID' });
     });
 });

@@ -7,6 +7,7 @@ import type { formatActorToStructuredCard } from '../../src/utils/actor_card.js'
 import { formatActorForWidget } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { mockUserInfo } from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 /**
@@ -26,7 +27,7 @@ describe('search-actors-widget response', () => {
     beforeEach(() => {
         vi.mocked(searchAgentSafeActors).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
-        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE', isOrganization: false });
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
     });
 
     it('returns widgetActors plus widget _meta and short pointer text', async () => {

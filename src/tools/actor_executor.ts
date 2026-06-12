@@ -66,7 +66,6 @@ export const actorExecutor: ActorExecutor = {
             abortSignal,
             mcpSessionId,
             onAbort: abortRunOnSignal,
-            linkContext: await getConsoleLinkContext(apifyClient.token, apifyClient),
         });
 
         if ('aborted' in fetchResult) {
@@ -87,6 +86,10 @@ export const actorExecutor: ActorExecutor = {
             dataset.itemsSchema = { type: 'object', properties: params.datasetItemsSchema };
         }
 
-        return buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false }) as ActorExecutionResult;
+        return buildGetActorRunSuccessResponse({
+            ...fetchResult.result,
+            widget: false,
+            linkContext: await getConsoleLinkContext(apifyClient.token, apifyClient),
+        }) as ActorExecutionResult;
     },
 };

@@ -7,6 +7,7 @@ import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSoftFailInvalidInput,
+    mockUserInfo,
     parseFencedJson,
     stubToolCallContext,
     type TextToolResult,
@@ -156,11 +157,7 @@ describe('get-dataset fields normalization', () => {
     });
 
     it('appends the dataset Console link (from the API-returned id) for Console UI token sessions', async () => {
-        vi.mocked(getUserInfoCached).mockResolvedValue({
-            userId: 'USER_ID',
-            userPlanTier: 'FREE',
-            isOrganization: false,
-        });
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
         // Slug input — the link must use the API-returned id, not the slug.
         const result = await (getDataset as HelperTool).call({

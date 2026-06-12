@@ -26,7 +26,6 @@ export const defaultGetActorRun: ToolEntry = Object.freeze({
                 progressTracker,
                 abortSignal: extra?.signal,
                 mcpSessionId,
-                linkContext: await getConsoleLinkContext(apifyToken, client),
             });
 
             // Per MCP spec, receivers SHOULD NOT send a response for a cancelled request:
@@ -34,7 +33,11 @@ export const defaultGetActorRun: ToolEntry = Object.freeze({
             if ('aborted' in fetchResult) return {};
             if ('error' in fetchResult) return fetchResult.error;
 
-            return buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false });
+            return buildGetActorRunSuccessResponse({
+                ...fetchResult.result,
+                widget: false,
+                linkContext: await getConsoleLinkContext(apifyToken, client),
+            });
         } catch (error) {
             logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });
             return buildGetActorRunError(parsed.runId, error);

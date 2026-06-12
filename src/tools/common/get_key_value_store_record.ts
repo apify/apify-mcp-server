@@ -60,9 +60,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         return {
             content: [
                 { type: 'text', text: wrapJsonText(record) },
-                ...buildConsoleLinkContent(
-                    linkContext ? buildConsoleKeyValueStoreUrl(linkContext, keyValueStoreId) : undefined,
-                ),
+                ...buildConsoleLinkContent(buildConsoleKeyValueStoreUrl(linkContext, keyValueStoreId)),
             ],
         };
     },
