@@ -1,5 +1,5 @@
 import type { ActorRun } from 'apify-client';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
     buildStartRunResponse,
@@ -11,7 +11,15 @@ import {
 } from '../../src/tools/core/actor_run_response.js';
 import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+
+// Only Console UI token sessions reach the users/me lookup; the default 'test-token'
+// stub never triggers it.
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
 
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
@@ -474,6 +482,57 @@ describe('get-actor-run default response', () => {
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain('not found');
     });
+
+    describe('Console UI token sessions (personalized Console links)', () => {
+        beforeEach(() => {
+            vi.mocked(getUserInfoCached).mockReset();
+        });
+
+        it('mints run + dataset + KV Console links and appends the Console line + nudge to the narrative', async () => {
+            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+            const run = mockSucceededRun();
+            const result = await (defaultGetActorRun as HelperTool).call({
+                ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset: mockDataset() })),
+                apifyToken: 'apify_ui_test',
+            });
+            const { structuredContent, content } = result as {
+                structuredContent: RunResponse;
+                content: { type: string; text: string }[];
+            };
+
+            expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/actors/runs/run-1');
+            expect(structuredContent.storages.datasets?.default.apifyConsoleUrl).toBe(
+                'https://console.apify.com/storage/datasets/dataset-xyz',
+            );
+            expect(structuredContent.storages.keyValueStores?.default.apifyConsoleUrl).toBe(
+                'https://console.apify.com/storage/key-value-stores/kv-xyz',
+            );
+
+            // content[0] JSON mirror carries the links; content[1] narrative lists them + nudge.
+            expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+            expect(content[1].text).toContain(
+                'Apify Console: run https://console.apify.com/actors/runs/run-1 | dataset https://console.apify.com/storage/datasets/dataset-xyz | key-value store https://console.apify.com/storage/key-value-stores/kv-xyz',
+            );
+            expect(content[1].text).toContain(VERBATIM_LINKS_NUDGE);
+        });
+
+        it('keeps responses link-free for API tokens', async () => {
+            const run = mockSucceededRun();
+            const result = await (defaultGetActorRun as HelperTool).call({
+                ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset: mockDataset() })),
+                apifyToken: 'apify_api_test',
+            });
+            const { structuredContent, content } = result as {
+                structuredContent: RunResponse;
+                content: { type: string; text: string }[];
+            };
+
+            expect(getUserInfoCached).not.toHaveBeenCalled();
+            expect(structuredContent.apifyConsoleUrl).toBeUndefined();
+            expect(content[1].text).not.toContain('console.apify.com');
+        });
+    });
 });
 
 // -----------------------------------------------------------------------------
@@ -515,6 +574,31 @@ describe('buildStartRunResponse()', () => {
 
         // Non-widget path: no widget _meta.
         expect(_meta).toBeUndefined();
+    });
+
+    // Org-prefixed URL variants are covered by the builder tests in console_link.test.ts.
+    it('mints Console links and appends the Console line when linkContext is set', () => {
+        const result = buildStartRunResponse({
+            actorName: 'apify/rag-web-browser',
+            actorRun,
+            linkContext: {},
+        });
+
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/actors/runs/run-abc');
+        expect(structuredContent.storages.datasets?.default.apifyConsoleUrl).toBe(
+            'https://console.apify.com/storage/datasets/dataset-abc',
+        );
+        expect(structuredContent.storages.keyValueStores?.default.apifyConsoleUrl).toBe(
+            'https://console.apify.com/storage/key-value-stores/kv-abc',
+        );
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        expect(content[1].text).toContain('Apify Console: run https://console.apify.com/actors/runs/run-abc');
+        expect(content[1].text).toContain(VERBATIM_LINKS_NUDGE);
     });
 
     it('includes widget metadata and no-poll nextStep when widget=true', () => {

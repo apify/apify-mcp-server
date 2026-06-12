@@ -27,6 +27,7 @@ import {
     isPermissionApprovalError,
     remoteMcpFailureDetail,
 } from '../../utils/apify_errors.js';
+import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
@@ -647,9 +648,11 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             return {};
         }
 
+        const linkContext = await getConsoleLinkContext(toolArgs.apifyToken, apifyClient);
+
         // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
         if (waitSecs === 0) {
-            const response = buildStartRunResponse({ actorName: baseActorName, actorRun });
+            const response = buildStartRunResponse({ actorName: baseActorName, actorRun, linkContext });
             return { ...response, toolTelemetry: { actorId: resolvedActorId } };
         }
 
@@ -668,7 +671,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
         if ('error' in fetchResult) return fetchResult.error;
 
         return {
-            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false }),
+            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false, linkContext }),
             toolTelemetry: { actorId: resolvedActorId },
         };
     } catch (error) {

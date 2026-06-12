@@ -10,7 +10,14 @@ import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_sto
 import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
-import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import {
+    expectSoftFailInvalidInput,
+    mockUserInfo,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 
 // Mirrors the official MCP SDK client: any tool with an outputSchema MUST return structuredContent
 // that validates against the schema, or callTool throws (client/index.js).
@@ -22,6 +29,11 @@ function expectSchemaConformingStructuredContent(result: unknown) {
     const valid = validateRecordOutput(structuredClone(structuredContent));
     expect(valid, JSON.stringify(validateRecordOutput.errors)).toBe(true);
 }
+
+// Only Console UI token sessions reach the users/me lookup.
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
 
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
@@ -355,5 +367,24 @@ describe('get-key-value-store-record', () => {
 
         expect(kvStoreSpy).toHaveBeenCalledWith('user~my-store');
         expect(getRecordSpy).toHaveBeenCalledWith('INPUT');
+    });
+
+    it('appends the store Console link for Console UI token sessions', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call({
+            ...stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'INPUT' },
+                stubApifyClient({ record: MOCK_RECORD }),
+            ),
+            apifyToken: 'apify_ui_test',
+        });
+        const { content } = result as TextToolResult;
+
+        // content: [0] data, [1] summary (record reads are terminal — no nextStep), [2] Apify Console link.
+        expect(content).toHaveLength(3);
+        expect(content[2].text).toBe(
+            `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
+        );
     });
 });

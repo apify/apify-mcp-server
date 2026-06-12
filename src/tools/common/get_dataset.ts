@@ -5,6 +5,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { normalizeDatasetFields } from '../core/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
@@ -44,13 +45,14 @@ export const getDataset: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
         const datasetId = stripQuoteWrappers(parsed.datasetId);
         const dataset = await client.dataset(datasetId).get();
         if (!dataset) {
             return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
         // Apify returns `fields` slash-separated AND with array indices expanded
         // (e.g. `latestComments/0/owner/username`). For a real Instagram-scraper
         // dataset this inflates ~78 schema fields into 528 paths (~85% bloat) and
@@ -66,6 +68,7 @@ export const getDataset: ToolEntry = Object.freeze({
             structuredContent: normalized as unknown as Record<string, unknown>,
             summary,
             nextStep,
+            apifyConsoleUrl: buildConsoleDatasetUrl(linkContext, dataset.id),
         });
     },
 } as const);
