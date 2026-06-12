@@ -682,6 +682,32 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(sc?.nextStep).toContain(sc?.storages?.datasets?.default?.id ?? '__unset__');
             });
 
+            it('surfaces aliased storages from run.storageIds in the canonical response', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+
+                const callResult = await client.callTool({
+                    name: HelperTools.ACTOR_CALL,
+                    arguments: {
+                        actor: ACTOR_NORMAL_MODE,
+                        input: { firstNumber: 1, secondNumber: 2 },
+                        waitSecs: 45,
+                    },
+                });
+
+                expect(callResult.isError).not.toBe(true);
+                const sc = (
+                    callResult as {
+                        structuredContent?: {
+                            storages?: { datasets?: Record<string, { id?: string }> };
+                        };
+                    }
+                ).structuredContent;
+                // normal-mode-test-actor opens an aliased 'books' dataset; the run response must
+                // surface it alongside the enriched default. Aliased entries carry the id only.
+                expect(sc?.storages?.datasets?.default?.id).toBeDefined();
+                expect(sc?.storages?.datasets?.books).toEqual({ id: expect.any(String) });
+            });
+
             it('should find Actors in store search', async () => {
                 const query = 'normal-mode-test-actor';
                 client = await createClientFn({
