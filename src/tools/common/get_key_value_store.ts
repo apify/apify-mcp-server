@@ -5,6 +5,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { keyValueStoreOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
@@ -41,13 +42,14 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
         const kvStore = await client.keyValueStore(keyValueStoreId).get();
         if (!kvStore) {
             return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
         }
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
         const bytes = (kvStore.stats as { storageBytes?: number } | undefined)?.storageBytes;
         const summary = `Key-value store '${kvStore.name ?? keyValueStoreId}'${bytes !== undefined ? ` holds ${bytes} bytes` : ''}.`;
         const nextStep = `Use ${HelperTools.KEY_VALUE_STORE_KEYS_GET} with keyValueStoreId=${keyValueStoreId} to list keys.`;
@@ -55,6 +57,7 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
             structuredContent: kvStore as unknown as Record<string, unknown>,
             summary,
             nextStep,
+            apifyConsoleUrl: buildConsoleKeyValueStoreUrl(linkContext, kvStore.id),
         });
     },
 } as const);

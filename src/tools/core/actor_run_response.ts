@@ -5,6 +5,13 @@ import log from '@apify/log';
 import type { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
+import type { ConsoleLinkContext } from '../../types.js';
+import {
+    buildConsoleDatasetUrl,
+    buildConsoleKeyValueStoreUrl,
+    buildConsoleRunUrl,
+    VERBATIM_LINKS_NUDGE,
+} from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
@@ -65,6 +72,8 @@ async function raceAbort<T>(promise: Promise<T>, abortSignal: AbortSignal | unde
 
 export type RunDataset = {
     id: string;
+    /** Personalized Apify Console link; set only for Console UI token sessions. */
+    apifyConsoleUrl?: string;
     name?: string;
     title?: string;
     itemCount?: number;
@@ -86,6 +95,8 @@ export type RunDataset = {
 
 export type RunKeyValueStore = {
     id: string;
+    /** Personalized Apify Console link; set only for Console UI token sessions. */
+    apifyConsoleUrl?: string;
     name?: string;
     title?: string;
     keyCount?: number;
@@ -110,6 +121,8 @@ export type RunStorages = {
  */
 export type RunResponse = {
     runId: string;
+    /** Personalized Apify Console link to the run; set only for Console UI token sessions. */
+    apifyConsoleUrl?: string;
     actorId: string;
     actorName?: string;
     status: string;
@@ -227,6 +240,28 @@ function buildRunKeyValueStore(
 
 function errMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * For Console UI token sessions, sets the Apify Console `apifyConsoleUrl` on the run and its default
+ * storages and returns the narrative suffix (the links + the verbatim nudge) in a single pass.
+ * No-op returning `''` for non-Console sessions (`linkContext` undefined).
+ */
+export function applyConsoleLinks(response: RunResponse, linkContext: ConsoleLinkContext | undefined): string {
+    if (!linkContext) return '';
+    response.apifyConsoleUrl = buildConsoleRunUrl(linkContext, response.runId);
+    const parts = [`run ${response.apifyConsoleUrl}`];
+    const dataset = response.storages.datasets?.default;
+    if (dataset) {
+        dataset.apifyConsoleUrl = buildConsoleDatasetUrl(linkContext, dataset.id);
+        parts.push(`dataset ${dataset.apifyConsoleUrl}`);
+    }
+    const keyValueStore = response.storages.keyValueStores?.default;
+    if (keyValueStore) {
+        keyValueStore.apifyConsoleUrl = buildConsoleKeyValueStoreUrl(linkContext, keyValueStore.id);
+        parts.push(`key-value store ${keyValueStore.apifyConsoleUrl}`);
+    }
+    return `\nApify Console: ${parts.join(' | ')}\n${VERBATIM_LINKS_NUDGE}`;
 }
 
 /**
@@ -603,8 +638,9 @@ export function buildStartRunResponse(params: {
     actorName: string;
     actorRun: ActorRun;
     widget?: boolean;
+    linkContext?: ConsoleLinkContext;
 }): ReturnType<typeof buildMCPResponse> {
-    const { actorName, actorRun, widget } = params;
+    const { actorName, actorRun, widget, linkContext } = params;
 
     const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
     const keyValueStore = actorRun.defaultKeyValueStoreId ? { id: actorRun.defaultKeyValueStoreId } : undefined;
@@ -630,6 +666,7 @@ export function buildStartRunResponse(params: {
         summary,
         nextStep,
     };
+    const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
 
     const widgetMeta = widget
         ? {
@@ -639,7 +676,7 @@ export function buildStartRunResponse(params: {
         : undefined;
 
     return buildMCPResponse({
-        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}`],
+        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinks}`],
         structuredContent,
         ...(widgetMeta && { _meta: widgetMeta }),
     });

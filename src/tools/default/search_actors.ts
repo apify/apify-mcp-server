@@ -3,6 +3,7 @@ import dedent from 'dedent';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
+import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import {
@@ -38,7 +39,10 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             return buildSearchActorsEmptyResponse(parsed.keywords);
         }
 
-        const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier);
+        // Cache hit — the Promise.all above already resolved users/me for this token.
+        const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
+        const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, linkContext);
+        const verbatimLinksNudge = linkContext ? `\n${VERBATIM_LINKS_NUDGE}` : '';
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,
@@ -49,7 +53,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
                 tool with the specific Actor name.
                 IMPORTANT: You MUST always do a second search with broader, more generic keywords
                 (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
-                you haven't missed a better Actor.
+                you haven't missed a better Actor.${verbatimLinksNudge}
             `,
         };
 
@@ -70,7 +74,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             specific Actor name.
             IMPORTANT: You MUST always do a second search with broader, more generic keywords
             (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
-            you haven't missed a better Actor.
+            you haven't missed a better Actor.${verbatimLinksNudge}
         `;
         const texts = [`${header}\n\n${actorCardText}\n\n${footer}`];
         return buildMCPResponse({ texts, structuredContent });

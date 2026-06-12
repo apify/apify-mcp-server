@@ -2,7 +2,13 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HelperTools, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
-import type { ActorStoreList, HelperTool, StructuredActorCard, ToolInputSchema } from '../../types.js';
+import type {
+    ActorStoreList,
+    ConsoleLinkContext,
+    HelperTool,
+    StructuredActorCard,
+    ToolInputSchema,
+} from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { DEFAULT_CARD_OPTIONS, formatActorToActorCard, formatActorToStructuredCard } from '../../utils/actor_card.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -115,8 +121,12 @@ export type SearchActorsResult = {
     actorCardStructured: StructuredActorCard[];
 };
 
-export function buildSearchActorsResult(actors: ActorStoreList[], userTier: PricingTier): SearchActorsResult {
-    const options = { ...DEFAULT_CARD_OPTIONS, userTier, simplifyPricingForUserTier: true };
+export function buildSearchActorsResult(
+    actors: ActorStoreList[],
+    userTier: PricingTier,
+    linkContext?: ConsoleLinkContext,
+): SearchActorsResult {
+    const options = { ...DEFAULT_CARD_OPTIONS, userTier, simplifyPricingForUserTier: true, linkContext };
     return {
         actorCardText: actors.map((actor) => formatActorToActorCard(actor, options)).join('\n\n'),
         actorCardStructured: actors.map((actor) => formatActorToStructuredCard(actor, options)),

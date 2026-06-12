@@ -6,6 +6,7 @@ import type { HelperTool } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { mockUserInfo } from './helpers/tool_context.js';
 import { stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 /**
@@ -57,7 +58,7 @@ describe('fetch-actor-details-widget response', () => {
     beforeEach(() => {
         vi.mocked(fetchActorDetails).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
-        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
     });
 
     it('returns { actorDetails: { actorInfo, actorCard, readme } } as structuredContent plus widget _meta', async () => {

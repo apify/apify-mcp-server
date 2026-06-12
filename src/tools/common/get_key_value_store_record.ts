@@ -6,9 +6,15 @@ import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
 import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound, buildStorageResponse, normalizeRecordKey } from './storage_helpers.js';
+import {
+    buildConsoleLinkContent,
+    buildStorageNotFound,
+    buildStorageResponse,
+    normalizeRecordKey,
+} from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -43,7 +49,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
         const recordKey = normalizeRecordKey(parsed.recordKey);
@@ -57,6 +63,10 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 : `Key-value store '${keyValueStoreId}' not found.`;
             return buildStorageNotFound(text);
         }
+        const apifyConsoleUrl = buildConsoleKeyValueStoreUrl(
+            await getConsoleLinkContext(apifyToken, client),
+            keyValueStoreId,
+        );
         // The SDK already parsed the body by Content-Type (JSON -> object, text/xml -> string, else -> Buffer);
         // branch on the resulting JS type, not on the MIME type.
         const { value, contentType } = record;
@@ -71,6 +81,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         // {"type":"Buffer",...}); the bytes ride in MCP content blocks. But the tool declares an
         // outputSchema, and the official SDK client rejects any result that has a schema but no
         // structuredContent — so emit a minimal schema-conforming descriptor alongside the block.
+        // The Console link (Console UI token sessions) rides as a trailing text block.
         if (Buffer.isBuffer(value)) {
             // Content-Type is case-insensitive; lowercase so the image/audio checks below don't miss `Image/PNG`.
             const mimeType = contentType?.split(';')[0].trim().toLowerCase();
@@ -81,6 +92,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 ...(contentType && { contentType }),
                 summary,
             };
+            const consoleLinkContent = buildConsoleLinkContent(apifyConsoleUrl);
             if (value.length > KV_RECORD_MAX_INLINE_BYTES) {
                 // base64-inlining a large binary would blow up the context window; return a link instead.
                 const uri = await store.getRecordPublicUrl(recordKey);
@@ -94,15 +106,22 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                             size: value.length,
                             ...(mimeType && { mimeType }),
                         } satisfies ResourceLink,
+                        ...consoleLinkContent,
                     ],
                 };
             }
             const data = value.toString('base64');
             if (mimeType?.startsWith('image/')) {
-                return { structuredContent, content: [{ type: 'image', data, mimeType } satisfies ImageContent] };
+                return {
+                    structuredContent,
+                    content: [{ type: 'image', data, mimeType } satisfies ImageContent, ...consoleLinkContent],
+                };
             }
             if (mimeType?.startsWith('audio/')) {
-                return { structuredContent, content: [{ type: 'audio', data, mimeType } satisfies AudioContent] };
+                return {
+                    structuredContent,
+                    content: [{ type: 'audio', data, mimeType } satisfies AudioContent, ...consoleLinkContent],
+                };
             }
             // The blob is inlined, so the uri is just an identifier — build it from the store's API
             // URL instead of getRecordPublicUrl, which fetches store metadata to sign a link nobody follows.
@@ -114,10 +133,11 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                         type: 'resource',
                         resource: { uri, blob: data, ...(mimeType && { mimeType }) },
                     } satisfies EmbeddedResource,
+                    ...consoleLinkContent,
                 ],
             };
         }
         // Text/JSON values serialize cleanly — return them as structuredContent per the storage-tool contract.
-        return buildStorageResponse({ structuredContent: { keyValueStoreId, ...record }, summary });
+        return buildStorageResponse({ structuredContent: { keyValueStoreId, ...record }, summary, apifyConsoleUrl });
     },
 } as const);
