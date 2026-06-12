@@ -9,6 +9,7 @@ import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { mockUserInfo } from './helpers/tool_context.js';
 import { stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 vi.mock('../../src/utils/actor_details.js', async () => {
@@ -177,11 +178,7 @@ describe('buildFetchActorDetailsResult()', () => {
     });
 
     it('performs the lookup for Console UI tokens and mints Console links', async () => {
-        vi.mocked(getUserInfoCached).mockResolvedValue({
-            userId: 'USER_ID',
-            userPlanTier: 'FREE',
-            isOrganization: false,
-        });
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
         const { content } = await callWithToken('apify_ui_test');
 

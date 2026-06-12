@@ -1,7 +1,7 @@
 import type { ApifyClient } from '../apify_client.js';
 import { CONSOLE_BASE_URL, CONSOLE_BASE_URL_STAGING, STAGING_MCP_HOSTNAME } from '../const.js';
 import type { ConsoleLinkContext } from '../types.js';
-import { type CachedUserInfo, getUserInfoCached } from './userid_cache.js';
+import { getUserInfoCached } from './userid_cache.js';
 
 /** Console origin for the current cluster: staging when on the staging MCP host, production otherwise. */
 function getConsoleBaseUrl(): string {
@@ -10,11 +10,6 @@ function getConsoleBaseUrl(): string {
 
 /** Prefix of Apify Console UI (session) tokens, as opposed to `apify_api_...` API tokens. */
 const UI_TOKEN_PREFIX = 'apify_ui_';
-
-/** True when the request is authenticated with a Console UI (session) token. */
-export function isConsoleUiToken(apifyToken: string | undefined): boolean {
-    return Boolean(apifyToken?.startsWith(UI_TOKEN_PREFIX));
-}
 
 // Console links are personalized — models otherwise tend to "correct" them to
 // the public apify.com URLs they know from training data.
@@ -29,51 +24,49 @@ export const VERBATIM_LINKS_NUDGE =
  * (e.g. the Console AI chat), so they are a verifiable signal that the user is in
  * Console → Console links. All other sessions → public `apify.com` links.
  *
- * For an organization-scoped token the `users/me` lookup resolves to the
- * organization itself, which yields org-prefixed links.
- */
-export function resolveConsoleLinkContext(
-    apifyToken: string | undefined,
-    userInfo: CachedUserInfo,
-): ConsoleLinkContext | undefined {
-    if (!isConsoleUiToken(apifyToken)) return undefined;
-    return { organizationId: userInfo.isOrganization && userInfo.userId ? userInfo.userId : undefined };
-}
-
-/**
- * Resolves the Console link context straight from the request token: `undefined`
- * for non-UI tokens (no API call), otherwise backed by the cached `users/me` lookup.
+ * Non-UI tokens short-circuit without an API call. For UI tokens the cached
+ * `users/me` lookup resolves the acting account; an organization-scoped token
+ * resolves to the organization itself, which yields org-prefixed links.
  */
 export async function getConsoleLinkContext(
     apifyToken: string | undefined,
     apifyClient: ApifyClient,
 ): Promise<ConsoleLinkContext | undefined> {
-    if (!isConsoleUiToken(apifyToken)) return undefined;
-    return resolveConsoleLinkContext(apifyToken, await getUserInfoCached(apifyToken, apifyClient));
+    if (!apifyToken?.startsWith(UI_TOKEN_PREFIX)) return undefined;
+    const userInfo = await getUserInfoCached(apifyToken, apifyClient);
+    return { organizationId: userInfo.isOrganization && userInfo.userId ? userInfo.userId : undefined };
 }
 
-/** Builds `<consoleBaseUrl>[/organization/<orgId>]<path>`. */
-function buildConsoleUrl(context: ConsoleLinkContext, path: string): string {
+/**
+ * Builds `<consoleBaseUrl>[/organization/<orgId>]<path>`.
+ * Accepts an undefined context (non-Console session) and returns undefined, so
+ * call sites can pass the resolved context straight through without a ternary.
+ */
+function buildConsoleUrl(context: ConsoleLinkContext | undefined, path: string): string | undefined {
+    if (!context) return undefined;
     const orgPrefix = context.organizationId ? `/organization/${context.organizationId}` : '';
     return `${getConsoleBaseUrl()}${orgPrefix}${path}`;
 }
 
 /** Builds the Console Actor detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/<actorId>`. */
-export function buildConsoleActorUrl(context: ConsoleLinkContext, actorId: string): string {
+export function buildConsoleActorUrl(context: ConsoleLinkContext | undefined, actorId: string): string | undefined {
     return buildConsoleUrl(context, `/actors/${actorId}`);
 }
 
 /** Builds the Console run detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/runs/<runId>`. */
-export function buildConsoleRunUrl(context: ConsoleLinkContext, runId: string): string {
+export function buildConsoleRunUrl(context: ConsoleLinkContext | undefined, runId: string): string | undefined {
     return buildConsoleUrl(context, `/actors/runs/${runId}`);
 }
 
 /** Builds the Console dataset URL: `<consoleBaseUrl>[/organization/<orgId>]/storage/datasets/<datasetId>`. */
-export function buildConsoleDatasetUrl(context: ConsoleLinkContext, datasetId: string): string {
+export function buildConsoleDatasetUrl(context: ConsoleLinkContext | undefined, datasetId: string): string | undefined {
     return buildConsoleUrl(context, `/storage/datasets/${datasetId}`);
 }
 
 /** Builds the Console key-value store URL: `<consoleBaseUrl>[/organization/<orgId>]/storage/key-value-stores/<storeId>`. */
-export function buildConsoleKeyValueStoreUrl(context: ConsoleLinkContext, storeId: string): string {
+export function buildConsoleKeyValueStoreUrl(
+    context: ConsoleLinkContext | undefined,
+    storeId: string,
+): string | undefined {
     return buildConsoleUrl(context, `/storage/key-value-stores/${storeId}`);
 }

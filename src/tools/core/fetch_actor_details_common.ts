@@ -13,12 +13,7 @@ import {
     typeObjectToString,
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
-import {
-    buildConsoleActorUrl,
-    isConsoleUiToken,
-    resolveConsoleLinkContext,
-    VERBATIM_LINKS_NUDGE,
-} from '../../utils/console_link.js';
+import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
@@ -175,9 +170,9 @@ export function buildActorDetailsTextResponse(options: {
 } {
     const { details, output, actorOutputSchema, mcpToolsMessage, linkContext } = options;
 
-    const actorUrl = linkContext
-        ? buildConsoleActorUrl(linkContext, details.actorInfo.id)
-        : `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
+    const actorUrl =
+        buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
+        `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
 
     const texts: string[] = [];
 
@@ -253,14 +248,11 @@ export async function buildFetchActorDetailsResult(
     // or mcpTools-only requests). In that case `userTier` is only used to fill the
     // placeholder `{ model: 'FREE', userTier }` in the structured card, where it's never
     // read, so defaulting to 'FREE' is safe and saves a request.
-    // Console UI token sessions always need the lookup — it resolves the acting
-    // account (user vs organization) for minting personalized Console links.
-    const userInfo =
-        resolvedOutput.pricing || isConsoleUiToken(apifyToken)
-            ? await getUserInfoCached(apifyToken, apifyClient)
-            : undefined;
-    const userPlanTier = userInfo?.userPlanTier ?? 'FREE';
-    const linkContext = userInfo ? resolveConsoleLinkContext(apifyToken, userInfo) : undefined;
+    const userPlanTier = resolvedOutput.pricing
+        ? (await getUserInfoCached(apifyToken, apifyClient)).userPlanTier
+        : 'FREE';
+    // Console UI tokens hit the same cached users/me lookup; non-UI tokens short-circuit.
+    const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
     const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier, linkContext };
     const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
     if (!details) {

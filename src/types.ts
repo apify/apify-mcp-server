@@ -651,7 +651,7 @@ export type StructuredActorCard = {
 
 /**
  * Context for minting Apify Console links instead of public website links.
- * Resolved from the session token by `resolveConsoleLinkContext` — present only for
+ * Resolved from the session token by `getConsoleLinkContext` — present only for
  * Console UI token sessions (its presence is the signal to mint Console links). The
  * Console origin is global per cluster, so it lives in the builders, not here.
  */

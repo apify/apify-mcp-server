@@ -3,7 +3,7 @@ import dedent from 'dedent';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
-import { resolveConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
+import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import {
@@ -24,7 +24,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
         const parsed = searchActorsBaseArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
-        const [actors, userInfo] = await Promise.all([
+        const [actors, { userPlanTier }] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyToken,
@@ -39,12 +39,9 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             return buildSearchActorsEmptyResponse(parsed.keywords);
         }
 
-        const linkContext = resolveConsoleLinkContext(apifyToken, userInfo);
-        const { actorCardText, actorCardStructured } = buildSearchActorsResult(
-            actors,
-            userInfo.userPlanTier,
-            linkContext,
-        );
+        // Cache hit — the Promise.all above already resolved users/me for this token.
+        const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
+        const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, linkContext);
         const verbatimLinksNudge = linkContext ? `\n${VERBATIM_LINKS_NUDGE}` : '';
         const structuredContent = {
             actors: actorCardStructured,

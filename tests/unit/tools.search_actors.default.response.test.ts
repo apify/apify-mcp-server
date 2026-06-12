@@ -10,6 +10,7 @@ import {
 } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { mockUserInfo } from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 /**
@@ -41,7 +42,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
     beforeEach(() => {
         vi.mocked(searchAgentSafeActors).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
-        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE', isOrganization: false });
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
     });
 
     it('returns structured actors and markdown text; no widget payload', async () => {
@@ -170,60 +171,24 @@ describe('search-actors without widget (defaultSearchActors)', () => {
         expect(content[0].text).toContain(SEARCH_KEYWORDS);
     });
 
-    describe('Console UI token sessions (personalized Console links)', () => {
-        const callWithToken = async (apifyToken: string) => {
-            vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
-            const result = await (defaultSearchActors as HelperTool).call({
-                ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
-                apifyToken,
-            });
-            return result as {
-                structuredContent: { actors: { url: string }[] };
-                content: { type: string; text: string }[];
-            };
+    // Org-prefixed and non-Console variants are covered by console_link.test.ts and
+    // the get-actor-run response tests.
+    it('mints Console links for a Console UI token', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+
+        const result = await (defaultSearchActors as HelperTool).call({
+            ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+            apifyToken: 'apify_ui_test',
+        });
+        const { structuredContent, content } = result as {
+            structuredContent: { actors: { url: string }[] };
+            content: { type: string; text: string }[];
         };
+        const consoleUrl = `https://console.apify.com/actors/${MOCK_STORE_ACTOR.id}`;
 
-        it('mints personal Console links for a personal UI token', async () => {
-            vi.mocked(getUserInfoCached).mockResolvedValue({
-                userId: 'USER_ID',
-                userPlanTier: 'FREE',
-                isOrganization: false,
-            });
-
-            const { structuredContent, content } = await callWithToken('apify_ui_test');
-            const consoleUrl = `https://console.apify.com/actors/${MOCK_STORE_ACTOR.id}`;
-
-            expect(structuredContent.actors[0].url).toBe(consoleUrl);
-            expect(content[0].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
-            expect(content[0].text).not.toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
-        });
-
-        it('mints org-prefixed Console links for an org-scoped UI token', async () => {
-            vi.mocked(getUserInfoCached).mockResolvedValue({
-                userId: 'ORG_ID',
-                userPlanTier: 'FREE',
-                isOrganization: true,
-            });
-
-            const { structuredContent, content } = await callWithToken('apify_ui_test');
-            const consoleUrl = `https://console.apify.com/organization/ORG_ID/actors/${MOCK_STORE_ACTOR.id}`;
-
-            expect(structuredContent.actors[0].url).toBe(consoleUrl);
-            expect(content[0].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
-        });
-
-        it('keeps public website links for API tokens', async () => {
-            vi.mocked(getUserInfoCached).mockResolvedValue({
-                userId: 'USER_ID',
-                userPlanTier: 'FREE',
-                isOrganization: false,
-            });
-
-            const { structuredContent, content } = await callWithToken('apify_api_test');
-
-            expect(structuredContent.actors[0].url).toBe(`${APIFY_STORE_URL}/apify/web-scraper`);
-            expect(content[0].text).toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
-            expect(content[0].text).not.toContain('console.apify.com');
-        });
+        expect(structuredContent.actors[0].url).toBe(consoleUrl);
+        expect(content[0].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
+        expect(content[0].text).not.toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
     });
 });

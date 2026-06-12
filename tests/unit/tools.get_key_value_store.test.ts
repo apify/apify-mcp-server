@@ -7,6 +7,7 @@ import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSoftFailInvalidInput,
+    mockUserInfo,
     parseFencedJson,
     stubToolCallContext,
     type TextToolResult,
@@ -61,11 +62,7 @@ describe('get-key-value-store', () => {
     });
 
     it('appends the store Console link (from the API-returned id) for Console UI token sessions', async () => {
-        vi.mocked(getUserInfoCached).mockResolvedValue({
-            userId: 'USER_ID',
-            userPlanTier: 'FREE',
-            isOrganization: false,
-        });
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
         const result = await (getKeyValueStore as HelperTool).call({
             ...stubToolCallContext({ keyValueStoreId: 'user~my-store' }, stubApifyClient(MOCK_STORE)),

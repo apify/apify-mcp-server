@@ -143,8 +143,6 @@ export type RunResponse = {
 export type FetchActorRunResult = {
     run: ActorRun;
     structuredContent: RunResponse;
-    /** Console link context resolved for the request; forwarded so the response builder mints links in one pass. */
-    linkContext?: ConsoleLinkContext;
 };
 
 // -----------------------------------------------------------------------------
@@ -711,7 +709,6 @@ export async function fetchActorRunData(params: {
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
-    linkContext?: ConsoleLinkContext;
 }): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
     const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
 
@@ -812,7 +809,5 @@ export async function fetchActorRunData(params: {
         nextStep,
     };
 
-    // Console links are minted once at the response-building layer (buildGetActorRunSuccessResponse),
-    // so forward the context rather than mutating here.
-    return { result: { run, structuredContent, linkContext: params.linkContext } };
+    return { result: { run, structuredContent } };
 }

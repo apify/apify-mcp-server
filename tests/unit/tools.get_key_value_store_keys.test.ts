@@ -8,6 +8,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     decodeFencedToolText,
     expectSoftFailInvalidInput,
+    mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -128,11 +129,7 @@ describe('get-key-value-store-keys', () => {
     });
 
     it('appends the store Console link for Console UI token sessions', async () => {
-        vi.mocked(getUserInfoCached).mockResolvedValue({
-            userId: 'USER_ID',
-            userPlanTier: 'FREE',
-            isOrganization: false,
-        });
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
         const result = await (getKeyValueStoreKeys as HelperTool).call({
             ...stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(vi.fn().mockResolvedValue(MOCK_KEYS))),

@@ -63,7 +63,7 @@ export const getDataset: ToolEntry = Object.freeze({
         return {
             content: [
                 { type: 'text', text: wrapJsonText(normalized) },
-                ...buildConsoleLinkContent(linkContext ? buildConsoleDatasetUrl(linkContext, dataset.id) : undefined),
+                ...buildConsoleLinkContent(buildConsoleDatasetUrl(linkContext, dataset.id)),
             ],
         };
     },

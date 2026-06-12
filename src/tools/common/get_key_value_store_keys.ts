@@ -71,9 +71,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         return {
             content: [
                 { type: 'text', text: encodeToon(keys) },
-                ...buildConsoleLinkContent(
-                    linkContext ? buildConsoleKeyValueStoreUrl(linkContext, keyValueStoreId) : undefined,
-                ),
+                ...buildConsoleLinkContent(buildConsoleKeyValueStoreUrl(linkContext, keyValueStoreId)),
             ],
             structuredContent: keys,
         };

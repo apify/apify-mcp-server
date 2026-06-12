@@ -13,7 +13,7 @@ import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 // Only Console UI token sessions reach the users/me lookup; the default 'test-token'
 // stub never triggers it.
@@ -489,11 +489,7 @@ describe('get-actor-run default response', () => {
         });
 
         it('mints run + dataset + KV Console links and appends the Console line + nudge to the narrative', async () => {
-            vi.mocked(getUserInfoCached).mockResolvedValue({
-                userId: 'USER_ID',
-                userPlanTier: 'FREE',
-                isOrganization: false,
-            });
+            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
             const run = mockSucceededRun();
             const result = await (defaultGetActorRun as HelperTool).call({
@@ -580,11 +576,12 @@ describe('buildStartRunResponse()', () => {
         expect(_meta).toBeUndefined();
     });
 
-    it('mints org-prefixed Console links and appends the Console line when linkContext is set', () => {
+    // Org-prefixed URL variants are covered by the builder tests in console_link.test.ts.
+    it('mints Console links and appends the Console line when linkContext is set', () => {
         const result = buildStartRunResponse({
             actorName: 'apify/rag-web-browser',
             actorRun,
-            linkContext: { organizationId: 'ORG_ID' },
+            linkContext: {},
         });
 
         const { structuredContent, content } = result as {
@@ -592,17 +589,15 @@ describe('buildStartRunResponse()', () => {
             content: { type: string; text: string }[];
         };
 
-        expect(structuredContent.apifyConsoleUrl).toBe(
-            'https://console.apify.com/organization/ORG_ID/actors/runs/run-abc',
-        );
+        expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/actors/runs/run-abc');
         expect(structuredContent.storages.datasets?.default.apifyConsoleUrl).toBe(
-            'https://console.apify.com/organization/ORG_ID/storage/datasets/dataset-abc',
+            'https://console.apify.com/storage/datasets/dataset-abc',
         );
         expect(structuredContent.storages.keyValueStores?.default.apifyConsoleUrl).toBe(
-            'https://console.apify.com/organization/ORG_ID/storage/key-value-stores/kv-abc',
+            'https://console.apify.com/storage/key-value-stores/kv-abc',
         );
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
-        expect(content[1].text).toContain('Apify Console: run https://console.apify.com/organization/ORG_ID');
+        expect(content[1].text).toContain('Apify Console: run https://console.apify.com/actors/runs/run-abc');
         expect(content[1].text).toContain(VERBATIM_LINKS_NUDGE);
     });
 
