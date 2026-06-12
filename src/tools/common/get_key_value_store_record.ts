@@ -60,15 +60,32 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         // The SDK already parsed the body by Content-Type (JSON -> object, text/xml -> string, else -> Buffer);
         // branch on the resulting JS type, not on the MIME type.
         const { value, contentType } = record;
-        // Binary values can't go in structuredContent (a Buffer serializes to useless {"type":"Buffer",...});
-        // return MCP content blocks instead.
+        const bytes = computeValueBytes(value);
+        const details = [
+            contentType ? `contentType=${contentType}` : undefined,
+            bytes !== undefined ? `${bytes} bytes` : undefined,
+        ].filter(Boolean);
+        // Reading a record is terminal — no nextStep.
+        const summary = `Read '${recordKey}'${details.length ? ` (${details.join(', ')})` : ''}.`;
+        // Binary values can't go in structuredContent as-is (a Buffer serializes to useless
+        // {"type":"Buffer",...}); the bytes ride in MCP content blocks. But the tool declares an
+        // outputSchema, and the official SDK client rejects any result that has a schema but no
+        // structuredContent — so emit a minimal schema-conforming descriptor alongside the block.
         if (Buffer.isBuffer(value)) {
             // Content-Type is case-insensitive; lowercase so the image/audio checks below don't miss `Image/PNG`.
             const mimeType = contentType?.split(';')[0].trim().toLowerCase();
+            const structuredContent = {
+                keyValueStoreId,
+                key: record.key,
+                value: `<binary ${mimeType ?? 'application/octet-stream'}, ${value.length} bytes>`,
+                ...(contentType && { contentType }),
+                summary,
+            };
             if (value.length > KV_RECORD_MAX_INLINE_BYTES) {
                 // base64-inlining a large binary would blow up the context window; return a link instead.
                 const uri = await store.getRecordPublicUrl(recordKey);
                 return {
+                    structuredContent,
                     content: [
                         {
                             type: 'resource_link',
@@ -82,13 +99,14 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             }
             const data = value.toString('base64');
             if (mimeType?.startsWith('image/')) {
-                return { content: [{ type: 'image', data, mimeType } satisfies ImageContent] };
+                return { structuredContent, content: [{ type: 'image', data, mimeType } satisfies ImageContent] };
             }
             if (mimeType?.startsWith('audio/')) {
-                return { content: [{ type: 'audio', data, mimeType } satisfies AudioContent] };
+                return { structuredContent, content: [{ type: 'audio', data, mimeType } satisfies AudioContent] };
             }
             const uri = await store.getRecordPublicUrl(recordKey);
             return {
+                structuredContent,
                 content: [
                     {
                         type: 'resource',
@@ -98,13 +116,6 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             };
         }
         // Text/JSON values serialize cleanly — return them as structuredContent per the storage-tool contract.
-        const bytes = computeValueBytes(value);
-        const details = [
-            contentType ? `contentType=${contentType}` : undefined,
-            bytes !== undefined ? `${bytes} bytes` : undefined,
-        ].filter(Boolean);
-        const summary = `Read '${recordKey}'${details.length ? ` (${details.join(', ')})` : ''}.`;
-        // Reading a record is terminal — no nextStep.
         return buildStorageResponse({ structuredContent: { keyValueStoreId, ...record }, summary });
     },
 } as const);
