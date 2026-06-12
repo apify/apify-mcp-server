@@ -67,7 +67,6 @@ import { actorExecutor } from '../tools/actor_executor.js';
 import {
     buildPermissionApprovalResponse,
     checkPaymentProviderStandbyConflict,
-    isPermissionApprovalError,
 } from '../tools/core/call_actor_common.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorsAsToolsResult } from '../tools/index.js';
@@ -85,13 +84,8 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { ServerMode, TOOL_TYPE } from '../types.js';
-import {
-    getHttpStatusCode,
-    isMcpClientFaultMessage,
-    logHttpError,
-    remoteMcpFailureDetail,
-    sanitizeMezmoMessage,
-} from '../utils/logging.js';
+import { isPermissionApprovalError, remoteMcpFailureDetail } from '../utils/apify_errors.js';
+import { getHttpStatusCode, isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import {
     buildMCPResponse,
     buildResponseBytesTelemetry,

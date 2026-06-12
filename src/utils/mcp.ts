@@ -1,5 +1,6 @@
 import type { ToolCallTelemetryProperties, ToolTelemetryContext } from '../types.js';
-import { ACTOR_RUN_LIMIT_MESSAGE, getHttpStatusCode, isActorRunLimitError } from './logging.js';
+import { ACTOR_RUN_LIMIT_MESSAGE, isActorRunLimitError } from './apify_errors.js';
+import { getHttpStatusCode } from './logging.js';
 
 /** MCP `_meta` key for Apify Actor run information. Namespaced per MCP spec. */
 export const APIFY_ACTOR_RUN_META_KEY = 'com.apify/ActorRun';

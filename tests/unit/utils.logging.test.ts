@@ -3,11 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import log from '@apify/log';
 
 import {
-    isActorRunLimitError,
     isMcpClientFaultMessage,
     logHttpError,
     redactSkyfirePayId,
-    remoteMcpFailureDetail,
     sanitizeMezmoMessage,
 } from '../../src/utils/logging.js';
 
@@ -25,35 +23,12 @@ describe('isMcpClientFaultMessage', () => {
     });
 });
 
-describe('isActorRunLimitError', () => {
-    it('matches by `type` field (direct run) or message substring (wrapped MCP error), not unrelated errors', () => {
-        expect(isActorRunLimitError({ type: 'cannot-start-actor-runs', message: 'Cannot start new Actor runs.' })).toBe(
-            true,
-        );
-        expect(isActorRunLimitError(new Error('Streamable HTTP error: ... "type": "cannot-start-actor-runs"'))).toBe(
-            true,
-        );
-        expect(isActorRunLimitError(new Error('socket hang up'))).toBe(false);
-        expect(isActorRunLimitError({ type: 'memory-limit-exceeded' })).toBe(false);
-    });
-});
-
 describe('sanitizeMezmoMessage', () => {
     it('replaces every "error" occurrence so Mezmo does not promote the entry', () => {
         // Mezmo promotes on the lowercase word "error"; the old ` error:` pattern missed this case.
         expect(sanitizeMezmoMessage('MCP error -32001: Request timed out')).toBe(
             'MCP failure -32001: Request timed out',
         );
-    });
-});
-
-describe('remoteMcpFailureDetail', () => {
-    it('returns the billing message for the wrapped concurrent-run limit', () => {
-        const detail = remoteMcpFailureDetail(
-            new Error('Streamable HTTP error: ... "type": "cannot-start-actor-runs"'),
-        );
-        expect(detail).toContain('concurrent Actor runs');
-        expect(detail).toContain('console.apify.com/billing/subscription');
     });
 });
 

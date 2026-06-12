@@ -1,5 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { ApifyApiError } from 'apify-client';
+import type { ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -22,11 +22,12 @@ import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/acto
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
-    getHttpStatusCode,
     isActorRunLimitError,
-    logHttpError,
+    isMemoryQuotaError,
+    isPermissionApprovalError,
     remoteMcpFailureDetail,
-} from '../../utils/logging.js';
+} from '../../utils/apify_errors.js';
+import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
@@ -117,14 +118,6 @@ export function buildCallActorAppsDescription(): string {
     return buildCallActorDescriptionSections(true);
 }
 
-export function isPermissionApprovalError(error: unknown): error is ApifyApiError {
-    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED;
-}
-
-function isMemoryQuotaError(error: unknown): error is ApifyApiError {
-    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
-}
-
 /** Exported for native actor tool error handling in server.ts — no logging, no telemetry. */
 export function buildPermissionApprovalResponse(error: ApifyApiError): ReturnType<typeof buildMCPResponse> {
     const approvalUrl = typeof error.data?.approvalUrl === 'string' ? error.data.approvalUrl : undefined;
@@ -160,7 +153,7 @@ function buildPermissionApprovalErrorResponse(
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ReturnType<typeof buildMCPResponse> {
     const { actorName, error, actorId, mcpSessionId, actorGetDetailsTool } = params;
 
-    if (error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED) {
+    if (isPermissionApprovalError(error)) {
         return buildPermissionApprovalErrorResponse(actorName, error, actorId, mcpSessionId);
     }
 

@@ -4,7 +4,8 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import { HTTP_PAYMENT_REQUIRED } from '../const.js';
-import { getHttpStatusCode, isActorRunLimitError } from './logging.js';
+import { isActorRunLimitError } from './apify_errors.js';
+import { getHttpStatusCode } from './logging.js';
 import { buildMCPResponse } from './mcp.js';
 
 const PAYMENT_REQUIRED_HEADER = 'payment-required';

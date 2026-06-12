@@ -2,7 +2,7 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
-import { APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS } from '../const.js';
+import { isActorRunLimitError } from './apify_errors.js';
 
 /**
  * Safely extract HTTP status code from errors.
@@ -42,29 +42,6 @@ export function sanitizeMezmoMessage(message: string): string {
     return message.replace(/error/g, 'failure');
 }
 
-/** User-facing message shown when an Actor run is rejected for hitting the concurrent-run limit. */
-export const ACTOR_RUN_LIMIT_MESSAGE =
-    'You have reached your account limit for concurrent Actor runs. ' +
-    'Wait for running Actors to finish, or upgrade your plan at https://console.apify.com/billing/subscription.';
-
-/**
- * The Apify platform refuses to start a run when the user hits their concurrent-run / usage limit.
- * A direct Actor run surfaces it as an `ApifyApiError` whose `type` is `cannot-start-actor-runs`;
- * a remote MCP-server Actor wraps it as an HTTP 500 whose body carries that same type string.
- * Either way it's a user billing condition, not a server fault.
- */
-export function isActorRunLimitError(error: unknown): boolean {
-    if (
-        typeof error === 'object' &&
-        error !== null &&
-        (error as { type?: unknown }).type === APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS
-    ) {
-        return true;
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    return message.includes(APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS);
-}
-
 // Client faults surfaced by the MCP SDK's `onerror` — expected noise, not server bugs.
 // Disconnects/transport:
 //   - "No connection established" (sendRequest before transport attached)
@@ -96,13 +73,6 @@ const MCP_CLIENT_FAULT_PATTERN = new RegExp(
 /** True when an MCP SDK `onerror` message is a known client fault that should softFail, not error. */
 export function isMcpClientFaultMessage(message: string): boolean {
     return MCP_CLIENT_FAULT_PATTERN.test(message);
-}
-
-/** User-facing detail appended to a failed remote MCP-server tool call message. */
-export function remoteMcpFailureDetail(error: unknown): string {
-    if (isActorRunLimitError(error)) return ACTOR_RUN_LIMIT_MESSAGE;
-    const message = error instanceof Error ? error.message : String(error);
-    return `${message}. The MCP server may be temporarily unavailable.`;
 }
 
 /**

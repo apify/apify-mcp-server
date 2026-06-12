@@ -3,7 +3,8 @@ import type { ErrorObject } from 'ajv';
 
 import { FAILURE_CATEGORY, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, TOOL_STATUS } from '../const.js';
 import type { AjvErrorDetails, CallDiagnostics, FailureCategory, ToolStatus, ToolTelemetryContext } from '../types.js';
-import { getHttpStatusCode, isActorRunLimitError } from './logging.js';
+import { isActorRunLimitError } from './apify_errors.js';
+import { getHttpStatusCode } from './logging.js';
 import { buildActorFields } from './tools.js';
 
 /**
