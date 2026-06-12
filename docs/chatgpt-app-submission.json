@@ -1,0 +1,248 @@
+{
+  "$schema": "https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "Apify",
+    "subtitle": "Extract data from any website",
+    "description": "Extract data from any website using thousands of tools from the Apify Store. Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.",
+    "category": "DEVELOPER_TOOLS"
+  },
+  "tools": {
+    "search-actors": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Searches the Apify Store catalog and returns matching Actors without creating, modifying, or deleting resources.",
+        "open_world_justification": "Queries only the bounded Apify Store catalog and does not interact with arbitrary external services or URLs.",
+        "destructive_justification": "Only reads Actor catalog metadata and does not create, modify, or delete data."
+      }
+    },
+    "fetch-actor-details": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves Actor metadata such as name, description, input schema, and pricing without modifying resources.",
+        "open_world_justification": "Fetches details exclusively from the Apify platform API and does not reach arbitrary external services.",
+        "destructive_justification": "Only reads Actor metadata and does not create, modify, or delete data."
+      }
+    },
+    "call-actor": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Starts an Actor run, which creates Apify run, dataset, and key-value store records.",
+        "open_world_justification": "Actors can interact with arbitrary external websites and services, such as scraping a user-specified URL.",
+        "destructive_justification": "Actors can change Apify platform state and may automate external actions such as form submissions or data writes."
+      }
+    },
+    "get-actor-run": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves the status and metadata of an existing Actor run without modifying the run.",
+        "open_world_justification": "Queries only the Apify platform API to fetch run details and does not interact with external services.",
+        "destructive_justification": "Only reads run metadata and does not create, modify, or delete data."
+      }
+    },
+    "get-dataset-items": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves dataset items with pagination and field selection without modifying the dataset.",
+        "open_world_justification": "Reads dataset items only through the Apify platform API and does not access arbitrary external services.",
+        "destructive_justification": "Only reads stored dataset items and does not create, modify, or delete data."
+      }
+    },
+    "get-key-value-store-record": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves one key-value store record without modifying the store or record.",
+        "open_world_justification": "Reads the record only through the Apify platform API and does not access arbitrary external services.",
+        "destructive_justification": "Only reads stored record content and does not create, modify, or delete data."
+      }
+    },
+    "abort-actor-run": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Requests cancellation of an existing Actor run, which changes run state.",
+        "open_world_justification": "Only changes private Apify run state and does not interact with arbitrary external services.",
+        "destructive_justification": "Can stop an in-progress run before it finishes, which may discard unfinished work."
+      }
+    },
+    "search-apify-docs": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Searches the Apify and Crawlee documentation indexes and returns matching articles without modifying resources.",
+        "open_world_justification": "Queries only the Apify and Crawlee documentation knowledge bases and does not access arbitrary external sources.",
+        "destructive_justification": "Performs a read-only documentation search and does not create, modify, or delete data."
+      }
+    },
+    "fetch-apify-docs": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Fetches the content of a specific Apify or Crawlee documentation page without modifying resources.",
+        "open_world_justification": "Retrieves content only from allowed Apify and Crawlee documentation domains, not arbitrary external URLs.",
+        "destructive_justification": "Only reads documentation content and does not create, modify, or delete data."
+      }
+    },
+    "apify--rag-web-browser": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Starts the Apify RAG Web Browser Actor, creating run storage with fetched web data.",
+        "open_world_justification": "Queries Google Search and fetches public web pages selected by the user's query.",
+        "destructive_justification": "Runs through the Actor execution path, which can change Apify platform state and may have Actor-dependent external effects."
+      }
+    },
+    "search-actors-widget": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Searches the Apify Store catalog and returns widget-ready Actor results without modifying resources.",
+        "open_world_justification": "Queries only the bounded Apify Store catalog and the widget connects only to the Apify API.",
+        "destructive_justification": "Only reads Actor catalog metadata and does not create, modify, or delete data."
+      }
+    },
+    "fetch-actor-details-widget": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves Actor metadata and widget display data without changing the Actor.",
+        "open_world_justification": "Fetches details from the Apify platform API and the widget connects only to the Apify API.",
+        "destructive_justification": "Only reads Actor metadata and does not create, modify, or delete data."
+      }
+    },
+    "call-actor-widget": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Starts an Actor run and returns widget data for tracking it.",
+        "open_world_justification": "Actors can interact with arbitrary external websites and services, while the widget connects only to the Apify API.",
+        "destructive_justification": "Actors can change Apify platform state and may automate external actions such as form submissions or data writes."
+      }
+    },
+    "get-actor-run-widget": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves Actor run status for widget display without modifying the run.",
+        "open_world_justification": "Queries only the Apify platform API for run details and does not interact with external services.",
+        "destructive_justification": "Only reads run metadata and does not create, modify, or delete data."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Search for Actors.",
+      "user_prompt": "Find flights using kiwi mcp server",
+      "file_attachment_urls": null,
+      "tools_triggered": "search-actors",
+      "expected_output": "Search widget renders with a list of relevant Actors.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Get Actor details.",
+      "user_prompt": "Tell me about the apify/web-scraper Actor",
+      "file_attachment_urls": null,
+      "tools_triggered": "fetch-actor-details",
+      "expected_output": "Returns the Actor name, description, pricing, and input schema summary.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Run an Actor.",
+      "user_prompt": "Scrape the homepage of https://example.com using apify/web-scraper",
+      "file_attachment_urls": null,
+      "tools_triggered": "call-actor",
+      "expected_output": "Actor Run widget shows run progress and completes with results.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Get run results.",
+      "user_prompt": "Show me the results from my last run",
+      "file_attachment_urls": null,
+      "tools_triggered": "get-dataset-items",
+      "expected_output": "Displays dataset items from the most recent Actor run.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Compare Actors.",
+      "user_prompt": "Explain apify/website-content-crawler inputs",
+      "file_attachment_urls": null,
+      "tools_triggered": "fetch-actor-details",
+      "expected_output": "Actor details include detailed explanations of input parameters.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Do not trigger for general web scraping concepts or programming techniques.",
+      "user_prompt": "How do I write a Python web scraper using BeautifulSoup to extract product prices?",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked because the user asks for programming guidance, not to run or manage Apify scrapers.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not trigger for Apify pricing, billing, account settings, or subscription plans.",
+      "user_prompt": "How much does Apify cost per month and what's included in the free tier?",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked because it has no tools to manage account settings, billing, or subscription plans.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not trigger for scraping or extracting data from a local file.",
+      "user_prompt": "Extract all the email addresses from this PDF on my desktop.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked because Apify MCP tools operate on cloud-based Actors, public URLs, and online services, not local files.",
+      "expected_output_url": null
+    }
+  ]
+}
