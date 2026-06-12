@@ -26,14 +26,21 @@ function expectSchemaConformingStructuredContent(result: unknown) {
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
 
-function stubApifyClient(opts: { record: unknown; store?: unknown }): InternalToolArgs['apifyClient'] {
-    const { record, store } = opts;
+function stubApifyClient(opts: {
+    record: unknown;
+    store?: unknown;
+    onGetRecordPublicUrl?: () => void;
+}): InternalToolArgs['apifyClient'] {
+    const { record, store, onGetRecordPublicUrl } = opts;
     return {
         keyValueStore: (id: string) => ({
+            url: `https://api.apify.com/v2/key-value-stores/${id}`,
             getRecord: async (_key: string) => record,
             get: async () => store,
-            getRecordPublicUrl: async (key: string) =>
-                `https://api.apify.com/v2/key-value-stores/${id}/records/${key}?signature=signed`,
+            getRecordPublicUrl: async (key: string) => {
+                onGetRecordPublicUrl?.();
+                return `https://api.apify.com/v2/key-value-stores/${id}/records/${key}?signature=signed`;
+            },
         }),
     } as unknown as InternalToolArgs['apifyClient'];
 }
@@ -136,21 +143,28 @@ describe('get-key-value-store-record', () => {
         });
     });
 
-    it('returns an embedded resource block with the SDK-signed URL for other binary records', async () => {
+    it('returns an embedded resource block with a synthetic URI for other binary records', async () => {
         const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF magic bytes
+        // The blob is inlined, so the uri is decorative — building it must not trigger the
+        // store-metadata fetch that getRecordPublicUrl performs to sign the URL.
+        const onGetRecordPublicUrl = vi.fn();
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'kv-1', recordKey: 'report.pdf' },
-                stubApifyClient({ record: { key: 'report.pdf', value: bytes, contentType: 'application/pdf' } }),
+                stubApifyClient({
+                    record: { key: 'report.pdf', value: bytes, contentType: 'application/pdf' },
+                    onGetRecordPublicUrl,
+                }),
             ),
         );
         const { content, isError } = result as CallToolResult;
 
         expect(isError).not.toBe(true);
+        expect(onGetRecordPublicUrl).not.toHaveBeenCalled();
         expect(content[0]).toEqual({
             type: 'resource',
             resource: {
-                uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/report.pdf?signature=signed',
+                uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/report.pdf',
                 blob: bytes.toString('base64'),
                 mimeType: 'application/pdf',
             },
@@ -280,7 +294,11 @@ describe('get-key-value-store-record', () => {
                     stubToolCallContext(req.params.arguments ?? {}, stubApifyClient({ record })),
                 )) as CallToolResult;
                 // Mirror the real server, which strips internal telemetry before sending the result.
-                return { content: result.content, structuredContent: result.structuredContent, isError: result.isError };
+                return {
+                    content: result.content,
+                    structuredContent: result.structuredContent,
+                    isError: result.isError,
+                };
             });
 
             const client = new Client({ name: 'pedantic-client', version: '0.0.0' });

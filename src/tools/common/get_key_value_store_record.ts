@@ -104,7 +104,9 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             if (mimeType?.startsWith('audio/')) {
                 return { structuredContent, content: [{ type: 'audio', data, mimeType } satisfies AudioContent] };
             }
-            const uri = await store.getRecordPublicUrl(recordKey);
+            // The blob is inlined, so the uri is just an identifier — build it from the store's API
+            // URL instead of getRecordPublicUrl, which fetches store metadata to sign a link nobody follows.
+            const uri = `${store.url}/records/${recordKey}`;
             return {
                 structuredContent,
                 content: [
