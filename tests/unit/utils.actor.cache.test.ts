@@ -54,7 +54,7 @@ describe('getActorDefinitionCached — tenant isolation', () => {
 
     it('serves a cached private Actor to its owner', async () => {
         const cached = seedCache('acme/private-owner', false, 'owner-2');
-        getUserInfoCachedMock.mockResolvedValue({ userId: 'owner-2', userPlanTier: 'FREE' });
+        getUserInfoCachedMock.mockResolvedValue({ userId: 'owner-2', userPlanTier: 'FREE', isOrganization: false });
 
         const result = await getActorDefinitionCached('acme/private-owner', client);
 
@@ -64,7 +64,7 @@ describe('getActorDefinitionCached — tenant isolation', () => {
 
     it('does NOT serve a cached private Actor to a non-owner — returns the re-fetched object, never the cached one', async () => {
         const cached = seedCache('acme/private-other', false, 'owner-3');
-        getUserInfoCachedMock.mockResolvedValue({ userId: 'intruder', userPlanTier: 'FREE' });
+        getUserInfoCachedMock.mockResolvedValue({ userId: 'intruder', userPlanTier: 'FREE', isOrganization: false });
         const refetched = {
             definition: {},
             info: { isPublic: false, userId: 'owner-3' },
@@ -80,7 +80,7 @@ describe('getActorDefinitionCached — tenant isolation', () => {
 
     it('does NOT serve a cached private Actor to an anonymous caller', async () => {
         seedCache('acme/private-anon', false, 'owner-4');
-        getUserInfoCachedMock.mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
+        getUserInfoCachedMock.mockResolvedValue({ userId: null, userPlanTier: 'FREE', isOrganization: false });
         getActorDefinitionMock.mockResolvedValue(null);
 
         const result = await getActorDefinitionCached('acme/private-anon', client);
@@ -102,7 +102,7 @@ describe('getActorMcpUrlCached — tenant isolation', () => {
 
     it('does NOT leak a cached private Actor MCP URL to a non-owner — re-fetches and returns false', async () => {
         seedCache('acme/mcp-private', false, 'owner-7', { id: 'actorpriv', webServerMcpPath: '/mcp' });
-        getUserInfoCachedMock.mockResolvedValue({ userId: 'intruder', userPlanTier: 'FREE' });
+        getUserInfoCachedMock.mockResolvedValue({ userId: 'intruder', userPlanTier: 'FREE', isOrganization: false });
         getActorDefinitionMock.mockResolvedValue(null); // intruder's own fetch is unauthorized
 
         const result = await getActorMcpUrlCached('acme/mcp-private', client);
