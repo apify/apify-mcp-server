@@ -96,7 +96,8 @@ export type RunKeyValueStore = {
  * Storage shape mirrors `ActorRunStorageIds` from the Apify client — a map of alias → storage
  * object where `default` is always the primary entry. Using the same plural alias-map structure
  * means named Actor storages (e.g. `storages.datasets.results`) can be added without introducing
- * new field names. Each value extends the bare Apify ID string with fetched metadata.
+ * new field names. The `default` entry extends the bare Apify ID string with fetched metadata;
+ * aliased entries carry `{ id }` only.
  */
 export type RunStorages = {
     datasets?: { default: RunDataset; [alias: string]: RunDataset };
@@ -236,6 +237,19 @@ function buildAliasedStorageEntries(aliasIds?: Record<string, string>): Record<s
         if (alias !== 'default') entries[alias] = { id };
     }
     return entries;
+}
+
+function buildRunStorages(
+    storageIds: ActorRun['storageIds'],
+    dataset?: RunDataset,
+    keyValueStore?: RunKeyValueStore,
+): RunStorages {
+    return {
+        ...(dataset && { datasets: { default: dataset, ...buildAliasedStorageEntries(storageIds?.datasets) } }),
+        ...(keyValueStore && {
+            keyValueStores: { default: keyValueStore, ...buildAliasedStorageEntries(storageIds?.keyValueStores) },
+        }),
+    };
 }
 
 function errMessage(error: unknown): string {
@@ -636,17 +650,7 @@ export function buildStartRunResponse(params: {
         actorName,
         status: actorRun.status,
         startedAt: toIsoString(actorRun.startedAt),
-        storages: {
-            ...(dataset && {
-                datasets: { default: dataset, ...buildAliasedStorageEntries(actorRun.storageIds?.datasets) },
-            }),
-            ...(keyValueStore && {
-                keyValueStores: {
-                    default: keyValueStore,
-                    ...buildAliasedStorageEntries(actorRun.storageIds?.keyValueStores),
-                },
-            }),
-        },
+        storages: buildRunStorages(actorRun.storageIds, dataset, keyValueStore),
         summary,
         nextStep,
     };
@@ -784,17 +788,7 @@ export async function fetchActorRunData(params: {
         startedAt: toIsoString(run.startedAt),
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
-        storages: {
-            ...(dataset && {
-                datasets: { default: dataset, ...buildAliasedStorageEntries(run.storageIds?.datasets) },
-            }),
-            ...(keyValueStore && {
-                keyValueStores: {
-                    default: keyValueStore,
-                    ...buildAliasedStorageEntries(run.storageIds?.keyValueStores),
-                },
-            }),
-        },
+        storages: buildRunStorages(run.storageIds, dataset, keyValueStore),
         summary,
         nextStep,
     };
