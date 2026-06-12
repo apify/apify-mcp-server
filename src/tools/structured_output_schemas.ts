@@ -381,6 +381,11 @@ export const getActorRunOutputSchema = {
                                 title: { type: 'string' },
                                 itemCount: { type: 'number' },
                                 cleanItemCount: { type: 'number' },
+                                inflatedBytes: {
+                                    type: 'number',
+                                    description:
+                                        'Approximate uncompressed byte size of the dataset. Use with itemCount to pick limit/fields before fetching.',
+                                },
                                 fields: {
                                     type: 'array' as const,
                                     items: { type: 'string' },
@@ -594,7 +599,8 @@ export const datasetSchemaOutputSchema = {
 
 /**
  * Schema for storage collection listings (get-dataset-list, get-key-value-store-list).
- * Mirrors the Apify paginated-list response shape plus the narrative fields.
+ * Mirrors the Apify paginated-list response shape plus the narrative fields. `items` is an opaque
+ * object since item shape varies by storage type; per-item fields pass through from the API.
  */
 export const storageListOutputSchema = {
     type: 'object' as const,

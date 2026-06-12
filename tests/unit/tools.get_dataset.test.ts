@@ -56,6 +56,32 @@ describe('get-dataset', () => {
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
+    it('steers nextStep away from fetching when the dataset is large', async () => {
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient({ ...MOCK_DATASET, itemCount: 47, stats: { inflatedBytes: 2_400_000 } }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, string> };
+
+        expect(structuredContent.summary).toContain('has 47 items');
+        expect(structuredContent.nextStep).toContain('Full output is ~2400000 bytes');
+    });
+
+    it('reports size but omits the large-output warning below the threshold', async () => {
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient({ ...MOCK_DATASET, itemCount: 2, stats: { inflatedBytes: 4000 } }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, string> };
+
+        expect(structuredContent.nextStep).toContain('Full output is ~4000 bytes');
+        expect(structuredContent.nextStep).not.toContain('may exceed context');
+    });
+
     it('returns isError with a not-found message when the dataset does not exist', async () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'missing' }, stubApifyClient(undefined)),

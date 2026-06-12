@@ -7,7 +7,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
-import { normalizeDatasetFields } from '../core/actor_run_response.js';
+import { datasetSizeNextStepHint, normalizeDatasetFields } from '../core/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
@@ -25,6 +25,7 @@ export const getDataset: ToolEntry = Object.freeze({
         Get metadata for a dataset (collection of structured data created by an Actor run).
         The results will include dataset details such as itemCount, schema, fields, and stats.
         Use fields to understand structure for filtering with ${HelperTools.DATASET_GET_ITEMS}.
+        stats.inflatedBytes (when present) is the approximate uncompressed byte size — use it with itemCount to pick a safe limit and fields before fetching.
         Note: itemCount updates may be delayed by up to ~5 seconds.
 
         USAGE:
@@ -62,8 +63,11 @@ export const getDataset: ToolEntry = Object.freeze({
         // the structured `storages.datasets.default.fields` shape.
         const normalized = dataset.fields ? { ...dataset, fields: normalizeDatasetFields(dataset.fields) } : dataset;
         const fieldCount = Array.isArray(normalized.fields) ? normalized.fields.length : undefined;
+        // `inflatedBytes` is undeclared on the apify-client `DatasetStats` type and absent from the GET
+        // response today (only the dataset-list endpoint returns it), so read it defensively.
+        const inflatedBytes = (dataset.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
-        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items.`;
+        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`;
         return buildStorageResponse({
             structuredContent: normalized as unknown as Record<string, unknown>,
             summary,
