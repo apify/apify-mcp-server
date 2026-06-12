@@ -25,7 +25,7 @@ Use `git mv` (not `mv` + `rm`) when renaming files so git records a rename rathe
 
 ## Verification (mandatory)
 
-After every code change, run `pnpm run type-check`, `pnpm run lint`, `pnpm run format:check`, `pnpm run test:unit`, and `pnpm run check:agents`.
+After every code change, run `pnpm run type-check`, `pnpm run lint`, `pnpm run test:unit`, `pnpm run format` and `pnpm run check:agents`.
 Zero tolerance for errors — fix before proceeding, don't defer.
 
 ## Agent constraints

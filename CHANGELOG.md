@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Return binary key-value store records as MCP content blocks ([#964](https://github.com/apify/apify-mcp-server/pull/964)) ([59dec22](https://github.com/apify/apify-mcp-server/commit/59dec2281ca368faf31f400d4acb4536df028f2c)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#883](https://github.com/apify/apify-mcp-server/issues/883)
+- Add format to verification steps in AGENTS.md ([#990](https://github.com/apify/apify-mcp-server/pull/990)) ([c8755ae](https://github.com/apify/apify-mcp-server/commit/c8755aeef56d1d87d74eedd6e85e7e910d4dd0fe)) by [@RobertCrupa](https://github.com/RobertCrupa)
 
 
 <!-- git-cliff-unreleased-end -->
