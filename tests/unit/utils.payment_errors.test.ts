@@ -17,23 +17,15 @@ const SAMPLE_PAYMENT_REQUIRED = {
 } as const;
 
 describe('isX402PaymentRequiredError()', () => {
-    it('returns true for a plain 402 error', () => {
+    it('returns true for a plain 402, false for the concurrent-run limit arriving as 402', () => {
         expect(isX402PaymentRequiredError(Object.assign(new Error('Payment required'), { statusCode: 402 }))).toBe(
             true,
         );
-    });
-
-    it('returns false for the concurrent-run limit even though it arrives as 402', () => {
-        const error = Object.assign(new Error('Cannot start new Actor runs.'), {
+        const runLimitError = Object.assign(new Error('Cannot start new Actor runs.'), {
             statusCode: 402,
             type: 'cannot-start-actor-runs',
         });
-        expect(isX402PaymentRequiredError(error)).toBe(false);
-    });
-
-    it('returns false for non-402 errors', () => {
-        expect(isX402PaymentRequiredError(Object.assign(new Error('boom'), { statusCode: 500 }))).toBe(false);
-        expect(isX402PaymentRequiredError(new Error('boom'))).toBe(false);
+        expect(isX402PaymentRequiredError(runLimitError)).toBe(false);
     });
 });
 

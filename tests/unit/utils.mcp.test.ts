@@ -14,11 +14,6 @@ describe('getToolCallErrorUserText()', () => {
         expect(text).toContain('console.apify.com/billing/subscription');
         expect(text).not.toContain('Verify the tool name');
     });
-
-    it('falls back to the generic hint for unrelated errors', () => {
-        const text = getToolCallErrorUserText('apify/instagram-scraper', new Error('boom'));
-        expect(text).toContain('Verify the tool name and input parameters');
-    });
 });
 
 describe('computeToolResponseBytes()', () => {

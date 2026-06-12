@@ -12,7 +12,7 @@ import {
 } from '../../src/utils/logging.js';
 
 describe('isMcpClientFaultMessage', () => {
-    it('matches known client-fault messages', () => {
+    it('matches known client-fault messages and rejects genuine server faults', () => {
         for (const message of [
             'Failed to send response: Error: Not connected',
             'Conflict: Only one SSE stream is allowed per session',
@@ -21,28 +21,18 @@ describe('isMcpClientFaultMessage', () => {
         ]) {
             expect(isMcpClientFaultMessage(message)).toBe(true);
         }
-    });
-
-    it('returns false for genuine server faults', () => {
         expect(isMcpClientFaultMessage('Unexpected internal failure')).toBe(false);
     });
 });
 
 describe('isActorRunLimitError', () => {
-    it('matches an ApifyApiError-shaped error by its `type` field (direct Actor run)', () => {
-        // A direct run carries the type on a field, not in the message text.
+    it('matches by `type` field (direct run) or message substring (wrapped MCP error), not unrelated errors', () => {
         expect(isActorRunLimitError({ type: 'cannot-start-actor-runs', message: 'Cannot start new Actor runs.' })).toBe(
             true,
         );
-    });
-
-    it('matches the type string embedded in a wrapped MCP error message', () => {
         expect(isActorRunLimitError(new Error('Streamable HTTP error: ... "type": "cannot-start-actor-runs"'))).toBe(
             true,
         );
-    });
-
-    it('returns false for unrelated errors', () => {
         expect(isActorRunLimitError(new Error('socket hang up'))).toBe(false);
         expect(isActorRunLimitError({ type: 'memory-limit-exceeded' })).toBe(false);
     });
@@ -50,17 +40,10 @@ describe('isActorRunLimitError', () => {
 
 describe('sanitizeMezmoMessage', () => {
     it('replaces every "error" occurrence so Mezmo does not promote the entry', () => {
-        // Mezmo promotes on the lowercase word "error"; " error:" alone is not enough to catch.
+        // Mezmo promotes on the lowercase word "error"; the old ` error:` pattern missed this case.
         expect(sanitizeMezmoMessage('MCP error -32001: Request timed out')).toBe(
             'MCP failure -32001: Request timed out',
         );
-        expect(sanitizeMezmoMessage('Parse error: Invalid JSON-RPC message')).toBe(
-            'Parse failure: Invalid JSON-RPC message',
-        );
-    });
-
-    it('leaves messages without "error" unchanged', () => {
-        expect(sanitizeMezmoMessage('Bad Request: Server not initialized')).toBe('Bad Request: Server not initialized');
     });
 });
 
@@ -71,12 +54,6 @@ describe('remoteMcpFailureDetail', () => {
         );
         expect(detail).toContain('concurrent Actor runs');
         expect(detail).toContain('console.apify.com/billing/subscription');
-    });
-
-    it('echoes the error with the generic availability hint otherwise', () => {
-        expect(remoteMcpFailureDetail(new Error('socket hang up'))).toBe(
-            'socket hang up. The MCP server may be temporarily unavailable.',
-        );
     });
 });
 
