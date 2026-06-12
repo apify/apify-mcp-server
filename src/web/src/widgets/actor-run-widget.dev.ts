@@ -219,7 +219,7 @@ export function setupActorRunWidgetDev(): void {
                             ? `SUCCEEDED in 12s. ${mockPreviewItems.length} items; 3 fields available.`
                             : 'RUNNING for 5s. In progress.',
                         nextStep: isComplete
-                            ? 'Use get-dataset-items with datasetId=test_dataset_456 and limit=20 to fetch items.'
+                            ? 'Use get-dataset-items with datasetId=test_dataset_456 and limit (for example 20) to fetch items.'
                             : 'Use get-actor-run with runId=test_run_123 and waitSecs=10 to poll for completion.',
                     },
                 };
@@ -257,7 +257,8 @@ export function setupActorRunWidgetDev(): void {
                     },
                 },
                 summary: `SUCCEEDED in 12s. ${mockPreviewItems.length} items; 3 fields available.`,
-                nextStep: 'Use get-dataset-items with datasetId=test_dataset_456 and limit=20 to fetch items.',
+                nextStep:
+                    'Use get-dataset-items with datasetId=test_dataset_456 and limit (for example 20) to fetch items.',
             },
         });
     }, LOADING_DELAY_MS);

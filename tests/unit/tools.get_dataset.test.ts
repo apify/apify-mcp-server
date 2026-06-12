@@ -8,7 +8,6 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSoftFailInvalidInput,
     mockUserInfo,
-    parseFencedJson,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -37,14 +36,24 @@ describe('get-dataset', () => {
         expect(getDataset.name).toBe(HelperTools.DATASET_GET);
     });
 
-    it('returns dataset metadata as JSON in a fenced code block', async () => {
+    it('returns dataset metadata plus a summary and nextStep in structuredContent', async () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET)),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
         expect(isError).not.toBe(true);
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_DATASET);
+        // structuredContent preserves the metadata and adds the narrative fields.
+        expect(structuredContent).toMatchObject(MOCK_DATASET);
+        expect(structuredContent.summary).toBe("Dataset 'my-dataset' has 42 items, 2 fields.");
+        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
+        expect(structuredContent.nextStep).toContain('datasetId=ds-1');
+        // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(JSON.parse(content[0].text)).toEqual(data);
+        expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
     it('returns isError with a not-found message when the dataset does not exist', async () => {
@@ -83,12 +92,8 @@ describe('get-dataset fields normalization', () => {
                 }),
             ),
         );
-        const { content } = result as TextToolResult;
-        expect((parseFencedJson(content[0].text) as { fields: string[] }).fields).toEqual([
-            'crawl.httpStatusCode',
-            'metadata.url',
-            'markdown',
-        ]);
+        const { structuredContent } = result as { structuredContent: { fields: string[] } };
+        expect(structuredContent.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
     });
 
     it('collapses array-index segments and dedupes', async () => {
@@ -113,8 +118,8 @@ describe('get-dataset fields normalization', () => {
                 }),
             ),
         );
-        const { content } = result as TextToolResult;
-        expect((parseFencedJson(content[0].text) as { fields: string[] }).fields).toEqual([
+        const { structuredContent } = result as { structuredContent: { fields: string[] } };
+        expect(structuredContent.fields).toEqual([
             'latestComments.id',
             'latestComments.text',
             'latestComments.owner.username',
@@ -134,8 +139,8 @@ describe('get-dataset fields normalization', () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(raw)),
         );
-        const { content } = result as TextToolResult;
-        expect(parseFencedJson(content[0].text)).toEqual({
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+        expect(structuredContent).toMatchObject({
             id: 'ds-1',
             name: null,
             userId: 'u-1',
@@ -150,10 +155,9 @@ describe('get-dataset fields normalization', () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-empty' }, stubApifyClient(raw)),
         );
-        const { content } = result as TextToolResult;
-        const json = parseFencedJson(content[0].text) as Record<string, unknown>;
-        expect(json).toEqual(raw);
-        expect(json).not.toHaveProperty('fields');
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+        expect(structuredContent).toMatchObject(raw);
+        expect(structuredContent).not.toHaveProperty('fields');
     });
 
     it('appends the dataset Console link (from the API-returned id) for Console UI token sessions', async () => {
@@ -166,8 +170,9 @@ describe('get-dataset fields normalization', () => {
         });
         const { content } = result as TextToolResult;
 
-        expect(content).toHaveLength(2);
-        expect(content[1].text).toBe(
+        // content: [0] data, [1] summary/nextStep, [2] Apify Console link.
+        expect(content).toHaveLength(3);
+        expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
         );
     });

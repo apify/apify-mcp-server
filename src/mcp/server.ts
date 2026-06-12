@@ -50,13 +50,11 @@ import { parseBooleanOrNull } from '@apify/utilities';
 import { ApifyClient } from '../apify_client.js';
 import {
     ALLOWED_TASK_TOOL_EXECUTION_MODES,
-    APIFY_MCP_URL,
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     FAILURE_CATEGORY,
     HelperTools,
     HTTP_PAYMENT_REQUIRED,
-    SERVER_NAME,
     TOOL_STATUS,
 } from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
@@ -64,6 +62,7 @@ import { prompts } from '../prompts/index.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
+import { getServerInfo } from '../server_card.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { actorExecutor } from '../tools/actor_executor.js';
 import {
@@ -88,7 +87,12 @@ import type {
 } from '../types.js';
 import { ServerMode, TOOL_TYPE } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
-import { buildMCPResponse, computeToolResponseBytes, getToolCallErrorUserText } from '../utils/mcp.js';
+import {
+    buildMCPResponse,
+    buildResponseBytesTelemetry,
+    computeToolResponseBytes,
+    getToolCallErrorUserText,
+} from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -230,38 +234,31 @@ export class ActorsMcpServer {
         this.serverModeResolved = this.serverModeOption !== 'auto';
 
         const { setupSigintHandler = true } = options;
-        this.server = new Server(
-            {
-                name: SERVER_NAME,
-                version: getPackageVersion()!,
-                websiteUrl: APIFY_MCP_URL,
-            },
-            {
-                capabilities: {
-                    tools: {
-                        listChanged: true,
-                    },
-                    // Declare long-running task support
-                    tasks: {
-                        list: {},
-                        cancel: {},
-                        requests: {
-                            tools: {
-                                call: {},
-                            },
+        this.server = new Server(getServerInfo(), {
+            capabilities: {
+                tools: {
+                    listChanged: true,
+                },
+                // Declare long-running task support
+                tasks: {
+                    list: {},
+                    cancel: {},
+                    requests: {
+                        tools: {
+                            call: {},
                         },
                     },
-                    /**
-                     * Declaring resources even though we are not using them
-                     * to prevent clients like Claude desktop from failing.
-                     */
-                    resources: {},
-                    prompts: {},
-                    logging: {},
                 },
-                instructions: getServerInstructions(),
+                /**
+                 * Declaring resources even though we are not using them
+                 * to prevent clients like Claude desktop from failing.
+                 */
+                resources: {},
+                prompts: {},
+                logging: {},
             },
-        );
+            instructions: getServerInstructions(),
+        });
         this.setupTelemetry();
         this.setupInitializeHandler();
         this.setupLoggingProxy();
@@ -1391,6 +1388,7 @@ export class ActorsMcpServer {
             ...(params.responseBytes !== undefined && {
                 responseContentBytes: params.responseBytes.contentBytes,
                 responseStructuredContentBytes: params.responseBytes.structuredContentBytes,
+                responseFileBytes: params.responseBytes.fileBytes,
             }),
             ...(params.taskId !== undefined && { taskId: params.taskId }),
         });
@@ -1400,10 +1398,7 @@ export class ActorsMcpServer {
                 ...params.telemetryData,
                 tool_status: params.toolStatus,
                 tool_exec_time_ms: durationMs,
-                ...(params.responseBytes !== undefined && {
-                    tool_response_content_bytes: params.responseBytes.contentBytes,
-                    tool_response_structured_content_bytes: params.responseBytes.structuredContentBytes,
-                }),
+                ...buildResponseBytesTelemetry(params.responseBytes),
                 // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
                 ...params.callDiagnostics,
             };

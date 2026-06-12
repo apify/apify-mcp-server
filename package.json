@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.10.13",
+  "version": "0.11.1",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -101,6 +101,7 @@
     "lint:fix": "oxlint . --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
+    "check:agents": "node scripts/check-agents-links.mjs",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "typecheck": "pnpm run type-check",
     "check": "pnpm run type-check && pnpm run lint",
@@ -109,7 +110,6 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "pnpm run build && vitest run tests/integration",
     "test:integration:stdio": "pnpm run build && vitest run tests/integration/stdio.test.ts",
-    "test:integration:sse": "pnpm run build && vitest run tests/integration/actor.server_sse.test.ts",
     "test:integration:streamable": "pnpm run build && vitest run tests/integration/actor.server_streamable.test.ts",
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:create-dataset": "tsx evals/create_dataset.ts",

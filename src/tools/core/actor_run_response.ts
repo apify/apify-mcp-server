@@ -411,7 +411,7 @@ function buildSucceededSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsProjectionHint(fields)}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items (${itemCount} total).${fieldsProjectionHint(fields)}`,
         };
     }
 
@@ -420,7 +420,7 @@ function buildSucceededSummaryNextStep(
     if (itemCount === undefined && datasetId) {
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. Dataset metadata unavailable.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to inspect output.`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to inspect output.`,
         };
     }
 
@@ -429,7 +429,7 @@ function buildSucceededSummaryNextStep(
     if (itemCount === 0 && datasetId) {
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 
@@ -458,7 +458,7 @@ function buildTimedOutSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,
         };
     }
 

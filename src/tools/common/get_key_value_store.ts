@@ -6,9 +6,9 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
-import { wrapJsonText } from '../../utils/encode_text.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
-import { buildConsoleLinkContent, buildStorageNotFound } from './storage_helpers.js';
+import { keyValueStoreOutputSchema } from '../structured_output_schemas.js';
+import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
 const getKeyValueStoreArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -31,6 +31,7 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
         - user_input: Show info for key-value store username~my-store
         - user_input: Get details for store adb123`,
     inputSchema: z.toJSONSchema(getKeyValueStoreArgs) as ToolInputSchema,
+    outputSchema: keyValueStoreOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreArgs)),
     paymentRequired: true,
     annotations: {
@@ -49,11 +50,14 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
             return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
-        return {
-            content: [
-                { type: 'text', text: wrapJsonText(kvStore) },
-                ...buildConsoleLinkContent(buildConsoleKeyValueStoreUrl(linkContext, kvStore.id)),
-            ],
-        };
+        const bytes = (kvStore.stats as { storageBytes?: number } | undefined)?.storageBytes;
+        const summary = `Key-value store '${kvStore.name ?? keyValueStoreId}'${bytes !== undefined ? ` holds ${bytes} bytes` : ''}.`;
+        const nextStep = `Use ${HelperTools.KEY_VALUE_STORE_KEYS_GET} with keyValueStoreId=${keyValueStoreId} to list keys.`;
+        return buildStorageResponse({
+            structuredContent: kvStore as unknown as Record<string, unknown>,
+            summary,
+            nextStep,
+            apifyConsoleUrl: buildConsoleKeyValueStoreUrl(linkContext, kvStore.id),
+        });
     },
 } as const);

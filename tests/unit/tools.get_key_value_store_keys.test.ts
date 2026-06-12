@@ -1,7 +1,9 @@
+import Ajv from 'ajv';
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { getKeyValueStoreKeys } from '../../src/tools/common/get_key_value_store_keys.js';
+import { keyValueStoreKeysOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
@@ -46,26 +48,72 @@ describe('get-key-value-store-keys', () => {
         expect(getKeyValueStoreKeys.name).toBe(HelperTools.KEY_VALUE_STORE_KEYS_GET);
     });
 
-    it('returns the keys response as fenced text (json or toon) that round-trips to the data', async () => {
+    it('returns the keys response plus a summary and read nextStep in structuredContent', async () => {
         const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
         );
-        const { content } = result as TextToolResult;
+        const { content, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
-        expect(decodeFencedToolText(content[0].text)).toEqual(MOCK_KEYS);
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', ...MOCK_KEYS });
+        expect(structuredContent.summary).toBe('Listed 2 keys.');
+        // nextStep points at reading the first listed key.
+        expect(structuredContent.nextStep).toBe(
+            `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=kv-1 and recordKey=INPUT to read a value.`,
+        );
+        // content[0] ships the TOON-fenced data; content[1] carries the prose summary + nextStep.
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(decodeFencedToolText(content[0].text)).toEqual(data);
+        expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
-    it('mirrors the keys response in structuredContent and declares an outputSchema', async () => {
-        const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
+    it('emits structuredContent that validates against the outputSchema when not truncated', async () => {
+        // The SDK returns `nextExclusiveStartKey: null` when `isTruncated` is false — the common
+        // single-page case. The output schema must accept that, or the MCP SDK rejects the response.
+        // Validated with a strict AJV (no coercion) to mirror the SDK's output-schema check; the
+        // repo's lenient `compileSchema` coerces types and would hide the mismatch.
+        const listKeysSpy = vi.fn().mockResolvedValue({ ...MOCK_KEYS, nextExclusiveStartKey: null });
+        const validate = new Ajv({ strict: false }).compile(keyValueStoreKeysOutputSchema);
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
         );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
-        expect((result as TextToolResult).structuredContent).toEqual(MOCK_KEYS);
-        expect((getKeyValueStoreKeys as HelperTool).outputSchema).toMatchObject({ type: 'object' });
+        expect(validate(structuredContent)).toBe(true);
+    });
+
+    it('flags truncation in the summary and points to the next page when more keys are available', async () => {
+        const listKeysSpy = vi.fn().mockResolvedValue({
+            ...MOCK_KEYS,
+            isTruncated: true,
+            nextExclusiveStartKey: 'OUTPUT',
+        });
+
+        const result = await (getKeyValueStoreKeys as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe('Listed 2 keys (more available).');
+        expect(structuredContent.nextStep).toBe(
+            `Call ${HelperTools.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=OUTPUT to fetch the next page.`,
+        );
+    });
+
+    it('points at inspecting the store when it has no keys', async () => {
+        const listKeysSpy = vi.fn().mockResolvedValue({ ...MOCK_KEYS, items: [], count: 0 });
+
+        const result = await (getKeyValueStoreKeys as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe('Listed 0 keys.');
+        expect(structuredContent.nextStep).toContain(HelperTools.KEY_VALUE_STORE_GET);
     });
 
     it('forwards exclusiveStartKey and limit to listKeys', async () => {
@@ -137,8 +185,9 @@ describe('get-key-value-store-keys', () => {
         });
         const { content } = result as TextToolResult;
 
-        expect(content).toHaveLength(2);
-        expect(content[1].text).toBe(
+        // content: [0] fenced data, [1] summary/nextStep, [2] Apify Console link.
+        expect(content).toHaveLength(3);
+        expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
         );
     });

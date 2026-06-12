@@ -8,7 +8,6 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSoftFailInvalidInput,
     mockUserInfo,
-    parseFencedJson,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -35,14 +34,35 @@ describe('get-key-value-store', () => {
         expect(getKeyValueStore.name).toBe(HelperTools.KEY_VALUE_STORE_GET);
     });
 
-    it('returns store metadata as JSON in a fenced code block', async () => {
+    it('returns store metadata plus a summary and nextStep in structuredContent', async () => {
         const result = await (getKeyValueStore as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_STORE)),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
         expect(isError).not.toBe(true);
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_STORE);
+        expect(structuredContent).toMatchObject(MOCK_STORE);
+        expect(structuredContent.summary).toBe("Key-value store 'my-store'.");
+        expect(structuredContent.nextStep).toContain(HelperTools.KEY_VALUE_STORE_KEYS_GET);
+        expect(structuredContent.nextStep).toContain('keyValueStoreId=kv-1');
+        // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(JSON.parse(content[0].text)).toEqual(data);
+        expect(content[1].text).toBe(`${summary}\n${nextStep}`);
+    });
+
+    it('includes the byte count in the summary when stats are present', async () => {
+        const result = await (getKeyValueStore as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1' },
+                stubApifyClient({ ...MOCK_STORE, stats: { storageBytes: 2048 } }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe("Key-value store 'my-store' holds 2048 bytes.");
     });
 
     it('returns isError with a not-found message when the store does not exist', async () => {
@@ -70,8 +90,9 @@ describe('get-key-value-store', () => {
         });
         const { content } = result as TextToolResult;
 
-        expect(content).toHaveLength(2);
-        expect(content[1].text).toBe(
+        // content: [0] data, [1] summary/nextStep, [2] Apify Console link.
+        expect(content).toHaveLength(3);
+        expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
         );
     });

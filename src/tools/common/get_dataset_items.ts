@@ -6,11 +6,10 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
-import { encodeToon } from '../../utils/encode_text.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildConsoleLinkContent, buildStorageNotFound } from './storage_helpers.js';
+import { buildDatasetItemsSummaryNextStep, buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
@@ -125,6 +124,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
 
+        const offset = parsed.offset ?? 0;
         const apifyConsoleUrl = buildConsoleDatasetUrl(await getConsoleLinkContext(apifyToken, client), datasetId);
         const structuredContent = {
             datasetId,
@@ -132,16 +132,16 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
-            offset: parsed.offset ?? 0,
+            offset,
             limit: effectiveLimit,
         };
 
-        return {
-            content: [
-                { type: 'text', text: encodeToon(structuredContent) },
-                ...buildConsoleLinkContent(apifyConsoleUrl),
-            ],
-            structuredContent,
-        };
+        const { summary, nextStep } = buildDatasetItemsSummaryNextStep({
+            datasetId,
+            itemCount: v.items.length,
+            totalItemCount: v.total,
+            offset,
+        });
+        return buildStorageResponse({ structuredContent, summary, nextStep, toon: true, apifyConsoleUrl });
     },
 } as const);

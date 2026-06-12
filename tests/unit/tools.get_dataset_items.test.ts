@@ -50,6 +50,7 @@ describe('extractDotPrefixes', () => {
 });
 
 const MOCK_ITEMS = [{ first_number: 3, second_number: 4, sum: 7 }];
+const MANY_ITEMS = Array.from({ length: 20 }, (_, i) => ({ n: i }));
 
 function stubApifyClient(
     listItems: (...args: unknown[]) => unknown = async () => ({ items: MOCK_ITEMS, total: 1 }),
@@ -80,13 +81,14 @@ describe('get-dataset-items', () => {
         expect(structuredContent.itemCount).toBe(MOCK_ITEMS.length);
     });
 
-    it('encodes the same payload into content text as structuredContent', async () => {
+    it('encodes the data payload (without summary/nextStep) into the fenced content text', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
         );
         const { content, structuredContent } = result as TextToolResult;
 
-        expect(decodeFencedToolText(content[0].text)).toEqual(structuredContent);
+        const { summary, nextStep, ...data } = structuredContent as Record<string, unknown>;
+        expect(decodeFencedToolText(content[0].text)).toEqual(data);
     });
 
     it('content round-trips to structuredContent for nested items (dot-flattened when TOON wins)', async () => {
@@ -106,11 +108,12 @@ describe('get-dataset-items', () => {
         const { content, structuredContent } = result as TextToolResult;
         const [{ text }] = content;
 
-        // Uniform nested rows favour TOON; assert the lift actually happened, then that the text
-        // round-trips to the dot-flattened structuredContent (its true on-the-wire equivalent).
+        // Uniform nested rows favour TOON; assert the lift actually happened, then that the fenced
+        // text round-trips to the dot-flattened data (summary/nextStep stay outside the fence).
+        const { summary, nextStep, ...data } = structuredContent as Record<string, unknown>;
         expect(text.startsWith('```toon\n')).toBe(true);
         expect(text).toContain('metadata.httpStatus');
-        expect(decodeFencedToolText(text)).toEqual(dotFlatten(JSON.parse(JSON.stringify(structuredContent))));
+        expect(decodeFencedToolText(text)).toEqual(dotFlatten(JSON.parse(JSON.stringify(data))));
     });
 
     it('defaults `limit` to 20 when caller omits it', async () => {
@@ -198,9 +201,53 @@ describe('get-dataset-items', () => {
         };
 
         expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/ds-1');
-        expect(content).toHaveLength(2);
-        expect(content[1].text).toBe(
+        // content: [0] fenced data, [1] summary/nextStep, [2] Apify Console link.
+        expect(content).toHaveLength(3);
+        expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
         );
+    });
+
+    it('emits a last-page summary and a schema nextStep when all items are returned', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+        );
+        const { content, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(structuredContent.summary).toBe('Fetched all 1 items.');
+        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_SCHEMA_GET);
+        expect(structuredContent.nextStep).toContain('datasetId=ds-1');
+        // summary + nextStep ship as a separate text block after the fenced data.
+        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
+    });
+
+    it('emits a pagination nextStep when more items remain', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient(async () => ({ items: MANY_ITEMS, total: 100 })),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe('Fetched 20 of 100 items (offset=0).');
+        expect(structuredContent.nextStep).toBe(
+            `Call ${HelperTools.DATASET_GET_ITEMS} again with offset=20 to fetch the next page.`,
+        );
+    });
+
+    it('content[0] mirrors the structuredContent data and does not echo the desc input param', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+        );
+        const { content, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        const { summary, nextStep, ...data } = structuredContent;
+        expect(decodeFencedToolText(content[0].text)).toEqual(data);
+        expect(structuredContent).not.toHaveProperty('desc');
     });
 });

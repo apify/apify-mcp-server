@@ -23,6 +23,8 @@ The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp
 >
 > For the best experience, connect your AI assistant to our hosted server at **[`https://mcp.apify.com`](https://mcp.apify.com)**. The hosted server supports the latest features - including output schema inference for structured Actor results - that are not available when running locally via stdio.
 
+> ⚠️ **Legacy SSE transport removed.** The `https://mcp.apify.com/sse` endpoint has been removed in favor of Streamable HTTP. Migrate your client to **[`https://mcp.apify.com`](https://mcp.apify.com)** — drop the `/sse` suffix from your configuration.
+
 💰 The server also supports [agentic payments](#-agentic-payments) via [x402](#-x402) and [Skyfire](#-skyfire), allowing AI agents to pay for Actor runs without an API token.
 
 Apify MCP Server is compatible with `Claude Code, Claude.ai, Cursor, VS Code` and any client that adheres to the Model Context Protocol.
@@ -33,7 +35,6 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 ## Table of Contents
 - [🌐 Introducing Apify MCP Server](#-introducing-apify-mcp-server)
 - [🚀 Quickstart](#-quickstart)
-- [⚠️ SSE transport deprecation](#%EF%B8%8F-sse-transport-deprecation)
 - [🤖 MCP clients](#-mcp-clients)
 - [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
 - [💰 Agentic payments](#-agentic-payments)
@@ -75,13 +76,6 @@ You can use the Apify MCP Server in two ways:
 - See `npx @apify/actors-mcp-server --help` for more options.
 
 You can find detailed instructions for setting up the MCP server in the [Apify documentation](https://docs.apify.com/platform/integrations/mcp).
-
-# ⚠️ SSE transport deprecation on April 1, 2026
-
-Update your MCP client config before April 1, 2026.
-Apify MCP Server is dropping Server-Sent Events (SSE) transport in favor of Streamable HTTP, in line with the official MCP spec.
-
-Go to [mcp.apify.com](https://mcp.apify.com/) to update the installation for your client of choice, with a valid endpoint.
 
 # 🤖 MCP clients
 

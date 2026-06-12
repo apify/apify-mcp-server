@@ -1,8 +1,8 @@
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
-import { SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
-import { getServerCard } from '../../src/server_card.js';
+import { APIFY_LOGO_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
+import { getServerCard, getServerInfo } from '../../src/server_card.js';
 import { readJsonFile } from '../../src/utils/generic.js';
 import { getPackageVersion } from '../../src/utils/version.js';
 
@@ -61,5 +61,18 @@ describe('getServerCard', () => {
         const card = getServerCard();
 
         expect(card.documentationUrl).toBe('https://docs.apify.com/platform/integrations/mcp');
+    });
+});
+
+describe('getServerInfo', () => {
+    it('returns name, title and version', () => {
+        const info = getServerInfo();
+
+        expect(info.name).toBe(SERVER_NAME);
+        expect(info.title).toBe(SERVER_TITLE);
+        expect(info.version).toBe(getPackageVersion());
+        expect(info.description).toBe(serverJson.description);
+        expect(info.websiteUrl).toBe(APIFY_MCP_URL);
+        expect(info.icons).toEqual([{ src: APIFY_LOGO_URL, mimeType: 'image/png', sizes: ['180x180'] }]);
     });
 });

@@ -297,7 +297,7 @@ Use comments to guide reviewers:
 
 ## Design System Compliance (MANDATORY)
 
-**READ FIRST**: [DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md](DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md) — Complete design system rules.
+**READ FIRST**: [src/web/DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md](src/web/DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md) — Complete design system rules.
 
 **Quick Rules** (Zero tolerance):
 - ✅ ALWAYS use `theme.*` tokens (colors, spacing)

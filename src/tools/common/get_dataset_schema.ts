@@ -5,12 +5,12 @@ import { HelperTools, HTTP_NOT_FOUND, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { wrapJsonText } from '../../utils/encode_text.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
-import { buildStorageNotFound } from './storage_helpers.js';
+import { datasetSchemaOutputSchema } from '../structured_output_schemas.js';
+import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -44,6 +44,7 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         - user_input: Generate schema for dataset 34das2 using 10 items
         - user_input: Show schema of username~my-dataset (clean items only)`,
     inputSchema: z.toJSONSchema(getDatasetSchemaArgs) as ToolInputSchema,
+    outputSchema: datasetSchemaOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getDatasetSchemaArgs)),
     paymentRequired: true,
     annotations: {
@@ -77,7 +78,11 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         const datasetItems = datasetResponse.items;
 
         if (datasetItems.length === 0) {
-            return { content: [{ type: 'text', text: `Dataset '${datasetId}' is empty.` }] };
+            // Empty dataset: no items to infer from, but still emit a schema-conforming
+            // response (empty schema = "any") rather than bare text.
+            const summary = `Dataset '${datasetId}' is empty; no schema to infer.`;
+            const nextStep = `Use ${HelperTools.DATASET_GET} with datasetId=${datasetId} to check itemCount and stats.`;
+            return buildStorageResponse({ structuredContent: { datasetId, schema: {} }, summary, nextStep });
         }
 
         // Generate schema using the shared utility
@@ -95,6 +100,9 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
             });
         }
 
-        return { content: [{ type: 'text', text: wrapJsonText(schema) }] };
+        const fieldCount = Object.keys(schema.items.properties ?? {}).length;
+        const summary = `Schema inferred from ${datasetItems.length} ${datasetItems.length === 1 ? 'item' : 'items'}, ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'}.`;
+        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and fields="..." to project specific fields.`;
+        return buildStorageResponse({ structuredContent: { datasetId, schema }, summary, nextStep });
     },
 } as const);

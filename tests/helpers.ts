@@ -1,5 +1,4 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
@@ -65,27 +64,6 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
     if (payment) {
         url.searchParams.append('payment', payment);
     }
-}
-
-export async function createMcpSseClient(serverUrl: string, options?: McpClientOptions): Promise<Client> {
-    checkApifyToken(options);
-    const url = new URL(serverUrl);
-    appendSearchParams(url, options);
-
-    const transport = new SSEClientTransport(url, {
-        requestInit: {
-            headers: buildClientAuthHeaders(options),
-        },
-    });
-
-    const client = new Client({
-        name: options?.clientName || 'sse-client',
-        version: '1.0.0',
-    });
-    if (options?.clientCapabilities) client.registerCapabilities(options.clientCapabilities);
-    await client.connect(transport);
-
-    return client;
 }
 
 export async function createMcpStreamableClient(serverUrl: string, options?: McpClientOptions): Promise<Client> {

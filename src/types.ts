@@ -369,6 +369,8 @@ export type ToolCallTelemetryProperties = {
     tool_response_content_bytes?: number;
     /** UTF-8 bytes of JSON-stringified structured content. */
     tool_response_structured_content_bytes?: number;
+    /** UTF-8 bytes of returned files/records: image/audio base64 `data` and embedded `resource` blob/text. */
+    tool_response_file_bytes?: number;
     failure_category?: FailureCategory;
     failure_http_status?: number;
     failure_detail?: string;
@@ -589,9 +591,8 @@ export type ActorsMcpServerOptions = {
      *  which is different for local and remote server based on the transport type.
      * - 'stdio': Direct/local stdio connection
      * - 'http': Remote HTTP streamable connection
-     * - 'sse': Remote Server-Sent Events (SSE) connection (deprecated, removal on 2026-04-01)
      */
-    transportType?: 'stdio' | 'http' | 'sse';
+    transportType?: 'stdio' | 'http';
     /**
      * Apify API token for authentication
      * Primarily used by stdio transport when token is read from ~/.apify/auth.json file
