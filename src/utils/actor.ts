@@ -7,19 +7,14 @@ import { getValuesByDotKeys } from './generic.js';
 import { getUserInfoCached } from './userid_cache.js';
 
 /**
- * `actorDefinitionCache` is process-wide and shared across every caller/tenant. Public Actor metadata
- * is safe to share, but a private Actor's definition (input schema, README, run options) must never be
- * served from cache to anyone but its owner — otherwise a different token on the same process reads it
- * with no authorization check. Non-owners get a cache miss and re-fetch with their own token, which the
- * platform authorizes (or 404s).
- *
- * Correctness rests on two invariants — break either and this gate inverts into a leak:
- *   1. `info.userId` is the Actor OWNER (platform-set, independent of the fetching token). This is what
- *      keeps re-fetch-and-overwrite safe: a non-owner's fetch can't change the cached ownership.
- *   2. The caller's identity is resolved with the SAME effective identity the platform authorizes with
- *      (`user('me')` under the caller's token), and `null` stays the sole non-identity sentinel — so a
- *      cache hit can never grant more than a bare re-fetch would. Don't swap in a cheaper identity
- *      source or drop the `!== null` guard.
+ * `actorDefinitionCache` is process-wide, so a private Actor's definition must never be served from it to
+ * anyone but its owner — else another token on the same process reads it with no auth check. Two invariants
+ * keep this gate from inverting into a leak:
+ *   1. `info.userId` is the platform-set OWNER, not the fetching token — so a non-owner's re-fetch can't
+ *      overwrite the cached ownership.
+ *   2. The caller is identified by `user('me')` under their own token (the same identity the platform
+ *      authorizes with) and `null` is the sole non-identity sentinel — so a hit grants no more than a bare
+ *      re-fetch would. Don't drop the `!== null` guard or swap in a cheaper identity source.
  */
 async function callerMaySeeCachedActor(cached: ActorDefinitionWithInfo, apifyClient: ApifyClient): Promise<boolean> {
     if (cached.info.isPublic) return true;
@@ -46,13 +41,9 @@ export async function getActorDefinitionCached(
 }
 
 /**
- * Resolve the MCP server URL for the given Actor.
- * - Returns a string URL when the Actor exposes an MCP server
- * - Returns false when the Actor is not an MCP server
- *
- * The URL is a pure function of the Actor definition (`getActorMCPServerURL` does no I/O), so this rides
- * the authorization-gated `getActorDefinitionCached` instead of a separate cache — which would otherwise
- * leak a private Actor's MCP URL across tenants.
+ * Resolve the Actor's MCP server URL, or `false` if it isn't an MCP server. The URL is a pure function of
+ * the definition (`getActorMCPServerURL` does no I/O), so this rides the authorization-gated
+ * `getActorDefinitionCached` instead of a separate cache that would leak a private Actor's URL across tenants.
  */
 export async function getActorMcpUrlCached(actorIdOrName: string, apifyClient: ApifyClient): Promise<string | false> {
     const definition = (await getActorDefinitionCached(actorIdOrName, apifyClient))?.definition;

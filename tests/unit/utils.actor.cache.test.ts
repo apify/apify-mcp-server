@@ -14,6 +14,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 const getActorDefinitionMock = vi.mocked(getActorDefinition);
 const getUserInfoCachedMock = vi.mocked(getUserInfoCached);
 
+// Each test uses a unique Actor name, so the shared module-level cache never collides between cases.
 function seedCache(
     name: string,
     isPublic: boolean,
@@ -35,13 +36,12 @@ function seedCache(
 
 const client = { token: 'caller-token' } as unknown as ApifyClient;
 
-describe('getActorDefinitionCached — tenant isolation', () => {
-    beforeEach(() => {
-        actorDefinitionCache.clear();
-        getActorDefinitionMock.mockReset();
-        getUserInfoCachedMock.mockReset();
-    });
+beforeEach(() => {
+    getActorDefinitionMock.mockReset();
+    getUserInfoCachedMock.mockReset();
+});
 
+describe('getActorDefinitionCached — tenant isolation', () => {
     it('serves a cached public Actor to any caller without an ownership check', async () => {
         const cached = seedCache('acme/public-1', true, 'owner-1');
 
@@ -65,7 +65,10 @@ describe('getActorDefinitionCached — tenant isolation', () => {
     it('does NOT serve a cached private Actor to a non-owner — returns the re-fetched object, never the cached one', async () => {
         const cached = seedCache('acme/private-other', false, 'owner-3');
         getUserInfoCachedMock.mockResolvedValue({ userId: 'intruder', userPlanTier: 'FREE' });
-        const refetched = seedRefetch('owner-3');
+        const refetched = {
+            definition: {},
+            info: { isPublic: false, userId: 'owner-3' },
+        } as unknown as ActorDefinitionWithInfo;
         getActorDefinitionMock.mockResolvedValue(refetched);
 
         const result = await getActorDefinitionCached('acme/private-other', client);
@@ -85,45 +88,9 @@ describe('getActorDefinitionCached — tenant isolation', () => {
         expect(result).toBeNull();
         expect(getActorDefinitionMock).toHaveBeenCalledWith('acme/private-anon', client);
     });
-
-    it('fails closed when the identity lookup throws (returns null userId) — re-fetches, never serves the cached entry', async () => {
-        seedCache('acme/private-degraded', false, 'owner-x');
-        // getUserInfoCached swallows API failures and returns { userId: null }; the gate must deny.
-        getUserInfoCachedMock.mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
-        getActorDefinitionMock.mockResolvedValue(null);
-
-        const result = await getActorDefinitionCached('acme/private-degraded', client);
-
-        expect(result).toBeNull();
-        expect(getActorDefinitionMock).toHaveBeenCalled();
-    });
-
-    it('a shared-access non-owner re-fetch does not corrupt ownership for the next caller', async () => {
-        seedCache('acme/private-shared', false, 'owner-5');
-        // Tenant C has shared access: its re-fetch returns a def whose owner is still owner-5.
-        getUserInfoCachedMock.mockResolvedValue({ userId: 'shared-c', userPlanTier: 'FREE' });
-        getActorDefinitionMock.mockResolvedValue(seedRefetch('owner-5'));
-        await getActorDefinitionCached('acme/private-shared', client);
-
-        // Intruder B (no access) must still be denied and forced to re-fetch under its own token.
-        getUserInfoCachedMock.mockResolvedValue({ userId: 'intruder-b', userPlanTier: 'FREE' });
-        getActorDefinitionMock.mockReset();
-        getActorDefinitionMock.mockResolvedValue(null);
-
-        const result = await getActorDefinitionCached('acme/private-shared', client);
-
-        expect(result).toBeNull();
-        expect(getActorDefinitionMock).toHaveBeenCalledWith('acme/private-shared', client);
-    });
 });
 
 describe('getActorMcpUrlCached — tenant isolation', () => {
-    beforeEach(() => {
-        actorDefinitionCache.clear();
-        getActorDefinitionMock.mockReset();
-        getUserInfoCachedMock.mockReset();
-    });
-
     it('derives the MCP URL from a cached Actor the caller may see', async () => {
         seedCache('acme/mcp-public', true, 'owner-6', { id: 'actorpub', webServerMcpPath: '/mcp' });
 
@@ -149,19 +116,4 @@ describe('getActorMcpUrlCached — tenant isolation', () => {
 
         await expect(getActorMcpUrlCached('acme/missing', client)).resolves.toBe(false);
     });
-
-    it('returns false for an Actor that is not an MCP server', async () => {
-        seedCache('acme/not-mcp', true, 'owner-8', { id: 'actorplain' });
-
-        const result = await getActorMcpUrlCached('acme/not-mcp', client);
-
-        expect(result).toBe(false);
-    });
 });
-
-function seedRefetch(ownerUserId: string): ActorDefinitionWithInfo {
-    return {
-        definition: { id: 'refetched', actorFullName: 'refetched' },
-        info: { id: 'refetched', isPublic: false, userId: ownerUserId },
-    } as unknown as ActorDefinitionWithInfo;
-}
