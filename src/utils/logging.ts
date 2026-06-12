@@ -2,6 +2,8 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
+import { APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS } from '../const.js';
+
 /**
  * Safely extract HTTP status code from errors.
  * Checks both `statusCode` and `code` properties for compatibility.
@@ -28,6 +30,46 @@ export function getHttpStatusCode(error: unknown): number | undefined {
     }
 
     return undefined;
+}
+
+/**
+ * Mezmo (logDNA) promotes a log entry to error level when its message contains the lowercase
+ * substring "error". Replace those occurrences with "failure" so soft logs keep their level.
+ * Case-sensitive: capitalized `Error`/`ERROR` does not trigger promotion, so leave it intact.
+ * See CONTRIBUTING.md § Logging → Mezmo promotion rule.
+ */
+export function sanitizeMezmoMessage(message: string): string {
+    return message.replace(/error/g, 'failure');
+}
+
+/** User-facing message shown when an Actor run is rejected for hitting the concurrent-run limit. */
+export const ACTOR_RUN_LIMIT_MESSAGE =
+    'You have reached your account limit for concurrent Actor runs. ' +
+    'Wait for running Actors to finish, or upgrade your plan at https://console.apify.com/billing/subscription.';
+
+/**
+ * The Apify platform refuses to start a run when the user hits their concurrent-run / usage limit.
+ * A direct Actor run surfaces it as an `ApifyApiError` whose `type` is `cannot-start-actor-runs`;
+ * a remote MCP-server Actor wraps it as an HTTP 500 whose body carries that same type string.
+ * Either way it's a user billing condition, not a server fault.
+ */
+export function isActorRunLimitError(error: unknown): boolean {
+    if (
+        typeof error === 'object' &&
+        error !== null &&
+        (error as { type?: unknown }).type === APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS
+    ) {
+        return true;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes(APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS);
+}
+
+/** User-facing detail appended to a failed remote MCP-server tool call message. */
+export function remoteMcpFailureDetail(error: unknown): string {
+    if (isActorRunLimitError(error)) return ACTOR_RUN_LIMIT_MESSAGE;
+    const message = error instanceof Error ? error.message : String(error);
+    return `${message}. The MCP server may be temporarily unavailable.`;
 }
 
 /**
@@ -67,9 +109,13 @@ function getMcpErrorCode(error: unknown): number | undefined {
 export function logHttpError<T extends object>(error: unknown, message: string, data?: T): void {
     const statusCode = getHttpStatusCode(error);
     const rawErrorMessage = error instanceof Error ? error.message : String(error);
-    // Mezmo (logDNA) promotes log entries to error level when message/keys contain "error".
-    // Sanitize for softFail paths (see CONTRIBUTING.md § Logging → Mezmo promotion rule).
-    const softErrMessage = rawErrorMessage.replace(/ error:/gi, ' failure:');
+    const softErrMessage = sanitizeMezmoMessage(rawErrorMessage);
+
+    // User concurrent-run / quota limit — arrives wrapped as a 500 but is a user billing condition.
+    if (isActorRunLimitError(error)) {
+        log.softFail(message, { errMessage: softErrMessage, ...data });
+        return;
+    }
 
     if (statusCode !== undefined && statusCode < 500) {
         // HTTP client errors (< 500) - softFail without stack trace

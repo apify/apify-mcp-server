@@ -1,5 +1,5 @@
 import type { ToolCallTelemetryProperties, ToolTelemetryContext } from '../types.js';
-import { getHttpStatusCode } from './logging.js';
+import { ACTOR_RUN_LIMIT_MESSAGE, getHttpStatusCode, isActorRunLimitError } from './logging.js';
 
 /** MCP `_meta` key for Apify Actor run information. Namespaced per MCP spec. */
 export const APIFY_ACTOR_RUN_META_KEY = 'com.apify/ActorRun';
@@ -122,6 +122,9 @@ export function buildResponseBytesTelemetry(
 export function getToolCallErrorUserText(toolName: string, error: unknown): string {
     const msg = error instanceof Error ? error.message : String(error);
     const status = getHttpStatusCode(error);
+    if (isActorRunLimitError(error)) {
+        return `Error calling tool "${toolName}": ${msg}. ${ACTOR_RUN_LIMIT_MESSAGE}`;
+    }
     if (status === 403) {
         return `Error calling tool "${toolName}": ${msg}. The resource may be private or your token may lack access.`;
     }

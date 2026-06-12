@@ -7,6 +7,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../../apify_client.js';
 import {
+    APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
@@ -19,7 +20,13 @@ import type { PaymentProvider } from '../../payments/types.js';
 import type { ActorInfo, ApifyToken, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
+import {
+    ACTOR_RUN_LIMIT_MESSAGE,
+    getHttpStatusCode,
+    isActorRunLimitError,
+    logHttpError,
+    remoteMcpFailureDetail,
+} from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
@@ -183,6 +190,14 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
             ],
             isError: true,
             telemetry: { ...telemetry, failureDetail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED },
+        });
+    }
+
+    if (isActorRunLimitError(error)) {
+        return buildMCPResponse({
+            texts: [`Failed to call Actor '${actorName}': ${errMsg}`, ACTOR_RUN_LIMIT_MESSAGE],
+            isError: true,
+            telemetry: { ...telemetry, failureDetail: APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS },
         });
     }
 
@@ -401,10 +416,9 @@ export async function handleMcpToolCall(params: {
             actorName: baseActorName,
             toolName: mcpToolName,
         });
-        const errMsg = error instanceof Error ? error.message : String(error);
         return buildMCPResponse({
             texts: [
-                `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${errMsg}. The MCP server may be temporarily unavailable.`,
+                `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${remoteMcpFailureDetail(error)}`,
             ],
             isError: true,
         });

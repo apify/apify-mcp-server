@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildResponseBytesTelemetry, computeToolResponseBytes } from '../../src/utils/mcp.js';
+import {
+    buildResponseBytesTelemetry,
+    computeToolResponseBytes,
+    getToolCallErrorUserText,
+} from '../../src/utils/mcp.js';
+
+describe('getToolCallErrorUserText()', () => {
+    it('returns the concurrent-run-limit hint when a direct Actor tool hits the limit', () => {
+        const error = Object.assign(new Error('Cannot start new Actor runs.'), { type: 'cannot-start-actor-runs' });
+        const text = getToolCallErrorUserText('apify/instagram-scraper', error);
+        expect(text).toContain('account limit for concurrent Actor runs');
+        expect(text).toContain('console.apify.com/billing/subscription');
+        expect(text).not.toContain('Verify the tool name');
+    });
+
+    it('falls back to the generic hint for unrelated errors', () => {
+        const text = getToolCallErrorUserText('apify/instagram-scraper', new Error('boom'));
+        expect(text).toContain('Verify the tool name and input parameters');
+    });
+});
 
 describe('computeToolResponseBytes()', () => {
     it('returns zero for null/undefined/non-object input', () => {
