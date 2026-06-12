@@ -54,7 +54,6 @@ import {
     DEFAULT_TELEMETRY_ENV,
     FAILURE_CATEGORY,
     HelperTools,
-    HTTP_PAYMENT_REQUIRED,
     TOOL_STATUS,
 } from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
@@ -88,7 +87,7 @@ import type {
 import { ServerMode, TOOL_TYPE } from '../types.js';
 import {
     getHttpStatusCode,
-    isActorRunLimitError,
+    isMcpClientFaultMessage,
     logHttpError,
     remoteMcpFailureDetail,
     sanitizeMezmoMessage,
@@ -99,7 +98,7 @@ import {
     computeToolResponseBytes,
     getToolCallErrorUserText,
 } from '../utils/mcp.js';
-import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
+import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
@@ -585,35 +584,10 @@ export class ActorsMcpServer {
 
     private setupErrorHandling(setupSIGINTHandler = true): void {
         this.server.onerror = (error) => {
-            // Client faults surfaced by the MCP SDK — expected noise, not server bugs. softFail so
-            // they don't flood Mezmo error alerts. Disconnects/transport:
-            //   - "No connection established" (sendRequest before transport attached)
-            //   - "Failed to send response: Error: Not connected" (client vanished mid-flight)
-            //   - "Conflict: Only one SSE stream is allowed per session" (duplicate GET, e.g. tab
-            //     refresh before the old SSE controller is GC'd)
-            //   - "Invalid state: Controller is already closed" (SSE stream closed by client before
-            //     a queued event was flushed)
-            //   - "Not Acceptable: Client must accept ... text/event-stream" (Accept header missing
-            //     a required MIME type; HTTP 406 already returned)
-            // Invalid requests from the streamable-http transport:
-            //   - "Parse error" (malformed JSON-RPC body)
-            //   - "Server not initialized" (request before initialize)
-            //   - "Only one initialization request" (duplicate initialize)
-            const clientFaultPattern = new RegExp(
-                [
-                    'Not connected',
-                    'No connection established',
-                    'Only one SSE stream',
-                    'Controller is already closed',
-                    'Not Acceptable: Client must accept',
-                    'Parse error',
-                    'Server not initialized',
-                    'Only one initialization request',
-                ].join('|'),
-                'i',
-            );
+            // Known client faults are expected noise, not server bugs — softFail so they don't
+            // flood Mezmo error alerts. The fault patterns live in utils/logging.ts.
             const message = error.message ?? '';
-            if (clientFaultPattern.test(message)) {
+            if (isMcpClientFaultMessage(message)) {
                 // Sanitize the errMessage value to preserve the soft-fail level (Mezmo promotes
                 // entries whose message contains "error").
                 log.softFail('MCP client fault, request could not be handled', {
@@ -1281,10 +1255,9 @@ export class ActorsMcpServer {
                 const httpStatus = getHttpStatusCode(error);
 
                 // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
-                // content[0].text (JSON) + isError: true. The concurrent-run limit can also surface
-                // as 402 but is an account quota, not an x402 payment — let it fall through to the
-                // run-limit message below.
-                if (httpStatus === HTTP_PAYMENT_REQUIRED && !isActorRunLimitError(error)) {
+                // content[0].text (JSON) + isError: true. The concurrent-run limit falls through
+                // to the run-limit message below.
+                if (isX402PaymentRequiredError(error)) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
                     callDiagnostics = {
                         failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -1680,7 +1653,7 @@ export class ActorsMcpServer {
         } catch (error) {
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
-            if (httpStatus === HTTP_PAYMENT_REQUIRED && !isActorRunLimitError(error)) {
+            if (isX402PaymentRequiredError(error)) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this 402.

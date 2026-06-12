@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { buildPaymentRequiredResponse } from '../../src/utils/payment_errors.js';
+import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../../src/utils/payment_errors.js';
 
 const SAMPLE_PAYMENT_REQUIRED = {
     x402Version: 2,
@@ -15,6 +15,27 @@ const SAMPLE_PAYMENT_REQUIRED = {
         { scheme: 'upto', network: 'eip155:8453', amount: '500000' },
     ],
 } as const;
+
+describe('isX402PaymentRequiredError()', () => {
+    it('returns true for a plain 402 error', () => {
+        expect(isX402PaymentRequiredError(Object.assign(new Error('Payment required'), { statusCode: 402 }))).toBe(
+            true,
+        );
+    });
+
+    it('returns false for the concurrent-run limit even though it arrives as 402', () => {
+        const error = Object.assign(new Error('Cannot start new Actor runs.'), {
+            statusCode: 402,
+            type: 'cannot-start-actor-runs',
+        });
+        expect(isX402PaymentRequiredError(error)).toBe(false);
+    });
+
+    it('returns false for non-402 errors', () => {
+        expect(isX402PaymentRequiredError(Object.assign(new Error('boom'), { statusCode: 500 }))).toBe(false);
+        expect(isX402PaymentRequiredError(new Error('boom'))).toBe(false);
+    });
+});
 
 describe('buildPaymentRequiredResponse()', () => {
     it('writes paymentData to both structuredContent and content[0].text', () => {

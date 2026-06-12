@@ -65,6 +65,39 @@ export function isActorRunLimitError(error: unknown): boolean {
     return message.includes(APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS);
 }
 
+// Client faults surfaced by the MCP SDK's `onerror` — expected noise, not server bugs.
+// Disconnects/transport:
+//   - "No connection established" (sendRequest before transport attached)
+//   - "Failed to send response: Error: Not connected" (client vanished mid-flight)
+//   - "Conflict: Only one SSE stream is allowed per session" (duplicate GET, e.g. tab
+//     refresh before the old SSE controller is GC'd)
+//   - "Invalid state: Controller is already closed" (SSE stream closed by client before
+//     a queued event was flushed)
+//   - "Not Acceptable: Client must accept ... text/event-stream" (Accept header missing
+//     a required MIME type; HTTP 406 already returned)
+// Invalid requests from the streamable-http transport:
+//   - "Parse error" (malformed JSON-RPC body)
+//   - "Server not initialized" (request before initialize)
+//   - "Only one initialization request" (duplicate initialize)
+const MCP_CLIENT_FAULT_PATTERN = new RegExp(
+    [
+        'Not connected',
+        'No connection established',
+        'Only one SSE stream',
+        'Controller is already closed',
+        'Not Acceptable: Client must accept',
+        'Parse error',
+        'Server not initialized',
+        'Only one initialization request',
+    ].join('|'),
+    'i',
+);
+
+/** True when an MCP SDK `onerror` message is a known client fault that should softFail, not error. */
+export function isMcpClientFaultMessage(message: string): boolean {
+    return MCP_CLIENT_FAULT_PATTERN.test(message);
+}
+
 /** User-facing detail appended to a failed remote MCP-server tool call message. */
 export function remoteMcpFailureDetail(error: unknown): string {
     if (isActorRunLimitError(error)) return ACTOR_RUN_LIMIT_MESSAGE;

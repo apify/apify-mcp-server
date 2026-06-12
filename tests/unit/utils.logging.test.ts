@@ -4,11 +4,29 @@ import log from '@apify/log';
 
 import {
     isActorRunLimitError,
+    isMcpClientFaultMessage,
     logHttpError,
     redactSkyfirePayId,
     remoteMcpFailureDetail,
     sanitizeMezmoMessage,
 } from '../../src/utils/logging.js';
+
+describe('isMcpClientFaultMessage', () => {
+    it('matches known client-fault messages', () => {
+        for (const message of [
+            'Failed to send response: Error: Not connected',
+            'Conflict: Only one SSE stream is allowed per session',
+            'Parse error: Invalid JSON-RPC message',
+            'Bad Request: Server not initialized',
+        ]) {
+            expect(isMcpClientFaultMessage(message)).toBe(true);
+        }
+    });
+
+    it('returns false for genuine server faults', () => {
+        expect(isMcpClientFaultMessage('Unexpected internal failure')).toBe(false);
+    });
+});
 
 describe('isActorRunLimitError', () => {
     it('matches an ApifyApiError-shaped error by its `type` field (direct Actor run)', () => {
