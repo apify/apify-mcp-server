@@ -47,7 +47,8 @@ describe('getCategoryTools', () => {
         const appsNames = appsResult.actors.map((t: ToolEntry) => t.name);
         expect(defaultNames).toEqual(appsNames);
 
-        // call-actor still has mode-specific variants (sync-capable default vs always-async apps).
+        // call-actor still has mode-specific variants — distinct objects differing only in
+        // description (apps mode appends a widget addendum).
         // search-actors and fetch-actor-details are mode-independent and share the same object.
         const defaultCallActor = defaultResult.actors.find((t: ToolEntry) => t.name === HelperTools.ACTOR_CALL);
         const appsCallActor = appsResult.actors.find((t: ToolEntry) => t.name === HelperTools.ACTOR_CALL);
