@@ -369,6 +369,8 @@ export type ToolCallTelemetryProperties = {
     tool_response_content_bytes?: number;
     /** UTF-8 bytes of JSON-stringified structured content. */
     tool_response_structured_content_bytes?: number;
+    /** UTF-8 bytes of returned files/records: image/audio base64 `data` and embedded `resource` blob/text. */
+    tool_response_file_bytes?: number;
     failure_category?: FailureCategory;
     failure_http_status?: number;
     failure_detail?: string;
