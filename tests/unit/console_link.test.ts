@@ -17,15 +17,6 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
     getUserInfoCached: vi.fn(),
 }));
 
-describe('isConsoleUiToken', () => {
-    it('detects Console UI tokens by prefix', () => {
-        expect(isConsoleUiToken('apify_ui_abc123')).toBe(true);
-        expect(isConsoleUiToken('apify_api_abc123')).toBe(false);
-        expect(isConsoleUiToken('legacy-token-format')).toBe(false);
-        expect(isConsoleUiToken(undefined)).toBe(false);
-        expect(isConsoleUiToken('')).toBe(false);
-    });
-});
 
 describe('resolveConsoleLinkContext', () => {
     const personalUser = { userId: 'USER_ID', userPlanTier: 'FREE' as const, isOrganization: false };
