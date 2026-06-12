@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.11.1 - **not yet released**
 
+### 🚀 Features
+
+- Return personalized Console links for Console UI token sessions ([#958](https://github.com/apify/apify-mcp-server/pull/958)) ([283322d](https://github.com/apify/apify-mcp-server/commit/283322d5bffd1d5a062200a9faaa0dce0852edbe)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
+
 ### 🐛 Bug Fixes
 
 - Return binary key-value store records as MCP content blocks ([#964](https://github.com/apify/apify-mcp-server/pull/964)) ([59dec22](https://github.com/apify/apify-mcp-server/commit/59dec2281ca368faf31f400d4acb4536df028f2c)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#883](https://github.com/apify/apify-mcp-server/issues/883)
