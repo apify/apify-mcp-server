@@ -3,12 +3,17 @@ import { z } from 'zod';
 
 import { HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { HelperTool, ToolInputSchema } from '../../types.js';
+import type { ConsoleLinkContext, HelperTool, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
-import { type FetchActorRunResult, WAIT_SECS_MAX, WIDGET_NO_POLL_NEXT_STEP } from './actor_run_response.js';
+import {
+    applyConsoleLinks,
+    type FetchActorRunResult,
+    WAIT_SECS_MAX,
+    WIDGET_NO_POLL_NEXT_STEP,
+} from './actor_run_response.js';
 
 /** Default `waitSecs` for `get-actor-run`. Intentionally non-zero so polling callers wait briefly by default. */
 export const WAIT_SECS_DEFAULT = 30;
@@ -87,13 +92,18 @@ export function buildGetActorRunError(runId: string, error: unknown): ReturnType
  * `nextStep` in default mode, a short pointer in widget mode.
  */
 export function buildGetActorRunSuccessResponse(
-    params: FetchActorRunResult & { widget: boolean },
+    params: FetchActorRunResult & { widget: boolean; linkContext?: ConsoleLinkContext },
 ): ReturnType<typeof buildMCPResponse> {
-    const { run, structuredContent, widget } = params;
+    const { run, structuredContent, widget, linkContext } = params;
 
     if (!widget) {
+        // Mints the `apifyConsoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
+        const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
         return buildMCPResponse({
-            texts: [JSON.stringify(structuredContent), `${structuredContent.summary}\n${structuredContent.nextStep}`],
+            texts: [
+                JSON.stringify(structuredContent),
+                `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinks}`,
+            ],
             structuredContent,
             _meta: buildUsageMeta(run),
         });

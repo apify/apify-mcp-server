@@ -1,7 +1,27 @@
-import { FAILURE_CATEGORY, TOOL_STATUS, HelperTools } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+
+/**
+ * The "Apify Console: <url>" line plus the verbatim-links nudge, or `undefined` when there is no
+ * link (non-Console session). Single source for both the text-channel suffix in `buildStorageResponse`
+ * and the standalone content item in `buildConsoleLinkContent` (binary KV records).
+ */
+export function apifyConsoleLinkText(apifyConsoleUrl: string | undefined): string | undefined {
+    return apifyConsoleUrl ? `Apify Console: ${apifyConsoleUrl}\n${VERBATIM_LINKS_NUDGE}` : undefined;
+}
+
+/**
+ * Optional extra text content item carrying the storage's personalized Console link
+ * (Console UI token sessions only). Spread into a tool's `content` array — used by the
+ * binary key-value-store-record path, which bypasses `buildStorageResponse`.
+ */
+export function buildConsoleLinkContent(apifyConsoleUrl: string | undefined): { type: 'text'; text: string }[] {
+    const text = apifyConsoleLinkText(apifyConsoleUrl);
+    return text ? [{ type: 'text', text }] : [];
+}
 
 /**
  * Soft-fail not-found response for storage tools. Centralizes
@@ -33,12 +53,16 @@ export function buildStorageResponse(params: {
     summary: string;
     nextStep?: string;
     toon?: boolean;
+    /** Personalized Apify Console link (Console UI token sessions); appended as a trailing text item. */
+    apifyConsoleUrl?: string;
 }) {
-    const { structuredContent, summary, nextStep, toon } = params;
+    const { structuredContent, summary, nextStep, toon, apifyConsoleUrl } = params;
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
     const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
+    const dataText = toon ? encodeToon(structuredContent) : JSON.stringify(structuredContent);
+    const consoleLinkText = apifyConsoleLinkText(apifyConsoleUrl);
     return buildMCPResponse({
-        texts: toon ? [encodeToon(structuredContent), summaryText] : [JSON.stringify(structuredContent), summaryText],
+        texts: [dataText, summaryText, ...(consoleLinkText ? [consoleLinkText] : [])],
         structuredContent: full,
     });
 }

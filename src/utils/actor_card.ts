@@ -1,5 +1,6 @@
 import { APIFY_STORE_URL, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../const.js';
 import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
+import { buildConsoleActorUrl } from './console_link.js';
 import {
     getCurrentPricingInfo,
     type PricingInfo,
@@ -120,7 +121,7 @@ type ExtractedActorData = {
  */
 function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptions): ExtractedActorData {
     const actorFullName = `${actor.username}/${actor.name}`;
-    const actorUrl = `${APIFY_STORE_URL}/${actorFullName}`;
+    const actorUrl = buildConsoleActorUrl(options.linkContext, actor.id) ?? `${APIFY_STORE_URL}/${actorFullName}`;
 
     const data: ExtractedActorData = {
         actorFullName,
@@ -221,7 +222,9 @@ export function formatActorToActorCard(
         const pricingString = options.simplifyPricingForUserTier
             ? pricingInfoToSimplifiedString(data.pricingInfo, userTier)
             : pricingInfoToString(data.pricingInfo);
-        markdownLines.push(`- **[Pricing](${data.actorUrl}/pricing):** ${pricingString}`);
+        // Console has no /pricing sub-page — link to the Actor detail page instead.
+        const pricingUrl = options.linkContext ? data.actorUrl : `${data.actorUrl}/pricing`;
+        markdownLines.push(`- **[Pricing](${pricingUrl}):** ${pricingString}`);
     }
 
     if (data.stats) {
