@@ -4,6 +4,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { abortActorRunOutputSchema } from '../structured_output_schemas.js';
 
 const abortRunArgs = z.object({
     runId: z.string().min(1).describe('The ID of the Actor run to abort.'),
@@ -31,6 +32,7 @@ USAGE EXAMPLES:
 - user_input: Gracefully abort run y2h7sK3Wc`,
     inputSchema: z.toJSONSchema(abortRunArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(abortRunArgs)),
+    outputSchema: abortActorRunOutputSchema,
     paymentRequired: true,
     annotations: {
         title: 'Abort Actor run',

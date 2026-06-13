@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { abortActorRun } from '../../src/tools/common/abort_actor_run.js';
 import { getNormalActorsAsTools } from '../../src/tools/core/actor_tools_factory.js';
 import {
+    abortActorRunOutputSchema,
     actorDetailsOutputSchema,
     actorInfoSchema,
     buildEnrichedDirectActorOutputSchema,
@@ -82,6 +84,46 @@ function createMockActorStore(schemas: Record<string, Record<string, unknown> | 
         },
     };
 }
+
+describe('abortActorRunOutputSchema', () => {
+    it('is a valid JSON Schema object', () => {
+        expect(abortActorRunOutputSchema.type).toBe('object');
+        expect(abortActorRunOutputSchema.properties).toBeDefined();
+    });
+
+    it('requires runId and status', () => {
+        expect(abortActorRunOutputSchema.required).toEqual(expect.arrayContaining(['runId', 'status']));
+    });
+
+    it('includes runId, status, startedAt, and finishedAt properties', () => {
+        const props = abortActorRunOutputSchema.properties;
+        expect(props.runId.type).toBe('string');
+        expect(props.status.type).toBe('string');
+        expect(props.startedAt.type).toBe('string');
+        expect(props.finishedAt.type).toBe('string');
+    });
+
+    it('abortActorRun tool wires the outputSchema', () => {
+        expect(abortActorRun.outputSchema).toBe(abortActorRunOutputSchema);
+    });
+
+    it('validates a minimal abort response', () => {
+        const validate = compileSchema(abortActorRunOutputSchema);
+        expect(validate({ runId: 'y2h7sK3Wc', status: 'ABORTED' })).toBe(true);
+    });
+
+    it('validates a full abort response', () => {
+        const validate = compileSchema(abortActorRunOutputSchema);
+        expect(
+            validate({
+                runId: 'y2h7sK3Wc',
+                status: 'ABORTED',
+                startedAt: '2024-01-01T00:00:00.000Z',
+                finishedAt: '2024-01-01T00:01:00.000Z',
+            }),
+        ).toBe(true);
+    });
+});
 
 describe('Structured Output Schemas', () => {
     describe('buildEnrichedDirectActorOutputSchema', () => {

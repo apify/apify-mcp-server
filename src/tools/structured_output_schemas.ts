@@ -472,6 +472,22 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
     return clone;
 }
 
+/** Schema for abort-actor-run tool output. */
+export const abortActorRunOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        runId: { type: 'string', description: 'Actor run ID' },
+        status: {
+            type: 'string',
+            description:
+                'Run status after abort request: ABORTING | ABORTED | SUCCEEDED | FAILED | TIMED-OUT | READY | RUNNING',
+        },
+        startedAt: { type: 'string', description: 'ISO timestamp when the run started' },
+        finishedAt: { type: 'string', description: 'ISO timestamp when the run finished; null while still running' },
+    },
+    required: ['runId', 'status'],
+};
+
 /** Past-tense state summary; emitted by every storage tool. */
 export const summaryProperty = {
     type: 'string' as const,
