@@ -69,8 +69,17 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
+// Largest real Apify Actor input schema measured ~31 KB; cap at 2× to bound AJV's synchronous
+// codegen so a pathological untrusted schema can't freeze the event loop. Only the untrusted
+// callers (actor_tools_factory, mcp/proxy) reach AJV through here; trusted compileSchema() is
+// intentionally uncapped.
+const MAX_UNTRUSTED_SCHEMA_BYTES = 65_536;
+
 // source https://github.com/ajv-validator/ajv/issues/1413#issuecomment-867064234
 export function fixedAjvCompile(ajvInstance: Ajv, schema: object): ValidateFunction<unknown> {
+    if (Buffer.byteLength(JSON.stringify(schema)) > MAX_UNTRUSTED_SCHEMA_BYTES) {
+        throw new Error(`Input schema exceeds ${MAX_UNTRUSTED_SCHEMA_BYTES}-byte safety limit`);
+    }
     const validate = ajvInstance.compile(schema);
     ajvInstance.removeSchema(schema);
 

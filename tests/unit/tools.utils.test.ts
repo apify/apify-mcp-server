@@ -7,6 +7,7 @@ import {
     decodeDotPropertyNames,
     encodeDotPropertyNames,
     filterAndShortenEnum,
+    fixedAjvCompile,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     isActorBlockedUnderPaymentProvider,
@@ -16,7 +17,23 @@ import {
 } from '../../src/tools/utils.js';
 import type { ActorInfo, ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { ajv } from '../../src/utils/ajv.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
+
+describe('fixedAjvCompile — untrusted schema size cap', () => {
+    it('compiles a normal-sized schema', () => {
+        const validate = fixedAjvCompile(ajv, { type: 'object', properties: { url: { type: 'string' } } });
+        expect(validate({ url: 'https://example.com' })).toBe(true);
+    });
+
+    it('rejects an oversized schema before AJV codegen runs (DoS guard)', () => {
+        const properties: Record<string, unknown> = {};
+        for (let i = 0; i < 3000; i++) properties[`p${i}`] = { type: 'string' };
+        const huge = { type: 'object', properties };
+        expect(JSON.stringify(huge).length).toBeGreaterThan(65_536);
+        expect(() => fixedAjvCompile(ajv, huge)).toThrow(/safety limit/);
+    });
+});
 
 describe('buildApifySpecificProperties', () => {
     it('should add resource picker structure to array items with editor resourcePicker', () => {

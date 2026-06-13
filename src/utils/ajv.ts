@@ -3,6 +3,15 @@ import Ajv from 'ajv';
 
 export const ajv = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
 
+// `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
+// a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is
+// inert today (ajv-formats is not registered) but would arm the same vector if it ever were. This
+// layer only sanitizes LLM args — the Actor re-validates its real input on the run — so dropping
+// regex enforcement removes the DoS surface with no loss of protection. No `src/` schema uses them.
+ajv.removeKeyword('pattern');
+ajv.removeKeyword('patternProperties');
+ajv.removeKeyword('format');
+
 /**
  * Removes the `$schema` property and drops fields with real `default` values from `required`.
  *
