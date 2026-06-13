@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 
 - Return binary key-value store records as MCP content blocks ([#964](https://github.com/apify/apify-mcp-server/pull/964)) ([59dec22](https://github.com/apify/apify-mcp-server/commit/59dec2281ca368faf31f400d4acb4536df028f2c)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#883](https://github.com/apify/apify-mcp-server/issues/883)
 - Add format to verification steps in AGENTS.md ([#990](https://github.com/apify/apify-mcp-server/pull/990)) ([c8755ae](https://github.com/apify/apify-mcp-server/commit/c8755aeef56d1d87d74eedd6e85e7e910d4dd0fe)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- **ajv:** Prevent ReDoS and compile-time DoS from untrusted schemas ([#991](https://github.com/apify/apify-mcp-server/pull/991)) ([ab55c5a](https://github.com/apify/apify-mcp-server/commit/ab55c5ad63d07c711a707a1bcca03694fdf33171)) by [@MQ37](https://github.com/MQ37)
+- **mcp:** Contain webServerMcpPath origin errors to one actor during tool load ([#984](https://github.com/apify/apify-mcp-server/pull/984)) ([e7dfdea](https://github.com/apify/apify-mcp-server/commit/e7dfdeaa931317dfe6e5af9862d3409f65b2d1e7)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
