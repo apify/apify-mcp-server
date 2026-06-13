@@ -99,6 +99,7 @@ import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
     classifyFailureCategory,
+    deriveResourceIds,
     extractAjvErrorDetails,
     extractToolTelemetry,
     getToolStatusFromError,
@@ -1342,7 +1343,9 @@ export class ActorsMcpServer {
                         startTime,
                         telemetryData,
                         userId,
-                        callDiagnostics,
+                        // Resource ids are read once here from the args + the tool's public output;
+                        // no tool threads them back. See deriveResourceIds.
+                        callDiagnostics: { ...callDiagnostics, ...deriveResourceIds(args, toolResult) },
                         responseBytes: computeToolResponseBytes(toolResult),
                     });
                 }
@@ -1662,7 +1665,11 @@ export class ActorsMcpServer {
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
-            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseBytes(result));
+            finishTaskTracking(
+                toolStatus,
+                { ...callDiagnostics, ...deriveResourceIds(toolArgs, result) },
+                computeToolResponseBytes(result),
+            );
         } catch (error) {
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);

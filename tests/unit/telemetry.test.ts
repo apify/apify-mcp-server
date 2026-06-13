@@ -57,7 +57,7 @@ describe('telemetry', () => {
         });
     });
 
-    it('should use anonymousId when userId is null', () => {
+    it('uses the session id as anonymousId when userId is null', () => {
         const properties = {
             app: 'mcp' as const,
             app_version: '0.5.6',
@@ -77,14 +77,34 @@ describe('telemetry', () => {
         expect(mockTrack).toHaveBeenCalledTimes(1);
         const callArgs = mockTrack.mock.calls[0][0];
 
-        // Should have anonymousId but not userId
-        expect(callArgs).toHaveProperty('anonymousId');
-        expect(callArgs.anonymousId).toBeDefined();
-        expect(typeof callArgs.anonymousId).toBe('string');
-        expect(callArgs.anonymousId.length).toBeGreaterThan(0);
+        // anonymousId is the session id (so a session's unauthenticated events share one identity), not userId.
+        expect(callArgs.anonymousId).toBe('session-123');
         expect(callArgs).not.toHaveProperty('userId');
         expect(callArgs.event).toBe('MCP Tool Call');
         expect(callArgs.properties).toEqual(properties);
+    });
+
+    it('falls back to a random anonymousId when no session id is present', () => {
+        const properties = {
+            app: 'mcp' as const,
+            app_version: '0.5.6',
+            mcp_client_name: 'test-client',
+            mcp_client_version: '1.0.0',
+            mcp_protocol_version: '2024-11-05',
+            mcp_client_capabilities: {},
+            mcp_session_id: '',
+            transport_type: 'stdio',
+            tool_name: 'test-tool',
+            tool_status: 'SUCCEEDED' as const,
+            tool_exec_time_ms: 100,
+        };
+
+        trackToolCall(null, 'DEV', properties);
+
+        const callArgs = mockTrack.mock.calls[0][0];
+        expect(typeof callArgs.anonymousId).toBe('string');
+        expect(callArgs.anonymousId.length).toBeGreaterThan(0);
+        expect(callArgs.anonymousId).not.toBe('');
     });
 
     it('should preserve optional failure diagnostics in the payload', () => {
