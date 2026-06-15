@@ -41,6 +41,7 @@ export const getUserDatasetsList: ToolEntry = Object.freeze({
         Actor runs automatically produce unnamed datasets (set unnamed=true to include them). Users can also create named datasets.
 
         The results will include datasets with itemCount, access settings, and usage stats, sorted by createdAt (ascending by default).
+        Each dataset's stats.inflatedBytes is its approximate uncompressed byte size — use it with itemCount to gauge size before fetching.
         Use limit (max 20), offset, and desc to paginate and sort.
 
         USAGE:

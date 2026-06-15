@@ -3,7 +3,13 @@ import type { ActorRun, Dataset, KeyValueClientListKeysResult } from 'apify-clie
 import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import {
+    DATASET_SIZE_HINT_BYTES,
+    FAILURE_CATEGORY,
+    HelperTools,
+    NARROW_OUTPUT_HINT,
+    TOOL_STATUS,
+} from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import {
@@ -78,6 +84,12 @@ export type RunDataset = {
     title?: string;
     itemCount?: number;
     cleanItemCount?: number;
+    /**
+     * Uncompressed size of the dataset in bytes (Apify `stats.inflatedBytes`). Items are stored as BSON,
+     * so this approximates — not exactly equals — the JSON size fetched into context. The single-dataset
+     * GET response does not return it (only the dataset-list endpoint does), so it is normally absent.
+     */
+    inflatedBytes?: number;
     /**
      * Dot-notation field paths. Pure-numeric segments (array indices) are stripped and the
      * list is deduped at build time, so callers receive a flat unique projection-valid list
@@ -214,6 +226,9 @@ function buildRunDataset(
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
         cleanItemCount: datasetMeta.cleanItemCount,
+        // Undeclared on the apify-client `DatasetStats` type (and absent from the GET response today),
+        // so read it defensively; `cleanEmptyProperties` drops it when absent.
+        inflatedBytes: (datasetMeta.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes,
         fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
     }) as RunDataset;
 }
@@ -395,6 +410,18 @@ function fieldsProjectionHint(fields: string[] | undefined): string {
     return ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`;
 }
 
+/**
+ * nextStep suffix reporting dataset size. The byte size is always shown when known; the steer to
+ * narrow is appended only when it exceeds DATASET_SIZE_HINT_BYTES. `inflatedBytes` is the
+ * whole-dataset uncompressed size; shared by get-actor-run and get-dataset.
+ */
+export function datasetSizeNextStepHint(inflatedBytes: number | undefined): string {
+    if (inflatedBytes === undefined || inflatedBytes <= 0) return '';
+    const size = ` Full output is ~${inflatedBytes} bytes.`;
+    if (inflatedBytes <= DATASET_SIZE_HINT_BYTES) return size;
+    return `${size} Fetching all may exceed context; ${NARROW_OUTPUT_HINT}.`;
+}
+
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
     statusMessage: string | null | undefined,
@@ -411,7 +438,7 @@ function buildSucceededSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items (${itemCount} total).${fieldsProjectionHint(fields)}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(fields)}`,
         };
     }
 
