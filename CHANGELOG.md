@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.11.1 - **not yet released**
+## [0.11.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.1) (2026-06-15)
 
 ### 🚀 Features
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - **mcp:** Contain webServerMcpPath origin errors to one actor during tool load ([#984](https://github.com/apify/apify-mcp-server/pull/984)) ([e7dfdea](https://github.com/apify/apify-mcp-server/commit/e7dfdeaa931317dfe6e5af9862d3409f65b2d1e7)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.11.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.0) (2026-06-11)
 
 ### 🚀 Features
