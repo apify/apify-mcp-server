@@ -33,6 +33,11 @@ describe('getToolStatusFromError', () => {
         expect(status).toBe(TOOL_STATUS.SOFT_FAIL);
     });
 
+    it('classifies the concurrent-run limit as soft_fail even when wrapped as a 5xx', () => {
+        const error = Object.assign(new Error('Streamable HTTP error: cannot-start-actor-runs'), { statusCode: 500 });
+        expect(getToolStatusFromError(error, false)).toBe(TOOL_STATUS.SOFT_FAIL);
+    });
+
     it('classifies unknown errors without status code as failed', () => {
         const status = getToolStatusFromError(new Error('unknown'), false);
         expect(status).toBe(TOOL_STATUS.FAILED);
@@ -73,6 +78,11 @@ describe('classifyFailureCategory', () => {
     it('classifies unexpected errors as INTERNAL_ERROR', () => {
         const category = classifyFailureCategory(new Error('connect ECONNREFUSED 127.0.0.1'));
         expect(category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
+    });
+
+    it('classifies the concurrent-run limit as INVALID_INPUT even when wrapped as a 5xx', () => {
+        const error = Object.assign(new Error('Streamable HTTP error: cannot-start-actor-runs'), { statusCode: 500 });
+        expect(classifyFailureCategory(error)).toBe(FAILURE_CATEGORY.INVALID_INPUT);
     });
 });
 

@@ -1,6 +1,68 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { redactSkyfirePayId } from '../../src/utils/logging.js';
+import log from '@apify/log';
+
+import {
+    isMcpClientFaultMessage,
+    logHttpError,
+    redactSkyfirePayId,
+    sanitizeMezmoMessage,
+} from '../../src/utils/logging.js';
+
+describe('isMcpClientFaultMessage', () => {
+    it('matches the exact MCP SDK client-fault literals', () => {
+        for (const message of [
+            'Bad Request: Server not initialized',
+            'Invalid Request: Only one initialization request is allowed',
+            'Not Acceptable: Client must accept text/event-stream',
+            'Not Acceptable: Client must accept both application/json and text/event-stream',
+            'Parse error: Invalid JSON',
+            'Parse error: Invalid JSON-RPC message',
+            'Conflict: Only one SSE stream is allowed per session',
+            'Not connected',
+        ]) {
+            expect(isMcpClientFaultMessage(message)).toBe(true);
+        }
+    });
+
+    it('matches the variable-tail disconnect messages by prefix', () => {
+        expect(isMcpClientFaultMessage('No connection established for request ID: abc-123')).toBe(true);
+        expect(isMcpClientFaultMessage('Failed to send response: Error: Not connected')).toBe(true);
+        expect(isMcpClientFaultMessage('Invalid state: Controller is already closed')).toBe(true);
+    });
+
+    it('does not match substrings or near-misses (avoids catching other libraries)', () => {
+        expect(isMcpClientFaultMessage('Unexpected internal failure')).toBe(false);
+        // A different library mentioning a fault keyword must not be swallowed.
+        expect(isMcpClientFaultMessage('Database connection: Not connected to replica')).toBe(false);
+        expect(isMcpClientFaultMessage('Parse error: Invalid YAML')).toBe(false);
+        expect(isMcpClientFaultMessage('Server not initialized yet, retrying')).toBe(false);
+    });
+});
+
+describe('sanitizeMezmoMessage', () => {
+    it('replaces every "error" occurrence so Mezmo does not promote the entry', () => {
+        // Mezmo promotes on the lowercase word "error"; the old ` error:` pattern missed this case.
+        expect(sanitizeMezmoMessage('MCP error -32001: Request timed out')).toBe(
+            'MCP failure -32001: Request timed out',
+        );
+    });
+});
+
+describe('logHttpError', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('soft-fails the run-limit condition even though it arrives wrapped as a 500', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
+        const error = Object.assign(new Error('Streamable HTTP error: cannot-start-actor-runs'), { statusCode: 500 });
+
+        logHttpError(error, 'Failed to load tools from MCP server');
+
+        expect(exception).not.toHaveBeenCalled();
+        expect(softFail).toHaveBeenCalledTimes(1);
+    });
+});
 
 describe('redactSkyfirePayId', () => {
     it('should pass through non-record values unchanged', () => {

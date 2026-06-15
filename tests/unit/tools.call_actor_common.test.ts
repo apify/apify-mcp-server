@@ -153,6 +153,39 @@ describe('call_actor_common', () => {
             expect(allText).not.toContain(HelperTools.ACTOR_RUNS_ABORT);
             expect(allText).not.toContain('verify the Actor name');
         });
+
+        it('returns the concurrent-run-limit billing hint for cannot-start-actor-runs errors', () => {
+            const error = new ApifyApiError(
+                {
+                    data: {
+                        error: {
+                            type: 'cannot-start-actor-runs',
+                            message:
+                                'Cannot start new Actor runs. Underlying error: By launching this job you will exceed your limit of 25 concurrent Actor runs.',
+                        },
+                    },
+                    status: 402,
+                } as AxiosResponse,
+                1,
+            );
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/instagram-scraper',
+                error,
+                actorId: 'actor-999',
+                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+            });
+
+            expect(response.isError).toBe(true);
+            const allText = response.content.map((c) => c.text).join('\n');
+            expect(allText).toContain('account limit for concurrent Actor runs');
+            expect(allText).toContain('console.apify.com/billing/subscription');
+            // Run-limit must not fall through to the generic "verify the Actor name" hint.
+            expect(allText).not.toContain('verify the Actor name');
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({ failureDetail: 'cannot-start-actor-runs', actorId: 'actor-999' }),
+            );
+        });
     });
 
     describe('callActorArgs.callOptions', () => {

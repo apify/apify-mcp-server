@@ -2,6 +2,8 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
+import { isActorRunLimitError } from './apify_errors.js';
+
 /**
  * Safely extract HTTP status code from errors.
  * Checks both `statusCode` and `code` properties for compatibility.
@@ -28,6 +30,45 @@ export function getHttpStatusCode(error: unknown): number | undefined {
     }
 
     return undefined;
+}
+
+/**
+ * Mezmo (logDNA) promotes a log entry to error level when its message contains the lowercase
+ * substring "error". Replace those occurrences with "failure" so soft logs keep their level.
+ * Case-sensitive: capitalized `Error`/`ERROR` does not trigger promotion, so leave it intact.
+ * See CONTRIBUTING.md § Logging → Mezmo promotion rule.
+ */
+export function sanitizeMezmoMessage(message: string): string {
+    return message.replace(/error/g, 'failure');
+}
+
+// Client faults surfaced by the MCP SDK's `onerror` — expected noise, not server bugs.
+// Pinned to @modelcontextprotocol/sdk@1.29.0 — server/webStandardStreamableHttp.js. The SDK calls
+// onerror with a bare `new Error(message)` (no JSON-RPC code, no HTTP status — those go only into
+// createJsonErrorResponse()), so the message text is the only signal here. Match exact literals to
+// avoid catching unrelated libraries' errors. Re-verify these on every SDK bump (the guard test in
+// utils.logging.test.ts fails loudly if a literal drifts).
+const MCP_CLIENT_FAULT_MESSAGES: ReadonlySet<string> = new Set([
+    'Bad Request: Server not initialized',
+    'Invalid Request: Only one initialization request is allowed',
+    'Not Acceptable: Client must accept text/event-stream',
+    'Not Acceptable: Client must accept both application/json and text/event-stream',
+    'Parse error: Invalid JSON',
+    'Parse error: Invalid JSON-RPC message',
+    'Conflict: Only one SSE stream is allowed per session',
+    'Not connected',
+]);
+
+// Transport/runtime disconnects with variable tails — anchored at the start, not substring-anywhere.
+const MCP_CLIENT_FAULT_PREFIXES: readonly string[] = [
+    'No connection established for request ID:', // webStandardStreamableHttp.js sendRequest
+    'Failed to send response: Error: Not connected', // send-path wrap
+    'Invalid state: Controller is already closed', // Node web-streams ERR_INVALID_STATE
+];
+
+/** True when an MCP SDK `onerror` message is a known client fault that should softFail, not error. */
+export function isMcpClientFaultMessage(message: string): boolean {
+    return MCP_CLIENT_FAULT_MESSAGES.has(message) || MCP_CLIENT_FAULT_PREFIXES.some((p) => message.startsWith(p));
 }
 
 /**
@@ -67,9 +108,13 @@ function getMcpErrorCode(error: unknown): number | undefined {
 export function logHttpError<T extends object>(error: unknown, message: string, data?: T): void {
     const statusCode = getHttpStatusCode(error);
     const rawErrorMessage = error instanceof Error ? error.message : String(error);
-    // Mezmo (logDNA) promotes log entries to error level when message/keys contain "error".
-    // Sanitize for softFail paths (see CONTRIBUTING.md § Logging → Mezmo promotion rule).
-    const softErrMessage = rawErrorMessage.replace(/ error:/gi, ' failure:');
+    const softErrMessage = sanitizeMezmoMessage(rawErrorMessage);
+
+    // User concurrent-run / quota limit — arrives wrapped as a 500 but is a user billing condition.
+    if (isActorRunLimitError(error)) {
+        log.softFail(message, { errMessage: softErrMessage, ...data });
+        return;
+    }
 
     if (statusCode !== undefined && statusCode < 500) {
         // HTTP client errors (< 500) - softFail without stack trace
