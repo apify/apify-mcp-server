@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.11.2 - **not yet released**
+## [0.11.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.2) (2026-06-15)
 
 ### 🚀 Features
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - **ajv:** Raise schema cap to 256 KB and soft-log oversized-schema errors ([#999](https://github.com/apify/apify-mcp-server/pull/999)) ([b609f6a](https://github.com/apify/apify-mcp-server/commit/b609f6a5916f1c325477706bebffd70e9086e8e5)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.11.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.1) (2026-06-15)
 
 ### 🚀 Features
