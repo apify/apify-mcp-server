@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.11.2 - **not yet released**
 
+### 🚀 Features
+
+- Surface dataset size hints to guide large-output fetches ([#932](https://github.com/apify/apify-mcp-server/pull/932)) ([750b784](https://github.com/apify/apify-mcp-server/commit/750b784329e93405cc927ef30f7092a653dda5ce)) by [@jirispilka](https://github.com/jirispilka), closes [#878](https://github.com/apify/apify-mcp-server/issues/878)
+
+### 🐛 Bug Fixes
+
+- Classify MCP protocol errors as client faults, not server errors ([#989](https://github.com/apify/apify-mcp-server/pull/989)) ([b896332](https://github.com/apify/apify-mcp-server/commit/b896332002728ef691bfbead5b56a76a130f10ed)) by [@jirispilka](https://github.com/jirispilka)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.11.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.1) (2026-06-15)
