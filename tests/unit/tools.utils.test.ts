@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
+import { SchemaTooLargeError } from '../../src/errors.js';
 import {
     buildActorInputSchema,
     buildApifySpecificProperties,
@@ -11,6 +12,7 @@ import {
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     isActorBlockedUnderPaymentProvider,
+    MAX_UNTRUSTED_SCHEMA_BYTES,
     markInputPropertiesAsRequired,
     shortenProperties,
     transformActorInputSchemaProperties,
@@ -26,12 +28,12 @@ describe('fixedAjvCompile — untrusted schema size cap', () => {
         expect(validate({ url: 'https://example.com' })).toBe(true);
     });
 
-    it('rejects an oversized schema before AJV codegen runs (DoS guard)', () => {
+    it('throws SchemaTooLargeError on an oversized schema before AJV codegen runs (DoS guard)', () => {
         const properties: Record<string, unknown> = {};
-        for (let i = 0; i < 3000; i++) properties[`p${i}`] = { type: 'string' };
+        for (let i = 0; i < 16000; i++) properties[`p${i}`] = { type: 'string' };
         const huge = { type: 'object', properties };
-        expect(JSON.stringify(huge).length).toBeGreaterThan(65_536);
-        expect(() => fixedAjvCompile(ajv, huge)).toThrow(/safety limit/);
+        expect(JSON.stringify(huge).length).toBeGreaterThan(MAX_UNTRUSTED_SCHEMA_BYTES);
+        expect(() => fixedAjvCompile(ajv, huge)).toThrow(SchemaTooLargeError);
     });
 });
 
