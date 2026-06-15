@@ -43,36 +43,32 @@ export function sanitizeMezmoMessage(message: string): string {
 }
 
 // Client faults surfaced by the MCP SDK's `onerror` — expected noise, not server bugs.
-// Disconnects/transport:
-//   - "No connection established" (sendRequest before transport attached)
-//   - "Failed to send response: Error: Not connected" (client vanished mid-flight)
-//   - "Conflict: Only one SSE stream is allowed per session" (duplicate GET, e.g. tab
-//     refresh before the old SSE controller is GC'd)
-//   - "Invalid state: Controller is already closed" (SSE stream closed by client before
-//     a queued event was flushed)
-//   - "Not Acceptable: Client must accept ... text/event-stream" (Accept header missing
-//     a required MIME type; HTTP 406 already returned)
-// Invalid requests from the streamable-http transport:
-//   - "Parse error" (malformed JSON-RPC body)
-//   - "Server not initialized" (request before initialize)
-//   - "Only one initialization request" (duplicate initialize)
-const MCP_CLIENT_FAULT_PATTERN = new RegExp(
-    [
-        'Not connected',
-        'No connection established',
-        'Only one SSE stream',
-        'Controller is already closed',
-        'Not Acceptable: Client must accept',
-        'Parse error',
-        'Server not initialized',
-        'Only one initialization request',
-    ].join('|'),
-    'i',
-);
+// Pinned to @modelcontextprotocol/sdk@1.29.0 — server/webStandardStreamableHttp.js. The SDK calls
+// onerror with a bare `new Error(message)` (no JSON-RPC code, no HTTP status — those go only into
+// createJsonErrorResponse()), so the message text is the only signal here. Match exact literals to
+// avoid catching unrelated libraries' errors. Re-verify these on every SDK bump (the guard test in
+// utils.logging.test.ts fails loudly if a literal drifts).
+const MCP_CLIENT_FAULT_MESSAGES: ReadonlySet<string> = new Set([
+    'Bad Request: Server not initialized',
+    'Invalid Request: Only one initialization request is allowed',
+    'Not Acceptable: Client must accept text/event-stream',
+    'Not Acceptable: Client must accept both application/json and text/event-stream',
+    'Parse error: Invalid JSON',
+    'Parse error: Invalid JSON-RPC message',
+    'Conflict: Only one SSE stream is allowed per session',
+    'Not connected',
+]);
+
+// Transport/runtime disconnects with variable tails — anchored at the start, not substring-anywhere.
+const MCP_CLIENT_FAULT_PREFIXES: readonly string[] = [
+    'No connection established for request ID:', // webStandardStreamableHttp.js sendRequest
+    'Failed to send response: Error: Not connected', // send-path wrap
+    'Invalid state: Controller is already closed', // Node web-streams ERR_INVALID_STATE
+];
 
 /** True when an MCP SDK `onerror` message is a known client fault that should softFail, not error. */
 export function isMcpClientFaultMessage(message: string): boolean {
-    return MCP_CLIENT_FAULT_PATTERN.test(message);
+    return MCP_CLIENT_FAULT_MESSAGES.has(message) || MCP_CLIENT_FAULT_PREFIXES.some((p) => message.startsWith(p));
 }
 
 /**

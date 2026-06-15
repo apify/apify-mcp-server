@@ -10,16 +10,33 @@ import {
 } from '../../src/utils/logging.js';
 
 describe('isMcpClientFaultMessage', () => {
-    it('matches known client-fault messages and rejects genuine server faults', () => {
+    it('matches the exact MCP SDK client-fault literals', () => {
         for (const message of [
-            'Failed to send response: Error: Not connected',
-            'Conflict: Only one SSE stream is allowed per session',
-            'Parse error: Invalid JSON-RPC message',
             'Bad Request: Server not initialized',
+            'Invalid Request: Only one initialization request is allowed',
+            'Not Acceptable: Client must accept text/event-stream',
+            'Not Acceptable: Client must accept both application/json and text/event-stream',
+            'Parse error: Invalid JSON',
+            'Parse error: Invalid JSON-RPC message',
+            'Conflict: Only one SSE stream is allowed per session',
+            'Not connected',
         ]) {
             expect(isMcpClientFaultMessage(message)).toBe(true);
         }
+    });
+
+    it('matches the variable-tail disconnect messages by prefix', () => {
+        expect(isMcpClientFaultMessage('No connection established for request ID: abc-123')).toBe(true);
+        expect(isMcpClientFaultMessage('Failed to send response: Error: Not connected')).toBe(true);
+        expect(isMcpClientFaultMessage('Invalid state: Controller is already closed')).toBe(true);
+    });
+
+    it('does not match substrings or near-misses (avoids catching other libraries)', () => {
         expect(isMcpClientFaultMessage('Unexpected internal failure')).toBe(false);
+        // A different library mentioning a fault keyword must not be swallowed.
+        expect(isMcpClientFaultMessage('Database connection: Not connected to replica')).toBe(false);
+        expect(isMcpClientFaultMessage('Parse error: Invalid YAML')).toBe(false);
+        expect(isMcpClientFaultMessage('Server not initialized yet, retrying')).toBe(false);
     });
 });
 
