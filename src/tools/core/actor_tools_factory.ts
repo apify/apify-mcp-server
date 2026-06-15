@@ -145,10 +145,10 @@ Actor description: ${definition.description}`;
             // are declared properties and won't be stripped.
             ajvValidate = fixedAjvCompile(ajv, inputSchema);
         } catch (e) {
-            log.error('Failed to compile schema', {
+            // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.
+            logHttpError(e, 'Failed to compile schema', {
                 actorName: definition.actorFullName,
                 mcpSessionId,
-                error: e,
             });
             continue;
         }

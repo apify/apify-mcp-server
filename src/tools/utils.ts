@@ -6,6 +6,7 @@ import type Ajv from 'ajv';
 import log from '@apify/log';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
+import { SchemaTooLargeError } from '../errors.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { ActorInfo, ActorInputSchema, SchemaProperties } from '../types.js';
 import {
@@ -69,16 +70,18 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
-// Largest real Apify Actor input schema measured ~31 KB; cap at 2× to bound AJV's synchronous
-// codegen so a pathological untrusted schema can't freeze the event loop. Only the untrusted
-// callers (actor_tools_factory, mcp/proxy) reach AJV through here; trusted compileSchema() is
-// intentionally uncapped.
-const MAX_UNTRUSTED_SCHEMA_BYTES = 65_536;
+// Real Apify Actor input schemas run up to ~140 KB post-transform; cap at 256 KB to bound AJV's
+// synchronous codegen so a pathological untrusted schema can't freeze the event loop. Only the
+// untrusted callers (actor_tools_factory, mcp/proxy) reach AJV through here; trusted compileSchema()
+// is intentionally uncapped.
+export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
 // source https://github.com/ajv-validator/ajv/issues/1413#issuecomment-867064234
 export function fixedAjvCompile(ajvInstance: Ajv, schema: object): ValidateFunction<unknown> {
+    // Skip AJV codegen (synchronous, would freeze the event loop) on an oversized untrusted schema.
+    // Throws SchemaTooLargeError, which callers log as a soft fail (not a server error).
     if (Buffer.byteLength(JSON.stringify(schema)) > MAX_UNTRUSTED_SCHEMA_BYTES) {
-        throw new Error(`Input schema exceeds ${MAX_UNTRUSTED_SCHEMA_BYTES}-byte safety limit`);
+        throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES);
     }
     const validate = ajvInstance.compile(schema);
     ajvInstance.removeSchema(schema);

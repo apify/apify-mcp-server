@@ -2,6 +2,7 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
+import { SchemaTooLargeError } from '../errors.js';
 import { isActorRunLimitError } from './apify_errors.js';
 
 /**
@@ -112,6 +113,12 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
 
     // User concurrent-run / quota limit — arrives wrapped as a 500 but is a user billing condition.
     if (isActorRunLimitError(error)) {
+        log.softFail(message, { errMessage: softErrMessage, ...data });
+        return;
+    }
+
+    // Oversized untrusted input schema — a property of the Actor's schema, not a server fault.
+    if (error instanceof SchemaTooLargeError) {
         log.softFail(message, { errMessage: softErrMessage, ...data });
         return;
     }

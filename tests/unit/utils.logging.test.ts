@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
+import { SchemaTooLargeError } from '../../src/errors.js';
+import { MAX_UNTRUSTED_SCHEMA_BYTES } from '../../src/tools/utils.js';
 import {
     isMcpClientFaultMessage,
     logHttpError,
@@ -61,6 +63,18 @@ describe('logHttpError', () => {
 
         expect(exception).not.toHaveBeenCalled();
         expect(softFail).toHaveBeenCalledTimes(1);
+    });
+
+    it('soft-fails an oversized input schema (SchemaTooLargeError), not a server error', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
+        const error = vi.spyOn(log, 'error').mockImplementation(() => log);
+
+        logHttpError(new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES), 'Failed to compile schema');
+
+        expect(softFail).toHaveBeenCalledTimes(1);
+        expect(exception).not.toHaveBeenCalled();
+        expect(error).not.toHaveBeenCalled();
     });
 });
 
