@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Classify MCP protocol errors as client faults, not server errors ([#989](https://github.com/apify/apify-mcp-server/pull/989)) ([b896332](https://github.com/apify/apify-mcp-server/commit/b896332002728ef691bfbead5b56a76a130f10ed)) by [@jirispilka](https://github.com/jirispilka)
+- **ajv:** Raise schema cap to 256 KB and soft-log oversized-schema errors ([#999](https://github.com/apify/apify-mcp-server/pull/999)) ([b609f6a](https://github.com/apify/apify-mcp-server/commit/b609f6a5916f1c325477706bebffd70e9086e8e5)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
