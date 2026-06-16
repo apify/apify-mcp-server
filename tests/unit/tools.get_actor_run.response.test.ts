@@ -395,31 +395,54 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.keyValueStores?.default.keyCount).toBeUndefined();
     });
 
-    it('surfaces aliased storages from run.storageIds: default stays enriched, aliases ship id-only', async () => {
+    it('enriches aliased storages from run.storageIds with their own metadata, not just the default', async () => {
         const run = mockSucceededRun({
             storageIds: {
                 datasets: { default: 'dataset-xyz', results: 'dataset-results' },
                 keyValueStores: { default: 'kv-xyz', screenshots: 'kv-screenshots' },
             },
         });
+        // Per-id metadata so default and alias entries are distinguishable.
+        const datasetsById: Record<string, ReturnType<typeof mockDataset>> = {
+            'dataset-xyz': mockDataset({ id: 'dataset-xyz', itemCount: 47 }),
+            'dataset-results': mockDataset({ id: 'dataset-results', itemCount: 5, fields: ['error'] }),
+        };
+        const kvKeysById: Record<string, { key: string }[]> = {
+            'kv-xyz': [{ key: 'OUTPUT' }],
+            'kv-screenshots': [{ key: 'shot-1' }, { key: 'shot-2' }],
+        };
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (id: string) => ({
+                get: async () => datasetsById[id] ?? null,
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            keyValueStore: (id: string) => ({
+                listKeys: async () => ({ items: kvKeysById[id] ?? [], isTruncated: false }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
         const result = await (defaultGetActorRun as HelperTool).call(
-            stubToolCallContext(
-                { runId: 'run-1', waitSecs: 0 },
-                stubClient({
-                    run,
-                    dataset: mockDataset(),
-                    listKeys: { items: [{ key: 'OUTPUT' }], isTruncated: false },
-                }),
-            ),
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
 
-        // The storageIds `default` entry must not clobber the metadata-enriched default.
+        // default stays enriched.
         expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
         expect(structuredContent.storages.keyValueStores?.default.keys).toEqual(['OUTPUT']);
-        // Aliased entries are bare { id } — no metadata fetches for them.
-        expect(structuredContent.storages.datasets?.results).toEqual({ id: 'dataset-results' });
-        expect(structuredContent.storages.keyValueStores?.screenshots).toEqual({ id: 'kv-screenshots' });
+        // Aliased dataset carries its own id, itemCount, and normalized fields — not the default's.
+        expect(structuredContent.storages.datasets?.results).toMatchObject({
+            id: 'dataset-results',
+            itemCount: 5,
+            fields: ['error'],
+        });
+        // Aliased KV store carries its own keys.
+        expect(structuredContent.storages.keyValueStores?.screenshots).toMatchObject({
+            id: 'kv-screenshots',
+            keys: ['shot-1', 'shot-2'],
+            keyCount: 2,
+        });
     });
 
     it('emits progress with formatted status messages on wait + terminal flip', async () => {

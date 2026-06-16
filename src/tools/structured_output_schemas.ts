@@ -325,6 +325,43 @@ export const fetchApifyDocsToolOutputSchema = {
     required: ['url', 'content'],
 };
 
+// Per-storage entry shapes, used for both the `default` entry and aliased entries
+// (additionalProperties). Both default and aliases are enriched on the completed-run path; only `id`
+// is guaranteed. Factories (not shared constants) so each call site gets a distinct object — the
+// per-tool clone injects `itemsSchema` into `datasets.default` only, which must not leak to aliases.
+const datasetEntrySchema = () => ({
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Dataset ID' },
+        name: { type: 'string' },
+        title: { type: 'string' },
+        itemCount: { type: 'number' },
+        cleanItemCount: { type: 'number' },
+        fields: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
+        },
+    },
+    required: ['id'],
+});
+
+const keyValueStoreEntrySchema = () => ({
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Key-value store ID' },
+        name: { type: 'string' },
+        title: { type: 'string' },
+        keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
+        keys: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Up to 50 key names',
+        },
+    },
+    required: ['id'],
+});
+
 /** Schema for get-actor-run tool output. */
 export const getActorRunOutputSchema = {
     type: 'object' as const,
@@ -364,58 +401,18 @@ export const getActorRunOutputSchema = {
                     type: 'object' as const,
                     description: 'Map of dataset alias → metadata. Key "default" is always the run\'s primary dataset.',
                     properties: {
-                        default: {
-                            type: 'object' as const,
-                            properties: {
-                                id: { type: 'string', description: 'Dataset ID' },
-                                name: { type: 'string' },
-                                title: { type: 'string' },
-                                itemCount: { type: 'number' },
-                                cleanItemCount: { type: 'number' },
-                                fields: {
-                                    type: 'array' as const,
-                                    items: { type: 'string' },
-                                    description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
-                                },
-                            },
-                            required: ['id'],
-                        },
+                        default: datasetEntrySchema(),
                     },
-                    additionalProperties: {
-                        type: 'object' as const,
-                        properties: { id: { type: 'string' } },
-                        required: ['id'],
-                    },
+                    additionalProperties: datasetEntrySchema(),
                 },
                 keyValueStores: {
                     type: 'object' as const,
                     description:
                         'Map of key-value store alias → metadata. Key "default" is always the run\'s primary store.',
                     properties: {
-                        default: {
-                            type: 'object' as const,
-                            properties: {
-                                id: { type: 'string', description: 'Key-value store ID' },
-                                name: { type: 'string' },
-                                title: { type: 'string' },
-                                keyCount: {
-                                    type: 'number',
-                                    description: 'Total number of keys (omitted when truncated)',
-                                },
-                                keys: {
-                                    type: 'array' as const,
-                                    items: { type: 'string' },
-                                    description: 'Up to 50 key names',
-                                },
-                            },
-                            required: ['id'],
-                        },
+                        default: keyValueStoreEntrySchema(),
                     },
-                    additionalProperties: {
-                        type: 'object' as const,
-                        properties: { id: { type: 'string' } },
-                        required: ['id'],
-                    },
+                    additionalProperties: keyValueStoreEntrySchema(),
                 },
             },
         },

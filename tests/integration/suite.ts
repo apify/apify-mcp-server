@@ -705,9 +705,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     }
                 ).structuredContent;
                 // normal-mode-test-actor opens an aliased 'books' dataset; the run response must
-                // surface it alongside the enriched default. Aliased entries carry the id only.
+                // surface it alongside the default, enriched with its own metadata (id at minimum).
                 expect(sc?.storages?.datasets?.default?.id).toBeDefined();
-                expect(sc?.storages?.datasets?.books).toEqual({ id: expect.any(String) });
+                expect(sc?.storages?.datasets?.books?.id).toEqual(expect.any(String));
             });
 
             it('should find Actors in store search', async () => {

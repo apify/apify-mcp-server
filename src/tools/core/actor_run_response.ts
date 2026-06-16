@@ -96,8 +96,9 @@ export type RunKeyValueStore = {
  * Storage shape mirrors `ActorRunStorageIds` from the Apify client — a map of alias → storage
  * object where `default` is always the primary entry. Using the same plural alias-map structure
  * means named Actor storages (e.g. `storages.datasets.results`) can be added without introducing
- * new field names. The `default` entry extends the bare Apify ID string with fetched metadata;
- * aliased entries carry `{ id }` only.
+ * new field names. On the completed-run path (`get-actor-run` / `call-actor` with wait) every entry
+ * — `default` and aliases — is enriched with fetched metadata. The immediate start-run path returns
+ * before any fetch, so there every entry carries `{ id }` only.
  */
 export type RunStorages = {
     datasets?: { default: RunDataset; [alias: string]: RunDataset };
@@ -187,14 +188,9 @@ function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     }) as RunResponse['stats'] | undefined;
 }
 
-function buildRunDataset(
-    run: ActorRun,
-    datasetMeta: Dataset | null,
-    resolvedItemCount?: number,
-): RunDataset | undefined {
-    if (!run.defaultDatasetId) return undefined;
+function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCount?: number): RunDataset {
     if (!datasetMeta) {
-        return { id: run.defaultDatasetId };
+        return { id };
     }
     return cleanEmptyProperties({
         id: datasetMeta.id,
@@ -206,30 +202,52 @@ function buildRunDataset(
     }) as RunDataset;
 }
 
-function buildRunKeyValueStore(
-    run: ActorRun,
-    listKeysResult: KeyValueClientListKeysResult | null,
-): RunKeyValueStore | undefined {
-    if (!run.defaultKeyValueStoreId) return undefined;
+function buildRunKeyValueStore(id: string, listKeysResult: KeyValueClientListKeysResult | null): RunKeyValueStore {
     if (!listKeysResult) {
-        return { id: run.defaultKeyValueStoreId };
+        return { id };
     }
     const keys = listKeysResult.items.map((k) => k.key);
     // Empty KV: surface only the id (matches non-terminal shape) instead of `keys: [], keyCount: 0`.
     if (keys.length === 0 && !listKeysResult.isTruncated) {
-        return { id: run.defaultKeyValueStoreId };
+        return { id };
     }
     // The Apify listKeys endpoint does not report a true total. When the page is not truncated,
     // we know the page count equals the total; when truncated, omit keyCount and let the agent
     // detect "more keys exist" from `keys.length === KV_KEYS_LIMIT`.
     const keyCount = listKeysResult.isTruncated ? undefined : keys.length;
-    return cleanEmptyProperties({ id: run.defaultKeyValueStoreId, keys, keyCount }) as RunKeyValueStore;
+    return cleanEmptyProperties({ id, keys, keyCount }) as RunKeyValueStore;
+}
+
+/**
+ * alias → id map for one storage type, with `default` (the run's `defaultXId`) guaranteed present
+ * if known. Mirrors `ActorRunStorageIds`, whose `default` key is always populated for a real run.
+ */
+function storageAliasIds(aliasMap: Record<string, string> | undefined, defaultId?: string): Record<string, string> {
+    const ids: Record<string, string> = { ...(aliasMap ?? {}) };
+    if (defaultId && !ids.default) ids.default = defaultId;
+    return ids;
+}
+
+/**
+ * Build a `{ default, ...aliases }` entry map from an alias → id map. Returns undefined when the
+ * map is empty or lacks `default`, so the caller omits the storage type entirely (RunStorages
+ * requires `default` whenever a storage type is present).
+ */
+function buildStorageEntries<T>(
+    ids: Record<string, string>,
+    build: (alias: string, id: string) => T,
+): { default: T; [alias: string]: T } | undefined {
+    if (!('default' in ids)) return undefined;
+    return Object.fromEntries(Object.entries(ids).map(([alias, id]) => [alias, build(alias, id)])) as {
+        default: T;
+        [alias: string]: T;
+    };
 }
 
 /**
  * Bare `{ id }` entries for the run's aliased (non-default) storages from `run.storageIds`.
- * Only `default` gets metadata enrichment; agents fetch aliased storage details via the
- * dataset / KV tools when needed.
+ * Used only by the immediate start-run path, which returns before any metadata fetch — there the
+ * default entry is `{ id }` too. The completed-run path (`fetchActorRunData`) enriches every entry.
  */
 function buildAliasedStorageEntries(aliasIds?: Record<string, string>): Record<string, { id: string }> {
     const entries: Record<string, { id: string }> = {};
@@ -254,6 +272,34 @@ function buildRunStorages(
 
 function errMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/** Fetch dataset metadata; a transient failure logs and yields null so the entry keeps its id only. */
+async function fetchDatasetMeta(client: ApifyClient, id: string, mcpSessionId?: string): Promise<Dataset | null> {
+    try {
+        return (await client.dataset(id).get()) ?? null;
+    } catch (error) {
+        log.warning('Failed to fetch dataset metadata', { datasetId: id, mcpSessionId, errMessage: errMessage(error) });
+        return null;
+    }
+}
+
+/** List KV store keys; a transient failure logs and yields null so the entry keeps its id only. */
+async function fetchKvKeys(
+    client: ApifyClient,
+    id: string,
+    mcpSessionId?: string,
+): Promise<KeyValueClientListKeysResult | null> {
+    try {
+        return await client.keyValueStore(id).listKeys({ limit: KV_KEYS_LIMIT });
+    } catch (error) {
+        log.warning('Failed to list KV store keys', {
+            keyValueStoreId: id,
+            mcpSessionId,
+            errMessage: errMessage(error),
+        });
+        return null;
+    }
 }
 
 /**
@@ -723,60 +769,55 @@ export async function fetchActorRunData(params: {
 
     log.debug('Get Actor run', { runId, status: run.status, mcpSessionId, waitSecs });
 
-    let datasetInfo: Dataset | null = null;
-    let kvListResult: KeyValueClientListKeysResult | null = null;
-
+    // Enrich every storage — default and aliases from `run.storageIds` — with fetched metadata.
     // Dataset metadata is fetched on every poll (not just terminal) so the summary can surface
     // partial progress on long-running scrapes (e.g. "127 results so far"), giving polling agents
-    // real movement instead of the same "In progress." each cycle. The extra round-trip is the
-    // accepted UX tradeoff. KV listKeys stays terminal-only — non-terminal summaries don't
-    // reference KV records, so fetching them on every poll would be pure waste on the hot path.
-    // Per-promise catches: a single transient metadata fetch failure must not hard-fail the
-    // whole call. The response still carries the storage id, which is enough for the agent
-    // to fetch items / records directly.
+    // real movement instead of the same "In progress." each cycle. KV listKeys stays terminal-only —
+    // non-terminal summaries don't reference KV records. All fetches run in parallel, so latency is
+    // one round-trip regardless of alias count. Per-fetch catches: a single transient failure must
+    // not hard-fail the call — that entry still carries its id, enough to fetch items / records.
     const isTerminal = TERMINAL_RUN_STATUSES.has(run.status);
-    const [datasetFetched, kvFetched] = await Promise.all([
-        run.defaultDatasetId
-            ? client
-                  .dataset(run.defaultDatasetId)
-                  .get()
-                  .catch((error) => {
-                      log.warning('Failed to fetch dataset metadata', {
-                          datasetId: run.defaultDatasetId,
-                          mcpSessionId,
-                          errMessage: errMessage(error),
-                      });
-                      return null;
-                  })
-            : Promise.resolve(null),
-        run.defaultKeyValueStoreId && isTerminal
-            ? client
-                  .keyValueStore(run.defaultKeyValueStoreId)
-                  .listKeys({ limit: KV_KEYS_LIMIT })
-                  .catch((error) => {
-                      log.warning('Failed to list KV store keys', {
-                          keyValueStoreId: run.defaultKeyValueStoreId,
-                          mcpSessionId,
-                          errMessage: errMessage(error),
-                      });
-                      return null;
-                  })
-            : Promise.resolve(null),
-    ]);
-    datasetInfo = datasetFetched ?? null;
-    kvListResult = kvFetched ?? null;
+    const datasetIds = storageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
+    const kvIds = storageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
+    const [datasetMetaPairs, kvKeysPairs] = await Promise.all([
+        Promise.all(
+            Object.entries(datasetIds).map(
+                async ([alias, id]) => [alias, await fetchDatasetMeta(client, id, mcpSessionId)] as const,
+            ),
+        ),
+        Promise.all(
+            Object.entries(kvIds).map(
+                async ([alias, id]) => [alias, isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null] as const,
+            ),
+        ),
+    ]);
+    const datasetMetaByAlias = Object.fromEntries(datasetMetaPairs);
+    const kvKeysByAlias = Object.fromEntries(kvKeysPairs);
+
+    // The itemCount lag-fallback probe is the run's primary-output completeness check — default only.
     const resolvedItemCount = await resolveItemCountWithLagFallback(
         client,
         run,
-        datasetInfo,
+        datasetMetaByAlias.default ?? null,
         waitSecs,
         mcpSessionId,
         abortSignal,
     );
-    const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
-    const keyValueStore = buildRunKeyValueStore(run, kvListResult);
-    const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });
+
+    const datasets = buildStorageEntries(datasetIds, (alias, id) =>
+        buildRunDataset(id, datasetMetaByAlias[alias] ?? null, alias === 'default' ? resolvedItemCount : undefined),
+    );
+    const keyValueStores = buildStorageEntries(kvIds, (alias, id) =>
+        buildRunKeyValueStore(id, kvKeysByAlias[alias] ?? null),
+    );
+
+    // Narrative summarizes the default storages only; aliases are surfaced in structured output.
+    const { summary, nextStep } = buildStatusSummaryNextStep({
+        run,
+        dataset: datasets?.default,
+        keyValueStore: keyValueStores?.default,
+    });
 
     const structuredContent: RunResponse = {
         runId: run.id,
@@ -788,7 +829,10 @@ export async function fetchActorRunData(params: {
         startedAt: toIsoString(run.startedAt),
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
-        storages: buildRunStorages(run.storageIds, dataset, keyValueStore),
+        storages: {
+            ...(datasets && { datasets }),
+            ...(keyValueStores && { keyValueStores }),
+        },
         summary,
         nextStep,
     };
