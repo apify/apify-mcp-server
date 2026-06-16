@@ -15,6 +15,10 @@ import { getUserInfoCached } from './userid_cache.js';
  *   2. The caller is identified by `user('me')` under their own token (the same identity the platform
  *      authorizes with) and `null` is the sole non-identity sentinel — so a hit grants no more than a bare
  *      re-fetch would. Don't drop the `!== null` guard or swap in a cheaper identity source.
+ *  Trade-off: an org-owned private Actor is cached under the org's userId, so an org member 
+ *  calling with a personal token never matches and re-fetches every time. 
+ *  Fail-safe (no leak), just uncached for members - accepted over an org-membership lookup
+ *   that would put a per-call API round trip back on * this path.
  */
 async function callerMaySeeCachedActor(cached: ActorDefinitionWithInfo, apifyClient: ApifyClient): Promise<boolean> {
     if (cached.info.isPublic) return true;
