@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.11.3 - **not yet released**
 
+### 🚀 Features
+
+- **telemetry:** Correlate tool calls to runs and storages ([#983](https://github.com/apify/apify-mcp-server/pull/983)) ([af7761c](https://github.com/apify/apify-mcp-server/commit/af7761c8ebc3624c76947f0c829d39bd94d1ca14)) by [@MQ37](https://github.com/MQ37)
+
 ### 🐛 Bug Fixes
 
 - **cache:** Scope Actor definition cache to its owner ([#985](https://github.com/apify/apify-mcp-server/pull/985)) ([2dc6c21](https://github.com/apify/apify-mcp-server/commit/2dc6c21f9664225c4ce0561df999c07ad2eb4b25)) by [@MQ37](https://github.com/MQ37)
