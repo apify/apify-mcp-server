@@ -72,15 +72,6 @@ export const defaults = {
     actors: [RAG_WEB_BROWSER],
 };
 
-// Cache
-export const ACTOR_CACHE_MAX_SIZE = 500;
-export const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
-export const APIFY_DOCS_CACHE_MAX_SIZE = 500;
-export const APIFY_DOCS_CACHE_TTL_SECS = 60 * 60; // 1 hour
-export const MCP_SERVER_CACHE_MAX_SIZE = 500;
-export const MCP_SERVER_CACHE_TTL_SECS = 30 * 60; // 30 minutes
-export const USER_CACHE_MAX_SIZE = 200;
-export const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
 export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
 /** Max input fields shown inline in text and structured Actor cards. */
