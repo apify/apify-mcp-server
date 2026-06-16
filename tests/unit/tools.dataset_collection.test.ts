@@ -48,6 +48,25 @@ describe('get-dataset-list', () => {
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
+    it('preserves each dataset stats.inflatedBytes in structuredContent', async () => {
+        const listSpy = vi.fn().mockResolvedValue({
+            ...MOCK_LIST,
+            items: [
+                { id: 'ds-1', name: 'a', itemCount: 5, stats: { inflatedBytes: 54385 } },
+                { id: 'ds-2', name: 'b', itemCount: 0, stats: { inflatedBytes: 0 } },
+            ],
+        });
+
+        const result = await (getUserDatasetsList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(listSpy)),
+        );
+        const { structuredContent } = result as {
+            structuredContent: { items: { stats: { inflatedBytes: number } }[] };
+        };
+
+        expect(structuredContent.items[0].stats.inflatedBytes).toBe(54385);
+    });
+
     it('emits a pagination nextStep when more datasets remain', async () => {
         const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total: 25 });
 

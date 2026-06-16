@@ -16,6 +16,15 @@ export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of me
  */
 export const KV_RECORD_MAX_INLINE_BYTES = 256 * 1024;
 
+/**
+ * Advisory threshold (uncompressed bytes) above which dataset tools append a size hint steering the
+ * caller to narrow the fetch. A soft hint, not a truncation cap; ~50 KB mirrors the ~25k-token budget.
+ */
+export const DATASET_SIZE_HINT_BYTES = 50000;
+
+/** Shared steer appended to large-output hints so the model narrows instead of refetching everything. */
+export const NARROW_OUTPUT_HINT = 'narrow with fields= or page with offset';
+
 // MCP Server
 /** When `false`, `resolveServerMode('auto', ...)` forces {@link ServerMode.DEFAULT} regardless of client capabilities. */
 export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
@@ -63,13 +72,6 @@ export const defaults = {
     actors: [RAG_WEB_BROWSER],
 };
 
-// Cache
-export const ACTOR_CACHE_MAX_SIZE = 500;
-export const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
-export const APIFY_DOCS_CACHE_MAX_SIZE = 500;
-export const APIFY_DOCS_CACHE_TTL_SECS = 60 * 60; // 1 hour
-export const USER_CACHE_MAX_SIZE = 200;
-export const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
 export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
 /** Max input fields shown inline in text and structured Actor cards. */
@@ -168,6 +170,7 @@ export const FAILURE_CATEGORY = {
 // Apify API error types
 export const APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED = 'full-permission-actor-not-approved';
 export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
+export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

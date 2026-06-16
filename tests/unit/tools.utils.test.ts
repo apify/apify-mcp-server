@@ -1,22 +1,41 @@
 import { describe, expect, it } from 'vitest';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
+import { SchemaTooLargeError } from '../../src/errors.js';
 import {
     buildActorInputSchema,
     buildApifySpecificProperties,
     decodeDotPropertyNames,
     encodeDotPropertyNames,
     filterAndShortenEnum,
+    fixedAjvCompile,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     isActorBlockedUnderPaymentProvider,
+    MAX_UNTRUSTED_SCHEMA_BYTES,
     markInputPropertiesAsRequired,
     shortenProperties,
     transformActorInputSchemaProperties,
 } from '../../src/tools/utils.js';
 import type { ActorInfo, ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { ajv } from '../../src/utils/ajv.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
+
+describe('fixedAjvCompile — untrusted schema size cap', () => {
+    it('compiles a normal-sized schema', () => {
+        const validate = fixedAjvCompile(ajv, { type: 'object', properties: { url: { type: 'string' } } });
+        expect(validate({ url: 'https://example.com' })).toBe(true);
+    });
+
+    it('throws SchemaTooLargeError on an oversized schema before AJV codegen runs (DoS guard)', () => {
+        const properties: Record<string, unknown> = {};
+        for (let i = 0; i < 16000; i++) properties[`p${i}`] = { type: 'string' };
+        const huge = { type: 'object', properties };
+        expect(JSON.stringify(huge).length).toBeGreaterThan(MAX_UNTRUSTED_SCHEMA_BYTES);
+        expect(() => fixedAjvCompile(ajv, huge)).toThrow(SchemaTooLargeError);
+    });
+});
 
 describe('buildApifySpecificProperties', () => {
     it('should add resource picker structure to array items with editor resourcePicker', () => {
