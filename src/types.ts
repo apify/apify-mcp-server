@@ -376,6 +376,11 @@ export type ToolCallTelemetryProperties = {
     failure_detail?: string;
     actor_name?: string;
     actor_id?: string;
+    /** Run the call touched. `run_status` is the run's own outcome, distinct from `tool_status`. */
+    run_id?: string;
+    run_status?: string;
+    dataset_id?: string;
+    key_value_store_id?: string;
     validation_keyword?: string;
     validation_path?: string;
     validation_missing_property?: string;
@@ -412,6 +417,10 @@ export type CallDiagnostics = Pick<
     | 'failure_detail'
     | 'actor_name'
     | 'actor_id'
+    | 'run_id'
+    | 'run_status'
+    | 'dataset_id'
+    | 'key_value_store_id'
     | 'validation_keyword'
     | 'validation_path'
     | 'validation_missing_property'

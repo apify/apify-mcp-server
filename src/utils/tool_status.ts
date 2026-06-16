@@ -2,10 +2,53 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ErrorObject } from 'ajv';
 
 import { FAILURE_CATEGORY, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, TOOL_STATUS } from '../const.js';
-import type { AjvErrorDetails, CallDiagnostics, FailureCategory, ToolStatus, ToolTelemetryContext } from '../types.js';
+import type { RunResponse } from '../tools/core/actor_run_response.js';
+import type {
+    AjvErrorDetails,
+    CallDiagnostics,
+    FailureCategory,
+    ToolCallTelemetryProperties,
+    ToolStatus,
+    ToolTelemetryContext,
+} from '../types.js';
 import { isActorRunLimitError } from './apify_errors.js';
+import { stripQuoteWrappers } from './generic.js';
 import { getHttpStatusCode } from './logging.js';
 import { buildActorFields } from './tools.js';
+
+type ResourceIds = Pick<ToolCallTelemetryProperties, 'run_id' | 'run_status' | 'dataset_id' | 'key_value_store_id'>;
+
+/**
+ * The resource ids for the "MCP Tool Call" Segment event, read from data the telemetry sink already
+ * holds — the validated tool args and the tool's public structured output. No tool threads anything.
+ *
+ * - `run_id` / `run_status` come from the spec'd RunResponse `structuredContent` (call-actor,
+ *   get-actor-run, direct Actors, widgets). `run_status` is the run's own outcome (RUNNING/SUCCEEDED/
+ *   FAILED), distinct from `tool_status` — the call SUCCEEDS even when the run is still running/failed.
+ * - `run_id` also comes from `args.runId` for tools whose response carries no RunResponse
+ *   (abort-actor-run, get-actor-run-log) and for not-found.
+ * - `dataset_id` / `key_value_store_id` come from `args`, quote-stripped to match the storage tools.
+ */
+export function deriveResourceIds(args: Record<string, unknown> | undefined, result: unknown): ResourceIds {
+    const argObj = (args ?? {}) as { datasetId?: unknown; keyValueStoreId?: unknown; runId?: unknown };
+    const run = (result as { structuredContent?: Pick<RunResponse, 'runId' | 'status'> } | null | undefined)
+        ?.structuredContent;
+    // Build-time shape guard: these typed reads fail to compile if RunResponse renames `runId`/`status`
+    // (Pick fails) or retypes them away from `string` (assignment fails) — telemetry can't silently go
+    // blank on a shape change. The `typeof` checks below guard the runtime value. A run tool ceasing to
+    // emit a RunResponse at all is caught by the deriveResourceIds regression test.
+    const scRunId: string | undefined = run?.runId;
+    const scStatus: string | undefined = run?.status;
+    const runId = scRunId ?? (typeof argObj.runId === 'string' ? argObj.runId : undefined);
+    return {
+        ...(typeof runId === 'string' && { run_id: runId }),
+        ...(typeof scStatus === 'string' && { run_status: scStatus }),
+        ...(typeof argObj.datasetId === 'string' && { dataset_id: stripQuoteWrappers(argObj.datasetId) }),
+        ...(typeof argObj.keyValueStoreId === 'string' && {
+            key_value_store_id: stripQuoteWrappers(argObj.keyValueStoreId),
+        }),
+    };
+}
 
 /**
  * Central helper to classify an error into a ToolStatus value.

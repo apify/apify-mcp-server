@@ -65,8 +65,10 @@ export function getOrInitAnalyticsClient(telemetryEnv: TelemetryEnv): Analytics 
 
 /**
  * Tracks a tool call event to Segment.
- * Segment requires either userId OR anonymousId, but not both
- * When userId is available, use it; otherwise use anonymousId
+ * Segment requires either userId OR anonymousId, but not both. When the Apify user is known, use
+ * userId; otherwise fall back to mcp_session_id so every unauthenticated call in the same session
+ * shares one identity (loops/retries/funnels stay reconstructable) instead of a fresh random id per
+ * event. A random UUID is the last resort only if a session id is somehow absent.
  *
  * @param userId - Apify user ID (null if not available)
  * @param telemetryEnv - Telemetry environment
@@ -81,7 +83,7 @@ export function trackToolCall(
 
     try {
         client?.track({
-            ...(userId ? { userId } : { anonymousId: crypto.randomUUID() }),
+            ...(userId ? { userId } : { anonymousId: properties.mcp_session_id || crypto.randomUUID() }),
             event: SEGMENT_EVENTS.TOOL_CALL,
             properties,
         });
