@@ -24,6 +24,8 @@ export type McpToolResult = {
     result?: unknown;
     /** Error message if execution failed */
     error?: string;
+    /** UTF-8 byte size of the serialized content the agent receives (set when the result is fed to the LLM) */
+    resultBytes?: number;
 };
 
 /**

@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import type { EvaluationResult, ResultsDatabase, TestResultRecord } from './output_formatter.js';
+import { sumResultBytes } from './output_formatter.js';
 
 /**
  * Build composite key for storing results
@@ -85,6 +86,7 @@ export function convertEvaluationResultToRecord(
             reason: result.error,
             durationMs: result.durationMs,
             turns: result.conversation.totalTurns,
+            resultBytes: sumResultBytes(result.conversation),
             error: result.error,
         };
     }
@@ -99,6 +101,7 @@ export function convertEvaluationResultToRecord(
         reason: result.judgeResult.reason,
         durationMs: result.durationMs,
         turns: result.conversation.totalTurns,
+        resultBytes: sumResultBytes(result.conversation),
         error: null,
     };
 }
