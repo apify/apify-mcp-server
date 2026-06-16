@@ -29,7 +29,7 @@ type ResourceIds = Pick<ToolCallTelemetryProperties, 'run_id' | 'run_status' | '
  * - `dataset_id` / `key_value_store_id` come from `args`, quote-stripped to match the storage tools.
  */
 export function deriveResourceIds(args: Record<string, unknown> | undefined, result: unknown): ResourceIds {
-    const a = (args ?? {}) as { datasetId?: unknown; keyValueStoreId?: unknown; runId?: unknown };
+    const argObj = (args ?? {}) as { datasetId?: unknown; keyValueStoreId?: unknown; runId?: unknown };
     const run = (result as { structuredContent?: Pick<RunResponse, 'runId' | 'status'> } | null | undefined)
         ?.structuredContent;
     // Build-time shape guard: these typed reads fail to compile if RunResponse renames `runId`/`status`
@@ -38,12 +38,14 @@ export function deriveResourceIds(args: Record<string, unknown> | undefined, res
     // emit a RunResponse at all is caught by the deriveResourceIds regression test.
     const scRunId: string | undefined = run?.runId;
     const scStatus: string | undefined = run?.status;
-    const runId = scRunId ?? (typeof a.runId === 'string' ? a.runId : undefined);
+    const runId = scRunId ?? (typeof argObj.runId === 'string' ? argObj.runId : undefined);
     return {
         ...(typeof runId === 'string' && { run_id: runId }),
         ...(typeof scStatus === 'string' && { run_status: scStatus }),
-        ...(typeof a.datasetId === 'string' && { dataset_id: stripQuoteWrappers(a.datasetId) }),
-        ...(typeof a.keyValueStoreId === 'string' && { key_value_store_id: stripQuoteWrappers(a.keyValueStoreId) }),
+        ...(typeof argObj.datasetId === 'string' && { dataset_id: stripQuoteWrappers(argObj.datasetId) }),
+        ...(typeof argObj.keyValueStoreId === 'string' && {
+            key_value_store_id: stripQuoteWrappers(argObj.keyValueStoreId),
+        }),
     };
 }
 
