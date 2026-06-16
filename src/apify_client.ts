@@ -1,10 +1,9 @@
 import type { ApifyClientOptions } from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
-import type { AxiosRequestConfig } from 'axios';
 
 import type { PaymentHeaders } from './payments/types.js';
 
-// User agent headers
+// Appended to the client's User-Agent via apify-client's userAgentSuffix option.
 const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 
 // Request origin headers
@@ -17,30 +16,6 @@ type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     paymentHeaders?: PaymentHeaders;
 };
 
-/**
- * Adds a User-Agent header to the request config.
- * @param config
- * @private
- */
-function addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
-    const updatedConfig = { ...config };
-    updatedConfig.headers = updatedConfig.headers ?? {};
-    updatedConfig.headers['User-Agent'] = `${updatedConfig.headers['User-Agent'] ?? ''}; ${USER_AGENT_ORIGIN}`;
-    return updatedConfig;
-}
-
-/**
- * Adds an MCP origin header to the request config.
- * @param config
- * @private
- */
-function addRequestOrigin(config: AxiosRequestConfig): AxiosRequestConfig {
-    const updatedConfig = { ...config };
-    updatedConfig.headers = updatedConfig.headers ?? {};
-    updatedConfig.headers[REQUEST_ORIGIN_HEADER] = REQUEST_ORIGIN_VALUE;
-    return updatedConfig;
-}
-
 export function getApifyAPIBaseUrl(): string {
     // Workaround for Actor server where the platform APIFY_API_BASE_URL did not work with getActorDefinition from actors.ts
     if (process.env.APIFY_IS_AT_HOME) return 'https://api.apify.com';
@@ -50,9 +25,9 @@ export function getApifyAPIBaseUrl(): string {
 export class ApifyClient extends _ApifyClient {
     constructor(options: ExtendedApifyClientOptions) {
         /**
-         * In order to publish to DockerHub, we need to run their build task to validate our MCP server.
-         * This was failing since we were sending this dummy token to Apify in order to build the Actor tools.
-         * So if we encounter this dummy value, we remove it to use Apify client as unauthenticated, which is sufficient
+         * To publish to DockerHub, we need to run their build task to validate our MCP server.
+         * This was failing since we were sending this dummy token to Apify to build the Actor tools.
+         * So if we encounter this dummy value, we remove it to use an Apify client as unauthenticated, which is enough
          * for server start and listing of tools.
          */
         if (options.token?.toLowerCase() === 'your-apify-token' || options.token === null) {
@@ -61,24 +36,15 @@ export class ApifyClient extends _ApifyClient {
         }
 
         const { paymentHeaders, ...clientOptions } = options;
-        const requestInterceptors = [addUserAgent, addRequestOrigin];
-        /**
-         * Add payment headers if provided by a PaymentProvider.
-         */
-        if (paymentHeaders && Object.keys(paymentHeaders).length > 0) {
-            requestInterceptors.push((config) => {
-                const updatedConfig = { ...config };
-                updatedConfig.headers = updatedConfig.headers ?? {};
-                Object.assign(updatedConfig.headers, paymentHeaders);
-                return updatedConfig;
-            });
-        }
+        // Static headers: MCP origin plus any payment headers from a PaymentProvider.
+        const staticHeaders = { [REQUEST_ORIGIN_HEADER]: REQUEST_ORIGIN_VALUE, ...paymentHeaders };
 
         super({
             // token null case is handled, we can assert type here
             ...(clientOptions as ApifyClientOptions),
             baseUrl: getApifyAPIBaseUrl(),
-            requestInterceptors,
+            userAgentSuffix: USER_AGENT_ORIGIN,
+            requestInterceptors: [(config) => ({ ...config, headers: { ...config.headers, ...staticHeaders } })],
         });
     }
 }

@@ -128,6 +128,21 @@ describe('get-actor-run default response', () => {
         });
     });
 
+    it('surfaces dataset inflatedBytes from stats in structuredContent', async () => {
+        // The single-dataset GET does not return `inflatedBytes` (only the dataset-list endpoint does);
+        // this stub injects it to verify the wiring.
+        const run = mockSucceededRun();
+        const result = await (defaultGetActorRun as HelperTool).call(
+            stubToolCallContext(
+                { runId: 'run-1', waitSecs: 0 },
+                stubClient({ run, dataset: mockDataset({ stats: { writeCount: 47, inflatedBytes: 1234 } }) }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.storages.datasets?.default.inflatedBytes).toBe(1234);
+    });
+
     it('fetches dataset metadata for a non-terminal RUNNING run and surfaces progress in the summary', async () => {
         // Dataset metadata is fetched on every poll so the summary can surface partial progress.
         // KV listKeys stays terminal-only — non-terminal summaries don't reference KV records, so
@@ -648,6 +663,28 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
         expect(t.nextStep).toContain('metadata.url, markdown');
+    });
+
+    it('SUCCEEDED steers nextStep away from fetching a large dataset', () => {
+        const dataset: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url'], inflatedBytes: 2_400_000 };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.summary).toContain('47 items; 1 fields available');
+        expect(t.nextStep).toContain('Full output is ~2400000 bytes');
+        expect(t.nextStep).toContain('page with offset');
+    });
+
+    it('SUCCEEDED reports size but omits the large-output warning below the threshold', () => {
+        const dataset: RunDataset = { id: 'ds-1', itemCount: 2, fields: [], inflatedBytes: 4000 };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.summary).toContain('2 items');
+        expect(t.nextStep).toContain('Full output is ~4000 bytes');
+        expect(t.nextStep).not.toContain('may exceed context');
+    });
+
+    it('SUCCEEDED omits the size hint entirely when the dataset size is unknown', () => {
+        const dataset: RunDataset = { id: 'ds-1', itemCount: 2, fields: [] };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.nextStep).not.toContain('Full output');
     });
 
     it('SUCCEEDED with items but no fields metadata omits the fields hint without a dangling em-dash', () => {

@@ -3,7 +3,27 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.11.1 - **not yet released**
+## 0.11.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **cache:** Scope Actor definition cache to its owner ([#985](https://github.com/apify/apify-mcp-server/pull/985)) ([2dc6c21](https://github.com/apify/apify-mcp-server/commit/2dc6c21f9664225c4ce0561df999c07ad2eb4b25)) by [@MQ37](https://github.com/MQ37)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.11.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.2) (2026-06-15)
+
+### 🚀 Features
+
+- Surface dataset size hints to guide large-output fetches ([#932](https://github.com/apify/apify-mcp-server/pull/932)) ([750b784](https://github.com/apify/apify-mcp-server/commit/750b784329e93405cc927ef30f7092a653dda5ce)) by [@jirispilka](https://github.com/jirispilka), closes [#878](https://github.com/apify/apify-mcp-server/issues/878)
+
+### 🐛 Bug Fixes
+
+- Classify MCP protocol errors as client faults, not server errors ([#989](https://github.com/apify/apify-mcp-server/pull/989)) ([b896332](https://github.com/apify/apify-mcp-server/commit/b896332002728ef691bfbead5b56a76a130f10ed)) by [@jirispilka](https://github.com/jirispilka)
+- **ajv:** Raise schema cap to 256 KB and soft-log oversized-schema errors ([#999](https://github.com/apify/apify-mcp-server/pull/999)) ([b609f6a](https://github.com/apify/apify-mcp-server/commit/b609f6a5916f1c325477706bebffd70e9086e8e5)) by [@MQ37](https://github.com/MQ37)
+
+
+## [0.11.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.1) (2026-06-15)
 
 ### 🚀 Features
 
@@ -13,9 +33,10 @@ All notable changes to this project will be documented in this file.
 
 - Return binary key-value store records as MCP content blocks ([#964](https://github.com/apify/apify-mcp-server/pull/964)) ([59dec22](https://github.com/apify/apify-mcp-server/commit/59dec2281ca368faf31f400d4acb4536df028f2c)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#883](https://github.com/apify/apify-mcp-server/issues/883)
 - Add format to verification steps in AGENTS.md ([#990](https://github.com/apify/apify-mcp-server/pull/990)) ([c8755ae](https://github.com/apify/apify-mcp-server/commit/c8755aeef56d1d87d74eedd6e85e7e910d4dd0fe)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- **ajv:** Prevent ReDoS and compile-time DoS from untrusted schemas ([#991](https://github.com/apify/apify-mcp-server/pull/991)) ([ab55c5a](https://github.com/apify/apify-mcp-server/commit/ab55c5ad63d07c711a707a1bcca03694fdf33171)) by [@MQ37](https://github.com/MQ37)
+- **mcp:** Contain webServerMcpPath origin errors to one actor during tool load ([#984](https://github.com/apify/apify-mcp-server/pull/984)) ([e7dfdea](https://github.com/apify/apify-mcp-server/commit/e7dfdeaa931317dfe6e5af9862d3409f65b2d1e7)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.11.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.0) (2026-06-11)
 
 ### 🚀 Features

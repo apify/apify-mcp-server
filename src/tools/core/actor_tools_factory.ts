@@ -145,10 +145,10 @@ Actor description: ${definition.description}`;
             // are declared properties and won't be stripped.
             ajvValidate = fixedAjvCompile(ajv, inputSchema);
         } catch (e) {
-            log.error('Failed to compile schema', {
+            // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.
+            logHttpError(e, 'Failed to compile schema', {
                 actorName: definition.actorFullName,
                 mcpSessionId,
-                error: e,
             });
             continue;
         }
@@ -211,19 +211,21 @@ export async function getMCPServersAsTools(
             return [];
         }
 
-        const mcpServerUrl = await getActorMCPServerURL(
-            actorInfo.definition.id, // Real ID of the Actor
-            actorInfo.webServerMcpPath,
-        );
-        log.debug('Retrieved MCP server URL for Actor', {
-            actorFullName: actorInfo.definition.actorFullName,
-            actorId,
-            mcpServerUrl,
-            mcpSessionId,
-        });
-
         let client: Client | null = null;
         try {
+            // getActorMCPServerURL rejects a webServerMcpPath that escapes the Actor's standby origin.
+            // Resolve it inside the try so one Actor's bad path skips only that Actor, not the whole batch.
+            const mcpServerUrl = await getActorMCPServerURL(
+                actorInfo.definition.id, // Real ID of the Actor
+                actorInfo.webServerMcpPath,
+            );
+            log.debug('Retrieved MCP server URL for Actor', {
+                actorFullName: actorInfo.definition.actorFullName,
+                actorId,
+                mcpServerUrl,
+                mcpSessionId,
+            });
+
             client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
             if (!client) {
                 // Skip this Actor, connectMCPClient will log the error

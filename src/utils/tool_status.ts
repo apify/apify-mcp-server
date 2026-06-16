@@ -11,6 +11,7 @@ import type {
     ToolStatus,
     ToolTelemetryContext,
 } from '../types.js';
+import { isActorRunLimitError } from './apify_errors.js';
 import { stripQuoteWrappers } from './generic.js';
 import { getHttpStatusCode } from './logging.js';
 import { buildActorFields } from './tools.js';
@@ -61,6 +62,11 @@ export function getToolStatusFromError(error: unknown, isAborted: boolean): Tool
         return TOOL_STATUS.ABORTED;
     }
 
+    // Account run-limit is a user billing condition even when it arrives wrapped as a 5xx.
+    if (isActorRunLimitError(error)) {
+        return TOOL_STATUS.SOFT_FAIL;
+    }
+
     const statusCode = getHttpStatusCode(error);
 
     // HTTP client errors (4xx) are treated as user errors
@@ -79,6 +85,11 @@ export function getToolStatusFromError(error: unknown, isAborted: boolean): Tool
 
 export function classifyFailureCategory(error: unknown): FailureCategory {
     if (error instanceof McpError && error.code === ErrorCode.InvalidParams) {
+        return FAILURE_CATEGORY.INVALID_INPUT;
+    }
+
+    // Account run-limit is a user billing condition even when it arrives wrapped as a 5xx.
+    if (isActorRunLimitError(error)) {
         return FAILURE_CATEGORY.INVALID_INPUT;
     }
 

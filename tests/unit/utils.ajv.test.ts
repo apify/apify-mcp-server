@@ -109,6 +109,36 @@ describe('fixZodSchemaRequired', () => {
     });
 });
 
+describe('ajv instance — regex keywords disabled (ReDoS guard)', () => {
+    // The `pattern`/`patternProperties`/`format` keywords compile an attacker-controlled RegExp from
+    // untrusted schemas, enabling catastrophic-backtracking ReDoS. They are removed from the instance,
+    // so the keyword is ignored: a value that would violate the pattern still validates.
+    it('does not enforce `pattern` (no RegExp is compiled from the schema)', () => {
+        const validate = ajv.compile({
+            type: 'object',
+            properties: { q: { type: 'string', pattern: '^(a+)+$' } },
+            required: ['q'],
+        });
+        expect(validate({ q: 'this-would-never-match-the-pattern!' })).toBe(true);
+    });
+
+    it('does not enforce `patternProperties`', () => {
+        const validate = ajv.compile({
+            type: 'object',
+            patternProperties: { '^(a+)+$': { type: 'string' } },
+        });
+        expect(validate({ anything: 123 })).toBe(true);
+    });
+
+    it('does not enforce `format`', () => {
+        const validate = ajv.compile({
+            type: 'object',
+            properties: { email: { type: 'string', format: 'email' } },
+        });
+        expect(validate({ email: 'not-an-email' })).toBe(true);
+    });
+});
+
 describe('ajv instance — Actor input schemas', () => {
     it('should strip extra properties when schema has additionalProperties: false', () => {
         const validate = ajv.compile({

@@ -4,9 +4,20 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import { HTTP_PAYMENT_REQUIRED } from '../const.js';
+import { isActorRunLimitError } from './apify_errors.js';
+import { getHttpStatusCode } from './logging.js';
 import { buildMCPResponse } from './mcp.js';
 
 const PAYMENT_REQUIRED_HEADER = 'payment-required';
+
+/**
+ * True for a genuine x402 402 Payment Required. The concurrent-run limit also surfaces as
+ * 402 but is an account quota, not an x402 payment — excluded so callers fall through to
+ * the run-limit handling.
+ */
+export function isX402PaymentRequiredError(error: unknown): boolean {
+    return getHttpStatusCode(error) === HTTP_PAYMENT_REQUIRED && !isActorRunLimitError(error);
+}
 
 /**
  * Symbol used to attach captured payment-required header data to errors.
