@@ -23,14 +23,6 @@ import { parseServerMode } from './utils/server_mode.js';
 // analytics. Still overridable by an explicit TELEMETRY_ENV (e.g. PROD) in the env.
 process.env.TELEMETRY_ENV ??= 'DEV';
 
-enum TransportType {
-    HTTP = 'HTTP',
-}
-
-enum Routes {
-    MCP = '/',
-}
-
 /**
  * Extracts the Apify API token from the incoming request.
  *
@@ -52,7 +44,10 @@ function extractApiTokenFromRequest(req: Request): string | undefined {
         const tokenFromUrl = new URL(req.url ?? '', `http://${req.headers.host}`).searchParams.get('token');
         return tokenFromUrl || undefined;
     } catch (error) {
-        log.softFail('Failed to parse request URL for token extraction', { url: req.url, error });
+        log.softFail('Failed to parse request URL for token extraction', {
+            url: req.url,
+            errMessage: error instanceof Error ? error.message : String(error),
+        });
         return undefined;
     }
 }
@@ -116,7 +111,7 @@ export function createExpressApp(): express.Express {
 
     // express.json() middleware to parse JSON bodies, before the POST / route.
     app.use(express.json());
-    app.post(Routes.MCP, async (req: Request, res: Response) => {
+    app.post('/', async (req: Request, res: Response) => {
         log.info('Received MCP request:', req.body);
         try {
             // Check for existing session ID
@@ -126,11 +121,6 @@ export function createExpressApp(): express.Express {
             if (sessionId && transports[sessionId]) {
                 // Reuse existing transport
                 transport = transports[sessionId];
-                // Inject session ID into request params for existing sessions
-                if (req.body?.params) {
-                    req.body.params._meta ??= {};
-                    req.body.params._meta.mcpSessionId = sessionId;
-                }
             } else if (!sessionId && isInitializeRequest(req.body)) {
                 // Extract telemetry query parameters
                 const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
@@ -197,7 +187,7 @@ export function createExpressApp(): express.Express {
                 return;
             }
 
-            // Inject session ID into request params for all requests
+            // Inject session ID into request params for the reused existing session
             if (req.body?.params && sessionId) {
                 req.body.params._meta ??= {};
                 req.body.params._meta.mcpSessionId = sessionId;
@@ -214,7 +204,7 @@ export function createExpressApp(): express.Express {
     // Clients open this to receive server-initiated notifications (e.g. notifications/tasks/status)
     // that are not tied to a specific POST request.  Without this, session-level notifications
     // are silently dropped by the transport.
-    app.get(Routes.MCP, async (req: Request, res: Response) => {
+    app.get('/', async (req: Request, res: Response) => {
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
         const transport = transports[sessionId || ''] as StreamableHTTPServerTransport | undefined;
         if (!transport) {
@@ -224,8 +214,7 @@ export function createExpressApp(): express.Express {
         }
         log.info('MCP API', {
             mth: req.method,
-            rt: Routes.MCP,
-            tr: TransportType.HTTP,
+            rt: '/',
             mcpSessionId: sessionId,
         });
         try {
@@ -235,18 +224,21 @@ export function createExpressApp(): express.Express {
         }
     });
 
-    app.delete(Routes.MCP, async (req: Request, res: Response) => {
+    app.delete('/', async (req: Request, res: Response) => {
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
         const transport = transports[sessionId || ''] as StreamableHTTPServerTransport | undefined;
         if (transport) {
             log.info('MCP API', {
                 mth: req.method,
-                rt: Routes.MCP,
-                tr: TransportType.HTTP,
+                rt: '/',
                 mcpSessionId: sessionId,
             });
-            await transport.handleRequest(req, res, req.body);
+            try {
+                await transport.handleRequest(req, res, req.body);
+            } catch (error) {
+                respondWithError(res, error, 'Error handling DELETE request');
+            }
             return;
         }
 
@@ -278,7 +270,7 @@ function isInitializeRequest(body: unknown): boolean {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const HOST = process.env.HOST ?? 'http://localhost';
-    const PORT = Number(process.env.PORT ?? 3001);
+    const PORT = Number(process.env.PORT) || 3001;
 
     const app = createExpressApp();
 
