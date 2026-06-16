@@ -329,7 +329,7 @@ export const fetchApifyDocsToolOutputSchema = {
 // (additionalProperties). Both default and aliases are enriched on the completed-run path; only `id`
 // is guaranteed. Factories (not shared constants) so each call site gets a distinct object — the
 // per-tool clone injects `itemsSchema` into `datasets.default` only, which must not leak to aliases.
-const datasetEntrySchema = () => ({
+const buildDatasetEntrySchema = () => ({
     type: 'object' as const,
     properties: {
         id: { type: 'string', description: 'Dataset ID' },
@@ -346,7 +346,7 @@ const datasetEntrySchema = () => ({
     required: ['id'],
 });
 
-const keyValueStoreEntrySchema = () => ({
+const buildKeyValueStoreEntrySchema = () => ({
     type: 'object' as const,
     properties: {
         id: { type: 'string', description: 'Key-value store ID' },
@@ -401,18 +401,18 @@ export const getActorRunOutputSchema = {
                     type: 'object' as const,
                     description: 'Map of dataset alias → metadata. Key "default" is always the run\'s primary dataset.',
                     properties: {
-                        default: datasetEntrySchema(),
+                        default: buildDatasetEntrySchema(),
                     },
-                    additionalProperties: datasetEntrySchema(),
+                    additionalProperties: buildDatasetEntrySchema(),
                 },
                 keyValueStores: {
                     type: 'object' as const,
                     description:
                         'Map of key-value store alias → metadata. Key "default" is always the run\'s primary store.',
                     properties: {
-                        default: keyValueStoreEntrySchema(),
+                        default: buildKeyValueStoreEntrySchema(),
                     },
-                    additionalProperties: keyValueStoreEntrySchema(),
+                    additionalProperties: buildKeyValueStoreEntrySchema(),
                 },
             },
         },

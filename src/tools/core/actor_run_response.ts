@@ -193,7 +193,7 @@ function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCo
         return { id };
     }
     return cleanEmptyProperties({
-        id: datasetMeta.id,
+        id,
         name: datasetMeta.name,
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
@@ -222,7 +222,10 @@ function buildRunKeyValueStore(id: string, listKeysResult: KeyValueClientListKey
  * alias → id map for one storage type, with `default` (the run's `defaultXId`) guaranteed present
  * if known. Mirrors `ActorRunStorageIds`, whose `default` key is always populated for a real run.
  */
-function storageAliasIds(aliasMap: Record<string, string> | undefined, defaultId?: string): Record<string, string> {
+function buildStorageAliasIds(
+    aliasMap: Record<string, string> | undefined,
+    defaultId?: string,
+): Record<string, string> {
     const ids: Record<string, string> = { ...(aliasMap ?? {}) };
     if (defaultId && !ids.default) ids.default = defaultId;
     return ids;
@@ -231,7 +234,8 @@ function storageAliasIds(aliasMap: Record<string, string> | undefined, defaultId
 /**
  * Build a `{ default, ...aliases }` entry map from an alias → id map. Returns undefined when the
  * map is empty or lacks `default`, so the caller omits the storage type entirely (RunStorages
- * requires `default` whenever a storage type is present).
+ * requires `default` whenever a storage type is present). The per-entry `build` differs by path:
+ * the start-run path passes `{ id }`, the completed-run path passes enriched metadata.
  */
 function buildStorageEntries<T>(
     ids: Record<string, string>,
@@ -241,32 +245,6 @@ function buildStorageEntries<T>(
     return Object.fromEntries(Object.entries(ids).map(([alias, id]) => [alias, build(alias, id)])) as {
         default: T;
         [alias: string]: T;
-    };
-}
-
-/**
- * Bare `{ id }` entries for the run's aliased (non-default) storages from `run.storageIds`.
- * Used only by the immediate start-run path, which returns before any metadata fetch — there the
- * default entry is `{ id }` too. The completed-run path (`fetchActorRunData`) enriches every entry.
- */
-function buildAliasedStorageEntries(aliasIds?: Record<string, string>): Record<string, { id: string }> {
-    const entries: Record<string, { id: string }> = {};
-    for (const [alias, id] of Object.entries(aliasIds ?? {})) {
-        if (alias !== 'default') entries[alias] = { id };
-    }
-    return entries;
-}
-
-function buildRunStorages(
-    storageIds: ActorRun['storageIds'],
-    dataset?: RunDataset,
-    keyValueStore?: RunKeyValueStore,
-): RunStorages {
-    return {
-        ...(dataset && { datasets: { default: dataset, ...buildAliasedStorageEntries(storageIds?.datasets) } }),
-        ...(keyValueStore && {
-            keyValueStores: { default: keyValueStore, ...buildAliasedStorageEntries(storageIds?.keyValueStores) },
-        }),
     };
 }
 
@@ -679,13 +657,16 @@ export function buildStartRunResponse(params: {
 }): ReturnType<typeof buildMCPResponse> {
     const { actorName, actorRun, widget } = params;
 
-    const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
-    const keyValueStore = actorRun.defaultKeyValueStoreId ? { id: actorRun.defaultKeyValueStoreId } : undefined;
+    // Start path returns before any metadata fetch, so every entry — default and aliases — is id-only.
+    const datasetIds = buildStorageAliasIds(actorRun.storageIds?.datasets, actorRun.defaultDatasetId ?? undefined);
+    const kvIds = buildStorageAliasIds(actorRun.storageIds?.keyValueStores, actorRun.defaultKeyValueStoreId ?? undefined);
+    const datasets = buildStorageEntries(datasetIds, (_alias, id) => ({ id }));
+    const keyValueStores = buildStorageEntries(kvIds, (_alias, id) => ({ id }));
 
     const { summary, nextStep: computedNextStep } = buildStatusSummaryNextStep({
         run: actorRun,
-        dataset,
-        keyValueStore,
+        dataset: datasets?.default,
+        keyValueStore: keyValueStores?.default,
     });
 
     const nextStep = widget ? WIDGET_NO_POLL_NEXT_STEP : computedNextStep;
@@ -696,7 +677,10 @@ export function buildStartRunResponse(params: {
         actorName,
         status: actorRun.status,
         startedAt: toIsoString(actorRun.startedAt),
-        storages: buildRunStorages(actorRun.storageIds, dataset, keyValueStore),
+        storages: {
+            ...(datasets && { datasets }),
+            ...(keyValueStores && { keyValueStores }),
+        },
         summary,
         nextStep,
     };
@@ -777,8 +761,8 @@ export async function fetchActorRunData(params: {
     // one round-trip regardless of alias count. Per-fetch catches: a single transient failure must
     // not hard-fail the call — that entry still carries its id, enough to fetch items / records.
     const isTerminal = TERMINAL_RUN_STATUSES.has(run.status);
-    const datasetIds = storageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
-    const kvIds = storageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
+    const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
+    const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
     const [datasetMetaPairs, kvKeysPairs] = await Promise.all([
         Promise.all(
