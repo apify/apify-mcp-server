@@ -363,6 +363,7 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
       "reason": "Agent successfully searched for Google Maps actors",
       "durationMs": 5234,
       "turns": 3,
+      "resultBytes": 18452,
       "error": null
     }
   }
@@ -378,6 +379,7 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
 - `reason` - Judge reasoning or error message
 - `durationMs` - Test duration in milliseconds
 - `turns` - Number of conversation turns
+- `resultBytes` - Total UTF-8 bytes of tool results returned to the agent across the conversation (measured at the point each result is fed to the LLM, so it reflects the format the agent actually receives — JSON vs TOON). Compare across branches to quantify byte savings.
 - `error` - Error message if execution failed, `null` otherwise
 
 **Examples:**

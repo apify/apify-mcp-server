@@ -10,7 +10,7 @@ import { mcpToolsToOpenAiTools } from '../shared/openai_tools.js';
 import { AGENT_SYSTEM_PROMPT, MAX_CONVERSATION_TURNS, MODELS } from './config.js';
 import type { LlmClient } from './llm_client.js';
 import type { McpClient } from './mcp_client.js';
-import type { ConversationHistory, ConversationTurn } from './types.js';
+import type { ConversationHistory, ConversationTurn, McpToolResult } from './types.js';
 
 export type ConversationExecutorOptions = {
     /** User's initial prompt */
@@ -111,10 +111,12 @@ export async function executeConversation(options: ConversationExecutorOptions):
                 args = JSON.parse(toolCall.arguments);
             } catch (error) {
                 // Invalid JSON arguments
-                const errorResult = {
+                const errorContent = JSON.stringify({ error: `Failed to parse arguments: ${error}` });
+                const errorResult: McpToolResult = {
                     toolName: toolCall.name,
                     success: false,
                     error: `Failed to parse arguments: ${error}`,
+                    resultBytes: Buffer.byteLength(errorContent, 'utf8'),
                 };
                 turn.toolResults.push(errorResult);
 
@@ -122,7 +124,7 @@ export async function executeConversation(options: ConversationExecutorOptions):
                 messages.push({
                     role: 'tool',
                     tool_call_id: toolCall.id,
-                    content: JSON.stringify({ error: errorResult.error }),
+                    content: errorContent,
                 });
                 continue;
             }
@@ -135,20 +137,17 @@ export async function executeConversation(options: ConversationExecutorOptions):
 
             turn.toolResults.push(result);
 
+            // Serialize the tool result exactly as the agent (LLM) receives it,
+            // and record its byte size to measure the data volume tools return.
+            const content = result.success ? JSON.stringify(result.result) : JSON.stringify({ error: result.error });
+            result.resultBytes = Buffer.byteLength(content, 'utf8');
+
             // Add tool result to conversation
-            if (result.success) {
-                messages.push({
-                    role: 'tool',
-                    tool_call_id: toolCall.id,
-                    content: JSON.stringify(result.result),
-                });
-            } else {
-                messages.push({
-                    role: 'tool',
-                    tool_call_id: toolCall.id,
-                    content: JSON.stringify({ error: result.error }),
-                });
-            }
+            messages.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content,
+            });
         }
 
         turns.push(turn);

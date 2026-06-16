@@ -18,6 +18,29 @@ export type EvaluationResult = {
 };
 
 /**
+ * Sum the byte size of all tool results returned to the agent across a conversation.
+ * This is the data volume the format (JSON vs TOON) directly affects.
+ */
+export function sumResultBytes(conversation: ConversationHistory): number {
+    let total = 0;
+    for (const turn of conversation.turns) {
+        for (const toolResult of turn.toolResults) {
+            total += toolResult.resultBytes ?? 0;
+        }
+    }
+    return total;
+}
+
+/**
+ * Format a byte count as a human-readable string (B / KB / MB).
+ */
+export function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
  * Format results as a table
  */
 export function formatResultsTable(results: EvaluationResult[]): string {
@@ -46,7 +69,10 @@ export function formatResultsTable(results: EvaluationResult[]): string {
         if (result.error) {
             lines.push(`  Error: ${result.error}`);
         } else {
-            lines.push(`  Turns: ${result.conversation.totalTurns} | Duration: ${result.durationMs}ms`);
+            const bytes = sumResultBytes(result.conversation);
+            lines.push(
+                `  Turns: ${result.conversation.totalTurns} | Duration: ${result.durationMs}ms | Tool bytes: ${formatBytes(bytes)}`,
+            );
             lines.push(`  Reason: ${result.judgeResult.reason}`);
         }
 
@@ -62,11 +88,18 @@ export function formatResultsTable(results: EvaluationResult[]): string {
     const failedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'FAIL').length;
     const errorTests = results.filter((r) => r.error).length;
 
+    const totalBytes = results.reduce((sum, r) => sum + sumResultBytes(r.conversation), 0);
+
     lines.push(`📊 Summary:`);
     lines.push(`  Total tests: ${totalTests}`);
     lines.push(`  Passed: ${passedTests} ✅`);
     lines.push(`  Failed: ${failedTests} ❌`);
     lines.push(`  Errors: ${errorTests} 🔥`);
+    if (totalTests > 0) {
+        lines.push(
+            `  Tool bytes returned: ${formatBytes(totalBytes)} total, ${formatBytes(Math.round(totalBytes / totalTests))} avg/test`,
+        );
+    }
     lines.push('');
 
     // Final verdict - ALL tests must pass
@@ -124,7 +157,8 @@ export function formatDetailedResult(result: EvaluationResult): string {
         if (turn.toolResults.length > 0) {
             for (const tr of turn.toolResults) {
                 const status = tr.success ? '✅' : '❌';
-                lines.push(`    ${status} Result for ${tr.toolName}:`);
+                const bytesLabel = tr.resultBytes !== undefined ? ` (${formatBytes(tr.resultBytes)})` : '';
+                lines.push(`    ${status} Result for ${tr.toolName}${bytesLabel}:`);
                 if (tr.error) {
                     lines.push(`       Error: ${tr.error}`);
                 } else if (tr.result) {
@@ -172,6 +206,8 @@ export type TestResultRecord = {
     durationMs: number;
     /** Number of conversation turns */
     turns: number;
+    /** Total bytes of tool results returned to the agent across the conversation */
+    resultBytes: number;
     /** Error message if execution failed, null otherwise */
     error: string | null;
 };
