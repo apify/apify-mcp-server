@@ -1343,10 +1343,9 @@ export class ActorsMcpServer {
                         startTime,
                         telemetryData,
                         userId,
-                        // Resource ids are read once here from the args + the tool's public output;
-                        // no tool threads them back. See deriveResourceIds.
-                        callDiagnostics: { ...callDiagnostics, ...deriveResourceIds(args, toolResult) },
-                        responseBytes: computeToolResponseBytes(toolResult),
+                        callDiagnostics,
+                        args,
+                        result: toolResult,
                     });
                 }
             }
@@ -1369,6 +1368,8 @@ export class ActorsMcpServer {
     /**
      * Logs tool call completion at INFO level and tracks telemetry.
      * Computes duration once so both the log line and telemetry event use the same value.
+     * Response bytes and resource ids are derived here from the raw `result` (+ `args`) so every
+     * call site stays a plain hand-off — no path can forget to compute or strip them.
      */
     private logToolCallAndTelemetry(params: {
         toolName: string;
@@ -1379,19 +1380,23 @@ export class ActorsMcpServer {
         telemetryData: ToolCallTelemetryProperties | null;
         userId: string | null;
         callDiagnostics?: CallDiagnostics;
-        responseBytes?: ReturnType<typeof computeToolResponseBytes>;
+        args?: Record<string, unknown>;
+        result?: unknown;
     }): void {
         const durationMs = Date.now() - params.startTime;
+        // `result` is undefined only on short-circuit paths that never produced a payload (e.g. a
+        // cancelled task); skip byte accounting there. `null`/`{}` still measure as zero bytes.
+        const responseBytes = params.result === undefined ? undefined : computeToolResponseBytes(params.result);
 
         log.info('Tool call completed', {
             toolName: params.toolName,
             mcpSessionId: params.mcpSessionId,
             toolStatus: params.toolStatus,
             durationMs,
-            ...(params.responseBytes !== undefined && {
-                responseContentBytes: params.responseBytes.contentBytes,
-                responseStructuredContentBytes: params.responseBytes.structuredContentBytes,
-                responseFileBytes: params.responseBytes.fileBytes,
+            ...(responseBytes !== undefined && {
+                responseContentBytes: responseBytes.contentBytes,
+                responseStructuredContentBytes: responseBytes.structuredContentBytes,
+                responseFileBytes: responseBytes.fileBytes,
             }),
             ...(params.taskId !== undefined && { taskId: params.taskId }),
         });
@@ -1401,9 +1406,12 @@ export class ActorsMcpServer {
                 ...params.telemetryData,
                 tool_status: params.toolStatus,
                 tool_exec_time_ms: durationMs,
-                ...buildResponseBytesTelemetry(params.responseBytes),
+                ...buildResponseBytesTelemetry(responseBytes),
                 // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
                 ...params.callDiagnostics,
+                // Resource ids are read once here from the args + the tool's public output; no tool
+                // threads them back. Applied uniformly, last. See deriveResourceIds.
+                ...deriveResourceIds(params.args, params.result),
             };
             trackToolCall(params.userId, this.telemetryEnv, finalizedTelemetryData);
         }
@@ -1472,11 +1480,7 @@ export class ActorsMcpServer {
             apifyToken,
         );
 
-        const finishTaskTracking = (
-            status: ToolStatus,
-            diagnostics?: CallDiagnostics,
-            responseBytes?: ReturnType<typeof computeToolResponseBytes>,
-        ) => {
+        const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, result?: unknown) => {
             this.logToolCallAndTelemetry({
                 toolName: tool.name,
                 mcpSessionId,
@@ -1486,7 +1490,8 @@ export class ActorsMcpServer {
                 telemetryData,
                 userId,
                 callDiagnostics: diagnostics,
-                responseBytes,
+                args: toolArgs,
+                result,
             });
         };
 
@@ -1665,11 +1670,7 @@ export class ActorsMcpServer {
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
-            finishTaskTracking(
-                toolStatus,
-                { ...callDiagnostics, ...deriveResourceIds(toolArgs, result) },
-                computeToolResponseBytes(result),
-            );
+            finishTaskTracking(toolStatus, callDiagnostics, result);
         } catch (error) {
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
@@ -1693,7 +1694,7 @@ export class ActorsMcpServer {
                         failure_http_status: 402,
                         ...buildActorFields(actorName, actorId),
                     },
-                    computeToolResponseBytes(paymentResponse),
+                    paymentResponse,
                 );
                 return;
             }
@@ -1720,7 +1721,7 @@ export class ActorsMcpServer {
                         failure_http_status: error.statusCode,
                         ...buildActorFields(actorName, actorId),
                     },
-                    computeToolResponseBytes(approvalResponse),
+                    approvalResponse,
                 );
                 return;
             }
@@ -1786,7 +1787,7 @@ export class ActorsMcpServer {
             await this.taskStore.storeTaskResult(taskId, 'failed', failedResult, mcpSessionId);
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
-            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseBytes(failedResult));
+            finishTaskTracking(toolStatus, callDiagnostics, failedResult);
         } finally {
             cancelWatcher.dispose();
         }
