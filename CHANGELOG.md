@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.11.3 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- **cache:** Scope Actor definition cache to its owner ([#985](https://github.com/apify/apify-mcp-server/pull/985)) ([2dc6c21](https://github.com/apify/apify-mcp-server/commit/2dc6c21f9664225c4ce0561df999c07ad2eb4b25)) by [@MQ37](https://github.com/MQ37)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.11.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.2) (2026-06-15)
