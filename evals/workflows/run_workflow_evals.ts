@@ -25,9 +25,14 @@ import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config
 import { executeConversation } from './conversation_executor.js';
 import { LlmClient } from './llm_client.js';
 import { McpClient } from './mcp_client.js';
-import type { EvaluationResult } from './output_formatter.js';
+import type { EvaluationResult, TestResultRecord } from './output_formatter.js';
 import { formatDetailedResult, formatResultsTable } from './output_formatter.js';
-import { loadResultsDatabase, saveResultsDatabase, updateResultsWithEvaluations } from './results_writer.js';
+import {
+    buildResultKey,
+    loadResultsDatabase,
+    saveResultsDatabase,
+    updateResultsWithEvaluations,
+} from './results_writer.js';
 import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test_cases_loader.js';
 import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test_cases_loader.js';
 import { evaluateConversation } from './workflow_judge.js';
@@ -43,6 +48,7 @@ type CliArgs = {
     toolTimeout?: number;
     concurrency?: number;
     output?: boolean;
+    baseline?: string;
 };
 
 /**
@@ -202,6 +208,12 @@ async function main() {
             description: 'Save test results to JSON file (evals/workflows/results.json)',
             default: false,
         })
+        .option('baseline', {
+            type: 'string',
+            description:
+                'Results JSON file to compare against; prints byte/token deltas per test ' +
+                '(default: evals/workflows/results.json)',
+        })
         .help().argv) as CliArgs;
 
     console.log('='.repeat(100));
@@ -303,6 +315,45 @@ async function main() {
     console.log(`✅ Loaded ${filteredTestCases.length} test case(s)`);
     console.log();
 
+    // Load baseline for byte/token deltas (read before --output overwrites results.json).
+    // Keyed by test ID for the agent/judge model pair being run.
+    const baselinePath = argv.baseline ?? path.join(process.cwd(), 'evals/workflows/results.json');
+    const baselineByTestId = new Map<string, TestResultRecord>();
+    let baselineWithMetrics = 0;
+    try {
+        const baselineDb = loadResultsDatabase(baselinePath);
+        for (const testCase of filteredTestCases) {
+            const record = baselineDb.results[buildResultKey(argv.agentModel!, argv.judgeModel!, testCase.id)];
+            if (!record) continue;
+            baselineByTestId.set(testCase.id, record);
+            // Cast: records written before these metrics existed lack the fields at runtime.
+            if (
+                (record.resultBytes as number | undefined) !== undefined ||
+                (record.totalTokens as number | undefined) !== undefined
+            ) {
+                baselineWithMetrics++;
+            }
+        }
+        // Explain the baseline state so a missing delta is never a silent mystery.
+        if (baselineWithMetrics > 0) {
+            console.log(`📐 Baseline: ${baselineWithMetrics} matching result(s) with metrics from ${baselinePath}`);
+        } else if (baselineByTestId.size > 0) {
+            console.log(
+                `📐 Baseline: ${baselineByTestId.size} matching result(s) in ${baselinePath}, but none record bytes/tokens yet. ` +
+                    `Re-run once with --output to capture them, then deltas appear next run.`,
+            );
+        } else {
+            console.log(
+                `📐 No baseline for ${argv.agentModel}:${argv.judgeModel} in ${baselinePath}. ` +
+                    `Run once with --output to record one (deltas need a prior --output run with the same models).`,
+            );
+        }
+        console.log();
+    } catch (error) {
+        console.error(`⚠️  Could not load baseline from ${baselinePath}: ${error}`);
+        console.log();
+    }
+
     // Initialize LLM client (shared across all tests - stateless)
     const llmClient = new LlmClient();
 
@@ -339,8 +390,8 @@ async function main() {
         }
     }
 
-    // Display results
-    console.log(formatResultsTable(results));
+    // Display results (with byte/token deltas when a baseline matched)
+    console.log(formatResultsTable(results, baselineByTestId.size > 0 ? baselineByTestId : undefined));
 
     // Exit with appropriate code - ALL tests must pass
     const totalTests = results.length;

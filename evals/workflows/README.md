@@ -248,6 +248,7 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 | `--tool-timeout <seconds>` | | Tool call timeout | `60` |
 | `--concurrency <number>` | `-c` | Number of tests to run in parallel | `4` |
 | `--output` | `-o` | Save results to JSON file | `false` |
+| `--baseline <path>` | | Results JSON to compare against (prints byte/token deltas) | `results.json` |
 | `--help` | | Show help message | - |
 
 ### Line Range Filtering
@@ -364,6 +365,9 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
       "durationMs": 5234,
       "turns": 3,
       "resultBytes": 18452,
+      "promptTokens": 6231,
+      "completionTokens": 412,
+      "totalTokens": 6643,
       "error": null
     }
   }
@@ -380,6 +384,7 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
 - `durationMs` - Test duration in milliseconds
 - `turns` - Number of conversation turns
 - `resultBytes` - Total UTF-8 bytes of tool results returned to the agent across the conversation (measured at the point each result is fed to the LLM, so it reflects the format the agent actually receives — JSON vs TOON). Compare across branches to quantify byte savings.
+- `promptTokens` / `completionTokens` / `totalTokens` - Tokens billed across all agent LLM calls (summed over turns; judge calls excluded). Tokens — not bytes — are what TOON actually reduces and what fills the context window, so this is the primary cost signal. Bytes are a deterministic, tokenizer-free proxy.
 - `error` - Error message if execution failed, `null` otherwise
 
 **Examples:**
@@ -409,6 +414,30 @@ The `results.json` file is tracked in git, allowing you to:
 - See result changes over time in commits
 - Compare results across branches
 - Track performance regressions in PRs
+
+### Comparing against a baseline (byte/token deltas)
+
+Every run automatically compares against a baseline and prints per-test and aggregate **deltas** for tool bytes and tokens — no manual file diffing. This is how you answer "did this change grow the response size?".
+
+- **Default baseline** is the committed `evals/workflows/results.json`. Each test is matched by its `agentModel:judgeModel:testId` key.
+- **Custom baseline:** `--baseline <path>` compares against any saved results file.
+- Deltas read as `▼ -2.1 KB / -10.2%` (reduction) or `▲ +900 / +3.4%` (increase). Lower is better for both metrics.
+- This is **reporting only** — a regression never fails the run. Task success (all tests PASS) is the hard gate.
+
+```bash
+# Compare the current code against the committed baseline (default)
+pnpm run evals:workflow
+
+# A/B JSON vs TOON on one branch — no branch switching.
+# APIFY_MCP_DISABLE_TOON forces the MCP server to emit JSON; the eval subprocess inherits the env.
+APIFY_MCP_DISABLE_TOON=1 pnpm run evals:workflow -- --output   # record the JSON baseline
+cp evals/workflows/results.json /tmp/baseline.json
+pnpm run evals:workflow -- --baseline /tmp/baseline.json       # TOON run, prints savings vs JSON
+```
+
+`APIFY_MCP_DISABLE_TOON=1` (or `=true`) makes the list/collection tools emit a ```json fence instead of TOON, with no code change. Unset (or any other value) keeps TOON on.
+
+> **Bootstrap note:** records written before these metrics existed have no `resultBytes`/`*Tokens` fields, so the first run after this change shows `(no baseline)` for them and writes fresh values with `--output`. Subsequent runs show real deltas.
 
 ### Test Case Format
 

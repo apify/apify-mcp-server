@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { dotFlatten, encodeToon, FENCES, wrapJsonText } from '../../src/utils/encode_text.js';
 import { decodeFencedToolText } from './helpers/tool_context.js';
@@ -134,5 +134,25 @@ describe('encodeToon', () => {
         const text = encodeToon(deep);
         expect(text.startsWith(FENCES.toon.prefix)).toBe(false);
         expect(decodeFencedToolText(text)).toEqual(deep);
+    });
+
+    describe('APIFY_MCP_DISABLE_TOON override', () => {
+        afterEach(() => {
+            delete process.env.APIFY_MCP_DISABLE_TOON;
+        });
+
+        it.each(['1', 'true'])('ships JSON (not TOON) when set to %s', (flag) => {
+            process.env.APIFY_MCP_DISABLE_TOON = flag;
+            const text = encodeToon(uniformRows);
+            expect(text.startsWith(FENCES.json.prefix)).toBe(true);
+            expect(text.startsWith(FENCES.toon.prefix)).toBe(false);
+            expect(decodeFencedToolText(text)).toEqual(uniformRows);
+        });
+
+        it('still ships TOON for other values (e.g. "0")', () => {
+            process.env.APIFY_MCP_DISABLE_TOON = '0';
+            const text = encodeToon(uniformRows);
+            expect(text.startsWith(FENCES.toon.prefix)).toBe(true);
+        });
     });
 });

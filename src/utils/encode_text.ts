@@ -20,6 +20,17 @@ function fence(format: keyof typeof FENCES, body: string): string {
     return `${FENCES[format].prefix}${body}${FENCES[format].suffix}`;
 }
 
+/**
+ * Operational override: set `APIFY_MCP_DISABLE_TOON=1` to make {@link encodeToon} emit lossless
+ * JSON instead of TOON, without a code change or branch switch. Lets the eval harness A/B JSON vs
+ * TOON on one branch (the MCP subprocess inherits the env). Distinct from the per-call error
+ * fallback in `encodeToon`: this opts out of TOON up front by request, not on encode failure.
+ */
+function isToonDisabled(): boolean {
+    const value = process.env.APIFY_MCP_DISABLE_TOON;
+    return value === '1' || value === 'true';
+}
+
 function flattenValue(value: unknown, depth: number): unknown {
     if (depth > MAX_DEPTH) throw new RangeError('dotFlatten: max depth exceeded');
     if (Array.isArray(value)) return value.map((item) => flattenValue(item, depth + 1));
@@ -85,6 +96,8 @@ export function encodeToon(value: unknown): string {
     // (or any `toJSON` carrier) becomes its ISO string here, not an empty object. A non-serialisable
     // value (circular, BigInt) throws here; API payloads are always JSON, so let it crash.
     const jsonStr = JSON.stringify(value);
+    // Operational opt-out: ship JSON (same fence the catch below uses) when TOON is disabled.
+    if (isToonDisabled()) return fence('json', jsonStr);
     try {
         return fence('toon', encode(dotFlatten(JSON.parse(jsonStr))));
     } catch (err) {
