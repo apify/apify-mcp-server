@@ -16,7 +16,7 @@ const getUserDatasetsListArgs = z.object({
     limit: z
         .number()
         .max(20)
-        .describe('Maximum number of array elements to return. The default value (as well as the maximum) is 20.')
+        .describe('Maximum number of array elements to return. The default value is 10, the maximum is 20.')
         .default(10),
     desc: z
         .boolean()
