@@ -1,0 +1,15 @@
+{
+  "$comment": "Domain engines only. The generic engines come from devforge's base registry — see devforge docs/devforge-config.md.",
+  "uses": {
+    "dig": {
+      "roles": ["architect"],
+      "engine": ".claude/skills/dig/SKILL.md",
+      "scope": "follow as instruction text (NOT Skill-invoked). Use dig's exploration + planning discipline, its Available-resources map (MCP spec/SDK + MCP Apps spec/SDK, internal repo, dev servers, mcpc), and its Key conventions. SKIP dig's intent-detection, its EnterPlanMode/ExitPlanMode gate, and its GitHub-issue creation — the orchestrator owns the gate. Write .devforge/design.md only: approach, files to change, test strategy (the oracle), risks."
+    },
+    "mcpc-tester": {
+      "roles": ["reviewer", "final_reviewer"],
+      "engine": ".claude/agents/mcpc-tester.md",
+      "scope": "follow as instruction text. pnpm run build, then probe the live server via mcpc per its workflow; judge implemented behavior against design.md + task.md. Do NOT run or replace the unit suite (that is the oracle). First line `VERDICT: PASS|FAIL` (PASS only with zero findings of any severity), then findings tagged blocker/major/minor/nit with actual-vs-expected."
+    }
+  }
+}
