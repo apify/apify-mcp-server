@@ -4,7 +4,7 @@
     "dig": {
       "roles": ["architect"],
       "engine": ".claude/skills/dig/SKILL.md",
-      "scope": "follow as instruction text (NOT Skill-invoked). Use dig's exploration + planning discipline, its Available-resources map (MCP spec/SDK + MCP Apps spec/SDK, internal repo, dev servers, mcpc), and its Key conventions. SKIP dig's intent-detection, its EnterPlanMode/ExitPlanMode gate, and its GitHub-issue creation — the orchestrator owns the gate. Write .devforge/design.md only: approach, files to change, test strategy (the oracle), risks."
+      "scope": "follow as instruction text (NOT Skill-invoked). Run dig's Plan mode — its exploration + Available-resources map + the required Design-output sections (approach, files, interfaces, test strategy/oracle, risks, data flow). SKIP dig's intent-detection, its EnterPlanMode/ExitPlanMode gate, and GitHub-issue creation — the orchestrator owns the gate. Write the design to .devforge/design.md."
     },
     "mcpc-tester": {
       "roles": ["reviewer", "final_reviewer"],
