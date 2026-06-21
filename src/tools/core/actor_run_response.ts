@@ -434,7 +434,6 @@ export function suggestTool(toolName: string, loadedToolNames: string[]): string
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
     statusMessage: string | null | undefined,
-    loadedToolNames: string[],
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
 ): { summary: string; nextStep: string } {
@@ -473,12 +472,13 @@ function buildSucceededSummaryNextStep(
     // KV store is rarely the primary output for Apify actors (mostly SDK state / intermediate data),
     // so we don't recommend it as `nextStep` — but `kv.summarySuffix` keeps it visible in the summary
     // when records exist, so callers can still discover them. Surface the upstream statusMessage so
-    // a text-only reader sees the actor's own diagnostic (often the only signal here).
+    // a text-only reader sees the actor's own diagnostic (often the only signal here). The nextStep
+    // stays generic ("re-run the Actor"): this builder is shared by get-actor-run / abort-actor-run,
+    // which only have a runId and can't know whether the run came from call-actor or a native Actor
+    // tool — naming a specific tool would mislead callers (see #1007).
     return {
         summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-        nextStep: suggestTool(HelperTools.ACTOR_CALL, loadedToolNames)
-            ? `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run ${HelperTools.ACTOR_CALL} with adjusted input.`
-            : `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run the Actor with adjusted input.`,
+        nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run the Actor with adjusted input.`,
     };
 }
 
@@ -514,10 +514,8 @@ export function buildStatusSummaryNextStep(params: {
     run: ActorRun;
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
-    /** Active loaded tool set; gates nextStep references to tools that may be absent (see #1007). */
-    loadedToolNames: string[];
 }): { summary: string; nextStep: string } {
-    const { run, dataset, keyValueStore, loadedToolNames } = params;
+    const { run, dataset, keyValueStore } = params;
     const { id: runId, status, statusMessage } = run;
     // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
@@ -546,20 +544,16 @@ export function buildStatusSummaryNextStep(params: {
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'SUCCEEDED':
-            return buildSucceededSummaryNextStep(runTimeSecs, statusMessage, loadedToolNames, dataset, keyValueStore);
+            return buildSucceededSummaryNextStep(runTimeSecs, statusMessage, dataset, keyValueStore);
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: suggestTool(HelperTools.ACTOR_CALL, loadedToolNames)
-                    ? `Diagnose using statusMessage and exitCode in this response; re-run ${HelperTools.ACTOR_CALL} with adjusted input if the cause is fixable.`
-                    : `Diagnose using statusMessage and exitCode in this response; re-run the Actor with adjusted input if the cause is fixable.`,
+                nextStep: `Diagnose using statusMessage and exitCode in this response; re-run the Actor with adjusted input if the cause is fixable.`,
             };
         case 'ABORTED':
             return {
                 summary: `ABORTED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: suggestTool(HelperTools.ACTOR_CALL, loadedToolNames)
-                    ? `Use ${HelperTools.ACTOR_CALL} again if you want to rerun the Actor.`
-                    : `Re-run the Actor if you want to retry.`,
+                nextStep: `Re-run the Actor if you want to retry.`,
             };
         case 'TIMED-OUT':
             return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore);
@@ -684,9 +678,8 @@ export function buildStartRunResponse(params: {
     actorRun: ActorRun;
     widget?: boolean;
     linkContext?: ConsoleLinkContext;
-    loadedToolNames: string[];
 }): ReturnType<typeof buildMCPResponse> {
-    const { actorName, actorRun, widget, linkContext, loadedToolNames } = params;
+    const { actorName, actorRun, widget, linkContext } = params;
 
     const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
     const keyValueStore = actorRun.defaultKeyValueStoreId ? { id: actorRun.defaultKeyValueStoreId } : undefined;
@@ -695,7 +688,6 @@ export function buildStartRunResponse(params: {
         run: actorRun,
         dataset,
         keyValueStore,
-        loadedToolNames,
     });
 
     const nextStep = widget ? WIDGET_NO_POLL_NEXT_STEP : computedNextStep;
@@ -756,9 +748,8 @@ export async function fetchActorRunData(params: {
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
-    loadedToolNames: string[];
 }): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
-    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort, loadedToolNames } = params;
+    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
 
     const waitResult = await waitForRunWithProgress({
         client,
@@ -837,7 +828,7 @@ export async function fetchActorRunData(params: {
     );
     const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
     const keyValueStore = buildRunKeyValueStore(run, kvListResult);
-    const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore, loadedToolNames });
+    const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });
 
     const structuredContent: RunResponse = {
         runId: run.id,

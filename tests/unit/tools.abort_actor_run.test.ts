@@ -29,18 +29,14 @@ function stubClient(run: unknown): InternalToolArgs['apifyClient'] {
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-/** Context with an overridable loaded tool set on apifyMcpServer.listToolNames. */
-function abortContext(args: Record<string, unknown>, run: unknown, loadedToolNames: string[]): InternalToolArgs {
-    return {
-        ...stubToolCallContext(args, stubClient(run)),
-        apifyMcpServer: { listToolNames: () => loadedToolNames },
-    } as unknown as InternalToolArgs;
+function abortContext(args: Record<string, unknown>, run: unknown): InternalToolArgs {
+    return stubToolCallContext(args, stubClient(run));
 }
 
 describe('abort-actor-run', () => {
     it('returns structuredContent with summary, nextStep, and run subset', async () => {
         const run = mockAbortedRun();
-        const result = await (abortActorRun as HelperTool).call(abortContext({ runId: 'run-1' }, run, ['call-actor']));
+        const result = await (abortActorRun as HelperTool).call(abortContext({ runId: 'run-1' }, run));
         const { structuredContent, content } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
         };
@@ -67,19 +63,14 @@ describe('abort-actor-run', () => {
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
-    it('emits the ABORTED nextStep gated on the loaded tool set', async () => {
+    // abort works on any runId — the run may have come from a native Actor tool, not call-actor —
+    // so the retry hint stays generic and never names call-actor (#1007).
+    it('emits a generic ABORTED nextStep that never names call-actor', async () => {
         const run = mockAbortedRun();
+        const result = await (abortActorRun as HelperTool).call(abortContext({ runId: 'run-1' }, run));
+        const { nextStep } = (result as { structuredContent: { nextStep: string } }).structuredContent;
 
-        const withCallActor = await (abortActorRun as HelperTool).call(
-            abortContext({ runId: 'run-1' }, run, ['call-actor']),
-        );
-        const without = await (abortActorRun as HelperTool).call(abortContext({ runId: 'run-1' }, run, []));
-
-        const loadedStep = (withCallActor as { structuredContent: { nextStep: string } }).structuredContent.nextStep;
-        const unloadedStep = (without as { structuredContent: { nextStep: string } }).structuredContent.nextStep;
-
-        expect(loadedStep).toContain('call-actor');
-        expect(unloadedStep).not.toContain('call-actor');
-        expect(unloadedStep).toContain('Re-run the Actor');
+        expect(nextStep).not.toContain('call-actor');
+        expect(nextStep).toContain('Re-run the Actor');
     });
 });

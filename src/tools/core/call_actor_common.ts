@@ -629,8 +629,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
         }
 
         resolvedActorId = extractActorId(resolution.actor);
-        const { apifyClient, apifyMcpServer } = toolArgs;
-        const loadedToolNames = apifyMcpServer.listToolNames();
+        const { apifyClient } = toolArgs;
         const abortSignal = toolArgs.extra.signal;
 
         if (abortSignal?.aborted) return {};
@@ -653,12 +652,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
 
         // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
         if (waitSecs === 0) {
-            const response = buildStartRunResponse({
-                actorName: baseActorName,
-                actorRun,
-                linkContext,
-                loadedToolNames,
-            });
+            const response = buildStartRunResponse({ actorName: baseActorName, actorRun, linkContext });
             return { ...response, toolTelemetry: { actorId: resolvedActorId } };
         }
 
@@ -671,7 +665,6 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             abortSignal,
             mcpSessionId: toolArgs.mcpSessionId,
             onAbort: abortRunOnSignal,
-            loadedToolNames,
         });
 
         if ('aborted' in fetchResult) return {};

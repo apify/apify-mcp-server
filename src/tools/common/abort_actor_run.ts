@@ -44,18 +44,13 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyMcpServer } = toolArgs;
+        const { args, apifyClient: client } = toolArgs;
         const parsed = abortRunArgs.parse(args);
         const run = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
 
         const dataset = run.defaultDatasetId ? { id: run.defaultDatasetId } : undefined;
         const keyValueStore = run.defaultKeyValueStoreId ? { id: run.defaultKeyValueStoreId } : undefined;
-        const { summary, nextStep } = buildStatusSummaryNextStep({
-            run,
-            dataset,
-            keyValueStore,
-            loadedToolNames: apifyMcpServer.listToolNames(),
-        });
+        const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });
 
         const structuredContent: RunResponse = {
             runId: run.id,
