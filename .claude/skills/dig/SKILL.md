@@ -58,25 +58,32 @@ Read the relevant source files and explain your findings. This is the baseline f
 
 ## Step 2: Plan (Plan and Spec only)
 
-Use the `EnterPlanMode` tool, then design the approach.
+Use the `EnterPlanMode` tool, then design the approach — and **commit to one**. If the request is
+genuinely ambiguous (e.g. it maps to two different existing knobs), surface the fork up front and
+ask; otherwise pick the most defensible design and commit rather than listing options.
 
-**What to do:**
+**Investigate first:**
 1. Assess internal repo impact (check `../apify-mcp-server-internal` if available)
 2. Check MCP spec/SDK if the feature involves protocol behavior
-3. Check MCP Apps spec/SDK if the feature involves widgets or interactive UIs
+3. Check MCP Apps spec/SDK if it involves widgets or interactive UIs
 4. Use `mcpc @stdio tools-call` to probe current behavior if useful (requires `pnpm run build`)
-5. Follow key conventions (see below)
-6. Ask clarifying questions if ambiguous — prefer narrowing scope over guessing intent
+5. Read the repo's convention docs — follow them, don't reinvent
 
-**Key conventions:**
-- **Simple > complex, ruthlessly minimal** — only what's explicitly in scope
-- **Reuse before creating.** Search for existing helpers and patterns. Extend what exists.
-- **Smallest possible change.** Ask: is there a simpler way using what's already there?
-- **Zod** for input validation, **HelperTools enum** for tool names
-- Integration tests go in `tests/integration/suite.ts`
-- Changes may affect `apify-mcp-server-internal` — always assess impact
-- **Public/internal repo separation**: See `CLAUDE.md § Public/internal repo separation`
-- See `CLAUDE.md`, `CONTRIBUTING.md`, and `DEVELOPMENT.md` for full conventions
+**Conventions live in the repo, not here.** `AGENTS.md`, `CONTRIBUTING.md`, and `DEVELOPMENT.md`
+hold the naming, validation, test-layout, and public/internal-separation rules — read them. Design
+**minimally**: reuse and adjust before adding.
+
+**Design output — required sections.** A plan has to be implementable by someone else, so produce:
+
+1. **Approach** — the chosen design in a few sentences and the main trade-off you accepted.
+2. **Files to change** — each file to create or modify with a one-line note on what changes (path + change; no line numbers needed).
+3. **Interfaces** — the key function/type signatures you add or change (names, params, returns), so the implementer and reviewers know the contract.
+4. **Test strategy (the oracle)** — which unit/integration tests prove it, where they live, and what each asserts. This is how "done" is judged — never leave it implicit.
+5. **Risks & impact** — edge cases, and `apify-mcp-server-internal` impact.
+6. **Data flow** — only when non-trivial: entry → transforms → output.
+
+Sections 2–4 must be concrete (real files, signatures, and tests — no "TBD", no "add error
+handling"). Sections 1, 5, 6 stay brief. This structure is for **Plan**; Explore and Spec stay lean.
 
 **Stop here if the intent is Plan.** Exit plan mode with `ExitPlanMode`.
 
@@ -117,11 +124,14 @@ Use the repo's `feature_spec.yml` template. Only the **Problem** and **Proposed 
 [Only if you actually evaluated other approaches.]
 ```
 
-**Style** (applies to issues AND all dig output — explanations, plans, specs):
+**Style** (Explore explanations and Spec issues):
 - Plain language, no fluff — see `CLAUDE.md § Communication style`
 - Skip any section that would be empty or generic
 - 10-30 lines, not 100
 - Concrete steps > prose
+
+(A **Plan**'s design follows its required-sections structure above — keep each section tight, but
+don't truncate files / interfaces / test strategy to hit a line count.)
 
 **Self-review before presenting:**
 - Is this the minimal design? Could scope be smaller?
