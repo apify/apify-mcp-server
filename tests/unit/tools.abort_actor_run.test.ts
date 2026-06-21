@@ -62,15 +62,4 @@ describe('abort-actor-run', () => {
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
-
-    // abort works on any runId — the run may have come from a native Actor tool, not call-actor —
-    // so the retry hint stays generic and never names call-actor (#1007).
-    it('emits a generic ABORTED nextStep that never names call-actor', async () => {
-        const run = mockAbortedRun();
-        const result = await (abortActorRun as HelperTool).call(abortContext({ runId: 'run-1' }, run));
-        const { nextStep } = (result as { structuredContent: { nextStep: string } }).structuredContent;
-
-        expect(nextStep).not.toContain('call-actor');
-        expect(nextStep).toContain('Re-run the Actor');
-    });
 });

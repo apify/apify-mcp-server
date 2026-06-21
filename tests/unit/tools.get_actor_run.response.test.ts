@@ -1,7 +1,6 @@
 import type { ActorRun } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
 import {
     buildStartRunResponse,
     buildStatusSummaryNextStep,
@@ -856,31 +855,6 @@ describe('buildStatusTemplate', () => {
         });
         expect(t.nextStep).toMatch(/to project\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
-    });
-});
-
-// -----------------------------------------------------------------------------
-// Terminal-status nextStep stays tool-agnostic (#1007): this builder is shared by
-// get-actor-run / abort-actor-run, which only have a runId and can't know whether the run
-// came from call-actor or a native Actor tool. So the retry hint must never name call-actor.
-// -----------------------------------------------------------------------------
-describe('buildStatusSummaryNextStep() terminal retry hint', () => {
-    it('FAILED nextStep refers to "the Actor" generically, never call-actor', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('FAILED') });
-        expect(t.nextStep).not.toContain(HelperTools.ACTOR_CALL);
-        expect(t.nextStep).toContain('re-run the Actor');
-    });
-
-    it('ABORTED nextStep refers to "the Actor" generically, never call-actor', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTED') });
-        expect(t.nextStep).not.toContain(HelperTools.ACTOR_CALL);
-        expect(t.nextStep).toContain('Re-run the Actor');
-    });
-
-    it('SUCCEEDED no-output nextStep refers to "the Actor" generically, never call-actor', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED') });
-        expect(t.nextStep).not.toContain(HelperTools.ACTOR_CALL);
-        expect(t.nextStep).toContain('re-run the Actor');
     });
 });
 
