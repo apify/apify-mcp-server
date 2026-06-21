@@ -1,5 +1,5 @@
 {
-  "slots": {
+  "stages": {
     "validate":    { "use": "brainstorming", "model": "opus" },
     "architect":   { "use": "dig",           "model": "opus" },
     "implementer": { "use": "feature-dev",   "model": "opus" },
