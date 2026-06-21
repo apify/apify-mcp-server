@@ -246,7 +246,7 @@ describe('deriveResourceIds', () => {
             status: 'RUNNING',
             startedAt: new Date(),
         } as unknown as ActorRun;
-        const response = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun });
+        const response = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun, loadedToolNames: [] });
         expect(deriveResourceIds({}, response)).toMatchObject({ run_id: 'run-abc', run_status: 'RUNNING' });
     });
 });

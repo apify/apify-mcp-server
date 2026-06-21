@@ -15,7 +15,15 @@ import {
 export const defaultGetActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, progressTracker, mcpSessionId, extra } = toolArgs;
+        const {
+            args,
+            apifyClient: client,
+            apifyToken,
+            progressTracker,
+            mcpSessionId,
+            extra,
+            apifyMcpServer,
+        } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
         try {
@@ -26,6 +34,7 @@ export const defaultGetActorRun: ToolEntry = Object.freeze({
                 progressTracker,
                 abortSignal: extra?.signal,
                 mcpSessionId,
+                loadedToolNames: apifyMcpServer.listToolNames(),
             });
 
             // Per MCP spec, receivers SHOULD NOT send a response for a cancelled request:

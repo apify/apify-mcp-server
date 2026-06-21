@@ -15,7 +15,8 @@ import { buildGetActorRunSuccessResponse } from './core/get_actor_run_common.js'
  */
 export const actorExecutor: ActorExecutor = {
     async executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult> {
-        const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker, taskMode } = params;
+        const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker, taskMode, loadedToolNames } =
+            params;
         // Strip `waitSecs` from the Actor's input — it's an MCP-injected opt-in, not an
         // Actor field — so `actor.start()` doesn't reject or silently pass it through.
         const { waitSecs: argsWaitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<
@@ -66,6 +67,7 @@ export const actorExecutor: ActorExecutor = {
             abortSignal,
             mcpSessionId,
             onAbort: abortRunOnSignal,
+            loadedToolNames,
         });
 
         if ('aborted' in fetchResult) {

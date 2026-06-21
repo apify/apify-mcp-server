@@ -1,6 +1,7 @@
 import type { ActorRun } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HelperTools } from '../../src/const.js';
 import {
     buildStartRunResponse,
     buildStatusSummaryNextStep,
@@ -565,7 +566,7 @@ describe('buildStartRunResponse()', () => {
     } as unknown as ActorRun;
 
     it('builds correct RunResponse shape without widget metadata', () => {
-        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun });
+        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun, loadedToolNames: [] });
 
         const { structuredContent, content, _meta } = result as {
             structuredContent: RunResponse;
@@ -597,6 +598,7 @@ describe('buildStartRunResponse()', () => {
             actorName: 'apify/rag-web-browser',
             actorRun,
             linkContext: {},
+            loadedToolNames: [],
         });
 
         const { structuredContent, content } = result as {
@@ -617,7 +619,12 @@ describe('buildStartRunResponse()', () => {
     });
 
     it('includes widget metadata and no-poll nextStep when widget=true', () => {
-        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun, widget: true });
+        const result = buildStartRunResponse({
+            actorName: 'apify/rag-web-browser',
+            actorRun,
+            widget: true,
+            loadedToolNames: [],
+        });
 
         const { structuredContent, _meta } = result as {
             structuredContent: RunResponse;
@@ -649,6 +656,11 @@ const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['meta
 const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
 const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
 
+// "Everything loaded" default for status-template tests: keeps the gated branches (SUCCEEDED
+// no-output, FAILED, ABORTED) naming their tool so these assertions stay unchanged from before
+// loadedToolNames became required. The dedicated tool-set-adaptation describe below tests gating.
+const ALL_TOOLS: string[] = Object.values(HelperTools);
+
 /**
  * Tests below cover real branching in buildSucceededSummaryNextStep / buildTimedOutSummaryNextStep
  * (3 branches each) and the dataset-vs-KV priority + truncation-labelling rules. Pure template
@@ -658,7 +670,11 @@ const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result
  */
 describe('buildStatusTemplate', () => {
     it('SUCCEEDED with dataset items routes to dataset-items nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+            loadedToolNames: ALL_TOOLS,
+        });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
@@ -667,7 +683,7 @@ describe('buildStatusTemplate', () => {
 
     it('SUCCEEDED steers nextStep away from fetching a large dataset', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url'], inflatedBytes: 2_400_000 };
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset, loadedToolNames: ALL_TOOLS });
         expect(t.summary).toContain('47 items; 1 fields available');
         expect(t.nextStep).toContain('Full output is ~2400000 bytes');
         expect(t.nextStep).toContain('page with offset');
@@ -675,7 +691,7 @@ describe('buildStatusTemplate', () => {
 
     it('SUCCEEDED reports size but omits the large-output warning below the threshold', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 2, fields: [], inflatedBytes: 4000 };
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset, loadedToolNames: ALL_TOOLS });
         expect(t.summary).toContain('2 items');
         expect(t.nextStep).toContain('Full output is ~4000 bytes');
         expect(t.nextStep).not.toContain('may exceed context');
@@ -683,13 +699,13 @@ describe('buildStatusTemplate', () => {
 
     it('SUCCEEDED omits the size hint entirely when the dataset size is unknown', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 2, fields: [] };
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset, loadedToolNames: ALL_TOOLS });
         expect(t.nextStep).not.toContain('Full output');
     });
 
     it('SUCCEEDED with items but no fields metadata omits the fields hint without a dangling em-dash', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset, loadedToolNames: ALL_TOOLS });
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).not.toContain('Available fields');
         expect(t.nextStep).not.toContain('—');
@@ -700,6 +716,7 @@ describe('buildStatusTemplate', () => {
             run: makeRun('SUCCEEDED'),
             dataset: datasetEmpty,
             keyValueStore: kvWithRecords,
+            loadedToolNames: ALL_TOOLS,
         });
         expect(t.summary).toContain('No dataset items found');
         expect(t.summary).toContain('Key-value store has 2 keys');
@@ -709,7 +726,7 @@ describe('buildStatusTemplate', () => {
     });
 
     it('SUCCEEDED with neither dataset items nor KV records routes to "no output" nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED') });
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), loadedToolNames: ALL_TOOLS });
         expect(t.summary).toContain('No dataset items found');
         expect(t.summary).not.toContain('Key-value store');
         expect(t.nextStep).toContain('re-run');
@@ -720,6 +737,7 @@ describe('buildStatusTemplate', () => {
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
             keyValueStore: kvWithRecords,
+            loadedToolNames: ALL_TOOLS,
         });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.summary).toContain('Key-value store has 2 keys');
@@ -737,13 +755,18 @@ describe('buildStatusTemplate', () => {
             run: makeRun('SUCCEEDED'),
             dataset: datasetEmpty,
             keyValueStore: truncatedKv,
+            loadedToolNames: ALL_TOOLS,
         });
         expect(t.summary).toContain('at least 50 keys');
         expect(t.summary).not.toMatch(/\(50 keys\)/);
     });
 
     it('TIMED-OUT with dataset routes to partial-output nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMED-OUT'),
+            dataset: datasetWithItems,
+            loadedToolNames: ALL_TOOLS,
+        });
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
@@ -752,6 +775,7 @@ describe('buildStatusTemplate', () => {
             run: makeRun('TIMED-OUT'),
             dataset: datasetWithItems,
             keyValueStore: kvWithRecords,
+            loadedToolNames: ALL_TOOLS,
         });
         expect(t.summary).toContain('Key-value store has 2 keys');
         expect(t.nextStep).toContain('partial output (47 items written)');
@@ -759,7 +783,7 @@ describe('buildStatusTemplate', () => {
     });
 
     it('TIMED-OUT without dataset routes to "no dataset to fetch" nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT') });
+        const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT'), loadedToolNames: ALL_TOOLS });
         expect(t.nextStep).toContain('no dataset to fetch');
     });
 
@@ -769,19 +793,26 @@ describe('buildStatusTemplate', () => {
     // naive reader doesn't mistake the actor's own message for our narrative.
 
     it('RUNNING with upstream statusMessage attributes it as Actor status and drops trailing period', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING', 'Starting the crawler.') });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING', 'Starting the crawler.'),
+            loadedToolNames: ALL_TOOLS,
+        });
         expect(t.summary).toContain('Actor status: "Starting the crawler"');
         expect(t.summary).not.toMatch(/\.\./);
     });
 
     it('RUNNING without statusMessage falls back to In progress (no Actor status attribution)', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING') });
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), loadedToolNames: ALL_TOOLS });
         expect(t.summary).toContain('In progress.');
         expect(t.summary).not.toContain('Actor status:');
     });
 
     it('RUNNING with dataset items appends "N results so far" so polling agents see real progress', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING'),
+            dataset: datasetWithItems,
+            loadedToolNames: ALL_TOOLS,
+        });
         expect(t.summary).toContain('47 results so far.');
         // Progress is summary-only; nextStep stays poll-only — partial reads mid-run are noise.
         expect(t.nextStep).toContain('poll for completion');
@@ -789,24 +820,40 @@ describe('buildStatusTemplate', () => {
     });
 
     it('RUNNING with empty dataset omits the progress suffix (no "0 results so far")', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetEmpty });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING'),
+            dataset: datasetEmpty,
+            loadedToolNames: ALL_TOOLS,
+        });
         expect(t.summary).not.toMatch(/results so far/);
         expect(t.summary).not.toContain('0 results');
     });
 
     it('RUNNING with exactly 1 item uses singular "result"', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: { id: 'ds-1', itemCount: 1 } });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING'),
+            dataset: { id: 'ds-1', itemCount: 1 },
+            loadedToolNames: ALL_TOOLS,
+        });
         expect(t.summary).toContain('1 result so far.');
         expect(t.summary).not.toContain('results');
     });
 
     it('TIMING-OUT with dataset items surfaces progress in the summary', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMING-OUT'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMING-OUT'),
+            dataset: datasetWithItems,
+            loadedToolNames: ALL_TOOLS,
+        });
         expect(t.summary).toContain('47 results so far.');
     });
 
     it('ABORTING with dataset items surfaces progress in the summary', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTING'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('ABORTING'),
+            dataset: datasetWithItems,
+            loadedToolNames: ALL_TOOLS,
+        });
         expect(t.summary).toContain('47 results so far.');
     });
 
@@ -814,7 +861,7 @@ describe('buildStatusTemplate', () => {
         // The agent reading text-only must see the actor's diagnostic; we pass it through with
         // attribution so it's clear the wording is upstream, not ours.
         const run = makeRun('SUCCEEDED', 'Finished! Total 1 requests: 1 succeeded, 0 failed.');
-        const t = buildStatusSummaryNextStep({ run, dataset: datasetEmpty });
+        const t = buildStatusSummaryNextStep({ run, dataset: datasetEmpty, loadedToolNames: ALL_TOOLS });
         expect(t.summary).toContain('Actor status: "Finished! Total 1 requests: 1 succeeded, 0 failed"');
         expect(t.summary).not.toMatch(/\.\./);
     });
@@ -822,9 +869,60 @@ describe('buildStatusTemplate', () => {
     it('SUCCEEDED with items ends nextStep with a single period after the fields hint', () => {
         // Pinned to prevent the `to project..` regression: the fields-hint template already
         // terminates the sentence, so the outer nextStep template must not append its own `.`.
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+            loadedToolNames: ALL_TOOLS,
+        });
         expect(t.nextStep).toMatch(/to project\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
+    });
+});
+
+// -----------------------------------------------------------------------------
+// nextStep tool-set adaptation (#1007): builders name a tool only when it is loaded.
+// -----------------------------------------------------------------------------
+describe('buildStatusSummaryNextStep() tool-set adaptation', () => {
+    it('names call-actor in ABORTED nextStep when call-actor is loaded', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('ABORTED'),
+            loadedToolNames: [HelperTools.ACTOR_CALL],
+        });
+        expect(t.nextStep).toContain(HelperTools.ACTOR_CALL);
+    });
+
+    it('omits call-actor from ABORTED nextStep when not loaded', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTED'), loadedToolNames: [] });
+        expect(t.nextStep).not.toContain(HelperTools.ACTOR_CALL);
+        expect(t.nextStep).toContain('Re-run the Actor');
+    });
+
+    it('names call-actor in FAILED nextStep when call-actor is loaded', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('FAILED'),
+            loadedToolNames: [HelperTools.ACTOR_CALL],
+        });
+        expect(t.nextStep).toContain(HelperTools.ACTOR_CALL);
+    });
+
+    it('omits call-actor from FAILED nextStep when not loaded', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('FAILED'), loadedToolNames: [] });
+        expect(t.nextStep).not.toContain(HelperTools.ACTOR_CALL);
+        expect(t.nextStep).toContain('re-run the Actor');
+    });
+
+    it('names call-actor in SUCCEEDED no-output nextStep when call-actor is loaded', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            loadedToolNames: [HelperTools.ACTOR_CALL],
+        });
+        expect(t.nextStep).toContain(HelperTools.ACTOR_CALL);
+    });
+
+    it('omits call-actor from SUCCEEDED no-output nextStep when not loaded', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), loadedToolNames: [] });
+        expect(t.nextStep).not.toContain(HelperTools.ACTOR_CALL);
+        expect(t.nextStep).toContain('re-run the Actor');
     });
 });
 

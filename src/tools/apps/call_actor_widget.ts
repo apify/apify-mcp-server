@@ -122,7 +122,12 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
                 runId: actorRun.id,
                 mcpSessionId: toolArgs.mcpSessionId,
             });
-            const response = buildStartRunResponse({ actorName: baseActorName, actorRun, widget: true });
+            const response = buildStartRunResponse({
+                actorName: baseActorName,
+                actorRun,
+                widget: true,
+                loadedToolNames: toolArgs.apifyMcpServer.listToolNames(),
+            });
             return {
                 ...response,
                 toolTelemetry: { actorId: resolvedActorId },

@@ -196,12 +196,12 @@ export function normalizeDatasetFields(fields: string[]): string[] {
     return collapseArrayIndices(fields.map((f) => f.replace(/\//g, '.')));
 }
 
-function toIsoString(value: Date | string | undefined | null): string | undefined {
+export function toIsoString(value: Date | string | undefined | null): string | undefined {
     if (!value) return undefined;
     return value instanceof Date ? value.toISOString() : value;
 }
 
-function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
+export function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     const stats = run.stats as ActorRun['stats'] | undefined;
     if (!stats) return undefined;
     return cleanEmptyProperties({
@@ -422,9 +422,19 @@ export function datasetSizeNextStepHint(inflatedBytes: number | undefined): stri
     return `${size} Fetching all may exceed context; ${NARROW_OUTPUT_HINT}.`;
 }
 
+/**
+ * Returns `toolName` when it is in the loaded set, else `undefined`. Lets nextStep builders
+ * name a tool only when the active configuration actually exposes it (pinned configs can omit
+ * the suggested tool while loading the suggesting one — see issue #1007).
+ */
+export function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
+    return loadedToolNames.includes(toolName) ? toolName : undefined;
+}
+
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
     statusMessage: string | null | undefined,
+    loadedToolNames: string[],
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
 ): { summary: string; nextStep: string } {
@@ -466,7 +476,9 @@ function buildSucceededSummaryNextStep(
     // a text-only reader sees the actor's own diagnostic (often the only signal here).
     return {
         summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-        nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run ${HelperTools.ACTOR_CALL} with adjusted input.`,
+        nextStep: suggestTool(HelperTools.ACTOR_CALL, loadedToolNames)
+            ? `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run ${HelperTools.ACTOR_CALL} with adjusted input.`
+            : `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run the Actor with adjusted input.`,
     };
 }
 
@@ -502,8 +514,10 @@ export function buildStatusSummaryNextStep(params: {
     run: ActorRun;
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
+    /** Active loaded tool set; gates nextStep references to tools that may be absent (see #1007). */
+    loadedToolNames: string[];
 }): { summary: string; nextStep: string } {
-    const { run, dataset, keyValueStore } = params;
+    const { run, dataset, keyValueStore, loadedToolNames } = params;
     const { id: runId, status, statusMessage } = run;
     // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
@@ -532,16 +546,20 @@ export function buildStatusSummaryNextStep(params: {
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'SUCCEEDED':
-            return buildSucceededSummaryNextStep(runTimeSecs, statusMessage, dataset, keyValueStore);
+            return buildSucceededSummaryNextStep(runTimeSecs, statusMessage, loadedToolNames, dataset, keyValueStore);
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: `Diagnose using statusMessage and exitCode in this response; re-run ${HelperTools.ACTOR_CALL} with adjusted input if the cause is fixable.`,
+                nextStep: suggestTool(HelperTools.ACTOR_CALL, loadedToolNames)
+                    ? `Diagnose using statusMessage and exitCode in this response; re-run ${HelperTools.ACTOR_CALL} with adjusted input if the cause is fixable.`
+                    : `Diagnose using statusMessage and exitCode in this response; re-run the Actor with adjusted input if the cause is fixable.`,
             };
         case 'ABORTED':
             return {
                 summary: `ABORTED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: `Use ${HelperTools.ACTOR_CALL} again if you want to rerun the Actor.`,
+                nextStep: suggestTool(HelperTools.ACTOR_CALL, loadedToolNames)
+                    ? `Use ${HelperTools.ACTOR_CALL} again if you want to rerun the Actor.`
+                    : `Re-run the Actor if you want to retry.`,
             };
         case 'TIMED-OUT':
             return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore);
@@ -666,8 +684,9 @@ export function buildStartRunResponse(params: {
     actorRun: ActorRun;
     widget?: boolean;
     linkContext?: ConsoleLinkContext;
+    loadedToolNames: string[];
 }): ReturnType<typeof buildMCPResponse> {
-    const { actorName, actorRun, widget, linkContext } = params;
+    const { actorName, actorRun, widget, linkContext, loadedToolNames } = params;
 
     const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
     const keyValueStore = actorRun.defaultKeyValueStoreId ? { id: actorRun.defaultKeyValueStoreId } : undefined;
@@ -676,6 +695,7 @@ export function buildStartRunResponse(params: {
         run: actorRun,
         dataset,
         keyValueStore,
+        loadedToolNames,
     });
 
     const nextStep = widget ? WIDGET_NO_POLL_NEXT_STEP : computedNextStep;
@@ -736,8 +756,9 @@ export async function fetchActorRunData(params: {
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
+    loadedToolNames: string[];
 }): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
-    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
+    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort, loadedToolNames } = params;
 
     const waitResult = await waitForRunWithProgress({
         client,
@@ -816,7 +837,7 @@ export async function fetchActorRunData(params: {
     );
     const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
     const keyValueStore = buildRunKeyValueStore(run, kvListResult);
-    const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });
+    const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore, loadedToolNames });
 
     const structuredContent: RunResponse = {
         runId: run.id,

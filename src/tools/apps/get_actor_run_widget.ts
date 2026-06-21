@@ -54,7 +54,7 @@ export const getActorRunWidgetTool: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, mcpSessionId } = toolArgs;
+        const { args, apifyClient: client, mcpSessionId, apifyMcpServer } = toolArgs;
         const parsed = getActorRunWidgetArgsSchema.parse(args);
 
         try {
@@ -63,6 +63,7 @@ export const getActorRunWidgetTool: ToolEntry = Object.freeze({
                 waitSecs: 0,
                 client,
                 mcpSessionId,
+                loadedToolNames: apifyMcpServer.listToolNames(),
             });
 
             // Widget always passes waitSecs=0 with no abort signal, so 'aborted' is unreachable

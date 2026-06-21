@@ -4,6 +4,9 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
+import { buildStats, buildStatusSummaryNextStep, type RunResponse, toIsoString } from '../core/actor_run_response.js';
+import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 const abortRunArgs = z.object({
     runId: z.string().min(1).describe('The ID of the Actor run to abort.'),
@@ -30,6 +33,7 @@ USAGE EXAMPLES:
 - user_input: Abort run y2h7sK3Wc
 - user_input: Gracefully abort run y2h7sK3Wc`,
     inputSchema: z.toJSONSchema(abortRunArgs) as ToolInputSchema,
+    outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(abortRunArgs)),
     paymentRequired: true,
     annotations: {
@@ -40,9 +44,38 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyMcpServer } = toolArgs;
         const parsed = abortRunArgs.parse(args);
-        const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
+        const run = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
+
+        const dataset = run.defaultDatasetId ? { id: run.defaultDatasetId } : undefined;
+        const keyValueStore = run.defaultKeyValueStoreId ? { id: run.defaultKeyValueStoreId } : undefined;
+        const { summary, nextStep } = buildStatusSummaryNextStep({
+            run,
+            dataset,
+            keyValueStore,
+            loadedToolNames: apifyMcpServer.listToolNames(),
+        });
+
+        const structuredContent: RunResponse = {
+            runId: run.id,
+            actorId: run.actId,
+            status: run.status,
+            statusMessage: run.statusMessage ?? undefined,
+            startedAt: toIsoString(run.startedAt),
+            finishedAt: toIsoString(run.finishedAt),
+            stats: buildStats(run),
+            storages: {
+                ...(dataset && { datasets: { default: dataset } }),
+                ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),
+            },
+            summary,
+            nextStep,
+        };
+
+        return buildMCPResponse({
+            texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}`],
+            structuredContent,
+        });
     },
 } as const);

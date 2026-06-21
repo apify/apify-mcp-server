@@ -1228,6 +1228,7 @@ export class ActorsMcpServer {
                             abortSignal: extra.signal,
                             mcpSessionId,
                             datasetItemsSchema: tool.datasetItemsSchema,
+                            loadedToolNames: this.listToolNames(),
                         });
 
                         if (!executorResult) {
@@ -1622,6 +1623,7 @@ export class ActorsMcpServer {
                         mcpSessionId,
                         datasetItemsSchema: tool.datasetItemsSchema,
                         taskMode: true,
+                        loadedToolNames: this.listToolNames(),
                     });
 
                     if (!executorResult) {

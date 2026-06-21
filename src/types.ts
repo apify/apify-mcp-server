@@ -480,6 +480,8 @@ export type ActorExecutionParams = {
     abortSignal?: AbortSignal;
     /** MCP session ID for logging */
     mcpSessionId?: string;
+    /** Active loaded tool set; gates nextStep tool suggestions that may be absent (see #1007). */
+    loadedToolNames: string[];
     /**
      * Per-Actor dataset row properties from {@link ActorTool.datasetItemsSchema}. Forwarded
      * by the request handler so the executor can inject `itemsSchema` into the response.

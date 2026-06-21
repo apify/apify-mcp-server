@@ -103,6 +103,7 @@ function buildParams(
             apifyClient: client,
             callOptions: {},
             mcpSessionId: 'test-session',
+            loadedToolNames: [],
             ...overrides,
         },
     };
