@@ -3,6 +3,8 @@ import { parse } from 'node:querystring';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import type { ApifyClient } from 'apify-client';
 
+import log from '@apify/log';
+
 import { processInput } from '../input.js';
 import type { ActorStore, Input } from '../types.js';
 import { ServerMode } from '../types.js';
@@ -40,6 +42,26 @@ export function parseInputParamsFromUrl(url: string): Input {
  */
 export function isTaskNotFoundError(error: unknown): boolean {
     return error instanceof Error && /^Task with ID .+ not found/.test(error.message);
+}
+
+/**
+ * Stores a task result, tolerating a task that expired before storage. On an expired/gone task the
+ * store throws {@link isTaskNotFoundError}; that is benign (the client gave up), so it is logged as
+ * softFail and swallowed instead of propagating. The caller can then still finish its telemetry.
+ * Any other store error is rethrown.
+ */
+export async function storeTaskResultToleratingExpiry(
+    taskStore: TaskStore,
+    toolName: string,
+    ...args: Parameters<TaskStore['storeTaskResult']>
+): Promise<void> {
+    const [taskId, , , mcpSessionId] = args;
+    try {
+        await taskStore.storeTaskResult(...args);
+    } catch (error) {
+        if (!isTaskNotFoundError(error)) throw error;
+        log.softFail('Task expired before its result could be stored', { taskId, toolName, mcpSessionId });
+    }
 }
 
 /**

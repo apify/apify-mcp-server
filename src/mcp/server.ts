@@ -120,6 +120,7 @@ import {
     isTaskCancelled,
     isTaskNotFoundError,
     parseInputParamsFromUrl,
+    storeTaskResultToleratingExpiry,
 } from './utils.js';
 
 /**
@@ -1052,18 +1053,11 @@ export class ActorsMcpServer {
                             mcpSessionId,
                             actorName,
                             actorId,
-                        }).catch((error) => {
-                            // A store call in the catch block (e.g. storing a failed result) can itself
-                            // throw "task not found or expired" when the TTL elapsed. That is benign —
-                            // soft-fail instead of escalating to an error.
-                            if (isTaskNotFoundError(error)) {
-                                log.softFail('Task expired before its result could be stored', {
-                                    taskId: task.taskId,
-                                });
-                                return;
-                            }
-                            log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error });
-                        });
+                        }).catch((error) =>
+                            // Benign task-expiry is handled in-method (see the catch block and
+                            // storeTaskResultToleratingExpiry); anything reaching here is genuinely unexpected.
+                            log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }),
+                        );
                     });
 
                     // Return the task immediately; execution continues asynchronously
@@ -1667,10 +1661,11 @@ export class ActorsMcpServer {
 
             finishTaskTracking(toolStatus, callDiagnostics, result);
         } catch (error) {
-            // A long-running task whose TTL elapsed before we could store its result throws here
-            // (the store rejects an unknown taskId). The task is gone — there is nothing left to
-            // store or notify — so this is a benign terminal condition, not a failure. Soft-fail and
-            // stop; retrying storeTaskResult below would only throw again and escalate to an error.
+            // A task whose TTL elapsed before the `working` transition or the success-path result
+            // store throws here (the store rejects an unknown taskId). The task is gone — nothing
+            // left to store or notify — so this is a benign terminal condition, not a failure.
+            // Soft-fail, record telemetry, and stop. (The error-path stores below tolerate expiry
+            // via storeTaskResultToleratingExpiry, so they don't reach this branch.)
             if (isTaskNotFoundError(error)) {
                 log.softFail('Task expired before its result could be stored', {
                     taskId,
@@ -1697,7 +1692,14 @@ export class ActorsMcpServer {
                 )
                     return;
                 const paymentResponse = buildPaymentRequiredResponse(error);
-                await this.taskStore.storeTaskResult(taskId, 'completed', paymentResponse, mcpSessionId);
+                await storeTaskResultToleratingExpiry(
+                    this.taskStore,
+                    tool.name,
+                    taskId,
+                    'completed',
+                    paymentResponse,
+                    mcpSessionId,
+                );
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(
                     TOOL_STATUS.SOFT_FAIL,
@@ -1724,7 +1726,14 @@ export class ActorsMcpServer {
                 )
                     return;
                 const approvalResponse = buildPermissionApprovalResponse(error);
-                await this.taskStore.storeTaskResult(taskId, 'completed', approvalResponse, mcpSessionId);
+                await storeTaskResultToleratingExpiry(
+                    this.taskStore,
+                    tool.name,
+                    taskId,
+                    'completed',
+                    approvalResponse,
+                    mcpSessionId,
+                );
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(
                     TOOL_STATUS.SOFT_FAIL,
@@ -1793,7 +1802,14 @@ export class ActorsMcpServer {
                 isError: true,
                 internalToolStatus: toolStatus,
             };
-            await this.taskStore.storeTaskResult(taskId, 'failed', failedResult, mcpSessionId);
+            await storeTaskResultToleratingExpiry(
+                this.taskStore,
+                tool.name,
+                taskId,
+                'failed',
+                failedResult,
+                mcpSessionId,
+            );
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics, failedResult);
