@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.11.3 - **not yet released**
+## [0.11.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.3) (2026-06-22)
 
 ### 🚀 Features
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - **logging:** SoftFail the send-path-wrapped &#x27;No connection established&#x27; fault ([#1014](https://github.com/apify/apify-mcp-server/pull/1014)) ([d280ffe](https://github.com/apify/apify-mcp-server/commit/d280ffe6263354edc6d3c47ce7a4f6ac52d422dc)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.11.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.2) (2026-06-15)
 
 ### 🚀 Features
