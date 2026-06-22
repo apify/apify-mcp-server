@@ -18,7 +18,12 @@ import { ActorsMcpServer } from './mcp/server.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import { parseServerMode } from './utils/server_mode.js';
 
-// This is the local dev/standby-emulation server only; production runs dist/stdio.js.
+// DEV ONLY. This is a local dev/standby-emulation server, not the hosted HTTP server.
+// The production Streamable HTTP transport (auth, rate limiting, Redis-backed session
+// lifecycle, multi-node) lives in apify-mcp-server-internal. Do not treat this file as
+// the source of HTTP-transport semantics or send PRs here to mirror production behavior;
+// fix production-facing HTTP behavior in the internal repo.
+//
 // Default telemetry to the DEV Segment source so local tool calls never land in PROD
 // analytics. Still overridable by an explicit TELEMETRY_ENV (e.g. PROD) in the env.
 process.env.TELEMETRY_ENV ??= 'DEV';
@@ -169,18 +174,33 @@ export function createExpressApp(): express.Express {
                         transports[newSessionId] = transport;
                         mcpServers[newSessionId] = mcpServer;
                     },
+                    onsessionclosed: (closedSessionId) => {
+                        delete transports[closedSessionId];
+                        delete mcpServers[closedSessionId];
+                    },
                 });
 
                 await mcpServer.connect(transport);
                 await transport.handleRequest(req, res, req.body);
                 return; // Already handled
-            } else {
-                // Invalid request - no session ID or not initialization request
-                res.status(404).json({
+            } else if (!sessionId) {
+                // Non-initialization request without a session ID - 400 Bad Request.
+                res.status(400).json({
                     jsonrpc: '2.0',
                     error: {
                         code: -32000,
-                        message: 'Not Found: No valid session ID provided or not initialization request',
+                        message: 'Bad Request: Mcp-Session-Id header is required',
+                    },
+                    id: null,
+                });
+                return;
+            } else {
+                // Session ID provided but unknown - 404 Not Found.
+                res.status(404).json({
+                    jsonrpc: '2.0',
+                    error: {
+                        code: -32001,
+                        message: 'Session not found',
                     },
                     id: null,
                 });
