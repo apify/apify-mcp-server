@@ -120,7 +120,7 @@ import {
     isTaskCancelled,
     isTaskNotFoundError,
     parseInputParamsFromUrl,
-    storeTaskResultToleratingExpiry,
+    storeTaskResultOrSkipIfExpired,
 } from './utils.js';
 
 /**
@@ -1055,7 +1055,7 @@ export class ActorsMcpServer {
                             actorId,
                         }).catch((error) =>
                             // Benign task-expiry is handled in-method (see the catch block and
-                            // storeTaskResultToleratingExpiry); anything reaching here is genuinely unexpected.
+                            // storeTaskResultOrSkipIfExpired); anything reaching here is genuinely unexpected.
                             log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }),
                         );
                     });
@@ -1655,7 +1655,7 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            await storeTaskResultToleratingExpiry(this.taskStore, tool.name, taskId, 'completed', result, mcpSessionId);
+            await storeTaskResultOrSkipIfExpired(this.taskStore, tool.name, taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
@@ -1664,7 +1664,7 @@ export class ActorsMcpServer {
             // Reached only when the task expired before the `working` transition (updateTaskStatus
             // above rethrows the store's unknown-taskId error). The tool never ran and the task is
             // gone, so soft-fail, record telemetry, and stop. Every result store (success and error
-            // paths) tolerates expiry via storeTaskResultToleratingExpiry, so they don't reach here.
+            // paths) tolerates expiry via storeTaskResultOrSkipIfExpired, so they don't reach here.
             if (isTaskNotFoundError(error)) {
                 log.softFail('Task expired before execution started', {
                     taskId,
@@ -1691,7 +1691,7 @@ export class ActorsMcpServer {
                 )
                     return;
                 const paymentResponse = buildPaymentRequiredResponse(error);
-                await storeTaskResultToleratingExpiry(
+                await storeTaskResultOrSkipIfExpired(
                     this.taskStore,
                     tool.name,
                     taskId,
@@ -1725,7 +1725,7 @@ export class ActorsMcpServer {
                 )
                     return;
                 const approvalResponse = buildPermissionApprovalResponse(error);
-                await storeTaskResultToleratingExpiry(
+                await storeTaskResultOrSkipIfExpired(
                     this.taskStore,
                     tool.name,
                     taskId,
@@ -1801,7 +1801,7 @@ export class ActorsMcpServer {
                 isError: true,
                 internalToolStatus: toolStatus,
             };
-            await storeTaskResultToleratingExpiry(
+            await storeTaskResultOrSkipIfExpired(
                 this.taskStore,
                 tool.name,
                 taskId,

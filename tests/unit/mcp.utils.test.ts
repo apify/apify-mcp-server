@@ -8,7 +8,7 @@ import {
     isTaskCancelled,
     isTaskNotFoundError,
     parseInputParamsFromUrl,
-    storeTaskResultToleratingExpiry,
+    storeTaskResultOrSkipIfExpired,
 } from '../../src/mcp/utils.js';
 
 describe('parseInputParamsFromUrl()', () => {
@@ -105,7 +105,7 @@ describe('isTaskNotFoundError()', () => {
     });
 });
 
-describe('storeTaskResultToleratingExpiry()', () => {
+describe('storeTaskResultOrSkipIfExpired()', () => {
     afterEach(() => vi.restoreAllMocks());
 
     const makeStore = (impl: () => Promise<void>) => ({ storeTaskResult: vi.fn(impl) }) as unknown as TaskStore;
@@ -114,7 +114,7 @@ describe('storeTaskResultToleratingExpiry()', () => {
         const store = makeStore(async () => {});
         const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
 
-        await storeTaskResultToleratingExpiry(store, 'call-actor', 'task-1', 'completed', { content: [] }, 'sess-1');
+        await storeTaskResultOrSkipIfExpired(store, 'call-actor', 'task-1', 'completed', { content: [] }, 'sess-1');
 
         expect(store.storeTaskResult).toHaveBeenCalledWith('task-1', 'completed', { content: [] }, 'sess-1');
         expect(softFail).not.toHaveBeenCalled();
@@ -127,7 +127,7 @@ describe('storeTaskResultToleratingExpiry()', () => {
         const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
 
         await expect(
-            storeTaskResultToleratingExpiry(store, 'call-actor', 'task-1', 'failed', { content: [] }, 'sess-1'),
+            storeTaskResultOrSkipIfExpired(store, 'call-actor', 'task-1', 'failed', { content: [] }, 'sess-1'),
         ).resolves.toBeUndefined();
         expect(softFail).toHaveBeenCalledOnce();
     });
@@ -138,7 +138,7 @@ describe('storeTaskResultToleratingExpiry()', () => {
         });
 
         await expect(
-            storeTaskResultToleratingExpiry(store, 'call-actor', 'task-1', 'failed', { content: [] }, 'sess-1'),
+            storeTaskResultOrSkipIfExpired(store, 'call-actor', 'task-1', 'failed', { content: [] }, 'sess-1'),
         ).rejects.toThrow('redis ETIMEDOUT');
     });
 });

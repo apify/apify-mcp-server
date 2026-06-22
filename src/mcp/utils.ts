@@ -45,19 +45,21 @@ export function isTaskNotFoundError(error: unknown): boolean {
 }
 
 /**
- * Stores a task result, tolerating a task that expired before storage. On an expired/gone task the
- * store throws {@link isTaskNotFoundError}; that is benign (the client gave up), so it is logged as
- * softFail and swallowed instead of propagating. The caller can then still finish its telemetry.
- * Any other store error is rethrown.
+ * Stores a task result, skipping the store if the task expired before storage. On an expired/gone
+ * task the store throws {@link isTaskNotFoundError}; that is benign (the client gave up), so it is
+ * logged as softFail and swallowed instead of propagating. The caller can then still finish its
+ * telemetry. Any other store error is rethrown.
  */
-export async function storeTaskResultToleratingExpiry(
+export async function storeTaskResultOrSkipIfExpired(
     taskStore: TaskStore,
     toolName: string,
-    ...args: Parameters<TaskStore['storeTaskResult']>
+    taskId: Parameters<TaskStore['storeTaskResult']>[0],
+    status: Parameters<TaskStore['storeTaskResult']>[1],
+    result: Parameters<TaskStore['storeTaskResult']>[2],
+    mcpSessionId?: Parameters<TaskStore['storeTaskResult']>[3],
 ): Promise<void> {
-    const [taskId, , , mcpSessionId] = args;
     try {
-        await taskStore.storeTaskResult(...args);
+        await taskStore.storeTaskResult(taskId, status, result, mcpSessionId);
     } catch (error) {
         if (!isTaskNotFoundError(error)) throw error;
         log.softFail('Task expired before its result could be stored', { taskId, toolName, mcpSessionId });
