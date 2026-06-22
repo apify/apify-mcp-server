@@ -54,7 +54,6 @@ import {
     DEFAULT_TELEMETRY_ENV,
     FAILURE_CATEGORY,
     HelperTools,
-    HTTP_PAYMENT_REQUIRED,
     TOOL_STATUS,
 } from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
@@ -68,7 +67,6 @@ import { actorExecutor } from '../tools/actor_executor.js';
 import {
     buildPermissionApprovalResponse,
     checkPaymentProviderStandbyConflict,
-    isPermissionApprovalError,
 } from '../tools/core/call_actor_common.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorsAsToolsResult } from '../tools/index.js';
@@ -86,14 +84,21 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { ServerMode, TOOL_TYPE } from '../types.js';
-import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
-import { buildMCPResponse, computeToolResponseBytes, getToolCallErrorUserText } from '../utils/mcp.js';
-import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
+import { isPermissionApprovalError, remoteMcpFailureDetail } from '../utils/apify_errors.js';
+import { getHttpStatusCode, isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
+import {
+    buildMCPResponse,
+    buildResponseBytesTelemetry,
+    computeToolResponseBytes,
+    getToolCallErrorUserText,
+} from '../utils/mcp.js';
+import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
     classifyFailureCategory,
+    deriveResourceIds,
     extractAjvErrorDetails,
     extractToolTelemetry,
     getToolStatusFromError,
@@ -110,7 +115,13 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
+import {
+    createTaskCancellationWatcher,
+    isTaskCancelled,
+    isTaskNotFoundError,
+    parseInputParamsFromUrl,
+    storeTaskResultOrSkipIfExpired,
+} from './utils.js';
 
 /**
  * Returns true when the initialize request advertises the MCP Apps UI extension
@@ -574,34 +585,15 @@ export class ActorsMcpServer {
 
     private setupErrorHandling(setupSIGINTHandler = true): void {
         this.server.onerror = (error) => {
-            // Client-disconnect noise from the MCP SDK. Messages we see in prod:
-            //   - "No connection established" (sendRequest before transport attached)
-            //   - "Failed to send response: Error: Not connected" (client vanished mid-flight)
-            //   - "Conflict: Only one SSE stream is allowed per session" (duplicate GET on the
-            //     streamable-http transport, e.g. tab refresh before the old SSE controller is GC'd)
-            //   - "Invalid state: Controller is already closed" (ERR_INVALID_STATE from
-            //     WebStandardStreamableHTTPServerTransport.writeSSEEvent when the SSE ReadableStream
-            //     controller was closed by client cancellation before a queued event was flushed)
-            //   - "Not Acceptable: Client must accept [both application/json and] text/event-stream"
-            //     (thrown from WebStandardStreamableHTTPServerTransport.handlePost/GetRequest when
-            //     the client sends an Accept header missing one of the required MIME types — pure
-            //     client misconfiguration, not a server fault; HTTP 406 is already returned to caller)
-            // All are expected; log as softFail so they don't flood Mezmo error alerts.
-            const clientDisconnectPattern = new RegExp(
-                [
-                    'Not connected',
-                    'No connection established',
-                    'Only one SSE stream',
-                    'Controller is already closed',
-                    'Not Acceptable: Client must accept',
-                ].join('|'),
-                'i',
-            );
-            if (clientDisconnectPattern.test(error.message ?? '')) {
-                // Mezmo (logDNA) promotes log entries to errors when the message contains "error".
-                // Use errMessage key and sanitize the string to preserve the soft-fail log level.
-                const errMessage = (error.message ?? '').replace(/ error:/gi, ' failure:');
-                log.softFail('MCP client disconnected before response could be sent', { errMessage });
+            // Known client faults are expected noise, not server bugs — softFail so they don't
+            // flood Mezmo error alerts. The fault patterns live in utils/logging.ts.
+            const message = error.message ?? '';
+            if (isMcpClientFaultMessage(message)) {
+                // Sanitize the errMessage value to preserve the soft-fail level (Mezmo promotes
+                // entries whose message contains "error").
+                log.softFail('MCP client fault, request could not be handled', {
+                    errMessage: sanitizeMezmoMessage(message),
+                });
             } else {
                 log.error('[MCP Error]', { error });
             }
@@ -1062,6 +1054,8 @@ export class ActorsMcpServer {
                             actorName,
                             actorId,
                         }).catch((error) =>
+                            // Benign task-expiry is handled in-method (see the catch block and
+                            // storeTaskResultOrSkipIfExpired); anything reaching here is genuinely unexpected.
                             log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }),
                         );
                     });
@@ -1212,7 +1206,7 @@ export class ActorsMcpServer {
                         return captureResult(
                             buildMCPResponse({
                                 texts: [
-                                    `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`,
+                                    `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${remoteMcpFailureDetail(error)}`,
                                 ],
                                 isError: true,
                             }),
@@ -1264,8 +1258,9 @@ export class ActorsMcpServer {
                 const httpStatus = getHttpStatusCode(error);
 
                 // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
-                // content[0].text (JSON) + isError: true
-                if (httpStatus === HTTP_PAYMENT_REQUIRED) {
+                // content[0].text (JSON) + isError: true. The concurrent-run limit falls through
+                // to the run-limit message below.
+                if (isX402PaymentRequiredError(error)) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
                     callDiagnostics = {
                         failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -1338,7 +1333,8 @@ export class ActorsMcpServer {
                         telemetryData,
                         userId,
                         callDiagnostics,
-                        responseBytes: computeToolResponseBytes(toolResult),
+                        args,
+                        result: toolResult,
                     });
                 }
             }
@@ -1361,6 +1357,8 @@ export class ActorsMcpServer {
     /**
      * Logs tool call completion at INFO level and tracks telemetry.
      * Computes duration once so both the log line and telemetry event use the same value.
+     * Response bytes and resource ids are derived here from the raw `result` (+ `args`) so every
+     * call site stays a plain hand-off — no path can forget to compute or strip them.
      */
     private logToolCallAndTelemetry(params: {
         toolName: string;
@@ -1371,18 +1369,23 @@ export class ActorsMcpServer {
         telemetryData: ToolCallTelemetryProperties | null;
         userId: string | null;
         callDiagnostics?: CallDiagnostics;
-        responseBytes?: ReturnType<typeof computeToolResponseBytes>;
+        args?: Record<string, unknown>;
+        result?: unknown;
     }): void {
         const durationMs = Date.now() - params.startTime;
+        // `result` is undefined only on short-circuit paths that never produced a payload (e.g. a
+        // cancelled task); skip byte accounting there. `null`/`{}` still measure as zero bytes.
+        const responseBytes = params.result === undefined ? undefined : computeToolResponseBytes(params.result);
 
         log.info('Tool call completed', {
             toolName: params.toolName,
             mcpSessionId: params.mcpSessionId,
             toolStatus: params.toolStatus,
             durationMs,
-            ...(params.responseBytes !== undefined && {
-                responseContentBytes: params.responseBytes.contentBytes,
-                responseStructuredContentBytes: params.responseBytes.structuredContentBytes,
+            ...(responseBytes !== undefined && {
+                responseContentBytes: responseBytes.contentBytes,
+                responseStructuredContentBytes: responseBytes.structuredContentBytes,
+                responseFileBytes: responseBytes.fileBytes,
             }),
             ...(params.taskId !== undefined && { taskId: params.taskId }),
         });
@@ -1392,12 +1395,12 @@ export class ActorsMcpServer {
                 ...params.telemetryData,
                 tool_status: params.toolStatus,
                 tool_exec_time_ms: durationMs,
-                ...(params.responseBytes !== undefined && {
-                    tool_response_content_bytes: params.responseBytes.contentBytes,
-                    tool_response_structured_content_bytes: params.responseBytes.structuredContentBytes,
-                }),
+                ...buildResponseBytesTelemetry(responseBytes),
                 // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
                 ...params.callDiagnostics,
+                // Resource ids are read once here from the args + the tool's public output; no tool
+                // threads them back. Applied uniformly, last. See deriveResourceIds.
+                ...deriveResourceIds(params.args, params.result),
             };
             trackToolCall(params.userId, this.telemetryEnv, finalizedTelemetryData);
         }
@@ -1466,11 +1469,7 @@ export class ActorsMcpServer {
             apifyToken,
         );
 
-        const finishTaskTracking = (
-            status: ToolStatus,
-            diagnostics?: CallDiagnostics,
-            responseBytes?: ReturnType<typeof computeToolResponseBytes>,
-        ) => {
+        const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, result?: unknown) => {
             this.logToolCallAndTelemetry({
                 toolName: tool.name,
                 mcpSessionId,
@@ -1480,7 +1479,8 @@ export class ActorsMcpServer {
                 telemetryData,
                 userId,
                 callDiagnostics: diagnostics,
-                responseBytes,
+                args: toolArgs,
+                result,
             });
         };
 
@@ -1655,15 +1655,32 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
+            await storeTaskResultOrSkipIfExpired(this.taskStore, tool.name, taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
-            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseBytes(result));
+            finishTaskTracking(toolStatus, callDiagnostics, result);
         } catch (error) {
+            // Reached only when the task expired before the `working` transition (updateTaskStatus
+            // above rethrows the store's unknown-taskId error). The tool never ran and the task is
+            // gone, so soft-fail, record telemetry, and stop. Every result store (success and error
+            // paths) tolerates expiry via storeTaskResultOrSkipIfExpired, so they don't reach here.
+            if (isTaskNotFoundError(error)) {
+                log.softFail('Task expired before execution started', {
+                    taskId,
+                    toolName: tool.name,
+                    mcpSessionId,
+                });
+                finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
+                    failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
+                    ...buildActorFields(actorName, actorId),
+                });
+                return;
+            }
+
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
-            if (httpStatus === HTTP_PAYMENT_REQUIRED) {
+            if (isX402PaymentRequiredError(error)) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this 402.
@@ -1674,7 +1691,14 @@ export class ActorsMcpServer {
                 )
                     return;
                 const paymentResponse = buildPaymentRequiredResponse(error);
-                await this.taskStore.storeTaskResult(taskId, 'completed', paymentResponse, mcpSessionId);
+                await storeTaskResultOrSkipIfExpired(
+                    this.taskStore,
+                    tool.name,
+                    taskId,
+                    'completed',
+                    paymentResponse,
+                    mcpSessionId,
+                );
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(
                     TOOL_STATUS.SOFT_FAIL,
@@ -1683,7 +1707,7 @@ export class ActorsMcpServer {
                         failure_http_status: 402,
                         ...buildActorFields(actorName, actorId),
                     },
-                    computeToolResponseBytes(paymentResponse),
+                    paymentResponse,
                 );
                 return;
             }
@@ -1701,7 +1725,14 @@ export class ActorsMcpServer {
                 )
                     return;
                 const approvalResponse = buildPermissionApprovalResponse(error);
-                await this.taskStore.storeTaskResult(taskId, 'completed', approvalResponse, mcpSessionId);
+                await storeTaskResultOrSkipIfExpired(
+                    this.taskStore,
+                    tool.name,
+                    taskId,
+                    'completed',
+                    approvalResponse,
+                    mcpSessionId,
+                );
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(
                     TOOL_STATUS.SOFT_FAIL,
@@ -1710,7 +1741,7 @@ export class ActorsMcpServer {
                         failure_http_status: error.statusCode,
                         ...buildActorFields(actorName, actorId),
                     },
-                    computeToolResponseBytes(approvalResponse),
+                    approvalResponse,
                 );
                 return;
             }
@@ -1728,10 +1759,7 @@ export class ActorsMcpServer {
             //   FAILED/ABORTED/other                                    → error
             if (toolStatus === TOOL_STATUS.SOFT_FAIL) {
                 // Mezmo promotes on "error" in message/keys — use errMessage key, sanitized.
-                const errMessage = (error instanceof Error ? error.message : String(error)).replace(
-                    / error:/gi,
-                    ' failure:',
-                );
+                const errMessage = sanitizeMezmoMessage(error instanceof Error ? error.message : String(error));
                 log.softFail('Tool execution soft-failed for task', {
                     taskId,
                     toolName: tool.name,
@@ -1773,10 +1801,17 @@ export class ActorsMcpServer {
                 isError: true,
                 internalToolStatus: toolStatus,
             };
-            await this.taskStore.storeTaskResult(taskId, 'failed', failedResult, mcpSessionId);
+            await storeTaskResultOrSkipIfExpired(
+                this.taskStore,
+                tool.name,
+                taskId,
+                'failed',
+                failedResult,
+                mcpSessionId,
+            );
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
-            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseBytes(failedResult));
+            finishTaskTracking(toolStatus, callDiagnostics, failedResult);
         } finally {
             cancelWatcher.dispose();
         }

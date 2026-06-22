@@ -2,9 +2,15 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { decode as decodeToon } from '@toon-format/toon';
 import { expect } from 'vitest';
 
-import { FAILURE_CATEGORY, TOOL_STATUS } from '../../../src/const.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
 import { FENCES } from '../../../src/utils/encode_text.js';
+import type { CachedUserInfo } from '../../../src/utils/userid_cache.js';
+
+/** Default `CachedUserInfo` for tests that mock `getUserInfoCached`. */
+export function mockUserInfo(overrides: Partial<CachedUserInfo> = {}): CachedUserInfo {
+    return { userId: 'USER_ID', userPlanTier: 'FREE', isOrganization: false, ...overrides };
+}
 
 /** Inverse of `wrapJsonText`; imports prod's fence constants so the two halves can't drift. */
 export function parseFencedJson(text: string): unknown {
@@ -48,7 +54,7 @@ export function stubToolCallContext(
         apifyClient: client,
         extra: {},
         mcpServer: {},
-        apifyMcpServer: { options: { paymentProvider: undefined } },
+        apifyMcpServer: { options: { paymentProvider: undefined }, listToolNames: () => Object.values(HelperTools) },
     } as unknown as InternalToolArgs;
 }
 

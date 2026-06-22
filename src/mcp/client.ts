@@ -5,7 +5,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import log from '@apify/log';
 
 import { TimeoutError } from '../errors.js';
-import { getHttpStatusCode } from '../utils/logging.js';
+import { getHttpStatusCode, sanitizeMezmoMessage } from '../utils/logging.js';
 import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC } from './const.js';
 import { getMCPServerID } from './proxy.js';
 
@@ -41,7 +41,7 @@ export async function connectMCPClient(url: string, token: string, mcpSessionId?
         // External MCP server unavailability is operational, not a bug.
         // Mezmo (logDNA) promotes log entries to errors when the message contains "error"
         // Sanitize the error message to preserve the soft-fail log level.
-        const errMessage = (error instanceof Error ? error.message : String(error)).replace(/ error:/gi, ' failure:');
+        const errMessage = sanitizeMezmoMessage(error instanceof Error ? error.message : String(error));
         log.softFail('MCP server unreachable', {
             url,
             mcpSessionId,

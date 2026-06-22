@@ -2,6 +2,19 @@ export class TimeoutError extends Error {
     override readonly name = 'TimeoutError';
 }
 
+/**
+ * Thrown by `fixedAjvCompile` when an untrusted Actor / proxied-MCP input schema exceeds the byte
+ * cap that bounds AJV's synchronous codegen. It's a property of the schema, not a server fault, so
+ * `logHttpError` logs it as a soft fail and the caller drops just that one tool.
+ */
+export class SchemaTooLargeError extends Error {
+    override readonly name = 'SchemaTooLargeError';
+
+    constructor(public readonly limitBytes: number) {
+        super(`Input schema exceeds ${limitBytes}-byte safety limit`);
+    }
+}
+
 export const ACTOR_LOAD_ERROR_KIND = {
     NOT_FOUND: 'not-found',
     LOAD_FAILED: 'load-failed',

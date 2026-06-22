@@ -68,7 +68,7 @@ describe('getUserInfoCached', () => {
             throw new Error('network');
         });
         const out = await getUserInfoCached(`token-${Math.random()}`, client);
-        expect(out).toEqual({ userId: null, userPlanTier: 'FREE' });
+        expect(out).toEqual({ userId: null, userPlanTier: 'FREE', isOrganization: false });
     });
 
     it('caches result and avoids second API call', async () => {
@@ -84,7 +84,7 @@ describe('getUserInfoCached', () => {
         const get = vi.fn();
         const client = { user: vi.fn(() => ({ get })) } as unknown as ApifyClient;
         const out = await getUserInfoCached(token, client);
-        expect(out).toEqual({ userId: null, userPlanTier: 'FREE' });
+        expect(out).toEqual({ userId: null, userPlanTier: 'FREE', isOrganization: false });
         expect(get).not.toHaveBeenCalled();
     });
 
@@ -98,9 +98,9 @@ describe('getUserInfoCached', () => {
         const client = { user: vi.fn(() => ({ get })) } as unknown as ApifyClient;
         const token = `token-${Math.random()}`;
         const first = await getUserInfoCached(token, client);
-        expect(first).toEqual({ userId: null, userPlanTier: 'FREE' });
+        expect(first).toEqual({ userId: null, userPlanTier: 'FREE', isOrganization: false });
         const second = await getUserInfoCached(token, client);
-        expect(second).toEqual({ userId: 'u6', userPlanTier: 'BRONZE' });
+        expect(second).toEqual({ userId: 'u6', userPlanTier: 'BRONZE', isOrganization: false });
         expect(get).toHaveBeenCalledTimes(2);
     });
 });

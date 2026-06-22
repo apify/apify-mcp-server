@@ -1,5 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { ApifyApiError } from 'apify-client';
+import type { ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -7,6 +7,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../../apify_client.js';
 import {
+    APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
@@ -19,6 +20,14 @@ import type { PaymentProvider } from '../../payments/types.js';
 import type { ActorInfo, ApifyToken, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
+import {
+    ACTOR_RUN_LIMIT_MESSAGE,
+    isActorRunLimitError,
+    isMemoryQuotaError,
+    isPermissionApprovalError,
+    remoteMcpFailureDetail,
+} from '../../utils/apify_errors.js';
+import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
@@ -110,14 +119,6 @@ export function buildCallActorAppsDescription(): string {
     return buildCallActorDescriptionSections(true);
 }
 
-export function isPermissionApprovalError(error: unknown): error is ApifyApiError {
-    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED;
-}
-
-function isMemoryQuotaError(error: unknown): error is ApifyApiError {
-    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
-}
-
 /** Exported for native actor tool error handling in server.ts — no logging, no telemetry. */
 export function buildPermissionApprovalResponse(error: ApifyApiError): ReturnType<typeof buildMCPResponse> {
     const approvalUrl = typeof error.data?.approvalUrl === 'string' ? error.data.approvalUrl : undefined;
@@ -153,7 +154,7 @@ function buildPermissionApprovalErrorResponse(
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ReturnType<typeof buildMCPResponse> {
     const { actorName, error, actorId, mcpSessionId, actorGetDetailsTool } = params;
 
-    if (error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED) {
+    if (isPermissionApprovalError(error)) {
         return buildPermissionApprovalErrorResponse(actorName, error, actorId, mcpSessionId);
     }
 
@@ -183,6 +184,14 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
             ],
             isError: true,
             telemetry: { ...telemetry, failureDetail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED },
+        });
+    }
+
+    if (isActorRunLimitError(error)) {
+        return buildMCPResponse({
+            texts: [`Failed to call Actor '${actorName}': ${errMsg}`, ACTOR_RUN_LIMIT_MESSAGE],
+            isError: true,
+            telemetry: { ...telemetry, failureDetail: APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS },
         });
     }
 
@@ -377,7 +386,7 @@ export async function handleMcpToolCall(params: {
             arguments: input,
         });
 
-        // `call-actor` declares `getActorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
+        // `call-actor` declares `actorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
         // without `structuredContent` (unless `isError: true`) with -32600. The pass-through has no
         // Apify run, so synthesize a sentinel `RunResponse` matching the schema's `required` keys;
         // the remote tool's payload still flows through `content`. Also forward `isError` so a
@@ -401,10 +410,9 @@ export async function handleMcpToolCall(params: {
             actorName: baseActorName,
             toolName: mcpToolName,
         });
-        const errMsg = error instanceof Error ? error.message : String(error);
         return buildMCPResponse({
             texts: [
-                `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${errMsg}. The MCP server may be temporarily unavailable.`,
+                `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${remoteMcpFailureDetail(error)}`,
             ],
             isError: true,
         });
@@ -640,9 +648,11 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             return {};
         }
 
+        const linkContext = await getConsoleLinkContext(toolArgs.apifyToken, apifyClient);
+
         // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
         if (waitSecs === 0) {
-            const response = buildStartRunResponse({ actorName: baseActorName, actorRun });
+            const response = buildStartRunResponse({ actorName: baseActorName, actorRun, linkContext });
             return { ...response, toolTelemetry: { actorId: resolvedActorId } };
         }
 
@@ -661,7 +671,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
         if ('error' in fetchResult) return fetchResult.error;
 
         return {
-            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false }),
+            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false, linkContext }),
             toolTelemetry: { actorId: resolvedActorId },
         };
     } catch (error) {

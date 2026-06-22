@@ -12,9 +12,11 @@ const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
 export type CachedUserInfo = {
     userId: string | null;
     userPlanTier: PricingTier;
+    /** True when the token acts as an organization account (`users/me` carries `organizationOwnerUserId`). */
+    isOrganization: boolean;
 };
 
-const ANONYMOUS_USER_INFO: CachedUserInfo = { userId: null, userPlanTier: 'FREE' };
+const ANONYMOUS_USER_INFO: CachedUserInfo = { userId: null, userPlanTier: 'FREE', isOrganization: false };
 
 // LRU cache with TTL for user info - keyed by hashed token
 const userInfoCache = new TTLLRUCache<CachedUserInfo>(USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS);
@@ -51,9 +53,13 @@ export async function getUserInfoCached(token: string | undefined, apifyClient: 
         // `tier` is present on /v2/users/me `plan` response (FREE/BRONZE/SILVER/GOLD/PLATINUM/DIAMOND)
         // but missing from apify-client's type declaration — hence the cast.
         const planTier = (user.plan as { tier?: string } | undefined)?.tier;
+        // `organizationOwnerUserId` is set only on organization accounts; also missing
+        // from apify-client's type declaration.
+        const { organizationOwnerUserId } = user as { organizationOwnerUserId?: string };
         const info: CachedUserInfo = {
             userId: user.id,
             userPlanTier: normalizePlanTier(planTier),
+            isOrganization: Boolean(organizationOwnerUserId),
         };
         userInfoCache.set(tokenHash, info);
         return info;

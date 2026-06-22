@@ -5,8 +5,9 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
-import { normalizeDatasetFields } from '../core/actor_run_response.js';
+import { datasetSizeNextStepHint, normalizeDatasetFields } from '../core/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
@@ -24,6 +25,7 @@ export const getDataset: ToolEntry = Object.freeze({
         Get metadata for a dataset (collection of structured data created by an Actor run).
         The results will include dataset details such as itemCount, schema, fields, and stats.
         Use fields to understand structure for filtering with ${HelperTools.DATASET_GET_ITEMS}.
+        stats.inflatedBytes (when present) is the approximate uncompressed byte size — use it with itemCount to pick a safe limit and fields before fetching.
         Note: itemCount updates may be delayed by up to ~5 seconds.
 
         USAGE:
@@ -44,13 +46,14 @@ export const getDataset: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
         const datasetId = stripQuoteWrappers(parsed.datasetId);
         const dataset = await client.dataset(datasetId).get();
         if (!dataset) {
             return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
         // Apify returns `fields` slash-separated AND with array indices expanded
         // (e.g. `latestComments/0/owner/username`). For a real Instagram-scraper
         // dataset this inflates ~78 schema fields into 528 paths (~85% bloat) and
@@ -60,12 +63,16 @@ export const getDataset: ToolEntry = Object.freeze({
         // the structured `storages.datasets.default.fields` shape.
         const normalized = dataset.fields ? { ...dataset, fields: normalizeDatasetFields(dataset.fields) } : dataset;
         const fieldCount = Array.isArray(normalized.fields) ? normalized.fields.length : undefined;
+        // `inflatedBytes` is undeclared on the apify-client `DatasetStats` type and absent from the GET
+        // response today (only the dataset-list endpoint returns it), so read it defensively.
+        const inflatedBytes = (dataset.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
-        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items.`;
+        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`;
         return buildStorageResponse({
             structuredContent: normalized as unknown as Record<string, unknown>,
             summary,
             nextStep,
+            apifyConsoleUrl: buildConsoleDatasetUrl(linkContext, dataset.id),
         });
     },
 } as const);

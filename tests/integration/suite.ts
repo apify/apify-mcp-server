@@ -16,7 +16,7 @@ import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/core/call_actor_common.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
-import { getActorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
@@ -160,12 +160,15 @@ function expectNormalModeTestStructuredContent(result: unknown): void {
         structuredContent?: {
             runId?: string;
             status?: string;
+            apifyConsoleUrl?: string;
             storages?: {
-                datasets?: { default?: { id?: string; fields?: string[] } };
+                datasets?: { default?: { id?: string; fields?: string[]; apifyConsoleUrl?: string } };
+                keyValueStores?: { default?: { apifyConsoleUrl?: string } };
             };
             summary?: string;
             nextStep?: string;
         };
+        content?: { type: string; text?: string }[];
     };
     const sc = resultWithStructured.structuredContent;
     expect(sc).toBeDefined();
@@ -177,6 +180,15 @@ function expectNormalModeTestStructuredContent(result: unknown): void {
     );
     expect(sc?.summary).toBeDefined();
     expect(sc?.nextStep).toBeDefined();
+
+    // Console links are gated on a Console UI token (apify_ui_...); integration tests authenticate
+    // with an API token, so the run/storage responses must carry no apifyConsoleUrl and no Console nudge.
+    // The positive (UI-token) path is covered by unit tests — CI has no UI token to exercise it.
+    expect(sc?.apifyConsoleUrl).toBeUndefined();
+    expect(sc?.storages?.datasets?.default?.apifyConsoleUrl).toBeUndefined();
+    expect(sc?.storages?.keyValueStores?.default?.apifyConsoleUrl).toBeUndefined();
+    const narrative = resultWithStructured.content?.map((c) => c.text ?? '').join('\n') ?? '';
+    expect(narrative).not.toContain('Apify Console:');
 }
 
 /** Validates that the result contains Apify usage cost metadata with expected structure. */
@@ -848,7 +860,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 // structuredContent must be present and carry the keys declared `required` on
-                // `getActorRunOutputSchema`. The pass-through path has no Apify run, so the fix is expected to
+                // `actorRunOutputSchema`. The pass-through path has no Apify run, so the fix is expected to
                 // synthesize sentinel values (e.g. `runId: 'mcp-passthrough'`) rather than real run identifiers.
                 const sc = (callResult as { structuredContent?: Record<string, unknown> }).structuredContent;
                 expect(sc).toBeDefined();
@@ -2227,7 +2239,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Direct actor tools return the canonical RunResponse shape — same as call-actor.
                 const normalModeToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
-                validateStructuredOutput(result, getActorRunOutputSchema, normalModeToolName);
+                validateStructuredOutput(result, actorRunOutputSchema, normalModeToolName);
                 const sc = (
                     result as {
                         structuredContent?: {
@@ -2280,7 +2292,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(content.length).toBe(2);
 
                 // Direct actor tools return the canonical RunResponse shape — same as call-actor.
-                validateStructuredOutput(result, getActorRunOutputSchema, selectedToolName);
+                validateStructuredOutput(result, actorRunOutputSchema, selectedToolName);
                 expectNormalModeTestStructuredContent(result);
                 expectUsageCostMeta(result);
 

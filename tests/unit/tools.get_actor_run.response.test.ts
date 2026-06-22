@@ -1,5 +1,5 @@
 import type { ActorRun } from 'apify-client';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
     buildStartRunResponse,
@@ -11,7 +11,15 @@ import {
 } from '../../src/tools/core/actor_run_response.js';
 import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+
+// Only Console UI token sessions reach the users/me lookup; the default 'test-token'
+// stub never triggers it.
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
 
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
@@ -118,6 +126,21 @@ describe('get-actor-run default response', () => {
             usageTotalUsd: 0.0001,
             usageUsd: { ACTOR_COMPUTE_UNITS: 0.0001 },
         });
+    });
+
+    it('surfaces dataset inflatedBytes from stats in structuredContent', async () => {
+        // The single-dataset GET does not return `inflatedBytes` (only the dataset-list endpoint does);
+        // this stub injects it to verify the wiring.
+        const run = mockSucceededRun();
+        const result = await (defaultGetActorRun as HelperTool).call(
+            stubToolCallContext(
+                { runId: 'run-1', waitSecs: 0 },
+                stubClient({ run, dataset: mockDataset({ stats: { writeCount: 47, inflatedBytes: 1234 } }) }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.storages.datasets?.default.inflatedBytes).toBe(1234);
     });
 
     it('fetches dataset metadata for a non-terminal RUNNING run and surfaces progress in the summary', async () => {
@@ -524,6 +547,57 @@ describe('get-actor-run default response', () => {
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain('not found');
     });
+
+    describe('Console UI token sessions (personalized Console links)', () => {
+        beforeEach(() => {
+            vi.mocked(getUserInfoCached).mockReset();
+        });
+
+        it('mints run + dataset + KV Console links and appends the Console line + nudge to the narrative', async () => {
+            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+            const run = mockSucceededRun();
+            const result = await (defaultGetActorRun as HelperTool).call({
+                ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset: mockDataset() })),
+                apifyToken: 'apify_ui_test',
+            });
+            const { structuredContent, content } = result as {
+                structuredContent: RunResponse;
+                content: { type: string; text: string }[];
+            };
+
+            expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/actors/runs/run-1');
+            expect(structuredContent.storages.datasets?.default.apifyConsoleUrl).toBe(
+                'https://console.apify.com/storage/datasets/dataset-xyz',
+            );
+            expect(structuredContent.storages.keyValueStores?.default.apifyConsoleUrl).toBe(
+                'https://console.apify.com/storage/key-value-stores/kv-xyz',
+            );
+
+            // content[0] JSON mirror carries the links; content[1] narrative lists them + nudge.
+            expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+            expect(content[1].text).toContain(
+                'Apify Console: run https://console.apify.com/actors/runs/run-1 | dataset https://console.apify.com/storage/datasets/dataset-xyz | key-value store https://console.apify.com/storage/key-value-stores/kv-xyz',
+            );
+            expect(content[1].text).toContain(VERBATIM_LINKS_NUDGE);
+        });
+
+        it('keeps responses link-free for API tokens', async () => {
+            const run = mockSucceededRun();
+            const result = await (defaultGetActorRun as HelperTool).call({
+                ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset: mockDataset() })),
+                apifyToken: 'apify_api_test',
+            });
+            const { structuredContent, content } = result as {
+                structuredContent: RunResponse;
+                content: { type: string; text: string }[];
+            };
+
+            expect(getUserInfoCached).not.toHaveBeenCalled();
+            expect(structuredContent.apifyConsoleUrl).toBeUndefined();
+            expect(content[1].text).not.toContain('console.apify.com');
+        });
+    });
 });
 
 // -----------------------------------------------------------------------------
@@ -589,8 +663,37 @@ describe('buildStartRunResponse()', () => {
         });
     });
 
+    // Org-prefixed URL variants are covered by the builder tests in console_link.test.ts.
+    it('mints Console links and appends the Console line when linkContext is set', () => {
+        const result = buildStartRunResponse({
+            actorName: 'apify/rag-web-browser',
+            actorRun,
+            linkContext: {},
+        });
+
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/actors/runs/run-abc');
+        expect(structuredContent.storages.datasets?.default.apifyConsoleUrl).toBe(
+            'https://console.apify.com/storage/datasets/dataset-abc',
+        );
+        expect(structuredContent.storages.keyValueStores?.default.apifyConsoleUrl).toBe(
+            'https://console.apify.com/storage/key-value-stores/kv-abc',
+        );
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        expect(content[1].text).toContain('Apify Console: run https://console.apify.com/actors/runs/run-abc');
+        expect(content[1].text).toContain(VERBATIM_LINKS_NUDGE);
+    });
+
     it('includes widget metadata and no-poll nextStep when widget=true', () => {
-        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun, widget: true });
+        const result = buildStartRunResponse({
+            actorName: 'apify/rag-web-browser',
+            actorRun,
+            widget: true,
+        });
 
         const { structuredContent, _meta } = result as {
             structuredContent: RunResponse;
@@ -631,11 +734,36 @@ const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result
  */
 describe('buildStatusTemplate', () => {
     it('SUCCEEDED with dataset items routes to dataset-items nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+        });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
         expect(t.nextStep).toContain('metadata.url, markdown');
+    });
+
+    it('SUCCEEDED steers nextStep away from fetching a large dataset', () => {
+        const dataset: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url'], inflatedBytes: 2_400_000 };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.summary).toContain('47 items; 1 fields available');
+        expect(t.nextStep).toContain('Full output is ~2400000 bytes');
+        expect(t.nextStep).toContain('page with offset');
+    });
+
+    it('SUCCEEDED reports size but omits the large-output warning below the threshold', () => {
+        const dataset: RunDataset = { id: 'ds-1', itemCount: 2, fields: [], inflatedBytes: 4000 };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.summary).toContain('2 items');
+        expect(t.nextStep).toContain('Full output is ~4000 bytes');
+        expect(t.nextStep).not.toContain('may exceed context');
+    });
+
+    it('SUCCEEDED omits the size hint entirely when the dataset size is unknown', () => {
+        const dataset: RunDataset = { id: 'ds-1', itemCount: 2, fields: [] };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.nextStep).not.toContain('Full output');
     });
 
     it('SUCCEEDED with items but no fields metadata omits the fields hint without a dangling em-dash', () => {
@@ -694,7 +822,10 @@ describe('buildStatusTemplate', () => {
     });
 
     it('TIMED-OUT with dataset routes to partial-output nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMED-OUT'),
+            dataset: datasetWithItems,
+        });
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
@@ -720,7 +851,9 @@ describe('buildStatusTemplate', () => {
     // naive reader doesn't mistake the actor's own message for our narrative.
 
     it('RUNNING with upstream statusMessage attributes it as Actor status and drops trailing period', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING', 'Starting the crawler.') });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING', 'Starting the crawler.'),
+        });
         expect(t.summary).toContain('Actor status: "Starting the crawler"');
         expect(t.summary).not.toMatch(/\.\./);
     });
@@ -732,7 +865,10 @@ describe('buildStatusTemplate', () => {
     });
 
     it('RUNNING with dataset items appends "N results so far" so polling agents see real progress', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING'),
+            dataset: datasetWithItems,
+        });
         expect(t.summary).toContain('47 results so far.');
         // Progress is summary-only; nextStep stays poll-only — partial reads mid-run are noise.
         expect(t.nextStep).toContain('poll for completion');
@@ -740,24 +876,36 @@ describe('buildStatusTemplate', () => {
     });
 
     it('RUNNING with empty dataset omits the progress suffix (no "0 results so far")', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetEmpty });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING'),
+            dataset: datasetEmpty,
+        });
         expect(t.summary).not.toMatch(/results so far/);
         expect(t.summary).not.toContain('0 results');
     });
 
     it('RUNNING with exactly 1 item uses singular "result"', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: { id: 'ds-1', itemCount: 1 } });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING'),
+            dataset: { id: 'ds-1', itemCount: 1 },
+        });
         expect(t.summary).toContain('1 result so far.');
         expect(t.summary).not.toContain('results');
     });
 
     it('TIMING-OUT with dataset items surfaces progress in the summary', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMING-OUT'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMING-OUT'),
+            dataset: datasetWithItems,
+        });
         expect(t.summary).toContain('47 results so far.');
     });
 
     it('ABORTING with dataset items surfaces progress in the summary', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTING'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('ABORTING'),
+            dataset: datasetWithItems,
+        });
         expect(t.summary).toContain('47 results so far.');
     });
 
@@ -773,7 +921,10 @@ describe('buildStatusTemplate', () => {
     it('SUCCEEDED with items ends nextStep with a single period after the fields hint', () => {
         // Pinned to prevent the `to project..` regression: the fields-hint template already
         // terminates the sentence, so the outer nextStep template must not append its own `.`.
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+        });
         expect(t.nextStep).toMatch(/to project\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
     });

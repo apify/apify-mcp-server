@@ -333,10 +333,19 @@ const buildDatasetEntrySchema = () => ({
     type: 'object' as const,
     properties: {
         id: { type: 'string', description: 'Dataset ID' },
+        apifyConsoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the dataset; present only for Console sessions',
+        },
         name: { type: 'string' },
         title: { type: 'string' },
         itemCount: { type: 'number' },
         cleanItemCount: { type: 'number' },
+        inflatedBytes: {
+            type: 'number',
+            description:
+                'Approximate uncompressed byte size of the dataset. Use with itemCount to pick limit/fields before fetching.',
+        },
         fields: {
             type: 'array' as const,
             items: { type: 'string' },
@@ -350,6 +359,10 @@ const buildKeyValueStoreEntrySchema = () => ({
     type: 'object' as const,
     properties: {
         id: { type: 'string', description: 'Key-value store ID' },
+        apifyConsoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the store; present only for Console sessions',
+        },
         name: { type: 'string' },
         title: { type: 'string' },
         keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
@@ -363,10 +376,14 @@ const buildKeyValueStoreEntrySchema = () => ({
 });
 
 /** Schema for get-actor-run tool output. */
-export const getActorRunOutputSchema = {
+export const actorRunOutputSchema = {
     type: 'object' as const,
     properties: {
         runId: { type: 'string', description: 'Actor run ID' },
+        apifyConsoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the run; present only for Console sessions',
+        },
         actorId: { type: 'string', description: 'Stable Apify Actor ID from the run record' },
         actorName: { type: 'string', description: '"username/actor-name"' },
         status: {
@@ -423,7 +440,7 @@ export const getActorRunOutputSchema = {
 };
 
 /**
- * Returns a per-tool clone of {@link getActorRunOutputSchema} with `storages.datasets.default.itemsSchema`
+ * Returns a per-tool clone of {@link actorRunOutputSchema} with `storages.datasets.default.itemsSchema`
  * declared as a JSON Schema describing each dataset row, inferred from historical successful runs.
  *
  * Used for direct actor tools (e.g. `apify--rag-web-browser`) where the target Actor is known
@@ -446,7 +463,7 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
             'dataset id and a `fields` projection drawn from this schema.',
         properties: itemProperties,
     };
-    const clone = structuredClone(getActorRunOutputSchema);
+    const clone = structuredClone(actorRunOutputSchema);
     const datasetDefaultProps = clone.properties.storages.properties.datasets.properties.default.properties as Record<
         string,
         unknown
@@ -524,6 +541,10 @@ export const datasetItemsOutputSchema = {
     type: 'object' as const,
     properties: {
         datasetId: { type: 'string', description: 'Dataset ID' },
+        apifyConsoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the dataset; present only for Console sessions',
+        },
         items: { type: 'array' as const, items: { type: 'object' as const }, description: 'Dataset items' },
         itemCount: { type: 'number', description: 'Number of items returned' },
         totalItemCount: { type: 'number', description: 'Total items in dataset' },
@@ -573,7 +594,8 @@ export const datasetSchemaOutputSchema = {
 
 /**
  * Schema for storage collection listings (get-dataset-list, get-key-value-store-list).
- * Mirrors the Apify paginated-list response shape plus the narrative fields.
+ * Mirrors the Apify paginated-list response shape plus the narrative fields. `items` is an opaque
+ * object since item shape varies by storage type; per-item fields pass through from the API.
  */
 export const storageListOutputSchema = {
     type: 'object' as const,

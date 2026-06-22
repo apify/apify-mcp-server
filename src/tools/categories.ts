@@ -22,7 +22,6 @@
 import { HelperTools } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
-import { appsCallActor } from './apps/call_actor.js';
 import { appsCallActorWidget } from './apps/call_actor_widget.js';
 import { fetchActorDetailsWidgetTool } from './apps/fetch_actor_details_widget.js';
 import { getActorRunWidgetTool } from './apps/get_actor_run_widget.js';
@@ -41,16 +40,11 @@ import { getKeyValueStoreRecord } from './common/get_key_value_store_record.js';
 import { getUserKeyValueStoresList } from './common/key_value_store_collection.js';
 import { getUserRunsList } from './common/run_collection.js';
 import { searchApifyDocsTool } from './common/search_apify_docs.js';
-import { defaultCallActor } from './default/call_actor.js';
+import { appsCallActor, defaultCallActor } from './default/call_actor.js';
 import { defaultFetchActorDetails } from './default/fetch_actor_details.js';
 import { defaultGetActorRun } from './default/get_actor_run.js';
 import { defaultSearchActors } from './default/search_actors.js';
 
-/**
- * A mode map: maps one or more ServerMode keys to their ToolEntry variant.
- * - All modes present → each mode gets its own implementation
- * - Subset of modes → tool is only included for those modes
- */
 type ModeMap = Partial<Record<ServerMode, ToolEntry>>;
 
 /** A category tool entry: plain ToolEntry (mode-independent) or a mode map. */

@@ -1,9 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { getDataset } from '../../src/tools/common/get_dataset.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import {
+    expectSoftFailInvalidInput,
+    mockUserInfo,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
+
+// Only Console UI token sessions reach the users/me lookup.
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
 
 const MOCK_DATASET = {
     id: 'ds-1',
@@ -42,6 +54,32 @@ describe('get-dataset', () => {
         const { summary, nextStep, ...data } = structuredContent;
         expect(JSON.parse(content[0].text)).toEqual(data);
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
+    });
+
+    it('steers nextStep away from fetching when the dataset is large', async () => {
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient({ ...MOCK_DATASET, itemCount: 47, stats: { inflatedBytes: 2_400_000 } }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, string> };
+
+        expect(structuredContent.summary).toContain('has 47 items');
+        expect(structuredContent.nextStep).toContain('Full output is ~2400000 bytes');
+    });
+
+    it('reports size but omits the large-output warning below the threshold', async () => {
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient({ ...MOCK_DATASET, itemCount: 2, stats: { inflatedBytes: 4000 } }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, string> };
+
+        expect(structuredContent.nextStep).toContain('Full output is ~4000 bytes');
+        expect(structuredContent.nextStep).not.toContain('may exceed context');
     });
 
     it('returns isError with a not-found message when the dataset does not exist', async () => {
@@ -146,5 +184,22 @@ describe('get-dataset fields normalization', () => {
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
         expect(structuredContent).toMatchObject(raw);
         expect(structuredContent).not.toHaveProperty('fields');
+    });
+
+    it('appends the dataset Console link (from the API-returned id) for Console UI token sessions', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+        // Slug input — the link must use the API-returned id, not the slug.
+        const result = await (getDataset as HelperTool).call({
+            ...stubToolCallContext({ datasetId: 'user~my-dataset' }, stubApifyClient(MOCK_DATASET)),
+            apifyToken: 'apify_ui_test',
+        });
+        const { content } = result as TextToolResult;
+
+        // content: [0] data, [1] summary/nextStep, [2] Apify Console link.
+        expect(content).toHaveLength(3);
+        expect(content[2].text).toBe(
+            `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
+        );
     });
 });

@@ -5,6 +5,7 @@ import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { keyValueStoreKeysOutputSchema } from '../structured_output_schemas.js';
@@ -48,7 +49,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
         // `listKeys()` throws ApifyApiError on a missing store (the SDK only soft-catches
@@ -65,6 +66,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         if (!keys) {
             return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
         }
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
         const { summary, nextStep } = buildKvsKeysSummaryNextStep({
             keyValueStoreId,
             count: keys.items.length,
@@ -77,6 +79,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
             summary,
             nextStep,
             toon: true,
+            apifyConsoleUrl: buildConsoleKeyValueStoreUrl(linkContext, keyValueStoreId),
         });
     },
 } as const);

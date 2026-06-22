@@ -3,8 +3,21 @@ import type { ActorRun, Dataset, KeyValueClientListKeysResult } from 'apify-clie
 import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import {
+    DATASET_SIZE_HINT_BYTES,
+    FAILURE_CATEGORY,
+    HelperTools,
+    NARROW_OUTPUT_HINT,
+    TOOL_STATUS,
+} from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
+import type { ConsoleLinkContext } from '../../types.js';
+import {
+    buildConsoleDatasetUrl,
+    buildConsoleKeyValueStoreUrl,
+    buildConsoleRunUrl,
+    VERBATIM_LINKS_NUDGE,
+} from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
@@ -65,10 +78,18 @@ async function raceAbort<T>(promise: Promise<T>, abortSignal: AbortSignal | unde
 
 export type RunDataset = {
     id: string;
+    /** Personalized Apify Console link; set only for Console UI token sessions. */
+    apifyConsoleUrl?: string;
     name?: string;
     title?: string;
     itemCount?: number;
     cleanItemCount?: number;
+    /**
+     * Uncompressed size of the dataset in bytes (Apify `stats.inflatedBytes`). Items are stored as BSON,
+     * so this approximates — not exactly equals — the JSON size fetched into context. The single-dataset
+     * GET response does not return it (only the dataset-list endpoint does), so it is normally absent.
+     */
+    inflatedBytes?: number;
     /**
      * Dot-notation field paths. Pure-numeric segments (array indices) are stripped and the
      * list is deduped at build time, so callers receive a flat unique projection-valid list
@@ -86,6 +107,8 @@ export type RunDataset = {
 
 export type RunKeyValueStore = {
     id: string;
+    /** Personalized Apify Console link; set only for Console UI token sessions. */
+    apifyConsoleUrl?: string;
     name?: string;
     title?: string;
     keyCount?: number;
@@ -112,6 +135,8 @@ export type RunStorages = {
  */
 export type RunResponse = {
     runId: string;
+    /** Personalized Apify Console link to the run; set only for Console UI token sessions. */
+    apifyConsoleUrl?: string;
     actorId: string;
     actorName?: string;
     status: string;
@@ -173,12 +198,12 @@ export function normalizeDatasetFields(fields: string[]): string[] {
     return collapseArrayIndices(fields.map((f) => f.replace(/\//g, '.')));
 }
 
-function toIsoString(value: Date | string | undefined | null): string | undefined {
+export function toIsoString(value: Date | string | undefined | null): string | undefined {
     if (!value) return undefined;
     return value instanceof Date ? value.toISOString() : value;
 }
 
-function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
+export function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     const stats = run.stats as ActorRun['stats'] | undefined;
     if (!stats) return undefined;
     return cleanEmptyProperties({
@@ -198,6 +223,9 @@ function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCo
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
         cleanItemCount: datasetMeta.cleanItemCount,
+        // Undeclared on the apify-client `DatasetStats` type (and absent from the GET response today),
+        // so read it defensively; `cleanEmptyProperties` drops it when absent.
+        inflatedBytes: (datasetMeta.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes,
         fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
     }) as RunDataset;
 }
@@ -278,6 +306,28 @@ async function fetchKvKeys(
         });
         return null;
     }
+}
+
+/**
+ * For Console UI token sessions, sets the Apify Console `apifyConsoleUrl` on the run and its default
+ * storages and returns the narrative suffix (the links + the verbatim nudge) in a single pass.
+ * No-op returning `''` for non-Console sessions (`linkContext` undefined).
+ */
+export function applyConsoleLinks(response: RunResponse, linkContext: ConsoleLinkContext | undefined): string {
+    if (!linkContext) return '';
+    response.apifyConsoleUrl = buildConsoleRunUrl(linkContext, response.runId);
+    const parts = [`run ${response.apifyConsoleUrl}`];
+    const dataset = response.storages.datasets?.default;
+    if (dataset) {
+        dataset.apifyConsoleUrl = buildConsoleDatasetUrl(linkContext, dataset.id);
+        parts.push(`dataset ${dataset.apifyConsoleUrl}`);
+    }
+    const keyValueStore = response.storages.keyValueStores?.default;
+    if (keyValueStore) {
+        keyValueStore.apifyConsoleUrl = buildConsoleKeyValueStoreUrl(linkContext, keyValueStore.id);
+        parts.push(`key-value store ${keyValueStore.apifyConsoleUrl}`);
+    }
+    return `\nApify Console: ${parts.join(' | ')}\n${VERBATIM_LINKS_NUDGE}`;
 }
 
 /**
@@ -411,6 +461,27 @@ function fieldsProjectionHint(fields: string[] | undefined): string {
     return ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`;
 }
 
+/**
+ * nextStep suffix reporting dataset size. The byte size is always shown when known; the steer to
+ * narrow is appended only when it exceeds DATASET_SIZE_HINT_BYTES. `inflatedBytes` is the
+ * whole-dataset uncompressed size; shared by get-actor-run and get-dataset.
+ */
+export function datasetSizeNextStepHint(inflatedBytes: number | undefined): string {
+    if (inflatedBytes === undefined || inflatedBytes <= 0) return '';
+    const size = ` Full output is ~${inflatedBytes} bytes.`;
+    if (inflatedBytes <= DATASET_SIZE_HINT_BYTES) return size;
+    return `${size} Fetching all may exceed context; ${NARROW_OUTPUT_HINT}.`;
+}
+
+/**
+ * Returns `toolName` when it is in the loaded set, else `undefined`. Lets nextStep builders
+ * name a tool only when the active configuration actually exposes it (pinned configs can omit
+ * the suggested tool while loading the suggesting one — see issue #1007).
+ */
+export function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
+    return loadedToolNames.includes(toolName) ? toolName : undefined;
+}
+
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
     statusMessage: string | null | undefined,
@@ -427,7 +498,7 @@ function buildSucceededSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items (${itemCount} total).${fieldsProjectionHint(fields)}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(fields)}`,
         };
     }
 
@@ -452,10 +523,13 @@ function buildSucceededSummaryNextStep(
     // KV store is rarely the primary output for Apify actors (mostly SDK state / intermediate data),
     // so we don't recommend it as `nextStep` — but `kv.summarySuffix` keeps it visible in the summary
     // when records exist, so callers can still discover them. Surface the upstream statusMessage so
-    // a text-only reader sees the actor's own diagnostic (often the only signal here).
+    // a text-only reader sees the actor's own diagnostic (often the only signal here). The nextStep
+    // stays generic ("re-run the Actor"): this builder is shared by get-actor-run / abort-actor-run,
+    // which only have a runId and can't know whether the run came from call-actor or a native Actor
+    // tool — naming a specific tool would mislead callers (see #1007).
     return {
         summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-        nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run ${HelperTools.ACTOR_CALL} with adjusted input.`,
+        nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run the Actor with adjusted input.`,
     };
 }
 
@@ -525,12 +599,12 @@ export function buildStatusSummaryNextStep(params: {
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: `Diagnose using statusMessage and exitCode in this response; re-run ${HelperTools.ACTOR_CALL} with adjusted input if the cause is fixable.`,
+                nextStep: `Diagnose using statusMessage and exitCode in this response; re-run the Actor with adjusted input if the cause is fixable.`,
             };
         case 'ABORTED':
             return {
                 summary: `ABORTED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: `Use ${HelperTools.ACTOR_CALL} again if you want to rerun the Actor.`,
+                nextStep: `Re-run the Actor if you want to retry.`,
             };
         case 'TIMED-OUT':
             return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore);
@@ -654,12 +728,16 @@ export function buildStartRunResponse(params: {
     actorName: string;
     actorRun: ActorRun;
     widget?: boolean;
+    linkContext?: ConsoleLinkContext;
 }): ReturnType<typeof buildMCPResponse> {
-    const { actorName, actorRun, widget } = params;
+    const { actorName, actorRun, widget, linkContext } = params;
 
     // Start path returns before any metadata fetch, so every entry — default and aliases — is id-only.
     const datasetIds = buildStorageAliasIds(actorRun.storageIds?.datasets, actorRun.defaultDatasetId ?? undefined);
-    const kvIds = buildStorageAliasIds(actorRun.storageIds?.keyValueStores, actorRun.defaultKeyValueStoreId ?? undefined);
+    const kvIds = buildStorageAliasIds(
+        actorRun.storageIds?.keyValueStores,
+        actorRun.defaultKeyValueStoreId ?? undefined,
+    );
     const datasets = buildStorageEntries(datasetIds, (_alias, id) => ({ id }));
     const keyValueStores = buildStorageEntries(kvIds, (_alias, id) => ({ id }));
 
@@ -684,6 +762,7 @@ export function buildStartRunResponse(params: {
         summary,
         nextStep,
     };
+    const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
 
     const widgetMeta = widget
         ? {
@@ -693,7 +772,7 @@ export function buildStartRunResponse(params: {
         : undefined;
 
     return buildMCPResponse({
-        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}`],
+        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinks}`],
         structuredContent,
         ...(widgetMeta && { _meta: widgetMeta }),
     });
@@ -772,7 +851,8 @@ export async function fetchActorRunData(params: {
         ),
         Promise.all(
             Object.entries(kvIds).map(
-                async ([alias, id]) => [alias, isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null] as const,
+                async ([alias, id]) =>
+                    [alias, isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null] as const,
             ),
         ),
     ]);
