@@ -29,7 +29,9 @@ describe('isMcpClientFaultMessage', () => {
 
     it('matches the variable-tail disconnect messages by prefix', () => {
         expect(isMcpClientFaultMessage('No connection established for request ID: abc-123')).toBe(true);
-        expect(isMcpClientFaultMessage('Failed to send response: Error: No connection established for request ID: 1')).toBe(true);
+        expect(
+            isMcpClientFaultMessage('Failed to send response: Error: No connection established for request ID: 1'),
+        ).toBe(true);
         expect(isMcpClientFaultMessage('Failed to send response: Error: Not connected')).toBe(true);
         expect(isMcpClientFaultMessage('Invalid state: Controller is already closed')).toBe(true);
     });
