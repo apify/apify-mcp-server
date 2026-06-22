@@ -8,7 +8,7 @@ import {
     callActorInputSchema,
     executeCallActor,
 } from '../core/call_actor_common.js';
-import { getActorRunOutputSchema } from '../structured_output_schemas.js';
+import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
  * Single call-actor definition shared by both modes — only the description differs
@@ -20,7 +20,7 @@ function createCallActorTool(description: string): ToolEntry {
         name: HelperTools.ACTOR_CALL,
         description,
         inputSchema: callActorInputSchema,
-        outputSchema: getActorRunOutputSchema,
+        outputSchema: actorRunOutputSchema,
         ajvValidate: callActorAjvValidate,
         paymentRequired: true,
         annotations: {

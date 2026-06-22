@@ -6,7 +6,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { buildStats, buildStatusSummaryNextStep, type RunResponse, toIsoString } from '../core/actor_run_response.js';
-import { getActorRunOutputSchema } from '../structured_output_schemas.js';
+import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 const abortRunArgs = z.object({
     runId: z.string().min(1).describe('The ID of the Actor run to abort.'),
@@ -33,7 +33,7 @@ USAGE EXAMPLES:
 - user_input: Abort run y2h7sK3Wc
 - user_input: Gracefully abort run y2h7sK3Wc`,
     inputSchema: z.toJSONSchema(abortRunArgs) as ToolInputSchema,
-    outputSchema: getActorRunOutputSchema,
+    outputSchema: actorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(abortRunArgs)),
     paymentRequired: true,
     annotations: {

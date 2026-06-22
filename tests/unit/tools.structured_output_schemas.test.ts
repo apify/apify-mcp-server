@@ -6,7 +6,7 @@ import {
     actorInfoSchema,
     buildEnrichedDirectActorOutputSchema,
     datasetItemsOutputSchema,
-    getActorRunOutputSchema,
+    actorRunOutputSchema,
 } from '../../src/tools/structured_output_schemas.js';
 import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -94,10 +94,10 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema?.properties).toEqual(itemProperties);
         });
 
-        it('does not mutate the canonical getActorRunOutputSchema', () => {
+        it('does not mutate the canonical actorRunOutputSchema', () => {
             buildEnrichedDirectActorOutputSchema({ url: { type: 'string' } });
 
-            expect(pickItemsSchema(getActorRunOutputSchema)).toBeUndefined();
+            expect(pickItemsSchema(actorRunOutputSchema)).toBeUndefined();
         });
 
         it('handles nested item properties', () => {
@@ -173,7 +173,7 @@ describe('Structured Output Schemas', () => {
 
             expect(tools).toHaveLength(1);
             const tool = tools[0] as ActorTool;
-            expect(tool.outputSchema).toBe(getActorRunOutputSchema);
+            expect(tool.outputSchema).toBe(actorRunOutputSchema);
         });
 
         it('injects waitSecs as an optional integer (0–45) into the input schema', async () => {
@@ -210,7 +210,7 @@ describe('Structured Output Schemas', () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
             const tool = tools[0] as ActorTool;
 
-            expect(tool.outputSchema).toBe(getActorRunOutputSchema);
+            expect(tool.outputSchema).toBe(actorRunOutputSchema);
         });
 
         it('falls back to the canonical schema when actorStore returns an empty object', async () => {
@@ -220,7 +220,7 @@ describe('Structured Output Schemas', () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
             const tool = tools[0] as ActorTool;
 
-            expect(tool.outputSchema).toBe(getActorRunOutputSchema);
+            expect(tool.outputSchema).toBe(actorRunOutputSchema);
         });
 
         it('falls back to the canonical schema when actorStore throws', async () => {
@@ -238,7 +238,7 @@ describe('Structured Output Schemas', () => {
             });
             const tool = tools[0] as ActorTool;
 
-            expect(tool.outputSchema).toBe(getActorRunOutputSchema);
+            expect(tool.outputSchema).toBe(actorRunOutputSchema);
         });
 
         it('mixes enriched and canonical schemas across multiple actors', async () => {
@@ -259,7 +259,7 @@ describe('Structured Output Schemas', () => {
             const tool2 = tools.find((t) => (t as ActorTool).actorFullName === actor2Name) as ActorTool;
 
             expect(pickItemsSchema(tool1.outputSchema)?.properties).toEqual(itemProperties);
-            expect(tool2.outputSchema).toBe(getActorRunOutputSchema);
+            expect(tool2.outputSchema).toBe(actorRunOutputSchema);
         });
 
         it('emits no widget meta on actor tools', async () => {

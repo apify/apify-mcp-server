@@ -326,7 +326,7 @@ export const fetchApifyDocsToolOutputSchema = {
 };
 
 /** Schema for get-actor-run tool output. */
-export const getActorRunOutputSchema = {
+export const actorRunOutputSchema = {
     type: 'object' as const,
     properties: {
         runId: { type: 'string', description: 'Actor run ID' },
@@ -445,7 +445,7 @@ export const getActorRunOutputSchema = {
 };
 
 /**
- * Returns a per-tool clone of {@link getActorRunOutputSchema} with `storages.datasets.default.itemsSchema`
+ * Returns a per-tool clone of {@link actorRunOutputSchema} with `storages.datasets.default.itemsSchema`
  * declared as a JSON Schema describing each dataset row, inferred from historical successful runs.
  *
  * Used for direct actor tools (e.g. `apify--rag-web-browser`) where the target Actor is known
@@ -468,7 +468,7 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
             'dataset id and a `fields` projection drawn from this schema.',
         properties: itemProperties,
     };
-    const clone = structuredClone(getActorRunOutputSchema);
+    const clone = structuredClone(actorRunOutputSchema);
     const datasetDefaultProps = clone.properties.storages.properties.datasets.properties.default.properties as Record<
         string,
         unknown

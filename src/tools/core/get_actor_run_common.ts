@@ -7,7 +7,7 @@ import type { ConsoleLinkContext, HelperTool, ToolInputSchema } from '../../type
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
-import { getActorRunOutputSchema } from '../structured_output_schemas.js';
+import { actorRunOutputSchema } from '../structured_output_schemas.js';
 import {
     applyConsoleLinks,
     type FetchActorRunResult,
@@ -56,7 +56,7 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     // `fixZodSchemaRequired` strips fields with a real `default` from `required` so MCP clients
     // that read `tools/list` see `waitSecs` as optional (matching its runtime behavior).
     inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorRunArgs)) as ToolInputSchema,
-    outputSchema: getActorRunOutputSchema,
+    outputSchema: actorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
     paymentRequired: true,
     annotations: {

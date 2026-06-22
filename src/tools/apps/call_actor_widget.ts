@@ -17,7 +17,7 @@ import {
     callOptionsSchema,
     resolveAndValidateActor,
 } from '../core/call_actor_common.js';
-import { getActorRunOutputSchema } from '../structured_output_schemas.js';
+import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
  * Widget-only input: `actor` + `input` + optional `callOptions`.
@@ -69,7 +69,7 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
     name: HelperTools.ACTOR_CALL_WIDGET,
     description: CALL_ACTOR_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(callActorWidgetArgsSchema) as ToolInputSchema,
-    outputSchema: getActorRunOutputSchema,
+    outputSchema: actorRunOutputSchema,
     // Allow arbitrary keys inside `input` (dynamic Actor input) while keeping the outer shape strict.
     ajvValidate: compileSchema(z.toJSONSchema(callActorWidgetArgsSchema)),
     paymentRequired: true,
