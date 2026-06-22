@@ -33,6 +33,16 @@ export function parseInputParamsFromUrl(url: string): Input {
 }
 
 /**
+ * Detects the task store's "task is gone" error. A long-running task whose TTL elapsed before its
+ * result could be stored makes `storeTaskResult`/`updateTaskStatus` throw — the in-memory SDK store
+ * says "Task with ID <id> not found", the hosted RedisTaskStore appends " or expired". This is a
+ * benign terminal condition (the client gave up before we finished), not an unexpected failure.
+ */
+export function isTaskNotFoundError(error: unknown): boolean {
+    return error instanceof Error && /^Task with ID .+ not found/.test(error.message);
+}
+
+/**
  * Checks if a task was cancelled, preventing state transitions from terminal states.
  * Critical for task execution: prevents SDK errors when trying to transition from 'cancelled' to 'working'.
  * @param taskId - The task identifier

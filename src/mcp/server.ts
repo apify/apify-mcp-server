@@ -115,7 +115,12 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
+import {
+    createTaskCancellationWatcher,
+    isTaskCancelled,
+    isTaskNotFoundError,
+    parseInputParamsFromUrl,
+} from './utils.js';
 
 /**
  * Returns true when the initialize request advertises the MCP Apps UI extension
@@ -1047,9 +1052,18 @@ export class ActorsMcpServer {
                             mcpSessionId,
                             actorName,
                             actorId,
-                        }).catch((error) =>
-                            log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }),
-                        );
+                        }).catch((error) => {
+                            // A store call in the catch block (e.g. storing a failed result) can itself
+                            // throw "task not found or expired" when the TTL elapsed. That is benign —
+                            // soft-fail instead of escalating to an error.
+                            if (isTaskNotFoundError(error)) {
+                                log.softFail('Task expired before its result could be stored', {
+                                    taskId: task.taskId,
+                                });
+                                return;
+                            }
+                            log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error });
+                        });
                     });
 
                     // Return the task immediately; execution continues asynchronously
@@ -1653,6 +1667,23 @@ export class ActorsMcpServer {
 
             finishTaskTracking(toolStatus, callDiagnostics, result);
         } catch (error) {
+            // A long-running task whose TTL elapsed before we could store its result throws here
+            // (the store rejects an unknown taskId). The task is gone — there is nothing left to
+            // store or notify — so this is a benign terminal condition, not a failure. Soft-fail and
+            // stop; retrying storeTaskResult below would only throw again and escalate to an error.
+            if (isTaskNotFoundError(error)) {
+                log.softFail('Task expired before its result could be stored', {
+                    taskId,
+                    toolName: tool.name,
+                    mcpSessionId,
+                });
+                finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
+                    failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
+                    ...buildActorFields(actorName, actorId),
+                });
+                return;
+            }
+
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
             if (isX402PaymentRequiredError(error)) {

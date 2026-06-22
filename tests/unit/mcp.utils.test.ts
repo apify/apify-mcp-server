@@ -1,7 +1,12 @@
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
+import {
+    createTaskCancellationWatcher,
+    isTaskCancelled,
+    isTaskNotFoundError,
+    parseInputParamsFromUrl,
+} from '../../src/mcp/utils.js';
 
 describe('parseInputParamsFromUrl()', () => {
     it('handles URL without query params', () => {
@@ -82,6 +87,26 @@ describe('isTaskCancelled()', () => {
         await isTaskCancelled('task-42', 'session-xyz', taskStore);
 
         expect(taskStore.getTask).toHaveBeenCalledWith('task-42', 'session-xyz');
+    });
+});
+
+describe('isTaskNotFoundError()', () => {
+    it('matches the in-memory store message', () => {
+        expect(isTaskNotFoundError(new Error('Task with ID call-tool-x not found'))).toBe(true);
+    });
+
+    it('matches the Redis store message (expired)', () => {
+        expect(isTaskNotFoundError(new Error('Task with ID call-tool-x not found or expired'))).toBe(true);
+    });
+
+    it('does not match unrelated errors', () => {
+        expect(isTaskNotFoundError(new Error('Cannot store result for task x in terminal status'))).toBe(false);
+        expect(isTaskNotFoundError(new Error('redis ETIMEDOUT'))).toBe(false);
+    });
+
+    it('returns false for non-Error values', () => {
+        expect(isTaskNotFoundError('Task with ID x not found')).toBe(false);
+        expect(isTaskNotFoundError(undefined)).toBe(false);
     });
 });
 
