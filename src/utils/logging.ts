@@ -63,6 +63,7 @@ const MCP_CLIENT_FAULT_MESSAGES: ReadonlySet<string> = new Set([
 // Transport/runtime disconnects with variable tails — anchored at the start, not substring-anywhere.
 const MCP_CLIENT_FAULT_PREFIXES: readonly string[] = [
     'No connection established for request ID:', // webStandardStreamableHttp.js sendRequest
+    'Failed to send response: Error: No connection established for request ID:', // send-path wrap of the above
     'Failed to send response: Error: Not connected', // send-path wrap
     'Invalid state: Controller is already closed', // Node web-streams ERR_INVALID_STATE
 ];
