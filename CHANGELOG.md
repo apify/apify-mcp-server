@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **cache:** Scope Actor definition cache to its owner ([#985](https://github.com/apify/apify-mcp-server/pull/985)) ([2dc6c21](https://github.com/apify/apify-mcp-server/commit/2dc6c21f9664225c4ce0561df999c07ad2eb4b25)) by [@MQ37](https://github.com/MQ37)
+- **logging:** SoftFail the send-path-wrapped &#x27;No connection established&#x27; fault ([#1014](https://github.com/apify/apify-mcp-server/pull/1014)) ([d280ffe](https://github.com/apify/apify-mcp-server/commit/d280ffe6263354edc6d3c47ce7a4f6ac52d422dc)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
