@@ -18,7 +18,12 @@ import { ActorsMcpServer } from './mcp/server.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import { parseServerMode } from './utils/server_mode.js';
 
-// This is the local dev/standby-emulation server only; production runs dist/stdio.js.
+// DEV ONLY. This is a local dev/standby-emulation server, not the hosted HTTP server.
+// The production Streamable HTTP transport (auth, rate limiting, Redis-backed session
+// lifecycle, multi-node) lives in apify-mcp-server-internal. Do not treat this file as
+// the source of HTTP-transport semantics or send PRs here to mirror production behavior;
+// fix production-facing HTTP behavior in the internal repo.
+//
 // Default telemetry to the DEV Segment source so local tool calls never land in PROD
 // analytics. Still overridable by an explicit TELEMETRY_ENV (e.g. PROD) in the env.
 process.env.TELEMETRY_ENV ??= 'DEV';
