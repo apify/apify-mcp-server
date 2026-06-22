@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.11.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Hints and abort-actor-run ([#1010](https://github.com/apify/apify-mcp-server/pull/1010)) ([719602a](https://github.com/apify/apify-mcp-server/commit/719602a0022c856fba13dff9a622ca16d6bdd840)) by [@jirispilka](https://github.com/jirispilka), closes [#1007](https://github.com/apify/apify-mcp-server/issues/1007)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.11.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.3) (2026-06-22)
 
 ### 🚀 Features
