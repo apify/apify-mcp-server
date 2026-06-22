@@ -617,7 +617,11 @@ describe('buildStartRunResponse()', () => {
     });
 
     it('includes widget metadata and no-poll nextStep when widget=true', () => {
-        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun, widget: true });
+        const result = buildStartRunResponse({
+            actorName: 'apify/rag-web-browser',
+            actorRun,
+            widget: true,
+        });
 
         const { structuredContent, _meta } = result as {
             structuredContent: RunResponse;
@@ -658,7 +662,10 @@ const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result
  */
 describe('buildStatusTemplate', () => {
     it('SUCCEEDED with dataset items routes to dataset-items nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+        });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
@@ -743,7 +750,10 @@ describe('buildStatusTemplate', () => {
     });
 
     it('TIMED-OUT with dataset routes to partial-output nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMED-OUT'),
+            dataset: datasetWithItems,
+        });
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
@@ -769,7 +779,9 @@ describe('buildStatusTemplate', () => {
     // naive reader doesn't mistake the actor's own message for our narrative.
 
     it('RUNNING with upstream statusMessage attributes it as Actor status and drops trailing period', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING', 'Starting the crawler.') });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING', 'Starting the crawler.'),
+        });
         expect(t.summary).toContain('Actor status: "Starting the crawler"');
         expect(t.summary).not.toMatch(/\.\./);
     });
@@ -781,7 +793,10 @@ describe('buildStatusTemplate', () => {
     });
 
     it('RUNNING with dataset items appends "N results so far" so polling agents see real progress', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING'),
+            dataset: datasetWithItems,
+        });
         expect(t.summary).toContain('47 results so far.');
         // Progress is summary-only; nextStep stays poll-only — partial reads mid-run are noise.
         expect(t.nextStep).toContain('poll for completion');
@@ -789,24 +804,36 @@ describe('buildStatusTemplate', () => {
     });
 
     it('RUNNING with empty dataset omits the progress suffix (no "0 results so far")', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetEmpty });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING'),
+            dataset: datasetEmpty,
+        });
         expect(t.summary).not.toMatch(/results so far/);
         expect(t.summary).not.toContain('0 results');
     });
 
     it('RUNNING with exactly 1 item uses singular "result"', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: { id: 'ds-1', itemCount: 1 } });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING'),
+            dataset: { id: 'ds-1', itemCount: 1 },
+        });
         expect(t.summary).toContain('1 result so far.');
         expect(t.summary).not.toContain('results');
     });
 
     it('TIMING-OUT with dataset items surfaces progress in the summary', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMING-OUT'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMING-OUT'),
+            dataset: datasetWithItems,
+        });
         expect(t.summary).toContain('47 results so far.');
     });
 
     it('ABORTING with dataset items surfaces progress in the summary', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTING'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('ABORTING'),
+            dataset: datasetWithItems,
+        });
         expect(t.summary).toContain('47 results so far.');
     });
 
@@ -822,7 +849,10 @@ describe('buildStatusTemplate', () => {
     it('SUCCEEDED with items ends nextStep with a single period after the fields hint', () => {
         // Pinned to prevent the `to project..` regression: the fields-hint template already
         // terminates the sentence, so the outer nextStep template must not append its own `.`.
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+        });
         expect(t.nextStep).toMatch(/to project\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
     });

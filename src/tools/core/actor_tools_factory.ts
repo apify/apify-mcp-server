@@ -23,7 +23,7 @@ import { getActorDefinitionCached } from '../../utils/actor.js';
 import { ajv } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildEnrichedDirectActorOutputSchema, getActorRunOutputSchema } from '../structured_output_schemas.js';
+import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import {
     actorNameToToolName,
     buildActorInputSchema,
@@ -51,7 +51,7 @@ const WAIT_SECS_INPUT_PROPERTY = {
 
 /**
  * For each direct actor tool with a known historical item schema, replaces the generic
- * `getActorRunOutputSchema` with a per-tool variant that declares
+ * `actorRunOutputSchema` with a per-tool variant that declares
  * `storages.datasets.default.itemsSchema` — letting an LLM plan field projection from
  * `tools/list` alone, before any call.
  *
@@ -161,7 +161,7 @@ Actor description: ${definition.description}`;
             description,
             inputSchema: inputSchema as ToolInputSchema,
             // Canonical RunResponse shape — same as call-actor and get-actor-run.
-            outputSchema: getActorRunOutputSchema,
+            outputSchema: actorRunOutputSchema,
             ajvValidate,
             paymentRequired: true,
             memoryMbytes,

@@ -386,7 +386,7 @@ export async function handleMcpToolCall(params: {
             arguments: input,
         });
 
-        // `call-actor` declares `getActorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
+        // `call-actor` declares `actorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
         // without `structuredContent` (unless `isError: true`) with -32600. The pass-through has no
         // Apify run, so synthesize a sentinel `RunResponse` matching the schema's `required` keys;
         // the remote tool's payload still flows through `content`. Also forward `isError` so a

@@ -90,7 +90,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken } = toolArgs;
+        const { args, apifyClient: client, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getDatasetItemsArgs.parse(args);
 
         const fields = parseCommaSeparatedList(parsed.fields);
@@ -141,6 +141,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset,
+            loadedToolNames: apifyMcpServer.listToolNames(),
         });
         return buildStorageResponse({ structuredContent, summary, nextStep, toon: true, apifyConsoleUrl });
     },

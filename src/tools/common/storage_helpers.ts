@@ -3,6 +3,7 @@ import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { suggestTool } from '../core/actor_run_response.js';
 
 /**
  * The "Apify Console: <url>" line plus the verbatim-links nudge, or `undefined` when there is no
@@ -98,8 +99,10 @@ export function buildDatasetItemsSummaryNextStep(params: {
     itemCount: number;
     totalItemCount: number;
     offset: number;
+    /** Active loaded tool set; gates the terminal get-dataset-schema reference (see #1007). */
+    loadedToolNames: string[];
 }): { summary: string; nextStep: string } {
-    const { datasetId, itemCount, totalItemCount, offset } = params;
+    const { datasetId, itemCount, totalItemCount, offset, loadedToolNames } = params;
     if (offset + itemCount < totalItemCount) {
         return {
             summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`,
@@ -112,7 +115,9 @@ export function buildDatasetItemsSummaryNextStep(params: {
             : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
     return {
         summary,
-        nextStep: `Use ${HelperTools.DATASET_SCHEMA_GET} with datasetId=${datasetId} to inspect structure if needed.`,
+        nextStep: suggestTool(HelperTools.DATASET_SCHEMA_GET, loadedToolNames)
+            ? `Use ${HelperTools.DATASET_SCHEMA_GET} with datasetId=${datasetId} to inspect structure if needed.`
+            : `No more pages. Inspect the returned items directly.`,
     };
 }
 

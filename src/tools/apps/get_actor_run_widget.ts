@@ -9,7 +9,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { fetchActorRunData } from '../core/actor_run_response.js';
 import { buildGetActorRunError, buildGetActorRunSuccessResponse } from '../core/get_actor_run_common.js';
-import { getActorRunOutputSchema } from '../structured_output_schemas.js';
+import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
  * Widget input is `runId` only. The tool always returns immediately so the widget can render
@@ -40,7 +40,7 @@ export const getActorRunWidgetTool: ToolEntry = Object.freeze({
     name: HelperTools.ACTOR_RUNS_GET_WIDGET,
     description: GET_ACTOR_RUN_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema,
-    outputSchema: getActorRunOutputSchema,
+    outputSchema: actorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunWidgetArgsSchema)),
     paymentRequired: true,
     _meta: {

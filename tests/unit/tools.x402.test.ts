@@ -11,7 +11,7 @@ import {
     X402PaymentProvider,
     type X402PaymentRequirements,
 } from '../../src/payments/x402.js';
-import { getActorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 
@@ -42,7 +42,7 @@ const UPTO_ACCEPT = {
     extra: { name: 'USDC', version: '2', facilitatorAddress: '0xFac' },
 } as const;
 
-/** A successful Actor run result — satisfies the `getActorRunOutputSchema` branch. */
+/** A successful Actor run result — satisfies the `actorRunOutputSchema` branch. */
 const SAMPLE_RUN_RESPONSE = {
     runId: 'abc123',
     actorId: 'JxcaGGqy7TwBdHxMz',
@@ -242,14 +242,14 @@ describe('decorateToolSchema() — outputSchema widening (#917)', () => {
     }
 
     it('wraps an existing outputSchema in anyOf:[success, PaymentRequired] with root type:object', () => {
-        const schema = decorateWithSchema(getActorRunOutputSchema).outputSchema as {
+        const schema = decorateWithSchema(actorRunOutputSchema).outputSchema as {
             type: string;
             anyOf: unknown[];
         };
         // MCP requires root type:'object'; the SDK Tool.outputSchema zod keeps `anyOf` via .catchall().
         expect(schema.type).toBe('object');
         expect(schema.anyOf).toHaveLength(2);
-        expect(schema.anyOf[0]).toEqual(getActorRunOutputSchema);
+        expect(schema.anyOf[0]).toEqual(actorRunOutputSchema);
         expect(schema.anyOf[1]).toEqual(X402_PAYMENT_REQUIRED_OUTPUT_SCHEMA);
     });
 
@@ -261,7 +261,7 @@ describe('decorateToolSchema() — outputSchema widening (#917)', () => {
     it('is idempotent — re-decorating an already-widened tool does not nest anyOf', () => {
         const provider2 = new X402PaymentProvider(requirements);
         const once = provider2.decorateToolSchema(
-            makePaidTool({ outputSchema: getActorRunOutputSchema } as unknown as Partial<HelperTool>),
+            makePaidTool({ outputSchema: actorRunOutputSchema } as unknown as Partial<HelperTool>),
         );
         const twice = provider2.decorateToolSchema(once);
 
@@ -269,11 +269,11 @@ describe('decorateToolSchema() — outputSchema widening (#917)', () => {
         expect(anyOf).toHaveLength(2);
         // If the guard regressed and re-wrapped, anyOf[0] would be the nested
         // { type, anyOf:[...] } wrapper rather than the original success schema.
-        expect(anyOf[0]).toEqual(getActorRunOutputSchema);
+        expect(anyOf[0]).toEqual(actorRunOutputSchema);
     });
 
     it('widened schema validates a successful run AND a PaymentRequired, and rejects garbage', () => {
-        const widened = decorateWithSchema(getActorRunOutputSchema).outputSchema as object;
+        const widened = decorateWithSchema(actorRunOutputSchema).outputSchema as object;
         // new Ajv({ strict:false }) matches the MCP SDK client validator here: the SDK also
         // adds ajv-formats, but neither branch uses a `format` keyword, so results are identical.
         const validate = new Ajv({ strict: false, allErrors: true }).compile(widened);
