@@ -115,7 +115,13 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
+import {
+    createTaskCancellationWatcher,
+    isTaskCancelled,
+    isTaskNotFoundError,
+    parseInputParamsFromUrl,
+    storeTaskResultOrSkipIfExpired,
+} from './utils.js';
 
 /**
  * Returns true when the initialize request advertises the MCP Apps UI extension
@@ -1048,6 +1054,8 @@ export class ActorsMcpServer {
                             actorName,
                             actorId,
                         }).catch((error) =>
+                            // Benign task-expiry is handled in-method (see the catch block and
+                            // storeTaskResultOrSkipIfExpired); anything reaching here is genuinely unexpected.
                             log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }),
                         );
                     });
@@ -1647,12 +1655,29 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
+            await storeTaskResultOrSkipIfExpired(this.taskStore, tool.name, taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics, result);
         } catch (error) {
+            // Reached only when the task expired before the `working` transition (updateTaskStatus
+            // above rethrows the store's unknown-taskId error). The tool never ran and the task is
+            // gone, so soft-fail, record telemetry, and stop. Every result store (success and error
+            // paths) tolerates expiry via storeTaskResultOrSkipIfExpired, so they don't reach here.
+            if (isTaskNotFoundError(error)) {
+                log.softFail('Task expired before execution started', {
+                    taskId,
+                    toolName: tool.name,
+                    mcpSessionId,
+                });
+                finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
+                    failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
+                    ...buildActorFields(actorName, actorId),
+                });
+                return;
+            }
+
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
             if (isX402PaymentRequiredError(error)) {
@@ -1666,7 +1691,14 @@ export class ActorsMcpServer {
                 )
                     return;
                 const paymentResponse = buildPaymentRequiredResponse(error);
-                await this.taskStore.storeTaskResult(taskId, 'completed', paymentResponse, mcpSessionId);
+                await storeTaskResultOrSkipIfExpired(
+                    this.taskStore,
+                    tool.name,
+                    taskId,
+                    'completed',
+                    paymentResponse,
+                    mcpSessionId,
+                );
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(
                     TOOL_STATUS.SOFT_FAIL,
@@ -1693,7 +1725,14 @@ export class ActorsMcpServer {
                 )
                     return;
                 const approvalResponse = buildPermissionApprovalResponse(error);
-                await this.taskStore.storeTaskResult(taskId, 'completed', approvalResponse, mcpSessionId);
+                await storeTaskResultOrSkipIfExpired(
+                    this.taskStore,
+                    tool.name,
+                    taskId,
+                    'completed',
+                    approvalResponse,
+                    mcpSessionId,
+                );
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(
                     TOOL_STATUS.SOFT_FAIL,
@@ -1762,7 +1801,14 @@ export class ActorsMcpServer {
                 isError: true,
                 internalToolStatus: toolStatus,
             };
-            await this.taskStore.storeTaskResult(taskId, 'failed', failedResult, mcpSessionId);
+            await storeTaskResultOrSkipIfExpired(
+                this.taskStore,
+                tool.name,
+                taskId,
+                'failed',
+                failedResult,
+                mcpSessionId,
+            );
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics, failedResult);

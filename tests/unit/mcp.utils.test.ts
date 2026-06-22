@@ -1,7 +1,15 @@
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
+import log from '@apify/log';
+
+import {
+    createTaskCancellationWatcher,
+    isTaskCancelled,
+    isTaskNotFoundError,
+    parseInputParamsFromUrl,
+    storeTaskResultOrSkipIfExpired,
+} from '../../src/mcp/utils.js';
 
 describe('parseInputParamsFromUrl()', () => {
     it('handles URL without query params', () => {
@@ -82,6 +90,56 @@ describe('isTaskCancelled()', () => {
         await isTaskCancelled('task-42', 'session-xyz', taskStore);
 
         expect(taskStore.getTask).toHaveBeenCalledWith('task-42', 'session-xyz');
+    });
+});
+
+describe('isTaskNotFoundError()', () => {
+    it('matches the in-memory and Redis store messages', () => {
+        expect(isTaskNotFoundError(new Error('Task with ID call-tool-x not found'))).toBe(true);
+        expect(isTaskNotFoundError(new Error('Task with ID call-tool-x not found or expired'))).toBe(true);
+    });
+
+    it('returns false for unrelated errors and non-Error values', () => {
+        expect(isTaskNotFoundError(new Error('Cannot store result for task x in terminal status'))).toBe(false);
+        expect(isTaskNotFoundError('Task with ID x not found')).toBe(false);
+    });
+});
+
+describe('storeTaskResultOrSkipIfExpired()', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const makeStore = (impl: () => Promise<void>) => ({ storeTaskResult: vi.fn(impl) }) as unknown as TaskStore;
+
+    it('stores the result when the task is present', async () => {
+        const store = makeStore(async () => {});
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+
+        await storeTaskResultOrSkipIfExpired(store, 'call-actor', 'task-1', 'completed', { content: [] }, 'sess-1');
+
+        expect(store.storeTaskResult).toHaveBeenCalledWith('task-1', 'completed', { content: [] }, 'sess-1');
+        expect(softFail).not.toHaveBeenCalled();
+    });
+
+    it('soft-fails without throwing when the task expired', async () => {
+        const store = makeStore(async () => {
+            throw new Error('Task with ID task-1 not found or expired');
+        });
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+
+        await expect(
+            storeTaskResultOrSkipIfExpired(store, 'call-actor', 'task-1', 'failed', { content: [] }, 'sess-1'),
+        ).resolves.toBeUndefined();
+        expect(softFail).toHaveBeenCalledOnce();
+    });
+
+    it('rethrows non-expiry errors', async () => {
+        const store = makeStore(async () => {
+            throw new Error('redis ETIMEDOUT');
+        });
+
+        await expect(
+            storeTaskResultOrSkipIfExpired(store, 'call-actor', 'task-1', 'failed', { content: [] }, 'sess-1'),
+        ).rejects.toThrow('redis ETIMEDOUT');
     });
 });
 

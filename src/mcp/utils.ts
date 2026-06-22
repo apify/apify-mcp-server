@@ -3,6 +3,8 @@ import { parse } from 'node:querystring';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import type { ApifyClient } from 'apify-client';
 
+import log from '@apify/log';
+
 import { processInput } from '../input.js';
 import type { ActorStore, Input } from '../types.js';
 import { ServerMode } from '../types.js';
@@ -30,6 +32,38 @@ export function parseInputParamsFromUrl(url: string): Input {
     const query = url.split('?')[1] || '';
     const params = parse(query) as unknown as Input;
     return processInput(params);
+}
+
+/**
+ * Detects the task store's "task is gone" error. A long-running task whose TTL elapsed before its
+ * result could be stored makes `storeTaskResult`/`updateTaskStatus` throw — the in-memory SDK store
+ * says "Task with ID <id> not found", the hosted RedisTaskStore appends " or expired". This is a
+ * benign terminal condition (the client gave up before we finished), not an unexpected failure.
+ */
+export function isTaskNotFoundError(error: unknown): boolean {
+    return error instanceof Error && /^Task with ID .+ not found/.test(error.message);
+}
+
+/**
+ * Stores a task result, skipping the store if the task expired before storage. On an expired/gone
+ * task the store throws {@link isTaskNotFoundError}; that is benign (the client gave up), so it is
+ * logged as softFail and swallowed instead of propagating. The caller can then still finish its
+ * telemetry. Any other store error is rethrown.
+ */
+export async function storeTaskResultOrSkipIfExpired(
+    taskStore: TaskStore,
+    toolName: string,
+    taskId: Parameters<TaskStore['storeTaskResult']>[0],
+    status: Parameters<TaskStore['storeTaskResult']>[1],
+    result: Parameters<TaskStore['storeTaskResult']>[2],
+    mcpSessionId?: Parameters<TaskStore['storeTaskResult']>[3],
+): Promise<void> {
+    try {
+        await taskStore.storeTaskResult(taskId, status, result, mcpSessionId);
+    } catch (error) {
+        if (!isTaskNotFoundError(error)) throw error;
+        log.softFail('Task expired before its result could be stored', { taskId, toolName, mcpSessionId });
+    }
 }
 
 /**
