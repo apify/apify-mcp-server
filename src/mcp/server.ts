@@ -1655,19 +1655,18 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
+            await storeTaskResultToleratingExpiry(this.taskStore, tool.name, taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics, result);
         } catch (error) {
-            // A task whose TTL elapsed before the `working` transition or the success-path result
-            // store throws here (the store rejects an unknown taskId). The task is gone — nothing
-            // left to store or notify — so this is a benign terminal condition, not a failure.
-            // Soft-fail, record telemetry, and stop. (The error-path stores below tolerate expiry
-            // via storeTaskResultToleratingExpiry, so they don't reach this branch.)
+            // Reached only when the task expired before the `working` transition (updateTaskStatus
+            // above rethrows the store's unknown-taskId error). The tool never ran and the task is
+            // gone, so soft-fail, record telemetry, and stop. Every result store (success and error
+            // paths) tolerates expiry via storeTaskResultToleratingExpiry, so they don't reach here.
             if (isTaskNotFoundError(error)) {
-                log.softFail('Task expired before its result could be stored', {
+                log.softFail('Task expired before execution started', {
                     taskId,
                     toolName: tool.name,
                     mcpSessionId,
