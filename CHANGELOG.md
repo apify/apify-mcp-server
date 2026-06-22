@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Hints and abort-actor-run ([#1010](https://github.com/apify/apify-mcp-server/pull/1010)) ([719602a](https://github.com/apify/apify-mcp-server/commit/719602a0022c856fba13dff9a622ca16d6bdd840)) by [@jirispilka](https://github.com/jirispilka), closes [#1007](https://github.com/apify/apify-mcp-server/issues/1007)
+- Handle task expiration gracefully when storing results ([#1012](https://github.com/apify/apify-mcp-server/pull/1012)) ([019a7a9](https://github.com/apify/apify-mcp-server/commit/019a7a958e0412f7a8bf123c8e3ac18862945b4f)) by [@jirispilka](https://github.com/jirispilka), closes [#1011](https://github.com/apify/apify-mcp-server/issues/1011)
 
 
 <!-- git-cliff-unreleased-end -->
