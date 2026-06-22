@@ -65,6 +65,7 @@ const getDatasetItemsArgs = z.object({
 export const getDatasetItems: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_GET_ITEMS,
+    title: 'Get dataset items',
     description: dedent`
         Retrieve dataset items with pagination, sorting, and field selection.
         For nested fields use dot notation (e.g., fields="metadata.url") — the server auto-flattens parent prefixes.

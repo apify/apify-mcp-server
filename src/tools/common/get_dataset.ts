@@ -21,6 +21,7 @@ const getDatasetArgs = z.object({
 export const getDataset: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_GET,
+    title: 'Get dataset',
     description: dedent`
         Get metadata for a dataset (collection of structured data created by an Actor run).
         The results will include dataset details such as itemCount, schema, fields, and stats.

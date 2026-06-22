@@ -32,6 +32,7 @@ const getDatasetSchemaArgs = z.object({
 export const getDatasetSchema: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_SCHEMA_GET,
+    title: 'Get dataset schema',
     description: dedent`
         Generate a JSON schema from a sample of dataset items.
         The schema describes the structure of the data and can be used for validation, documentation, or processing.

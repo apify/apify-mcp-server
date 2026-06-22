@@ -17,6 +17,7 @@ const GetRunLogArgs = z.object({
 export const getActorRunLog: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_LOG,
+    title: 'Get Actor run log',
     description: `Retrieve recent log lines for a specific Actor run.
 The results will include the last N lines of the run's log output (plain text).
 

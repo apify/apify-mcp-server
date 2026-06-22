@@ -47,6 +47,7 @@ const FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION = dedent`
 export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
+    title: 'Fetch Actor details (widget)',
     description: FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(fetchActorDetailsWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsWidgetOutputSchema,

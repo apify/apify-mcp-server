@@ -52,6 +52,7 @@ USAGE EXAMPLES:
 export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_GET,
+    title: 'Get Actor run',
     description: GET_ACTOR_RUN_DESCRIPTION,
     // `fixZodSchemaRequired` strips fields with a real `default` from `required` so MCP clients
     // that read `tools/list` see `waitSecs` as optional (matching its runtime behavior).

@@ -27,6 +27,7 @@ const getKeyValueStoreRecordArgs = z.object({
 export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
+    title: 'Get key-value store record',
     description: dedent`
         Get a value stored in a key-value store under a specific key.
         The response preserves the original Content-Encoding; most clients handle decompression automatically.
