@@ -3,7 +3,10 @@ import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { suggestTool } from '../core/actor_run_response.js';
+
+function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
+    return loadedToolNames.includes(toolName) ? toolName : undefined;
+}
 
 /**
  * The "Apify Console: <url>" line plus the verbatim-links nudge, or `undefined` when there is no

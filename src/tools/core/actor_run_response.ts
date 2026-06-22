@@ -473,15 +473,6 @@ export function datasetSizeNextStepHint(inflatedBytes: number | undefined): stri
     return `${size} Fetching all may exceed context; ${NARROW_OUTPUT_HINT}.`;
 }
 
-/**
- * Returns `toolName` when it is in the loaded set, else `undefined`. Lets nextStep builders
- * name a tool only when the active configuration actually exposes it (pinned configs can omit
- * the suggested tool while loading the suggesting one — see issue #1007).
- */
-export function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
-    return loadedToolNames.includes(toolName) ? toolName : undefined;
-}
-
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
     statusMessage: string | null | undefined,

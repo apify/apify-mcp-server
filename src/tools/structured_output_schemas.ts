@@ -325,10 +325,10 @@ export const fetchApifyDocsToolOutputSchema = {
     required: ['url', 'content'],
 };
 
-// Per-storage entry shapes, used for both the `default` entry and aliased entries
-// (additionalProperties). Both default and aliases are enriched on the completed-run path; only `id`
-// is guaranteed. Factories (not shared constants) so each call site gets a distinct object — the
-// per-tool clone injects `itemsSchema` into `datasets.default` only, which must not leak to aliases.
+// Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
+// object identity: if `default` and `additionalProperties` referenced the same object, cloning
+// `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
+// `default` via `buildEnrichedDirectActorOutputSchema` would silently leak it into aliases too.
 const buildDatasetEntrySchema = () => ({
     type: 'object' as const,
     properties: {
