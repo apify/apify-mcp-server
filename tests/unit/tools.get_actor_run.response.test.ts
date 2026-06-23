@@ -200,6 +200,35 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
     });
 
+    it('recovers a lagging itemCount=0 for an aliased dataset via the probe, not just the default', async () => {
+        // Reproduces the aliased-storage bug: Apify's counter lags ~5s post-SUCCEEDED, so a freshly
+        // written aliased dataset reports itemCount 0 in metadata. The probe must recover it for
+        // aliases too, exactly as it does for the default.
+        const run = mockSucceededRun({
+            storageIds: { datasets: { default: 'dataset-xyz', results: 'dataset-results' } },
+        });
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (id: string) => ({
+                // Both datasets report a stale itemCount 0 in metadata...
+                get: async () => mockDataset({ id, itemCount: 0 }),
+                // ...but listItems.total reflects the true count (distinct per dataset).
+                listItems: async () => ({ items: [{ a: 1 }], total: id === 'dataset-results' ? 3 : 1 }),
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (defaultGetActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(1);
+        expect(structuredContent.storages.datasets?.results.itemCount).toBe(3);
+    });
+
     it('retries the itemCount=0 probe once when the first probe also returns 0 (waitSecs > 0)', async () => {
         // Delayed retries run only when waitSecs > 0 — they're skipped on the "return immediately"
         // path. Drive the [0, 1000, ...]ms schedule with fake timers.

@@ -83,7 +83,6 @@ export type RunDataset = {
     name?: string;
     title?: string;
     itemCount?: number;
-    cleanItemCount?: number;
     /**
      * Uncompressed size of the dataset in bytes (Apify `stats.inflatedBytes`). Items are stored as BSON,
      * so this approximates — not exactly equals — the JSON size fetched into context. The single-dataset
@@ -222,7 +221,6 @@ function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCo
         name: datasetMeta.name,
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
-        cleanItemCount: datasetMeta.cleanItemCount,
         // Undeclared on the apify-client `DatasetStats` type (and absent from the GET response today),
         // so read it defensively; `cleanEmptyProperties` drops it when absent.
         inflatedBytes: (datasetMeta.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes,
@@ -333,17 +331,19 @@ export function applyConsoleLinks(response: RunResponse, linkContext: ConsoleLin
 /**
  * Apify's pagination counter is eventually consistent (~5s post-terminal). Probe with `listItems({ limit: 1 })`
  * when `itemCount === 0` on a SUCCEEDED run — if the probe returns items, surface the larger count.
- * Returns the resolved item count, or `undefined` if the dataset id is unknown / we shouldn't override.
+ * Applies to any dataset of the run (default or aliased), so freshly-written aliased storages don't
+ * report a stale 0. Returns the resolved item count, or `undefined` if we shouldn't override.
  */
 async function resolveItemCountWithLagFallback(
     client: ApifyClient,
-    run: ActorRun,
+    datasetId: string,
     datasetMeta: Dataset | null,
+    isSucceeded: boolean,
     waitSecs: number | undefined,
     mcpSessionId?: string,
     abortSignal?: AbortSignal,
 ): Promise<number | undefined> {
-    if (run.status !== 'SUCCEEDED' || !datasetMeta || !run.defaultDatasetId) return datasetMeta?.itemCount;
+    if (!isSucceeded || !datasetMeta) return datasetMeta?.itemCount;
     if (datasetMeta.itemCount > 0) return datasetMeta.itemCount;
     try {
         // `total` is the dataset's true count from the SDK; `items.length` is capped by `limit` and
@@ -364,7 +364,7 @@ async function resolveItemCountWithLagFallback(
                 if (sleepResult === ABORT) return lastTotal;
             }
             const result = await raceAbort(
-                client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT }),
+                client.dataset(datasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT }),
                 abortSignal,
             );
             if (result === ABORT) return lastTotal;
@@ -374,7 +374,7 @@ async function resolveItemCountWithLagFallback(
         return lastTotal;
     } catch (error) {
         log.warning('itemCount lag-fallback probe failed', {
-            datasetId: run.defaultDatasetId,
+            datasetId,
             mcpSessionId,
             errMessage: errMessage(error),
         });
@@ -850,18 +850,32 @@ export async function fetchActorRunData(params: {
     const datasetMetaByAlias = Object.fromEntries(datasetMetaPairs);
     const kvKeysByAlias = Object.fromEntries(kvKeysPairs);
 
-    // The itemCount lag-fallback probe is the run's primary-output completeness check — default only.
-    const resolvedItemCount = await resolveItemCountWithLagFallback(
-        client,
-        run,
-        datasetMetaByAlias.default ?? null,
-        waitSecs,
-        mcpSessionId,
-        abortSignal,
+    // Recover a lagging itemCount=0 for every dataset (default + aliases) — Apify's counter is
+    // eventually consistent post-SUCCEEDED, so a freshly-written storage otherwise reports a stale 0.
+    // The probe only fires when a dataset reports 0, so datasets with a count cost nothing extra.
+    const isSucceeded = run.status === 'SUCCEEDED';
+    const resolvedItemCountByAlias = Object.fromEntries(
+        await Promise.all(
+            Object.entries(datasetIds).map(
+                async ([alias, id]) =>
+                    [
+                        alias,
+                        await resolveItemCountWithLagFallback(
+                            client,
+                            id,
+                            datasetMetaByAlias[alias] ?? null,
+                            isSucceeded,
+                            waitSecs,
+                            mcpSessionId,
+                            abortSignal,
+                        ),
+                    ] as const,
+            ),
+        ),
     );
 
     const datasets = buildStorageEntries(datasetIds, (alias, id) =>
-        buildRunDataset(id, datasetMetaByAlias[alias] ?? null, alias === 'default' ? resolvedItemCount : undefined),
+        buildRunDataset(id, datasetMetaByAlias[alias] ?? null, resolvedItemCountByAlias[alias]),
     );
     const keyValueStores = buildStorageEntries(kvIds, (alias, id) =>
         buildRunKeyValueStore(id, kvKeysByAlias[alias] ?? null),

@@ -340,7 +340,6 @@ const buildDatasetEntrySchema = () => ({
         name: { type: 'string' },
         title: { type: 'string' },
         itemCount: { type: 'number' },
-        cleanItemCount: { type: 'number' },
         inflatedBytes: {
             type: 'number',
             description:
