@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Handle task expiration gracefully when storing results ([#1012](https://github.com/apify/apify-mcp-server/pull/1012)) ([019a7a9](https://github.com/apify/apify-mcp-server/commit/019a7a958e0412f7a8bf123c8e3ac18862945b4f)) by [@jirispilka](https://github.com/jirispilka), closes [#1011](https://github.com/apify/apify-mcp-server/issues/1011)
 - **streamable-http:** Correct session lifecycle ([#1006](https://github.com/apify/apify-mcp-server/pull/1006)) ([320faf8](https://github.com/apify/apify-mcp-server/commit/320faf87e4baa90c2d9ce4192f0894233c5f7a33)) by [@jstar0](https://github.com/jstar0), closes [#918](https://github.com/apify/apify-mcp-server/issues/918)
 - Add top-level Tool.title per MCP 2025-11-25 ([#1013](https://github.com/apify/apify-mcp-server/pull/1013)) ([176cd08](https://github.com/apify/apify-mcp-server/commit/176cd082af8c95ea338dc98f55635bb4964bc5e2)) by [@vjsai](https://github.com/vjsai), closes [#729](https://github.com/apify/apify-mcp-server/issues/729)
+- Resolve dataset tool schema&#x2F;description inconsistencies ([#1008](https://github.com/apify/apify-mcp-server/pull/1008)) ([f3ab40a](https://github.com/apify/apify-mcp-server/commit/f3ab40a7254664aad3eb4526b9d4a80b0094f790)) by [@surya16122114](https://github.com/surya16122114)
 
 
 <!-- git-cliff-unreleased-end -->
