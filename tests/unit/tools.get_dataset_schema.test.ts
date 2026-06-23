@@ -65,6 +65,17 @@ describe('get-dataset-schema', () => {
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
+    it('applies defaults (limit=5, clean=true) to listItems when no params given', async () => {
+        const listItemsSpy = vi.fn().mockResolvedValue({ items: MOCK_ITEMS, total: 2 });
+        const client = {
+            dataset: (_id: string) => ({ listItems: listItemsSpy }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        await (getDatasetSchema as HelperTool).call(stubToolCallContext({ datasetId: 'ds-1' }, client));
+
+        expect(listItemsSpy).toHaveBeenCalledWith({ clean: true, limit: 5 });
+    });
+
     it('returns a schema-conforming structured response when the dataset has no items', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
