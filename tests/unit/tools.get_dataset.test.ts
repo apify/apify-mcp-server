@@ -21,7 +21,6 @@ const MOCK_DATASET = {
     id: 'ds-1',
     name: 'my-dataset',
     itemCount: 42,
-    cleanItemCount: 42,
     fields: ['title', 'url'],
 };
 

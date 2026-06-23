@@ -707,7 +707,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 expect(callResult.isError).not.toBe(true);
-                // Schema validation must accept the alias entries (additionalProperties: { id }).
+                // Schema validation must accept the alias entries (additionalProperties: full dataset shape).
                 validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
                 const sc = (
                     callResult as {

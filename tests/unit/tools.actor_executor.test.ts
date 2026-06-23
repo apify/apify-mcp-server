@@ -78,7 +78,6 @@ function buildStub(): { client: ActorExecutionParams['apifyClient']; spies: Spie
             get: async () => ({
                 id: 'dataset-xyz',
                 itemCount: 5,
-                cleanItemCount: 5,
                 fields: ['url'],
             }),
             listItems: async () => ({ items: [], total: 5 }),

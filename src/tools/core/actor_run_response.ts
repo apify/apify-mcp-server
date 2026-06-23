@@ -42,7 +42,7 @@ const POLL_HINT_WAIT_SECS = 30;
 const ITEM_COUNT_PROBE_LIMIT = 1;
 
 /**
- * Delays before each `itemCount=0` lag-fallback probe. Apify docs state `itemCount` / `cleanItemCount`
+ * Delays before each `itemCount=0` lag-fallback probe. Apify docs state `itemCount`
  * can lag up to ~5s after `pushItem`. We probe immediately, then again at +1s/+3s/+5s so a
  * SUCCEEDED-but-empty dataset has the full propagation window to surface real items.
  */
@@ -249,6 +249,9 @@ function buildRunKeyValueStore(id: string, listKeysResult: KeyValueClientListKey
 /**
  * alias → id map for one storage type, with `default` (the run's `defaultXId`) guaranteed present
  * if known. Mirrors `ActorRunStorageIds`, whose `default` key is always populated for a real run.
+ * The `if (defaultId && !ids.default)` guard is defensive: the platform guarantees
+ * `storageIds.<type>.default` equals `run.defaultXId`, so the fallback only matters when `storageIds`
+ * is absent entirely.
  */
 function buildStorageAliasIds(
     aliasMap: Record<string, string> | undefined,
@@ -260,20 +263,14 @@ function buildStorageAliasIds(
 }
 
 /**
- * Build a `{ default, ...aliases }` entry map from an alias → id map. Returns undefined when the
- * map is empty or lacks `default`, so the caller omits the storage type entirely (RunStorages
- * requires `default` whenever a storage type is present). The per-entry `build` differs by path:
- * the start-run path passes `{ id }`, the completed-run path passes enriched metadata.
+ * Wrap an alias → entry map with the `default`-presence guard: returns undefined when the map lacks
+ * `default`, so the caller omits the storage type entirely (RunStorages requires `default` whenever a
+ * storage type is present). The completed-run path passes its assembled enriched entries; the
+ * start-run path passes id-only entries built from `buildStorageAliasIds`.
  */
-function buildStorageEntries<T>(
-    ids: Record<string, string>,
-    build: (alias: string, id: string) => T,
-): { default: T; [alias: string]: T } | undefined {
-    if (!('default' in ids)) return undefined;
-    return Object.fromEntries(Object.entries(ids).map(([alias, id]) => [alias, build(alias, id)])) as {
-        default: T;
-        [alias: string]: T;
-    };
+function buildStorageEntries<T>(entries: Record<string, T>): { default: T; [alias: string]: T } | undefined {
+    if (!('default' in entries)) return undefined;
+    return entries as { default: T; [alias: string]: T };
 }
 
 function errMessage(error: unknown): string {
@@ -731,8 +728,12 @@ export function buildStartRunResponse(params: {
         actorRun.storageIds?.keyValueStores,
         actorRun.defaultKeyValueStoreId ?? undefined,
     );
-    const datasets = buildStorageEntries(datasetIds, (_alias, id) => ({ id }));
-    const keyValueStores = buildStorageEntries(kvIds, (_alias, id) => ({ id }));
+    const datasets = buildStorageEntries(
+        Object.fromEntries(Object.entries(datasetIds).map(([alias, id]) => [alias, { id }])),
+    );
+    const keyValueStores = buildStorageEntries(
+        Object.fromEntries(Object.entries(kvIds).map(([alias, id]) => [alias, { id }])),
+    );
 
     const { summary, nextStep: computedNextStep } = buildStatusSummaryNextStep({
         run: actorRun,
@@ -833,55 +834,40 @@ export async function fetchActorRunData(params: {
     // one round-trip regardless of alias count. Per-fetch catches: a single transient failure must
     // not hard-fail the call — that entry still carries its id, enough to fetch items / records.
     const isTerminal = TERMINAL_RUN_STATUSES.has(run.status);
+    const isSucceeded = run.status === 'SUCCEEDED';
     const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
-    const [datasetMetaPairs, kvKeysPairs] = await Promise.all([
+    // One per-alias dataset pipeline: fetch metadata → recover a lagging itemCount=0 (Apify's counter
+    // is eventually consistent post-SUCCEEDED, so a freshly-written storage otherwise reports a stale
+    // 0; the probe only fires when the dataset reports 0, so datasets with a count cost nothing extra)
+    // → build the entry. KV listKeys runs in parallel with the whole dataset wave.
+    const [datasetPairs, kvPairs] = await Promise.all([
         Promise.all(
-            Object.entries(datasetIds).map(
-                async ([alias, id]) => [alias, await fetchDatasetMeta(client, id, mcpSessionId)] as const,
-            ),
+            Object.entries(datasetIds).map(async ([alias, id]) => {
+                const meta = await fetchDatasetMeta(client, id, mcpSessionId);
+                const resolvedItemCount = await resolveItemCountWithLagFallback(
+                    client,
+                    id,
+                    meta,
+                    isSucceeded,
+                    waitSecs,
+                    mcpSessionId,
+                    abortSignal,
+                );
+                return [alias, buildRunDataset(id, meta, resolvedItemCount)] as const;
+            }),
         ),
         Promise.all(
-            Object.entries(kvIds).map(
-                async ([alias, id]) =>
-                    [alias, isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null] as const,
-            ),
+            Object.entries(kvIds).map(async ([alias, id]) => {
+                const keys = isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null;
+                return [alias, buildRunKeyValueStore(id, keys)] as const;
+            }),
         ),
     ]);
-    const datasetMetaByAlias = Object.fromEntries(datasetMetaPairs);
-    const kvKeysByAlias = Object.fromEntries(kvKeysPairs);
 
-    // Recover a lagging itemCount=0 for every dataset (default + aliases) — Apify's counter is
-    // eventually consistent post-SUCCEEDED, so a freshly-written storage otherwise reports a stale 0.
-    // The probe only fires when a dataset reports 0, so datasets with a count cost nothing extra.
-    const isSucceeded = run.status === 'SUCCEEDED';
-    const resolvedItemCountByAlias = Object.fromEntries(
-        await Promise.all(
-            Object.entries(datasetIds).map(
-                async ([alias, id]) =>
-                    [
-                        alias,
-                        await resolveItemCountWithLagFallback(
-                            client,
-                            id,
-                            datasetMetaByAlias[alias] ?? null,
-                            isSucceeded,
-                            waitSecs,
-                            mcpSessionId,
-                            abortSignal,
-                        ),
-                    ] as const,
-            ),
-        ),
-    );
-
-    const datasets = buildStorageEntries(datasetIds, (alias, id) =>
-        buildRunDataset(id, datasetMetaByAlias[alias] ?? null, resolvedItemCountByAlias[alias]),
-    );
-    const keyValueStores = buildStorageEntries(kvIds, (alias, id) =>
-        buildRunKeyValueStore(id, kvKeysByAlias[alias] ?? null),
-    );
+    const datasets = buildStorageEntries(Object.fromEntries(datasetPairs));
+    const keyValueStores = buildStorageEntries(Object.fromEntries(kvPairs));
 
     // Narrative summarizes the default storages only; aliases are surfaced in structured output.
     const { summary, nextStep } = buildStatusSummaryNextStep({

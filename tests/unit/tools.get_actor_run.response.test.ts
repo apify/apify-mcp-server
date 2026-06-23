@@ -55,7 +55,6 @@ function mockDataset(overrides: Record<string, unknown> = {}) {
         createdAt: new Date('2026-05-01T10:00:00.000Z'),
         modifiedAt: new Date('2026-05-01T10:00:22.000Z'),
         itemCount: 47,
-        cleanItemCount: 47,
         // Apify returns slash-notation; server must translate to dot-notation in the response.
         fields: ['crawl/httpStatusCode', 'metadata/url', 'markdown'],
         stats: { writeCount: 47, storageBytes: 152340 },
