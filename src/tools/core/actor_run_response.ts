@@ -216,14 +216,16 @@ function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCo
     if (!datasetMeta) {
         return { id };
     }
+    const inflatedBytes = (datasetMeta.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
     return cleanEmptyProperties({
         id,
         name: datasetMeta.name,
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
-        // Undeclared on the apify-client `DatasetStats` type (and absent from the GET response today),
-        // so read it defensively; `cleanEmptyProperties` drops it when absent.
-        inflatedBytes: (datasetMeta.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes,
+        // Undeclared on the apify-client `DatasetStats` type and read defensively. The platform
+        // reports `0` when it doesn't populate the size yet; treat that as absent (a literal
+        // "0 bytes" is misleading for a non-empty dataset). `cleanEmptyProperties` drops undefined.
+        inflatedBytes: inflatedBytes && inflatedBytes > 0 ? inflatedBytes : undefined,
         fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
     }) as RunDataset;
 }

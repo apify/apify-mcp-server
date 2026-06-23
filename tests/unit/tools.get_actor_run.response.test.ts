@@ -143,6 +143,21 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.datasets?.default.inflatedBytes).toBe(1234);
     });
 
+    it('omits inflatedBytes when the platform reports 0 (size unavailable, not a real 0)', async () => {
+        // The platform returns inflatedBytes: 0 when it does not yet populate the size; surfacing a
+        // literal "0 bytes" is misleading for a non-empty dataset, so the field must be omitted.
+        const run = mockSucceededRun();
+        const result = await (defaultGetActorRun as HelperTool).call(
+            stubToolCallContext(
+                { runId: 'run-1', waitSecs: 0 },
+                stubClient({ run, dataset: mockDataset({ stats: { writeCount: 47, inflatedBytes: 0 } }) }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.storages.datasets?.default.inflatedBytes).toBeUndefined();
+    });
+
     it('fetches dataset metadata for a non-terminal RUNNING run and surfaces progress in the summary', async () => {
         // Dataset metadata is fetched on every poll so the summary can surface partial progress.
         // KV listKeys stays terminal-only — non-terminal summaries don't reference KV records, so
