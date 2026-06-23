@@ -36,6 +36,7 @@ const getUserDatasetsListArgs = z.object({
 export const getUserDatasetsList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_LIST_GET,
+    title: 'Get user datasets list',
     description: dedent`
         List datasets (collections of Actor run data) for the authenticated user.
         Actor runs automatically produce unnamed datasets (set unnamed=true to include them). Users can also create named datasets.

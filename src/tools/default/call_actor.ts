@@ -18,6 +18,7 @@ function createCallActorTool(description: string): ToolEntry {
     return Object.freeze({
         type: TOOL_TYPE.INTERNAL,
         name: HelperTools.ACTOR_CALL,
+        title: 'Call Actor',
         description,
         inputSchema: callActorInputSchema,
         outputSchema: actorRunOutputSchema,

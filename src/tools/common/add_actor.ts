@@ -16,6 +16,7 @@ export const addToolArgsSchema = z.object({
 export const addTool: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_ADD,
+    title: 'Add tool',
     description: `Add an Actor or MCP server to the Apify MCP Server as an available tool.
 This does not execute the Actor; it only registers it so it can be called later.
 

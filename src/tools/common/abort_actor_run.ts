@@ -22,6 +22,7 @@ const abortRunArgs = z.object({
 export const abortActorRun: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_ABORT,
+    title: 'Abort Actor run',
     description: `Abort an Actor run that is currently starting or running.
 For runs with status FINISHED, FAILED, ABORTING, or TIMED-OUT, this call has no effect.
 The results will include the updated run details after the abort request.

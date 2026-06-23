@@ -124,6 +124,7 @@ EXAMPLES:
 export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_GET_DETAILS,
+    title: 'Fetch Actor details',
     description: FETCH_ACTOR_DETAILS_DESCRIPTION,
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,

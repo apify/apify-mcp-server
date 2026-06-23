@@ -26,6 +26,7 @@ const getKeyValueStoreKeysArgs = z.object({
 export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
+    title: 'Get key-value store keys',
     description: dedent`
         List keys in a key-value store with optional pagination.
         The results will include keys and basic info about stored values (e.g., size).

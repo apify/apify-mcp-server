@@ -20,6 +20,7 @@ const getKeyValueStoreArgs = z.object({
 export const getKeyValueStore: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_GET,
+    title: 'Get key-value store',
     description: dedent`
         Get details about a key-value store by ID or username~store-name.
         The results will include store metadata (ID, name, owner, access settings) and usage statistics.

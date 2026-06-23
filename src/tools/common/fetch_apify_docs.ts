@@ -60,6 +60,7 @@ You can search for available documentation pages using the ${HelperTools.DOCS_SE
 export const fetchApifyDocsTool: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DOCS_FETCH,
+    title: 'Fetch Apify docs',
     description: `Fetch the full content of an Apify or Crawlee documentation page by its URL.
 Use this after finding a relevant page with the ${HelperTools.DOCS_SEARCH} tool.
 

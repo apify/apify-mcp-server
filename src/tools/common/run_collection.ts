@@ -36,6 +36,7 @@ const getUserRunsListArgs = z.object({
 export const getUserRunsList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUN_LIST_GET,
+    title: 'Get user runs list',
     description: `List Actor runs for the authenticated user with optional filtering and sorting.
 The results will include run details (including datasetId and keyValueStoreId) and can be filtered by status.
 Valid statuses: READY (not allocated), RUNNING (executing), SUCCEEDED (finished), FAILED (failed), TIMING-OUT, TIMED-OUT, ABORTING, ABORTED.

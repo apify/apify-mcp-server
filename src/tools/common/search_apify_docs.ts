@@ -71,6 +71,7 @@ const searchApifyDocsToolInputSchema = z.toJSONSchema(searchApifyDocsToolArgsSch
 export const searchApifyDocsTool: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DOCS_SEARCH,
+    title: 'Search Apify docs',
     description: buildToolDescription(),
     inputSchema: searchApifyDocsToolInputSchema,
     outputSchema: searchApifyDocsToolOutputSchema,

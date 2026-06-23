@@ -38,6 +38,7 @@ const SEARCH_ACTORS_WIDGET_DESCRIPTION = dedent`
 export const searchActorsWidgetTool: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.STORE_SEARCH_WIDGET,
+    title: 'Search Actors (widget)',
     description: SEARCH_ACTORS_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(searchActorsWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchWidgetOutputSchema,

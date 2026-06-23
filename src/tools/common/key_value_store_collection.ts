@@ -38,6 +38,7 @@ const getUserKeyValueStoresListArgs = z.object({
 export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_LIST_GET,
+    title: 'Get user key-value stores list',
     description: dedent`
         List key-value stores owned by the authenticated user.
         Actor runs automatically produce unnamed stores (set unnamed=true to include them). Users can also create named stores.

@@ -103,6 +103,7 @@ Returns list of Actor cards with the following info:
 export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.STORE_SEARCH,
+    title: 'Search Actors',
     description: SEARCH_ACTORS_DESCRIPTION,
     inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,

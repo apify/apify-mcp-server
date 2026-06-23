@@ -67,6 +67,7 @@ const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
 export const appsCallActorWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_CALL_WIDGET,
+    title: 'Call Actor (widget)',
     description: CALL_ACTOR_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(callActorWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorRunOutputSchema,

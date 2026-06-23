@@ -156,6 +156,7 @@ Actor description: ${definition.description}`;
         tools.push({
             type: TOOL_TYPE.ACTOR,
             name: actorNameToToolName(definition.actorFullName),
+            title: definition.actorFullName,
             actorId: definition.id,
             actorFullName: definition.actorFullName,
             description,
