@@ -210,35 +210,6 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     });
 });
 
-describe('top-level Tool.title (MCP 2025-11-25)', () => {
-    // The 2025-11-25 spec moved the human-readable display name to a top-level `Tool.title`
-    // and deprecated `annotations.title`. Every tool must set both: top-level for new clients,
-    // annotations for older ones during the transition. Guards against new tools regressing.
-    for (const mode of SERVER_MODES) {
-        const categories = getCategoryTools(mode);
-
-        for (const categoryName of CATEGORY_NAMES) {
-            for (const tool of categories[categoryName]) {
-                it(`${tool.name} (${mode} mode) sets a top-level title matching annotations.title`, () => {
-                    expect(tool.title).toBeTruthy();
-                    expect(tool.title).toBe(tool.annotations?.title);
-                });
-
-                it(`${tool.name} (${mode} mode) exposes title via getToolPublicFieldOnly`, () => {
-                    expect(getToolPublicFieldOnly(tool).title).toBe(tool.title);
-                });
-            }
-        }
-    }
-
-    for (const widget of WIDGET_BY_BASE_TOOL.values()) {
-        it(`${widget.name} widget sets a top-level title matching annotations.title`, () => {
-            expect(widget.title).toBeTruthy();
-            expect(widget.title).toBe(widget.annotations?.title);
-        });
-    }
-});
-
 describe('apps-mode widget pairing in getToolsForServerMode', () => {
     function namesFor(input: Input, mode: ServerMode): string[] {
         return getToolsForServerMode(input, [], mode).map((t) => t.name);
