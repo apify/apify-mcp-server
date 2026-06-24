@@ -98,7 +98,7 @@ Returns list of Actor cards with the following info:
 
 /**
  * Tool metadata for the base search-actors tool — mode-independent, no widget `_meta`.
- * Used by `defaultSearchActors` in both default and apps modes.
+ * Used by `searchActors` in both default and apps modes.
  */
 export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,

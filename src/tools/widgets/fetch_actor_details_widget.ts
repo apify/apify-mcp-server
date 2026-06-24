@@ -44,7 +44,7 @@ const FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION = dedent`
     Input: the Actor ID or full name only. Output fields are fixed by the widget contract.
 `;
 
-export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
+export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
     title: 'Fetch Actor details (widget)',

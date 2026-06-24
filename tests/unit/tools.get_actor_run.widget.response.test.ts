@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
-import { getActorRunWidgetTool } from '../../src/tools/widgets/get_actor_run_widget.js';
+import { getActorRunWidget } from '../../src/tools/widgets/get_actor_run_widget.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { stubToolCallContext } from './helpers/tool_context.js';
 
@@ -38,7 +38,7 @@ function stubApifyClient(): InternalToolArgs['apifyClient'] {
 
 describe('get-actor-run-widget response', () => {
     it('returns structured content and widget _meta on the response', async () => {
-        const result = await (getActorRunWidgetTool as HelperTool).call(
+        const result = await (getActorRunWidget as HelperTool).call(
             stubToolCallContext({ runId: 'run-widget-1' }, stubApifyClient()),
         );
 
@@ -74,7 +74,7 @@ describe('get-actor-run-widget response', () => {
     });
 
     it('carries widget _meta on the tool definition', () => {
-        const tool = getActorRunWidgetTool as HelperTool;
+        const tool = getActorRunWidget as HelperTool;
         const meta = tool._meta as { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown } };
         expect(meta.ui?.resourceUri).toBe(WIDGET_URIS.ACTOR_RUN);
         expect(meta.ui?.visibility).toEqual(['model', 'app']);
@@ -82,7 +82,7 @@ describe('get-actor-run-widget response', () => {
     });
 
     it('declares a strict input schema accepting runId only', () => {
-        const tool = getActorRunWidgetTool as HelperTool;
+        const tool = getActorRunWidget as HelperTool;
 
         const schema = tool.inputSchema as {
             additionalProperties?: boolean;
@@ -102,7 +102,7 @@ describe('get-actor-run-widget response', () => {
     });
 
     it('accepts a minimal runId payload', () => {
-        const tool = getActorRunWidgetTool as HelperTool;
+        const tool = getActorRunWidget as HelperTool;
         const ok = tool.ajvValidate({ runId: 'run-widget-1' });
         expect(ok).toBe(true);
     });

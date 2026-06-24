@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { searchActorsWidgetTool } from '../../src/tools/widgets/search_actors_widget.js';
+import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
 import type { HelperTool } from '../../src/types.js';
 import type { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { formatActorForWidget } from '../../src/utils/actor_card.js';
@@ -33,7 +33,7 @@ describe('search-actors-widget response', () => {
     it('returns widgetActors plus widget _meta and short pointer text', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
-        const result = await (searchActorsWidgetTool as HelperTool).call(
+        const result = await (searchActorsWidget as HelperTool).call(
             stubInternalToolArgs({
                 keywords: SEARCH_KEYWORDS,
                 limit: 5,
@@ -77,7 +77,7 @@ describe('search-actors-widget response', () => {
     it('returns empty widgetActors and omits widget _meta when there are no results', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
-        const result = await (searchActorsWidgetTool as HelperTool).call(
+        const result = await (searchActorsWidget as HelperTool).call(
             stubInternalToolArgs({
                 keywords: SEARCH_KEYWORDS,
                 limit: 5,
@@ -105,7 +105,7 @@ describe('search-actors-widget response', () => {
     });
 
     it('carries widget _meta on the tool definition', () => {
-        const tool = searchActorsWidgetTool as HelperTool;
+        const tool = searchActorsWidget as HelperTool;
         const meta = tool._meta as { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown } };
         expect(meta.ui?.resourceUri).toBe(WIDGET_URIS.SEARCH_ACTORS);
         expect(meta.ui?.visibility).toEqual(['model', 'app']);
@@ -113,7 +113,7 @@ describe('search-actors-widget response', () => {
     });
 
     it('declares a strict input schema and strips stray keys at validation time', () => {
-        const tool = searchActorsWidgetTool as HelperTool;
+        const tool = searchActorsWidget as HelperTool;
 
         // Schema-level: strict shape (no extra properties allowed).
         const schema = tool.inputSchema as { additionalProperties?: boolean; properties?: Record<string, unknown> };
@@ -129,7 +129,7 @@ describe('search-actors-widget response', () => {
     });
 
     it('accepts a valid keywords-only input', () => {
-        const tool = searchActorsWidgetTool as HelperTool;
+        const tool = searchActorsWidget as HelperTool;
         const ok = tool.ajvValidate({ keywords: 'web scraper' });
         expect(ok).toBe(true);
     });

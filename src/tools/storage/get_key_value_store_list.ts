@@ -35,7 +35,7 @@ const getUserKeyValueStoresListArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/key-value-stores-get
  */
-export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
+export const getKeyValueStoreList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_LIST_GET,
     title: 'Get user key-value stores list',
