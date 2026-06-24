@@ -101,6 +101,20 @@ describe('get-key-value-store-record', () => {
         expect(structuredContent.summary).toBe("Read 'note.txt' (contentType=text/plain; charset=utf-8, 23 bytes).");
     });
 
+    it('returns an empty value in schema-conforming structuredContent for an empty record', async () => {
+        // apify-client maps an empty record body to `undefined` (e.g. an Actor that writes an empty OUTPUT);
+        // the value must still be present so the output schema's required `value` is satisfied.
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'OUTPUT' },
+                stubApifyClient({ record: { key: 'OUTPUT', value: undefined, contentType: 'application/json' } }),
+            ),
+        );
+        expectSchemaConformingStructuredContent(result);
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', key: 'OUTPUT', value: '' });
+    });
+
     it('returns an image content block for a binary image record', async () => {
         const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
         const result = await (getKeyValueStoreRecord as HelperTool).call(
