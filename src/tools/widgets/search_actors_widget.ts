@@ -35,7 +35,7 @@ const SEARCH_ACTORS_WIDGET_DESCRIPTION = dedent`
     Input: keywords (plus optional limit/offset). Output fields are fixed by the widget contract.
 `;
 
-export const searchActorsWidgetTool: ToolEntry = Object.freeze({
+export const searchActorsWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.STORE_SEARCH_WIDGET,
     title: 'Search Actors (widget)',

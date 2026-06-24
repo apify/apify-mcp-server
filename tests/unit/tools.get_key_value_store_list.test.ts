@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { getUserKeyValueStoresList } from '../../src/tools/storage/key_value_store_collection.js';
+import { getKeyValueStoreList } from '../../src/tools/storage/get_key_value_store_list.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
@@ -25,13 +25,13 @@ function stubApifyClient(listSpy: ReturnType<typeof vi.fn>): InternalToolArgs['a
 
 describe('get-key-value-store-list', () => {
     it('has the expected tool name', () => {
-        expect(getUserKeyValueStoresList.name).toBe(HelperTools.KEY_VALUE_STORE_LIST_GET);
+        expect(getKeyValueStoreList.name).toBe(HelperTools.KEY_VALUE_STORE_LIST_GET);
     });
 
     it('returns the list response plus a summary and nextStep in structuredContent', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        const result = await (getUserKeyValueStoresList as HelperTool).call(
+        const result = await (getKeyValueStoreList as HelperTool).call(
             stubToolCallContext({}, stubApifyClient(listSpy)),
         );
         const { content, structuredContent } = result as TextToolResult & {
@@ -50,7 +50,7 @@ describe('get-key-value-store-list', () => {
     it('emits a pagination nextStep when more stores remain', async () => {
         const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total: 30 });
 
-        const result = await (getUserKeyValueStoresList as HelperTool).call(
+        const result = await (getKeyValueStoreList as HelperTool).call(
             stubToolCallContext({}, stubApifyClient(listSpy)),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
@@ -64,7 +64,7 @@ describe('get-key-value-store-list', () => {
     it('forwards pagination params (limit, offset, desc, unnamed) to ApifyClient', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        await (getUserKeyValueStoresList as HelperTool).call(
+        await (getKeyValueStoreList as HelperTool).call(
             stubToolCallContext(
                 {
                     limit: 5,
@@ -82,13 +82,13 @@ describe('get-key-value-store-list', () => {
     it('applies defaults (limit=10, offset=0, desc=false, unnamed=false) when no params given', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        await (getUserKeyValueStoresList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
+        await (getKeyValueStoreList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
 
         expect(listSpy).toHaveBeenCalledWith({ limit: 10, offset: 0, desc: false, unnamed: false });
     });
 
     it('rejects limit above 10 via ajv validation', () => {
-        const tool = getUserKeyValueStoresList as HelperTool;
+        const tool = getKeyValueStoreList as HelperTool;
         expect(tool.ajvValidate({ limit: 11 })).toBe(false);
         expect(tool.ajvValidate({ limit: 10 })).toBe(true);
     });

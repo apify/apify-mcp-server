@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_STORE_URL, HelperTools, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
-import { defaultSearchActors } from '../../src/tools/actors/search_actors.js';
+import { searchActors } from '../../src/tools/actors/search_actors.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
     DEFAULT_CARD_OPTIONS,
@@ -38,7 +38,7 @@ function buildInputSchema(fieldCount: number): ActorStoreInputSchema {
     };
 }
 
-describe('search-actors without widget (defaultSearchActors)', () => {
+describe('search-actors without widget (searchActors)', () => {
     beforeEach(() => {
         vi.mocked(searchAgentSafeActors).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
@@ -48,7 +48,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
     it('returns structured actors and markdown text; no widget payload', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
-        const result = await (defaultSearchActors as HelperTool).call(
+        const result = await (searchActors as HelperTool).call(
             stubInternalToolArgs({
                 keywords: SEARCH_KEYWORDS,
                 limit: 5,
@@ -103,7 +103,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
         ] as ActorStoreList[];
         vi.mocked(searchAgentSafeActors).mockResolvedValue(actors);
 
-        const result = await (defaultSearchActors as HelperTool).call(
+        const result = await (searchActors as HelperTool).call(
             stubInternalToolArgs({
                 keywords: SEARCH_KEYWORDS,
                 limit: 5,
@@ -141,7 +141,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
     it('returns empty structured content and retry instructions when no actors match', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
-        const result = await (defaultSearchActors as HelperTool).call(
+        const result = await (searchActors as HelperTool).call(
             stubInternalToolArgs({
                 keywords: SEARCH_KEYWORDS,
                 limit: 5,
@@ -177,7 +177,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
-        const result = await (defaultSearchActors as HelperTool).call({
+        const result = await (searchActors as HelperTool).call({
             ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
             apifyToken: 'apify_ui_test',
         });

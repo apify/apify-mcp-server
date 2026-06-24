@@ -5,7 +5,7 @@ import { buildFetchActorDetailsResult, fetchActorDetailsMetadata } from './fetch
  * Default mode fetch-actor-details tool.
  * Returns full text response with output schema fetch.
  */
-export const defaultFetchActorDetails: ToolEntry = Object.freeze({
+export const fetchActorDetails: ToolEntry = Object.freeze({
     ...fetchActorDetailsMetadata,
     call: async (toolArgs) => buildFetchActorDetailsResult(toolArgs),
 } as const);

@@ -35,7 +35,7 @@ const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
     ${HelperTools.ACTOR_RUNS_GET} instead — it returns the same data without rendering a widget.
 `;
 
-export const getActorRunWidgetTool: ToolEntry = Object.freeze({
+export const getActorRunWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_GET_WIDGET,
     title: 'Get Actor run (widget)',

@@ -22,28 +22,28 @@
 import { HelperTools } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
-import { addTool } from './actors/add_actor.js';
-import { appsCallActor, defaultCallActor } from './actors/call_actor.js';
-import { defaultFetchActorDetails } from './actors/fetch_actor_details.js';
-import { defaultSearchActors } from './actors/search_actors.js';
-import { fetchApifyDocsTool } from './docs/fetch_apify_docs.js';
-import { searchApifyDocsTool } from './docs/search_apify_docs.js';
+import { addActor } from './actors/add_actor.js';
+import { callActorApps, callActorDefault } from './actors/call_actor.js';
+import { fetchActorDetails } from './actors/fetch_actor_details.js';
+import { searchActors } from './actors/search_actors.js';
+import { fetchApifyDocs } from './docs/fetch_apify_docs.js';
+import { searchApifyDocs } from './docs/search_apify_docs.js';
 import { abortActorRun } from './runs/abort_actor_run.js';
-import { defaultGetActorRun } from './runs/get_actor_run.js';
+import { getActorRun } from './runs/get_actor_run.js';
+import { getActorRunList } from './runs/get_actor_run_list.js';
 import { getActorRunLog } from './runs/get_actor_run_log.js';
-import { getUserRunsList } from './runs/run_collection.js';
-import { getUserDatasetsList } from './storage/dataset_collection.js';
 import { getDataset } from './storage/get_dataset.js';
 import { getDatasetItems } from './storage/get_dataset_items.js';
+import { getDatasetList } from './storage/get_dataset_list.js';
 import { getDatasetSchema } from './storage/get_dataset_schema.js';
 import { getKeyValueStore } from './storage/get_key_value_store.js';
 import { getKeyValueStoreKeys } from './storage/get_key_value_store_keys.js';
+import { getKeyValueStoreList } from './storage/get_key_value_store_list.js';
 import { getKeyValueStoreRecord } from './storage/get_key_value_store_record.js';
-import { getUserKeyValueStoresList } from './storage/key_value_store_collection.js';
-import { appsCallActorWidget } from './widgets/call_actor_widget.js';
-import { fetchActorDetailsWidgetTool } from './widgets/fetch_actor_details_widget.js';
-import { getActorRunWidgetTool } from './widgets/get_actor_run_widget.js';
-import { searchActorsWidgetTool } from './widgets/search_actors_widget.js';
+import { callActorWidget } from './widgets/call_actor_widget.js';
+import { fetchActorDetailsWidget } from './widgets/fetch_actor_details_widget.js';
+import { getActorRunWidget } from './widgets/get_actor_run_widget.js';
+import { searchActorsWidget } from './widgets/search_actors_widget.js';
 
 type ModeMap = Partial<Record<ServerMode, ToolEntry>>;
 
@@ -64,15 +64,15 @@ function isModeMap(entry: CategoryToolEntry): entry is ModeMap {
  * Use {@link getCategoryTools} to resolve entries into concrete ToolEntry arrays for a given mode.
  */
 export const toolCategories = {
-    experimental: [addTool],
+    experimental: [addActor],
     actors: [
-        defaultSearchActors,
-        defaultFetchActorDetails,
+        searchActors,
+        fetchActorDetails,
         // call-actor is identical between modes; apps mode appends a widget addendum to the description.
-        { default: defaultCallActor, apps: appsCallActor },
+        { default: callActorDefault, apps: callActorApps },
     ],
-    docs: [searchApifyDocsTool, fetchApifyDocsTool],
-    runs: [defaultGetActorRun, getUserRunsList, getActorRunLog, abortActorRun],
+    docs: [searchApifyDocs, fetchApifyDocs],
+    runs: [getActorRun, getActorRunList, getActorRunLog, abortActorRun],
     storage: [
         getDataset,
         getDatasetItems,
@@ -80,8 +80,8 @@ export const toolCategories = {
         getKeyValueStore,
         getKeyValueStoreKeys,
         getKeyValueStoreRecord,
-        getUserDatasetsList,
-        getUserKeyValueStoresList,
+        getDatasetList,
+        getKeyValueStoreList,
     ],
     dev: [],
 } satisfies Record<string, CategoryToolEntry[]>;
@@ -146,8 +146,8 @@ export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] =
  * the programmatic data tool. To get both, select the base (or both explicitly).
  */
 export const WIDGET_BY_BASE_TOOL: ReadonlyMap<HelperTools, ToolEntry> = new Map([
-    [HelperTools.STORE_SEARCH, searchActorsWidgetTool],
-    [HelperTools.ACTOR_GET_DETAILS, fetchActorDetailsWidgetTool],
-    [HelperTools.ACTOR_CALL, appsCallActorWidget],
-    [HelperTools.ACTOR_RUNS_GET, getActorRunWidgetTool],
+    [HelperTools.STORE_SEARCH, searchActorsWidget],
+    [HelperTools.ACTOR_GET_DETAILS, fetchActorDetailsWidget],
+    [HelperTools.ACTOR_CALL, callActorWidget],
+    [HelperTools.ACTOR_RUNS_GET, getActorRunWidget],
 ]);

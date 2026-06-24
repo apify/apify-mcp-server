@@ -17,7 +17,7 @@ import {
  * Default mode search-actors tool.
  * Returns text-based Actor cards without widget metadata.
  */
-export const defaultSearchActors: ToolEntry = Object.freeze({
+export const searchActors: ToolEntry = Object.freeze({
     ...searchActorsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, apifyMcpServer } = toolArgs;

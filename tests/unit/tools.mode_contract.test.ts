@@ -12,7 +12,7 @@ import { z } from 'zod';
 
 import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HelperTools } from '../../src/const.js';
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors_common.js';
-import { searchApifyDocsTool } from '../../src/tools/docs/search_apify_docs.js';
+import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
 import { WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';
 import type { Input, ToolBase, ToolEntry } from '../../src/types.js';
@@ -354,7 +354,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
 
 describe('getToolPublicFieldOnly inputSchema normalization', () => {
     it('should not expose Zod-defaulted fields as JSON Schema required (search-apify-docs)', () => {
-        const { inputSchema } = getToolPublicFieldOnly(searchApifyDocsTool, { filterWidgetMeta: false });
+        const { inputSchema } = getToolPublicFieldOnly(searchApifyDocs, { filterWidgetMeta: false });
         const schema = inputSchema as { required?: string[]; properties?: Record<string, { default?: unknown }> };
 
         expect(schema.required).toEqual(['query']);

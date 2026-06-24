@@ -33,7 +33,7 @@ const getUserRunsListArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/act-runs-get
  */
-export const getUserRunsList: ToolEntry = Object.freeze({
+export const getActorRunList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUN_LIST_GET,
     title: 'Get user runs list',

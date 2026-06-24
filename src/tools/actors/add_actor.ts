@@ -13,7 +13,7 @@ export const addToolArgsSchema = z.object({
         .min(1)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
 });
-export const addTool: ToolEntry = Object.freeze({
+export const addActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_ADD,
     title: 'Add tool',

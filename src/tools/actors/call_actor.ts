@@ -40,10 +40,10 @@ function createCallActorTool(description: string): ToolEntry {
 }
 
 /** Default mode call-actor tool. */
-export const defaultCallActor: ToolEntry = createCallActorTool(buildCallActorDescription());
+export const callActorDefault: ToolEntry = createCallActorTool(buildCallActorDescription());
 
 /**
  * Apps mode call-actor tool.
  * Renders no widget; for a live progress UI, use the call-actor-widget sibling.
  */
-export const appsCallActor: ToolEntry = createCallActorTool(buildCallActorAppsDescription());
+export const callActorApps: ToolEntry = createCallActorTool(buildCallActorAppsDescription());
