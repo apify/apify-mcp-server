@@ -261,9 +261,9 @@ Use comments to guide reviewers:
         * `warn` - suspicious but non-critical behavior
         * `info` - progress or important state changes
         * `debug` - local development
-    * **Mezmo (logDNA) promotion rule:** Mezmo automatically promotes log entries to error level when the log message or a data value contains the lowercase word `"error"` (capitalized `Error`/`ERROR`, e.g. the `mcpErrorCode` key or `INTERNAL_ERROR`, is safe). To avoid false error alerts in `softFail` calls:
+    * **Mezmo (logDNA) promotion rule:** Mezmo automatically promotes log entries to error level when the log message or a data value contains the standalone word `"error"` (case-insensitive, e.g. the SDK send-path wrap `Failed to send response: Error: …`). `Error`/`ERROR` embedded in identifiers (`mcpErrorCode` key, `INTERNAL_ERROR`) has no word boundary and is safe. To avoid false error alerts in `softFail` calls:
         * Use `errMessage` as the data key (not `error`) when logging an error message string.
-        * Sanitize the error message string with `sanitizeMezmoMessage()` from `src/utils/logging.ts` (replaces every lowercase `"error"` substring with `"failure"`).
+        * Sanitize the error message string with `sanitizeMezmoMessage()` from `src/utils/logging.ts` (replaces every whole-word `"error"` — any case — with `"failure"`).
         * Avoid the word `"error"` in the `softFail` message string itself.
         * Example: `log.softFail('Client disconnected', { errMessage: sanitizeMezmoMessage(err.message) })`
 

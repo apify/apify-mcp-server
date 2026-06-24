@@ -34,13 +34,14 @@ export function getHttpStatusCode(error: unknown): number | undefined {
 }
 
 /**
- * Mezmo (logDNA) promotes a log entry to error level when its message contains the lowercase
- * substring "error". Replace those occurrences with "failure" so soft logs keep their level.
- * Case-sensitive: capitalized `Error`/`ERROR` does not trigger promotion, so leave it intact.
- * See CONTRIBUTING.md § Logging → Mezmo promotion rule.
+ * Mezmo (logDNA) promotes a log entry to error level when its message contains the standalone
+ * word "error" (case-insensitive), e.g. the SDK send-path wrap `Failed to send response: Error: …`.
+ * Replace whole-word occurrences with "failure" so soft logs keep their level. Word-bounded, so
+ * `Error`/`ERROR` embedded in identifiers (`mcpErrorCode`, `INTERNAL_ERROR`) stays intact — Mezmo
+ * does not promote those. See CONTRIBUTING.md § Logging → Mezmo promotion rule.
  */
 export function sanitizeMezmoMessage(message: string): string {
-    return message.replace(/error/g, 'failure');
+    return message.replace(/\berror\b/gi, 'failure');
 }
 
 // Client faults surfaced by the MCP SDK's `onerror` — expected noise, not server bugs.
