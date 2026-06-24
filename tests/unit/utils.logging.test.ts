@@ -52,6 +52,18 @@ describe('sanitizeMezmoMessage', () => {
             'MCP failure -32001: Request timed out',
         );
     });
+
+    it('replaces the standalone capitalized "Error" word from the SDK send-path wrap', () => {
+        // The SDK wraps disconnects as `Failed to send response: Error: <message>`. The standalone
+        // word "Error" is space/colon-delimited, so Mezmo promotes the entry despite the capital E.
+        expect(
+            sanitizeMezmoMessage('Failed to send response: Error: No connection established for request ID: 1'),
+        ).toBe('Failed to send response: failure: No connection established for request ID: 1');
+    });
+
+    it('keeps "Error" embedded in identifiers intact (no word boundary, Mezmo does not promote)', () => {
+        expect(sanitizeMezmoMessage('mcpErrorCode INTERNAL_ERROR')).toBe('mcpErrorCode INTERNAL_ERROR');
+    });
 });
 
 describe('logHttpError', () => {
