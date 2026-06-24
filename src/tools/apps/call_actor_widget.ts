@@ -7,6 +7,7 @@ import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
+import { invalidateActorDefinitionCacheIfBuildChanged } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
@@ -118,6 +119,7 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
 
             const actorClient = apifyClient.actor(baseActorName);
             const actorRun = await actorClient.start(input, callOptions);
+            invalidateActorDefinitionCacheIfBuildChanged(baseActorName, actorRun, callOptions?.build);
             log.debug('Started Actor run (widget)', {
                 actorName: baseActorName,
                 runId: actorRun.id,

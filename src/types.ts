@@ -81,6 +81,9 @@ export type ActorDefinitionPruned = Pick<
 export type ActorDefinitionWithInfo = {
     definition: ActorDefinitionPruned;
     info: ActorOutdated;
+    /** ID of the default build this definition (and its input schema) was read from. Lets a run
+     *  detect a rebuilt Actor and drop the stale cache entry before the TTL expires. */
+    buildId?: string;
 };
 
 /**

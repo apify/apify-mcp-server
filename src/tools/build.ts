@@ -48,6 +48,7 @@ export async function getActorDefinition(
             return {
                 definition: pruneActorDefinition(actorDefinitions),
                 info: actor,
+                buildId: buildDetails.id,
             };
         }
         return null;

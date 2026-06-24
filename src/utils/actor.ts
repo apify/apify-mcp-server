@@ -45,6 +45,22 @@ export async function getActorDefinitionCached(
 }
 
 /**
+ * Drops the cached Actor definition when its build no longer matches the build a run actually used —
+ * an Actor rebuilt within the cache TTL would otherwise keep serving a stale input schema. The build
+ * a run used is reported by the run API (`ActorRun.buildId`). Skipped when the caller requested an
+ * explicit `build`, since running a non-default build is an expected mismatch, not staleness.
+ */
+export function invalidateActorDefinitionCacheIfBuildChanged(
+    actorIdOrName: string,
+    actorRun: { buildId?: string },
+    requestedBuild?: string,
+): void {
+    if (requestedBuild || !actorRun.buildId) return;
+    const cached = actorDefinitionCache.get(actorIdOrName);
+    if (cached?.buildId && cached.buildId !== actorRun.buildId) actorDefinitionCache.delete(actorIdOrName);
+}
+
+/**
  * Resolve the Actor's MCP server URL, or `false` if it isn't an MCP server. The URL is a pure function of
  * the definition (`getActorMCPServerURL` does no I/O), so this rides the authorization-gated
  * `getActorDefinitionCached` instead of a separate cache that would leak a private Actor's URL across tenants.

@@ -14,6 +14,7 @@ import { stubToolCallContext, type TextToolResult } from './helpers/tool_context
  */
 vi.mock('../../src/utils/actor.js', () => ({
     getActorMcpUrlCached: vi.fn(),
+    invalidateActorDefinitionCacheIfBuildChanged: vi.fn(),
 }));
 
 vi.mock('../../src/tools/core/actor_tools_factory.js', async () => {

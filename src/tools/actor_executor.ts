@@ -1,6 +1,7 @@
 import log from '@apify/log';
 
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../types.js';
+import { invalidateActorDefinitionCacheIfBuildChanged } from '../utils/actor.js';
 import { getConsoleLinkContext } from '../utils/console_link.js';
 import { redactSkyfirePayId } from '../utils/logging.js';
 import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './core/actor_run_response.js';
@@ -38,6 +39,7 @@ export const actorExecutor: ActorExecutor = {
         }
 
         const actorRun = await apifyClient.actor(actorFullName).start(actorInput, params.callOptions);
+        invalidateActorDefinitionCacheIfBuildChanged(actorFullName, actorRun, params.callOptions?.build);
 
         log.debug('Started Actor run (direct actor tool)', {
             actorName: actorFullName,

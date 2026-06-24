@@ -66,4 +66,12 @@ export class TTLLRUCache<T> {
         this.cache.remove(key); // Remove expired entry
         return null;
     }
+
+    /**
+     * Remove an entry by key. No-op if the key is absent.
+     * @param key Cache key
+     */
+    delete(key: string) {
+        this.cache.remove(key);
+    }
 }

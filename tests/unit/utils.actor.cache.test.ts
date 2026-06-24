@@ -8,7 +8,11 @@ vi.mock('../../src/utils/userid_cache.js', () => ({ getUserInfoCached: vi.fn() }
 
 import { actorDefinitionCache } from '../../src/state.js';
 import { getActorDefinition } from '../../src/tools/build.js';
-import { getActorDefinitionCached, getActorMcpUrlCached } from '../../src/utils/actor.js';
+import {
+    getActorDefinitionCached,
+    getActorMcpUrlCached,
+    invalidateActorDefinitionCacheIfBuildChanged,
+} from '../../src/utils/actor.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 
 const getActorDefinitionMock = vi.mocked(getActorDefinition);
@@ -19,7 +23,7 @@ function seedCache(
     name: string,
     isPublic: boolean,
     ownerUserId: string,
-    opts: { id?: string; webServerMcpPath?: string } = {},
+    opts: { id?: string; webServerMcpPath?: string; buildId?: string } = {},
 ): ActorDefinitionWithInfo {
     const id = opts.id ?? name;
     const entry = {
@@ -29,6 +33,7 @@ function seedCache(
             ...(opts.webServerMcpPath && { webServerMcpPath: opts.webServerMcpPath }),
         },
         info: { id, isPublic, userId: ownerUserId },
+        ...(opts.buildId && { buildId: opts.buildId }),
     } as unknown as ActorDefinitionWithInfo;
     actorDefinitionCache.set(name, entry);
     return entry;
@@ -115,5 +120,31 @@ describe('getActorMcpUrlCached — tenant isolation', () => {
         getActorDefinitionMock.mockResolvedValue(null);
 
         await expect(getActorMcpUrlCached('acme/missing', client)).resolves.toBe(false);
+    });
+});
+
+describe('invalidateActorDefinitionCacheIfBuildChanged', () => {
+    it('drops the cached entry when the run used a different build', () => {
+        seedCache('acme/rebuilt', true, 'owner-8', { buildId: 'build-old' });
+
+        invalidateActorDefinitionCacheIfBuildChanged('acme/rebuilt', { buildId: 'build-new' });
+
+        expect(actorDefinitionCache.get('acme/rebuilt')).toBeNull();
+    });
+
+    it('keeps the cached entry when the run used the same build', () => {
+        const cached = seedCache('acme/unchanged', true, 'owner-9', { buildId: 'build-1' });
+
+        invalidateActorDefinitionCacheIfBuildChanged('acme/unchanged', { buildId: 'build-1' });
+
+        expect(actorDefinitionCache.get('acme/unchanged')).toBe(cached);
+    });
+
+    it('keeps the cached entry when an explicit build was requested', () => {
+        const cached = seedCache('acme/explicit-build', true, 'owner-10', { buildId: 'build-default' });
+
+        invalidateActorDefinitionCacheIfBuildChanged('acme/explicit-build', { buildId: 'build-beta' }, 'beta');
+
+        expect(actorDefinitionCache.get('acme/explicit-build')).toBe(cached);
     });
 });

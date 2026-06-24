@@ -18,7 +18,11 @@ import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import type { ActorInfo, ApifyToken, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/actor.js';
+import {
+    getActorDefinitionCached,
+    getActorMcpUrlCached,
+    invalidateActorDefinitionCacheIfBuildChanged,
+} from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
@@ -635,6 +639,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
         if (abortSignal?.aborted) return {};
 
         const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
+        invalidateActorDefinitionCacheIfBuildChanged(baseActorName, actorRun, callOptions?.build);
         log.debug('Started Actor run', {
             actorName: baseActorName,
             runId: actorRun.id,
