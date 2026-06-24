@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **streamable-http:** Correct session lifecycle ([#1006](https://github.com/apify/apify-mcp-server/pull/1006)) ([320faf8](https://github.com/apify/apify-mcp-server/commit/320faf87e4baa90c2d9ce4192f0894233c5f7a33)) by [@jstar0](https://github.com/jstar0), closes [#918](https://github.com/apify/apify-mcp-server/issues/918)
 - Add top-level Tool.title per MCP 2025-11-25 ([#1013](https://github.com/apify/apify-mcp-server/pull/1013)) ([176cd08](https://github.com/apify/apify-mcp-server/commit/176cd082af8c95ea338dc98f55635bb4964bc5e2)) by [@vjsai](https://github.com/vjsai), closes [#729](https://github.com/apify/apify-mcp-server/issues/729)
 - Resolve dataset tool schema&#x2F;description inconsistencies ([#1008](https://github.com/apify/apify-mcp-server/pull/1008)) ([f3ab40a](https://github.com/apify/apify-mcp-server/commit/f3ab40a7254664aad3eb4526b9d4a80b0094f790)) by [@surya16122114](https://github.com/surya16122114)
+- Detect standalone &quot;error&quot; word for Mezmo promotion rule ([#1022](https://github.com/apify/apify-mcp-server/pull/1022)) ([9575bd1](https://github.com/apify/apify-mcp-server/commit/9575bd11cc68ee444a50cc1e95a9813c4223a617)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
