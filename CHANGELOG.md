@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.11.4 - **not yet released**
+## [0.11.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.4) (2026-06-24)
 
 ### 🐛 Bug Fixes
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - Detect standalone &quot;error&quot; word for Mezmo promotion rule ([#1022](https://github.com/apify/apify-mcp-server/pull/1022)) ([9575bd1](https://github.com/apify/apify-mcp-server/commit/9575bd11cc68ee444a50cc1e95a9813c4223a617)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.11.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.3) (2026-06-22)
 
 ### 🚀 Features
