@@ -640,12 +640,22 @@ export class ActorsMcpServer {
             getAvailableWidgets: () => this.availableWidgets,
         });
 
+        // Resolve the token like the CallTool handler and build a client when one is present.
+        // Only resources/read is token-scoped (the API proxy needs auth); without a token reads soft-fail.
+        const resolveApifyClient = (params: ApifyRequestParams): ApifyClient | undefined => {
+            const token = (params._meta?.apifyToken || this.options.token) as string | undefined;
+            return token ? new ApifyClient({ token }) : undefined;
+        };
+
         this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
             return await resourceService.listResources();
         });
 
         this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-            return await resourceService.readResource(request.params.uri);
+            return await resourceService.readResource(
+                request.params.uri,
+                resolveApifyClient(request.params as ApifyRequestParams),
+            );
         });
 
         this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {

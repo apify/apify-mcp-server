@@ -146,7 +146,7 @@ describe('createResourceService()', () => {
     });
 
     describe('listResourceTemplates()', () => {
-        it('returns an empty list', async () => {
+        it('returns no templates (the read proxy is advertised via server instructions)', async () => {
             const service = createResourceService({
                 getMode: () => 'default',
                 getAvailableWidgets: () => new Map(),
@@ -154,7 +154,7 @@ describe('createResourceService()', () => {
 
             const result = await service.listResourceTemplates();
 
-            expect(result).toEqual({ resourceTemplates: [] });
+            expect(result.resourceTemplates).toEqual([]);
         });
     });
 });

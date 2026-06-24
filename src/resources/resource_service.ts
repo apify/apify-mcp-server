@@ -8,8 +8,10 @@ import type {
 
 import log from '@apify/log';
 
+import type { ApifyClient } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { ServerMode } from '../types.js';
+import { isApifyApiUri, readApiResource } from './api_resources.js';
 import type { AvailableWidget } from './widgets.js';
 import { RESOURCE_MIME_TYPE } from './widgets.js';
 
@@ -24,7 +26,7 @@ type ExtendedReadResourceResult = Omit<ReadResourceResult, 'contents'> & {
 
 type ResourceService = {
     listResources: () => Promise<ListResourcesResult>;
-    readResource: (uri: string) => Promise<ExtendedReadResourceResult>;
+    readResource: (uri: string, apifyClient?: ApifyClient) => Promise<ExtendedReadResourceResult>;
     listResourceTemplates: () => Promise<ListResourceTemplatesResult>;
 };
 
@@ -76,7 +78,12 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         return { resources };
     };
 
-    const readResource = async (uri: string): Promise<ExtendedReadResourceResult> => {
+    const readResource = async (uri: string, apifyClient?: ApifyClient): Promise<ExtendedReadResourceResult> => {
+        if (isApifyApiUri(uri)) {
+            // API contents carry no widget `_meta`/`html`; the extended shape only adds optional fields.
+            return (await readApiResource(uri, apifyClient)) as ExtendedReadResourceResult;
+        }
+
         const usageGuide = paymentProvider?.getUsageGuide?.();
         if (usageGuide && uri === 'file://readme.md') {
             return {
@@ -158,6 +165,8 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         };
     };
 
+    // Read is a generic proxy over any Apify API GET URL, advertised in the server instructions;
+    // there are no fixed templates to enumerate.
     const listResourceTemplates = async (): Promise<ListResourceTemplatesResult> => ({
         resourceTemplates: [],
     });
