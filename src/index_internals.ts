@@ -38,6 +38,10 @@ export {
     defaults,
     getDefaultTools,
     addActor,
+    /**
+     * @deprecated Use `addActor` instead. Kept for the apify-mcp-server-internal migration; remove once it no longer imports `addTool`.
+     */
+    addActor as addTool,
     getCategoryTools,
     toolCategoriesEnabledByDefault,
     type ActorStore,
