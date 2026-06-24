@@ -42,7 +42,7 @@ const POLL_HINT_WAIT_SECS = 30;
 const ITEM_COUNT_PROBE_LIMIT = 1;
 
 /**
- * Delays before each `itemCount=0` lag-fallback probe. Apify docs state `itemCount` / `cleanItemCount`
+ * Delays before each `itemCount=0` lag-fallback probe. Apify docs state `itemCount`
  * can lag up to ~5s after `pushItem`. We probe immediately, then again at +1s/+3s/+5s so a
  * SUCCEEDED-but-empty dataset has the full propagation window to surface real items.
  */
@@ -83,7 +83,6 @@ export type RunDataset = {
     name?: string;
     title?: string;
     itemCount?: number;
-    cleanItemCount?: number;
     /**
      * Uncompressed size of the dataset in bytes (Apify `stats.inflatedBytes`). Items are stored as BSON,
      * so this approximates — not exactly equals — the JSON size fetched into context. The single-dataset
@@ -119,7 +118,9 @@ export type RunKeyValueStore = {
  * Storage shape mirrors `ActorRunStorageIds` from the Apify client — a map of alias → storage
  * object where `default` is always the primary entry. Using the same plural alias-map structure
  * means named Actor storages (e.g. `storages.datasets.results`) can be added without introducing
- * new field names. Each value extends the bare Apify ID string with fetched metadata.
+ * new field names. On the completed-run path (`get-actor-run` / `call-actor` with wait) every entry
+ * — `default` and aliases — is enriched with fetched metadata. The immediate start-run path returns
+ * before any fetch, so there every entry carries `{ id }` only.
  */
 export type RunStorages = {
     datasets?: { default: RunDataset; [alias: string]: RunDataset };
@@ -211,50 +212,107 @@ export function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     }) as RunResponse['stats'] | undefined;
 }
 
-function buildRunDataset(
-    run: ActorRun,
-    datasetMeta: Dataset | null,
-    resolvedItemCount?: number,
-): RunDataset | undefined {
-    if (!run.defaultDatasetId) return undefined;
+function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCount?: number): RunDataset {
     if (!datasetMeta) {
-        return { id: run.defaultDatasetId };
+        return { id };
     }
+    const inflatedBytes = (datasetMeta.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
     return cleanEmptyProperties({
-        id: datasetMeta.id,
+        id,
         name: datasetMeta.name,
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
-        cleanItemCount: datasetMeta.cleanItemCount,
-        // Undeclared on the apify-client `DatasetStats` type (and absent from the GET response today),
-        // so read it defensively; `cleanEmptyProperties` drops it when absent.
-        inflatedBytes: (datasetMeta.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes,
+        // Undeclared on the apify-client `DatasetStats` type and read defensively. The platform
+        // reports `0` when it doesn't populate the size yet; treat that as absent (a literal
+        // "0 bytes" is misleading for a non-empty dataset). `cleanEmptyProperties` drops undefined.
+        inflatedBytes: inflatedBytes && inflatedBytes > 0 ? inflatedBytes : undefined,
         fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
     }) as RunDataset;
 }
 
-function buildRunKeyValueStore(
-    run: ActorRun,
-    listKeysResult: KeyValueClientListKeysResult | null,
-): RunKeyValueStore | undefined {
-    if (!run.defaultKeyValueStoreId) return undefined;
+function buildRunKeyValueStore(id: string, listKeysResult: KeyValueClientListKeysResult | null): RunKeyValueStore {
     if (!listKeysResult) {
-        return { id: run.defaultKeyValueStoreId };
+        return { id };
     }
     const keys = listKeysResult.items.map((k) => k.key);
     // Empty KV: surface only the id (matches non-terminal shape) instead of `keys: [], keyCount: 0`.
     if (keys.length === 0 && !listKeysResult.isTruncated) {
-        return { id: run.defaultKeyValueStoreId };
+        return { id };
     }
     // The Apify listKeys endpoint does not report a true total. When the page is not truncated,
     // we know the page count equals the total; when truncated, omit keyCount and let the agent
     // detect "more keys exist" from `keys.length === KV_KEYS_LIMIT`.
     const keyCount = listKeysResult.isTruncated ? undefined : keys.length;
-    return cleanEmptyProperties({ id: run.defaultKeyValueStoreId, keys, keyCount }) as RunKeyValueStore;
+    return cleanEmptyProperties({ id, keys, keyCount }) as RunKeyValueStore;
+}
+
+/**
+ * alias → id map for one storage type, with `default` (the run's `defaultXId`) guaranteed present
+ * if known. Mirrors `ActorRunStorageIds`, whose `default` key is always populated for a real run.
+ * The `if (defaultId && !ids.default)` guard is defensive: the platform guarantees
+ * `storageIds.<type>.default` equals `run.defaultXId`, so the fallback only matters when `storageIds`
+ * is absent entirely.
+ */
+function buildStorageAliasIds(
+    aliasMap: Record<string, string> | undefined,
+    defaultId?: string,
+): Record<string, string> {
+    const ids: Record<string, string> = { ...(aliasMap ?? {}) };
+    if (defaultId && !ids.default) ids.default = defaultId;
+    return ids;
+}
+
+/**
+ * Wrap an alias → entry map with the `default`-presence guard: returns undefined when the map lacks
+ * `default`, so the caller omits the storage type entirely (RunStorages requires `default` whenever a
+ * storage type is present). The completed-run path passes its assembled enriched entries; the
+ * start-run path passes id-only entries built from `buildStorageAliasIds`.
+ */
+function buildStorageEntries<T>(entries: Record<string, T>): { default: T; [alias: string]: T } | undefined {
+    if (!('default' in entries)) return undefined;
+    return entries as { default: T; [alias: string]: T };
+}
+
+async function buildStorageEntriesFromIds<T>(
+    ids: Record<string, string>,
+    buildEntry: (id: string) => Promise<T>,
+): Promise<{ default: T; [alias: string]: T } | undefined> {
+    const pairs = await Promise.all(
+        Object.entries(ids).map(async ([alias, id]) => [alias, await buildEntry(id)] as const),
+    );
+    return buildStorageEntries(Object.fromEntries(pairs));
 }
 
 function errMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/** Fetch dataset metadata; a transient failure logs and yields null so the entry keeps its id only. */
+async function fetchDatasetMeta(client: ApifyClient, id: string, mcpSessionId?: string): Promise<Dataset | null> {
+    try {
+        return (await client.dataset(id).get()) ?? null;
+    } catch (error) {
+        log.warning('Failed to fetch dataset metadata', { datasetId: id, mcpSessionId, errMessage: errMessage(error) });
+        return null;
+    }
+}
+
+/** List KV store keys; a transient failure logs and yields null so the entry keeps its id only. */
+async function fetchKvKeys(
+    client: ApifyClient,
+    id: string,
+    mcpSessionId?: string,
+): Promise<KeyValueClientListKeysResult | null> {
+    try {
+        return await client.keyValueStore(id).listKeys({ limit: KV_KEYS_LIMIT });
+    } catch (error) {
+        log.warning('Failed to list KV store keys', {
+            keyValueStoreId: id,
+            mcpSessionId,
+            errMessage: errMessage(error),
+        });
+        return null;
+    }
 }
 
 /**
@@ -281,27 +339,23 @@ export function applyConsoleLinks(response: RunResponse, linkContext: ConsoleLin
 
 /**
  * Apify's pagination counter is eventually consistent (~5s post-terminal). Probe with `listItems({ limit: 1 })`
- * when `itemCount === 0` on a SUCCEEDED run — if the probe returns items, surface the larger count.
- * Returns the resolved item count, or `undefined` if the dataset id is unknown / we shouldn't override.
+ * after a SUCCEEDED run reports `itemCount === 0`. Callers decide when the probe is needed.
  */
-async function resolveItemCountWithLagFallback(
+async function fetchDatasetItemCountWithLagFallback(
     client: ApifyClient,
-    run: ActorRun,
-    datasetMeta: Dataset | null,
+    datasetId: string,
     waitSecs: number | undefined,
-    mcpSessionId?: string,
     abortSignal?: AbortSignal,
-): Promise<number | undefined> {
-    if (run.status !== 'SUCCEEDED' || !datasetMeta || !run.defaultDatasetId) return datasetMeta?.itemCount;
-    if (datasetMeta.itemCount > 0) return datasetMeta.itemCount;
+): Promise<number> {
+    const delays = waitSecs !== 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
+    let itemCount = 0;
+
     try {
         // `total` is the dataset's true count from the SDK; `items.length` is capped by `limit` and
         // would undercount whenever lag has hidden more than `ITEM_COUNT_PROBE_LIMIT` items.
         // When `waitSecs === 0` the caller asked for an immediate response (e.g. the widget's initial
         // render), so we do a single immediate probe and skip the delayed retries — otherwise the
         // ~5s lag-recovery schedule would block "immediate" callers for the full window.
-        const delays = waitSecs !== 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
-        let lastTotal = 0;
         for (const delay of delays) {
             if (delay > 0) {
                 const sleepResult = await raceAbort(
@@ -310,25 +364,24 @@ async function resolveItemCountWithLagFallback(
                     }),
                     abortSignal,
                 );
-                if (sleepResult === ABORT) return lastTotal;
+                if (sleepResult === ABORT) break;
             }
             const result = await raceAbort(
-                client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT }),
+                client.dataset(datasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT }),
                 abortSignal,
             );
-            if (result === ABORT) return lastTotal;
-            lastTotal = result.total ?? 0;
-            if (lastTotal > 0) return lastTotal;
+            if (result === ABORT) break;
+            itemCount = result.total ?? 0;
+            if (itemCount > 0) break;
         }
-        return lastTotal;
     } catch (error) {
         log.warning('itemCount lag-fallback probe failed', {
-            datasetId: run.defaultDatasetId,
-            mcpSessionId,
+            datasetId,
             errMessage: errMessage(error),
         });
-        return datasetMeta.itemCount;
     }
+
+    return itemCount;
 }
 
 async function actorNameForActorId(
@@ -420,15 +473,6 @@ export function datasetSizeNextStepHint(inflatedBytes: number | undefined): stri
     const size = ` Full output is ~${inflatedBytes} bytes.`;
     if (inflatedBytes <= DATASET_SIZE_HINT_BYTES) return size;
     return `${size} Fetching all may exceed context; ${NARROW_OUTPUT_HINT}.`;
-}
-
-/**
- * Returns `toolName` when it is in the loaded set, else `undefined`. Lets nextStep builders
- * name a tool only when the active configuration actually exposes it (pinned configs can omit
- * the suggested tool while loading the suggesting one — see issue #1007).
- */
-export function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
-    return loadedToolNames.includes(toolName) ? toolName : undefined;
 }
 
 function buildSucceededSummaryNextStep(
@@ -681,13 +725,23 @@ export function buildStartRunResponse(params: {
 }): ReturnType<typeof buildMCPResponse> {
     const { actorName, actorRun, widget, linkContext } = params;
 
-    const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
-    const keyValueStore = actorRun.defaultKeyValueStoreId ? { id: actorRun.defaultKeyValueStoreId } : undefined;
+    // Start path returns before any metadata fetch, so every entry — default and aliases — is id-only.
+    const datasetIds = buildStorageAliasIds(actorRun.storageIds?.datasets, actorRun.defaultDatasetId ?? undefined);
+    const kvIds = buildStorageAliasIds(
+        actorRun.storageIds?.keyValueStores,
+        actorRun.defaultKeyValueStoreId ?? undefined,
+    );
+    const datasets = buildStorageEntries(
+        Object.fromEntries(Object.entries(datasetIds).map(([alias, id]) => [alias, { id }])),
+    );
+    const keyValueStores = buildStorageEntries(
+        Object.fromEntries(Object.entries(kvIds).map(([alias, id]) => [alias, { id }])),
+    );
 
     const { summary, nextStep: computedNextStep } = buildStatusSummaryNextStep({
         run: actorRun,
-        dataset,
-        keyValueStore,
+        dataset: datasets?.default,
+        keyValueStore: keyValueStores?.default,
     });
 
     const nextStep = widget ? WIDGET_NO_POLL_NEXT_STEP : computedNextStep;
@@ -699,8 +753,8 @@ export function buildStartRunResponse(params: {
         status: actorRun.status,
         startedAt: toIsoString(actorRun.startedAt),
         storages: {
-            ...(dataset && { datasets: { default: dataset } }),
-            ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),
+            ...(datasets && { datasets }),
+            ...(keyValueStores && { keyValueStores }),
         },
         summary,
         nextStep,
@@ -775,60 +829,39 @@ export async function fetchActorRunData(params: {
 
     log.debug('Get Actor run', { runId, status: run.status, mcpSessionId, waitSecs });
 
-    let datasetInfo: Dataset | null = null;
-    let kvListResult: KeyValueClientListKeysResult | null = null;
-
+    // Enrich every storage — default and aliases from `run.storageIds` — with fetched metadata.
     // Dataset metadata is fetched on every poll (not just terminal) so the summary can surface
     // partial progress on long-running scrapes (e.g. "127 results so far"), giving polling agents
-    // real movement instead of the same "In progress." each cycle. The extra round-trip is the
-    // accepted UX tradeoff. KV listKeys stays terminal-only — non-terminal summaries don't
-    // reference KV records, so fetching them on every poll would be pure waste on the hot path.
-    // Per-promise catches: a single transient metadata fetch failure must not hard-fail the
-    // whole call. The response still carries the storage id, which is enough for the agent
-    // to fetch items / records directly.
+    // real movement instead of the same "In progress." each cycle. KV listKeys stays terminal-only —
+    // non-terminal summaries don't reference KV records. All fetches run in parallel, so latency is
+    // one round-trip regardless of alias count. Per-fetch catches: a single transient failure must
+    // not hard-fail the call — that entry still carries its id, enough to fetch items / records.
     const isTerminal = TERMINAL_RUN_STATUSES.has(run.status);
-    const [datasetFetched, kvFetched] = await Promise.all([
-        run.defaultDatasetId
-            ? client
-                  .dataset(run.defaultDatasetId)
-                  .get()
-                  .catch((error) => {
-                      log.warning('Failed to fetch dataset metadata', {
-                          datasetId: run.defaultDatasetId,
-                          mcpSessionId,
-                          errMessage: errMessage(error),
-                      });
-                      return null;
-                  })
-            : Promise.resolve(null),
-        run.defaultKeyValueStoreId && isTerminal
-            ? client
-                  .keyValueStore(run.defaultKeyValueStoreId)
-                  .listKeys({ limit: KV_KEYS_LIMIT })
-                  .catch((error) => {
-                      log.warning('Failed to list KV store keys', {
-                          keyValueStoreId: run.defaultKeyValueStoreId,
-                          mcpSessionId,
-                          errMessage: errMessage(error),
-                      });
-                      return null;
-                  })
-            : Promise.resolve(null),
-    ]);
-    datasetInfo = datasetFetched ?? null;
-    kvListResult = kvFetched ?? null;
+    const isSucceeded = run.status === 'SUCCEEDED';
+    const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
+    const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
-    const resolvedItemCount = await resolveItemCountWithLagFallback(
-        client,
+    const [datasets, keyValueStores] = await Promise.all([
+        buildStorageEntriesFromIds(datasetIds, async (id) => {
+            const meta = await fetchDatasetMeta(client, id, mcpSessionId);
+            let itemCount = meta?.itemCount;
+            if (isSucceeded && itemCount === 0) {
+                itemCount = await fetchDatasetItemCountWithLagFallback(client, id, waitSecs, abortSignal);
+            }
+            return buildRunDataset(id, meta, itemCount);
+        }),
+        buildStorageEntriesFromIds(kvIds, async (id) => {
+            const keys = isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null;
+            return buildRunKeyValueStore(id, keys);
+        }),
+    ]);
+
+    // Narrative summarizes the default storages only; aliases are surfaced in structured output.
+    const { summary, nextStep } = buildStatusSummaryNextStep({
         run,
-        datasetInfo,
-        waitSecs,
-        mcpSessionId,
-        abortSignal,
-    );
-    const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
-    const keyValueStore = buildRunKeyValueStore(run, kvListResult);
-    const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });
+        dataset: datasets?.default,
+        keyValueStore: keyValueStores?.default,
+    });
 
     const structuredContent: RunResponse = {
         runId: run.id,
@@ -841,8 +874,8 @@ export async function fetchActorRunData(params: {
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
         storages: {
-            ...(dataset && { datasets: { default: dataset } }),
-            ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),
+            ...(datasets && { datasets }),
+            ...(keyValueStores && { keyValueStores }),
         },
         summary,
         nextStep,

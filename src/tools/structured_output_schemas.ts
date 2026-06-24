@@ -325,6 +325,55 @@ export const fetchApifyDocsToolOutputSchema = {
     required: ['url', 'content'],
 };
 
+// Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
+// object identity: if `default` and `additionalProperties` referenced the same object, cloning
+// `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
+// `default` via `buildEnrichedDirectActorOutputSchema` would silently leak it into aliases too.
+const buildDatasetEntrySchema = () => ({
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Dataset ID' },
+        apifyConsoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the dataset; present only for Console sessions',
+        },
+        name: { type: 'string' },
+        title: { type: 'string' },
+        itemCount: { type: 'number' },
+        inflatedBytes: {
+            type: 'number',
+            description:
+                'Approximate uncompressed byte size of the dataset. Use with itemCount to pick limit/fields before fetching.',
+        },
+        fields: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
+        },
+    },
+    required: ['id'],
+});
+
+const buildKeyValueStoreEntrySchema = () => ({
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Key-value store ID' },
+        apifyConsoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the store; present only for Console sessions',
+        },
+        name: { type: 'string' },
+        title: { type: 'string' },
+        keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
+        keys: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Up to 50 key names',
+        },
+    },
+    required: ['id'],
+});
+
 /** Schema for get-actor-run tool output. */
 export const actorRunOutputSchema = {
     type: 'object' as const,
@@ -368,73 +417,18 @@ export const actorRunOutputSchema = {
                     type: 'object' as const,
                     description: 'Map of dataset alias → metadata. Key "default" is always the run\'s primary dataset.',
                     properties: {
-                        default: {
-                            type: 'object' as const,
-                            properties: {
-                                id: { type: 'string', description: 'Dataset ID' },
-                                apifyConsoleUrl: {
-                                    type: 'string',
-                                    description:
-                                        'Personalized Apify Console link to the dataset; present only for Console sessions',
-                                },
-                                name: { type: 'string' },
-                                title: { type: 'string' },
-                                itemCount: { type: 'number' },
-                                cleanItemCount: { type: 'number' },
-                                inflatedBytes: {
-                                    type: 'number',
-                                    description:
-                                        'Approximate uncompressed byte size of the dataset. Use with itemCount to pick limit/fields before fetching.',
-                                },
-                                fields: {
-                                    type: 'array' as const,
-                                    items: { type: 'string' },
-                                    description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
-                                },
-                            },
-                            required: ['id'],
-                        },
+                        default: buildDatasetEntrySchema(),
                     },
-                    additionalProperties: {
-                        type: 'object' as const,
-                        properties: { id: { type: 'string' } },
-                        required: ['id'],
-                    },
+                    additionalProperties: buildDatasetEntrySchema(),
                 },
                 keyValueStores: {
                     type: 'object' as const,
                     description:
                         'Map of key-value store alias → metadata. Key "default" is always the run\'s primary store.',
                     properties: {
-                        default: {
-                            type: 'object' as const,
-                            properties: {
-                                id: { type: 'string', description: 'Key-value store ID' },
-                                apifyConsoleUrl: {
-                                    type: 'string',
-                                    description:
-                                        'Personalized Apify Console link to the store; present only for Console sessions',
-                                },
-                                name: { type: 'string' },
-                                title: { type: 'string' },
-                                keyCount: {
-                                    type: 'number',
-                                    description: 'Total number of keys (omitted when truncated)',
-                                },
-                                keys: {
-                                    type: 'array' as const,
-                                    items: { type: 'string' },
-                                    description: 'Up to 50 key names',
-                                },
-                            },
-                            required: ['id'],
-                        },
+                        default: buildKeyValueStoreEntrySchema(),
                     },
-                    additionalProperties: {
-                        type: 'object' as const,
-                        properties: { id: { type: 'string' } },
-                        required: ['id'],
-                    },
+                    additionalProperties: buildKeyValueStoreEntrySchema(),
                 },
             },
         },

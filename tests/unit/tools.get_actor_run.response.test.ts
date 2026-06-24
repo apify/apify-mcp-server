@@ -55,7 +55,6 @@ function mockDataset(overrides: Record<string, unknown> = {}) {
         createdAt: new Date('2026-05-01T10:00:00.000Z'),
         modifiedAt: new Date('2026-05-01T10:00:22.000Z'),
         itemCount: 47,
-        cleanItemCount: 47,
         // Apify returns slash-notation; server must translate to dot-notation in the response.
         fields: ['crawl/httpStatusCode', 'metadata/url', 'markdown'],
         stats: { writeCount: 47, storageBytes: 152340 },
@@ -143,6 +142,21 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.datasets?.default.inflatedBytes).toBe(1234);
     });
 
+    it('omits inflatedBytes when the platform reports 0 (size unavailable, not a real 0)', async () => {
+        // The platform returns inflatedBytes: 0 when it does not yet populate the size; surfacing a
+        // literal "0 bytes" is misleading for a non-empty dataset, so the field must be omitted.
+        const run = mockSucceededRun();
+        const result = await (defaultGetActorRun as HelperTool).call(
+            stubToolCallContext(
+                { runId: 'run-1', waitSecs: 0 },
+                stubClient({ run, dataset: mockDataset({ stats: { writeCount: 47, inflatedBytes: 0 } }) }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.storages.datasets?.default.inflatedBytes).toBeUndefined();
+    });
+
     it('fetches dataset metadata for a non-terminal RUNNING run and surfaces progress in the summary', async () => {
         // Dataset metadata is fetched on every poll so the summary can surface partial progress.
         // KV listKeys stays terminal-only — non-terminal summaries don't reference KV records, so
@@ -198,6 +212,35 @@ describe('get-actor-run default response', () => {
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
         expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
+    });
+
+    it('recovers a lagging itemCount=0 for an aliased dataset via the probe, not just the default', async () => {
+        // Reproduces the aliased-storage bug: Apify's counter lags ~5s post-SUCCEEDED, so a freshly
+        // written aliased dataset reports itemCount 0 in metadata. The probe must recover it for
+        // aliases too, exactly as it does for the default.
+        const run = mockSucceededRun({
+            storageIds: { datasets: { default: 'dataset-xyz', results: 'dataset-results' } },
+        });
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (id: string) => ({
+                // Both datasets report a stale itemCount 0 in metadata...
+                get: async () => mockDataset({ id, itemCount: 0 }),
+                // ...but listItems.total reflects the true count (distinct per dataset).
+                listItems: async () => ({ items: [{ a: 1 }], total: id === 'dataset-results' ? 3 : 1 }),
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (defaultGetActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(1);
+        expect(structuredContent.storages.datasets?.results.itemCount).toBe(3);
     });
 
     it('retries the itemCount=0 probe once when the first probe also returns 0 (waitSecs > 0)', async () => {
@@ -418,6 +461,56 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.keyValueStores?.default.keyCount).toBeUndefined();
     });
 
+    it('enriches aliased storages from run.storageIds with their own metadata, not just the default', async () => {
+        const run = mockSucceededRun({
+            storageIds: {
+                datasets: { default: 'dataset-xyz', results: 'dataset-results' },
+                keyValueStores: { default: 'kv-xyz', screenshots: 'kv-screenshots' },
+            },
+        });
+        // Per-id metadata so default and alias entries are distinguishable.
+        const datasetsById: Record<string, ReturnType<typeof mockDataset>> = {
+            'dataset-xyz': mockDataset({ id: 'dataset-xyz', itemCount: 47 }),
+            'dataset-results': mockDataset({ id: 'dataset-results', itemCount: 5, fields: ['error'] }),
+        };
+        const kvKeysById: Record<string, { key: string }[]> = {
+            'kv-xyz': [{ key: 'OUTPUT' }],
+            'kv-screenshots': [{ key: 'shot-1' }, { key: 'shot-2' }],
+        };
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (id: string) => ({
+                get: async () => datasetsById[id] ?? null,
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            keyValueStore: (id: string) => ({
+                listKeys: async () => ({ items: kvKeysById[id] ?? [], isTruncated: false }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (defaultGetActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        // default stays enriched.
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
+        expect(structuredContent.storages.keyValueStores?.default.keys).toEqual(['OUTPUT']);
+        // Aliased dataset carries its own id, itemCount, and normalized fields — not the default's.
+        expect(structuredContent.storages.datasets?.results).toMatchObject({
+            id: 'dataset-results',
+            itemCount: 5,
+            fields: ['error'],
+        });
+        // Aliased KV store carries its own keys.
+        expect(structuredContent.storages.keyValueStores?.screenshots).toMatchObject({
+            id: 'kv-screenshots',
+            keys: ['shot-1', 'shot-2'],
+            keyCount: 2,
+        });
+    });
+
     it('emits progress with formatted status messages on wait + terminal flip', async () => {
         // RUNNING with a non-terminal statusMessage at start; SUCCEEDED with a terminal statusMessage
         // at end. formatRunStatusMessage suppresses non-terminal-marked statusMessages on terminal
@@ -589,6 +682,28 @@ describe('buildStartRunResponse()', () => {
 
         // Non-widget path: no widget _meta.
         expect(_meta).toBeUndefined();
+    });
+
+    it('emits id-only entries for aliased storages from run.storageIds', () => {
+        const runWithAliases = {
+            ...actorRun,
+            storageIds: {
+                datasets: { default: 'dataset-abc', errors: 'dataset-errors' },
+                keyValueStores: { default: 'kv-abc', debug: 'kv-debug' },
+            },
+        } as unknown as ActorRun;
+
+        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun: runWithAliases });
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.storages.datasets).toEqual({
+            default: { id: 'dataset-abc' },
+            errors: { id: 'dataset-errors' },
+        });
+        expect(structuredContent.storages.keyValueStores).toEqual({
+            default: { id: 'kv-abc' },
+            debug: { id: 'kv-debug' },
+        });
     });
 
     // Org-prefixed URL variants are covered by the builder tests in console_link.test.ts.
