@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.11.5 - **not yet released**
+
+### 🚀 Features
+
+- Surface multiple datasets, kv-stores ([#987](https://github.com/apify/apify-mcp-server/pull/987)) ([6b48228](https://github.com/apify/apify-mcp-server/commit/6b482281ff0aed04a90da8ecf9dc240a50e70f0d)) by [@jirispilka](https://github.com/jirispilka), closes [#912](https://github.com/apify/apify-mcp-server/issues/912)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.11.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.4) (2026-06-24)
 
 ### 🐛 Bug Fixes
