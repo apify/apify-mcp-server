@@ -273,6 +273,16 @@ function buildStorageEntries<T>(entries: Record<string, T>): { default: T; [alia
     return entries as { default: T; [alias: string]: T };
 }
 
+async function buildStorageEntriesFromIds<T>(
+    ids: Record<string, string>,
+    buildEntry: (id: string) => Promise<T>,
+): Promise<{ default: T; [alias: string]: T } | undefined> {
+    const pairs = await Promise.all(
+        Object.entries(ids).map(async ([alias, id]) => [alias, await buildEntry(id)] as const),
+    );
+    return buildStorageEntries(Object.fromEntries(pairs));
+}
+
 function errMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
@@ -329,29 +339,23 @@ export function applyConsoleLinks(response: RunResponse, linkContext: ConsoleLin
 
 /**
  * Apify's pagination counter is eventually consistent (~5s post-terminal). Probe with `listItems({ limit: 1 })`
- * when `itemCount === 0` on a SUCCEEDED run — if the probe returns items, surface the larger count.
- * Applies to any dataset of the run (default or aliased), so freshly-written aliased storages don't
- * report a stale 0. Returns the resolved item count, or `undefined` if we shouldn't override.
+ * after a SUCCEEDED run reports `itemCount === 0`. Callers decide when the probe is needed.
  */
-async function resolveItemCountWithLagFallback(
+async function fetchDatasetItemCountWithLagFallback(
     client: ApifyClient,
     datasetId: string,
-    datasetMeta: Dataset | null,
-    isSucceeded: boolean,
     waitSecs: number | undefined,
-    mcpSessionId?: string,
     abortSignal?: AbortSignal,
-): Promise<number | undefined> {
-    if (!isSucceeded || !datasetMeta) return datasetMeta?.itemCount;
-    if (datasetMeta.itemCount > 0) return datasetMeta.itemCount;
+): Promise<number> {
+    const delays = waitSecs !== 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
+    let itemCount = 0;
+
     try {
         // `total` is the dataset's true count from the SDK; `items.length` is capped by `limit` and
         // would undercount whenever lag has hidden more than `ITEM_COUNT_PROBE_LIMIT` items.
         // When `waitSecs === 0` the caller asked for an immediate response (e.g. the widget's initial
         // render), so we do a single immediate probe and skip the delayed retries — otherwise the
         // ~5s lag-recovery schedule would block "immediate" callers for the full window.
-        const delays = waitSecs !== 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
-        let lastTotal = 0;
         for (const delay of delays) {
             if (delay > 0) {
                 const sleepResult = await raceAbort(
@@ -360,25 +364,24 @@ async function resolveItemCountWithLagFallback(
                     }),
                     abortSignal,
                 );
-                if (sleepResult === ABORT) return lastTotal;
+                if (sleepResult === ABORT) break;
             }
             const result = await raceAbort(
                 client.dataset(datasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT }),
                 abortSignal,
             );
-            if (result === ABORT) return lastTotal;
-            lastTotal = result.total ?? 0;
-            if (lastTotal > 0) return lastTotal;
+            if (result === ABORT) break;
+            itemCount = result.total ?? 0;
+            if (itemCount > 0) break;
         }
-        return lastTotal;
     } catch (error) {
         log.warning('itemCount lag-fallback probe failed', {
             datasetId,
-            mcpSessionId,
             errMessage: errMessage(error),
         });
-        return datasetMeta.itemCount;
     }
+
+    return itemCount;
 }
 
 async function actorNameForActorId(
@@ -838,36 +841,20 @@ export async function fetchActorRunData(params: {
     const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
-    // One per-alias dataset pipeline: fetch metadata → recover a lagging itemCount=0 (Apify's counter
-    // is eventually consistent post-SUCCEEDED, so a freshly-written storage otherwise reports a stale
-    // 0; the probe only fires when the dataset reports 0, so datasets with a count cost nothing extra)
-    // → build the entry. KV listKeys runs in parallel with the whole dataset wave.
-    const [datasetPairs, kvPairs] = await Promise.all([
-        Promise.all(
-            Object.entries(datasetIds).map(async ([alias, id]) => {
-                const meta = await fetchDatasetMeta(client, id, mcpSessionId);
-                const resolvedItemCount = await resolveItemCountWithLagFallback(
-                    client,
-                    id,
-                    meta,
-                    isSucceeded,
-                    waitSecs,
-                    mcpSessionId,
-                    abortSignal,
-                );
-                return [alias, buildRunDataset(id, meta, resolvedItemCount)] as const;
-            }),
-        ),
-        Promise.all(
-            Object.entries(kvIds).map(async ([alias, id]) => {
-                const keys = isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null;
-                return [alias, buildRunKeyValueStore(id, keys)] as const;
-            }),
-        ),
+    const [datasets, keyValueStores] = await Promise.all([
+        buildStorageEntriesFromIds(datasetIds, async (id) => {
+            const meta = await fetchDatasetMeta(client, id, mcpSessionId);
+            let itemCount = meta?.itemCount;
+            if (isSucceeded && itemCount === 0) {
+                itemCount = await fetchDatasetItemCountWithLagFallback(client, id, waitSecs, abortSignal);
+            }
+            return buildRunDataset(id, meta, itemCount);
+        }),
+        buildStorageEntriesFromIds(kvIds, async (id) => {
+            const keys = isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null;
+            return buildRunKeyValueStore(id, keys);
+        }),
     ]);
-
-    const datasets = buildStorageEntries(Object.fromEntries(datasetPairs));
-    const keyValueStores = buildStorageEntries(Object.fromEntries(kvPairs));
 
     // Narrative summarizes the default storages only; aliases are surfaced in structured output.
     const { summary, nextStep } = buildStatusSummaryNextStep({
