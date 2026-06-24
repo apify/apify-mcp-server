@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { getUserKeyValueStoresList } from '../../src/tools/common/key_value_store_collection.js';
+import { getUserKeyValueStoresList } from '../../src/tools/storage/key_value_store_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 

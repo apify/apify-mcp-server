@@ -1,13 +1,13 @@
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
-import { fetchActorRunData } from '../core/actor_run_response.js';
+import { fetchActorRunData } from '../actors/actor_run_response.js';
 import {
     buildGetActorRunError,
     buildGetActorRunSuccessResponse,
     getActorRunArgs,
     getActorRunMetadata,
-} from '../core/get_actor_run_common.js';
+} from './get_actor_run_common.js';
 
 /**
  * Default mode `get-actor-run` — returns without any widget metadata.

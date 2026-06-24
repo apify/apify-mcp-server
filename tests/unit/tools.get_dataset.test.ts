@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { getDataset } from '../../src/tools/common/get_dataset.js';
+import { getDataset } from '../../src/tools/storage/get_dataset.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';

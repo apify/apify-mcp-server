@@ -4,7 +4,7 @@
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
-storage
+/storage
 apify_storage
 crawlee_storage
 node_modules

@@ -9,8 +9,8 @@ import { buildActorDetailsForWidget, buildCardOptions, fetchActorDetails } from 
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
-import { actorDetailsOutputDefaults, buildActorNotFoundResponse } from '../core/fetch_actor_details_common.js';
+import { fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
+import { actorDetailsOutputDefaults, buildActorNotFoundResponse } from '../actors/fetch_actor_details_common.js';
 import { actorDetailsWidgetOutputSchema } from '../structured_output_schemas.js';
 
 const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);

@@ -6,7 +6,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../src/const.js';
-import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
+import { getKeyValueStoreRecord } from '../../src/tools/storage/get_key_value_store_record.js';
 import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';

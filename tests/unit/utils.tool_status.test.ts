@@ -3,7 +3,7 @@ import type { ActorRun } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
-import { buildStartRunResponse } from '../../src/tools/core/actor_run_response.js';
+import { buildStartRunResponse } from '../../src/tools/actors/actor_run_response.js';
 import {
     classifyFailureCategory,
     deriveResourceIds,

@@ -7,13 +7,13 @@ import type { ConsoleLinkContext, HelperTool, ToolInputSchema } from '../../type
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
-import { actorRunOutputSchema } from '../structured_output_schemas.js';
 import {
     applyConsoleLinks,
     type FetchActorRunResult,
     WAIT_SECS_MAX,
     WIDGET_NO_POLL_NEXT_STEP,
-} from './actor_run_response.js';
+} from '../actors/actor_run_response.js';
+import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /** Default `waitSecs` for `get-actor-run`. Intentionally non-zero so polling callers wait briefly by default. */
 export const WAIT_SECS_DEFAULT = 30;

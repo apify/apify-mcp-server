@@ -8,8 +8,8 @@ import {
     type RunDataset,
     type RunKeyValueStore,
     type RunResponse,
-} from '../../src/tools/core/actor_run_response.js';
-import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
+} from '../../src/tools/actors/actor_run_response.js';
+import { defaultGetActorRun } from '../../src/tools/runs/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';

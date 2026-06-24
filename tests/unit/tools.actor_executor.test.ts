@@ -1,7 +1,7 @@
 import type { ActorRun } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
-import { actorExecutor } from '../../src/tools/actor_executor.js';
+import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { ActorExecutionParams } from '../../src/types.js';
 
 /**

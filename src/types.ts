@@ -17,7 +17,7 @@ import type { ApifyClient } from './apify_client.js';
 import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { PaymentProvider } from './payments/types.js';
-import type { CATEGORY_NAMES } from './tools/categories.js';
+import type { CATEGORY_NAMES } from './tools/registry.js';
 import type { PricingTier, StructuredPricingInfo } from './utils/pricing_info.js';
 import type { ProgressTracker } from './utils/progress.js';
 

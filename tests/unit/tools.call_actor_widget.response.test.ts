@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { appsCallActorWidget } from '../../src/tools/apps/call_actor_widget.js';
+import { appsCallActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
 import type { HelperTool, InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { getActorMcpUrlCached } from '../../src/utils/actor.js';
@@ -16,15 +16,15 @@ vi.mock('../../src/utils/actor.js', () => ({
     getActorMcpUrlCached: vi.fn(),
 }));
 
-vi.mock('../../src/tools/core/actor_tools_factory.js', async () => {
-    const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/core/actor_tools_factory.js');
+vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
+    const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/actors/actor_tools_factory.js');
     return {
         ...actual,
         getActorsAsTools: vi.fn(),
     };
 });
 
-const { getActorsAsTools } = await import('../../src/tools/core/actor_tools_factory.js');
+const { getActorsAsTools } = await import('../../src/tools/actors/actor_tools_factory.js');
 
 const MOCK_ACTOR_TOOL: ToolEntry = {
     type: TOOL_TYPE.ACTOR,

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { getKeyValueStore } from '../../src/tools/common/get_key_value_store.js';
+import { getKeyValueStore } from '../../src/tools/storage/get_key_value_store.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';

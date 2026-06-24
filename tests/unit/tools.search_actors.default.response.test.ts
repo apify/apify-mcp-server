@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_STORE_URL, HelperTools, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
-import { defaultSearchActors } from '../../src/tools/default/search_actors.js';
+import { defaultSearchActors } from '../../src/tools/actors/search_actors.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
     DEFAULT_CARD_OPTIONS,

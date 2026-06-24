@@ -11,7 +11,7 @@ import {
     buildSearchActorsResult,
     searchActorsBaseArgsSchema,
     searchActorsMetadata,
-} from '../core/search_actors_common.js';
+} from './search_actors_common.js';
 
 /**
  * Default mode search-actors tool.

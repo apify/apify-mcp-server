@@ -1,14 +1,14 @@
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
+import { actorRunOutputSchema } from '../structured_output_schemas.js';
 import {
     buildCallActorAppsDescription,
     buildCallActorDescription,
     callActorAjvValidate,
     callActorInputSchema,
     executeCallActor,
-} from '../core/call_actor_common.js';
-import { actorRunOutputSchema } from '../structured_output_schemas.js';
+} from './call_actor_common.js';
 
 /**
  * Single call-actor definition shared by both modes — only the description differs

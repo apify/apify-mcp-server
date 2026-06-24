@@ -17,7 +17,7 @@ vi.mock('../../src/mcp/proxy.js', () => ({
     getMCPServerTools: (...args: unknown[]) => getMCPServerTools(...args),
 }));
 
-const { getMCPServersAsTools } = await import('../../src/tools/core/actor_tools_factory.js');
+const { getMCPServersAsTools } = await import('../../src/tools/actors/actor_tools_factory.js');
 
 function makeActorInfo(id: string, webServerMcpPath: string): ActorInfo {
     return {

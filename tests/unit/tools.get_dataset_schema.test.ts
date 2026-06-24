@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
-import { getDatasetSchema } from '../../src/tools/common/get_dataset_schema.js';
+import { getDatasetSchema } from '../../src/tools/storage/get_dataset_schema.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
