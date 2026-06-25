@@ -139,6 +139,12 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             };
         }
         // Text/JSON values serialize cleanly — return them as structuredContent per the storage-tool contract.
-        return buildStorageResponse({ structuredContent: { keyValueStoreId, ...record }, summary, apifyConsoleUrl });
+        // apify-client maps an empty record body to `undefined`, which drops the schema-required `value` on
+        // serialization; emit empty text instead (an empty OUTPUT is legitimate).
+        return buildStorageResponse({
+            structuredContent: { keyValueStoreId, ...record, value: value === undefined ? '' : value },
+            summary,
+            apifyConsoleUrl,
+        });
     },
 } as const);
