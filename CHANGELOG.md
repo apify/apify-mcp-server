@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 - Surface multiple datasets, kv-stores ([#987](https://github.com/apify/apify-mcp-server/pull/987)) ([6b48228](https://github.com/apify/apify-mcp-server/commit/6b482281ff0aed04a90da8ecf9dc240a50e70f0d)) by [@jirispilka](https://github.com/jirispilka), closes [#912](https://github.com/apify/apify-mcp-server/issues/912)
 
+### 🐛 Bug Fixes
+
+- Preserve empty key-value store record value in structuredContent ([#1023](https://github.com/apify/apify-mcp-server/pull/1023)) ([38f142a](https://github.com/apify/apify-mcp-server/commit/38f142a037dfea1b8bfdbf46eedd05d99835efaf)) by [@RobertCrupa](https://github.com/RobertCrupa)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.11.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.4) (2026-06-24)
