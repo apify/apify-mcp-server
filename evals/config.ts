@@ -11,6 +11,9 @@ import log from '@apify/log';
 // Re-export shared config
 export {
     OPENROUTER_CONFIG,
+    REQUESTY_CONFIG,
+    getProviderConfig,
+    getEvalProvider,
     sanitizeEnvValue,
     sanitizeProcessEnv,
     validateEnvVars,

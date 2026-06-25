@@ -1,5 +1,6 @@
 /**
- * LLM client for calling OpenRouter API
+ * LLM client for the eval harness, using an OpenAI-compatible provider
+ * (OpenRouter by default, or Requesty when EVAL_LLM_PROVIDER=requesty).
  * Phase 3: Added support for tool calling
  */
 
@@ -9,7 +10,7 @@ import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/reso
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
-import { OPENROUTER_CONFIG } from './config.js';
+import { getEvalProvider, getProviderConfig } from './config.js';
 
 /**
  * Response from LLM - either text or tool calls
@@ -32,13 +33,15 @@ export class LlmClient {
     private openai: OpenAI;
 
     constructor() {
-        if (!OPENROUTER_CONFIG.apiKey) {
-            throw new Error('OPENROUTER_API_KEY environment variable is required');
+        const providerConfig = getProviderConfig();
+        if (!providerConfig.apiKey) {
+            const envVar = getEvalProvider() === 'requesty' ? 'REQUESTY_API_KEY' : 'OPENROUTER_API_KEY';
+            throw new Error(`${envVar} environment variable is required`);
         }
 
         this.openai = new OpenAI({
-            baseURL: OPENROUTER_CONFIG.baseURL,
-            apiKey: OPENROUTER_CONFIG.apiKey,
+            baseURL: providerConfig.baseURL,
+            apiKey: providerConfig.apiKey,
         });
     }
 

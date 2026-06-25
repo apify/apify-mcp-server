@@ -21,6 +21,8 @@ To trigger evaluations on a PR, add the `validated` label to your pull request.
 
 Unified API for Gemini, Claude, GPT. No separate integrations needed.
 
+To use [Requesty](https://requesty.ai) instead, set `EVAL_LLM_PROVIDER=requesty` and `REQUESTY_API_KEY` (base URL `https://router.requesty.ai/v1`, optionally overridable via `REQUESTY_BASE_URL`); it is OpenAI-compatible and uses the same `provider/model` naming.
+
 ## Judge model
 
 - model: `openai/gpt-4o-mini`

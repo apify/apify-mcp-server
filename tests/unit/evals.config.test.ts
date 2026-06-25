@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/shared/config.js';
+import { getEvalProvider, getProviderConfig, sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/shared/config.js';
 
 describe('sanitizeEnvValue', () => {
     it('passes through undefined and null', () => {
@@ -58,5 +58,29 @@ describe('sanitizeProcessEnv', () => {
     it('leaves unset vars untouched', () => {
         sanitizeProcessEnv();
         expect(process.env.PHOENIX_API_KEY).toBeUndefined();
+    });
+});
+
+describe('getEvalProvider / getProviderConfig', () => {
+    afterEach(() => {
+        delete process.env.EVAL_LLM_PROVIDER;
+    });
+
+    it('defaults to openrouter when EVAL_LLM_PROVIDER is unset', () => {
+        delete process.env.EVAL_LLM_PROVIDER;
+        expect(getEvalProvider()).toBe('openrouter');
+        expect(getProviderConfig().baseURL).toBe('https://openrouter.ai/api/v1');
+    });
+
+    it('selects requesty when EVAL_LLM_PROVIDER=requesty', () => {
+        process.env.EVAL_LLM_PROVIDER = 'requesty';
+        expect(getEvalProvider()).toBe('requesty');
+        expect(getProviderConfig().baseURL).toBe('https://router.requesty.ai/v1');
+    });
+
+    it('falls back to openrouter for any other value', () => {
+        process.env.EVAL_LLM_PROVIDER = 'something-else';
+        expect(getEvalProvider()).toBe('openrouter');
+        expect(getProviderConfig().baseURL).toBe('https://openrouter.ai/api/v1');
     });
 });

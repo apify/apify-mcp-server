@@ -18,7 +18,7 @@ import {
     TOOL_SELECTION_EVAL_MODEL,
     EVALUATOR_NAMES,
     TEMPERATURE,
-    OPENROUTER_CONFIG,
+    getProviderConfig,
 } from './config.js';
 import { transformToolsToOpenAIFormat } from './shared/openai_tools.js';
 import { loadTestCases as loadTestCasesShared, filterByCategory, filterById } from './shared/test_case_loader.js';
@@ -60,7 +60,7 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
         context: string;
         reference: string;
     }> => {
-        const client = new OpenAI(OPENROUTER_CONFIG);
+        const client = new OpenAI(getProviderConfig());
 
         log.info(`Input: ${JSON.stringify(example)}`);
 
@@ -105,7 +105,7 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
 }
 
 export function createClassifierEvaluator() {
-    const openai = createOpenAI(OPENROUTER_CONFIG);
+    const openai = createOpenAI(getProviderConfig());
 
     return createClassifierFn({
         model: openai(TOOL_SELECTION_EVAL_MODEL),
