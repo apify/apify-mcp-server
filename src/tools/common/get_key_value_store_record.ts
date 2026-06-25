@@ -2,12 +2,12 @@ import type { AudioContent, EmbeddedResource, ImageContent, ResourceLink } from 
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../const.js';
+import { HelperTools, KV_RECORD_MAX_INLINE_BYTES, KV_RECORD_MAX_INLINE_TEXT_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
-import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
+import { computeValueBytes, stripQuoteWrappers, truncateToBytes } from '../../utils/generic.js';
 import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
 import {
     buildConsoleLinkContent,
@@ -137,6 +137,23 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                     ...consoleLinkContent,
                 ],
             };
+        }
+        // Large text/JSON values were previously inlined uncapped — a multi-MB record would blow the
+        // context window. Mirror the binary cap: truncate to a byte budget and point at the full record.
+        if (bytes !== undefined && bytes > KV_RECORD_MAX_INLINE_TEXT_BYTES) {
+            const uri = await store.getRecordPublicUrl(recordKey);
+            const asText = typeof value === 'string' ? value : JSON.stringify(value);
+            const preview = truncateToBytes(asText, KV_RECORD_MAX_INLINE_TEXT_BYTES);
+            const truncatedSummary =
+                `${summary} Value truncated to ${KV_RECORD_MAX_INLINE_TEXT_BYTES} bytes ` +
+                `(full size ${bytes} bytes); fetch the full record at ${uri}.`;
+            const structuredContent = {
+                keyValueStoreId,
+                key: record.key,
+                value: preview,
+                ...(contentType && { contentType }),
+            };
+            return buildStorageResponse({ structuredContent, summary: truncatedSummary, apifyConsoleUrl });
         }
         // Text/JSON values serialize cleanly — return them as structuredContent per the storage-tool contract.
         // apify-client maps an empty record body to `undefined`, which drops the schema-required `value` on

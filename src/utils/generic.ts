@@ -112,6 +112,17 @@ export function stripQuoteWrappers(s: string): string {
     return s.trim().replace(STRIP_QUOTE_WRAPPERS_REGEX, '').trim();
 }
 
+/**
+ * Truncate a string to at most `maxBytes` UTF-8 bytes without splitting a multi-byte codepoint.
+ * Returns the input unchanged when already within budget.
+ */
+export function truncateToBytes(s: string, maxBytes: number): string {
+    if (Buffer.byteLength(s) <= maxBytes) return s;
+    const sliced = Buffer.from(s, 'utf8').subarray(0, maxBytes).toString('utf8');
+    // A cut that lands mid-codepoint leaves a trailing replacement char (U+FFFD); drop it.
+    return sliced.endsWith('�') ? sliced.slice(0, -1) : sliced;
+}
+
 /** Best-effort byte size of a value for summaries. */
 export function computeValueBytes(value: unknown): number | undefined {
     if (Buffer.isBuffer(value)) return value.length;
