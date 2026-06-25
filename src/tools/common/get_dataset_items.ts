@@ -67,17 +67,21 @@ export const getDatasetItems: ToolEntry = Object.freeze({
     name: HelperTools.DATASET_GET_ITEMS,
     description: dedent`
         Retrieve dataset items with pagination, sorting, and field selection.
+        Dataset items are often large — filter aggressively to avoid wasting tokens:
+        - Pass \`fields\` to return only the columns you need (the biggest token saver). Use ${HelperTools.DATASET_SCHEMA_GET} or ${HelperTools.DATASET_GET} first if you don't know the field names.
+        - Use \`limit\` to cap how many items you fetch; raise it only when the user actually needs more.
+        - Set \`clean=true\` to drop empty items and hidden (#) fields, and \`omit\` to exclude bulky fields you don't need.
         For nested fields use dot notation (e.g., fields="metadata.url") — the server auto-flattens parent prefixes.
-        Defaults limit to ${DEFAULT_DATASET_ITEMS_LIMIT}. Use clean=true to skip empty items and hidden fields.
+        Defaults limit to ${DEFAULT_DATASET_ITEMS_LIMIT}.
 
         The results will include items along with pagination info (limit, offset) and total count.
 
         USAGE:
-        - Use when you need to read data from a dataset (all items or only selected fields).
+        - Use when you need to read data from a dataset. When you only need specific fields, always pass \`fields\` instead of fetching whole items.
 
         USAGE EXAMPLES:
-        - user_input: Get first 20 items from dataset abd123
-        - user_input: Get only metadata.url and title from dataset username~my-dataset`,
+        - user_input: Get only url and title from dataset username~my-dataset → fields="url,title"
+        - user_input: Get first 20 items from dataset abd123`,
     inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getDatasetItemsArgs)),
