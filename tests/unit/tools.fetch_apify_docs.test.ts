@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildMarkdownUrl, isAllowedDocsUrl } from '../../src/tools/common/fetch_apify_docs.js';
+import { buildMarkdownUrl, isAllowedDocsUrl } from '../../src/tools/docs/fetch_apify_docs.js';
 
 describe('buildMarkdownUrl', () => {
     it.each([

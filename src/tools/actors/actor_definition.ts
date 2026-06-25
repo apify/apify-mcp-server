@@ -1,11 +1,11 @@
-import type { ApifyClient } from '../apify_client.js';
-import { ACTOR_README_MAX_LENGTH } from '../const.js';
+import type { ApifyClient } from '../../apify_client.js';
+import { ACTOR_README_MAX_LENGTH } from '../../const.js';
 import type {
     ActorDefinitionPruned,
     ActorDefinitionWithDesc,
     ActorDefinitionWithInfo,
     SchemaProperties,
-} from '../types.js';
+} from '../../types.js';
 
 /**
  * Get Actor input schema by Actor name.

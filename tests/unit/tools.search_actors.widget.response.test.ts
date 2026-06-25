@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { searchActorsWidgetTool } from '../../src/tools/apps/search_actors_widget.js';
+import { searchActorsWidgetTool } from '../../src/tools/widgets/search_actors_widget.js';
 import type { HelperTool } from '../../src/types.js';
 import type { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { formatActorForWidget } from '../../src/utils/actor_card.js';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getNormalActorsAsTools } from '../../src/tools/core/actor_tools_factory.js';
+import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import {
     actorDetailsOutputSchema,
     actorInfoSchema,

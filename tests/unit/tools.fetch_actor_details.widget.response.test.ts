@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { fetchActorDetailsWidgetTool } from '../../src/tools/apps/fetch_actor_details_widget.js';
+import { fetchActorDetailsWidgetTool } from '../../src/tools/widgets/fetch_actor_details_widget.js';
 import type { HelperTool } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';

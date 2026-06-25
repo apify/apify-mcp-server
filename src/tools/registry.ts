@@ -14,7 +14,7 @@
  * - A partial mode map (e.g. { apps: ToolEntry }) — included only for listed modes
  *
  * Apps vs default mode invariant:
- * Only `*-widget` tools differ between modes — they live in `tools/apps/` and render an
+ * Only `*-widget` tools differ between modes — they live in `tools/widgets/` and render an
  * interactive UI element. All non-widget tools (`call-actor`, `get-actor-run`, direct actor
  * tools, `search-actors`, `fetch-actor-details`) share a single implementation across modes.
  * Do NOT add per-mode runtime variants for non-widget tools.
@@ -22,28 +22,28 @@
 import { HelperTools } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
-import { appsCallActorWidget } from './apps/call_actor_widget.js';
-import { fetchActorDetailsWidgetTool } from './apps/fetch_actor_details_widget.js';
-import { getActorRunWidgetTool } from './apps/get_actor_run_widget.js';
-import { searchActorsWidgetTool } from './apps/search_actors_widget.js';
-import { abortActorRun } from './common/abort_actor_run.js';
-import { addTool } from './common/add_actor.js';
-import { getUserDatasetsList } from './common/dataset_collection.js';
-import { fetchApifyDocsTool } from './common/fetch_apify_docs.js';
-import { getActorRunLog } from './common/get_actor_run_log.js';
-import { getDataset } from './common/get_dataset.js';
-import { getDatasetItems } from './common/get_dataset_items.js';
-import { getDatasetSchema } from './common/get_dataset_schema.js';
-import { getKeyValueStore } from './common/get_key_value_store.js';
-import { getKeyValueStoreKeys } from './common/get_key_value_store_keys.js';
-import { getKeyValueStoreRecord } from './common/get_key_value_store_record.js';
-import { getUserKeyValueStoresList } from './common/key_value_store_collection.js';
-import { getUserRunsList } from './common/run_collection.js';
-import { searchApifyDocsTool } from './common/search_apify_docs.js';
-import { appsCallActor, defaultCallActor } from './default/call_actor.js';
-import { defaultFetchActorDetails } from './default/fetch_actor_details.js';
-import { defaultGetActorRun } from './default/get_actor_run.js';
-import { defaultSearchActors } from './default/search_actors.js';
+import { addTool } from './actors/add_actor.js';
+import { appsCallActor, defaultCallActor } from './actors/call_actor.js';
+import { defaultFetchActorDetails } from './actors/fetch_actor_details.js';
+import { defaultSearchActors } from './actors/search_actors.js';
+import { fetchApifyDocsTool } from './docs/fetch_apify_docs.js';
+import { searchApifyDocsTool } from './docs/search_apify_docs.js';
+import { abortActorRun } from './runs/abort_actor_run.js';
+import { defaultGetActorRun } from './runs/get_actor_run.js';
+import { getActorRunLog } from './runs/get_actor_run_log.js';
+import { getUserRunsList } from './runs/run_collection.js';
+import { getUserDatasetsList } from './storage/dataset_collection.js';
+import { getDataset } from './storage/get_dataset.js';
+import { getDatasetItems } from './storage/get_dataset_items.js';
+import { getDatasetSchema } from './storage/get_dataset_schema.js';
+import { getKeyValueStore } from './storage/get_key_value_store.js';
+import { getKeyValueStoreKeys } from './storage/get_key_value_store_keys.js';
+import { getKeyValueStoreRecord } from './storage/get_key_value_store_record.js';
+import { getUserKeyValueStoresList } from './storage/key_value_store_collection.js';
+import { appsCallActorWidget } from './widgets/call_actor_widget.js';
+import { fetchActorDetailsWidgetTool } from './widgets/fetch_actor_details_widget.js';
+import { getActorRunWidgetTool } from './widgets/get_actor_run_widget.js';
+import { searchActorsWidgetTool } from './widgets/search_actors_widget.js';
 
 type ModeMap = Partial<Record<ServerMode, ToolEntry>>;
 

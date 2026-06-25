@@ -10,14 +10,19 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 ## Files
 
-- `actor_executor.ts` — direct actor-tool executor; mode-agnostic.
-- `categories.ts` — tool categories and the tools in each (`index.ts` re-exports them).
-- `build.ts` — fetches and prunes an Actor's definition (`getActorDefinition`).
+- `registry.ts` — tool categories and the tools in each (`index.ts` re-exports them).
 - `structured_output_schemas.ts` — shared JSON-schema definitions for structured
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
-- The bulk of tool implementations live in `apps/`, `common/`, `core/`, `default/`,
-  registered through `categories.ts`.
+- Tool implementations are grouped by domain, each registered through `registry.ts`:
+  - `actors/` — search, details, call, add, the actor-tools factory, the direct
+    actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
+    prunes an Actor's definition, `getActorDefinition`), and `actor_run_response.ts`.
+  - `runs/` — get/abort runs, run logs, run list.
+  - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
+  - `docs/` — search and fetch Apify docs.
+  - `widgets/` — the `*-widget` tool variants (apps mode only).
+- `*_common.ts` files hold logic shared between a tool and its widget sibling.
 
 ## Rules when editing here
 

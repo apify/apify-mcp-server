@@ -7,8 +7,8 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
-import { fetchActorRunData } from '../core/actor_run_response.js';
-import { buildGetActorRunError, buildGetActorRunSuccessResponse } from '../core/get_actor_run_common.js';
+import { fetchActorRunData } from '../actors/actor_run_response.js';
+import { buildGetActorRunError, buildGetActorRunSuccessResponse } from '../runs/get_actor_run_common.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**

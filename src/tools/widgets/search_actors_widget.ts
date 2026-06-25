@@ -10,7 +10,7 @@ import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { buildSearchActorsResult, searchActorsBaseArgsSchema } from '../core/search_actors_common.js';
+import { buildSearchActorsResult, searchActorsBaseArgsSchema } from '../actors/search_actors_common.js';
 import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
 
 /**

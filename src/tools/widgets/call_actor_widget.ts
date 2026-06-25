@@ -10,13 +10,13 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
-import { buildStartRunResponse } from '../core/actor_run_response.js';
+import { buildStartRunResponse } from '../actors/actor_run_response.js';
 import {
     buildCallActorErrorResponse,
     callActorPreExecute,
     callOptionsSchema,
     resolveAndValidateActor,
-} from '../core/call_actor_common.js';
+} from '../actors/call_actor_common.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**

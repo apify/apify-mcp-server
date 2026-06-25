@@ -2,7 +2,7 @@ import Ajv from 'ajv';
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { getKeyValueStoreKeys } from '../../src/tools/common/get_key_value_store_keys.js';
+import { getKeyValueStoreKeys } from '../../src/tools/storage/get_key_value_store_keys.js';
 import { keyValueStoreKeysOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';

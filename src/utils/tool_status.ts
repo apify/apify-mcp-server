@@ -2,7 +2,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ErrorObject } from 'ajv';
 
 import { FAILURE_CATEGORY, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, TOOL_STATUS } from '../const.js';
-import type { RunResponse } from '../tools/core/actor_run_response.js';
+import type { RunResponse } from '../tools/actors/actor_run_response.js';
 import type {
     AjvErrorDetails,
     CallDiagnostics,

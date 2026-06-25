@@ -5,7 +5,7 @@ import {
     buildDatasetItemsSummaryNextStep,
     buildStorageNotFound,
     normalizeRecordKey,
-} from '../../src/tools/common/storage_helpers.js';
+} from '../../src/tools/storage/storage_helpers.js';
 
 describe('buildStorageNotFound()', () => {
     it('returns a SOFT_FAIL / INVALID_INPUT response with the supplied message', () => {

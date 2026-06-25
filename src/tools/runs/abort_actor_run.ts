@@ -5,7 +5,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { buildStats, buildStatusSummaryNextStep, type RunResponse, toIsoString } from '../core/actor_run_response.js';
+import { buildStats, buildStatusSummaryNextStep, type RunResponse, toIsoString } from '../actors/actor_run_response.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 const abortRunArgs = z.object({

@@ -13,7 +13,7 @@ import {
 } from '../../src/const.js';
 import { SKYFIRE_ENABLED_TOOLS } from '../../src/payments/const.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/core/call_actor_common.js';
+import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/actors/call_actor_common.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';

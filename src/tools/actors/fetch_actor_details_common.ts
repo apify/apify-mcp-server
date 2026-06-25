@@ -89,7 +89,7 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
 /**
  * Zod schema for fetch-actor-details arguments — used by the mode-independent
  * base tool. The `-widget` sibling has its own `actor`-only schema in
- * `src/tools/apps/fetch_actor_details_widget.ts`.
+ * `src/tools/widgets/fetch_actor_details_widget.ts`.
  */
 export const fetchActorDetailsToolArgsSchema = z.object({
     actor: z

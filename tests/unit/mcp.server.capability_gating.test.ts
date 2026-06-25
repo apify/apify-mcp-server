@@ -6,9 +6,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HelperTools, SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
-import { searchActorsWidgetTool } from '../../src/tools/apps/search_actors_widget.js';
-import { appsCallActor } from '../../src/tools/default/call_actor.js';
-import { defaultSearchActors } from '../../src/tools/default/search_actors.js';
+import { appsCallActor } from '../../src/tools/actors/call_actor.js';
+import { defaultSearchActors } from '../../src/tools/actors/search_actors.js';
+import { searchActorsWidgetTool } from '../../src/tools/widgets/search_actors_widget.js';
 import type { ServerModeOption } from '../../src/types.js';
 import { ServerMode } from '../../src/types.js';
 

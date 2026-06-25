@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { getActorRunWidgetTool } from '../../src/tools/apps/get_actor_run_widget.js';
-import type { RunResponse } from '../../src/tools/core/actor_run_response.js';
+import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
+import { getActorRunWidgetTool } from '../../src/tools/widgets/get_actor_run_widget.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { stubToolCallContext } from './helpers/tool_context.js';
 

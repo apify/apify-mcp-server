@@ -9,19 +9,19 @@ import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
+import { addTool } from '../tools/actors/add_actor.js';
+import { getActorsAsTools } from '../tools/index.js';
 import {
     CATEGORY_NAME_SET,
     CATEGORY_NAMES,
     getCategoryTools,
     toolCategoriesEnabledByDefault,
     WIDGET_BY_BASE_TOOL,
-} from '../tools/categories.js';
-import { abortActorRun } from '../tools/common/abort_actor_run.js';
-import { addTool } from '../tools/common/add_actor.js';
-import { getDatasetItems } from '../tools/common/get_dataset_items.js';
-import { getKeyValueStoreRecord } from '../tools/common/get_key_value_store_record.js';
-import { defaultGetActorRun } from '../tools/default/get_actor_run.js';
-import { getActorsAsTools } from '../tools/index.js';
+} from '../tools/registry.js';
+import { abortActorRun } from '../tools/runs/abort_actor_run.js';
+import { defaultGetActorRun } from '../tools/runs/get_actor_run.js';
+import { getDatasetItems } from '../tools/storage/get_dataset_items.js';
+import { getKeyValueStoreRecord } from '../tools/storage/get_key_value_store_record.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODES, ServerMode, TOOL_TYPE } from '../types.js';
 

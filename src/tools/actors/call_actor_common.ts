@@ -32,6 +32,7 @@ import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
+import { buildGetActorRunSuccessResponse } from '../runs/get_actor_run_common.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../utils.js';
 import {
     abortRunOnSignal,
@@ -40,7 +41,6 @@ import {
     fetchActorRunData,
 } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
-import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks

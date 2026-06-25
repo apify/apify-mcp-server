@@ -7,7 +7,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
-import { datasetSizeNextStepHint, normalizeDatasetFields } from '../core/actor_run_response.js';
+import { datasetSizeNextStepHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 

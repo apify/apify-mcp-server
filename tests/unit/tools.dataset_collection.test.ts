@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { getUserDatasetsList } from '../../src/tools/common/dataset_collection.js';
+import { getUserDatasetsList } from '../../src/tools/storage/dataset_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 

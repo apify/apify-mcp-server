@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { extractDotPrefixes, getDatasetItems } from '../../src/tools/common/get_dataset_items.js';
+import { extractDotPrefixes, getDatasetItems } from '../../src/tools/storage/get_dataset_items.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { dotFlatten } from '../../src/utils/encode_text.js';

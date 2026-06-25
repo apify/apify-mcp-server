@@ -1,7 +1,7 @@
 import type { ApifyClient } from '../apify_client.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { actorDefinitionCache } from '../state.js';
-import { getActorDefinition } from '../tools/build.js';
+import { getActorDefinition } from '../tools/actors/actor_definition.js';
 import type { ActorDefinitionStorage, ActorDefinitionWithInfo, DatasetItem } from '../types.js';
 import { getValuesByDotKeys } from './generic.js';
 import { getUserInfoCached } from './userid_cache.js';
