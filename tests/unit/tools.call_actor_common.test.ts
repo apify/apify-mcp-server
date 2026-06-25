@@ -1,15 +1,24 @@
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
+import { getActorsAsTools } from '../../src/tools/core/actor_tools_factory.js';
 import {
     buildCallActorAppsDescription,
     buildCallActorDescription,
     buildCallActorErrorResponse,
     buildPermissionApprovalResponse,
     callActorArgs,
+    resolveAndValidateActor,
 } from '../../src/tools/core/call_actor_common.js';
+import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
+
+vi.mock('../../src/tools/core/actor_tools_factory.js', () => ({
+    getActorsAsTools: vi.fn(),
+    fixActorNameInputAndLog: vi.fn((actor: string) => actor),
+}));
 
 describe('call_actor_common', () => {
     describe('buildCallActorDescription', () => {
@@ -248,6 +257,64 @@ describe('call_actor_common', () => {
             expect(response.isError).toBe(true);
             expect(response.content).toHaveLength(1);
             expect(response.content[0]?.text).toContain('This Actor requires full access to your account');
+        });
+    });
+
+    describe('resolveAndValidateActor — input schema is not inlined in error responses', () => {
+        // A property description large enough that a full-schema dump would dominate the response.
+        const HUGE_DESC = 'x'.repeat(30_000);
+        const bigSchema = {
+            type: 'object',
+            properties: { startUrls: { type: 'array', description: HUGE_DESC } },
+            required: ['startUrls'],
+        };
+
+        function stubActor(valid: boolean): ToolEntry {
+            const ajvValidate = Object.assign(() => valid, {
+                errors: valid ? null : [{ message: "must have required property 'startUrls'" }],
+            });
+            return {
+                type: TOOL_TYPE.ACTOR,
+                actorId: 'abc123',
+                inputSchema: bigSchema,
+                ajvValidate,
+            } as unknown as ToolEntry;
+        }
+
+        const toolArgs = { apifyClient: {}, mcpSessionId: 's1' } as unknown as InternalToolArgs;
+
+        function errorText(res: object): string {
+            const content = (res as { error?: { content?: { text?: string }[] } }).error?.content ?? [];
+            return content.map((c) => c.text ?? '').join('\n');
+        }
+
+        beforeEach(() => vi.mocked(getActorsAsTools).mockReset());
+
+        it('validation failure returns the AJV errors and a fetch-actor-details pointer, not the full schema', async () => {
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [stubActor(false)], errors: [] } as never);
+
+            const res = await resolveAndValidateActor({ actorName: 'apify/x', input: { foo: 1 }, toolArgs });
+            const text = errorText(res);
+
+            expect(text).not.toContain(HUGE_DESC);
+            expect(text.length).toBeLessThan(2_000);
+            expect(text).toContain(HelperTools.ACTOR_GET_DETAILS);
+            expect(text).toContain("must have required property 'startUrls'");
+        });
+
+        it('missing input returns a fetch-actor-details pointer, not the full schema', async () => {
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [stubActor(true)], errors: [] } as never);
+
+            const res = await resolveAndValidateActor({
+                actorName: 'apify/x',
+                input: undefined as never,
+                toolArgs,
+            });
+            const text = errorText(res);
+
+            expect(text).not.toContain(HUGE_DESC);
+            expect(text.length).toBeLessThan(2_000);
+            expect(text).toContain(HelperTools.ACTOR_GET_DETAILS);
         });
     });
 });

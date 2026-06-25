@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { DATASET_ITEMS_MAX_BYTES, HelperTools, MAX_DATASET_ITEMS_LIMIT } from '../../src/const.js';
 import { extractDotPrefixes, getDatasetItems } from '../../src/tools/common/get_dataset_items.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -249,5 +249,67 @@ describe('get-dataset-items', () => {
         const { summary, nextStep, ...data } = structuredContent;
         expect(decodeFencedToolText(content[0].text)).toEqual(data);
         expect(structuredContent).not.toHaveProperty('desc');
+    });
+
+    describe('response size caps', () => {
+        it('clamps an over-large requested limit to MAX_DATASET_ITEMS_LIMIT before fetching', async () => {
+            const listItemsSpy = vi.fn().mockResolvedValue({ items: [], total: 0 });
+            const result = await (getDatasetItems as HelperTool).call(
+                stubToolCallContext({ datasetId: 'ds-1', limit: 1226 }, stubApifyClient(listItemsSpy)),
+            );
+            const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+            expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ limit: MAX_DATASET_ITEMS_LIMIT }));
+            expect(structuredContent.limit).toBe(MAX_DATASET_ITEMS_LIMIT);
+        });
+
+        it('does not clamp a limit already within MAX_DATASET_ITEMS_LIMIT', async () => {
+            const listItemsSpy = vi.fn().mockResolvedValue({ items: [], total: 0 });
+            await (getDatasetItems as HelperTool).call(
+                stubToolCallContext({ datasetId: 'ds-1', limit: 10 }, stubApifyClient(listItemsSpy)),
+            );
+
+            expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ limit: 10 }));
+        });
+
+        it('byte-caps the response: drops trailing items and steers to paginate from the returned count', async () => {
+            // Each item ~2 KB; a full clamped page (100) far exceeds the byte cap, forcing truncation.
+            const bigItems = Array.from({ length: MAX_DATASET_ITEMS_LIMIT }, (_, i) => ({
+                i,
+                text: 'x'.repeat(2000),
+            }));
+            const result = await (getDatasetItems as HelperTool).call(
+                stubToolCallContext(
+                    { datasetId: 'ds-1' },
+                    stubApifyClient(async () => ({ items: bigItems, total: 5000 })),
+                ),
+            );
+            const { content, structuredContent } = result as TextToolResult & {
+                structuredContent: Record<string, unknown>;
+            };
+
+            const itemCount = structuredContent.itemCount as number;
+            expect(itemCount).toBeGreaterThan(0);
+            expect(itemCount).toBeLessThan(bigItems.length);
+            expect((structuredContent.items as unknown[]).length).toBe(itemCount);
+            // The encoded payload (content[0]) stays within the cap.
+            expect(Buffer.byteLength(content[0].text)).toBeLessThanOrEqual(DATASET_ITEMS_MAX_BYTES);
+            // Next step resumes from the actually-returned count (not the requested limit) and notes the cap.
+            expect(structuredContent.nextStep).toContain(`offset=${itemCount}`);
+            expect(structuredContent.nextStep).toContain('capped');
+        });
+
+        it('returns at least one item even when a single item exceeds the byte cap', async () => {
+            const hugeItem = { text: 'x'.repeat(DATASET_ITEMS_MAX_BYTES * 2) };
+            const result = await (getDatasetItems as HelperTool).call(
+                stubToolCallContext(
+                    { datasetId: 'ds-1' },
+                    stubApifyClient(async () => ({ items: [hugeItem], total: 1 })),
+                ),
+            );
+            const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+            expect(structuredContent.itemCount).toBe(1);
+        });
     });
 });

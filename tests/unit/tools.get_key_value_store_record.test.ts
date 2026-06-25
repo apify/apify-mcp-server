@@ -5,7 +5,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../src/const.js';
+import { HelperTools, KV_RECORD_MAX_INLINE_BYTES, KV_RECORD_MAX_INLINE_TEXT_BYTES } from '../../src/const.js';
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
 import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -220,6 +220,60 @@ describe('get-key-value-store-record', () => {
             name: 'blob',
             size: KV_RECORD_MAX_INLINE_BYTES + 1,
         });
+    });
+
+    it('truncates an over-cap text value and points at the full record', async () => {
+        const big = 'a'.repeat(KV_RECORD_MAX_INLINE_TEXT_BYTES + 10_000);
+        const onGetRecordPublicUrl = vi.fn();
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'big.txt' },
+                stubApifyClient({
+                    record: { key: 'big.txt', value: big, contentType: 'text/plain' },
+                    onGetRecordPublicUrl,
+                }),
+            ),
+        );
+        const { isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(isError).not.toBe(true);
+        expect(onGetRecordPublicUrl).toHaveBeenCalled();
+        expect(Buffer.byteLength(structuredContent.value as string)).toBeLessThanOrEqual(
+            KV_RECORD_MAX_INLINE_TEXT_BYTES,
+        );
+        expect(structuredContent.summary).toContain('truncated');
+        expect(structuredContent.summary).toContain('signature=signed');
+        // Still schema-conforming (value is a string, all required fields present).
+        expectSchemaConformingStructuredContent(result);
+    });
+
+    it('truncates an over-cap JSON value (serialized) and keeps it schema-conforming', async () => {
+        const bigJson = { blob: 'b'.repeat(KV_RECORD_MAX_INLINE_TEXT_BYTES + 10_000) };
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'big.json' },
+                stubApifyClient({ record: { key: 'big.json', value: bigJson, contentType: 'application/json' } }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(Buffer.byteLength(structuredContent.value as string)).toBeLessThanOrEqual(
+            KV_RECORD_MAX_INLINE_TEXT_BYTES,
+        );
+        expectSchemaConformingStructuredContent(result);
+    });
+
+    it('does not truncate a text value within the cap', async () => {
+        const record = { key: 'small.txt', value: 'short value', contentType: 'text/plain' };
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1', recordKey: 'small.txt' }, stubApifyClient({ record })),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.value).toBe('short value');
+        expect(structuredContent.summary).not.toContain('truncated');
     });
 
     it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {

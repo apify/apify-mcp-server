@@ -22,6 +22,35 @@ export const KV_RECORD_MAX_INLINE_BYTES = 256 * 1024;
  */
 export const DATASET_SIZE_HINT_BYTES = 50000;
 
+/**
+ * Hard ceiling on the effective row count for `get-dataset-items`. The model freely requests far more
+ * (real traces show up to 1226 items, blowing the context budget); we clamp to this before fetching so
+ * an over-asking call is served a bounded first page instead of the whole dataset, then steered to
+ * paginate via `offset`. The cheap, pre-fetch first layer; {@link DATASET_ITEMS_MAX_BYTES} is the
+ * post-fetch backstop for the case where even this many items are individually huge.
+ */
+export const MAX_DATASET_ITEMS_LIMIT = 100;
+
+/**
+ * Hard cap on a single `get-dataset-items` response, measured on the TOON text in `content[0]` — which
+ * is exactly what the model receives. The chat wraps MCP tools with `schemas: "automatic"`, so the AI
+ * SDK serializes the result via `mcpToModelOutput`, forwarding only `content` (text/image) and dropping
+ * `structuredContent`. When exceeded, trailing items are dropped until the payload fits and the caller
+ * is told to page via `offset`. Mirrors {@link DATASET_SIZE_HINT_BYTES} (~25k-token budget) — the
+ * former soft hint becomes a real truncation cap.
+ */
+export const DATASET_ITEMS_MAX_BYTES = 50000;
+
+/**
+ * Inline cap for text/JSON key-value-store records. Larger values are truncated and a link to the full
+ * record is returned instead of inlining the whole value. Parallels {@link KV_RECORD_MAX_INLINE_BYTES}
+ * (the 256 KB binary cap); text/JSON was previously inlined uncapped.
+ */
+export const KV_RECORD_MAX_INLINE_TEXT_BYTES = 50 * 1024;
+
+/** Per-snippet `content` char cap for `search-apify-docs`; full page is fetched separately via `fetch-apify-docs`. */
+export const DOCS_SNIPPET_MAX_LENGTH = 1000;
+
 /** Shared steer appended to large-output hints so the model narrows instead of refetching everything. */
 export const NARROW_OUTPUT_HINT = 'narrow with fields= or page with offset';
 

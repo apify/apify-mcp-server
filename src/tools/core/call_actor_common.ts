@@ -479,8 +479,9 @@ export async function resolveAndValidateActor(params: {
             error: buildMCPResponse({
                 texts: [
                     `Input is required for Actor '${actorName}'. Please provide the input parameter based on the Actor's input schema.`,
-                    `The input schema for this Actor was retrieved and is shown below:`,
-                    `\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
+                    // Point at fetch-actor-details rather than inlining the full schema, which can be
+                    // very large; fetch-actor-details returns the per-field capped schema.
+                    `Call ${HelperTools.ACTOR_GET_DETAILS} with actor='${actorName}' and output={ inputSchema: true } to retrieve the input schema.`,
                 ],
                 isError: true,
                 telemetry: {
@@ -507,13 +508,18 @@ export async function resolveAndValidateActor(params: {
             validationMissingProperty: ajvDetails.validation_missing_property,
         });
 
+        // Don't inline the full input schema — for complex Actors it can be very large. The AJV
+        // errors already identify what's wrong; point at fetch-actor-details (which returns the
+        // per-field capped schema) for the full schema instead.
         const content = [
             `Input validation failed for Actor '${actorName}'. Please ensure your input matches the Actor's input schema.`,
-            `Input schema:\n\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
         ];
         if (validationSummary) {
             content.push(`Validation errors: ${validationSummary}`);
         }
+        content.push(
+            `For the full input schema, call ${HelperTools.ACTOR_GET_DETAILS} with actor='${actorName}' and output={ inputSchema: true }.`,
+        );
         return {
             error: buildMCPResponse({
                 texts: content,

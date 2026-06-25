@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { DOCS_SOURCES, HelperTools } from '../../const.js';
+import { DOCS_SNIPPET_MAX_LENGTH, DOCS_SOURCES, HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -39,6 +39,12 @@ and a limited piece of content that matches the search query.
 Fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.
 
 ${PLATFORM_DOCS_PREFERENCE}`;
+}
+
+/** Clip an Algolia snippet to {@link DOCS_SNIPPET_MAX_LENGTH} chars; full page is fetched via fetch-apify-docs. */
+function clipSnippet(content: string): string {
+    if (content.length <= DOCS_SNIPPET_MAX_LENGTH) return content;
+    return `${content.slice(0, DOCS_SNIPPET_MAX_LENGTH)}… (truncated; fetch the full doc with ${HelperTools.DOCS_FETCH})`;
 }
 
 const searchApifyDocsToolArgsSchema = z.object({
@@ -115,7 +121,7 @@ ${results
     .map((result) => {
         let line = `- Document URL: ${result.url}`;
         if (result.content) {
-            line += `\n  Content: ${result.content}`;
+            line += `\n  Content: ${clipSnippet(result.content)}`;
         }
         return line;
     })
@@ -124,7 +130,7 @@ ${results
         const structuredContent = {
             results: results.map((result) => ({
                 url: result.url,
-                ...(result.content ? { content: result.content } : {}),
+                ...(result.content ? { content: clipSnippet(result.content) } : {}),
             })),
             query,
             count: results.length,
