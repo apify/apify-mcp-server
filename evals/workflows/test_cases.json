@@ -133,6 +133,46 @@
       "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-actor-run-list. PASS only if get-actor-run-list was actually called and the final answer reports a run ID and a status matching the run the agent just started.",
       "tools": ["actors", "get-actor-run-list"],
       "maxTurns": 12
+    },
+    {
+      "id": "storage-dataset-items-maps-bulk",
+      "category": "storage",
+      "query": "Use the Google Maps Scraper to find the best 20 restaurants in Prague. When the run finishes, retrieve all of them in a single call. Then tell me how many restaurants were returned and list the names and ratings of the first five.",
+      "reference": "The agent must find the Google Maps scraper and call-actor it for restaurants in Prague, then call get-dataset-items with the datasetId from that run and a limit high enough to return every row in one call. PASS only if get-dataset-items was called with a datasetId argument and the final answer states a restaurant count and lists at least five restaurant names with ratings.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 20
+    },
+    {
+      "id": "storage-dataset-items-hotels-bulk",
+      "category": "storage",
+      "query": "Use the Google Maps Scraper to find at least 20 hotels in Vienna. When the run finishes, retrieve all the results and tell me how many hotels were returned and the names and addresses of the first five.",
+      "reference": "The agent must find the Google Maps scraper and call-actor it for hotels in Vienna, then call get-dataset-items with the datasetId from that run and a limit high enough to return every row in one call. PASS only if get-dataset-items was called with a datasetId argument and the final answer states a hotel count and lists at least five hotel names with addresses.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 20
+    },
+    {
+      "id": "storage-dataset-items-rag-bulk",
+      "category": "storage",
+      "query": "Run the apify/rag-web-browser Actor to search for the best open source web scraping libraries. Set maxResults to 8, waiting up to 45 seconds for it to finish. Then give me the title and URL of each result.",
+      "reference": "The agent must call call-actor for apify/rag-web-browser with maxResults 8, then call get-dataset-items with the datasetId from that run and a limit high enough to return every row in one call. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists a title and a URL for at least five results.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 16
+    },
+    {
+      "id": "storage-run-list-recent",
+      "category": "storage",
+      "query": "List my 10 most recent Actor runs, newest first. For each run report its run ID, the Actor it ran, and its status.",
+      "reference": "The agent must call get-actor-run-list (newest first, limit 10). PASS only if get-actor-run-list was actually called and the final answer reports several runs, each with a run ID and a status.",
+      "tools": ["get-actor-run-list"],
+      "maxTurns": 6
+    },
+    {
+      "id": "storage-kv-keys-bulk",
+      "category": "storage",
+      "query": "Run the apify/rag-web-browser Actor with the search query 'web scraping' and maxResults set to 3, waiting up to 45 seconds for it to finish. Then list the keys in that run's key-value store (limit 10) and tell me how many keys there are and what they are named.",
+      "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-key-value-store-keys with the keyValueStoreId from that run. PASS only if get-key-value-store-keys was actually called with a keyValueStoreId argument and the final answer states a key count and lists one or more key names.",
+      "tools": ["actors", "get-key-value-store-keys"],
+      "maxTurns": 14
     }
   ]
 }
