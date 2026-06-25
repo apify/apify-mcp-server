@@ -46,8 +46,8 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - **Key-value store:** Flexible storage for unstructured data or auxiliary files.
 
 ## Apify API resources
-- Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`https://api.apify.com/v2/...\` URL to resources/read; the server injects authentication and returns the response body.
-- Actor and tool responses often include such URLs (e.g. dataset items, key-value store records) — read them directly via resources/read, no rewriting needed.
+- Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`https://api.apify.com/v2/...\` URL to \`resources/read\`; the server injects authentication and returns the response body.
+- Actor and tool responses often include such URLs (e.g. dataset items, key-value store records) — read them directly via \`resources/read\`, no rewriting needed.
 - Reads are not size-bounded; for large datasets page with \`limit\` and \`offset\` rather than reading everything at once.
 - Examples: \`https://api.apify.com/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`https://api.apify.com/v2/key-value-stores/{storeId}/records/{recordKey}\`.
 ${
