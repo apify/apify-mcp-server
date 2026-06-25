@@ -79,6 +79,7 @@
     "@types/yargs": "^17.0.33",
     "@types/yargs-parser": "^21.0.3",
     "eventsource": "^3.0.2",
+    "gpt-tokenizer": "^3.4.0",
     "openai": "^6.10.0",
     "oxfmt": "0.51.0",
     "oxlint": "^1.64.0",
