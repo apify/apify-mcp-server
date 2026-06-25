@@ -7,7 +7,7 @@ import type {
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
 import { KV_RECORD_MAX_INLINE_BYTES } from '../const.js';
-import { getHttpStatusCode } from '../utils/logging.js';
+import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 
 const JSON_MIME_TYPE = 'application/json';
 const TEXT_MIME_TYPE = 'text/plain';
@@ -48,7 +48,8 @@ async function getRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Prom
     try {
         const store = apifyClient.keyValueStore(decodeURIComponent(match[1]));
         return await store.getRecordPublicUrl(decodeURIComponent(match[2]));
-    } catch {
+    } catch (err) {
+        logHttpError(err, `Failed to mint signed download URL for ${uri}; falling back to API URL`);
         return uri;
     }
 }
