@@ -54,9 +54,12 @@ async function getRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Prom
     }
 }
 
-/** Single explanatory text-contents result for a not-found / no-token / refused read. */
-function buildTextResult(uri: string, text: string): ReadResourceResult {
-    return { contents: [{ uri, mimeType: TEXT_MIME_TYPE, text } satisfies TextResourceContents] };
+/**
+ * Single text-contents result. Defaults to text/plain (errors, refusals, link-outs); pass
+ * `mimeType` to preserve a body's declared Content-Type (e.g. an empty record).
+ */
+function buildTextResult(uri: string, text: string, mimeType: string = TEXT_MIME_TYPE): ReadResourceResult {
+    return { contents: [{ uri, mimeType, text } satisfies TextResourceContents] };
 }
 
 /**
@@ -94,9 +97,10 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     const contentType = typeof contentTypeHeader === 'string' ? contentTypeHeader : undefined;
     const { data } = response;
 
-    // An empty body (e.g. an Actor that wrote an empty OUTPUT) is legitimate; emit empty text.
+    // An empty body (e.g. an Actor that wrote an empty OUTPUT) is legitimate; emit empty text,
+    // preserving the record's declared Content-Type when present.
     if (data === undefined || data === null) {
-        return buildTextResult(uri, '');
+        return buildTextResult(uri, '', contentType);
     }
 
     if (Buffer.isBuffer(data)) {

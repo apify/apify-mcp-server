@@ -167,6 +167,8 @@ describe('readApiResource()', () => {
 
         expect(firstContent(result).text).toBe('');
         expect(firstContent(result)).not.toHaveProperty('blob');
+        // Empty body still preserves the record's declared Content-Type rather than defaulting to text/plain.
+        expect(firstContent(result).mimeType).toBe('application/json');
     });
 
     it('returns an explanatory text block when the request fails', async () => {

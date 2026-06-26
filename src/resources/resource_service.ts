@@ -1,4 +1,5 @@
 import type {
+    BlobResourceContents,
     ListResourcesResult,
     ListResourceTemplatesResult,
     ReadResourceResult,
@@ -15,7 +16,8 @@ import { isApifyApiUri, readApiResource } from './api_resources.js';
 import type { AvailableWidget } from './widgets.js';
 import { RESOURCE_MIME_TYPE } from './widgets.js';
 
-type ExtendedResourceContents = TextResourceContents & {
+// API reads can yield binary blob contents, not just text; the widget fields are optional add-ons.
+type ExtendedResourceContents = (TextResourceContents | BlobResourceContents) & {
     html?: string;
     _meta?: AvailableWidget['meta'];
 };
