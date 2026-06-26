@@ -87,6 +87,9 @@ export function convertEvaluationResultToRecord(
             durationMs: result.durationMs,
             turns: result.conversation.totalTurns,
             resultBytes: sumResultBytes(result.conversation),
+            promptTokens: result.conversation.promptTokens ?? 0,
+            completionTokens: result.conversation.completionTokens ?? 0,
+            totalTokens: result.conversation.totalTokens ?? 0,
             error: result.error,
         };
     }
@@ -102,6 +105,9 @@ export function convertEvaluationResultToRecord(
         durationMs: result.durationMs,
         turns: result.conversation.totalTurns,
         resultBytes: sumResultBytes(result.conversation),
+        promptTokens: result.conversation.promptTokens ?? 0,
+        completionTokens: result.conversation.completionTokens ?? 0,
+        totalTokens: result.conversation.totalTokens ?? 0,
         error: null,
     };
 }

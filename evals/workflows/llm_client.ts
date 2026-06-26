@@ -12,6 +12,15 @@ import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 import { OPENROUTER_CONFIG } from './config.js';
 
 /**
+ * Token usage reported by the LLM API for a single call
+ */
+export type LlmUsage = {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+};
+
+/**
  * Response from LLM - either text or tool calls
  */
 export type LlmResponse = {
@@ -23,6 +32,8 @@ export type LlmResponse = {
         name: string;
         arguments: string;
     }[];
+    /** Token usage for this call (undefined if the provider did not report it) */
+    usage?: LlmUsage;
 };
 
 /**
@@ -67,6 +78,14 @@ export class LlmClient {
             throw new Error('LLM returned no message');
         }
 
+        const usage: LlmUsage | undefined = response.usage
+            ? {
+                  promptTokens: response.usage.prompt_tokens,
+                  completionTokens: response.usage.completion_tokens,
+                  totalTokens: response.usage.total_tokens,
+              }
+            : undefined;
+
         // Check if LLM wants to call tools
         if (message.tool_calls && message.tool_calls.length > 0) {
             return {
@@ -82,12 +101,14 @@ export class LlmClient {
                     }
                     throw new Error(`Unsupported tool call type: ${tc.type}`);
                 }),
+                usage,
             };
         }
 
         // Regular text response
         return {
             content: message.content || null,
+            usage,
         };
     }
 }

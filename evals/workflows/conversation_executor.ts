@@ -56,6 +56,8 @@ export async function executeConversation(options: ConversationExecutorOptions):
 
     let turnNumber = 0;
     let completed = false;
+    let promptTokens = 0;
+    let completionTokens = 0;
 
     // Fetch tools initially
     let tools: ChatCompletionTool[] = mcpToolsToOpenAiTools(mcpClient.getTools());
@@ -65,6 +67,12 @@ export async function executeConversation(options: ConversationExecutorOptions):
 
         // Call LLM with current conversation state and current tools
         const llmResponse = await llmClient.callLlm(messages, model, tools);
+
+        // Accumulate token usage across the agent loop (cost grows with tool-result size)
+        if (llmResponse.usage) {
+            promptTokens += llmResponse.usage.promptTokens;
+            completionTokens += llmResponse.usage.completionTokens;
+        }
 
         // Check if LLM wants to call tools
         if (!llmResponse.toolCalls || llmResponse.toolCalls.length === 0) {
@@ -164,5 +172,8 @@ export async function executeConversation(options: ConversationExecutorOptions):
         completed,
         hitMaxTurns: turnNumber >= maxTurns && !completed,
         totalTurns: turnNumber,
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
     };
 }

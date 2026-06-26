@@ -76,4 +76,10 @@ export type ConversationHistory = {
     hitMaxTurns: boolean;
     /** Total number of turns */
     totalTurns: number;
+    /** Prompt tokens billed across all agent LLM calls (sum over turns; judge calls excluded) */
+    promptTokens?: number;
+    /** Completion tokens billed across all agent LLM calls */
+    completionTokens?: number;
+    /** Total tokens billed across all agent LLM calls (prompt + completion) */
+    totalTokens?: number;
 };

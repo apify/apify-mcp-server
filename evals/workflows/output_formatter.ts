@@ -19,7 +19,7 @@ export type EvaluationResult = {
 
 /**
  * Sum the byte size of all tool results returned to the agent across a conversation.
- * This is the data volume the format (JSON vs TOON) directly affects.
+ * This is the data volume returned by the tools, independent of the model's own output.
  */
 export function sumResultBytes(conversation: ConversationHistory): number {
     let total = 0;
@@ -41,9 +41,36 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * Format results as a table
+ * Format a token count with thousands separators.
  */
-export function formatResultsTable(results: EvaluationResult[]): string {
+export function formatTokens(tokens: number): string {
+    return tokens.toLocaleString('en-US');
+}
+
+/**
+ * Render a metric value followed by its change vs an optional baseline.
+ * Lower-is-better metrics (bytes, tokens): ▼ marks a reduction, ▲ an increase.
+ * Returns just the formatted value when no baseline exists.
+ */
+export function formatWithDelta(current: number, baseline: number | undefined, format: (n: number) => string): string {
+    if (baseline === undefined) return `${format(current)} (no baseline)`;
+
+    const diff = current - baseline;
+    if (diff === 0) return `${format(current)} (= baseline)`;
+
+    const arrow = diff > 0 ? '▲' : '▼';
+    const sign = diff > 0 ? '+' : '-';
+    const pct = baseline === 0 ? 'n/a' : `${sign}${Math.abs((diff / baseline) * 100).toFixed(1)}%`;
+    return `${format(current)} (${arrow} ${sign}${format(Math.abs(diff))} / ${pct})`;
+}
+
+/**
+ * Format results as a table.
+ *
+ * @param results - Evaluation results to render
+ * @param baseline - Optional prior results keyed by test ID; when present, byte/token deltas are shown
+ */
+export function formatResultsTable(results: EvaluationResult[], baseline?: Map<string, TestResultRecord>): string {
     const lines: string[] = [];
 
     // Header
@@ -69,10 +96,12 @@ export function formatResultsTable(results: EvaluationResult[]): string {
         if (result.error) {
             lines.push(`  Error: ${result.error}`);
         } else {
+            const prior = baseline?.get(result.testCase.id);
             const bytes = sumResultBytes(result.conversation);
-            lines.push(
-                `  Turns: ${result.conversation.totalTurns} | Duration: ${result.durationMs}ms | Tool bytes: ${formatBytes(bytes)}`,
-            );
+            const tokens = result.conversation.totalTokens ?? 0;
+            lines.push(`  Turns: ${result.conversation.totalTurns} | Duration: ${result.durationMs}ms`);
+            lines.push(`  Tool bytes: ${formatWithDelta(bytes, prior?.resultBytes, formatBytes)}`);
+            lines.push(`  Tokens: ${formatWithDelta(tokens, prior?.totalTokens, formatTokens)}`);
             lines.push(`  Reason: ${result.judgeResult.reason}`);
         }
 
@@ -89,6 +118,36 @@ export function formatResultsTable(results: EvaluationResult[]): string {
     const errorTests = results.filter((r) => r.error).length;
 
     const totalBytes = results.reduce((sum, r) => sum + sumResultBytes(r.conversation), 0);
+    const totalTokens = results.reduce((sum, r) => sum + (r.conversation.totalTokens ?? 0), 0);
+
+    // Aggregate deltas over the subset of tests whose baseline record has the metric, so
+    // the comparison is like-for-like. A legacy baseline may predate a metric (field absent),
+    // so bytes and tokens are matched independently.
+    let bytesMatched = 0;
+    let bytesCurrent = 0;
+    let bytesBaseline = 0;
+    let tokensMatched = 0;
+    let tokensCurrent = 0;
+    let tokensBaseline = 0;
+    if (baseline) {
+        for (const result of results) {
+            const prior = baseline.get(result.testCase.id);
+            if (!prior) continue;
+            // Cast to reflect runtime reality: records written before these metrics lack the field.
+            const priorBytes = prior.resultBytes as number | undefined;
+            if (priorBytes !== undefined) {
+                bytesMatched++;
+                bytesCurrent += sumResultBytes(result.conversation);
+                bytesBaseline += priorBytes;
+            }
+            const priorTokens = prior.totalTokens as number | undefined;
+            if (priorTokens !== undefined) {
+                tokensMatched++;
+                tokensCurrent += result.conversation.totalTokens ?? 0;
+                tokensBaseline += priorTokens;
+            }
+        }
+    }
 
     lines.push(`📊 Summary:`);
     lines.push(`  Total tests: ${totalTests}`);
@@ -99,6 +158,23 @@ export function formatResultsTable(results: EvaluationResult[]): string {
         lines.push(
             `  Tool bytes returned: ${formatBytes(totalBytes)} total, ${formatBytes(Math.round(totalBytes / totalTests))} avg/test`,
         );
+        lines.push(
+            `  Tokens used: ${formatTokens(totalTokens)} total, ${formatTokens(Math.round(totalTokens / totalTests))} avg/test`,
+        );
+    }
+    if (bytesMatched > 0 || tokensMatched > 0) {
+        lines.push('');
+        lines.push(`  vs baseline:`);
+        if (bytesMatched > 0) {
+            lines.push(
+                `    Tool bytes (${bytesMatched}/${totalTests}): ${formatWithDelta(bytesCurrent, bytesBaseline, formatBytes)}`,
+            );
+        }
+        if (tokensMatched > 0) {
+            lines.push(
+                `    Tokens (${tokensMatched}/${totalTests}): ${formatWithDelta(tokensCurrent, tokensBaseline, formatTokens)}`,
+            );
+        }
     }
     lines.push('');
 
@@ -181,6 +257,8 @@ export function formatDetailedResult(result: EvaluationResult): string {
     lines.push('');
 
     lines.push(`⏱️  Duration: ${result.durationMs}ms`);
+    lines.push(`📦 Tool bytes: ${formatBytes(sumResultBytes(result.conversation))}`);
+    lines.push(`🔢 Tokens: ${formatTokens(result.conversation.totalTokens ?? 0)}`);
     lines.push('');
 
     return lines.join('\n');
@@ -208,6 +286,12 @@ export type TestResultRecord = {
     turns: number;
     /** Total bytes of tool results returned to the agent across the conversation */
     resultBytes: number;
+    /** Prompt tokens billed across all agent LLM calls */
+    promptTokens: number;
+    /** Completion tokens billed across all agent LLM calls */
+    completionTokens: number;
+    /** Total tokens billed across all agent LLM calls (prompt + completion) */
+    totalTokens: number;
     /** Error message if execution failed, null otherwise */
     error: string | null;
 };
