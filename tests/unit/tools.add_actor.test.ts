@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { addTool } from '../../src/tools/actors/add_actor.js';
+import { addActor } from '../../src/tools/actors/add_actor.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type { TextToolResult } from './helpers/tool_context.js';
 
@@ -44,12 +44,12 @@ function buildContext(
 
 describe('add-actor tool', () => {
     it('has the expected tool name', () => {
-        expect(addTool.name).toBe(HelperTools.ACTOR_ADD);
+        expect(addActor.name).toBe(HelperTools.ACTOR_ADD);
     });
 
     it('sends list_changed and nudges the client to refresh via tools/list (#851)', async () => {
         const sendNotification = vi.fn().mockResolvedValue(undefined);
-        const result = (await (addTool as HelperTool).call(
+        const result = (await (addActor as HelperTool).call(
             buildContext({ tools: [{ name: 'apify/rag-web-browser' }], sendNotification }),
         )) as TextToolResult;
 
@@ -63,7 +63,7 @@ describe('add-actor tool', () => {
     });
 
     it('does not nudge when the actor is already available', async () => {
-        const result = (await (addTool as HelperTool).call(
+        const result = (await (addActor as HelperTool).call(
             buildContext({ actor: 'apify/already-there', alreadyLoaded: ['apify/already-there'] }),
         )) as TextToolResult;
 
@@ -72,7 +72,7 @@ describe('add-actor tool', () => {
     });
 
     it('forwards a load error without a nudge', async () => {
-        const result = (await (addTool as HelperTool).call(
+        const result = (await (addActor as HelperTool).call(
             buildContext({ errors: [{ message: 'Actor xyz was not found.' }], tools: [] }),
         )) as TextToolResult;
 

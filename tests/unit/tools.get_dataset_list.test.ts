@@ -110,9 +110,7 @@ describe('get-dataset-list', () => {
     it('emits structuredContent that validates against the outputSchema for the last/empty page', async () => {
         const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total: 0, count: 0, items: [] });
 
-        const result = await (getDatasetList as HelperTool).call(
-            stubToolCallContext({}, stubApifyClient(listSpy)),
-        );
+        const result = await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
         expect(structuredContent).toHaveProperty('count', 0);
