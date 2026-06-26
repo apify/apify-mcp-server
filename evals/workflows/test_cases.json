@@ -201,8 +201,8 @@
     {
       "id": "storage-dataset-items-youtube",
       "category": "storage",
-      "query": "Use Apify to scrape 15 videos from the MrBeast YouTube channel. When the run finishes, retrieve only the title and view count of each video and list them.",
-      "reference": "The agent must find a YouTube scraper and call-actor it for the MrBeast channel, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several videos, each with a title and a view count.",
+      "query": "Use Apify to scrape 15 videos from the Apify YouTube channel. When the run finishes, retrieve only the title and view count of each video and list them.",
+      "reference": "The agent must find a YouTube scraper and call-actor it for the Apify channel, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several videos, each with a title and a view count.",
       "tools": ["actors", "get-dataset-items"],
       "maxTurns": 18
     },
