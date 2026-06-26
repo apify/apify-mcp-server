@@ -173,6 +173,76 @@
       "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-key-value-store-keys with the keyValueStoreId from that run. PASS only if get-key-value-store-keys was actually called with a keyValueStoreId argument and the final answer states a key count and lists one or more key names.",
       "tools": ["actors", "get-key-value-store-keys"],
       "maxTurns": 14
+    },
+    {
+      "id": "call-google-search-results",
+      "category": "call",
+      "query": "Use Apify to run a Google search for 'best open source web scraping libraries' and give me the title and URL of the top 5 organic results.",
+      "reference": "The agent must find the Google Search Results scraper (e.g. apify/google-search-scraper), call it with the query 'best open source web scraping libraries', and present at least 5 organic results, each with a title and a URL."
+    },
+    {
+      "id": "storage-dataset-items-google-search",
+      "category": "storage",
+      "query": "Run a Google search via Apify for 'apify web scraping' and request the top 10 organic results. When the run finishes, retrieve only the title and URL of each result and list them.",
+      "reference": "The agent must find the Google Search Results scraper and call-actor it for the query 'apify web scraping', then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists at least five results, each with a title and a URL.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 16
+    },
+    {
+      "id": "call-instagram-recent-posts",
+      "category": "call",
+      "query": "Using Apify, get the 3 most recent posts from the nasa Instagram profile and tell me each post's caption and like count.",
+      "reference": "The agent must find an Instagram scraper (e.g. apify/instagram-scraper), call it for the nasa profile, and present at least 3 recent posts, each with a caption and a like count."
+    },
+    {
+      "id": "storage-dataset-items-instagram",
+      "category": "storage",
+      "query": "Scrape the 10 latest posts from the natgeo Instagram profile using Apify. When the run finishes, retrieve only the caption and like count of each post and list them.",
+      "reference": "The agent must find an Instagram scraper and call-actor it for the natgeo profile, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several posts, each with a caption and a like count.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 18
+    },
+    {
+      "id": "call-tiktok-recent-videos",
+      "category": "call",
+      "query": "Use Apify to get the 5 latest TikTok videos from the @nasa profile and report each video's view count.",
+      "reference": "The agent must find a TikTok scraper, call it for the @nasa profile, and present at least 5 recent videos, each with a view count."
+    },
+    {
+      "id": "storage-dataset-items-tiktok",
+      "category": "storage",
+      "query": "Scrape the 10 latest TikTok videos from the @natgeo profile using Apify. When the run finishes, retrieve only each video's URL and view count and list them.",
+      "reference": "The agent must find a TikTok scraper and call-actor it for the @natgeo profile, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several videos, each with a URL and a view count.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 18
+    },
+    {
+      "id": "call-youtube-channel-videos",
+      "category": "call",
+      "query": "Find a YouTube scraper on Apify and get the 5 latest videos from the NASA YouTube channel, with each video's title and view count.",
+      "reference": "The agent must find a YouTube scraper (e.g. streamers/youtube-scraper), call it for the NASA channel, and present at least 5 videos, each with a title and a view count."
+    },
+    {
+      "id": "storage-dataset-items-youtube",
+      "category": "storage",
+      "query": "Use Apify to scrape 10 videos from the MrBeast YouTube channel. When the run finishes, retrieve only the title and view count of each video and list them.",
+      "reference": "The agent must find a YouTube scraper and call-actor it for the MrBeast channel, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several videos, each with a title and a view count.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 18
+    },
+    {
+      "id": "call-reddit-subreddit-posts",
+      "category": "call",
+      "query": "Use Apify to get the top 5 posts from the r/programming subreddit and tell me each post's title and number of upvotes.",
+      "reference": "The agent must find a Reddit scraper, call it for the r/programming subreddit, and present at least 5 posts, each with a title and an upvote count."
+    },
+    {
+      "id": "storage-dataset-items-reddit",
+      "category": "storage",
+      "query": "Scrape 10 posts from the r/technology subreddit using Apify. When the run finishes, retrieve only the title and upvote count of each post and list them.",
+      "reference": "The agent must find a Reddit scraper and call-actor it for the r/technology subreddit, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several posts, each with a title and an upvote count.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 18
     }
   ]
 }
