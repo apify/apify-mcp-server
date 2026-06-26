@@ -1,0 +1,1545 @@
+{
+  "meta": {
+    "runsPerFormat": 3,
+    "testCount": 16,
+    "concurrency": 2,
+    "agentModel": "anthropic/claude-haiku-4.5",
+    "judgeModel": "deepseek/deepseek-v4-flash",
+    "note": "Bytes = UTF-8 tool-result bytes fed to the agent. Tokens = agent prompt+completion (judge excluded). Live-Actor output varies between calls, hence averaging."
+  },
+  "summary": {
+    "toon": {
+      "format": "toon",
+      "runs": 3,
+      "avgPassCount": 14.666666666666666,
+      "avgPassRate": 0.9166666666666666,
+      "avgBytes": 404291,
+      "avgTokens": 816603,
+      "avgPromptTokens": 802553.3333333334,
+      "avgCompletionTokens": 14049.666666666666,
+      "avgDurationMs": 325812.6666666667,
+      "perRunPassCount": [
+        15,
+        15,
+        14
+      ],
+      "perRunBytes": [
+        408559,
+        403928,
+        400386
+      ],
+      "perRunTokens": [
+        820480,
+        824630,
+        804699
+      ]
+    },
+    "json": {
+      "format": "json",
+      "runs": 3,
+      "avgPassCount": 14,
+      "avgPassRate": 0.875,
+      "avgBytes": 410082.3333333333,
+      "avgTokens": 830454,
+      "avgPromptTokens": 816294.3333333334,
+      "avgCompletionTokens": 14159.666666666666,
+      "avgDurationMs": 332748,
+      "perRunPassCount": [
+        14,
+        14,
+        14
+      ],
+      "perRunBytes": [
+        410114,
+        411290,
+        408843
+      ],
+      "perRunTokens": [
+        832002,
+        845481,
+        813879
+      ]
+    }
+  },
+  "comparison": {
+    "bytes": {
+      "toonAvg": 404291,
+      "jsonAvg": 410082.3333333333,
+      "deltaPct": -1.412236729697365
+    },
+    "tokens": {
+      "toonAvg": 816603,
+      "jsonAvg": 830454,
+      "deltaPct": -1.6678828688885836
+    },
+    "accuracy": {
+      "toonPassRate": 0.9166666666666666,
+      "jsonPassRate": 0.875,
+      "deltaPoints": 4.1666666666666625
+    }
+  },
+  "perTest": [
+    {
+      "testId": "storage-dataset-items-seeded",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 5022.333333333333,
+        "avgTokens": 29428
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 5050,
+        "avgTokens": 29444.666666666668
+      }
+    },
+    {
+      "testId": "storage-dataset-schema-seeded",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 9299.333333333334,
+        "avgTokens": 33701.666666666664
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 9299.333333333334,
+        "avgTokens": 33700.333333333336
+      }
+    },
+    {
+      "testId": "storage-dataset-metadata-seeded",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 7286.666666666667,
+        "avgTokens": 31261
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 7289.666666666667,
+        "avgTokens": 31227.666666666668
+      }
+    },
+    {
+      "testId": "storage-kv-keys-seeded",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 5467.333333333333,
+        "avgTokens": 31034
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 6847.666666666667,
+        "avgTokens": 31917.666666666668
+      }
+    },
+    {
+      "testId": "storage-kv-record-seeded",
+      "category": "storage",
+      "toon": {
+        "passRate": 0.6666666666666666,
+        "avgBytes": 6815.666666666667,
+        "avgTokens": 30855
+      },
+      "json": {
+        "passRate": 0.3333333333333333,
+        "avgBytes": 5564.666666666667,
+        "avgTokens": 30036
+      }
+    },
+    {
+      "testId": "storage-actor-run-list-seeded",
+      "category": "storage",
+      "toon": {
+        "passRate": 0.6666666666666666,
+        "avgBytes": 11397.333333333334,
+        "avgTokens": 36615
+      },
+      "json": {
+        "passRate": 0.6666666666666666,
+        "avgBytes": 15211.666666666666,
+        "avgTokens": 42424.666666666664
+      }
+    },
+    {
+      "testId": "storage-dataset-items-maps-bulk",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 55281.666666666664,
+        "avgTokens": 80349.33333333333
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 55164.666666666664,
+        "avgTokens": 80076.33333333333
+      }
+    },
+    {
+      "testId": "storage-dataset-items-hotels-bulk",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 44950.666666666664,
+        "avgTokens": 73711.33333333333
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 43407,
+        "avgTokens": 72824.33333333333
+      }
+    },
+    {
+      "testId": "storage-dataset-items-rag-bulk",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 6832.333333333333,
+        "avgTokens": 30498.666666666668
+      },
+      "json": {
+        "passRate": 0.3333333333333333,
+        "avgBytes": 8754.666666666666,
+        "avgTokens": 42934
+      }
+    },
+    {
+      "testId": "storage-run-list-recent",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 5000.333333333333,
+        "avgTokens": 6706
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 5224.666666666667,
+        "avgTokens": 6733
+      }
+    },
+    {
+      "testId": "storage-kv-keys-bulk",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 9809,
+        "avgTokens": 33851
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 9959.666666666666,
+        "avgTokens": 33885.333333333336
+      }
+    },
+    {
+      "testId": "storage-dataset-items-google-search",
+      "category": "storage",
+      "toon": {
+        "passRate": 0.3333333333333333,
+        "avgBytes": 45677.666666666664,
+        "avgTokens": 89230
+      },
+      "json": {
+        "passRate": 0.6666666666666666,
+        "avgBytes": 47349,
+        "avgTokens": 90215.66666666667
+      }
+    },
+    {
+      "testId": "storage-dataset-items-instagram",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 19574,
+        "avgTokens": 52054.666666666664
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 18107.666666666668,
+        "avgTokens": 47418.666666666664
+      }
+    },
+    {
+      "testId": "storage-dataset-items-tiktok",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 121363.33333333333,
+        "avgTokens": 119960.33333333333
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 121703,
+        "avgTokens": 120000.33333333333
+      }
+    },
+    {
+      "testId": "storage-dataset-items-youtube",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 23976.333333333332,
+        "avgTokens": 65043
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 24209,
+        "avgTokens": 65132.333333333336
+      }
+    },
+    {
+      "testId": "storage-dataset-items-reddit",
+      "category": "storage",
+      "toon": {
+        "passRate": 1,
+        "avgBytes": 26537,
+        "avgTokens": 72304
+      },
+      "json": {
+        "passRate": 1,
+        "avgBytes": 26940,
+        "avgTokens": 72483
+      }
+    }
+  ],
+  "rawRuns": [
+    {
+      "format": "toon",
+      "run": 1,
+      "passCount": 15,
+      "failCount": 1,
+      "errorCount": 0,
+      "totalBytes": 408559,
+      "totalTokens": 820480,
+      "totalPromptTokens": 806335,
+      "totalCompletionTokens": 14145,
+      "durationMs": 315165,
+      "outcomes": [
+        {
+          "testId": "storage-dataset-items-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5013,
+          "promptTokens": 28918,
+          "completionTokens": 475,
+          "totalTokens": 29393,
+          "turns": 4,
+          "durationMs": 27336
+        },
+        {
+          "testId": "storage-dataset-schema-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9290,
+          "promptTokens": 32795,
+          "completionTokens": 900,
+          "totalTokens": 33695,
+          "turns": 4,
+          "durationMs": 26630
+        },
+        {
+          "testId": "storage-dataset-metadata-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 7286,
+          "promptTokens": 30701,
+          "completionTokens": 577,
+          "totalTokens": 31278,
+          "turns": 4,
+          "durationMs": 36414
+        },
+        {
+          "testId": "storage-kv-keys-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5472,
+          "promptTokens": 30419,
+          "completionTokens": 617,
+          "totalTokens": 31036,
+          "turns": 4,
+          "durationMs": 26601
+        },
+        {
+          "testId": "storage-kv-record-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5569,
+          "promptTokens": 29252,
+          "completionTokens": 745,
+          "totalTokens": 29997,
+          "turns": 4,
+          "durationMs": 28811
+        },
+        {
+          "testId": "storage-actor-run-list-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9724,
+          "promptTokens": 33113,
+          "completionTokens": 645,
+          "totalTokens": 33758,
+          "turns": 4,
+          "durationMs": 29866
+        },
+        {
+          "testId": "storage-dataset-items-maps-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 55827,
+          "promptTokens": 79849,
+          "completionTokens": 831,
+          "totalTokens": 80680,
+          "turns": 5,
+          "durationMs": 31864
+        },
+        {
+          "testId": "storage-dataset-items-hotels-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 50188,
+          "promptTokens": 75714,
+          "completionTokens": 1067,
+          "totalTokens": 76781,
+          "turns": 5,
+          "durationMs": 37597
+        },
+        {
+          "testId": "storage-dataset-items-rag-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 6616,
+          "promptTokens": 29595,
+          "completionTokens": 848,
+          "totalTokens": 30443,
+          "turns": 4,
+          "durationMs": 31860
+        },
+        {
+          "testId": "storage-run-list-recent",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5016,
+          "promptTokens": 6130,
+          "completionTokens": 583,
+          "totalTokens": 6713,
+          "turns": 2,
+          "durationMs": 13606
+        },
+        {
+          "testId": "storage-kv-keys-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9807,
+          "promptTokens": 33254,
+          "completionTokens": 598,
+          "totalTokens": 33852,
+          "turns": 4,
+          "durationMs": 39143
+        },
+        {
+          "testId": "storage-dataset-items-google-search",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 44742,
+          "promptTokens": 87931,
+          "completionTokens": 1062,
+          "totalTokens": 88993,
+          "turns": 6,
+          "durationMs": 37929
+        },
+        {
+          "testId": "storage-dataset-items-instagram",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 22209,
+          "promptTokens": 59019,
+          "completionTokens": 1860,
+          "totalTokens": 60879,
+          "turns": 6,
+          "durationMs": 76502
+        },
+        {
+          "testId": "storage-dataset-items-tiktok",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 121555,
+          "promptTokens": 119051,
+          "completionTokens": 1066,
+          "totalTokens": 120117,
+          "turns": 5,
+          "durationMs": 29959
+        },
+        {
+          "testId": "storage-dataset-items-youtube",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 23967,
+          "promptTokens": 64020,
+          "completionTokens": 1066,
+          "totalTokens": 65086,
+          "turns": 6,
+          "durationMs": 33141
+        },
+        {
+          "testId": "storage-dataset-items-reddit",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 26278,
+          "promptTokens": 66574,
+          "completionTokens": 1205,
+          "totalTokens": 67779,
+          "turns": 6,
+          "durationMs": 66571
+        }
+      ]
+    },
+    {
+      "format": "json",
+      "run": 1,
+      "passCount": 14,
+      "failCount": 2,
+      "errorCount": 0,
+      "totalBytes": 410114,
+      "totalTokens": 832002,
+      "totalPromptTokens": 817932,
+      "totalCompletionTokens": 14070,
+      "durationMs": 319796,
+      "outcomes": [
+        {
+          "testId": "storage-dataset-items-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5055,
+          "promptTokens": 28958,
+          "completionTokens": 479,
+          "totalTokens": 29437,
+          "turns": 4,
+          "durationMs": 21414
+        },
+        {
+          "testId": "storage-dataset-schema-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9304,
+          "promptTokens": 32817,
+          "completionTokens": 871,
+          "totalTokens": 33688,
+          "turns": 4,
+          "durationMs": 27858
+        },
+        {
+          "testId": "storage-dataset-metadata-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 7289,
+          "promptTokens": 30676,
+          "completionTokens": 557,
+          "totalTokens": 31233,
+          "turns": 4,
+          "durationMs": 41262
+        },
+        {
+          "testId": "storage-kv-keys-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5584,
+          "promptTokens": 30457,
+          "completionTokens": 648,
+          "totalTokens": 31105,
+          "turns": 4,
+          "durationMs": 22036
+        },
+        {
+          "testId": "storage-kv-record-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5569,
+          "promptTokens": 29252,
+          "completionTokens": 763,
+          "totalTokens": 30015,
+          "turns": 4,
+          "durationMs": 36077
+        },
+        {
+          "testId": "storage-actor-run-list-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 15216,
+          "promptTokens": 41751,
+          "completionTokens": 743,
+          "totalTokens": 42494,
+          "turns": 4,
+          "durationMs": 38157
+        },
+        {
+          "testId": "storage-dataset-items-maps-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 54157,
+          "promptTokens": 78561,
+          "completionTokens": 804,
+          "totalTokens": 79365,
+          "turns": 5,
+          "durationMs": 38542
+        },
+        {
+          "testId": "storage-dataset-items-hotels-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 44847,
+          "promptTokens": 73268,
+          "completionTokens": 863,
+          "totalTokens": 74131,
+          "turns": 5,
+          "durationMs": 32243
+        },
+        {
+          "testId": "storage-dataset-items-rag-bulk",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 9162,
+          "promptTokens": 47813,
+          "completionTokens": 1100,
+          "totalTokens": 48913,
+          "turns": 6,
+          "durationMs": 63005
+        },
+        {
+          "testId": "storage-run-list-recent",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5223,
+          "promptTokens": 6147,
+          "completionTokens": 586,
+          "totalTokens": 6733,
+          "turns": 2,
+          "durationMs": 13151
+        },
+        {
+          "testId": "storage-kv-keys-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9975,
+          "promptTokens": 33272,
+          "completionTokens": 572,
+          "totalTokens": 33844,
+          "turns": 4,
+          "durationMs": 30665
+        },
+        {
+          "testId": "storage-dataset-items-google-search",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 46520,
+          "promptTokens": 88491,
+          "completionTokens": 989,
+          "totalTokens": 89480,
+          "turns": 6,
+          "durationMs": 46080
+        },
+        {
+          "testId": "storage-dataset-items-instagram",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 19879,
+          "promptTokens": 46828,
+          "completionTokens": 1745,
+          "totalTokens": 48573,
+          "turns": 5,
+          "durationMs": 49873
+        },
+        {
+          "testId": "storage-dataset-items-tiktok",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 121588,
+          "promptTokens": 118882,
+          "completionTokens": 1038,
+          "totalTokens": 119920,
+          "turns": 5,
+          "durationMs": 33753
+        },
+        {
+          "testId": "storage-dataset-items-youtube",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 24209,
+          "promptTokens": 64090,
+          "completionTokens": 1068,
+          "totalTokens": 65158,
+          "turns": 6,
+          "durationMs": 36050
+        },
+        {
+          "testId": "storage-dataset-items-reddit",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 26537,
+          "promptTokens": 66669,
+          "completionTokens": 1244,
+          "totalTokens": 67913,
+          "turns": 6,
+          "durationMs": 62129
+        }
+      ]
+    },
+    {
+      "format": "toon",
+      "run": 2,
+      "passCount": 15,
+      "failCount": 1,
+      "errorCount": 0,
+      "totalBytes": 403928,
+      "totalTokens": 824630,
+      "totalPromptTokens": 810565,
+      "totalCompletionTokens": 14065,
+      "durationMs": 342626,
+      "outcomes": [
+        {
+          "testId": "storage-dataset-items-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5027,
+          "promptTokens": 28956,
+          "completionTokens": 490,
+          "totalTokens": 29446,
+          "turns": 4,
+          "durationMs": 25242
+        },
+        {
+          "testId": "storage-dataset-schema-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9304,
+          "promptTokens": 32822,
+          "completionTokens": 914,
+          "totalTokens": 33736,
+          "turns": 4,
+          "durationMs": 24087
+        },
+        {
+          "testId": "storage-dataset-metadata-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 7269,
+          "promptTokens": 30653,
+          "completionTokens": 607,
+          "totalTokens": 31260,
+          "turns": 4,
+          "durationMs": 30244
+        },
+        {
+          "testId": "storage-kv-keys-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5458,
+          "promptTokens": 30403,
+          "completionTokens": 616,
+          "totalTokens": 31019,
+          "turns": 4,
+          "durationMs": 29665
+        },
+        {
+          "testId": "storage-kv-record-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9295,
+          "promptTokens": 31823,
+          "completionTokens": 742,
+          "totalTokens": 32565,
+          "turns": 4,
+          "durationMs": 33764
+        },
+        {
+          "testId": "storage-actor-run-list-seeded",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 14747,
+          "promptTokens": 41582,
+          "completionTokens": 729,
+          "totalTokens": 42311,
+          "turns": 4,
+          "durationMs": 40771
+        },
+        {
+          "testId": "storage-dataset-items-maps-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 53691,
+          "promptTokens": 78507,
+          "completionTokens": 837,
+          "totalTokens": 79344,
+          "turns": 5,
+          "durationMs": 39344
+        },
+        {
+          "testId": "storage-dataset-items-hotels-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 39971,
+          "promptTokens": 69200,
+          "completionTokens": 868,
+          "totalTokens": 70068,
+          "turns": 5,
+          "durationMs": 55592
+        },
+        {
+          "testId": "storage-dataset-items-rag-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 6618,
+          "promptTokens": 29580,
+          "completionTokens": 822,
+          "totalTokens": 30402,
+          "turns": 4,
+          "durationMs": 60549
+        },
+        {
+          "testId": "storage-run-list-recent",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 4986,
+          "promptTokens": 6109,
+          "completionTokens": 593,
+          "totalTokens": 6702,
+          "turns": 2,
+          "durationMs": 14856
+        },
+        {
+          "testId": "storage-kv-keys-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9805,
+          "promptTokens": 33254,
+          "completionTokens": 608,
+          "totalTokens": 33862,
+          "turns": 4,
+          "durationMs": 25751
+        },
+        {
+          "testId": "storage-dataset-items-google-search",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 45995,
+          "promptTokens": 88302,
+          "completionTokens": 1048,
+          "totalTokens": 89350,
+          "turns": 6,
+          "durationMs": 34859
+        },
+        {
+          "testId": "storage-dataset-items-instagram",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 19551,
+          "promptTokens": 46743,
+          "completionTokens": 1761,
+          "totalTokens": 48504,
+          "turns": 5,
+          "durationMs": 48802
+        },
+        {
+          "testId": "storage-dataset-items-tiktok",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 121217,
+          "promptTokens": 118759,
+          "completionTokens": 1022,
+          "totalTokens": 119781,
+          "turns": 5,
+          "durationMs": 36913
+        },
+        {
+          "testId": "storage-dataset-items-youtube",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 23974,
+          "promptTokens": 63883,
+          "completionTokens": 1053,
+          "totalTokens": 64936,
+          "turns": 6,
+          "durationMs": 36131
+        },
+        {
+          "testId": "storage-dataset-items-reddit",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 27020,
+          "promptTokens": 79989,
+          "completionTokens": 1355,
+          "totalTokens": 81344,
+          "turns": 7,
+          "durationMs": 81672
+        }
+      ]
+    },
+    {
+      "format": "json",
+      "run": 2,
+      "passCount": 14,
+      "failCount": 2,
+      "errorCount": 0,
+      "totalBytes": 411290,
+      "totalTokens": 845481,
+      "totalPromptTokens": 830887,
+      "totalCompletionTokens": 14594,
+      "durationMs": 367187,
+      "outcomes": [
+        {
+          "testId": "storage-dataset-items-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5040,
+          "promptTokens": 28960,
+          "completionTokens": 495,
+          "totalTokens": 29455,
+          "turns": 4,
+          "durationMs": 31568
+        },
+        {
+          "testId": "storage-dataset-schema-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9290,
+          "promptTokens": 32815,
+          "completionTokens": 910,
+          "totalTokens": 33725,
+          "turns": 4,
+          "durationMs": 27694
+        },
+        {
+          "testId": "storage-dataset-metadata-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 7277,
+          "promptTokens": 30670,
+          "completionTokens": 532,
+          "totalTokens": 31202,
+          "turns": 4,
+          "durationMs": 24268
+        },
+        {
+          "testId": "storage-kv-keys-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9312,
+          "promptTokens": 32990,
+          "completionTokens": 572,
+          "totalTokens": 33562,
+          "turns": 4,
+          "durationMs": 33382
+        },
+        {
+          "testId": "storage-kv-record-seeded",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 5556,
+          "promptTokens": 29254,
+          "completionTokens": 805,
+          "totalTokens": 30059,
+          "turns": 4,
+          "durationMs": 25412
+        },
+        {
+          "testId": "storage-actor-run-list-seeded",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 15218,
+          "promptTokens": 41668,
+          "completionTokens": 715,
+          "totalTokens": 42383,
+          "turns": 4,
+          "durationMs": 49840
+        },
+        {
+          "testId": "storage-dataset-items-maps-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 54574,
+          "promptTokens": 78736,
+          "completionTokens": 1088,
+          "totalTokens": 79824,
+          "turns": 5,
+          "durationMs": 37957
+        },
+        {
+          "testId": "storage-dataset-items-hotels-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 40234,
+          "promptTokens": 69181,
+          "completionTokens": 843,
+          "totalTokens": 70024,
+          "turns": 5,
+          "durationMs": 34595
+        },
+        {
+          "testId": "storage-dataset-items-rag-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 10116,
+          "promptTokens": 48254,
+          "completionTokens": 1144,
+          "totalTokens": 49398,
+          "turns": 6,
+          "durationMs": 62976
+        },
+        {
+          "testId": "storage-run-list-recent",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5227,
+          "promptTokens": 6153,
+          "completionTokens": 574,
+          "totalTokens": 6727,
+          "turns": 2,
+          "durationMs": 11891
+        },
+        {
+          "testId": "storage-kv-keys-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9942,
+          "promptTokens": 33266,
+          "completionTokens": 600,
+          "totalTokens": 33866,
+          "turns": 4,
+          "durationMs": 38752
+        },
+        {
+          "testId": "storage-dataset-items-google-search",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 49008,
+          "promptTokens": 90603,
+          "completionTokens": 1091,
+          "totalTokens": 91694,
+          "turns": 6,
+          "durationMs": 32866
+        },
+        {
+          "testId": "storage-dataset-items-instagram",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 17219,
+          "promptTokens": 45105,
+          "completionTokens": 1730,
+          "totalTokens": 46835,
+          "turns": 5,
+          "durationMs": 39158
+        },
+        {
+          "testId": "storage-dataset-items-tiktok",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 121741,
+          "promptTokens": 118966,
+          "completionTokens": 1093,
+          "totalTokens": 120059,
+          "turns": 5,
+          "durationMs": 31812
+        },
+        {
+          "testId": "storage-dataset-items-youtube",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 24209,
+          "promptTokens": 64060,
+          "completionTokens": 1064,
+          "totalTokens": 65124,
+          "turns": 6,
+          "durationMs": 34126
+        },
+        {
+          "testId": "storage-dataset-items-reddit",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 27327,
+          "promptTokens": 80206,
+          "completionTokens": 1338,
+          "totalTokens": 81544,
+          "turns": 7,
+          "durationMs": 122471
+        }
+      ]
+    },
+    {
+      "format": "toon",
+      "run": 3,
+      "passCount": 14,
+      "failCount": 2,
+      "errorCount": 0,
+      "totalBytes": 400386,
+      "totalTokens": 804699,
+      "totalPromptTokens": 790760,
+      "totalCompletionTokens": 13939,
+      "durationMs": 319647,
+      "outcomes": [
+        {
+          "testId": "storage-dataset-items-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5027,
+          "promptTokens": 28960,
+          "completionTokens": 485,
+          "totalTokens": 29445,
+          "turns": 4,
+          "durationMs": 31761
+        },
+        {
+          "testId": "storage-dataset-schema-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9304,
+          "promptTokens": 32788,
+          "completionTokens": 886,
+          "totalTokens": 33674,
+          "turns": 4,
+          "durationMs": 25573
+        },
+        {
+          "testId": "storage-dataset-metadata-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 7305,
+          "promptTokens": 30670,
+          "completionTokens": 575,
+          "totalTokens": 31245,
+          "turns": 4,
+          "durationMs": 44164
+        },
+        {
+          "testId": "storage-kv-keys-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5472,
+          "promptTokens": 30393,
+          "completionTokens": 654,
+          "totalTokens": 31047,
+          "turns": 4,
+          "durationMs": 33012
+        },
+        {
+          "testId": "storage-kv-record-seeded",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 5583,
+          "promptTokens": 29284,
+          "completionTokens": 719,
+          "totalTokens": 30003,
+          "turns": 4,
+          "durationMs": 30944
+        },
+        {
+          "testId": "storage-actor-run-list-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9721,
+          "promptTokens": 33095,
+          "completionTokens": 681,
+          "totalTokens": 33776,
+          "turns": 4,
+          "durationMs": 44040
+        },
+        {
+          "testId": "storage-dataset-items-maps-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 56327,
+          "promptTokens": 80126,
+          "completionTokens": 898,
+          "totalTokens": 81024,
+          "turns": 5,
+          "durationMs": 35020
+        },
+        {
+          "testId": "storage-dataset-items-hotels-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 44693,
+          "promptTokens": 73369,
+          "completionTokens": 916,
+          "totalTokens": 74285,
+          "turns": 5,
+          "durationMs": 38888
+        },
+        {
+          "testId": "storage-dataset-items-rag-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 7263,
+          "promptTokens": 29824,
+          "completionTokens": 827,
+          "totalTokens": 30651,
+          "turns": 4,
+          "durationMs": 39579
+        },
+        {
+          "testId": "storage-run-list-recent",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 4999,
+          "promptTokens": 6115,
+          "completionTokens": 588,
+          "totalTokens": 6703,
+          "turns": 2,
+          "durationMs": 22201
+        },
+        {
+          "testId": "storage-kv-keys-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9815,
+          "promptTokens": 33239,
+          "completionTokens": 600,
+          "totalTokens": 33839,
+          "turns": 4,
+          "durationMs": 31398
+        },
+        {
+          "testId": "storage-dataset-items-google-search",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 46296,
+          "promptTokens": 88360,
+          "completionTokens": 987,
+          "totalTokens": 89347,
+          "turns": 6,
+          "durationMs": 33081
+        },
+        {
+          "testId": "storage-dataset-items-instagram",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 16962,
+          "promptTokens": 45030,
+          "completionTokens": 1751,
+          "totalTokens": 46781,
+          "turns": 5,
+          "durationMs": 41102
+        },
+        {
+          "testId": "storage-dataset-items-tiktok",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 121318,
+          "promptTokens": 118915,
+          "completionTokens": 1068,
+          "totalTokens": 119983,
+          "turns": 5,
+          "durationMs": 35128
+        },
+        {
+          "testId": "storage-dataset-items-youtube",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 23988,
+          "promptTokens": 64040,
+          "completionTokens": 1067,
+          "totalTokens": 65107,
+          "turns": 6,
+          "durationMs": 32537
+        },
+        {
+          "testId": "storage-dataset-items-reddit",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 26313,
+          "promptTokens": 66552,
+          "completionTokens": 1237,
+          "totalTokens": 67789,
+          "turns": 6,
+          "durationMs": 75618
+        }
+      ]
+    },
+    {
+      "format": "json",
+      "run": 3,
+      "passCount": 14,
+      "failCount": 2,
+      "errorCount": 0,
+      "totalBytes": 408843,
+      "totalTokens": 813879,
+      "totalPromptTokens": 800064,
+      "totalCompletionTokens": 13815,
+      "durationMs": 311261,
+      "outcomes": [
+        {
+          "testId": "storage-dataset-items-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5055,
+          "promptTokens": 28953,
+          "completionTokens": 489,
+          "totalTokens": 29442,
+          "turns": 4,
+          "durationMs": 29326
+        },
+        {
+          "testId": "storage-dataset-schema-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9304,
+          "promptTokens": 32827,
+          "completionTokens": 861,
+          "totalTokens": 33688,
+          "turns": 4,
+          "durationMs": 29160
+        },
+        {
+          "testId": "storage-dataset-metadata-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 7303,
+          "promptTokens": 30685,
+          "completionTokens": 563,
+          "totalTokens": 31248,
+          "turns": 4,
+          "durationMs": 27609
+        },
+        {
+          "testId": "storage-kv-keys-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5647,
+          "promptTokens": 30483,
+          "completionTokens": 603,
+          "totalTokens": 31086,
+          "turns": 4,
+          "durationMs": 23949
+        },
+        {
+          "testId": "storage-kv-record-seeded",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 5569,
+          "promptTokens": 29253,
+          "completionTokens": 781,
+          "totalTokens": 30034,
+          "turns": 4,
+          "durationMs": 27019
+        },
+        {
+          "testId": "storage-actor-run-list-seeded",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 15201,
+          "promptTokens": 41680,
+          "completionTokens": 717,
+          "totalTokens": 42397,
+          "turns": 4,
+          "durationMs": 50546
+        },
+        {
+          "testId": "storage-dataset-items-maps-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 56763,
+          "promptTokens": 80235,
+          "completionTokens": 805,
+          "totalTokens": 81040,
+          "turns": 5,
+          "durationMs": 49049
+        },
+        {
+          "testId": "storage-dataset-items-hotels-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 45140,
+          "promptTokens": 73502,
+          "completionTokens": 816,
+          "totalTokens": 74318,
+          "turns": 5,
+          "durationMs": 34213
+        },
+        {
+          "testId": "storage-dataset-items-rag-bulk",
+          "category": "storage",
+          "verdict": "FAIL",
+          "error": null,
+          "resultBytes": 6986,
+          "promptTokens": 29676,
+          "completionTokens": 815,
+          "totalTokens": 30491,
+          "turns": 4,
+          "durationMs": 38144
+        },
+        {
+          "testId": "storage-run-list-recent",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 5224,
+          "promptTokens": 6147,
+          "completionTokens": 592,
+          "totalTokens": 6739,
+          "turns": 2,
+          "durationMs": 21247
+        },
+        {
+          "testId": "storage-kv-keys-bulk",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 9962,
+          "promptTokens": 33323,
+          "completionTokens": 623,
+          "totalTokens": 33946,
+          "turns": 4,
+          "durationMs": 31426
+        },
+        {
+          "testId": "storage-dataset-items-google-search",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 46519,
+          "promptTokens": 88446,
+          "completionTokens": 1027,
+          "totalTokens": 89473,
+          "turns": 6,
+          "durationMs": 32310
+        },
+        {
+          "testId": "storage-dataset-items-instagram",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 17225,
+          "promptTokens": 45106,
+          "completionTokens": 1742,
+          "totalTokens": 46848,
+          "turns": 5,
+          "durationMs": 39499
+        },
+        {
+          "testId": "storage-dataset-items-tiktok",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 121780,
+          "promptTokens": 118985,
+          "completionTokens": 1037,
+          "totalTokens": 120022,
+          "turns": 5,
+          "durationMs": 33454
+        },
+        {
+          "testId": "storage-dataset-items-youtube",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 24209,
+          "promptTokens": 64048,
+          "completionTokens": 1067,
+          "totalTokens": 65115,
+          "turns": 6,
+          "durationMs": 44467
+        },
+        {
+          "testId": "storage-dataset-items-reddit",
+          "category": "storage",
+          "verdict": "PASS",
+          "error": null,
+          "resultBytes": 26956,
+          "promptTokens": 66715,
+          "completionTokens": 1277,
+          "totalTokens": 67992,
+          "turns": 6,
+          "durationMs": 76742
+        }
+      ]
+    }
+  ]
+}

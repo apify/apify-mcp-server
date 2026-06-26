@@ -1,0 +1,580 @@
+{
+  "accuracy": {
+    "toonPassPerRun": [
+      18,
+      8,
+      14,
+      16,
+      8
+    ],
+    "jsonPassPerRun": [
+      18,
+      16,
+      10,
+      13,
+      10
+    ],
+    "toonPassRate": 0.64,
+    "jsonPassRate": 0.67,
+    "toonMeanPass": 12.8,
+    "jsonMeanPass": 13.4,
+    "toonSd": 4.1182520563948,
+    "jsonSd": 3.2,
+    "deltaPts": -3.0000000000000027
+  },
+  "bytesPairedSuccessOnly": {
+    "nTests": 19,
+    "toonSum": 257287.19999999998,
+    "jsonSum": 250795.33333333337,
+    "deltaPct": 2.5885117479591364
+  },
+  "bytesSeededDeterministic": {
+    "nTests": 6,
+    "toonSum": 51090.833333333336,
+    "jsonSum": 51451.33333333333,
+    "deltaPct": -0.7006621143604819
+  },
+  "affectedTests": [
+    {
+      "id": "search-add-call-python-actor",
+      "seeded": false,
+      "toonBytes": 9677,
+      "jsonBytes": 9707,
+      "deltaPct": -0.3
+    },
+    {
+      "id": "instagram-posts",
+      "seeded": false,
+      "toonBytes": 18330,
+      "jsonBytes": 18708,
+      "deltaPct": -2
+    },
+    {
+      "id": "call-actor-mcp-weather",
+      "seeded": false,
+      "toonBytes": 29034,
+      "jsonBytes": 26095,
+      "deltaPct": 11.3
+    },
+    {
+      "id": "search-instagram-scrapers",
+      "seeded": false,
+      "toonBytes": 13687,
+      "jsonBytes": 9400,
+      "deltaPct": 45.6
+    },
+    {
+      "id": "call-google-maps-restaurants",
+      "seeded": false,
+      "toonBytes": 46336,
+      "jsonBytes": 46062,
+      "deltaPct": 0.6
+    },
+    {
+      "id": "workflow-search-fetch-schema-call",
+      "seeded": false,
+      "toonBytes": 17543,
+      "jsonBytes": 17562,
+      "deltaPct": -0.1
+    },
+    {
+      "id": "workflow-mcp-discover-and-execute",
+      "seeded": false,
+      "toonBytes": 1407,
+      "jsonBytes": 1627,
+      "deltaPct": -13.6
+    },
+    {
+      "id": "storage-dataset-items-seeded",
+      "seeded": true,
+      "toonBytes": 5018,
+      "jsonBytes": 5040,
+      "deltaPct": -0.4
+    },
+    {
+      "id": "storage-dataset-schema-seeded",
+      "seeded": true,
+      "toonBytes": 9290,
+      "jsonBytes": 9285,
+      "deltaPct": 0.1
+    },
+    {
+      "id": "storage-dataset-metadata-seeded",
+      "seeded": true,
+      "toonBytes": 7292,
+      "jsonBytes": 7295,
+      "deltaPct": 0
+    },
+    {
+      "id": "storage-kv-keys-seeded",
+      "seeded": true,
+      "toonBytes": 5458,
+      "jsonBytes": 5573,
+      "deltaPct": -2.1
+    },
+    {
+      "id": "storage-kv-record-seeded",
+      "seeded": true,
+      "toonBytes": 9295,
+      "jsonBytes": 9299,
+      "deltaPct": 0
+    },
+    {
+      "id": "storage-actor-run-list-seeded",
+      "seeded": true,
+      "toonBytes": 14739,
+      "jsonBytes": 14959,
+      "deltaPct": -1.5
+    }
+  ],
+  "identicalTests": [
+    {
+      "id": "search-google-maps",
+      "bytes": 18455
+    },
+    {
+      "id": "search-tiktok-scrapers",
+      "bytes": 14500
+    },
+    {
+      "id": "search-generic-scrapers",
+      "bytes": 12213
+    },
+    {
+      "id": "fetch-details-mcp-tools-list",
+      "bytes": 2236
+    },
+    {
+      "id": "fetch-details-mcp-tools-then-call",
+      "bytes": 22684
+    },
+    {
+      "id": "fetch-details-non-mcp-actor-graceful",
+      "bytes": 95
+    }
+  ],
+  "perTest": [
+    {
+      "id": "search-google-maps",
+      "cat": "search",
+      "seeded": false,
+      "toonPass": 5,
+      "jsonPass": 5,
+      "toonBytes": 18455,
+      "jsonBytes": 18455,
+      "byteDeltaPct": 0,
+      "toonTok": 21341.8,
+      "jsonTok": 21368.4,
+      "tokDeltaPct": -0.12448288126393264,
+      "bothPassed": true,
+      "affected": false
+    },
+    {
+      "id": "search-add-call-python-actor",
+      "cat": "call",
+      "seeded": false,
+      "toonPass": 2,
+      "jsonPass": 3,
+      "toonBytes": 9677,
+      "jsonBytes": 9707,
+      "byteDeltaPct": -0.30905532090244153,
+      "toonTok": 47023.5,
+      "jsonTok": 48449.333333333336,
+      "tokDeltaPct": -2.9429369513168444,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "instagram-posts",
+      "cat": "call",
+      "seeded": false,
+      "toonPass": 1,
+      "jsonPass": 5,
+      "toonBytes": 18330,
+      "jsonBytes": 18708.4,
+      "byteDeltaPct": -2.022620854803198,
+      "toonTok": 56653,
+      "jsonTok": 64194.4,
+      "tokDeltaPct": -11.747753698141896,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "call-actor-mcp-weather",
+      "cat": "mcp",
+      "seeded": false,
+      "toonPass": 3,
+      "jsonPass": 1,
+      "toonBytes": 29033.666666666668,
+      "jsonBytes": 26095,
+      "byteDeltaPct": 11.261416618764775,
+      "toonTok": 124158.33333333333,
+      "jsonTok": 112120,
+      "tokDeltaPct": 10.7370079676537,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "search-instagram-scrapers",
+      "cat": "search",
+      "seeded": false,
+      "toonPass": 5,
+      "jsonPass": 5,
+      "toonBytes": 13687.4,
+      "jsonBytes": 9399.8,
+      "byteDeltaPct": 45.61373646247793,
+      "toonTok": 20004,
+      "jsonTok": 18714.6,
+      "tokDeltaPct": 6.889807957423624,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "search-tiktok-scrapers",
+      "cat": "search",
+      "seeded": false,
+      "toonPass": 5,
+      "jsonPass": 5,
+      "toonBytes": 14500.4,
+      "jsonBytes": 14500.2,
+      "byteDeltaPct": 0.0013792913201121956,
+      "toonTok": 20602.6,
+      "jsonTok": 20608.6,
+      "tokDeltaPct": -0.02911405917917763,
+      "bothPassed": true,
+      "affected": false
+    },
+    {
+      "id": "search-generic-scrapers",
+      "cat": "search",
+      "seeded": false,
+      "toonPass": 5,
+      "jsonPass": 5,
+      "toonBytes": 12212.8,
+      "jsonBytes": 12212.8,
+      "byteDeltaPct": 0,
+      "toonTok": 19829,
+      "jsonTok": 19752.4,
+      "tokDeltaPct": 0.3878009760839115,
+      "bothPassed": true,
+      "affected": false
+    },
+    {
+      "id": "call-google-maps-restaurants",
+      "cat": "call",
+      "seeded": false,
+      "toonPass": 2,
+      "jsonPass": 1,
+      "toonBytes": 46335.5,
+      "jsonBytes": 46062,
+      "byteDeltaPct": 0.5937649255351483,
+      "toonTok": 82405.5,
+      "jsonTok": 82146,
+      "tokDeltaPct": 0.31590095683295594,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "call-tiktok-scraper",
+      "cat": "call",
+      "seeded": false,
+      "toonPass": 1,
+      "jsonPass": 0,
+      "toonBytes": 25085,
+      "jsonBytes": 0,
+      "byteDeltaPct": 0,
+      "toonTok": 61818,
+      "jsonTok": 0,
+      "tokDeltaPct": 0,
+      "bothPassed": false,
+      "affected": false
+    },
+    {
+      "id": "fetch-details-mcp-tools-list",
+      "cat": "mcp",
+      "seeded": false,
+      "toonPass": 5,
+      "jsonPass": 5,
+      "toonBytes": 2236,
+      "jsonBytes": 2236,
+      "byteDeltaPct": 0,
+      "toonTok": 16408,
+      "jsonTok": 16403.6,
+      "tokDeltaPct": 0.02682338023361613,
+      "bothPassed": true,
+      "affected": false
+    },
+    {
+      "id": "fetch-details-mcp-tools-then-call",
+      "cat": "mcp",
+      "seeded": false,
+      "toonPass": 5,
+      "jsonPass": 5,
+      "toonBytes": 22684,
+      "jsonBytes": 22684,
+      "byteDeltaPct": 0,
+      "toonTok": 35669.6,
+      "jsonTok": 35668.2,
+      "tokDeltaPct": 0.003925064903755882,
+      "bothPassed": true,
+      "affected": false
+    },
+    {
+      "id": "fetch-details-non-mcp-actor-graceful",
+      "cat": "fetch",
+      "seeded": false,
+      "toonPass": 5,
+      "jsonPass": 5,
+      "toonBytes": 95,
+      "jsonBytes": 95,
+      "byteDeltaPct": 0,
+      "toonTok": 15631.4,
+      "jsonTok": 15598.6,
+      "tokDeltaPct": 0.2102752811149672,
+      "bothPassed": true,
+      "affected": false
+    },
+    {
+      "id": "workflow-search-fetch-schema-call",
+      "cat": "call",
+      "seeded": false,
+      "toonPass": 3,
+      "jsonPass": 5,
+      "toonBytes": 17543,
+      "jsonBytes": 17561.6,
+      "byteDeltaPct": -0.10591290087462728,
+      "toonTok": 53498.333333333336,
+      "jsonTok": 52604.6,
+      "tokDeltaPct": 1.69896422239374,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "workflow-mcp-discover-and-execute",
+      "cat": "mcp",
+      "seeded": false,
+      "toonPass": 5,
+      "jsonPass": 5,
+      "toonBytes": 1406.6,
+      "jsonBytes": 1627.2,
+      "byteDeltaPct": -13.557030481809251,
+      "toonTok": 24458.4,
+      "jsonTok": 24578.2,
+      "tokDeltaPct": -0.487423814599927,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "storage-dataset-items-seeded",
+      "cat": "storage",
+      "seeded": true,
+      "toonPass": 3,
+      "jsonPass": 3,
+      "toonBytes": 5017.666666666667,
+      "jsonBytes": 5040.333333333333,
+      "byteDeltaPct": -0.4497057072944791,
+      "toonTok": 28921.666666666668,
+      "jsonTok": 28918.666666666668,
+      "tokDeltaPct": 0.010373922264742496,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "storage-dataset-schema-seeded",
+      "cat": "storage",
+      "seeded": true,
+      "toonPass": 2,
+      "jsonPass": 2,
+      "toonBytes": 9290,
+      "jsonBytes": 9285,
+      "byteDeltaPct": 0.053850296176628974,
+      "toonTok": 33178.5,
+      "jsonTok": 33124.5,
+      "tokDeltaPct": 0.1630213286238283,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "storage-dataset-metadata-seeded",
+      "cat": "storage",
+      "seeded": true,
+      "toonPass": 2,
+      "jsonPass": 2,
+      "toonBytes": 7291.5,
+      "jsonBytes": 7295,
+      "byteDeltaPct": -0.047978067169294036,
+      "toonTok": 30724,
+      "jsonTok": 30760,
+      "tokDeltaPct": -0.11703511053315993,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "storage-kv-keys-seeded",
+      "cat": "storage",
+      "seeded": true,
+      "toonPass": 3,
+      "jsonPass": 2,
+      "toonBytes": 5457.666666666667,
+      "jsonBytes": 5573,
+      "byteDeltaPct": -2.0695017644595914,
+      "toonTok": 30520,
+      "jsonTok": 30534.5,
+      "tokDeltaPct": -0.04748726849956607,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "storage-kv-record-seeded",
+      "cat": "storage",
+      "seeded": true,
+      "toonPass": 1,
+      "jsonPass": 2,
+      "toonBytes": 9295,
+      "jsonBytes": 9299,
+      "byteDeltaPct": -0.043015377997634156,
+      "toonTok": 32053,
+      "jsonTok": 32052,
+      "tokDeltaPct": 0.0031199301135654564,
+      "bothPassed": true,
+      "affected": true
+    },
+    {
+      "id": "storage-actor-run-list-seeded",
+      "cat": "storage",
+      "seeded": true,
+      "toonPass": 1,
+      "jsonPass": 1,
+      "toonBytes": 14739,
+      "jsonBytes": 14959,
+      "byteDeltaPct": -1.4706865432181295,
+      "toonTok": 41760,
+      "jsonTok": 41590,
+      "tokDeltaPct": 0.4087521038711229,
+      "bothPassed": true,
+      "affected": true
+    }
+  ],
+  "perTestAccuracy": [
+    {
+      "id": "search-google-maps",
+      "cat": "search",
+      "toonPass": 5,
+      "jsonPass": 5
+    },
+    {
+      "id": "search-add-call-python-actor",
+      "cat": "call",
+      "toonPass": 2,
+      "jsonPass": 3
+    },
+    {
+      "id": "instagram-posts",
+      "cat": "call",
+      "toonPass": 1,
+      "jsonPass": 5
+    },
+    {
+      "id": "call-actor-mcp-weather",
+      "cat": "mcp",
+      "toonPass": 3,
+      "jsonPass": 1
+    },
+    {
+      "id": "search-instagram-scrapers",
+      "cat": "search",
+      "toonPass": 5,
+      "jsonPass": 5
+    },
+    {
+      "id": "search-tiktok-scrapers",
+      "cat": "search",
+      "toonPass": 5,
+      "jsonPass": 5
+    },
+    {
+      "id": "search-generic-scrapers",
+      "cat": "search",
+      "toonPass": 5,
+      "jsonPass": 5
+    },
+    {
+      "id": "call-google-maps-restaurants",
+      "cat": "call",
+      "toonPass": 2,
+      "jsonPass": 1
+    },
+    {
+      "id": "call-tiktok-scraper",
+      "cat": "call",
+      "toonPass": 1,
+      "jsonPass": 0
+    },
+    {
+      "id": "fetch-details-mcp-tools-list",
+      "cat": "mcp",
+      "toonPass": 5,
+      "jsonPass": 5
+    },
+    {
+      "id": "fetch-details-mcp-tools-then-call",
+      "cat": "mcp",
+      "toonPass": 5,
+      "jsonPass": 5
+    },
+    {
+      "id": "fetch-details-non-mcp-actor-graceful",
+      "cat": "fetch",
+      "toonPass": 5,
+      "jsonPass": 5
+    },
+    {
+      "id": "workflow-search-fetch-schema-call",
+      "cat": "call",
+      "toonPass": 3,
+      "jsonPass": 5
+    },
+    {
+      "id": "workflow-mcp-discover-and-execute",
+      "cat": "mcp",
+      "toonPass": 5,
+      "jsonPass": 5
+    },
+    {
+      "id": "storage-dataset-items-seeded",
+      "cat": "storage",
+      "toonPass": 3,
+      "jsonPass": 3
+    },
+    {
+      "id": "storage-dataset-schema-seeded",
+      "cat": "storage",
+      "toonPass": 2,
+      "jsonPass": 2
+    },
+    {
+      "id": "storage-dataset-metadata-seeded",
+      "cat": "storage",
+      "toonPass": 2,
+      "jsonPass": 2
+    },
+    {
+      "id": "storage-kv-keys-seeded",
+      "cat": "storage",
+      "toonPass": 3,
+      "jsonPass": 2
+    },
+    {
+      "id": "storage-kv-record-seeded",
+      "cat": "storage",
+      "toonPass": 1,
+      "jsonPass": 2
+    },
+    {
+      "id": "storage-actor-run-list-seeded",
+      "cat": "storage",
+      "toonPass": 1,
+      "jsonPass": 1
+    }
+  ]
+}

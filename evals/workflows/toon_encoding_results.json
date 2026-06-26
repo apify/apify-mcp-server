@@ -1,0 +1,151 @@
+{
+  "rows": [
+    {
+      "label": "get-dataset-items · compact tabular (Google Maps)",
+      "rows": 25,
+      "bytesT": 110602,
+      "bytesJ": 99401,
+      "tokT": 42039,
+      "tokJ": 37462
+    },
+    {
+      "label": "get-dataset-items · compact tabular (Google Maps)",
+      "rows": 100,
+      "bytesT": 459973,
+      "bytesJ": 414947,
+      "tokT": 177685,
+      "tokJ": 159962
+    },
+    {
+      "label": "get-dataset-items · compact tabular (Google Maps)",
+      "rows": "100 (real)",
+      "bytesT": 459973,
+      "bytesJ": 414947,
+      "tokT": 177685,
+      "tokJ": 159962
+    },
+    {
+      "label": "get-dataset-items · text-heavy (rag-web-browser)",
+      "rows": 25,
+      "bytesT": 614919,
+      "bytesJ": 611691,
+      "tokT": 150357,
+      "tokJ": 149498
+    },
+    {
+      "label": "get-dataset-items · text-heavy (rag-web-browser)",
+      "rows": "15 (real)",
+      "bytesT": 318730,
+      "bytesJ": 316832,
+      "tokT": 78684,
+      "tokJ": 78181
+    },
+    {
+      "label": "get-key-value-store-keys · {key,size} rows",
+      "rows": 4,
+      "bytesT": 761,
+      "bytesJ": 877,
+      "tokT": 304,
+      "tokJ": 323
+    },
+    {
+      "label": "get-actor-run-list · run rows",
+      "rows": 10,
+      "bytesT": 4987,
+      "bytesJ": 4826,
+      "tokT": 2298,
+      "tokJ": 2099
+    }
+  ],
+  "sweeps": {
+    "get-dataset-items · compact tabular (Google Maps)": [
+      {
+        "n": 1,
+        "bytesDeltaPct": 14.91494532199271,
+        "tokDeltaPct": 18.932038834951456,
+        "toonTok": 1225,
+        "jsonTok": 1030
+      },
+      {
+        "n": 5,
+        "bytesDeltaPct": 9.03839760638298,
+        "tokDeltaPct": 9.483454398708636,
+        "toonTok": 10852,
+        "jsonTok": 9912
+      },
+      {
+        "n": 10,
+        "bytesDeltaPct": 9.845027981058974,
+        "tokDeltaPct": 9.762410062632641,
+        "toonTok": 21205,
+        "jsonTok": 19319
+      },
+      {
+        "n": 25,
+        "bytesDeltaPct": 11.268498304846029,
+        "tokDeltaPct": 12.217713950136137,
+        "toonTok": 42039,
+        "jsonTok": 37462
+      },
+      {
+        "n": 50,
+        "bytesDeltaPct": 11.837960009297863,
+        "tokDeltaPct": 12.06375132389909,
+        "toonTok": 87821,
+        "jsonTok": 78367
+      },
+      {
+        "n": 100,
+        "bytesDeltaPct": 10.851024347687776,
+        "tokDeltaPct": 11.079506382765906,
+        "toonTok": 177685,
+        "jsonTok": 159962
+      }
+    ],
+    "get-dataset-items · text-heavy (rag-web-browser)": [
+      {
+        "n": 1,
+        "bytesDeltaPct": 0.2567483172576504,
+        "tokDeltaPct": 0.3838280450358239,
+        "toonTok": 3923,
+        "jsonTok": 3908
+      },
+      {
+        "n": 5,
+        "bytesDeltaPct": 0.3790023456547612,
+        "tokDeltaPct": 0.444833369795085,
+        "toonTok": 41322,
+        "jsonTok": 41139
+      },
+      {
+        "n": 10,
+        "bytesDeltaPct": 0.4481781321616967,
+        "tokDeltaPct": 0.5030618107422614,
+        "toonTok": 71722,
+        "jsonTok": 71363
+      },
+      {
+        "n": 25,
+        "bytesDeltaPct": 0.5277174259552617,
+        "tokDeltaPct": 0.5745896266170785,
+        "toonTok": 150357,
+        "jsonTok": 149498
+      },
+      {
+        "n": 50,
+        "bytesDeltaPct": 0.5675525531407245,
+        "tokDeltaPct": 0.6107917428795401,
+        "toonTok": 277227,
+        "jsonTok": 275544
+      },
+      {
+        "n": 100,
+        "bytesDeltaPct": 0.5811993688299667,
+        "tokDeltaPct": 0.6218378186247739,
+        "toonTok": 543532,
+        "jsonTok": 540173
+      }
+    ]
+  },
+  "tokenizer": "o200k_base (gpt-4o)"
+}
