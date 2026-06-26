@@ -162,7 +162,7 @@
       "id": "storage-run-list-recent",
       "category": "storage",
       "query": "List my 10 most recent Actor runs, newest first. For each run report its run ID, the Actor it ran, and its status.",
-      "reference": "The agent must call get-actor-run-list (newest first, limit 10). PASS only if get-actor-run-list was actually called and the final answer reports several runs, each with a run ID and a status.",
+      "reference": "The agent must call get-actor-run-list (newest first, limit 10). PASS only if get-actor-run-list was actually called and if there are runs, the final answer reports the runs, each with a run ID and a status.",
       "tools": ["get-actor-run-list"],
       "maxTurns": 6
     },
