@@ -146,7 +146,7 @@ describe('get-actor-run default response', () => {
         // The platform returns inflatedBytes: 0 when it does not yet populate the size; surfacing a
         // literal "0 bytes" is misleading for a non-empty dataset, so the field must be omitted.
         const run = mockSucceededRun();
-        const result = await (defaultGetActorRun as HelperTool).call(
+        const result = await (getActorRun as HelperTool).call(
             stubToolCallContext(
                 { runId: 'run-1', waitSecs: 0 },
                 stubClient({ run, dataset: mockDataset({ stats: { writeCount: 47, inflatedBytes: 0 } }) }),
@@ -235,7 +235,7 @@ describe('get-actor-run default response', () => {
             }),
         } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call(
+        const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
@@ -489,7 +489,7 @@ describe('get-actor-run default response', () => {
             }),
         } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call(
+        const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
