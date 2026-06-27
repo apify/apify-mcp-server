@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HelperTools } from '../../src/const.js';
-import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors_common.js';
+import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
 import { WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';

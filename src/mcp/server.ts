@@ -64,10 +64,7 @@ import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getServerInfo } from '../server_card.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
-import {
-    buildPermissionApprovalResponse,
-    checkPaymentProviderStandbyConflict,
-} from '../tools/actors/call_actor_common.js';
+import { buildPermissionApprovalResponse, checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorsAsToolsResult } from '../tools/index.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';

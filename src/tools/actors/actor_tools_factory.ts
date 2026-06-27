@@ -303,7 +303,7 @@ export type ActorsAsToolsResult = {
  * When `paymentProvider` is set, standby and MCP-server Actors are reported
  * as `STANDBY_PAYMENT_NOT_SUPPORTED` errors instead of contributing tools.
  * External payment providers (x402, Skyfire) cannot pay for standby Actor
- * runs — the call-time guard in `call_actor_common.ts` rejects any such
+ * runs — the call-time guard in `call_actor.ts` rejects any such
  * tool call. Filtering at list time keeps the advertised tool surface
  * honest so agents never discover a tool that can only fail later.
  */
