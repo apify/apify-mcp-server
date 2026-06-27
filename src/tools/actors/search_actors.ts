@@ -21,6 +21,10 @@ import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
+/**
+ * Shared schema for search-actors arguments. Used by both the default and
+ * widget variants — the widget variant calls `.strict()` on it.
+ */
 export const searchActorsBaseArgsSchema = z.object({
     keywords: z.string().default('').describe(dedent`
             Space-separated keywords used to search pre-built solutions (Actors) in the Apify Store.
