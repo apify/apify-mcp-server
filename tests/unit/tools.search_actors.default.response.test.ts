@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_STORE_URL, HelperTools, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
 import { defaultSearchActors } from '../../src/tools/actors/search_actors.js';
+import { actorSearchOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
     DEFAULT_CARD_OPTIONS,
@@ -9,6 +10,7 @@ import {
     formatActorToStructuredCard,
 } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
+import { compileSchema } from '../../src/utils/ajv.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { mockUserInfo } from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
@@ -169,6 +171,47 @@ describe('search-actors without widget (defaultSearchActors)', () => {
         expect(content).toHaveLength(1);
         expect(content[0].text).toContain('No Actors were found');
         expect(content[0].text).toContain(SEARCH_KEYWORDS);
+    });
+
+    it('validates structured output with and without pictureUrl', () => {
+        const validate = compileSchema(actorSearchOutputSchema);
+
+        expect(
+            validate({
+                actors: [
+                    {
+                        url: 'https://apify.com/apify/web-scraper',
+                        id: 'actor-id',
+                        fullName: 'apify/web-scraper',
+                        pictureUrl: 'https://example.com/pic.png',
+                        developer: { username: 'apify', isOfficialApify: true, url: 'https://apify.com/apify' },
+                        description: 'Scrapes stuff.',
+                        categories: ['SCRAPING'],
+                        isDeprecated: false,
+                    },
+                ],
+                query: SEARCH_KEYWORDS,
+                count: 1,
+            }),
+        ).toBe(true);
+
+        expect(
+            validate({
+                actors: [
+                    {
+                        url: 'https://apify.com/apify/web-scraper',
+                        id: 'actor-id',
+                        fullName: 'apify/web-scraper',
+                        developer: { username: 'apify', isOfficialApify: true, url: 'https://apify.com/apify' },
+                        description: 'Scrapes stuff.',
+                        categories: ['SCRAPING'],
+                        isDeprecated: false,
+                    },
+                ],
+                query: SEARCH_KEYWORDS,
+                count: 1,
+            }),
+        ).toBe(true);
     });
 
     // Org-prefixed and non-Console variants are covered by console_link.test.ts and
