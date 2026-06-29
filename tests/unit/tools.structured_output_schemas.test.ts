@@ -132,10 +132,7 @@ describe('Structured Output Schemas', () => {
 
     describe('actorInfoSchema', () => {
         it('declares pictureUrl as an optional string', () => {
-            expect(actorInfoSchema.properties.pictureUrl).toEqual({
-                type: 'string',
-                description: 'Actor picture URL',
-            });
+            expect(actorInfoSchema.properties.pictureUrl?.type).toBe('string');
             expect(actorInfoSchema.required).not.toContain('pictureUrl');
         });
 

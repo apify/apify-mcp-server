@@ -47,6 +47,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             actors: actorCardStructured,
             query: parsed.keywords,
             count: actors.length,
+            userTier: userPlanTier,
             instructions: dedent`
                 If you need more detailed information about any of these Actors, including their
                 input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS}

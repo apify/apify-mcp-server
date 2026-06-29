@@ -99,7 +99,10 @@ export const pricingSchema = {
                 'Note explaining that event descriptions were omitted and full details are available via fetch-actor-details',
         },
     },
-    required: ['model', 'userTier'],
+    // `userTier` is optional: `search-actors` returns it once at the response top level
+    // (it is a session constant), so per-Actor pricing omits it. `fetch-actor-details`
+    // returns a single Actor and keeps `userTier` in the pricing block.
+    required: ['model'],
 };
 
 /**
@@ -253,6 +256,11 @@ export const actorSearchOutputSchema = {
         },
         query: { type: 'string', description: 'The search query used' },
         count: { type: 'number', description: 'Number of Actors returned' },
+        userTier: {
+            type: 'string',
+            enum: ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'],
+            description: "The user's plan tier used to resolve the per-Actor pricing shown in the results",
+        },
         instructions: {
             type: 'string',
             description: 'Additional instructions for the LLM to follow when processing the search results.',
@@ -277,6 +285,11 @@ export const actorSearchWidgetOutputSchema = {
         },
         query: { type: 'string', description: 'The search query used' },
         count: { type: 'number', description: 'Number of Actors returned' },
+        userTier: {
+            type: 'string',
+            enum: ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'],
+            description: "The user's plan tier used to resolve the per-Actor pricing shown in the results",
+        },
         widgetActors: {
             type: 'array' as const,
             items: {
