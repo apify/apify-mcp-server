@@ -58,6 +58,9 @@ export async function executeConversation(options: ConversationExecutorOptions):
     let completed = false;
     let promptTokens = 0;
     let completionTokens = 0;
+    // Track whether the provider ever reported usage; if it never does, totals stay undefined
+    // rather than a fabricated 0 that reads as a real measurement.
+    let hasUsage = false;
 
     // Fetch tools initially
     let tools: ChatCompletionTool[] = mcpToolsToOpenAiTools(mcpClient.getTools());
@@ -70,6 +73,7 @@ export async function executeConversation(options: ConversationExecutorOptions):
 
         // Accumulate token usage across the agent loop (cost grows with tool-result size)
         if (llmResponse.usage) {
+            hasUsage = true;
             promptTokens += llmResponse.usage.promptTokens;
             completionTokens += llmResponse.usage.completionTokens;
         }
@@ -172,8 +176,8 @@ export async function executeConversation(options: ConversationExecutorOptions):
         completed,
         hitMaxTurns: turnNumber >= maxTurns && !completed,
         totalTurns: turnNumber,
-        promptTokens,
-        completionTokens,
-        totalTokens: promptTokens + completionTokens,
+        promptTokens: hasUsage ? promptTokens : undefined,
+        completionTokens: hasUsage ? completionTokens : undefined,
+        totalTokens: hasUsage ? promptTokens + completionTokens : undefined,
     };
 }
