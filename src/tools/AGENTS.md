@@ -22,7 +22,6 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `docs/` — search and fetch Apify docs.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
-- `*_common.ts` files hold logic shared between a tool and its widget sibling.
 
 ## Rules when editing here
 

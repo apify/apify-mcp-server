@@ -16,7 +16,7 @@ import {
     callActorPreExecute,
     callOptionsSchema,
     resolveAndValidateActor,
-} from '../actors/call_actor_common.js';
+} from '../actors/call_actor.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
