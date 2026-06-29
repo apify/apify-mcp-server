@@ -147,12 +147,12 @@ export async function executeConversation(options: ConversationExecutorOptions):
                 arguments: args,
             });
 
-            turn.toolResults.push(result);
-
             // Serialize the tool result exactly as the agent (LLM) receives it,
             // and record its byte size to measure the data volume tools return.
             const content = result.success ? JSON.stringify(result.result) : JSON.stringify({ error: result.error });
             result.resultBytes = Buffer.byteLength(content, 'utf8');
+
+            turn.toolResults.push(result);
 
             // Add tool result to conversation
             messages.push({
