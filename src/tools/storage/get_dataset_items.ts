@@ -68,6 +68,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
     title: 'Get dataset items',
     description: dedent`
         Retrieve dataset items with pagination, sorting, and field selection.
+        Items can be large; when you only need specific columns, pass fields to reduce response size (use ${HelperTools.DATASET_GET} first if you don't know the field names).
         For nested fields use dot notation (e.g., fields="metadata.url") — the server auto-flattens parent prefixes.
         Defaults limit to ${DEFAULT_DATASET_ITEMS_LIMIT}. Use clean=true to skip empty items and hidden fields.
 
