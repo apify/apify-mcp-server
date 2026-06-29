@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **tools:** Nudge clients to refresh tool list after add-actor ([#1026](https://github.com/apify/apify-mcp-server/pull/1026)) ([920e289](https://github.com/apify/apify-mcp-server/commit/920e28903c37b1287158a2c1934db9e4d3de6441)) by [@vjsai](https://github.com/vjsai), closes [#851](https://github.com/apify/apify-mcp-server/issues/851)
 - Hint field filtering in get-dataset-items description ([#1032](https://github.com/apify/apify-mcp-server/pull/1032)) ([f2c7a1a](https://github.com/apify/apify-mcp-server/commit/f2c7a1add94cdd784e2c97b8fec0e4e83432a0af)) by [@RobertCrupa](https://github.com/RobertCrupa)
 - Add large-dataset and scraper workflow eval cases ([#1033](https://github.com/apify/apify-mcp-server/pull/1033)) ([b755213](https://github.com/apify/apify-mcp-server/commit/b755213bf8dbffa2aa2224f68cb0f03c722c662a)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Add byte&#x2F;token cost metrics to workflow evals ([#1031](https://github.com/apify/apify-mcp-server/pull/1031)) ([e101595](https://github.com/apify/apify-mcp-server/commit/e1015957a2bfcef01f2a7b5753a574ece8c0d258)) by [@RobertCrupa](https://github.com/RobertCrupa)
 
 ### 🐛 Bug Fixes
 
