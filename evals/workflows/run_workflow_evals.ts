@@ -28,7 +28,7 @@ import { McpClient } from './mcp_client.js';
 import type { EvaluationResult, TestResultRecord } from './output_formatter.js';
 import { formatDetailedResult, formatResultsTable } from './output_formatter.js';
 import {
-    buildResultKey,
+    findBaselineRecord,
     loadResultsDatabase,
     saveResultsDatabase,
     updateResultsWithEvaluations,
@@ -316,14 +316,15 @@ async function main() {
     console.log();
 
     // Load baseline for byte/token deltas (read before --output overwrites results.json).
-    // Keyed by test ID for the agent/judge model pair being run.
+    // Matched by agent model + test ID; the judge model is ignored because bytes/tokens
+    // come from the agent, so a baseline recorded with a different judge still compares.
     const baselinePath = argv.baseline ?? path.join(process.cwd(), 'evals/workflows/results.json');
     const baselineByTestId = new Map<string, TestResultRecord>();
     let baselineWithMetrics = 0;
     try {
         const baselineDb = loadResultsDatabase(baselinePath);
         for (const testCase of filteredTestCases) {
-            const record = baselineDb.results[buildResultKey(argv.agentModel!, argv.judgeModel!, testCase.id)];
+            const record = findBaselineRecord(baselineDb, argv.agentModel!, testCase.id);
             if (!record) continue;
             baselineByTestId.set(testCase.id, record);
             // Records written before these metrics existed lack the fields at runtime.
@@ -341,8 +342,8 @@ async function main() {
             );
         } else {
             console.log(
-                `📐 No baseline for ${argv.agentModel}:${argv.judgeModel} in ${baselinePath}. ` +
-                    `Run once with --output to record one (deltas need a prior --output run with the same models).`,
+                `📐 No baseline for agent model ${argv.agentModel} in ${baselinePath}. ` +
+                    `Run once with --output to record one (deltas need a prior --output run with the same agent model).`,
             );
         }
         console.log();
