@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { extractDotPrefixes, getDatasetItems } from '../../src/tools/storage/get_dataset_items.js';
+import { datasetItemsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { dotFlatten } from '../../src/utils/encode_text.js';
@@ -9,6 +10,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     decodeFencedToolText,
     expectSoftFailInvalidInput,
+    expectStructuredContentMatchesSchema,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -134,14 +136,27 @@ describe('get-dataset-items', () => {
         expect(structuredContent).toHaveProperty('limit', 10);
     });
 
+    it('emits structuredContent that validates against the outputSchema for an empty dataset', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient(async () => ({ items: [], total: 0 })),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expectStructuredContentMatchesSchema(datasetItemsOutputSchema, structuredContent);
+    });
+
     it('returns isError with a not-found message when listItems throws 404', async () => {
         const notFound = Object.assign(new Error('Dataset was not found'), { statusCode: 404 });
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'missing' }, stubApifyClientThrowing(notFound)),
         );
-        const { content } = result as TextToolResult;
+        const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
         expectSoftFailInvalidInput(result);
+        expect(structuredContent).toBeUndefined();
         expect(content[0].text).toContain("Dataset 'missing' not found");
     });
 
