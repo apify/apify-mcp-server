@@ -326,11 +326,8 @@ async function main() {
             const record = baselineDb.results[buildResultKey(argv.agentModel!, argv.judgeModel!, testCase.id)];
             if (!record) continue;
             baselineByTestId.set(testCase.id, record);
-            // Cast: records written before these metrics existed lack the fields at runtime.
-            if (
-                (record.resultBytes as number | undefined) !== undefined ||
-                (record.totalTokens as number | undefined) !== undefined
-            ) {
+            // Records written before these metrics existed lack the fields at runtime.
+            if (record.resultBytes !== undefined || record.totalTokens !== undefined) {
                 baselineWithMetrics++;
             }
         }

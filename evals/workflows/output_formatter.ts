@@ -133,14 +133,14 @@ export function formatResultsTable(results: EvaluationResult[], baseline?: Map<s
         for (const result of results) {
             const prior = baseline.get(result.testCase.id);
             if (!prior) continue;
-            // Cast to reflect runtime reality: records written before these metrics lack the field.
-            const priorBytes = prior.resultBytes as number | undefined;
+            // Records written before these metrics existed lack the field, so match each independently.
+            const priorBytes = prior.resultBytes;
             if (priorBytes !== undefined) {
                 bytesMatched++;
                 bytesCurrent += sumResultBytes(result.conversation);
                 bytesBaseline += priorBytes;
             }
-            const priorTokens = prior.totalTokens as number | undefined;
+            const priorTokens = prior.totalTokens;
             if (priorTokens !== undefined) {
                 tokensMatched++;
                 tokensCurrent += result.conversation.totalTokens ?? 0;
@@ -284,14 +284,14 @@ export type TestResultRecord = {
     durationMs: number;
     /** Number of conversation turns */
     turns: number;
-    /** Total bytes of tool results returned to the agent across the conversation */
-    resultBytes: number;
-    /** Prompt tokens billed across all agent LLM calls */
-    promptTokens: number;
-    /** Completion tokens billed across all agent LLM calls */
-    completionTokens: number;
-    /** Total tokens billed across all agent LLM calls (prompt + completion) */
-    totalTokens: number;
+    /** Total bytes of tool results returned to the agent across the conversation (absent in records written before this metric) */
+    resultBytes?: number;
+    /** Prompt tokens billed across all agent LLM calls (absent in records written before this metric, or when the provider omits usage) */
+    promptTokens?: number;
+    /** Completion tokens billed across all agent LLM calls (absent in records written before this metric, or when the provider omits usage) */
+    completionTokens?: number;
+    /** Total tokens billed across all agent LLM calls (prompt + completion; absent in records written before this metric, or when the provider omits usage) */
+    totalTokens?: number;
     /** Error message if execution failed, null otherwise */
     error: string | null;
 };
