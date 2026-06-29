@@ -64,8 +64,14 @@ USAGE EXAMPLES:
         }
         await sendNotification({ method: 'notifications/tools/list_changed' });
         const toolNames = tools.map((t: ToolEntry) => t.name).join(', ');
+        // Many MCP clients ignore `notifications/tools/list_changed`, so nudge the LLM to
+        // re-list tools itself — otherwise the freshly added Actor stays invisible until the
+        // client happens to refresh (apify-mcp-server#851).
         return buildMCPResponse({
-            texts: [`Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}.`],
+            texts: [
+                `Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}. ` +
+                    `If they are not visible yet, refresh the tool list using the tools/list request before calling them.`,
+            ],
         });
     },
 } as const);

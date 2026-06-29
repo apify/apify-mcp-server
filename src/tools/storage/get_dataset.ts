@@ -9,6 +9,7 @@ import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/conso
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { datasetSizeNextStepHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
+import { DEFAULT_DATASET_ITEMS_LIMIT } from './get_dataset_items.js';
 import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
 const getDatasetArgs = z.object({
@@ -68,7 +69,7 @@ export const getDataset: ToolEntry = Object.freeze({
         // response today (only the dataset-list endpoint returns it), so read it defensively.
         const inflatedBytes = (dataset.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
-        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example 20) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`;
+        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`;
         return buildStorageResponse({
             structuredContent: normalized as unknown as Record<string, unknown>,
             summary,

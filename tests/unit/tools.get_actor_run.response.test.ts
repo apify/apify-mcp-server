@@ -787,6 +787,14 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('metadata.url, markdown');
     });
 
+    it('SUCCEEDED dataset nextStep uses DEFAULT_DATASET_ITEMS_LIMIT as example limit', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+        });
+        expect(t.nextStep).toContain('limit (for example 20)');
+    });
+
     it('SUCCEEDED steers nextStep away from fetching a large dataset', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url'], inflatedBytes: 2_400_000 };
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });

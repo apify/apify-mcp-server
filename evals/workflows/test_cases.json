@@ -133,6 +133,70 @@
       "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-actor-run-list. PASS only if get-actor-run-list was actually called and the final answer reports a run ID and a status matching the run the agent just started.",
       "tools": ["actors", "get-actor-run-list"],
       "maxTurns": 12
+    },
+    {
+      "id": "storage-dataset-items-maps-bulk",
+      "category": "storage",
+      "query": "Use the Google Maps Scraper to find the best 20 restaurants in Prague. When the run finishes, retrieve all of them in a single call. Then tell me how many restaurants were returned and list the names and ratings of the first five.",
+      "reference": "The agent must find the Google Maps scraper and call-actor it for restaurants in Prague, then call get-dataset-items with the datasetId from that run and a limit high enough to return every row in one call. PASS only if get-dataset-items was called with a datasetId argument and the final answer states a restaurant count and lists at least five restaurant names with ratings.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 20
+    },
+    {
+      "id": "storage-dataset-items-hotels-bulk",
+      "category": "storage",
+      "query": "Use the Google Maps Scraper to find at least 20 hotels in Vienna. When the run finishes, retrieve all the results and tell me how many hotels were returned and the names and addresses of the first five.",
+      "reference": "The agent must find the Google Maps scraper and call-actor it for hotels in Vienna, then call get-dataset-items with the datasetId from that run and a limit high enough to return every row in one call. PASS only if get-dataset-items was called with a datasetId argument and the final answer states a hotel count and lists at least five hotel names with addresses.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 20
+    },
+    {
+      "id": "storage-run-list-recent",
+      "category": "storage",
+      "query": "List my 10 most recent Actor runs, newest first. For each run report its run ID, the Actor it ran, and its status.",
+      "reference": "The agent must call get-actor-run-list (newest first, limit 10). PASS only if get-actor-run-list was actually called and if there are runs, the final answer reports the runs, each with a run ID and a status.",
+      "tools": ["get-actor-run-list"],
+      "maxTurns": 6
+    },
+    {
+      "id": "storage-dataset-items-google-search",
+      "category": "storage",
+      "query": "Run a Google search via Apify for 'apify web scraping' and request the top 15 organic results. When the run finishes, retrieve only the title and URL of each result and list them.",
+      "reference": "The agent must find the Google Search Results scraper and call-actor it for the query 'apify web scraping', then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists at least five results, each with a title and a URL.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 16
+    },
+    {
+      "id": "storage-dataset-items-instagram",
+      "category": "storage",
+      "query": "Scrape the 15 latest posts from the natgeo Instagram profile using Apify. When the run finishes, retrieve only the caption and like count of each post and list them.",
+      "reference": "The agent must find an Instagram scraper and call-actor it for the natgeo profile, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several posts, each with a caption and a like count.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 18
+    },
+    {
+      "id": "storage-dataset-items-tiktok",
+      "category": "storage",
+      "query": "Scrape the 15 latest TikTok videos from the @natgeo profile using Apify. When the run finishes, retrieve only each video's URL and view count and list them.",
+      "reference": "The agent must find a TikTok scraper and call-actor it for the @natgeo profile, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several videos, each with a URL and a view count.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 18
+    },
+    {
+      "id": "storage-dataset-items-youtube",
+      "category": "storage",
+      "query": "Use Apify to scrape 15 videos from the Apify YouTube channel. When the run finishes, retrieve only the title and view count of each video and list them.",
+      "reference": "The agent must find a YouTube scraper and call-actor it for the Apify channel, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several videos, each with a title and a view count.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 18
+    },
+    {
+      "id": "storage-dataset-items-reddit",
+      "category": "storage",
+      "query": "Scrape 15 posts from the r/technology subreddit using Apify. When the run finishes, retrieve only the title and upvote count of each post and list them.",
+      "reference": "The agent must find a Reddit scraper and call-actor it for the r/technology subreddit, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several posts, each with a title and an upvote count.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 18
     }
   ]
 }
