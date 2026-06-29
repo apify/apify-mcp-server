@@ -95,14 +95,14 @@ export function buildStorageListSummaryNextStep(params: {
 
 /**
  * Pagination-aware {summary, nextStep}: when more items remain, point at the next page;
- * otherwise point at get-dataset-schema for structure inspection.
+ * otherwise point at get-dataset for the field list (structure lives there, not in a heavy schema dump).
  */
 export function buildDatasetItemsSummaryNextStep(params: {
     datasetId: string;
     itemCount: number;
     totalItemCount: number;
     offset: number;
-    /** Active loaded tool set; gates the terminal get-dataset-schema reference (see #1007). */
+    /** Active loaded tool set; gates the terminal get-dataset reference (see #1007). */
     loadedToolNames: string[];
 }): { summary: string; nextStep: string } {
     const { datasetId, itemCount, totalItemCount, offset, loadedToolNames } = params;
@@ -118,8 +118,8 @@ export function buildDatasetItemsSummaryNextStep(params: {
             : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
     return {
         summary,
-        nextStep: suggestTool(HelperTools.DATASET_SCHEMA_GET, loadedToolNames)
-            ? `Use ${HelperTools.DATASET_SCHEMA_GET} with datasetId=${datasetId} to inspect structure if needed.`
+        nextStep: suggestTool(HelperTools.DATASET_GET, loadedToolNames)
+            ? `Use ${HelperTools.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`
             : `No more pages. Inspect the returned items directly.`,
     };
 }

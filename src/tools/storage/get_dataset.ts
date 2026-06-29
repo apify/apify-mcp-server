@@ -25,7 +25,7 @@ export const getDataset: ToolEntry = Object.freeze({
     title: 'Get dataset',
     description: dedent`
         Get metadata for a dataset (collection of structured data created by an Actor run).
-        The results will include dataset details such as itemCount, schema, fields, and stats.
+        The results will include dataset details such as itemCount, fields, and stats.
         Use fields to understand structure for filtering with ${HelperTools.DATASET_GET_ITEMS}.
         stats.inflatedBytes (when present) is the approximate uncompressed byte size — use it with itemCount to pick a safe limit and fields before fetching.
         Note: itemCount updates may be delayed by up to ~5 seconds.
@@ -56,6 +56,10 @@ export const getDataset: ToolEntry = Object.freeze({
             return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
+        // The API also returns a raw `schema` (untyped in apify-client). It is 93–95% of the
+        // response bytes on top store Actors and declares fields that may be absent from the
+        // data, so drop it — get-dataset-schema infers a compact schema from real items (#882).
+        const { schema, ...metadata } = dataset as typeof dataset & { schema?: unknown };
         // Apify returns `fields` slash-separated AND with array indices expanded
         // (e.g. `latestComments/0/owner/username`). For a real Instagram-scraper
         // dataset this inflates ~78 schema fields into 528 paths (~85% bloat) and
@@ -63,7 +67,9 @@ export const getDataset: ToolEntry = Object.freeze({
         // hints for `get-dataset-items` (which expects dot-notation). Run the same
         // normalization `buildRunDataset` applies so this tool's `fields` matches
         // the structured `storages.datasets.default.fields` shape.
-        const normalized = dataset.fields ? { ...dataset, fields: normalizeDatasetFields(dataset.fields) } : dataset;
+        const normalized = metadata.fields
+            ? { ...metadata, fields: normalizeDatasetFields(metadata.fields) }
+            : metadata;
         const fieldCount = Array.isArray(normalized.fields) ? normalized.fields.length : undefined;
         // `inflatedBytes` is undeclared on the apify-client `DatasetStats` type and absent from the GET
         // response today (only the dataset-list endpoint returns it), so read it defensively.

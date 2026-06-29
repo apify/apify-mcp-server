@@ -21,19 +21,19 @@ describe('buildStorageNotFound()', () => {
 });
 
 describe('buildDatasetItemsSummaryNextStep()', () => {
-    it('suggests get-dataset-schema on the terminal page when loaded', () => {
+    it('suggests get-dataset on the terminal page when loaded', () => {
         const t = buildDatasetItemsSummaryNextStep({
             datasetId: 'ds-1',
             itemCount: 5,
             totalItemCount: 5,
             offset: 0,
-            loadedToolNames: [HelperTools.DATASET_SCHEMA_GET],
+            loadedToolNames: [HelperTools.DATASET_GET],
         });
-        expect(t.nextStep).toContain(HelperTools.DATASET_SCHEMA_GET);
+        expect(t.nextStep).toContain(HelperTools.DATASET_GET);
         expect(t.nextStep).toContain('datasetId=ds-1');
     });
 
-    it('omits get-dataset-schema when not loaded', () => {
+    it('omits get-dataset when not loaded', () => {
         const t = buildDatasetItemsSummaryNextStep({
             datasetId: 'ds-1',
             itemCount: 5,
@@ -41,7 +41,7 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             offset: 0,
             loadedToolNames: [],
         });
-        expect(t.nextStep).not.toContain(HelperTools.DATASET_SCHEMA_GET);
+        expect(t.nextStep).not.toContain(HelperTools.DATASET_GET);
         expect(t.nextStep).toContain('No more pages');
     });
 
@@ -51,7 +51,7 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             itemCount: 20,
             totalItemCount: 100,
             offset: 0,
-            loadedToolNames: [HelperTools.DATASET_SCHEMA_GET],
+            loadedToolNames: [HelperTools.DATASET_GET],
         });
         const unloaded = buildDatasetItemsSummaryNextStep({
             datasetId: 'ds-1',

@@ -221,7 +221,7 @@ describe('get-dataset-items', () => {
         );
     });
 
-    it('emits a last-page summary and a schema nextStep when all items are returned', async () => {
+    it('emits a last-page summary and a get-dataset nextStep when all items are returned', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
         );
@@ -230,7 +230,7 @@ describe('get-dataset-items', () => {
         };
 
         expect(structuredContent.summary).toBe('Fetched all 1 items.');
-        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_SCHEMA_GET);
+        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
         // summary + nextStep ship as a separate text block after the fenced data.
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
