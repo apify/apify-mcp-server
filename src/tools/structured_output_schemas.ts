@@ -558,7 +558,8 @@ export const datasetItemsOutputSchema = {
 
 /**
  * Schema for dataset metadata (get-dataset). Documents the fields the LLM acts on; the raw API
- * response carries more keys (stats, schema, access settings), allowed as additional properties.
+ * response carries more keys (stats, access settings), allowed as additional properties.
+ * The raw `schema` key is stripped by the tool — get-dataset-schema owns schema output (#882).
  */
 export const datasetMetadataOutputSchema = {
     type: 'object' as const,
