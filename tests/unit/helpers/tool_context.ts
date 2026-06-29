@@ -1,5 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { decode as decodeToon } from '@toon-format/toon';
+import Ajv from 'ajv';
 import { expect } from 'vitest';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../../src/const.js';
@@ -67,4 +68,20 @@ export function expectSoftFailInvalidInput(result: { isError?: boolean; toolTele
             failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
         }),
     );
+}
+
+/**
+ * Assert a tool result's `structuredContent` conforms to its declared `outputSchema` under a
+ * non-coercing AJV (`new Ajv({ strict: false })` compiled directly on the schema) — the same check
+ * the MCP SDK client runs on tool results: a result that declares a schema but returns absent or
+ * non-conforming `structuredContent` is rejected. The repo's `compileSchema` coerces types and would
+ * hide a mismatch, so compile strictly here. Surfaces AJV errors in the failure message.
+ */
+export function expectSchemaConformingStructuredContent(result: unknown, schema: object): void {
+    const { structuredContent, isError } = result as { structuredContent?: unknown; isError?: boolean };
+    expect(isError).not.toBe(true);
+    expect(structuredContent).toBeDefined();
+    const validate = new Ajv({ strict: false }).compile(schema);
+    const valid = validate(structuredContent);
+    expect(valid, JSON.stringify(validate.errors)).toBe(true);
 }

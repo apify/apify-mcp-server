@@ -2,8 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { getUserKeyValueStoresList } from '../../src/tools/storage/key_value_store_collection.js';
+import { storageListOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import {
+    decodeFencedToolText,
+    expectSchemaConformingStructuredContent,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 
 const MOCK_LIST = {
     total: 2,
@@ -85,6 +91,18 @@ describe('get-key-value-store-list', () => {
         await (getUserKeyValueStoresList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
 
         expect(listSpy).toHaveBeenCalledWith({ limit: 10, offset: 0, desc: false, unnamed: false });
+    });
+
+    it('emits structuredContent that validates against the outputSchema for the last/empty page', async () => {
+        const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total: 0, count: 0, items: [] });
+
+        const result = await (getUserKeyValueStoresList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(listSpy)),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent).toHaveProperty('count', 0);
+        expectSchemaConformingStructuredContent(result, storageListOutputSchema);
     });
 
     it('rejects limit above 10 via ajv validation', () => {

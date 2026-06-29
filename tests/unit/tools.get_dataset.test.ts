@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { getDataset } from '../../src/tools/storage/get_dataset.js';
+import { datasetMetadataOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSoftFailInvalidInput,
+    expectSchemaConformingStructuredContent,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -81,13 +83,21 @@ describe('get-dataset', () => {
         expect(structuredContent.nextStep).not.toContain('may exceed context');
     });
 
+    it('emits structuredContent that validates against the outputSchema for an unnamed dataset', async () => {
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ ...MOCK_DATASET, name: null })),
+        );
+        expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
+    });
+
     it('returns isError with a not-found message when the dataset does not exist', async () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'missing' }, stubApifyClient(undefined)),
         );
-        const { content } = result as TextToolResult;
+        const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
         expectSoftFailInvalidInput(result);
+        expect(structuredContent).toBeUndefined();
         expect(content[0].text).toContain("Dataset 'missing' not found");
     });
 
