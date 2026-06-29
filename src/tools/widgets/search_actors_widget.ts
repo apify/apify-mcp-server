@@ -94,6 +94,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
             actors: actorCardStructured,
             query: parsed.keywords,
             count: actors.length,
+            userTier: userPlanTier,
             widgetActors: actors.map((actor) => formatActorForWidget(actor, userPlanTier)),
         };
 

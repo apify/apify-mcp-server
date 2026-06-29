@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { getKeyValueStore } from '../../src/tools/storage/get_key_value_store.js';
+import { keyValueStoreOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSoftFailInvalidInput,
+    expectSchemaConformingStructuredContent,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -65,13 +67,21 @@ describe('get-key-value-store', () => {
         expect(structuredContent.summary).toBe("Key-value store 'my-store' holds 2048 bytes.");
     });
 
+    it('emits structuredContent that validates against the outputSchema for an unnamed store', async () => {
+        const result = await (getKeyValueStore as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient({ ...MOCK_STORE, name: null })),
+        );
+        expectSchemaConformingStructuredContent(result, keyValueStoreOutputSchema);
+    });
+
     it('returns isError with a not-found message when the store does not exist', async () => {
         const result = await (getKeyValueStore as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'missing' }, stubApifyClient(undefined)),
         );
-        const { content } = result as TextToolResult;
+        const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
         expectSoftFailInvalidInput(result);
+        expect(structuredContent).toBeUndefined();
         expect(content[0].text).toContain("Key-value store 'missing' not found");
     });
 

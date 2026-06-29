@@ -24,6 +24,8 @@ export type McpToolResult = {
     result?: unknown;
     /** Error message if execution failed */
     error?: string;
+    /** UTF-8 byte size of the serialized content the agent receives (set when the result is fed to the LLM) */
+    resultBytes?: number;
 };
 
 /**
@@ -74,4 +76,10 @@ export type ConversationHistory = {
     hitMaxTurns: boolean;
     /** Total number of turns */
     totalTurns: number;
+    /** Prompt tokens billed across all agent LLM calls (sum over turns; judge calls excluded) */
+    promptTokens?: number;
+    /** Completion tokens billed across all agent LLM calls */
+    completionTokens?: number;
+    /** Total tokens billed across all agent LLM calls (prompt + completion) */
+    totalTokens?: number;
 };

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_STORE_URL, HelperTools, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
 import { searchActors } from '../../src/tools/actors/search_actors.js';
+import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
     DEFAULT_CARD_OPTIONS,
@@ -61,6 +62,7 @@ describe('search-actors without widget (searchActors)', () => {
                 actors: ReturnType<typeof formatActorToStructuredCard>[];
                 query: string;
                 count: number;
+                userTier?: string;
                 instructions?: string;
                 widgetActors?: unknown;
             };
@@ -71,8 +73,15 @@ describe('search-actors without widget (searchActors)', () => {
         expect(structuredContent.widgetActors).toBeUndefined();
         expect(structuredContent.query).toBe(SEARCH_KEYWORDS);
         expect(structuredContent.count).toBe(1);
+        expect(structuredContent.userTier).toBe('FREE');
         expect(structuredContent.actors).toHaveLength(1);
-        expect(structuredContent.actors[0]).toStrictEqual(formatActorToStructuredCard(MOCK_STORE_ACTOR));
+        expect(structuredContent.actors[0]).toStrictEqual(
+            formatActorToStructuredCard(MOCK_STORE_ACTOR, {
+                ...DEFAULT_CARD_OPTIONS,
+                userTier: 'FREE',
+                simplifyPricingForUserTier: true,
+            }),
+        );
         expect(structuredContent.instructions).toContain(HelperTools.ACTOR_GET_DETAILS);
 
         expect(content).toHaveLength(1);
@@ -169,6 +178,21 @@ describe('search-actors without widget (searchActors)', () => {
         expect(content).toHaveLength(1);
         expect(content[0].text).toContain('No Actors were found');
         expect(content[0].text).toContain(SEARCH_KEYWORDS);
+    });
+
+    it('declares every field the structured card emits (guards schema/runtime drift)', () => {
+        // Regression guard for #889: the advertised output schema must declare every field
+        // the runtime card actually emits. `pictureUrl` was emitted but undeclared — this
+        // asserts no emitted key is missing from `actorInfoSchema`, so the next dropped
+        // field fails here instead of silently shipping an inconsistent schema.
+        const card = formatActorToStructuredCard(MOCK_STORE_ACTOR, {
+            ...DEFAULT_CARD_OPTIONS,
+            userTier: 'FREE',
+            simplifyPricingForUserTier: true,
+        });
+        const declared = new Set(Object.keys(actorInfoSchema.properties));
+        const undeclared = Object.keys(card).filter((key) => !declared.has(key));
+        expect(undeclared).toEqual([]);
     });
 
     // Org-prefixed and non-Console variants are covered by console_link.test.ts and

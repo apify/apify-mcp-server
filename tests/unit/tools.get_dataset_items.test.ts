@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { extractDotPrefixes, getDatasetItems } from '../../src/tools/storage/get_dataset_items.js';
+import { datasetItemsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { dotFlatten } from '../../src/utils/encode_text.js';
@@ -9,6 +10,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     decodeFencedToolText,
     expectSoftFailInvalidInput,
+    expectSchemaConformingStructuredContent,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -134,14 +136,25 @@ describe('get-dataset-items', () => {
         expect(structuredContent).toHaveProperty('limit', 10);
     });
 
+    it('emits structuredContent that validates against the outputSchema for an empty dataset', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient(async () => ({ items: [], total: 0 })),
+            ),
+        );
+        expectSchemaConformingStructuredContent(result, datasetItemsOutputSchema);
+    });
+
     it('returns isError with a not-found message when listItems throws 404', async () => {
         const notFound = Object.assign(new Error('Dataset was not found'), { statusCode: 404 });
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'missing' }, stubApifyClientThrowing(notFound)),
         );
-        const { content } = result as TextToolResult;
+        const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
         expectSoftFailInvalidInput(result);
+        expect(structuredContent).toBeUndefined();
         expect(content[0].text).toContain("Dataset 'missing' not found");
     });
 
@@ -208,7 +221,7 @@ describe('get-dataset-items', () => {
         );
     });
 
-    it('emits a last-page summary and a schema nextStep when all items are returned', async () => {
+    it('emits a last-page summary and a get-dataset nextStep when all items are returned', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
         );
@@ -217,7 +230,7 @@ describe('get-dataset-items', () => {
         };
 
         expect(structuredContent.summary).toBe('Fetched all 1 items.');
-        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_SCHEMA_GET);
+        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
         // summary + nextStep ship as a separate text block after the fenced data.
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);

@@ -131,6 +131,11 @@ describe('Structured Output Schemas', () => {
     });
 
     describe('actorInfoSchema', () => {
+        it('declares pictureUrl as an optional string', () => {
+            expect(actorInfoSchema.properties.pictureUrl?.type).toBe('string');
+            expect(actorInfoSchema.required).not.toContain('pictureUrl');
+        });
+
         // openai/fetch-actor-details intentionally strips `pricing` from `actorInfo` so the
         // widget's tier-aware pricing under `actorDetails.actorInfo.currentPricingInfo` is
         // the single source of truth. The shared actor-info schema must accept that shape.

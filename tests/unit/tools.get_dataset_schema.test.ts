@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
 import { getDatasetSchema } from '../../src/tools/storage/get_dataset_schema.js';
+import { datasetSchemaOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
 import {
     expectSoftFailInvalidInput,
+    expectSchemaConformingStructuredContent,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
@@ -90,6 +92,8 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.summary).toBe("Dataset 'ds-1' is empty; no schema to infer.");
         expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
+        // The required `schema` is still present (empty object) and the emit conforms to the schema.
+        expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
     });
 
     it('returns isError with a not-found message when listItems throws 404', async () => {
@@ -97,9 +101,10 @@ describe('get-dataset-schema', () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubToolCallContext({ datasetId: 'missing' }, stubApifyClientThrowing(notFound)),
         );
-        const { content } = result as TextToolResult;
+        const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
         expectSoftFailInvalidInput(result);
+        expect(structuredContent).toBeUndefined();
         expect(content[0].text).toContain("Dataset 'missing' not found");
     });
 

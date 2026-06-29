@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import type { EvaluationResult, ResultsDatabase, TestResultRecord } from './output_formatter.js';
+import { sumResultBytes } from './output_formatter.js';
 
 /**
  * Build composite key for storing results
@@ -14,6 +15,33 @@ import type { EvaluationResult, ResultsDatabase, TestResultRecord } from './outp
  */
 export function buildResultKey(agentModel: string, judgeModel: string, testId: string): string {
     return `${agentModel}:${judgeModel}:${testId}`;
+}
+
+/**
+ * Find the baseline record for byte/token deltas, matched by agent model + test ID.
+ * The judge model is excluded on purpose: tool bytes and agent token counts are
+ * produced by the agent, not the judge, so a baseline recorded with a different
+ * judge is still a valid comparison. When several judges recorded the same
+ * agent/test, prefer a record that carries metrics, then the most recent.
+ */
+export function findBaselineRecord(
+    database: ResultsDatabase,
+    agentModel: string,
+    testId: string,
+): TestResultRecord | undefined {
+    const hasMetrics = (r: TestResultRecord): boolean => r.resultBytes !== undefined || r.totalTokens !== undefined;
+    let best: TestResultRecord | undefined;
+    for (const record of Object.values(database.results)) {
+        if (record.agentModel !== agentModel || record.testId !== testId) continue;
+        if (
+            best === undefined ||
+            (hasMetrics(record) && !hasMetrics(best)) ||
+            (hasMetrics(record) === hasMetrics(best) && record.timestamp > best.timestamp)
+        ) {
+            best = record;
+        }
+    }
+    return best;
 }
 
 /**
@@ -85,6 +113,10 @@ export function convertEvaluationResultToRecord(
             reason: result.error,
             durationMs: result.durationMs,
             turns: result.conversation.totalTurns,
+            resultBytes: sumResultBytes(result.conversation),
+            promptTokens: result.conversation.promptTokens ?? 0,
+            completionTokens: result.conversation.completionTokens ?? 0,
+            totalTokens: result.conversation.totalTokens ?? 0,
             error: result.error,
         };
     }
@@ -99,6 +131,10 @@ export function convertEvaluationResultToRecord(
         reason: result.judgeResult.reason,
         durationMs: result.durationMs,
         turns: result.conversation.totalTurns,
+        resultBytes: sumResultBytes(result.conversation),
+        promptTokens: result.conversation.promptTokens ?? 0,
+        completionTokens: result.conversation.completionTokens ?? 0,
+        totalTokens: result.conversation.totalTokens ?? 0,
         error: null,
     };
 }
