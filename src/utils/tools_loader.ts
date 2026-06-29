@@ -9,7 +9,7 @@ import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
-import { addTool } from '../tools/actors/add_actor.js';
+import { addActor } from '../tools/actors/add_actor.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
     CATEGORY_NAME_SET,
@@ -19,7 +19,7 @@ import {
     WIDGET_BY_BASE_TOOL,
 } from '../tools/registry.js';
 import { abortActorRun } from '../tools/runs/abort_actor_run.js';
-import { defaultGetActorRun } from '../tools/runs/get_actor_run.js';
+import { getActorRun } from '../tools/runs/get_actor_run.js';
 import { getDatasetItems } from '../tools/storage/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/storage/get_key_value_store_record.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
@@ -31,7 +31,7 @@ import { SERVER_MODES, ServerMode, TOOL_TYPE } from '../types.js';
  * fetch items → fetch KV record → abort.
  */
 export const AUTO_INJECTED_TOOLS: readonly ToolEntry[] = [
-    defaultGetActorRun,
+    getActorRun,
     getDatasetItems,
     getKeyValueStoreRecord,
     abortActorRun,
@@ -243,12 +243,12 @@ export function getToolsForServerMode(
         result.push(...internalSelections);
         // If add-actor mode is enabled, ensure add-actor tool is available alongside selected tools.
         if (addActorEnabled && !selectorsExplicitEmpty && !actorsExplicitlyEmpty) {
-            const hasAddActor = result.some((e) => e.name === addTool.name);
-            if (!hasAddActor) result.push(addTool);
+            const hasAddActor = result.some((e) => e.name === addActor.name);
+            if (!hasAddActor) result.push(addActor);
         }
     } else if (addActorEnabled && !actorsExplicitlyEmpty) {
         // No selectors: either expose only add-actor (when enabled), or default categories
-        result.push(addTool);
+        result.push(addActor);
     } else if (!actorsExplicitlyEmpty) {
         // Use mode-resolved default categories
         for (const cat of toolCategoriesEnabledByDefault) {

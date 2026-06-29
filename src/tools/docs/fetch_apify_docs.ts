@@ -57,7 +57,7 @@ Please verify the URL is correct and accessible. \
 You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`;
 }
 
-export const fetchApifyDocsTool: ToolEntry = Object.freeze({
+export const fetchApifyDocs: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DOCS_FETCH,
     title: 'Fetch Apify docs',

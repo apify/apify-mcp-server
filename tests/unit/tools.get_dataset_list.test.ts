@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { getUserDatasetsList } from '../../src/tools/storage/dataset_collection.js';
+import { getDatasetList } from '../../src/tools/storage/get_dataset_list.js';
 import { storageListOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
@@ -31,15 +31,13 @@ function stubApifyClient(listSpy: ReturnType<typeof vi.fn>): InternalToolArgs['a
 
 describe('get-dataset-list', () => {
     it('has the expected tool name', () => {
-        expect(getUserDatasetsList.name).toBe(HelperTools.DATASET_LIST_GET);
+        expect(getDatasetList.name).toBe(HelperTools.DATASET_LIST_GET);
     });
 
     it('returns the list response plus a summary and nextStep in structuredContent', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        const result = await (getUserDatasetsList as HelperTool).call(
-            stubToolCallContext({}, stubApifyClient(listSpy)),
-        );
+        const result = await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
         const { content, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
         };
@@ -63,9 +61,7 @@ describe('get-dataset-list', () => {
             ],
         });
 
-        const result = await (getUserDatasetsList as HelperTool).call(
-            stubToolCallContext({}, stubApifyClient(listSpy)),
-        );
+        const result = await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
         const { structuredContent } = result as {
             structuredContent: { items: { stats: { inflatedBytes: number } }[] };
         };
@@ -76,9 +72,7 @@ describe('get-dataset-list', () => {
     it('emits a pagination nextStep when more datasets remain', async () => {
         const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total: 25 });
 
-        const result = await (getUserDatasetsList as HelperTool).call(
-            stubToolCallContext({}, stubApifyClient(listSpy)),
-        );
+        const result = await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
         expect(structuredContent.summary).toBe('Listed 2 of 25 datasets.');
@@ -90,7 +84,7 @@ describe('get-dataset-list', () => {
     it('forwards pagination params (limit, offset, desc, unnamed) to ApifyClient', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        await (getUserDatasetsList as HelperTool).call(
+        await (getDatasetList as HelperTool).call(
             stubToolCallContext(
                 {
                     limit: 5,
@@ -108,7 +102,7 @@ describe('get-dataset-list', () => {
     it('applies defaults (limit=10, offset=0, desc=false, unnamed=false) when no params given', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        await (getUserDatasetsList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
+        await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
 
         expect(listSpy).toHaveBeenCalledWith({ limit: 10, offset: 0, desc: false, unnamed: false });
     });
@@ -116,9 +110,7 @@ describe('get-dataset-list', () => {
     it('emits structuredContent that validates against the outputSchema for the last/empty page', async () => {
         const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total: 0, count: 0, items: [] });
 
-        const result = await (getUserDatasetsList as HelperTool).call(
-            stubToolCallContext({}, stubApifyClient(listSpy)),
-        );
+        const result = await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
         expect(structuredContent).toHaveProperty('count', 0);
@@ -126,7 +118,7 @@ describe('get-dataset-list', () => {
     });
 
     it('rejects limit above 20 via ajv validation', () => {
-        const tool = getUserDatasetsList as HelperTool;
+        const tool = getDatasetList as HelperTool;
         expect(tool.ajvValidate({ limit: 21 })).toBe(false);
         expect(tool.ajvValidate({ limit: 20 })).toBe(true);
     });

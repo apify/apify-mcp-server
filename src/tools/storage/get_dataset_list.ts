@@ -33,7 +33,7 @@ const getUserDatasetsListArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/datasets-get
  */
-export const getUserDatasetsList: ToolEntry = Object.freeze({
+export const getDatasetList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_LIST_GET,
     title: 'Get user datasets list',

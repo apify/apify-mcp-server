@@ -8,7 +8,7 @@ import { processParamsGetTools } from './mcp/utils.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import type { PaymentProvider } from './payments/types.js';
 import { getServerCard } from './server_card.js';
-import { addTool } from './tools/actors/add_actor.js';
+import { addActor } from './tools/actors/add_actor.js';
 import {
     getActorsAsTools,
     getCategoryTools,
@@ -37,7 +37,11 @@ export {
     SERVER_TITLE,
     defaults,
     getDefaultTools,
-    addTool,
+    addActor,
+    /**
+     * @deprecated Use `addActor` instead. Kept for the apify-mcp-server-internal migration; remove once it no longer imports `addTool`.
+     */
+    addActor as addTool,
     getCategoryTools,
     toolCategoriesEnabledByDefault,
     type ActorStore,

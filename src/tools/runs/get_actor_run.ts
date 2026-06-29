@@ -12,7 +12,7 @@ import {
 /**
  * Default mode `get-actor-run` — returns without any widget metadata.
  */
-export const defaultGetActorRun: ToolEntry = Object.freeze({
+export const getActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, apifyToken, progressTracker, mcpSessionId, extra } = toolArgs;

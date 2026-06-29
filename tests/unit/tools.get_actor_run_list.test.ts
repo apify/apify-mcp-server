@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { getUserRunsList } from '../../src/tools/runs/run_collection.js';
+import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
@@ -32,29 +32,29 @@ const MOCK_RUNS = {
     ],
 };
 
-// run_collection constructs its own ApifyClient from the token, so the injected client is unused.
+// get_actor_run_list constructs its own ApifyClient from the token, so the injected client is unused.
 const noClient = null as unknown as InternalToolArgs['apifyClient'];
 
 describe('get-actor-run-list', () => {
     it('has the expected tool name', () => {
-        expect(getUserRunsList.name).toBe(HelperTools.ACTOR_RUN_LIST_GET);
+        expect(getActorRunList.name).toBe(HelperTools.ACTOR_RUN_LIST_GET);
     });
 
     it('returns runs as fenced text (json or toon), mirrors them in structuredContent, and declares an outputSchema', async () => {
         listMock.mockResolvedValue(MOCK_RUNS);
 
-        const result = await (getUserRunsList as HelperTool).call(stubToolCallContext({}, noClient));
+        const result = await (getActorRunList as HelperTool).call(stubToolCallContext({}, noClient));
         const { content } = result as TextToolResult;
 
         expect(decodeFencedToolText(content[0].text)).toEqual(MOCK_RUNS);
         expect((result as TextToolResult).structuredContent).toEqual(MOCK_RUNS);
-        expect((getUserRunsList as HelperTool).outputSchema).toMatchObject({ type: 'object' });
+        expect((getActorRunList as HelperTool).outputSchema).toMatchObject({ type: 'object' });
     });
 
     it('forwards pagination and status filters to runs().list()', async () => {
         listMock.mockResolvedValue(MOCK_RUNS);
 
-        await (getUserRunsList as HelperTool).call(
+        await (getActorRunList as HelperTool).call(
             stubToolCallContext({ limit: 5, offset: 2, desc: true, status: 'SUCCEEDED' }, noClient),
         );
 
@@ -64,13 +64,13 @@ describe('get-actor-run-list', () => {
     it('applies defaults (limit=10, offset=0, desc=false) when no params given', async () => {
         listMock.mockResolvedValue(MOCK_RUNS);
 
-        await (getUserRunsList as HelperTool).call(stubToolCallContext({}, noClient));
+        await (getActorRunList as HelperTool).call(stubToolCallContext({}, noClient));
 
         expect(listMock).toHaveBeenCalledWith({ limit: 10, offset: 0, desc: false, status: undefined });
     });
 
     it('rejects limit above 10 via ajv validation', () => {
-        const tool = getUserRunsList as HelperTool;
+        const tool = getActorRunList as HelperTool;
         expect(tool.ajvValidate({ limit: 11 })).toBe(false);
         expect(tool.ajvValidate({ limit: 10 })).toBe(true);
     });

@@ -64,7 +64,7 @@ const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
     Input: actor name and input JSON; callOptions (memory, timeout) are optional.
 `;
 
-export const appsCallActorWidget: ToolEntry = Object.freeze({
+export const callActorWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_CALL_WIDGET,
     title: 'Call Actor (widget)',

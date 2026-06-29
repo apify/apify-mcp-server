@@ -68,7 +68,7 @@ Use this to paginate through the search results. For example, if you want to get
 
 const searchApifyDocsToolInputSchema = z.toJSONSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema;
 
-export const searchApifyDocsTool: ToolEntry = Object.freeze({
+export const searchApifyDocs: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DOCS_SEARCH,
     title: 'Search Apify docs',
