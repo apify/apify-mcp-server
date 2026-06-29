@@ -6,7 +6,7 @@ import { storageListOutputSchema } from '../../src/tools/structured_output_schem
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
     decodeFencedToolText,
-    expectStructuredContentMatchesSchema,
+    expectSchemaConformingStructuredContent,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -102,7 +102,7 @@ describe('get-key-value-store-list', () => {
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
         expect(structuredContent).toHaveProperty('count', 0);
-        expectStructuredContentMatchesSchema(storageListOutputSchema, structuredContent);
+        expectSchemaConformingStructuredContent(result, storageListOutputSchema);
     });
 
     it('rejects limit above 10 via ajv validation', () => {

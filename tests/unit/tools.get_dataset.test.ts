@@ -8,7 +8,7 @@ import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSoftFailInvalidInput,
-    expectStructuredContentMatchesSchema,
+    expectSchemaConformingStructuredContent,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -87,9 +87,7 @@ describe('get-dataset', () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ ...MOCK_DATASET, name: null })),
         );
-        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
-
-        expectStructuredContentMatchesSchema(datasetMetadataOutputSchema, structuredContent);
+        expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
     });
 
     it('returns isError with a not-found message when the dataset does not exist', async () => {

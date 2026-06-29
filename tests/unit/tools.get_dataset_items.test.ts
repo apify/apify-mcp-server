@@ -10,7 +10,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     decodeFencedToolText,
     expectSoftFailInvalidInput,
-    expectStructuredContentMatchesSchema,
+    expectSchemaConformingStructuredContent,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -143,9 +143,7 @@ describe('get-dataset-items', () => {
                 stubApifyClient(async () => ({ items: [], total: 0 })),
             ),
         );
-        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
-
-        expectStructuredContentMatchesSchema(datasetItemsOutputSchema, structuredContent);
+        expectSchemaConformingStructuredContent(result, datasetItemsOutputSchema);
     });
 
     it('returns isError with a not-found message when listItems throws 404', async () => {

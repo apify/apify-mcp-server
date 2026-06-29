@@ -8,7 +8,7 @@ import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
 import {
     expectSoftFailInvalidInput,
-    expectStructuredContentMatchesSchema,
+    expectSchemaConformingStructuredContent,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
@@ -93,7 +93,7 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
         // The required `schema` is still present (empty object) and the emit conforms to the schema.
-        expectStructuredContentMatchesSchema(datasetSchemaOutputSchema, structuredContent);
+        expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
     });
 
     it('returns isError with a not-found message when listItems throws 404', async () => {

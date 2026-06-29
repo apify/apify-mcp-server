@@ -9,7 +9,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     decodeFencedToolText,
     expectSoftFailInvalidInput,
-    expectStructuredContentMatchesSchema,
+    expectSchemaConformingStructuredContent,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -80,9 +80,7 @@ describe('get-key-value-store-keys', () => {
         const result = await (getKeyValueStoreKeys as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
         );
-        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
-
-        expectStructuredContentMatchesSchema(keyValueStoreKeysOutputSchema, structuredContent);
+        expectSchemaConformingStructuredContent(result, keyValueStoreKeysOutputSchema);
     });
 
     it('flags truncation in the summary and points to the next page when more keys are available', async () => {

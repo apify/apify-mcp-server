@@ -71,12 +71,16 @@ export function expectSoftFailInvalidInput(result: { isError?: boolean; toolTele
 }
 
 /**
- * Assert that `structuredContent` validates against `schema` under a non-coercing AJV
- * (`new Ajv({ strict: false })` compiled directly on the schema) — the same shape of check the MCP
- * SDK client runs on tool results. The repo's lenient `compileSchema` coerces types and would hide a
- * mismatch, so conformance tests compile here instead. Surfaces AJV errors in the failure message.
+ * Assert a tool result's `structuredContent` conforms to its declared `outputSchema` under a
+ * non-coercing AJV (`new Ajv({ strict: false })` compiled directly on the schema) — the same check
+ * the MCP SDK client runs on tool results: a result that declares a schema but returns absent or
+ * non-conforming `structuredContent` is rejected. The repo's `compileSchema` coerces types and would
+ * hide a mismatch, so compile strictly here. Surfaces AJV errors in the failure message.
  */
-export function expectStructuredContentMatchesSchema(schema: object, structuredContent: unknown): void {
+export function expectSchemaConformingStructuredContent(result: unknown, schema: object): void {
+    const { structuredContent, isError } = result as { structuredContent?: unknown; isError?: boolean };
+    expect(isError).not.toBe(true);
+    expect(structuredContent).toBeDefined();
     const validate = new Ajv({ strict: false }).compile(schema);
     const valid = validate(structuredContent);
     expect(valid, JSON.stringify(validate.errors)).toBe(true);

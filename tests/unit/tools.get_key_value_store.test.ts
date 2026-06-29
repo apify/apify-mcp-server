@@ -8,7 +8,7 @@ import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSoftFailInvalidInput,
-    expectStructuredContentMatchesSchema,
+    expectSchemaConformingStructuredContent,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -71,9 +71,7 @@ describe('get-key-value-store', () => {
         const result = await (getKeyValueStore as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient({ ...MOCK_STORE, name: null })),
         );
-        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
-
-        expectStructuredContentMatchesSchema(keyValueStoreOutputSchema, structuredContent);
+        expectSchemaConformingStructuredContent(result, keyValueStoreOutputSchema);
     });
 
     it('returns isError with a not-found message when the store does not exist', async () => {
