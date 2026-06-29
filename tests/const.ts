@@ -1,6 +1,6 @@
 import { defaults } from '../src/const.js';
+import { actorNameToToolName } from '../src/tools/actor_tool_naming.js';
 import { toolCategoriesEnabledByDefault } from '../src/tools/index.js';
-import { actorNameToToolName } from '../src/tools/utils.js';
 import { getExpectedToolNamesByCategories } from '../src/utils/tool_categories_helpers.js';
 
 export const ACTOR_NORMAL_MODE = 'apify/normal-mode-test-actor';

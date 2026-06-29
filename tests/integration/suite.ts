@@ -13,11 +13,11 @@ import {
 } from '../../src/const.js';
 import { SKYFIRE_ENABLED_TOOLS } from '../../src/payments/const.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/actors/call_actor.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
