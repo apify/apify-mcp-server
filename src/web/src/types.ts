@@ -32,13 +32,13 @@ export type StructuredPricingInfo = {
     eventDescriptionsNote?: string;
 };
 
-export interface ActorStats {
+export type ActorStats = {
     totalUsers: number;
     actorReviewRating: number;
     actorReviewCount: number;
-}
+};
 
-export interface ActorDetails {
+export type ActorDetails = {
     actorInfo: Actor;
     actorCard: string;
     readme: string;
@@ -46,9 +46,9 @@ export interface ActorDetails {
         type: string;
         properties: Record<string, unknown>;
     };
-}
+};
 
-export interface Actor {
+export type Actor = {
     id: string;
     name: string;
     username: string;
@@ -59,4 +59,4 @@ export interface Actor {
     pictureUrl?: string;
     stats?: ActorStats;
     currentPricingInfo?: StructuredPricingInfo;
-}
+};
