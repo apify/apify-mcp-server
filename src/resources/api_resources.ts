@@ -125,15 +125,15 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         const mimeType = contentType?.split(';')[0].trim().toLowerCase();
         // Inlining a large binary as base64 would blow up the client's context, so above the inline
         // limit link out instead: an explanatory text block with the URL, size, and type (resources/read
-        // has no resource_link content type), matching the soft-fail contract. For a key-value-store record
-        // the link is the signed public URL, fetchable without a token; other endpoints fall back to the
-        // (token-gated) API URL.
+        // has no resource_link content type), matching the soft-fail contract. The link is only auth-free
+        // for a key-value-store record whose store has a URL-signing key; an unsigned record URL and every
+        // other (token-gated) API URL still need the Apify token — so the message says it may require it.
         if (data.length > KV_RECORD_MAX_INLINE_BYTES) {
             const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient);
             return buildTextResult(
                 uri,
                 `Content (${mimeType ?? 'binary'}, ${data.length} bytes) is too large to inline. ` +
-                    `Fetch it directly from: ${downloadUrl}`,
+                    `Download it from ${downloadUrl} (may require your Apify API token).`,
             );
         }
         return {

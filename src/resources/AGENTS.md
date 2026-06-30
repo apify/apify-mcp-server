@@ -29,8 +29,9 @@ Binary and empty bodies are keyed off the JS type; a JSON body is re-serialized 
 strings are emitted verbatim. Buffers over `KV_RECORD_MAX_INLINE_BYTES`
 (256 KB) link out — an explanatory `text/plain` block naming the URL + size + type
 (`resources/read` has no `resource_link` content type) — instead of inlining base64. For a KVS
-record the URL is the store's signed `recordPublicUrl` (fetchable without a token); other endpoints
-fall back to the token-gated API URL. Text/JSON bodies are not size-capped (the model paginates via
+record the URL is the store's `recordPublicUrl` (auth-free only when the store has a URL-signing key);
+an unsigned record URL and every other endpoint fall back to the token-gated API URL, so the block says
+the link may require the token. Text/JSON bodies are not size-capped (the model paginates via
 `limit`/`offset`). Errors never throw: a missing resource, bad token, or 5xx returns an explanatory
 `text` block.
 
