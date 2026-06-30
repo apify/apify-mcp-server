@@ -1,4 +1,4 @@
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, KV_RECORD_MAX_INLINE_BYTES, TOOL_STATUS } from '../../const.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
@@ -160,4 +160,28 @@ export function buildKvsKeysSummaryNextStep(params: {
 const NORMALIZE_RECORD_KEY_REGEX = new RegExp(`^[${QUOTE_WRAPPER_CHARS}]+|[${QUOTE_WRAPPER_CHARS}]+$`, 'g');
 export function normalizeRecordKey(key: string): string {
     return key.trim().replace(NORMALIZE_RECORD_KEY_REGEX, '').trim();
+}
+
+/**
+ * How to surface a binary key-value-store record value: inline as base64 below
+ * `KV_RECORD_MAX_INLINE_BYTES`, otherwise link out (inlining a multi-MB blob would blow up the
+ * client's context). `mimeType` is the Content-Type with parameters stripped and lowercased
+ * (`Image/PNG; charset=…` → `image/png`), or `undefined` when no Content-Type was declared.
+ */
+export type BinaryRecordDisposition =
+    | { kind: 'inline'; mimeType?: string; base64: string }
+    | { kind: 'linkOut'; mimeType?: string; bytes: number };
+
+/**
+ * Classify a binary record value for transport. Shared by the get-key-value-store-record tool and the
+ * API-resource proxy so the MIME normalization, inline threshold, and base64 encoding stay in one place.
+ * It does NOT mint the link-out URL — the two callers build different URLs (a signed record URL vs the
+ * API URL) via async calls — so the caller handles `linkOut` by minting its own URL.
+ */
+export function classifyBinaryRecord(contentType: string | undefined, value: Buffer): BinaryRecordDisposition {
+    const mimeType = contentType?.split(';')[0].trim().toLowerCase();
+    if (value.length > KV_RECORD_MAX_INLINE_BYTES) {
+        return { kind: 'linkOut', ...(mimeType !== undefined && { mimeType }), bytes: value.length };
+    }
+    return { kind: 'inline', ...(mimeType !== undefined && { mimeType }), base64: value.toString('base64') };
 }

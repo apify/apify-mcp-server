@@ -6,7 +6,7 @@ import type {
 
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
-import { KV_RECORD_MAX_INLINE_BYTES } from '../const.js';
+import { classifyBinaryRecord } from '../tools/common/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 
 const JSON_MIME_TYPE = 'application/json';
@@ -122,23 +122,26 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     }
 
     if (Buffer.isBuffer(data)) {
-        const mimeType = contentType?.split(';')[0].trim().toLowerCase();
-        // Inlining a large binary as base64 would blow up the client's context, so above the inline
-        // limit link out instead: an explanatory text block with the URL, size, and type (resources/read
-        // has no resource_link content type), matching the soft-fail contract. The link is only auth-free
-        // for a key-value-store record whose store has a URL-signing key; an unsigned record URL and every
-        // other (token-gated) API URL still need the Apify token — so the message says it may require it.
-        if (data.length > KV_RECORD_MAX_INLINE_BYTES) {
+        const disposition = classifyBinaryRecord(contentType, data);
+        // Above the inline limit, link out with an explanatory text block (resources/read has no
+        // resource_link content type), matching the soft-fail contract. The link is only auth-free for a
+        // key-value-store record whose store has a URL-signing key; an unsigned record URL and every other
+        // (token-gated) API URL still need the Apify token — so the message says it may require it.
+        if (disposition.kind === 'linkOut') {
             const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient);
             return buildTextResult(
                 uri,
-                `Content (${mimeType ?? 'binary'}, ${data.length} bytes) is too large to inline. ` +
+                `Content (${disposition.mimeType ?? 'binary'}, ${disposition.bytes} bytes) is too large to inline. ` +
                     `Download it from ${downloadUrl} (may require your Apify API token).`,
             );
         }
         return {
             contents: [
-                { uri, ...(mimeType && { mimeType }), blob: data.toString('base64') } satisfies BlobResourceContents,
+                {
+                    uri,
+                    ...(disposition.mimeType && { mimeType: disposition.mimeType }),
+                    blob: disposition.base64,
+                } satisfies BlobResourceContents,
             ],
         };
     }
