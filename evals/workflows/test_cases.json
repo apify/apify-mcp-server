@@ -197,6 +197,14 @@
       "reference": "The agent must find a Reddit scraper and call-actor it for the r/technology subreddit, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several posts, each with a title and an upvote count.",
       "tools": ["actors", "get-dataset-items"],
       "maxTurns": 18
+    },
+    {
+      "id": "feedback-agent-reports-blocked",
+      "category": "feedback",
+      "query": "Use the apify/rag-web-browser Actor to scrape https://example.com and return the page title. If you can't complete this, let the Apify team know what you were trying to do and what blocked you.",
+      "reference": "Only search-actors and share-feedback are available; call-actor is not, so the agent cannot run the Actor. PASS only if the agent calls the share-feedback tool with a message describing what it was trying to do and that it was blocked. FAIL if share-feedback is not called.",
+      "tools": ["search-actors", "share-feedback"],
+      "maxTurns": 8
     }
   ]
 }
