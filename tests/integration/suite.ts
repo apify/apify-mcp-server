@@ -2206,6 +2206,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const fields = sc?.storages?.datasets?.default?.fields ?? [];
                 expect(fields).toEqual(expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']));
 
+                // #911/#894: the actor emits `math.fibonacci: [..]`, which Apify reports index-expanded
+                // (`math/fibonacci/0`, `/1`, `/2`). The server must collapse those to a single
+                // `math.fibonacci` on the wire. `math.fibonacci` present proves collapse fired (not a
+                // flat-only no-op); no entry keeps an array index; no duplicates survive collapse.
+                expect(fields).toEqual(expect.arrayContaining(['math.fibonacci']));
+                expect(fields.some((f) => /\.\d+(\.|$)/.test(f))).toBe(false);
+                expect(new Set(fields).size).toBe(fields.length);
+
                 const outputResult = await client.callTool({
                     name: HelperTools.DATASET_GET_ITEMS,
                     arguments: {
