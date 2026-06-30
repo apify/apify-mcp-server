@@ -7,7 +7,9 @@ Three files serving the MCP `resources/*` surface:
 
 - `resource_service.ts` — handles `ListResources` / `ListResourceTemplates` /
   read-resource requests. Takes an optional `apifyClient` on list/read; the server
-  builds it from the per-request token (`_meta.apifyToken || options.token`).
+  builds it from the per-request token (`_meta.apifyToken || options.token`). This is
+  token-only by design — it does not forward payment headers like the CallTool path, so a
+  payment-only session (x402/Skyfire, no token) gets no client and every read soft-fails.
 - `api_resources.ts` — a thin MCP-resource proxy over the Apify API: any Apify API GET
   endpoint is readable as a resource, identified by its real API URL.
 - `widgets.ts` — the registry of UI widgets (the metadata that maps a widget name to

@@ -650,8 +650,10 @@ export class ActorsMcpServer {
             getAvailableWidgets: () => this.availableWidgets,
         });
 
-        // Resolve the token like the CallTool handler and build a client when one is present.
-        // Only resources/read is token-scoped (the API proxy needs auth); without a token reads soft-fail.
+        // Build a token-scoped client for resources/read (the API proxy needs auth). This is deliberately
+        // token-only: unlike the CallTool path it does NOT forward provider/payment headers, so a
+        // payment-only session (x402/Skyfire, no Apify token) has no client and every read soft-fails by
+        // design. Resources are scoped to token sessions; the server-instructions state a read needs a token.
         const resolveApifyClient = (params: ApifyRequestParams): ApifyClient | undefined => {
             const token = this.resolveApifyToken(params._meta);
             return token ? new ApifyClient({ token }) : undefined;
