@@ -11,12 +11,12 @@ import {
     fixedAjvCompile,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
-    isActorBlockedUnderPaymentProvider,
     MAX_UNTRUSTED_SCHEMA_BYTES,
     markInputPropertiesAsRequired,
     shortenProperties,
     transformActorInputSchemaProperties,
-} from '../../src/tools/utils.js';
+} from '../../src/tools/actor_input_schema.js';
+import { isActorBlockedUnderPaymentProvider } from '../../src/tools/actor_tool_naming.js';
 import type { ActorInfo, ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { ajv } from '../../src/utils/ajv.js';

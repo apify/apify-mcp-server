@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
-import { fixedAjvCompile } from '../tools/utils.js';
+import { fixedAjvCompile } from '../tools/actor_input_schema.js';
 import type { ActorMcpTool, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { ajv } from '../utils/ajv.js';

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import log from '@apify/log';
 
 import { SchemaTooLargeError } from '../../src/errors.js';
-import { MAX_UNTRUSTED_SCHEMA_BYTES } from '../../src/tools/utils.js';
+import { MAX_UNTRUSTED_SCHEMA_BYTES } from '../../src/tools/actor_input_schema.js';
 import {
     isMcpClientFaultMessage,
     logHttpError,

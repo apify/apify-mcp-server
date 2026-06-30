@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
-import { actorNameToToolName, legacyToolNameToNew } from '../../src/tools/utils.js';
+import { actorNameToToolName, legacyToolNameToNew } from '../../src/tools/actor_tool_naming.js';
 
 describe('actors', () => {
     describe('actorNameToToolName', () => {

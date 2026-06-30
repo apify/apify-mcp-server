@@ -23,14 +23,9 @@ import { getActorDefinitionCached } from '../../utils/actor.js';
 import { ajv } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
+import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js';
+import { actorNameToToolName, isActorBlockedUnderPaymentProvider, isActorInfoMcpServer } from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
-import {
-    actorNameToToolName,
-    buildActorInputSchema,
-    fixedAjvCompile,
-    isActorBlockedUnderPaymentProvider,
-    isActorInfoMcpServer,
-} from '../utils.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
 
 /**

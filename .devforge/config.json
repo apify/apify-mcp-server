@@ -1,8 +1,8 @@
 {
   "stages": {
-    "validate":    { "use": "brainstorming", "model": "opus" },
-    "architect":   { "use": "dig",           "model": "opus" },
-    "implementer": { "use": "feature-dev",   "model": "opus" },
+    "verify_request": { "use": "brainstorming", "model": "opus" },
+    "architect":      { "use": "dig",           "model": "opus" },
+    "implementer":    { "use": "feature-dev",   "model": "opus" },
     "reviewers": [
       { "use": "staff-review", "model": "sonnet" }
     ],
@@ -10,6 +10,14 @@
       { "use": "thermonuclear", "model": "sonnet" },
       { "use": "code-review",   "model": "sonnet" },
       { "use": "mcpc-tester",   "model": "sonnet" }
+    ]
+  },
+  "oracle": {
+    "commands": [
+      "pnpm run type-check",
+      "pnpm run lint",
+      "pnpm run test:unit",
+      "pnpm run check:agents"
     ]
   },
   "limits": { "inner_iterations": 3, "final_review_rounds": 2 },
