@@ -153,8 +153,11 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     if (isJsonContentType(contentType)) {
         return buildTextResult(uri, JSON.stringify(data), contentType ?? JSON_MIME_TYPE);
     }
-    // text/xml bodies are JS strings, emitted verbatim with their declared Content-Type; any other
-    // parsed object (no/unknown Content-Type) is lossless-serialized as JSON.
+    // text/xml bodies are JS strings, emitted verbatim with their FULL declared Content-Type — charset
+    // included, since a client needs it to decode the text. This is deliberately unlike the binary path,
+    // where `classifyBinaryRecord` strips the Content-Type to its base MIME type (only the base type is
+    // meaningful for a blob, and the image/audio routing keys off it). Any other parsed object (no/unknown
+    // Content-Type) is lossless-serialized as JSON.
     const text = typeof data === 'string' ? data : JSON.stringify(data);
     return buildTextResult(uri, text, contentType ?? (typeof data === 'string' ? TEXT_MIME_TYPE : JSON_MIME_TYPE));
 }
