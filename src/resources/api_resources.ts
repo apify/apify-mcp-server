@@ -36,7 +36,7 @@ const KV_RECORD_PATH_RE = /^\/v2\/key-value-stores\/([^/]+)\/records\/(.+)$/;
  * store's URL signing key. Falls back to the original API URL for any other endpoint, or if minting
  * the signed URL fails (fetching that link then needs a token).
  */
-async function getRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Promise<string> {
+async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Promise<string> {
     let pathname: string;
     try {
         pathname = new URL(uri).pathname;
@@ -111,7 +111,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         // the link is the signed public URL, fetchable without a token; other endpoints fall back to the
         // (token-gated) API URL.
         if (data.length > KV_RECORD_MAX_INLINE_BYTES) {
-            const downloadUrl = await getRecordDownloadUrl(uri, apifyClient);
+            const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient);
             return buildTextResult(
                 uri,
                 `Content (${mimeType ?? 'binary'}, ${data.length} bytes) is too large to inline. ` +
