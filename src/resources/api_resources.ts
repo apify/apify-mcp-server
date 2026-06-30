@@ -65,7 +65,7 @@ function buildTextResult(uri: string, text: string, mimeType: string = TEXT_MIME
 /**
  * Read any Apify API GET endpoint as an MCP resource.
  *
- * A thin proxy: the apify-client injects the session token (and MCP-origin / payment headers),
+ * A thin proxy: the apify-client injects the session token (and the MCP-origin header),
  * performs the GET, and parses the body by Content-Type — JSON to an object, text/xml to a
  * string, anything else to a Buffer, an empty body to `undefined`. We branch on that resulting
  * JS type, not the MIME type. Errors (a missing resource, a bad token, a 5xx) never throw; they
