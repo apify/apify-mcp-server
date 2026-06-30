@@ -34,6 +34,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
+import { SHARE_FEEDBACK_FOOTER } from '../feedback/share_feedback.js';
 import { buildGetActorRunSuccessResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 import {
@@ -106,6 +107,7 @@ function buildCallActorDescriptionSections(includeWidget: boolean): string {
             - Use \`waitSecs\` (0–45) to control how long to wait. Default 30s returns results for fast actors. Use \`waitSecs: 0\` to start and return immediately for long-running actors.
         `,
         CALL_ACTOR_EXAMPLES_SECTION,
+        SHARE_FEEDBACK_FOOTER,
     ];
 
     if (includeWidget) sections.push(WIDGET_ADDENDUM);

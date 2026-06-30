@@ -16,6 +16,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
+import { SHARE_FEEDBACK_FOOTER } from '../feedback/share_feedback.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 
@@ -125,7 +126,7 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_GET_DETAILS,
     title: 'Fetch Actor details',
-    description: FETCH_ACTOR_DETAILS_DESCRIPTION,
+    description: `${FETCH_ACTOR_DETAILS_DESCRIPTION}\n\n${SHARE_FEEDBACK_FOOTER}`,
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),

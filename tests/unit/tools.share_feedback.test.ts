@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { HelperTools } from '../../src/const.js';
+import { callActorDefault } from '../../src/tools/actors/call_actor.js';
+import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
+import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { shareFeedback } from '../../src/tools/feedback/share_feedback.js';
 import type { HelperTool } from '../../src/types.js';
 import { type TextToolResult, stubToolCallContext } from './helpers/tool_context.js';
@@ -42,6 +46,16 @@ describe('shareFeedback', () => {
                     relatedTools: ['call-actor', 'get-dataset-items'],
                 }),
             ).toBe(true);
+        });
+    });
+
+    describe('discoverability', () => {
+        it.each([
+            ['search-actors', searchActors],
+            ['fetch-actor-details', fetchActorDetails],
+            ['call-actor', callActorDefault],
+        ])('advertises share-feedback in the %s description', (_name, tool) => {
+            expect(tool.description).toContain(HelperTools.FEEDBACK_SHARE);
         });
     });
 });

@@ -19,6 +19,7 @@ import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console
 import { buildMCPResponse } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
+import { SHARE_FEEDBACK_FOOTER } from '../feedback/share_feedback.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -109,7 +110,7 @@ export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.STORE_SEARCH,
     title: 'Search Actors',
-    description: SEARCH_ACTORS_DESCRIPTION,
+    description: `${SEARCH_ACTORS_DESCRIPTION}\n${SHARE_FEEDBACK_FOOTER}`,
     inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),

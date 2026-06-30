@@ -17,6 +17,12 @@ content. Describe the issue in your own words.`;
 
 const ACKNOWLEDGEMENT = `Feedback submitted. Thank you — this helps improve Apify's tools.`;
 
+/**
+ * One-line recruiting footer appended to the descriptions of tools where agents commonly get stuck
+ * (call-actor, search-actors, fetch-actor-details) so the feedback channel is discoverable.
+ */
+export const SHARE_FEEDBACK_FOOTER = `If you got stuck, or this tool's response was confusing or wrong, use ${HelperTools.FEEDBACK_SHARE} to report it — you can also use it to rate an Actor.`;
+
 const shareFeedbackArgsSchema = z.object({
     message: z.string().min(1).describe('What happened: the problem you hit, or what went well or badly. Required.'),
     actorId: z.string().optional().describe('Optional. The Actor this feedback is about, e.g. apify/rag-web-browser.'),
