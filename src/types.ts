@@ -388,6 +388,28 @@ export type ToolCallTelemetryProperties = {
     validation_error_count?: number;
 };
 
+/**
+ * Segment 'MCP Agent Feedback' event payload: the `share-feedback` submission plus the same
+ * session/client context carried by {@link ToolCallTelemetryProperties}. The internal repo consumes
+ * this event for Slack/GitHub fan-out.
+ */
+export type AgentFeedbackTelemetryProperties = Pick<
+    ToolCallTelemetryProperties,
+    | 'app'
+    | 'app_version'
+    | 'mcp_client_name'
+    | 'mcp_client_version'
+    | 'mcp_protocol_version'
+    | 'mcp_session_id'
+    | 'transport_type'
+> & {
+    message: string;
+    actor_id?: string;
+    actor_run_id?: string;
+    nps_rating?: number;
+    related_tools?: string[];
+};
+
 export type AjvErrorDetails = Pick<
     ToolCallTelemetryProperties,
     | 'validation_keyword'

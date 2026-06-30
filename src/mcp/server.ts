@@ -62,7 +62,7 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getServerInfo } from '../server_card.js';
-import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { buildAgentFeedbackProperties, getTelemetryEnv, trackAgentFeedback, trackToolCall } from '../telemetry.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
@@ -1401,6 +1401,20 @@ export class ActorsMcpServer {
                 ...deriveResourceIds(params.args, params.result),
             };
             trackToolCall(params.userId, this.telemetryEnv, finalizedTelemetryData);
+
+            // A successful share-feedback call also emits a dedicated feedback event carrying the
+            // submission. The internal repo consumes it for Slack/GitHub fan-out.
+            if (
+                params.toolName === HelperTools.FEEDBACK_SHARE &&
+                params.toolStatus === TOOL_STATUS.SUCCEEDED &&
+                params.args
+            ) {
+                trackAgentFeedback(
+                    params.userId,
+                    this.telemetryEnv,
+                    buildAgentFeedbackProperties(finalizedTelemetryData, params.args),
+                );
+            }
         }
     }
 
