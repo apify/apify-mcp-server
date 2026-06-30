@@ -54,6 +54,7 @@ export enum HelperTools {
     STORE_SEARCH_WIDGET = 'search-actors-widget',
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',
+    FEEDBACK_SHARE = 'share-feedback',
 }
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
