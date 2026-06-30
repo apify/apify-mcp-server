@@ -146,6 +146,18 @@ describe('readApiResource()', () => {
         expect(contents.text).toContain('application/octet-stream');
     });
 
+    it('still mints a signed link for a record key with malformed percent-encoding', async () => {
+        // A stray `%` in the key path used to throw in decodeURIComponent and drop the link to the
+        // token-gated API URL; safeDecodeURIComponent keeps the raw segment so the signed link survives.
+        const oversized = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
+        const uri = `${API}/v2/key-value-stores/kv-1/records/BIG%`;
+        const { call } = callReturning(oversized, 'application/octet-stream');
+
+        const result = await readApiResource(uri, stubApifyClient({ call }));
+
+        expect(firstContent(result).text).toContain(signedUrl('kv-1', 'BIG%'));
+    });
+
     it('falls back to the API URL when minting the signed link fails', async () => {
         const oversized = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
         const uri = `${API}/v2/key-value-stores/kv-1/records/BIG`;

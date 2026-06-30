@@ -27,8 +27,20 @@ export function isApifyApiUri(uri: string): boolean {
     }
 }
 
-/** Matches an Apify key-value-store record path, capturing the store id and the record key. */
-const KV_RECORD_PATH_RE = /^\/v2\/key-value-stores\/([^/]+)\/records\/(.+)$/;
+/**
+ * Matches an Apify key-value-store record path, capturing the store id and the record key.
+ * Both groups exclude `/?#` so a trailing query or fragment can't leak into the captured key.
+ */
+const KV_RECORD_PATH_RE = /^\/v2\/key-value-stores\/([^/?#]+)\/records\/([^/?#]+)$/;
+
+/** `decodeURIComponent` that returns the input unchanged on malformed percent-encoding instead of throwing. */
+function safeDecodeURIComponent(segment: string): string {
+    try {
+        return decodeURIComponent(segment);
+    } catch {
+        return segment;
+    }
+}
 
 /**
  * Download URL for a binary too large to inline. For a key-value-store record URI, returns the
@@ -46,8 +58,8 @@ async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Pr
     const match = KV_RECORD_PATH_RE.exec(pathname);
     if (!match) return uri;
     try {
-        const store = apifyClient.keyValueStore(decodeURIComponent(match[1]));
-        return await store.getRecordPublicUrl(decodeURIComponent(match[2]));
+        const store = apifyClient.keyValueStore(safeDecodeURIComponent(match[1]));
+        return await store.getRecordPublicUrl(safeDecodeURIComponent(match[2]));
     } catch (err) {
         logHttpError(err, `Failed to mint signed download URL for ${uri}; falling back to API URL`);
         return uri;
