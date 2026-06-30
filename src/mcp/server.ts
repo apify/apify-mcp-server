@@ -90,6 +90,7 @@ import {
     computeToolResponseBytes,
     getToolCallErrorUserText,
 } from '../utils/mcp.js';
+import { isAnthropicClient } from '../utils/mcp_clients.js';
 import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -556,7 +557,12 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
+        // Hard block: share-feedback must never appear in Anthropic surfaces (Claude.ai, Claude
+        // Desktop, Claude Code), even when explicitly requested. Filtering at this single commit
+        // point keeps it both unlistable and uncallable.
+        const blockFeedback = isAnthropicClient(this.options.initializeRequestData);
         for (const tool of tools) {
+            if (blockFeedback && tool.name === HelperTools.FEEDBACK_SHARE) continue;
             const stored = this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
             this.tools.set(stored.name, stored);
         }
