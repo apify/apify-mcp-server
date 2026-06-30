@@ -12,6 +12,11 @@ import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 const JSON_MIME_TYPE = 'application/json';
 const TEXT_MIME_TYPE = 'text/plain';
 
+/** True when the declared Content-Type is JSON, so the body must be re-serialized to round-trip primitives. */
+function isJsonContentType(contentType: string | undefined): boolean {
+    return contentType?.split(';')[0].trim().toLowerCase() === JSON_MIME_TYPE;
+}
+
 /**
  * True when the URI is an Apify API URL (same origin as the configured API base).
  *
@@ -109,9 +114,10 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     const contentType = typeof contentTypeHeader === 'string' ? contentTypeHeader : undefined;
     const { data } = response;
 
-    // An empty body (e.g. an Actor that wrote an empty OUTPUT) is legitimate; emit empty text,
-    // preserving the record's declared Content-Type when present.
-    if (data === undefined || data === null) {
+    // An empty response body (e.g. an Actor that wrote an empty OUTPUT) maps to `undefined`; emit empty
+    // text, preserving the record's declared Content-Type. JSON `null` maps to JS `null` — a distinct,
+    // meaningful value — so it is NOT treated as empty here and round-trips through the JSON branch below.
+    if (data === undefined) {
         return buildTextResult(uri, '', contentType);
     }
 
@@ -137,16 +143,15 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         };
     }
 
-    // JSON (already parsed to an object/array) or text/xml (a string). A string is emitted verbatim
-    // with its declared Content-Type; anything else is lossless-serialized as JSON.
+    // A JSON body must be re-serialized so primitives round-trip as valid JSON: a bare JSON string
+    // `"hi"` parses to the JS string `hi`, and emitting it verbatim would drop the quotes; JSON `null`
+    // must stay `null`, not collapse to empty text. Branch on the declared Content-Type, not the parsed
+    // JS type, so the type alone can't misclassify a string body.
+    if (isJsonContentType(contentType)) {
+        return buildTextResult(uri, JSON.stringify(data), contentType ?? JSON_MIME_TYPE);
+    }
+    // text/xml bodies are JS strings, emitted verbatim with their declared Content-Type; any other
+    // parsed object (no/unknown Content-Type) is lossless-serialized as JSON.
     const text = typeof data === 'string' ? data : JSON.stringify(data);
-    return {
-        contents: [
-            {
-                uri,
-                mimeType: contentType ?? (typeof data === 'string' ? TEXT_MIME_TYPE : JSON_MIME_TYPE),
-                text,
-            } satisfies TextResourceContents,
-        ],
-    };
+    return buildTextResult(uri, text, contentType ?? (typeof data === 'string' ? TEXT_MIME_TYPE : JSON_MIME_TYPE));
 }

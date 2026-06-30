@@ -108,6 +108,35 @@ describe('readApiResource()', () => {
         expect(JSON.parse(firstContent(result).text as string)).toEqual([{ a: 1 }, { a: 2 }]);
     });
 
+    it('round-trips a JSON null body instead of dropping it as empty text', async () => {
+        // apify-client parses a literal JSON `null` body to JS null; it must serialize back to "null",
+        // not collapse to empty text (which would look like an absent record).
+        const { call } = callReturning(null, 'application/json');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/OUTPUT`,
+            stubApifyClient({ call }),
+        );
+
+        expect(firstContent(result).mimeType).toBe('application/json');
+        expect(firstContent(result).text).toBe('null');
+    });
+
+    it('re-serializes a bare JSON string body so the quotes survive', async () => {
+        // A bare JSON string body parses to a JS string; emitting it verbatim would yield invalid JSON
+        // (`hello`, not `"hello"`). Re-serialize when the declared Content-Type is JSON.
+        const { call } = callReturning('hello', 'application/json');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/GREETING`,
+            stubApifyClient({ call }),
+        );
+
+        expect(firstContent(result).mimeType).toBe('application/json');
+        expect(firstContent(result).text).toBe('"hello"');
+        expect(JSON.parse(firstContent(result).text as string)).toBe('hello');
+    });
+
     it('returns a text body verbatim with its content-type', async () => {
         const { call } = callReturning('hello world', 'text/plain; charset=utf-8');
 
