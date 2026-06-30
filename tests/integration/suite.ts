@@ -260,19 +260,52 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 // Note: UI tools (search-actors-widget, fetch-actor-details-widget) are only available in apps mode
                 const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
                 const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
+                const expectedFeedbackTools = ['share-feedback'];
                 const expectedActors = [actorNameToToolName('apify/rag-web-browser')];
 
-                const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
+                const expectedTotal = expectedActorsTools.concat(
+                    expectedDocsTools,
+                    expectedFeedbackTools,
+                    expectedActors,
+                );
                 expect(names).toHaveLength(expectedTotal.length + 4);
 
                 expectToolNamesToContain(names, expectedActorsTools);
                 expectToolNamesToContain(names, expectedDocsTools);
+                expectToolNamesToContain(names, expectedFeedbackTools);
                 expectToolNamesToContain(names, expectedActors);
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                 // get-actor-run should be automatically included when call-actor is present
                 expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
 
                 await client.close();
+            });
+
+            describe('share-feedback', () => {
+                it('is listed by default and acknowledges a submission', async () => {
+                    client = await createClientFn();
+                    const names = getToolNames(await client.listTools());
+                    expect(names).toContain(HelperTools.FEEDBACK_SHARE);
+
+                    const result = await client.callTool({
+                        name: HelperTools.FEEDBACK_SHARE,
+                        arguments: {
+                            message: 'fetch-actor-details did not explain the input schema clearly.',
+                            npsRating: 6,
+                            relatedTools: ['fetch-actor-details'],
+                        },
+                    });
+
+                    expect(result.isError).not.toBe(true);
+                    const content = result.content as { type: string; text: string }[];
+                    expect(content[0].text).toContain('Feedback submitted');
+                });
+
+                it('is hidden from Anthropic clients', async () => {
+                    client = await createClientFn({ clientName: 'claude-ai' });
+                    const names = getToolNames(await client.listTools());
+                    expect(names).not.toContain(HelperTools.FEEDBACK_SHARE);
+                });
             });
 
             it('should auto-inject storage and abort tools when enableAddingActors is true', async () => {
