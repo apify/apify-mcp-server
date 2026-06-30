@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
@@ -32,12 +32,12 @@ const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
     (e.g., "show progress for run y2h7sK3Wc", "display the status of that run").
 
     For silent data lookups (run status, dataset IDs, stats, resource IDs), use
-    ${HelperTools.ACTOR_RUNS_GET} instead — it returns the same data without rendering a widget.
+    ${HELPER_TOOLS.ACTOR_RUNS_GET} instead — it returns the same data without rendering a widget.
 `;
 
 export const getActorRunWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_RUNS_GET_WIDGET,
+    name: HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET,
     title: 'Get Actor run (widget)',
     description: GET_ACTOR_RUN_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema,

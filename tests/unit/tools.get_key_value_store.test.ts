@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { getKeyValueStore } from '../../src/tools/storage/get_key_value_store.js';
 import { keyValueStoreOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -33,7 +33,7 @@ function stubApifyClient(store: unknown): InternalToolArgs['apifyClient'] {
 
 describe('get-key-value-store', () => {
     it('has the expected tool name', () => {
-        expect(getKeyValueStore.name).toBe(HelperTools.KEY_VALUE_STORE_GET);
+        expect(getKeyValueStore.name).toBe(HELPER_TOOLS.KEY_VALUE_STORE_GET);
     });
 
     it('returns store metadata plus a summary and nextStep in structuredContent', async () => {
@@ -47,7 +47,7 @@ describe('get-key-value-store', () => {
         expect(isError).not.toBe(true);
         expect(structuredContent).toMatchObject(MOCK_STORE);
         expect(structuredContent.summary).toBe("Key-value store 'my-store'.");
-        expect(structuredContent.nextStep).toContain(HelperTools.KEY_VALUE_STORE_KEYS_GET);
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET);
         expect(structuredContent.nextStep).toContain('keyValueStoreId=kv-1');
         // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
         const { summary, nextStep, ...data } = structuredContent;

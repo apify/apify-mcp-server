@@ -7,7 +7,7 @@ import type { ApifyClient } from 'apify-client';
 
 import log from '@apify/log';
 
-import { defaults, HelperTools } from '../const.js';
+import { defaults, HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { addActor } from '../tools/actors/add_actor.js';
 import { getActorsAsTools } from '../tools/index.js';
@@ -211,7 +211,7 @@ export function getToolsForServerMode(
             if (sel === 'preview') {
                 // 'preview' category is deprecated. It contained `call-actor` which is now default.
                 log.warning('Tool category "preview" is deprecated');
-                const callActorTool = toolsByName.get(HelperTools.ACTOR_CALL);
+                const callActorTool = toolsByName.get(HELPER_TOOLS.ACTOR_CALL);
                 if (callActorTool) internalSelections.push(callActorTool);
                 continue;
             }
@@ -268,13 +268,13 @@ export function getToolsForServerMode(
      * get-key-value-store-record → abort-actor-run. If the user explicitly selected these tools
      * via category before `actors`, the de-dup pass below preserves their selector order.
      */
-    const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
+    const hasCallActor = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === TOOL_TYPE.ACTOR);
-    const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
+    const hasAddActorTool = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_ADD);
     // `get-actor-run`'s nextStep templates point at `get-dataset-items` / `get-key-value-store-record`,
     // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session
     // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
-    const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
+    const hasGetActorRun = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_RUNS_GET);
 
     // Inject run-workflow helpers whenever any actor-running entrypoint is present; de-dup pass below drops repeats.
     const toolsToInject: ToolEntry[] = [];
@@ -283,7 +283,7 @@ export function getToolsForServerMode(
     }
 
     if (toolsToInject.length > 0) {
-        const callActorIndex = result.findIndex((entry) => entry.name === HelperTools.ACTOR_CALL);
+        const callActorIndex = result.findIndex((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);
         if (callActorIndex !== -1) {
             result.splice(callActorIndex + 1, 0, ...toolsToInject);
         } else {
@@ -296,7 +296,7 @@ export function getToolsForServerMode(
     // brings its widget sibling.
     if (mode === ServerMode.APPS) {
         for (const entry of [...result]) {
-            const widget = WIDGET_BY_BASE_TOOL.get(entry.name as HelperTools);
+            const widget = WIDGET_BY_BASE_TOOL.get(entry.name as HelperToolName);
             // Push unconditionally; any duplicates are stripped by the de-dup pass below.
             if (widget) result.push(widget);
         }

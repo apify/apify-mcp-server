@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -16,7 +16,7 @@ const GetRunLogArgs = z.object({
  */
 export const getActorRunLog: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_RUNS_LOG,
+    name: HELPER_TOOLS.ACTOR_RUNS_LOG,
     title: 'Get Actor run log',
     description: `Retrieve recent log lines for a specific Actor run.
 The results will include the last N lines of the run's log output (plain text).

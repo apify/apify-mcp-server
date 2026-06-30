@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HelperTools } from '../../src/const.js';
+import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HELPER_TOOLS, type HelperToolName } from '../../src/const.js';
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
@@ -31,28 +31,28 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
     describe('per-mode tool lists', () => {
         it('should have correct tools in experimental category (both modes)', () => {
-            expect(toolNames(defaultCategories.experimental)).toEqual([HelperTools.ACTOR_ADD]);
-            expect(toolNames(appsCategories.experimental)).toEqual([HelperTools.ACTOR_ADD]);
+            expect(toolNames(defaultCategories.experimental)).toEqual([HELPER_TOOLS.ACTOR_ADD]);
+            expect(toolNames(appsCategories.experimental)).toEqual([HELPER_TOOLS.ACTOR_ADD]);
         });
 
         it('should have correct tools in actors category (both modes)', () => {
-            const expected = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL];
+            const expected = [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.ACTOR_CALL];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
             expect(toolNames(appsCategories.actors)).toEqual(expected);
         });
 
         it('should have correct tools in docs category (both modes)', () => {
-            const expected = [HelperTools.DOCS_SEARCH, HelperTools.DOCS_FETCH];
+            const expected = [HELPER_TOOLS.DOCS_SEARCH, HELPER_TOOLS.DOCS_FETCH];
             expect(toolNames(defaultCategories.docs)).toEqual(expected);
             expect(toolNames(appsCategories.docs)).toEqual(expected);
         });
 
         it('should have correct tools in runs category (both modes)', () => {
             const expected = [
-                HelperTools.ACTOR_RUNS_GET,
-                HelperTools.ACTOR_RUN_LIST_GET,
-                HelperTools.ACTOR_RUNS_LOG,
-                HelperTools.ACTOR_RUNS_ABORT,
+                HELPER_TOOLS.ACTOR_RUNS_GET,
+                HELPER_TOOLS.ACTOR_RUN_LIST_GET,
+                HELPER_TOOLS.ACTOR_RUNS_LOG,
+                HELPER_TOOLS.ACTOR_RUNS_ABORT,
             ];
             expect(toolNames(defaultCategories.runs)).toEqual(expected);
             expect(toolNames(appsCategories.runs)).toEqual(expected);
@@ -60,14 +60,14 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
         it('should have correct tools in storage category (both modes)', () => {
             const expected = [
-                HelperTools.DATASET_GET,
-                HelperTools.DATASET_GET_ITEMS,
-                HelperTools.DATASET_SCHEMA_GET,
-                HelperTools.KEY_VALUE_STORE_GET,
-                HelperTools.KEY_VALUE_STORE_KEYS_GET,
-                HelperTools.KEY_VALUE_STORE_RECORD_GET,
-                HelperTools.DATASET_LIST_GET,
-                HelperTools.KEY_VALUE_STORE_LIST_GET,
+                HELPER_TOOLS.DATASET_GET,
+                HELPER_TOOLS.DATASET_GET_ITEMS,
+                HELPER_TOOLS.DATASET_SCHEMA_GET,
+                HELPER_TOOLS.KEY_VALUE_STORE_GET,
+                HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+                HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+                HELPER_TOOLS.DATASET_LIST_GET,
+                HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
             ];
             expect(toolNames(defaultCategories.storage)).toEqual(expected);
             expect(toolNames(appsCategories.storage)).toEqual(expected);
@@ -98,11 +98,11 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     });
 
     describe('base data tools have no widget meta in either mode', () => {
-        const baseTools: { name: HelperTools; category: keyof typeof defaultCategories }[] = [
-            { name: HelperTools.ACTOR_GET_DETAILS, category: 'actors' },
-            { name: HelperTools.STORE_SEARCH, category: 'actors' },
-            { name: HelperTools.ACTOR_CALL, category: 'actors' },
-            { name: HelperTools.ACTOR_RUNS_GET, category: 'runs' },
+        const baseTools: { name: HelperToolName; category: keyof typeof defaultCategories }[] = [
+            { name: HELPER_TOOLS.ACTOR_GET_DETAILS, category: 'actors' },
+            { name: HELPER_TOOLS.STORE_SEARCH, category: 'actors' },
+            { name: HELPER_TOOLS.ACTOR_CALL, category: 'actors' },
+            { name: HELPER_TOOLS.ACTOR_RUNS_GET, category: 'runs' },
         ];
         for (const mode of SERVER_MODES) {
             for (const { name, category } of baseTools) {
@@ -122,10 +122,10 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
     describe('inputSchema parity for mode-variant tools', () => {
         const modeVariantToolNames = [
-            HelperTools.STORE_SEARCH,
-            HelperTools.ACTOR_GET_DETAILS,
-            HelperTools.ACTOR_CALL,
-            HelperTools.ACTOR_RUNS_GET,
+            HELPER_TOOLS.STORE_SEARCH,
+            HELPER_TOOLS.ACTOR_GET_DETAILS,
+            HELPER_TOOLS.ACTOR_CALL,
+            HELPER_TOOLS.ACTOR_RUNS_GET,
         ];
 
         for (const name of modeVariantToolNames) {
@@ -144,26 +144,26 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         // Locks the invariant that search-actors-widget reuses the shared base schema
         // verbatim (see #700). Prevents silent drift on limit/offset/keywords.
         it('should use searchActorsBaseArgsSchema.strict() for search-actors-widget inputSchema', () => {
-            const widgetTool = WIDGET_BY_BASE_TOOL.get(HelperTools.STORE_SEARCH);
+            const widgetTool = WIDGET_BY_BASE_TOOL.get(HELPER_TOOLS.STORE_SEARCH);
             expect(widgetTool).toBeDefined();
-            expect(widgetTool!.name).toBe(HelperTools.STORE_SEARCH_WIDGET);
+            expect(widgetTool!.name).toBe(HELPER_TOOLS.STORE_SEARCH_WIDGET);
             expect(widgetTool!.inputSchema).toEqual(z.toJSONSchema(searchActorsBaseArgsSchema.strict()));
         });
     });
 
     describe('mode-specific call-actor behavior guidance', () => {
         it('apps call-actor description points to the widget sibling and warns against search-actors-widget for name resolution', () => {
-            const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
-            const defaultCallActor = defaultCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
+            const appsCallActor = appsCategories.actors.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
+            const defaultCallActor = defaultCategories.actors.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
 
             expect(appsCallActor).toBeDefined();
-            expect(appsCallActor!.description).toContain(HelperTools.ACTOR_CALL_WIDGET);
-            expect(appsCallActor!.description).toContain(HelperTools.STORE_SEARCH_WIDGET);
+            expect(appsCallActor!.description).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(appsCallActor!.description).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
 
             // Widget guidance must not leak into default mode where those tools don't exist.
             expect(defaultCallActor).toBeDefined();
-            expect(defaultCallActor!.description).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
-            expect(defaultCallActor!.description).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
+            expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         });
     });
 
@@ -187,24 +187,24 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         }
     });
 
-    describe('all tool names match HelperTools enum values', () => {
-        const allHelperToolNames = new Set(Object.values(HelperTools));
+    describe('all tool names match HELPER_TOOLS values', () => {
+        const allHelperToolNames = new Set(Object.values(HELPER_TOOLS));
 
         for (const mode of SERVER_MODES) {
             const categories = getCategoryTools(mode);
 
             for (const categoryName of CATEGORY_NAMES) {
                 for (const tool of categories[categoryName]) {
-                    it(`${tool.name} (${mode} mode) should be a known HelperTools value`, () => {
-                        expect(allHelperToolNames.has(tool.name as HelperTools)).toBe(true);
+                    it(`${tool.name} (${mode} mode) should be a known HELPER_TOOLS value`, () => {
+                        expect(allHelperToolNames.has(tool.name as HelperToolName)).toBe(true);
                     });
                 }
             }
         }
 
         for (const widget of WIDGET_BY_BASE_TOOL.values()) {
-            it(`${widget.name} widget should be a known HelperTools value`, () => {
-                expect(allHelperToolNames.has(widget.name as HelperTools)).toBe(true);
+            it(`${widget.name} widget should be a known HELPER_TOOLS value`, () => {
+                expect(allHelperToolNames.has(widget.name as HelperToolName)).toBe(true);
             });
         }
     });
@@ -217,46 +217,46 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
 
     it('tools: ["docs"] in apps mode includes no widget tools', () => {
         const names = namesFor({ tools: ['docs'] }, ServerMode.APPS);
-        expect(names).toContain(HelperTools.DOCS_SEARCH);
-        expect(names).toContain(HelperTools.DOCS_FETCH);
-        expect(names).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
-        expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
-        expect(names).not.toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.DOCS_SEARCH);
+        expect(names).toContain(HELPER_TOOLS.DOCS_FETCH);
+        expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
     it('tools: ["search-actors"] in apps mode pairs only the search-actors widget', () => {
         const names = namesFor({ tools: ['search-actors'] }, ServerMode.APPS);
-        expect(names).toContain(HelperTools.STORE_SEARCH);
-        expect(names).toContain(HelperTools.STORE_SEARCH_WIDGET);
-        expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.STORE_SEARCH);
+        expect(names).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
     });
 
     it('tools: ["call-actor"] in apps mode pairs call-actor-widget and the auto-injected get-actor-run-widget', () => {
         const names = namesFor({ tools: ['call-actor'] }, ServerMode.APPS);
-        expect(names).toContain(HelperTools.ACTOR_CALL);
-        expect(names).toContain(HelperTools.ACTOR_CALL_WIDGET);
-        expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
-        expect(names).toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
-        expect(names).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
-        expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+        expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
     });
 
     it('tools: ["actors"] category in apps mode pairs all four actor widgets', () => {
         const names = namesFor({ tools: ['actors'] }, ServerMode.APPS);
-        expect(names).toContain(HelperTools.STORE_SEARCH_WIDGET);
-        expect(names).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).toContain(HelperTools.ACTOR_CALL_WIDGET);
-        expect(names).toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
     it('default mode adds no widget tools regardless of selection', () => {
         const names = namesFor({ tools: ['actors'] }, ServerMode.DEFAULT);
-        expect(names).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
-        expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
-        expect(names).not.toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 });
 
@@ -277,7 +277,7 @@ describe('taskSupport contract across tool categories', () => {
             // Only call-actor is expected to declare taskSupport among static internal tools.
             // (Dynamically-created Actor tools from actor_tools_factory also declare it, but those
             // are not returned by getCategoryTools.)
-            expect(toolsWithTaskSupport.map((t) => t.name)).toEqual([HelperTools.ACTOR_CALL]);
+            expect(toolsWithTaskSupport.map((t) => t.name)).toEqual([HELPER_TOOLS.ACTOR_CALL]);
 
             for (const { value } of toolsWithTaskSupport) {
                 expect(ALLOWED_TASK_TOOL_EXECUTION_MODES).toContain(value);

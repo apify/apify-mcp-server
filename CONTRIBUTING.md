@@ -278,7 +278,7 @@ Use comments to guide reviewers:
     * **Error responses**: Return user-friendly error messages with suggestions.
     * **Input validation**: Always validate tool inputs with Zod before processing.
     * **Caching**: Use TTL-based caching for Actor schemas and details (see `src/utils/ttl_lru.ts`).
-    * **Constants and tool names**: Always use constants and never hardcoded values. When referring to tools, ALWAYS use the `HelperTools` enum.
+    * **Constants and tool names**: Always use constants and never hardcoded values. When referring to tools, ALWAYS use the `HELPER_TOOLS` `as const` object.
         * Exception: Integration tests (`tests/integration/`) must use hardcoded strings for tool names. This ensures tests fail if a tool is renamed, preventing accidental breaking changes.
 
 *   **Anti-patterns:**

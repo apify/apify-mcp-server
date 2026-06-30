@@ -1,4 +1,4 @@
-import { type HelperTools } from '../const.js';
+import { type HelperToolName } from '../const.js';
 import {
     SKYFIRE_ENABLED_TOOLS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
@@ -145,7 +145,7 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
 function isSkyfireEligible(tool: ToolEntry): boolean {
     return (
         tool.type === TOOL_TYPE.ACTOR ||
-        (tool.type === TOOL_TYPE.INTERNAL && SKYFIRE_ENABLED_TOOLS.has(tool.name as HelperTools))
+        (tool.type === TOOL_TYPE.INTERNAL && SKYFIRE_ENABLED_TOOLS.has(tool.name as HelperToolName))
     );
 }
 

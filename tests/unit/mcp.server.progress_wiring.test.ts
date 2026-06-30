@@ -1,7 +1,7 @@
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
@@ -84,7 +84,7 @@ async function runRecorder(toolName: string, meta: Record<string, unknown>) {
 
 describe('tools/call progressToken wiring', () => {
     it('creates a ProgressTracker for get-actor-run when _meta.progressToken is provided', async () => {
-        const received = await runRecorder(HelperTools.ACTOR_RUNS_GET, {
+        const received = await runRecorder(HELPER_TOOLS.ACTOR_RUNS_GET, {
             progressToken: 'tok-1',
             mcpSessionId: 'sess-1',
         });
@@ -92,7 +92,7 @@ describe('tools/call progressToken wiring', () => {
     });
 
     it('passes null progressTracker for get-actor-run when no progressToken is provided', async () => {
-        const received = await runRecorder(HelperTools.ACTOR_RUNS_GET, { mcpSessionId: 'sess-1' });
+        const received = await runRecorder(HELPER_TOOLS.ACTOR_RUNS_GET, { mcpSessionId: 'sess-1' });
         expect(received.progressTracker).toBeNull();
     });
 

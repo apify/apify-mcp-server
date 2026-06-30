@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { DOCS_SOURCES, HelperTools } from '../../const.js';
+import { DOCS_SOURCES, HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -36,7 +36,7 @@ ${sources}
 The results will include the URL of the documentation page (which may include an anchor),
 and a limited piece of content that matches the search query.
 
-Fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.
+Fetch the full content of the document using the ${HELPER_TOOLS.DOCS_FETCH} tool by providing the URL.
 
 ${PLATFORM_DOCS_PREFERENCE}`;
 }
@@ -70,7 +70,7 @@ const searchApifyDocsToolInputSchema = z.toJSONSchema(searchApifyDocsToolArgsSch
 
 export const searchApifyDocs: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.DOCS_SEARCH,
+    name: HELPER_TOOLS.DOCS_SEARCH,
     title: 'Search Apify docs',
     description: buildToolDescription(),
     inputSchema: searchApifyDocsToolInputSchema,

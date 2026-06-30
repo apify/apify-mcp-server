@@ -3,7 +3,7 @@ import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyClient } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { HelperTools, SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../src/const.js';
+import { HELPER_TOOLS, SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import { callActorApps } from '../../src/tools/actors/call_actor.js';
@@ -97,17 +97,17 @@ describe('ActorsMcpServer initialize handler', () => {
             const server = track(makeServer('auto'));
             const apifyClient = new ApifyClient({ token: 'test-token' });
 
-            await server.loadToolsFromInput({ tools: [HelperTools.STORE_SEARCH] }, apifyClient);
+            await server.loadToolsFromInput({ tools: [HELPER_TOOLS.STORE_SEARCH] }, apifyClient);
 
             // Sources are pending — no tools visible yet
-            expect(server.tools.has(HelperTools.STORE_SEARCH)).toBe(false);
+            expect(server.tools.has(HELPER_TOOLS.STORE_SEARCH)).toBe(false);
 
             await dispatchInitialize(server, makeInitializeRequest(true));
 
             // After initialize (apps mode): composed with APPS-mode variants
             // search-actors is mode-independent (data-only); search-actors-widget is the apps-only UI variant auto-added in apps mode.
-            expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(searchActors);
-            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH)).toBe(searchActors);
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
         },
     );
 
@@ -147,16 +147,16 @@ describe('ActorsMcpServer initialize handler', () => {
             const server = track(makeServer('auto'));
             const apifyClient = new ApifyClient({ token: 'test-token' });
 
-            await server.loadToolsByName([HelperTools.STORE_SEARCH, HelperTools.ACTOR_CALL], apifyClient);
+            await server.loadToolsByName([HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_CALL], apifyClient);
 
-            expect(server.tools.has(HelperTools.STORE_SEARCH)).toBe(false);
-            expect(server.tools.has(HelperTools.ACTOR_CALL)).toBe(false);
+            expect(server.tools.has(HELPER_TOOLS.STORE_SEARCH)).toBe(false);
+            expect(server.tools.has(HELPER_TOOLS.ACTOR_CALL)).toBe(false);
 
             await dispatchInitialize(server, makeInitializeRequest(true));
 
-            expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(searchActors);
-            expect(server.tools.get(HelperTools.ACTOR_CALL)).toBe(callActorApps);
-            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH)).toBe(searchActors);
+            expect(server.tools.get(HELPER_TOOLS.ACTOR_CALL)).toBe(callActorApps);
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
         },
     );
 
@@ -169,14 +169,14 @@ describe('ActorsMcpServer initialize handler', () => {
                 .spyOn(server, 'loadActorsAsTools')
                 .mockResolvedValue({ tools: [], errors: [] });
 
-            await server.loadToolsByName([HelperTools.STORE_SEARCH_WIDGET], apifyClient);
+            await server.loadToolsByName([HELPER_TOOLS.STORE_SEARCH_WIDGET], apifyClient);
 
             expect(loadActorsAsTools).not.toHaveBeenCalled();
-            expect(server.tools.has(HelperTools.STORE_SEARCH_WIDGET)).toBe(false);
+            expect(server.tools.has(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(false);
 
             await dispatchInitialize(server, makeInitializeRequest(true));
 
-            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
         },
     );
 });

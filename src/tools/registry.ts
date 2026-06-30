@@ -19,7 +19,7 @@
  * tools, `search-actors`, `fetch-actor-details`) share a single implementation across modes.
  * Do NOT add per-mode runtime variants for non-widget tools.
  */
-import { HelperTools } from '../const.js';
+import { HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
 import { addActor } from './actors/add_actor.js';
@@ -145,9 +145,9 @@ export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] =
  * does NOT auto-bring its base; callers asking for widget-only get a UI without
  * the programmatic data tool. To get both, select the base (or both explicitly).
  */
-export const WIDGET_BY_BASE_TOOL: ReadonlyMap<HelperTools, ToolEntry> = new Map([
-    [HelperTools.STORE_SEARCH, searchActorsWidget],
-    [HelperTools.ACTOR_GET_DETAILS, fetchActorDetailsWidget],
-    [HelperTools.ACTOR_CALL, callActorWidget],
-    [HelperTools.ACTOR_RUNS_GET, getActorRunWidget],
+export const WIDGET_BY_BASE_TOOL: ReadonlyMap<HelperToolName, ToolEntry> = new Map([
+    [HELPER_TOOLS.STORE_SEARCH, searchActorsWidget],
+    [HELPER_TOOLS.ACTOR_GET_DETAILS, fetchActorDetailsWidget],
+    [HELPER_TOOLS.ACTOR_CALL, callActorWidget],
+    [HELPER_TOOLS.ACTOR_RUNS_GET, getActorRunWidget],
 ]);

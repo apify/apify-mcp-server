@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, TOOL_STATUS } from '../../const.js';
+import { HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
@@ -40,9 +40,9 @@ Returns run result: status, storages (datasets/keyValueStores alias map), stats,
 - waitSecs (0–${WAIT_SECS_MAX}, default ${WAIT_SECS_DEFAULT}) waits up to that many seconds for terminal status before returning.
 
 USAGE:
-- Use to check the status of a run started with ${HelperTools.ACTOR_CALL}.
+- Use to check the status of a run started with ${HELPER_TOOLS.ACTOR_CALL}.
 - Pass waitSecs > 0 to block until terminal (or until the cap elapses).
-- If \`${HelperTools.ACTOR_CALL_WIDGET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` rendered a widget for this run, do NOT poll here — the widget self-polls.
+- If \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` or \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` rendered a widget for this run, do NOT poll here — the widget self-polls.
 
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc
@@ -54,7 +54,7 @@ USAGE EXAMPLES:
  */
 export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_RUNS_GET,
+    name: HELPER_TOOLS.ACTOR_RUNS_GET,
     title: 'Get Actor run',
     description: GET_ACTOR_RUN_DESCRIPTION,
     // `fixZodSchemaRequired` strips fields with a real `default` from `required` so MCP clients

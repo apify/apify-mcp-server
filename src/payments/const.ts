@@ -1,4 +1,4 @@
-import { HelperTools } from '../const.js';
+import { HELPER_TOOLS, type HelperToolName } from '../const.js';
 
 export const PAYMENT_PROTOCOL_HEADER = 'x-apify-payment-protocol';
 
@@ -15,15 +15,15 @@ export const SKYFIRE_README_CONTENT = `The Apify MCP Server allows clients to in
  * Set of internal tool names that require Skyfire PAY token ID in Skyfire mode.
  * These tools interact with Actor runs, datasets, or key-value stores and need billing support.
  */
-export const SKYFIRE_ENABLED_TOOLS = new Set([
-    HelperTools.ACTOR_CALL,
-    HelperTools.ACTOR_RUNS_GET,
-    HelperTools.ACTOR_RUNS_LOG,
-    HelperTools.ACTOR_RUNS_ABORT,
-    HelperTools.DATASET_GET,
-    HelperTools.DATASET_GET_ITEMS,
-    HelperTools.DATASET_SCHEMA_GET,
-    HelperTools.KEY_VALUE_STORE_GET,
-    HelperTools.KEY_VALUE_STORE_KEYS_GET,
-    HelperTools.KEY_VALUE_STORE_RECORD_GET,
+export const SKYFIRE_ENABLED_TOOLS = new Set<HelperToolName>([
+    HELPER_TOOLS.ACTOR_CALL,
+    HELPER_TOOLS.ACTOR_RUNS_GET,
+    HELPER_TOOLS.ACTOR_RUNS_LOG,
+    HELPER_TOOLS.ACTOR_RUNS_ABORT,
+    HELPER_TOOLS.DATASET_GET,
+    HELPER_TOOLS.DATASET_GET_ITEMS,
+    HELPER_TOOLS.DATASET_SCHEMA_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
 ]);

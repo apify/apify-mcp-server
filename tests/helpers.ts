@@ -4,7 +4,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
-import { HelperTools } from '../src/const.js';
+import { HELPER_TOOLS } from '../src/const.js';
 import type { TelemetryEnv, ToolCategory } from '../src/types.js';
 
 export type McpClientOptions = {
@@ -164,7 +164,7 @@ export async function createMcpStdioClient(options?: McpClientOptions): Promise<
  */
 export async function addActor(client: Client, actor: string): Promise<void> {
     await client.callTool({
-        name: HelperTools.ACTOR_ADD,
+        name: HELPER_TOOLS.ACTOR_ADD,
         arguments: {
             actor,
         },

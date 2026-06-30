@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
@@ -29,7 +29,7 @@ const SEARCH_ACTORS_WIDGET_DESCRIPTION = dedent`
     The response renders as an interactive widget the user can view directly.
 
     For silent name resolution before running an Actor (e.g., "scrape google maps" — you need to
-    find the right Actor first, then fetch its schema and call it), use ${HelperTools.STORE_SEARCH}
+    find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH}
     instead — it returns the same data without rendering a widget.
 
     Input: keywords (plus optional limit/offset). Output fields are fixed by the widget contract.
@@ -37,7 +37,7 @@ const SEARCH_ACTORS_WIDGET_DESCRIPTION = dedent`
 
 export const searchActorsWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.STORE_SEARCH_WIDGET,
+    name: HELPER_TOOLS.STORE_SEARCH_WIDGET,
     title: 'Search Actors (widget)',
     description: SEARCH_ACTORS_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(searchActorsWidgetArgsSchema) as ToolInputSchema,

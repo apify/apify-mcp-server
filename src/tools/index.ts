@@ -1,4 +1,4 @@
-import { HelperTools } from '../const.js';
+import { HELPER_TOOLS } from '../const.js';
 import type { ToolCategory, ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
 import { getExpectedToolsByCategories } from '../utils/tool_categories_helpers.js';
@@ -14,10 +14,10 @@ import {
 
 // Use string constants instead of tool object imports to avoid circular dependencies
 export const unauthEnabledTools: string[] = [
-    HelperTools.DOCS_SEARCH,
-    HelperTools.DOCS_FETCH,
-    HelperTools.STORE_SEARCH,
-    HelperTools.ACTOR_GET_DETAILS,
+    HELPER_TOOLS.DOCS_SEARCH,
+    HELPER_TOOLS.DOCS_FETCH,
+    HELPER_TOOLS.STORE_SEARCH,
+    HELPER_TOOLS.ACTOR_GET_DETAILS,
 ];
 
 // Re-export from registry.ts

@@ -53,7 +53,7 @@ import {
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     FAILURE_CATEGORY,
-    HelperTools,
+    HELPER_TOOLS,
     TOOL_STATUS,
 } from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
@@ -927,7 +927,7 @@ export class ActorsMcpServer {
                     await failInvalidParams(
                         dedent`
                     Missing arguments for tool "${name}".
-                    Please provide the required arguments for this tool. Check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool to see what parameters are required.
+                    Please provide the required arguments for this tool. Check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool to see what parameters are required.
                 `,
                         {
                             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -970,7 +970,7 @@ export class ActorsMcpServer {
                         dedent`
                     Invalid arguments for tool "${tool.name}".
                     Validation errors: ${errorMessages}.
-                    Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.
+                    Please check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.
                 `,
                         {
                             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -1004,7 +1004,7 @@ export class ActorsMcpServer {
                 // `taskSupport: 'optional'`, so without this both paths would 402 by default.
                 const { paymentProvider } = this.options;
                 const isCallActorTool =
-                    tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET;
+                    tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_CALL_WIDGET;
                 const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
 
                 const standbyRejection =
@@ -1089,7 +1089,7 @@ export class ActorsMcpServer {
                     // Tools that may emit notifications/progress during a sync wait must be opted in here.
                     // call-actor: emits during start+waitForFinish. get-actor-run: emits when waitSecs > 0.
                     const progressTrackerOptIn =
-                        tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_RUNS_GET;
+                        tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_RUNS_GET;
                     const progressTracker = progressTrackerOptIn
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;

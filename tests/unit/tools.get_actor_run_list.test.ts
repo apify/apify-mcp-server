@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
@@ -37,7 +37,7 @@ const noClient = null as unknown as InternalToolArgs['apifyClient'];
 
 describe('get-actor-run-list', () => {
     it('has the expected tool name', () => {
-        expect(getActorRunList.name).toBe(HelperTools.ACTOR_RUN_LIST_GET);
+        expect(getActorRunList.name).toBe(HELPER_TOOLS.ACTOR_RUN_LIST_GET);
     });
 
     it('returns runs as fenced text (json or toon), mirrors them in structuredContent, and declares an outputSchema', async () => {

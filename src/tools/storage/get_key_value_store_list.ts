@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -37,7 +37,7 @@ const getUserKeyValueStoresListArgs = z.object({
  */
 export const getKeyValueStoreList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.KEY_VALUE_STORE_LIST_GET,
+    name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
     title: 'Get user key-value stores list',
     description: dedent`
         List key-value stores owned by the authenticated user.
@@ -76,8 +76,8 @@ export const getKeyValueStoreList: ToolEntry = Object.freeze({
             total: stores.total,
             offset: stores.offset,
             noun: 'key-value stores',
-            listToolName: HelperTools.KEY_VALUE_STORE_LIST_GET,
-            inspectHint: `Use ${HelperTools.KEY_VALUE_STORE_GET} with a keyValueStoreId from the list to inspect a store.`,
+            listToolName: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+            inspectHint: `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with a keyValueStoreId from the list to inspect a store.`,
         });
         return buildStorageResponse({
             structuredContent: stores as unknown as Record<string, unknown>,

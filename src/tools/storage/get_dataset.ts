@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -21,12 +21,12 @@ const getDatasetArgs = z.object({
  */
 export const getDataset: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.DATASET_GET,
+    name: HELPER_TOOLS.DATASET_GET,
     title: 'Get dataset',
     description: dedent`
         Get metadata for a dataset (collection of structured data created by an Actor run).
         The results will include dataset details such as itemCount, fields, and stats.
-        Use fields to understand structure for filtering with ${HelperTools.DATASET_GET_ITEMS}.
+        Use fields to understand structure for filtering with ${HELPER_TOOLS.DATASET_GET_ITEMS}.
         stats.inflatedBytes (when present) is the approximate uncompressed byte size — use it with itemCount to pick a safe limit and fields before fetching.
         Note: itemCount updates may be delayed by up to ~5 seconds.
 
@@ -75,7 +75,7 @@ export const getDataset: ToolEntry = Object.freeze({
         // response today (only the dataset-list endpoint returns it), so read it defensively.
         const inflatedBytes = (dataset.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
-        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`;
+        const nextStep = `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`;
         return buildStorageResponse({
             structuredContent: normalized as unknown as Record<string, unknown>,
             summary,
