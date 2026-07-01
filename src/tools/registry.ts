@@ -25,6 +25,8 @@ import { SERVER_MODE } from '../types.js';
 import { addActor } from './actors/add_actor.js';
 import { callActorApps, callActorDefault } from './actors/call_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
+import { getCodeDocs } from './actors/get_code_docs.js';
+import { runCode } from './actors/run_code.js';
 import { searchActors } from './actors/search_actors.js';
 import { fetchApifyDocs } from './docs/fetch_apify_docs.js';
 import { searchApifyDocs } from './docs/search_apify_docs.js';
@@ -64,7 +66,7 @@ function isModeMap(entry: CategoryToolEntry): entry is ModeMap {
  * Use {@link getCategoryTools} to resolve entries into concrete ToolEntry arrays for a given mode.
  */
 export const toolCategories = {
-    experimental: [addActor],
+    experimental: [addActor, runCode, getCodeDocs],
     actors: [
         searchActors,
         fetchActorDetails,

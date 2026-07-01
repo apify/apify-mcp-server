@@ -31,8 +31,9 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
     describe('per-mode tool lists', () => {
         it('should have correct tools in experimental category (both modes)', () => {
-            expect(toolNames(defaultCategories.experimental)).toEqual([HELPER_TOOLS.ACTOR_ADD]);
-            expect(toolNames(appsCategories.experimental)).toEqual([HELPER_TOOLS.ACTOR_ADD]);
+            const expectedExperimental = [HELPER_TOOLS.ACTOR_ADD, HELPER_TOOLS.CODE_RUN, HELPER_TOOLS.CODE_DOCS];
+            expect(toolNames(defaultCategories.experimental)).toEqual(expectedExperimental);
+            expect(toolNames(appsCategories.experimental)).toEqual(expectedExperimental);
         });
 
         it('should have correct tools in actors category (both modes)', () => {
@@ -274,10 +275,12 @@ describe('taskSupport contract across tool categories', () => {
                 }
             }
 
-            // Only call-actor is expected to declare taskSupport among static internal tools.
-            // (Dynamically-created Actor tools from actor_tools_factory also declare it, but those
-            // are not returned by getCategoryTools.)
-            expect(toolsWithTaskSupport.map((t) => t.name)).toEqual([HELPER_TOOLS.ACTOR_CALL]);
+            // call-actor and run-code declare taskSupport among static internal tools — both can
+            // orchestrate long-running Actor runs. Order follows CATEGORY_NAMES (experimental, which
+            // holds run-code, is iterated before actors, which holds call-actor). Dynamically-created
+            // Actor tools from actor_tools_factory also declare it, but those aren't returned by
+            // getCategoryTools.
+            expect(toolsWithTaskSupport.map((t) => t.name)).toEqual([HELPER_TOOLS.CODE_RUN, HELPER_TOOLS.ACTOR_CALL]);
 
             for (const { value } of toolsWithTaskSupport) {
                 expect(ALLOWED_TASK_TOOL_EXECUTION_MODES).toContain(value);

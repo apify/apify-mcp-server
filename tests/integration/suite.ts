@@ -319,9 +319,12 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ enableAddingActors: false, tools: ['experimental'] });
 
                 const names = getToolNames(await client.listTools());
-                // experimental category provides add-actor + auto-injected helpers (get-actor-run, storage, abort).
-                expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
+                // experimental category provides add-actor + Code Mode tools (run-code, get-code-docs)
+                // + auto-injected helpers (get-actor-run, storage, abort).
+                expect(names).toHaveLength(3 + AUTO_INJECTED_TOOL_NAMES.length);
                 expect(names).toContain('add-actor');
+                expect(names).toContain(HELPER_TOOLS.CODE_RUN);
+                expect(names).toContain(HELPER_TOOLS.CODE_DOCS);
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
                 await client.close();
