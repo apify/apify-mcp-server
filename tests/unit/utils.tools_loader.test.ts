@@ -170,3 +170,23 @@ describe('loadToolsFromInput explicit widget selection', () => {
         expect(toolNames.filter((n) => n === HelperTools.STORE_SEARCH)).toHaveLength(1);
     });
 });
+
+describe('Code Mode tool pairing', () => {
+    const apifyClient = new ApifyClient({ token: 'test-token' });
+
+    it('adds get-code-docs and the run/storage helpers when only run-code is selected', async () => {
+        const tools = await loadToolsFromInput({ tools: [HelperTools.CODE_RUN] }, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+        expect(toolNames).toContain(HelperTools.CODE_RUN);
+        expect(toolNames).toContain(HelperTools.CODE_DOCS);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
+    });
+
+    it('adds run-code (and its helpers) when only get-code-docs is selected', async () => {
+        const tools = await loadToolsFromInput({ tools: [HelperTools.CODE_DOCS] }, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+        expect(toolNames).toContain(HelperTools.CODE_RUN);
+        expect(toolNames).toContain(HelperTools.CODE_DOCS);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
+    });
+});

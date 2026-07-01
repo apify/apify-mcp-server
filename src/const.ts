@@ -54,7 +54,12 @@ export enum HelperTools {
     STORE_SEARCH_WIDGET = 'search-actors-widget',
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',
+    CODE_RUN = 'run-code',
+    CODE_DOCS = 'get-code-docs',
 }
+
+/** Actor backing Code Mode's run-code tool. Runs a user script in a workerd sandbox. */
+export const APIFY_CODE_RUNTIME_ACTOR = 'apify/code-runtime';
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];

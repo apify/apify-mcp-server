@@ -242,7 +242,7 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 
 Legend for the **Enabled by default** column:
 - ✅ — in the default tool set.
-- ⚡ — auto-injected when `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present (which is true in the default configuration).
+- ⚡ — auto-injected when `call-actor`, `add-actor`, `run-code`, an Actor tool, or `get-actor-run` is present (which is true in the default configuration).
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
@@ -265,10 +265,12 @@ Legend for the **Enabled by default** column:
 | `get-dataset-list` | storage | List all available datasets for the user. |  |
 | `get-key-value-store-list`| storage | List all available key-value stores for the user. |  |
 | `add-actor` | experimental | Add an Actor as a new tool for the user to call. |  |
+| `run-code` | experimental | Run MCP in Code mode and orchestrate actions through code in one go. Execute JS/TS script in a sandboxed Actor. |  |
+| `get-code-docs` | experimental | Read the Code Mode guide for writing run-code scripts. |  |
 
 > **Note:**
 >
-> When `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present, the server auto-injects `get-actor-run`, `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run`.
+> When `call-actor`, `add-actor`, `run-code`, an Actor tool, or `get-actor-run` is present, the server auto-injects `get-actor-run`, `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run`.
 >
 > When you call an Actor — through `call-actor` or directly via an Actor tool (e.g., `apify--rag-web-browser`) — the response contains run metadata, storage IDs, and a `summary` + `nextStep`, but no dataset items. To fetch items, follow `nextStep` and call `get-dataset-items` (auto-injected), passing the `datasetId` returned from the call.
 
