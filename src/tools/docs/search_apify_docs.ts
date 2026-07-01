@@ -5,7 +5,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { searchDocsBySourceCached } from '../../utils/apify_docs.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import { searchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
 const PLATFORM_DOCS_PREFERENCE = `When results contain both platform documentation (\`docs.apify.com/platform\`) \
@@ -103,7 +103,7 @@ You can also try using more specific or alternative keywords related to your sea
                 count: 0,
                 instructions,
             };
-            return buildMCPResponse({ texts: [instructions], structuredContent });
+            return respondOk(instructions, { structuredContent });
         }
 
         // Instructions for LLM to use the docs fetch tool when retrieving full document content
@@ -131,6 +131,6 @@ ${results
             instructions,
         };
         // We put the instructions at the end so that they are more likely to be acknowledged by the LLM
-        return buildMCPResponse({ texts: [textResult, instructions], structuredContent });
+        return respondOk([textResult, instructions], { structuredContent });
     },
 } as const);

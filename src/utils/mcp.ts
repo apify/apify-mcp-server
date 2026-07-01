@@ -1,6 +1,9 @@
-import type { ToolCallTelemetryProperties, ToolTelemetryContext } from '../types.js';
+import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
+import type { AjvErrorDetails, FailureCategory, ToolTelemetryContext } from '../types.js';
 import { ACTOR_RUN_LIMIT_MESSAGE, isActorRunLimitError } from './apify_errors.js';
+import { wrapJsonText } from './encode_text.js';
 import { getHttpStatusCode } from './logging.js';
+import { classifyFailureCategory, getToolStatusFromError } from './tool_status.js';
 
 /** MCP `_meta` key for Apify Actor run information. Namespaced per MCP spec. */
 export const APIFY_ACTOR_RUN_META_KEY = 'com.apify/ActorRun';
@@ -32,7 +35,7 @@ export function buildUsageMeta(source: {
  *   then stripped by `extractToolTelemetry()` before the response reaches the client.
  *   Contains tool outcome (toolStatus, failureCategory, etc.) used for Segment telemetry.
  */
-export function buildMCPResponse(options: {
+function buildMCPResponse(options: {
     texts: string[];
     isError?: boolean;
     telemetry?: ToolTelemetryContext;
@@ -48,6 +51,121 @@ export function buildMCPResponse(options: {
         ...(structuredContent !== undefined && { structuredContent }),
         ...(_meta !== undefined && { _meta }),
     };
+}
+
+/**
+ * Shared return type of the `respond*` constructors. Replaces the
+ * `ReturnType<typeof buildMCPResponse>` annotations now that `buildMCPResponse` is private.
+ */
+export type ToolResponse = ReturnType<typeof buildMCPResponse>;
+
+/** Normalise a `string | string[]` text argument to the array `buildMCPResponse` expects. */
+function toTexts(texts: string | string[]): string[] {
+    return Array.isArray(texts) ? texts : [texts];
+}
+
+/**
+ * Success response carrying caller-supplied text. `content[0]` is the raw text verbatim — bare JSON
+ * stays bare (the raw-JSON mirror channel), so use this (not `respondJson`) for unfenced JSON payloads.
+ */
+export function respondOk(
+    texts: string | string[],
+    opts?: { structuredContent?: unknown; meta?: Record<string, unknown> },
+): ToolResponse {
+    return buildMCPResponse({
+        texts: toTexts(texts),
+        structuredContent: opts?.structuredContent,
+        _meta: opts?.meta,
+    });
+}
+
+/**
+ * Success response carrying a JSON value in a ```json code fence. Owns the fence by delegating to
+ * `wrapJsonText` — use only where the byte output already leads with a ```json fence.
+ */
+export function respondJson(
+    value: unknown,
+    opts?: { structuredContent?: unknown; meta?: Record<string, unknown> },
+): ToolResponse {
+    return buildMCPResponse({
+        texts: [wrapJsonText(value)],
+        structuredContent: opts?.structuredContent,
+        _meta: opts?.meta,
+    });
+}
+
+/**
+ * User-error response (`SOFT_FAIL`). `category` defaults to `INVALID_INPUT`; the type excludes
+ * `INTERNAL_ERROR` (a server category — use `respondServerError` for that).
+ */
+export function respondUserError(
+    texts: string | string[],
+    opts?: {
+        category?: Exclude<FailureCategory, 'INTERNAL_ERROR'>;
+        httpStatus?: number;
+        detail?: string;
+        actorId?: string;
+        ajvErrorDetails?: AjvErrorDetails;
+        structuredContent?: unknown;
+    },
+): ToolResponse {
+    return buildMCPResponse({
+        texts: toTexts(texts),
+        isError: true,
+        telemetry: {
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureCategory: opts?.category ?? FAILURE_CATEGORY.INVALID_INPUT,
+            ...(opts?.httpStatus !== undefined && { failureHttpStatus: opts.httpStatus }),
+            ...(opts?.detail !== undefined && { failureDetail: opts.detail }),
+            ...(opts?.actorId !== undefined && { actorId: opts.actorId }),
+            ...(opts?.ajvErrorDetails !== undefined && { ajvErrorDetails: opts.ajvErrorDetails }),
+        },
+        structuredContent: opts?.structuredContent,
+    });
+}
+
+/**
+ * Server-error response. Derives `toolStatus`/`failureCategory`/`failureHttpStatus` from the caught
+ * error (so a 4xx yields `SOFT_FAIL`, not `FAILED`); with no error → `FAILED` + `INTERNAL_ERROR`.
+ */
+export function respondServerError(
+    texts: string | string[],
+    opts?: {
+        error?: unknown;
+        detail?: string;
+        actorId?: string;
+        structuredContent?: unknown;
+        meta?: Record<string, unknown>;
+    },
+): ToolResponse {
+    const { error } = opts ?? {};
+    const httpStatus = getHttpStatusCode(error);
+    return buildMCPResponse({
+        texts: toTexts(texts),
+        isError: true,
+        telemetry: {
+            toolStatus: error === undefined ? TOOL_STATUS.FAILED : getToolStatusFromError(error, false),
+            failureCategory: error === undefined ? FAILURE_CATEGORY.INTERNAL_ERROR : classifyFailureCategory(error),
+            ...(httpStatus !== undefined && { failureHttpStatus: httpStatus }),
+            ...(opts?.detail !== undefined && { failureDetail: opts.detail }),
+            ...(opts?.actorId !== undefined && { actorId: opts.actorId }),
+        },
+        structuredContent: opts?.structuredContent,
+        _meta: opts?.meta,
+    });
+}
+
+/**
+ * Error response for framework paths (native-tool handling and the outer catch in `server.ts`, the
+ * x402 path) that record telemetry on local vars and bypass `extractToolTelemetry`. Carries no
+ * `toolTelemetry` key, so nothing leaks onto the wire. Tool handlers must NOT use this — they return
+ * a `respond*` error so telemetry is attached and then stripped by `extractToolTelemetry`.
+ */
+export function respondErrorNoTelemetry(
+    texts: string | string[],
+    opts?: { structuredContent?: unknown },
+): ToolResponse {
+    return { ...respondOk(texts, opts), isError: true };
 }
 
 /**
@@ -97,26 +215,6 @@ export function computeToolResponseBytes(result: unknown): {
         }
     }
     return { contentBytes, structuredContentBytes, fileBytes };
-}
-
-/**
- * Maps computed response byte counts to their `tool_response_*_bytes` telemetry fields.
- * Single source of truth for the field set, so adding a byte metric touches only
- * `computeToolResponseBytes` and this mapping. Returns `{}` when bytes weren't computed
- * (e.g. telemetry-disabled path) so callers can spread it unconditionally.
- */
-export function buildResponseBytesTelemetry(
-    responseBytes?: ReturnType<typeof computeToolResponseBytes>,
-): Pick<
-    ToolCallTelemetryProperties,
-    'tool_response_content_bytes' | 'tool_response_structured_content_bytes' | 'tool_response_file_bytes'
-> {
-    if (!responseBytes) return {};
-    return {
-        tool_response_content_bytes: responseBytes.contentBytes,
-        tool_response_structured_content_bytes: responseBytes.structuredContentBytes,
-        tool_response_file_bytes: responseBytes.fileBytes,
-    };
 }
 
 /** User-facing error text for tool execution failures with HTTP-aware hints. */

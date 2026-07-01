@@ -2,14 +2,13 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { ALLOWED_DOC_DOMAINS, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
+import { ALLOWED_DOC_DOMAINS, HELPER_TOOLS } from '../../const.js';
 import { fetchApifyDocsCache } from '../../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
-import { classifyFailureCategory } from '../../utils/tool_status.js';
+import { respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { fetchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
@@ -92,17 +91,13 @@ USAGE EXAMPLES:
 
         if (!isAllowedDomain) {
             log.softFail(`[fetch-apify-docs] Invalid URL domain: ${url}`);
-            return buildMCPResponse({
-                texts: [
-                    `Invalid URL: "${url}". \
+            return respondUserError(
+                `Invalid URL: "${url}". \
 Only documentation URLs from Apify and Crawlee are allowed \
 (starting with ${ALLOWED_DOC_DOMAINS.map((d) => `"${d}"`).join(' or ')}). \
 Please provide a valid documentation URL. \
 You can find documentation URLs using the ${HELPER_TOOLS.DOCS_SEARCH} tool.`,
-                ],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-            });
+            );
         }
 
         // Cache by URL without fragment to avoid fetching the same page multiple times
@@ -121,36 +116,24 @@ You can find documentation URLs using the ${HELPER_TOOLS.DOCS_SEARCH} tool.`,
                         url: mdUrl,
                         statusText: response.statusText,
                     });
-                    const isUserError = response.status >= 400 && response.status < 500;
-                    return buildMCPResponse({
-                        texts: [buildFetchErrorMessage(url, `HTTP Status: ${response.status} ${response.statusText}.`)],
-                        isError: true,
-                        telemetry: {
-                            toolStatus: isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED,
-                            failureCategory: classifyFailureCategory(error),
-                            failureHttpStatus: response.status,
-                        },
-                    });
+                    return respondServerError(
+                        buildFetchErrorMessage(url, `HTTP Status: ${response.status} ${response.statusText}.`),
+                        { error },
+                    );
                 }
                 markdown = await response.text();
                 fetchApifyDocsCache.set(urlWithoutFragment, markdown);
             } catch (error) {
                 logHttpError(error, 'Failed to fetch the documentation page', { url: mdUrl });
-                return buildMCPResponse({
-                    texts: [
-                        buildFetchErrorMessage(
-                            url,
-                            `Error: ${error instanceof Error ? error.message : String(error)}.`,
-                        ),
-                    ],
-                    isError: true,
-                    telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR },
-                });
+                // A thrown fetch (network/DNS, no statusCode) is a server failure, so classify it FAILED + INTERNAL_ERROR.
+                return respondServerError(
+                    buildFetchErrorMessage(url, `Error: ${error instanceof Error ? error.message : String(error)}.`),
+                    { error },
+                );
             }
         }
 
-        return buildMCPResponse({
-            texts: [`Fetched content from ${url}:\n\n${markdown}`],
+        return respondOk(`Fetched content from ${url}:\n\n${markdown}`, {
             structuredContent: { url, content: markdown },
         });
     },

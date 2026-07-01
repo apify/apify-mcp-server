@@ -8,8 +8,9 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreKeysOutputSchema } from '../structured_output_schemas.js';
-import { buildKvsKeysSummaryNextStep, buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
+import { buildKvsKeysSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -65,7 +66,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
                 throw err;
             });
         if (!keys) {
-            return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
+            return respondUserError(`Key-value store '${keyValueStoreId}' not found.`);
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const { summary, nextStep } = buildKvsKeysSummaryNextStep({

@@ -8,7 +8,7 @@ import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondServerError } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
 import { buildStartRunResponse } from '../actors/actor_run_response.js';
 import {
@@ -85,13 +85,10 @@ export const callActorWidget: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const rawActor = toolArgs.args?.actor;
         if (typeof rawActor === 'string' && rawActor.includes(':')) {
-            return buildMCPResponse({
-                texts: [
-                    `${HELPER_TOOLS.ACTOR_CALL_WIDGET} does not render widgets for MCP tool calls.`,
-                    `Use ${HELPER_TOOLS.ACTOR_CALL} for the "actorName:toolName" syntax.`,
-                ],
-                isError: true,
-            });
+            return respondServerError([
+                `${HELPER_TOOLS.ACTOR_CALL_WIDGET} does not render widgets for MCP tool calls.`,
+                `Use ${HELPER_TOOLS.ACTOR_CALL} for the "actorName:toolName" syntax.`,
+            ]);
         }
 
         const preResult = await callActorPreExecute(toolArgs, { route: HELPER_TOOLS.ACTOR_CALL_WIDGET });

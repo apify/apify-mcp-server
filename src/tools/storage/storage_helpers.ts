@@ -1,8 +1,8 @@
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 
 function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
     return loadedToolNames.includes(toolName) ? toolName : undefined;
@@ -25,19 +25,6 @@ export function apifyConsoleLinkText(apifyConsoleUrl: string | undefined): strin
 export function buildConsoleLinkContent(apifyConsoleUrl: string | undefined): { type: 'text'; text: string }[] {
     const text = apifyConsoleLinkText(apifyConsoleUrl);
     return text ? [{ type: 'text', text }] : [];
-}
-
-/**
- * Soft-fail not-found response for storage tools. Centralizes
- * `isError: true` + SOFT_FAIL/INVALID_INPUT telemetry so call sites
- * only supply the message.
- */
-export function buildStorageNotFound(text: string) {
-    return buildMCPResponse({
-        texts: [text],
-        isError: true,
-        telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-    });
 }
 
 /**
@@ -65,8 +52,7 @@ export function buildStorageResponse(params: {
     const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
     const dataText = toon ? encodeToon(structuredContent) : JSON.stringify(structuredContent);
     const consoleLinkText = apifyConsoleLinkText(apifyConsoleUrl);
-    return buildMCPResponse({
-        texts: [dataText, summaryText, ...(consoleLinkText ? [consoleLinkText] : [])],
+    return respondOk([dataText, summaryText, ...(consoleLinkText ? [consoleLinkText] : [])], {
         structuredContent: full,
     });
 }
