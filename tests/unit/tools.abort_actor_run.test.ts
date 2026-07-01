@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { abortActorRun } from '../../src/tools/common/abort_actor_run.js';
+import { abortActorRun } from '../../src/tools/runs/abort_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 

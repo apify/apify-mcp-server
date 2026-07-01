@@ -4,7 +4,7 @@ import {
     actorDetailsOutputDefaults,
     buildActorDetailsTextResponse,
     buildFetchActorDetailsResult,
-} from '../../src/tools/core/fetch_actor_details_common.js';
+} from '../../src/tools/actors/fetch_actor_details.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';

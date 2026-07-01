@@ -99,7 +99,10 @@ export const pricingSchema = {
                 'Note explaining that event descriptions were omitted and full details are available via fetch-actor-details',
         },
     },
-    required: ['model', 'userTier'],
+    // `userTier` is optional: `search-actors` returns it once at the response top level
+    // (it is a session constant), so per-Actor pricing omits it. `fetch-actor-details`
+    // returns a single Actor and keeps `userTier` in the pricing block.
+    required: ['model'],
 };
 
 /**
@@ -126,6 +129,7 @@ export const actorInfoSchema = {
         url: { type: 'string', description: 'Actor URL' },
         id: { type: 'string', description: 'Actor ID' },
         fullName: { type: 'string', description: 'Full Actor name (username/name)' },
+        pictureUrl: { type: 'string', description: 'Actor picture URL' },
         developer: developerSchema,
         description: { type: 'string', description: 'Actor description' },
         categories: {
@@ -252,6 +256,11 @@ export const actorSearchOutputSchema = {
         },
         query: { type: 'string', description: 'The search query used' },
         count: { type: 'number', description: 'Number of Actors returned' },
+        userTier: {
+            type: 'string',
+            enum: ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'],
+            description: "The user's plan tier used to resolve the per-Actor pricing shown in the results",
+        },
         instructions: {
             type: 'string',
             description: 'Additional instructions for the LLM to follow when processing the search results.',
@@ -276,6 +285,11 @@ export const actorSearchWidgetOutputSchema = {
         },
         query: { type: 'string', description: 'The search query used' },
         count: { type: 'number', description: 'Number of Actors returned' },
+        userTier: {
+            type: 'string',
+            enum: ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'],
+            description: "The user's plan tier used to resolve the per-Actor pricing shown in the results",
+        },
         widgetActors: {
             type: 'array' as const,
             items: {
@@ -325,6 +339,55 @@ export const fetchApifyDocsToolOutputSchema = {
     required: ['url', 'content'],
 };
 
+// Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
+// object identity: if `default` and `additionalProperties` referenced the same object, cloning
+// `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
+// `default` via `buildEnrichedDirectActorOutputSchema` would silently leak it into aliases too.
+const buildDatasetEntrySchema = () => ({
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Dataset ID' },
+        apifyConsoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the dataset; present only for Console sessions',
+        },
+        name: { type: 'string' },
+        title: { type: 'string' },
+        itemCount: { type: 'number' },
+        inflatedBytes: {
+            type: 'number',
+            description:
+                'Approximate uncompressed byte size of the dataset. Use with itemCount to pick limit/fields before fetching.',
+        },
+        fields: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
+        },
+    },
+    required: ['id'],
+});
+
+const buildKeyValueStoreEntrySchema = () => ({
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Key-value store ID' },
+        apifyConsoleUrl: {
+            type: 'string',
+            description: 'Personalized Apify Console link to the store; present only for Console sessions',
+        },
+        name: { type: 'string' },
+        title: { type: 'string' },
+        keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
+        keys: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Up to 50 key names',
+        },
+    },
+    required: ['id'],
+});
+
 /** Schema for get-actor-run tool output. */
 export const actorRunOutputSchema = {
     type: 'object' as const,
@@ -368,73 +431,18 @@ export const actorRunOutputSchema = {
                     type: 'object' as const,
                     description: 'Map of dataset alias → metadata. Key "default" is always the run\'s primary dataset.',
                     properties: {
-                        default: {
-                            type: 'object' as const,
-                            properties: {
-                                id: { type: 'string', description: 'Dataset ID' },
-                                apifyConsoleUrl: {
-                                    type: 'string',
-                                    description:
-                                        'Personalized Apify Console link to the dataset; present only for Console sessions',
-                                },
-                                name: { type: 'string' },
-                                title: { type: 'string' },
-                                itemCount: { type: 'number' },
-                                cleanItemCount: { type: 'number' },
-                                inflatedBytes: {
-                                    type: 'number',
-                                    description:
-                                        'Approximate uncompressed byte size of the dataset. Use with itemCount to pick limit/fields before fetching.',
-                                },
-                                fields: {
-                                    type: 'array' as const,
-                                    items: { type: 'string' },
-                                    description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
-                                },
-                            },
-                            required: ['id'],
-                        },
+                        default: buildDatasetEntrySchema(),
                     },
-                    additionalProperties: {
-                        type: 'object' as const,
-                        properties: { id: { type: 'string' } },
-                        required: ['id'],
-                    },
+                    additionalProperties: buildDatasetEntrySchema(),
                 },
                 keyValueStores: {
                     type: 'object' as const,
                     description:
                         'Map of key-value store alias → metadata. Key "default" is always the run\'s primary store.',
                     properties: {
-                        default: {
-                            type: 'object' as const,
-                            properties: {
-                                id: { type: 'string', description: 'Key-value store ID' },
-                                apifyConsoleUrl: {
-                                    type: 'string',
-                                    description:
-                                        'Personalized Apify Console link to the store; present only for Console sessions',
-                                },
-                                name: { type: 'string' },
-                                title: { type: 'string' },
-                                keyCount: {
-                                    type: 'number',
-                                    description: 'Total number of keys (omitted when truncated)',
-                                },
-                                keys: {
-                                    type: 'array' as const,
-                                    items: { type: 'string' },
-                                    description: 'Up to 50 key names',
-                                },
-                            },
-                            required: ['id'],
-                        },
+                        default: buildKeyValueStoreEntrySchema(),
                     },
-                    additionalProperties: {
-                        type: 'object' as const,
-                        properties: { id: { type: 'string' } },
-                        required: ['id'],
-                    },
+                    additionalProperties: buildKeyValueStoreEntrySchema(),
                 },
             },
         },
@@ -564,7 +572,8 @@ export const datasetItemsOutputSchema = {
 
 /**
  * Schema for dataset metadata (get-dataset). Documents the fields the LLM acts on; the raw API
- * response carries more keys (stats, schema, access settings), allowed as additional properties.
+ * response carries more keys (stats, access settings), allowed as additional properties.
+ * The raw `schema` key is stripped by the tool — get-dataset-schema owns schema output (#882).
  */
 export const datasetMetadataOutputSchema = {
     type: 'object' as const,

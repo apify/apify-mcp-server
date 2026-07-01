@@ -6,29 +6,18 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../src/const.js';
-import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
+import { getKeyValueStoreRecord } from '../../src/tools/storage/get_key_value_store_record.js';
 import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { compileSchema } from '../../src/utils/ajv.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
+    expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
-
-// Mirrors the official MCP SDK client: any tool with an outputSchema MUST return structuredContent
-// that validates against the schema, or callTool throws (client/index.js).
-const validateRecordOutput = compileSchema(keyValueStoreRecordOutputSchema as unknown as Record<string, unknown>);
-function expectSchemaConformingStructuredContent(result: unknown) {
-    const { structuredContent, isError } = result as { structuredContent?: unknown; isError?: boolean };
-    expect(isError).not.toBe(true);
-    expect(structuredContent).toBeDefined();
-    const valid = validateRecordOutput(structuredClone(structuredContent));
-    expect(valid, JSON.stringify(validateRecordOutput.errors)).toBe(true);
-}
 
 // Only Console UI token sessions reach the users/me lookup.
 vi.mock('../../src/utils/userid_cache.js', () => ({
@@ -99,6 +88,20 @@ describe('get-key-value-store-record', () => {
         expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', ...record });
         // 'hello world\nsecond line' is 23 ASCII bytes.
         expect(structuredContent.summary).toBe("Read 'note.txt' (contentType=text/plain; charset=utf-8, 23 bytes).");
+    });
+
+    it('returns an empty value in schema-conforming structuredContent for an empty record', async () => {
+        // apify-client maps an empty record body to `undefined` (e.g. an Actor that writes an empty OUTPUT);
+        // the value must still be present so the output schema's required `value` is satisfied.
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'OUTPUT' },
+                stubApifyClient({ record: { key: 'OUTPUT', value: undefined, contentType: 'application/json' } }),
+            ),
+        );
+        expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', key: 'OUTPUT', value: '' });
     });
 
     it('returns an image content block for a binary image record', async () => {
@@ -282,7 +285,7 @@ describe('get-key-value-store-record', () => {
                         stubApifyClient({ record: { key: recordKey, value, contentType } }),
                     ),
                 );
-                expectSchemaConformingStructuredContent(result);
+                expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
                 const { structuredContent } = result as { structuredContent: Record<string, unknown> };
                 expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', key: recordKey, contentType });
             });

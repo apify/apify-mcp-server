@@ -261,16 +261,14 @@ describe('pricingInfoToString (complete mode)', () => {
 // ─── Simplified mode: search-actors ───────────────────────────────────────────
 
 describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
-    it('E2: user on GOLD — tieredPricing filtered to GOLD entry, pricingNote names GOLD', () => {
+    it('E2: user on GOLD — resolved price reflects GOLD, pricingNote names GOLD', () => {
         expect(pricingInfoToSimplifiedStructured(multiTierPayPerEvent, 'GOLD')).toEqual({
             model: 'PAY_PER_EVENT',
-            userTier: 'GOLD',
             events: [
                 {
                     title: 'Scraped place',
                     description: 'A Google Maps place scraped',
                     priceUsd: 0.0021,
-                    tieredPricing: [{ tier: 'GOLD', priceUsd: 0.0021 }],
                 },
                 {
                     title: 'Actor start',
@@ -282,7 +280,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
         });
     });
 
-    it('E3: user on DIAMOND, actor offers only FREE — falls back to FREE, userTier stays DIAMOND, note names FREE', () => {
+    it('E3: user on DIAMOND, actor offers only FREE — resolves to FREE price, note names FREE', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
             pricePerUnitUsd: 0.005,
@@ -294,15 +292,13 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
         } as unknown as PricingInfo;
         expect(pricingInfoToSimplifiedStructured(info, 'DIAMOND')).toEqual({
             model: 'PRICE_PER_DATASET_ITEM',
-            userTier: 'DIAMOND',
             pricePerUnit: 0.005,
             unitName: 'result',
-            tieredPricing: [{ tier: 'FREE', pricePerUnit: 0.005 }],
             pricingNote: NOTE_FREE,
         });
     });
 
-    it('falls back to first entry when neither user tier nor FREE exist', () => {
+    it('resolves to the first entry when neither user tier nor FREE exist; omits the tieredPricing array', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
             pricePerUnitUsd: 0.005,
@@ -313,21 +309,20 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
             },
         } as unknown as PricingInfo;
         const out = pricingInfoToSimplifiedStructured(info, 'DIAMOND');
-        expect(out.tieredPricing).toEqual([{ tier: 'BRONZE', pricePerUnit: 0.004 }]);
         expect(out.pricePerUnit).toBe(0.004);
         expect(out.pricingNote).toContain('BRONZE');
+        expect(out.tieredPricing).toBeUndefined();
+        expect(out.userTier).toBeUndefined();
     });
 
     it('E4: single-tier actor — no pricingNote (the "higher tiers" promise is vacuous)', () => {
         expect(pricingInfoToSimplifiedStructured(singleTierPayPerEvent, 'GOLD')).toEqual({
             model: 'PAY_PER_EVENT',
-            userTier: 'GOLD',
             events: [
                 {
                     title: 'Scraped place',
                     description: 'A Google Maps place scraped',
                     priceUsd: 0.004,
-                    tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }],
                 },
             ],
         });
@@ -336,15 +331,13 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
     it('E6: PRICE_PER_DATASET_ITEM simplified — top-level pricePerUnit reflects resolved tier', () => {
         expect(pricingInfoToSimplifiedStructured(multiTierDatasetItem, 'GOLD')).toEqual({
             model: 'PRICE_PER_DATASET_ITEM',
-            userTier: 'GOLD',
             pricePerUnit: 0.002,
             unitName: 'result',
-            tieredPricing: [{ tier: 'GOLD', pricePerUnit: 0.002 }],
             pricingNote: NOTE_GOLD,
         });
     });
 
-    it('user on DIAMOND — resolved tier is DIAMOND, pricingNote is suppressed (top tier)', () => {
+    it('user on DIAMOND — resolved price is DIAMOND, pricingNote is suppressed (top tier)', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
             pricePerUnitUsd: 0.005,
@@ -356,45 +349,39 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
             },
         } as unknown as PricingInfo;
         const out = pricingInfoToSimplifiedStructured(info, 'DIAMOND');
-        expect(out.tieredPricing).toEqual([{ tier: 'DIAMOND', pricePerUnit: 0.001 }]);
         expect(out.pricePerUnit).toBe(0.001);
         expect(out.pricingNote).toBeUndefined();
+        expect(out.tieredPricing).toBeUndefined();
     });
 
     it('E7: FLAT_PRICE_PER_MONTH simplified includes trialMinutes + resolved tier price', () => {
         expect(pricingInfoToSimplifiedStructured(multiTierRental, 'GOLD')).toEqual({
             model: 'FLAT_PRICE_PER_MONTH',
-            userTier: 'GOLD',
             pricePerUnit: 20,
             trialMinutes: 60 * 24 * 7,
-            tieredPricing: [{ tier: 'GOLD', pricePerUnit: 20 }],
             pricingNote: NOTE_GOLD,
         });
     });
 
-    it('E8: FREE actor — same minimal shape + userTier in simplified mode too', () => {
+    it('E8: FREE actor — minimal shape, no userTier in simplified mode', () => {
         expect(pricingInfoToSimplifiedStructured(freeActor, 'GOLD')).toEqual({
             model: 'FREE',
-            userTier: 'GOLD',
         });
     });
 
     it('omits pricingNote when PAY_PER_EVENT events resolve to different tiers', () => {
         expect(pricingInfoToSimplifiedStructured(mixedTierPayPerEvent, 'GOLD')).toEqual({
             model: 'PAY_PER_EVENT',
-            userTier: 'GOLD',
             events: [
                 {
                     title: 'A',
                     description: '',
                     priceUsd: 0.005,
-                    tieredPricing: [{ tier: 'GOLD', priceUsd: 0.005 }],
                 },
                 {
                     title: 'B',
                     description: '',
                     priceUsd: 0.02,
-                    tieredPricing: [{ tier: 'FREE', priceUsd: 0.02 }],
                 },
             ],
         });
@@ -403,26 +390,13 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
     it('omits event descriptions and adds omission metadata when PAY_PER_EVENT has more than 5 events (single-tier: no pricingNote)', () => {
         expect(pricingInfoToSimplifiedStructured(longPayPerEvent, 'FREE')).toEqual({
             model: 'PAY_PER_EVENT',
-            userTier: 'FREE',
             events: [
-                { title: 'Result', priceUsd: 0.0037, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0037 }] },
-                { title: 'Add-on: Date filter', priceUsd: 0.0013, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
-                {
-                    title: 'Add-on: Popularity filter',
-                    priceUsd: 0.0013,
-                    tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }],
-                },
-                {
-                    title: 'Add-on: Follower / Following',
-                    priceUsd: 0.004,
-                    tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }],
-                },
-                {
-                    title: 'Add-on: Search video sorting',
-                    priceUsd: 0.0013,
-                    tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }],
-                },
-                { title: 'Actor start', priceUsd: 0.001, tieredPricing: [{ tier: 'FREE', priceUsd: 0.001 }] },
+                { title: 'Result', priceUsd: 0.0037 },
+                { title: 'Add-on: Date filter', priceUsd: 0.0013 },
+                { title: 'Add-on: Popularity filter', priceUsd: 0.0013 },
+                { title: 'Add-on: Follower / Following', priceUsd: 0.004 },
+                { title: 'Add-on: Search video sorting', priceUsd: 0.0013 },
+                { title: 'Actor start', priceUsd: 0.001 },
             ],
             eventDescriptionsOmitted: true,
             eventDescriptionsNote: EVENT_DESCRIPTIONS_OMITTED_NOTE,

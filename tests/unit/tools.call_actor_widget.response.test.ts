@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { appsCallActorWidget } from '../../src/tools/apps/call_actor_widget.js';
+import { callActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
 import type { HelperTool, InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { getActorMcpUrlCached } from '../../src/utils/actor.js';
@@ -16,15 +16,15 @@ vi.mock('../../src/utils/actor.js', () => ({
     getActorMcpUrlCached: vi.fn(),
 }));
 
-vi.mock('../../src/tools/core/actor_tools_factory.js', async () => {
-    const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/core/actor_tools_factory.js');
+vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
+    const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/actors/actor_tools_factory.js');
     return {
         ...actual,
         getActorsAsTools: vi.fn(),
     };
 });
 
-const { getActorsAsTools } = await import('../../src/tools/core/actor_tools_factory.js');
+const { getActorsAsTools } = await import('../../src/tools/actors/actor_tools_factory.js');
 
 const MOCK_ACTOR_TOOL: ToolEntry = {
     type: TOOL_TYPE.ACTOR,
@@ -65,7 +65,7 @@ describe('call-actor-widget response', () => {
         const startSpy = vi.fn().mockResolvedValue(MOCK_RUN);
         const apifyClient = stubApifyClient(startSpy);
 
-        const result = await (appsCallActorWidget as HelperTool).call(
+        const result = await (callActorWidget as HelperTool).call(
             stubToolCallContext({ actor: 'apify/rag-web-browser', input: { query: 'test' } }, apifyClient),
         );
 
@@ -116,7 +116,7 @@ describe('call-actor-widget response', () => {
     });
 
     it('carries widget _meta on the tool definition', () => {
-        const tool = appsCallActorWidget as HelperTool;
+        const tool = callActorWidget as HelperTool;
         const meta = tool._meta as { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown } };
         expect(meta.ui?.resourceUri).toBe(WIDGET_URIS.ACTOR_RUN);
         expect(meta.ui?.visibility).toEqual(['model', 'app']);
@@ -124,7 +124,7 @@ describe('call-actor-widget response', () => {
     });
 
     it('declares a strict input schema that silently strips stray keys like async/previewOutput', () => {
-        const tool = appsCallActorWidget as HelperTool;
+        const tool = callActorWidget as HelperTool;
 
         const schema = tool.inputSchema as {
             additionalProperties?: boolean;
@@ -150,7 +150,7 @@ describe('call-actor-widget response', () => {
     });
 
     it('accepts a minimal actor+input payload', () => {
-        const tool = appsCallActorWidget as HelperTool;
+        const tool = callActorWidget as HelperTool;
         const ok = tool.ajvValidate({ actor: 'apify/rag-web-browser', input: { query: 'test' } });
         expect(ok).toBe(true);
     });
@@ -159,7 +159,7 @@ describe('call-actor-widget response', () => {
         const startSpy = vi.fn();
         const apifyClient = stubApifyClient(startSpy);
 
-        const result = await (appsCallActorWidget as HelperTool).call(
+        const result = await (callActorWidget as HelperTool).call(
             stubToolCallContext(
                 { actor: 'apify/actors-mcp-server:fetch-apify-docs', input: { query: 'test' } },
                 apifyClient,

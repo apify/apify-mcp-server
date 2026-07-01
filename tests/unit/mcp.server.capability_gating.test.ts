@@ -6,9 +6,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HelperTools, SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
-import { searchActorsWidgetTool } from '../../src/tools/apps/search_actors_widget.js';
-import { appsCallActor } from '../../src/tools/default/call_actor.js';
-import { defaultSearchActors } from '../../src/tools/default/search_actors.js';
+import { callActorApps } from '../../src/tools/actors/call_actor.js';
+import { searchActors } from '../../src/tools/actors/search_actors.js';
+import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
 import type { ServerModeOption } from '../../src/types.js';
 import { ServerMode } from '../../src/types.js';
 
@@ -106,8 +106,8 @@ describe('ActorsMcpServer initialize handler', () => {
 
             // After initialize (apps mode): composed with APPS-mode variants
             // search-actors is mode-independent (data-only); search-actors-widget is the apps-only UI variant auto-added in apps mode.
-            expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(defaultSearchActors);
-            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
+            expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(searchActors);
+            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
         },
     );
 
@@ -154,9 +154,9 @@ describe('ActorsMcpServer initialize handler', () => {
 
             await dispatchInitialize(server, makeInitializeRequest(true));
 
-            expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(defaultSearchActors);
-            expect(server.tools.get(HelperTools.ACTOR_CALL)).toBe(appsCallActor);
-            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
+            expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(searchActors);
+            expect(server.tools.get(HelperTools.ACTOR_CALL)).toBe(callActorApps);
+            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
         },
     );
 
@@ -176,7 +176,7 @@ describe('ActorsMcpServer initialize handler', () => {
 
             await dispatchInitialize(server, makeInitializeRequest(true));
 
-            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
+            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
         },
     );
 });

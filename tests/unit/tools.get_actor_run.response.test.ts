@@ -8,8 +8,8 @@ import {
     type RunDataset,
     type RunKeyValueStore,
     type RunResponse,
-} from '../../src/tools/core/actor_run_response.js';
-import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
+} from '../../src/tools/actors/actor_run_response.js';
+import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
@@ -55,7 +55,6 @@ function mockDataset(overrides: Record<string, unknown> = {}) {
         createdAt: new Date('2026-05-01T10:00:00.000Z'),
         modifiedAt: new Date('2026-05-01T10:00:22.000Z'),
         itemCount: 47,
-        cleanItemCount: 47,
         // Apify returns slash-notation; server must translate to dot-notation in the response.
         fields: ['crawl/httpStatusCode', 'metadata/url', 'markdown'],
         stats: { writeCount: 47, storageBytes: 152340 },
@@ -89,7 +88,7 @@ function stubClient(opts: {
 describe('get-actor-run default response', () => {
     it('end-to-end SUCCEEDED: translates fields, omits legacy preview, carries identifiers in text, attaches usage _meta', async () => {
         const run = mockSucceededRun();
-        const result = await (defaultGetActorRun as HelperTool).call(
+        const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset: mockDataset() })),
         );
 
@@ -132,7 +131,7 @@ describe('get-actor-run default response', () => {
         // The single-dataset GET does not return `inflatedBytes` (only the dataset-list endpoint does);
         // this stub injects it to verify the wiring.
         const run = mockSucceededRun();
-        const result = await (defaultGetActorRun as HelperTool).call(
+        const result = await (getActorRun as HelperTool).call(
             stubToolCallContext(
                 { runId: 'run-1', waitSecs: 0 },
                 stubClient({ run, dataset: mockDataset({ stats: { writeCount: 47, inflatedBytes: 1234 } }) }),
@@ -141,6 +140,21 @@ describe('get-actor-run default response', () => {
         const { structuredContent } = result as { structuredContent: RunResponse };
 
         expect(structuredContent.storages.datasets?.default.inflatedBytes).toBe(1234);
+    });
+
+    it('omits inflatedBytes when the platform reports 0 (size unavailable, not a real 0)', async () => {
+        // The platform returns inflatedBytes: 0 when it does not yet populate the size; surfacing a
+        // literal "0 bytes" is misleading for a non-empty dataset, so the field must be omitted.
+        const run = mockSucceededRun();
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext(
+                { runId: 'run-1', waitSecs: 0 },
+                stubClient({ run, dataset: mockDataset({ stats: { writeCount: 47, inflatedBytes: 0 } }) }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.storages.datasets?.default.inflatedBytes).toBeUndefined();
     });
 
     it('fetches dataset metadata for a non-terminal RUNNING run and surfaces progress in the summary', async () => {
@@ -166,7 +180,7 @@ describe('get-actor-run default response', () => {
             },
         } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call(
+        const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
@@ -190,7 +204,7 @@ describe('get-actor-run default response', () => {
         const dataset = mockDataset({ itemCount: 0 });
         // Probe runs with `limit: 1`, so `items.length === 1` even when the dataset has more.
         // The recovered count must come from `total`, otherwise the lag fallback caps at 1.
-        const result = await (defaultGetActorRun as HelperTool).call(
+        const result = await (getActorRun as HelperTool).call(
             stubToolCallContext(
                 { runId: 'run-1', waitSecs: 0 },
                 stubClient({ run, dataset, listItemsProbe: { items: [{ a: 1 }], total: 47 } }),
@@ -198,6 +212,35 @@ describe('get-actor-run default response', () => {
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
         expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
+    });
+
+    it('recovers a lagging itemCount=0 for an aliased dataset via the probe, not just the default', async () => {
+        // Reproduces the aliased-storage bug: Apify's counter lags ~5s post-SUCCEEDED, so a freshly
+        // written aliased dataset reports itemCount 0 in metadata. The probe must recover it for
+        // aliases too, exactly as it does for the default.
+        const run = mockSucceededRun({
+            storageIds: { datasets: { default: 'dataset-xyz', results: 'dataset-results' } },
+        });
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (id: string) => ({
+                // Both datasets report a stale itemCount 0 in metadata...
+                get: async () => mockDataset({ id, itemCount: 0 }),
+                // ...but listItems.total reflects the true count (distinct per dataset).
+                listItems: async () => ({ items: [{ a: 1 }], total: id === 'dataset-results' ? 3 : 1 }),
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(1);
+        expect(structuredContent.storages.datasets?.results.itemCount).toBe(3);
     });
 
     it('retries the itemCount=0 probe once when the first probe also returns 0 (waitSecs > 0)', async () => {
@@ -223,7 +266,7 @@ describe('get-actor-run default response', () => {
                 }),
             } as unknown as InternalToolArgs['apifyClient'];
 
-            const callPromise = (defaultGetActorRun as HelperTool).call(
+            const callPromise = (getActorRun as HelperTool).call(
                 stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client),
             );
             await vi.runAllTimersAsync();
@@ -260,7 +303,7 @@ describe('get-actor-run default response', () => {
                 }),
             } as unknown as InternalToolArgs['apifyClient'];
 
-            const callPromise = (defaultGetActorRun as HelperTool).call(
+            const callPromise = (getActorRun as HelperTool).call(
                 stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client),
             );
             // Drive the [0, 1000, 2000, 2000]ms schedule to completion without real wall time.
@@ -296,7 +339,7 @@ describe('get-actor-run default response', () => {
             }),
         } as unknown as InternalToolArgs['apifyClient'];
 
-        await (defaultGetActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client));
+        await (getActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client));
         // Exactly one immediate probe — no delayed retries.
         expect(probeCalls).toBe(1);
     });
@@ -328,12 +371,12 @@ describe('get-actor-run default response', () => {
             }),
         } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call({
+        const result = await (getActorRun as HelperTool).call({
             ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
             extra: { signal: controller.signal } as InternalToolArgs['extra'],
         });
 
-        // Cancelled requests return no payload per MCP spec — see `defaultGetActorRun`.
+        // Cancelled requests return no payload per MCP spec — see `getActorRun`.
         expect(result).toEqual({});
         // ≤1 because raceAbort may short-circuit before or after `run().get()` is invoked; what
         // matters is that the call returns instead of hanging on the never-resolving promise.
@@ -341,12 +384,12 @@ describe('get-actor-run default response', () => {
     });
 
     it('rejects waitSecs above 45', () => {
-        const tool = defaultGetActorRun as HelperTool;
+        const tool = getActorRun as HelperTool;
         expect(tool.ajvValidate({ runId: 'run-1', waitSecs: 46 })).toBe(false);
     });
 
     it('rejects waitSecs below 0', () => {
-        const tool = defaultGetActorRun as HelperTool;
+        const tool = getActorRun as HelperTool;
         expect(tool.ajvValidate({ runId: 'run-1', waitSecs: -1 })).toBe(false);
     });
 
@@ -366,7 +409,7 @@ describe('get-actor-run default response', () => {
             }),
         } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call(
+        const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
         );
         const { content, structuredContent, isError } = result as TextToolResult & { structuredContent: RunResponse };
@@ -404,7 +447,7 @@ describe('get-actor-run default response', () => {
             }),
         } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call(
+        const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
         );
         const { structuredContent, isError } = result as { structuredContent: RunResponse; isError?: boolean };
@@ -416,6 +459,56 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.keyValueStores?.default.id).toBe('kv-xyz');
         expect(structuredContent.storages.keyValueStores?.default.keys).toBeUndefined();
         expect(structuredContent.storages.keyValueStores?.default.keyCount).toBeUndefined();
+    });
+
+    it('enriches aliased storages from run.storageIds with their own metadata, not just the default', async () => {
+        const run = mockSucceededRun({
+            storageIds: {
+                datasets: { default: 'dataset-xyz', results: 'dataset-results' },
+                keyValueStores: { default: 'kv-xyz', screenshots: 'kv-screenshots' },
+            },
+        });
+        // Per-id metadata so default and alias entries are distinguishable.
+        const datasetsById: Record<string, ReturnType<typeof mockDataset>> = {
+            'dataset-xyz': mockDataset({ id: 'dataset-xyz', itemCount: 47 }),
+            'dataset-results': mockDataset({ id: 'dataset-results', itemCount: 5, fields: ['error'] }),
+        };
+        const kvKeysById: Record<string, { key: string }[]> = {
+            'kv-xyz': [{ key: 'OUTPUT' }],
+            'kv-screenshots': [{ key: 'shot-1' }, { key: 'shot-2' }],
+        };
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (id: string) => ({
+                get: async () => datasetsById[id] ?? null,
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            keyValueStore: (id: string) => ({
+                listKeys: async () => ({ items: kvKeysById[id] ?? [], isTruncated: false }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        // default stays enriched.
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
+        expect(structuredContent.storages.keyValueStores?.default.keys).toEqual(['OUTPUT']);
+        // Aliased dataset carries its own id, itemCount, and normalized fields — not the default's.
+        expect(structuredContent.storages.datasets?.results).toMatchObject({
+            id: 'dataset-results',
+            itemCount: 5,
+            fields: ['error'],
+        });
+        // Aliased KV store carries its own keys.
+        expect(structuredContent.storages.keyValueStores?.screenshots).toMatchObject({
+            id: 'kv-screenshots',
+            keys: ['shot-1', 'shot-2'],
+            keyCount: 2,
+        });
     });
 
     it('emits progress with formatted status messages on wait + terminal flip', async () => {
@@ -471,7 +564,7 @@ describe('get-actor-run default response', () => {
         };
 
         const baseArgs = stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client);
-        await (defaultGetActorRun as HelperTool).call({
+        await (getActorRun as HelperTool).call({
             ...baseArgs,
             progressTracker: tracker as unknown as InternalToolArgs['progressTracker'],
         });
@@ -491,7 +584,7 @@ describe('get-actor-run default response', () => {
             run: (_id: string) => ({ get: async () => undefined }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
         } as unknown as InternalToolArgs['apifyClient'];
-        const result = (await (defaultGetActorRun as HelperTool).call(
+        const result = (await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'missing', waitSecs: 0 }, client),
         )) as TextToolResult;
         expect(result.isError).toBe(true);
@@ -507,7 +600,7 @@ describe('get-actor-run default response', () => {
             vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
             const run = mockSucceededRun();
-            const result = await (defaultGetActorRun as HelperTool).call({
+            const result = await (getActorRun as HelperTool).call({
                 ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset: mockDataset() })),
                 apifyToken: 'apify_ui_test',
             });
@@ -534,7 +627,7 @@ describe('get-actor-run default response', () => {
 
         it('keeps responses link-free for API tokens', async () => {
             const run = mockSucceededRun();
-            const result = await (defaultGetActorRun as HelperTool).call({
+            const result = await (getActorRun as HelperTool).call({
                 ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset: mockDataset() })),
                 apifyToken: 'apify_api_test',
             });
@@ -589,6 +682,28 @@ describe('buildStartRunResponse()', () => {
 
         // Non-widget path: no widget _meta.
         expect(_meta).toBeUndefined();
+    });
+
+    it('emits id-only entries for aliased storages from run.storageIds', () => {
+        const runWithAliases = {
+            ...actorRun,
+            storageIds: {
+                datasets: { default: 'dataset-abc', errors: 'dataset-errors' },
+                keyValueStores: { default: 'kv-abc', debug: 'kv-debug' },
+            },
+        } as unknown as ActorRun;
+
+        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun: runWithAliases });
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.storages.datasets).toEqual({
+            default: { id: 'dataset-abc' },
+            errors: { id: 'dataset-errors' },
+        });
+        expect(structuredContent.storages.keyValueStores).toEqual({
+            default: { id: 'kv-abc' },
+            debug: { id: 'kv-debug' },
+        });
     });
 
     // Org-prefixed URL variants are covered by the builder tests in console_link.test.ts.
@@ -670,6 +785,14 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
         expect(t.nextStep).toContain('metadata.url, markdown');
+    });
+
+    it('SUCCEEDED dataset nextStep uses DEFAULT_DATASET_ITEMS_LIMIT as example limit', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+        });
+        expect(t.nextStep).toContain('limit (for example 20)');
     });
 
     it('SUCCEEDED steers nextStep away from fetching a large dataset', () => {

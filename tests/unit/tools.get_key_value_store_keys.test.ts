@@ -1,8 +1,7 @@
-import Ajv from 'ajv';
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { getKeyValueStoreKeys } from '../../src/tools/common/get_key_value_store_keys.js';
+import { getKeyValueStoreKeys } from '../../src/tools/storage/get_key_value_store_keys.js';
 import { keyValueStoreKeysOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -10,6 +9,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     decodeFencedToolText,
     expectSoftFailInvalidInput,
+    expectSchemaConformingStructuredContent,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -76,14 +76,11 @@ describe('get-key-value-store-keys', () => {
         // Validated with a strict AJV (no coercion) to mirror the SDK's output-schema check; the
         // repo's lenient `compileSchema` coerces types and would hide the mismatch.
         const listKeysSpy = vi.fn().mockResolvedValue({ ...MOCK_KEYS, nextExclusiveStartKey: null });
-        const validate = new Ajv({ strict: false }).compile(keyValueStoreKeysOutputSchema);
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
         );
-        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
-
-        expect(validate(structuredContent)).toBe(true);
+        expectSchemaConformingStructuredContent(result, keyValueStoreKeysOutputSchema);
     });
 
     it('flags truncation in the summary and points to the next page when more keys are available', async () => {

@@ -13,11 +13,11 @@ import {
 } from '../../src/const.js';
 import { SKYFIRE_ENABLED_TOOLS } from '../../src/payments/const.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/core/call_actor_common.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
+import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/actors/call_actor.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
@@ -692,6 +692,34 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 ).structuredContent;
                 // nextStep should interpolate the datasetId so a text-only client can act without parsing storages.
                 expect(sc?.nextStep).toContain(sc?.storages?.datasets?.default?.id ?? '__unset__');
+            });
+
+            it('surfaces aliased storages from run.storageIds in the canonical response', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+
+                const callResult = await client.callTool({
+                    name: HelperTools.ACTOR_CALL,
+                    arguments: {
+                        actor: ACTOR_NORMAL_MODE,
+                        input: { firstNumber: 1, secondNumber: 2 },
+                        waitSecs: 45,
+                    },
+                });
+
+                expect(callResult.isError).not.toBe(true);
+                // Schema validation must accept the alias entries (additionalProperties: full dataset shape).
+                validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
+                const sc = (
+                    callResult as {
+                        structuredContent?: {
+                            storages?: { datasets?: Record<string, { id?: string }> };
+                        };
+                    }
+                ).structuredContent;
+                // normal-mode-test-actor opens an aliased 'books' dataset; the run response must
+                // surface it alongside the default, enriched with its own metadata (id at minimum).
+                expect(sc?.storages?.datasets?.default?.id).toBeDefined();
+                expect(sc?.storages?.datasets?.books?.id).toEqual(expect.any(String));
             });
 
             it('should find Actors in store search', async () => {
@@ -2200,6 +2228,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 // Dataset field paths surface in `storages.datasets.default.fields`.
                 const fields = sc?.storages?.datasets?.default?.fields ?? [];
                 expect(fields).toEqual(expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']));
+
+                // #911/#894: the actor emits `math.fibonacci: [..]`, which Apify reports index-expanded
+                // (`math/fibonacci/0`, `/1`, `/2`). The server must collapse those to a single
+                // `math.fibonacci` on the wire. `math.fibonacci` present proves collapse fired (not a
+                // flat-only no-op); no entry keeps an array index; no duplicates survive collapse.
+                expect(fields).toEqual(expect.arrayContaining(['math.fibonacci']));
+                expect(fields.some((f) => /\.\d+(\.|$)/.test(f))).toBe(false);
+                expect(new Set(fields).size).toBe(fields.length);
 
                 const outputResult = await client.callTool({
                     name: HelperTools.DATASET_GET_ITEMS,

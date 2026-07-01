@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApifyClient } from '../../src/apify_client.js';
 import type { ActorDefinitionWithInfo } from '../../src/types.js';
 
-vi.mock('../../src/tools/build.js', () => ({ getActorDefinition: vi.fn() }));
+vi.mock('../../src/tools/actors/actor_definition.js', () => ({ getActorDefinition: vi.fn() }));
 vi.mock('../../src/utils/userid_cache.js', () => ({ getUserInfoCached: vi.fn() }));
 
 import { actorDefinitionCache } from '../../src/state.js';
-import { getActorDefinition } from '../../src/tools/build.js';
+import { getActorDefinition } from '../../src/tools/actors/actor_definition.js';
 import { getActorDefinitionCached, getActorMcpUrlCached } from '../../src/utils/actor.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 

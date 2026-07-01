@@ -9,7 +9,7 @@ import {
     buildCallActorErrorResponse,
     buildPermissionApprovalResponse,
     callActorArgs,
-} from '../../src/tools/core/call_actor_common.js';
+} from '../../src/tools/actors/call_actor.js';
 
 describe('call_actor_common', () => {
     describe('buildCallActorDescription', () => {

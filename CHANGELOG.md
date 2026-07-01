@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.11.5 - **not yet released**
+
+### 🚀 Features
+
+- Surface multiple datasets, kv-stores ([#987](https://github.com/apify/apify-mcp-server/pull/987)) ([6b48228](https://github.com/apify/apify-mcp-server/commit/6b482281ff0aed04a90da8ecf9dc240a50e70f0d)) by [@jirispilka](https://github.com/jirispilka), closes [#912](https://github.com/apify/apify-mcp-server/issues/912)
+- **tools:** Nudge clients to refresh tool list after add-actor ([#1026](https://github.com/apify/apify-mcp-server/pull/1026)) ([920e289](https://github.com/apify/apify-mcp-server/commit/920e28903c37b1287158a2c1934db9e4d3de6441)) by [@vjsai](https://github.com/vjsai), closes [#851](https://github.com/apify/apify-mcp-server/issues/851)
+- Hint field filtering in get-dataset-items description ([#1032](https://github.com/apify/apify-mcp-server/pull/1032)) ([f2c7a1a](https://github.com/apify/apify-mcp-server/commit/f2c7a1add94cdd784e2c97b8fec0e4e83432a0af)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Add large-dataset and scraper workflow eval cases ([#1033](https://github.com/apify/apify-mcp-server/pull/1033)) ([b755213](https://github.com/apify/apify-mcp-server/commit/b755213bf8dbffa2aa2224f68cb0f03c722c662a)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Add byte&#x2F;token cost metrics to workflow evals ([#1031](https://github.com/apify/apify-mcp-server/pull/1031)) ([e101595](https://github.com/apify/apify-mcp-server/commit/e1015957a2bfcef01f2a7b5753a574ece8c0d258)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Drop raw schema from get-dataset; stop nudging schema tool ([#986](https://github.com/apify/apify-mcp-server/pull/986)) ([fb5c418](https://github.com/apify/apify-mcp-server/commit/fb5c418ad84fb93ad779c1cd9ca32140b0c556d9)) by [@jirispilka](https://github.com/jirispilka), closes [#882](https://github.com/apify/apify-mcp-server/issues/882)
+
+### 🐛 Bug Fixes
+
+- Preserve empty key-value store record value in structuredContent ([#1023](https://github.com/apify/apify-mcp-server/pull/1023)) ([38f142a](https://github.com/apify/apify-mcp-server/commit/38f142a037dfea1b8bfdbf46eedd05d99835efaf)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Align search-actors schema with output, trim redundant pricing ([#1036](https://github.com/apify/apify-mcp-server/pull/1036)) ([743774b](https://github.com/apify/apify-mcp-server/commit/743774bd93446aef6bbc744507d99f3233d09d57)) by [@mvanhorn](https://github.com/mvanhorn), closes [#889](https://github.com/apify/apify-mcp-server/issues/889)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.11.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.4) (2026-06-24)
 
 ### 🐛 Bug Fixes

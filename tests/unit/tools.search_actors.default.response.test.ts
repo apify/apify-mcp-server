@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_STORE_URL, HelperTools, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
-import { defaultSearchActors } from '../../src/tools/default/search_actors.js';
+import { searchActors } from '../../src/tools/actors/search_actors.js';
+import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
     DEFAULT_CARD_OPTIONS,
@@ -38,7 +39,7 @@ function buildInputSchema(fieldCount: number): ActorStoreInputSchema {
     };
 }
 
-describe('search-actors without widget (defaultSearchActors)', () => {
+describe('search-actors without widget (searchActors)', () => {
     beforeEach(() => {
         vi.mocked(searchAgentSafeActors).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
@@ -48,7 +49,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
     it('returns structured actors and markdown text; no widget payload', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
-        const result = await (defaultSearchActors as HelperTool).call(
+        const result = await (searchActors as HelperTool).call(
             stubInternalToolArgs({
                 keywords: SEARCH_KEYWORDS,
                 limit: 5,
@@ -61,6 +62,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
                 actors: ReturnType<typeof formatActorToStructuredCard>[];
                 query: string;
                 count: number;
+                userTier?: string;
                 instructions?: string;
                 widgetActors?: unknown;
             };
@@ -71,8 +73,15 @@ describe('search-actors without widget (defaultSearchActors)', () => {
         expect(structuredContent.widgetActors).toBeUndefined();
         expect(structuredContent.query).toBe(SEARCH_KEYWORDS);
         expect(structuredContent.count).toBe(1);
+        expect(structuredContent.userTier).toBe('FREE');
         expect(structuredContent.actors).toHaveLength(1);
-        expect(structuredContent.actors[0]).toStrictEqual(formatActorToStructuredCard(MOCK_STORE_ACTOR));
+        expect(structuredContent.actors[0]).toStrictEqual(
+            formatActorToStructuredCard(MOCK_STORE_ACTOR, {
+                ...DEFAULT_CARD_OPTIONS,
+                userTier: 'FREE',
+                simplifyPricingForUserTier: true,
+            }),
+        );
         expect(structuredContent.instructions).toContain(HelperTools.ACTOR_GET_DETAILS);
 
         expect(content).toHaveLength(1);
@@ -103,7 +112,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
         ] as ActorStoreList[];
         vi.mocked(searchAgentSafeActors).mockResolvedValue(actors);
 
-        const result = await (defaultSearchActors as HelperTool).call(
+        const result = await (searchActors as HelperTool).call(
             stubInternalToolArgs({
                 keywords: SEARCH_KEYWORDS,
                 limit: 5,
@@ -141,7 +150,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
     it('returns empty structured content and retry instructions when no actors match', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
-        const result = await (defaultSearchActors as HelperTool).call(
+        const result = await (searchActors as HelperTool).call(
             stubInternalToolArgs({
                 keywords: SEARCH_KEYWORDS,
                 limit: 5,
@@ -171,13 +180,28 @@ describe('search-actors without widget (defaultSearchActors)', () => {
         expect(content[0].text).toContain(SEARCH_KEYWORDS);
     });
 
+    it('declares every field the structured card emits (guards schema/runtime drift)', () => {
+        // Regression guard for #889: the advertised output schema must declare every field
+        // the runtime card actually emits. `pictureUrl` was emitted but undeclared — this
+        // asserts no emitted key is missing from `actorInfoSchema`, so the next dropped
+        // field fails here instead of silently shipping an inconsistent schema.
+        const card = formatActorToStructuredCard(MOCK_STORE_ACTOR, {
+            ...DEFAULT_CARD_OPTIONS,
+            userTier: 'FREE',
+            simplifyPricingForUserTier: true,
+        });
+        const declared = new Set(Object.keys(actorInfoSchema.properties));
+        const undeclared = Object.keys(card).filter((key) => !declared.has(key));
+        expect(undeclared).toEqual([]);
+    });
+
     // Org-prefixed and non-Console variants are covered by console_link.test.ts and
     // the get-actor-run response tests.
     it('mints Console links for a Console UI token', async () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
-        const result = await (defaultSearchActors as HelperTool).call({
+        const result = await (searchActors as HelperTool).call({
             ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
             apifyToken: 'apify_ui_test',
         });

@@ -6,7 +6,7 @@ import type {
 
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
-import { classifyBinaryRecord } from '../tools/common/storage_helpers.js';
+import { classifyBinaryRecord } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 
 const JSON_MIME_TYPE = 'application/json';

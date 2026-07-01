@@ -5,9 +5,9 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { ActorsMcpServer } from '../../src/index.js';
-import { addTool } from '../../src/tools/common/add_actor.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
+import { addActor } from '../../src/tools/actors/add_actor.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
-import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { Input } from '../../src/types.js';
 import { ServerMode } from '../../src/types.js';
 import { loadToolsFromInput } from '../../src/utils/tools_loader.js';
@@ -44,7 +44,7 @@ describe('MCP server internals integration tests', () => {
         // enableAddingActors=true seeds add-actor + 4 auto-injected helpers (get-actor-run, dataset, kv, abort);
         // then ACTOR_NORMAL_MODE is added on top.
         const expectedToolNames = [
-            addTool.name,
+            addActor.name,
             'get-actor-run',
             'get-dataset-items',
             'get-key-value-store-record',
@@ -94,7 +94,7 @@ describe('MCP server internals integration tests', () => {
         expect(toolNotificationCount).toBe(1);
         expect(latestTools.length).toBe(numberOfTools + 1);
         expect(latestTools).toContain(actor);
-        expect(latestTools).toContain(addTool.name);
+        expect(latestTools).toContain(addActor.name);
         // No default actors are present when only add-actor is enabled by default
 
         // Remove the Actor
@@ -104,7 +104,7 @@ describe('MCP server internals integration tests', () => {
         expect(toolNotificationCount).toBe(2);
         expect(latestTools.length).toBe(numberOfTools);
         expect(latestTools).not.toContain(actor);
-        expect(latestTools).toContain(addTool.name);
+        expect(latestTools).toContain(addActor.name);
         // No default actors are present by default in this mode
     });
 

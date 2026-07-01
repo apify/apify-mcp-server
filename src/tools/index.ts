@@ -2,15 +2,15 @@ import { HelperTools } from '../const.js';
 import type { ToolCategory, ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
 import { getExpectedToolsByCategories } from '../utils/tool_categories_helpers.js';
+import { getActorsAsTools } from './actors/actor_tools_factory.js';
+import type { ActorsAsToolsResult } from './actors/actor_tools_factory.js';
 import {
     CATEGORY_NAME_SET,
     CATEGORY_NAMES,
     getCategoryTools,
     toolCategories,
     toolCategoriesEnabledByDefault,
-} from './categories.js';
-import { getActorsAsTools } from './core/actor_tools_factory.js';
-import type { ActorsAsToolsResult } from './core/actor_tools_factory.js';
+} from './registry.js';
 
 // Use string constants instead of tool object imports to avoid circular dependencies
 export const unauthEnabledTools: string[] = [
@@ -20,7 +20,7 @@ export const unauthEnabledTools: string[] = [
     HelperTools.ACTOR_GET_DETAILS,
 ];
 
-// Re-export from categories.ts
+// Re-export from registry.ts
 // This is actually needed to avoid circular dependency issues
 export { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategories, toolCategoriesEnabledByDefault };
 

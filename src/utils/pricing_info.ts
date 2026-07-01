@@ -28,10 +28,14 @@
  *   eventDescriptionsNote?: string,
  * }
  *
- * Complete mode keeps full tier matrices and never sets `pricingNote`.
+ * Complete mode keeps full tier matrices (`tieredPricing` arrays), sets `userTier`,
+ * and never sets `pricingNote`.
  *
- * Simplified mode picks a single tier from each tiered map
- * (requested tier -> FREE -> first entry) and emits `pricingNote` only when
+ * Simplified mode resolves a single tier from each tiered map
+ * (requested tier -> FREE -> first entry) and carries that resolved price in
+ * `pricePerUnit` / event `priceUsd`. It drops the `tieredPricing` arrays (a single
+ * resolved tier makes them redundant) and omits `userTier` (a session constant
+ * returned once at the search-response top level). It emits `pricingNote` only when
  * the Actor actually has multiple tiers *and* they resolve consistently. The
  * note is omitted for single-tier Actors (the note's "higher tiers may offer
  * lower prices" promise is vacuous) and when PAY_PER_EVENT events resolve
@@ -42,7 +46,6 @@
  * - `events.length > 5`: omit event descriptions and set
  *   `eventDescriptionsOmitted` / `eventDescriptionsNote`
  *
- * Single-tier buckets stay as 1-element `tieredPricing` arrays in both modes.
  * `FREE` or `null` input returns the free text / structured shape.
  *
  * Full examples and contract details are documented inline in this module.
@@ -423,7 +426,9 @@ export function pricingInfoToSimplifiedStructured(
     pricingInfo: PricingInfo | null,
     userTier: PricingTier,
 ): StructuredPricingInfo {
-    const base = createStructuredBase(pricingInfo, userTier);
+    // Simplified mode (search-actors) omits `userTier` from each pricing block — it is a
+    // session constant returned once at the search-response top level, not per Actor.
+    const base: StructuredPricingInfo = { model: pricingInfo?.pricingModel || ACTOR_PRICING_MODEL.FREE };
     if (isFreeActor(pricingInfo)) return base;
 
     const { patch, noteTier } = resolveSimplifiedPatch(pricingInfo, userTier);
@@ -456,7 +461,8 @@ function structureTieredUnitSimplified(info: DatasetItemLike | RentalLike, userT
     const patch: Partial<StructuredPricingInfo> = { pricePerUnit: info.pricePerUnitUsd ?? 0 };
     if (hasTiers(info.tieredPricing)) {
         const { tier, value } = resolveTier(info.tieredPricing, userTier);
-        patch.tieredPricing = [{ tier, pricePerUnit: value.tieredPricePerUnitUsd }];
+        // Simplified mode resolves to one tier; the resolved price lives in `pricePerUnit`,
+        // so the 1-element `tieredPricing` array just duplicates it. Drop it.
         patch.pricePerUnit = value.tieredPricePerUnitUsd;
         return { patch, noteTier: hasMultipleTiers(info.tieredPricing) ? tier : null };
     }
@@ -487,13 +493,12 @@ function structurePayPerEventSimplified(
 
         const { tier, value } = resolveTier(tieredMap, userTier);
         resolvedTiers.add(tier);
-        // `priceUsd` is set in addition to `tieredPricing` so the widget's FREE-tier
-        // fallback (src/web/src/utils/formatting.ts) can render a concrete price for
-        // FREE-tier users instead of the generic "Pay per event" fallback.
+        // Simplified mode resolves to one tier; `priceUsd` carries the resolved price
+        // (the widget reads it — src/web/src/utils/formatting.ts), so the 1-element
+        // `tieredPricing` array just duplicates it. Drop it.
         return {
             ...baseEvent,
             priceUsd: value.tieredEventPriceUsd,
-            tieredPricing: [{ tier, priceUsd: value.tieredEventPriceUsd }],
         };
     });
 

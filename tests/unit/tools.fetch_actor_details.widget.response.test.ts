@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { fetchActorDetailsWidgetTool } from '../../src/tools/apps/fetch_actor_details_widget.js';
+import { fetchActorDetailsWidget } from '../../src/tools/widgets/fetch_actor_details_widget.js';
 import type { HelperTool } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
@@ -64,7 +64,7 @@ describe('fetch-actor-details-widget response', () => {
     it('returns { actorDetails: { actorInfo, actorCard, readme } } as structuredContent plus widget _meta', async () => {
         vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
 
-        const result = await (fetchActorDetailsWidgetTool as HelperTool).call(
+        const result = await (fetchActorDetailsWidget as HelperTool).call(
             stubInternalToolArgs({ actor: 'apify/web-scraper' }),
         );
 
@@ -100,7 +100,7 @@ describe('fetch-actor-details-widget response', () => {
     });
 
     it('carries widget _meta on the tool definition', () => {
-        const tool = fetchActorDetailsWidgetTool as HelperTool;
+        const tool = fetchActorDetailsWidget as HelperTool;
         const meta = tool._meta as { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown } };
         expect(meta.ui?.resourceUri).toBe(WIDGET_URIS.SEARCH_ACTORS);
         expect(meta.ui?.visibility).toEqual(['model', 'app']);
@@ -108,7 +108,7 @@ describe('fetch-actor-details-widget response', () => {
     });
 
     it('declares a strict input schema and strips stray keys like `output` at validation time', () => {
-        const tool = fetchActorDetailsWidgetTool as HelperTool;
+        const tool = fetchActorDetailsWidget as HelperTool;
 
         // Schema-level: strict shape (no extra properties allowed).
         const schema = tool.inputSchema as {
@@ -129,7 +129,7 @@ describe('fetch-actor-details-widget response', () => {
     });
 
     it('accepts a valid actor-only input', () => {
-        const tool = fetchActorDetailsWidgetTool as HelperTool;
+        const tool = fetchActorDetailsWidget as HelperTool;
         const ok = tool.ajvValidate({ actor: 'apify/web-scraper' });
         expect(ok).toBe(true);
     });

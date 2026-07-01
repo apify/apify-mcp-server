@@ -8,7 +8,8 @@ import { processParamsGetTools } from './mcp/utils.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import type { PaymentProvider } from './payments/types.js';
 import { getServerCard } from './server_card.js';
-import { addTool } from './tools/common/add_actor.js';
+import { actorNameToToolName } from './tools/actor_tool_naming.js';
+import { addActor } from './tools/actors/add_actor.js';
 import {
     getActorsAsTools,
     getCategoryTools,
@@ -17,7 +18,6 @@ import {
     toolCategoriesEnabledByDefault,
     unauthEnabledTools,
 } from './tools/index.js';
-import { actorNameToToolName } from './tools/utils.js';
 import type { ActorStore, ServerCard, ToolCategory } from './types.js';
 import { parseCommaSeparatedList, parseQueryParamList, readJsonFile } from './utils/generic.js';
 import { redactSkyfirePayId } from './utils/logging.js';
@@ -37,7 +37,11 @@ export {
     SERVER_TITLE,
     defaults,
     getDefaultTools,
-    addTool,
+    addActor,
+    /**
+     * @deprecated Use `addActor` instead. Kept for the apify-mcp-server-internal migration; remove once it no longer imports `addTool`.
+     */
+    addActor as addTool,
     getCategoryTools,
     toolCategoriesEnabledByDefault,
     type ActorStore,
