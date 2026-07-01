@@ -33,9 +33,9 @@ import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
+import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunSuccessResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
-import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../utils.js';
 import {
     abortRunOnSignal,
     buildStartRunResponse,

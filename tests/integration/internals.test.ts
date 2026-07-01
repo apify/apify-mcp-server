@@ -5,9 +5,9 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { ActorsMcpServer } from '../../src/index.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { addActor } from '../../src/tools/actors/add_actor.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
-import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { Input } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
 import { loadToolsFromInput } from '../../src/utils/tools_loader.js';

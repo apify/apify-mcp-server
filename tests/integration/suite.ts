@@ -13,11 +13,11 @@ import {
 } from '../../src/const.js';
 import { SKYFIRE_ENABLED_TOOLS } from '../../src/payments/const.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/actors/call_actor.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { SERVER_MODE, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
@@ -2205,6 +2205,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 // Dataset field paths surface in `storages.datasets.default.fields`.
                 const fields = sc?.storages?.datasets?.default?.fields ?? [];
                 expect(fields).toEqual(expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']));
+
+                // #911/#894: the actor emits `math.fibonacci: [..]`, which Apify reports index-expanded
+                // (`math/fibonacci/0`, `/1`, `/2`). The server must collapse those to a single
+                // `math.fibonacci` on the wire. `math.fibonacci` present proves collapse fired (not a
+                // flat-only no-op); no entry keeps an array index; no duplicates survive collapse.
+                expect(fields).toEqual(expect.arrayContaining(['math.fibonacci']));
+                expect(fields.some((f) => /\.\d+(\.|$)/.test(f))).toBe(false);
+                expect(new Set(fields).size).toBe(fields.length);
 
                 const outputResult = await client.callTool({
                     name: HELPER_TOOLS.DATASET_GET_ITEMS,

@@ -3,7 +3,7 @@ import type { Build } from 'apify-client';
 import type { ApifyClient } from '../apify_client.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
-import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
+import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
 import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { getActorMcpUrlCached } from './actor.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';

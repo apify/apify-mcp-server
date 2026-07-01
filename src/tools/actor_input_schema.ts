@@ -1,14 +1,9 @@
-import { createHash } from 'node:crypto';
-
 import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
-import log from '@apify/log';
-
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
-import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
-import type { ActorInfo, ActorInputSchema, SchemaProperties } from '../types.js';
+import type { ActorInputSchema, SchemaProperties } from '../types.js';
 import {
     addGlobsProperties,
     addKeyValueProperties,
@@ -17,58 +12,9 @@ import {
     addRequestListSourcesProperties,
     addResourcePickerProperties as addArrayResourcePickerProperties,
 } from '../utils/apify_properties.js';
+import { getToolSchemaID } from './actor_tool_naming.js';
 
 type ActorInputSchemaProperties = Record<string, SchemaProperties>;
-
-/*
- * Checks if the given ActorInfo represents an MCP server Actor.
- */
-export function isActorInfoMcpServer(actorInfo: ActorInfo): boolean {
-    return !!(actorInfo.webServerMcpPath && actorInfo.actor.actorStandby?.isEnabled);
-}
-
-/**
- * Whether this Actor must be excluded from tool surfaces and rejected on
- * `call-actor` when the session uses a third-party payment provider (x402, Skyfire).
- * List-time filtering in `getActorsAsTools` and the call-time guard in
- * `checkPaymentProviderStandbyConflict` must use this — not MCP URL presence alone.
- */
-export function isActorBlockedUnderPaymentProvider(actorInfo: ActorInfo): boolean {
-    return !!actorInfo.actor.actorStandby?.isEnabled;
-}
-
-export function actorNameToToolName(actorFullName: string): string {
-    const slashIndex = actorFullName.indexOf('/');
-    if (slashIndex === -1) {
-        log.warning(`Actor name "${actorFullName}" does not contain a slash — expected format "username/actor-name"`);
-    }
-
-    const username = slashIndex !== -1 ? actorFullName.slice(0, slashIndex) : '';
-    const actorName = slashIndex !== -1 ? actorFullName.slice(slashIndex + 1) : actorFullName;
-    const safeUsername = username.replace(/\./g, '-dot-');
-    const fullName = slashIndex !== -1 ? `${safeUsername}--${actorName}` : actorName;
-
-    if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
-        return fullName;
-    }
-
-    // Truncate and add hash for uniqueness
-    const hash = createHash('sha256').update(actorFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
-    return `${fullName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
-}
-
-/**
- * Converts a legacy tool name (apify-slash-rag-web-browser) to the current format (apify--rag-web-browser).
- * Returns null if the name doesn't match the legacy pattern.
- */
-export function legacyToolNameToNew(name: string): string | null {
-    if (!name.includes('-slash-')) return null;
-    return name.replace('-slash-', '--');
-}
-
-export function getToolSchemaID(actorName: string): string {
-    return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
-}
 
 // Real Apify Actor input schemas run up to ~140 KB post-transform; cap at 256 KB to bound AJV's
 // synchronous codegen so a pathological untrusted schema can't freeze the event loop. Only the

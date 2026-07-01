@@ -24,7 +24,7 @@ implementations, not by importing from here.
 
 - **Tool names: capped + hash-deduped.** Names are capped at `MAX_TOOL_NAME_LENGTH`;
   over-length or colliding names get a `TOOL_NAME_HASH_LENGTH` hash suffix so the
-  exposed set stays unique within the limit (the hashing is in `../tools/utils.ts`).
+  exposed set stays unique within the limit (the hashing is in `../tools/actor_tool_naming.ts`).
   Never widen the cap — downstream clients depend on it.
 - **Proxy server IDs are keyed by URL, not Actor ID.** `getMCPServerID(url)` is
   `sha256(url)` sliced to `SERVER_ID_LENGTH`. One Actor can expose both an SSE and a
