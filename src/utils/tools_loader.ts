@@ -10,6 +10,8 @@ import log from '@apify/log';
 import { defaults, HelperTools } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { addActor } from '../tools/actors/add_actor.js';
+import { getCodeDocs } from '../tools/actors/get_code_docs.js';
+import { runCode } from '../tools/actors/run_code.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
     CATEGORY_NAME_SET,
@@ -261,6 +263,14 @@ export function getToolsForServerMode(
         result.push(...actorTools);
     }
 
+    // Code Mode tools are a pair: get-code-docs teaches how to write the script that run-code runs.
+    // Selecting either alone is a mistake, so load both when the caller selected just one. Done before
+    // the auto-inject block below so a lone get-code-docs still pulls in run-code's run/storage helpers.
+    const selectedRunCode = result.some((entry) => entry.name === HelperTools.CODE_RUN);
+    const selectedCodeDocs = result.some((entry) => entry.name === HelperTools.CODE_DOCS);
+    if (selectedRunCode && !selectedCodeDocs) result.push(getCodeDocs);
+    if (selectedCodeDocs && !selectedRunCode) result.push(runCode);
+
     /**
      * Auto-inject run-status and storage tools when call-actor, actor tools, or add-actor are present.
      * Insert them right after call-actor (or appended at the end when call-actor is absent) so the
@@ -275,10 +285,13 @@ export function getToolsForServerMode(
     // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session
     // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
     const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
+    // run-code starts an Actor and writes its { stdout, stderr } to a dataset; its nextStep points
+    // at get-dataset-items, so it needs the same run/storage helpers injected.
+    const hasRunCode = result.some((entry) => entry.name === HelperTools.CODE_RUN);
 
     // Inject run-workflow helpers whenever any actor-running entrypoint is present; de-dup pass below drops repeats.
     const toolsToInject: ToolEntry[] = [];
-    if (hasCallActor || hasActorTools || hasAddActorTool || hasGetActorRun) {
+    if (hasCallActor || hasActorTools || hasAddActorTool || hasGetActorRun || hasRunCode) {
         toolsToInject.push(...AUTO_INJECTED_TOOLS);
     }
 
