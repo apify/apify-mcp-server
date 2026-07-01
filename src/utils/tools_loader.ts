@@ -23,7 +23,7 @@ import { getActorRun } from '../tools/runs/get_actor_run.js';
 import { getDatasetItems } from '../tools/storage/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/storage/get_key_value_store_record.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
-import { SERVER_MODES, ServerMode, TOOL_TYPE } from '../types.js';
+import { SERVER_MODES, SERVER_MODE, TOOL_TYPE } from '../types.js';
 
 /**
  * Tools auto-injected alongside any actor-running tool (call-actor / direct
@@ -90,7 +90,7 @@ function normalizeInput(input: Input): NormalizedInput {
 /**
  * Resolve the list of Actor names (`username/name`) to fetch from the input.
  *
- * **Mode-agnostic** — the result does NOT depend on `ServerMode`. An Actor tool
+ * **Mode-agnostic** — the result does NOT depend on `SERVER_MODE`. An Actor tool
  * is identified by name, and the same Actor entry is reused across modes; only
  * the *internal* tool variants around it differ by mode.
  *
@@ -181,7 +181,7 @@ export function toolNamesToInput(toolNames: string[]): Input {
 export function getToolsForServerMode(
     input: Input,
     actorTools: ToolEntry[],
-    mode: ServerMode = ServerMode.DEFAULT,
+    mode: SERVER_MODE = SERVER_MODE.DEFAULT,
 ): ToolEntry[] {
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
@@ -197,7 +197,7 @@ export function getToolsForServerMode(
         }
     }
     // Widgets are apps-only and not in any category; include it for direct selection
-    if (mode === ServerMode.APPS) {
+    if (mode === SERVER_MODE.APPS) {
         for (const widget of WIDGET_BY_BASE_TOOL.values()) {
             toolsByName.set(widget.name, widget);
         }
@@ -294,7 +294,7 @@ export function getToolsForServerMode(
     // Apps mode: append a widget tool for each base tool already in the result.
     // Runs after the get-actor-run auto-inject, so an auto-injected base still
     // brings its widget sibling.
-    if (mode === ServerMode.APPS) {
+    if (mode === SERVER_MODE.APPS) {
         for (const entry of [...result]) {
             const widget = WIDGET_BY_BASE_TOOL.get(entry.name as HelperToolName);
             // Push unconditionally; any duplicates are stripped by the de-dup pass below.
@@ -311,7 +311,7 @@ export function getToolsForServerMode(
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
-    mode: ServerMode = ServerMode.DEFAULT,
+    mode: SERVER_MODE = SERVER_MODE.DEFAULT,
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
     const actorTools = await getActors(input, apifyClient, { actorStore });

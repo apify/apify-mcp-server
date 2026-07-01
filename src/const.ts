@@ -26,7 +26,7 @@ export const DATASET_SIZE_HINT_BYTES = 50000;
 export const NARROW_OUTPUT_HINT = 'narrow with fields= or page with offset';
 
 // MCP Server
-/** When `false`, `resolveServerMode('auto', ...)` forces {@link ServerMode.DEFAULT} regardless of client capabilities. */
+/** When `false`, `resolveServerMode('auto', ...)` forces {@link SERVER_MODE.DEFAULT} regardless of client capabilities. */
 export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
 
 export const SERVER_NAME = 'apify-mcp-server';

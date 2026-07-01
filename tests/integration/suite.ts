@@ -18,7 +18,7 @@ import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/actors/cal
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
+import type { SERVER_MODE, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
 import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
@@ -30,7 +30,7 @@ const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 // Helper to find tool by name, resolving categories for the given mode on each call.
 // This ensures we always validate against the correct mode-specific tool definition
 // (e.g. outputSchema may diverge between modes in the future).
-function findToolByName(name: string, mode: ServerMode): ToolEntry | undefined {
+function findToolByName(name: string, mode: SERVER_MODE): ToolEntry | undefined {
     const resolved = getCategoryTools(mode);
     for (const tools of Object.values(resolved)) {
         const tool = tools.find((t) => t.name === name);
@@ -126,7 +126,7 @@ function expectReadmeInStructuredContent(result: unknown, expectedActorFullName?
     expect(r.structuredContent?.inputSchema).toBeDefined();
 }
 
-function validateStructuredOutputForTool(result: unknown, toolName: string, mode: ServerMode): void {
+function validateStructuredOutputForTool(result: unknown, toolName: string, mode: SERVER_MODE): void {
     validateStructuredOutput(result, findToolByName(toolName, mode)?.outputSchema, toolName);
 }
 

@@ -440,20 +440,20 @@ export type CallDiagnostics = Pick<
  * OpenAI-specific; `'openai'` is kept as a deprecated alias at CLI/env ingestion
  * (see {@link parseServerMode}) and is silently normalized to `'apps'`.
  */
-export const ServerMode = {
+export const SERVER_MODE = {
     DEFAULT: 'default',
     APPS: 'apps',
 } as const;
-export type ServerMode = (typeof ServerMode)[keyof typeof ServerMode];
+export type SERVER_MODE = (typeof SERVER_MODE)[keyof typeof SERVER_MODE];
 
 /** All valid server modes, for iteration in tests and caches. */
-export const SERVER_MODES: readonly ServerMode[] = Object.values(ServerMode);
+export const SERVER_MODES: readonly SERVER_MODE[] = Object.values(SERVER_MODE);
 
 /**
- * Server mode option — a concrete {@link ServerMode} or `'auto'` to resolve from
+ * Server mode option — a concrete {@link SERVER_MODE} or `'auto'` to resolve from
  * the client's `initialize` capabilities at connection time.
  */
-export type ServerModeOption = ServerMode | 'auto';
+export type ServerModeOption = SERVER_MODE | 'auto';
 
 /**
  * Parameters for executing a direct actor tool ({@link TOOL_TYPE.ACTOR}).
@@ -609,7 +609,7 @@ export type ActorsMcpServerOptions = {
      */
     token?: string;
     /**
-     * Server mode — controls tool variants and response formats. See {@link ServerMode}.
+     * Server mode — controls tool variants and response formats. See {@link SERVER_MODE}.
      * Pass `'auto'` (or omit) to resolve from the client's `initialize` capabilities;
      * pass `'default'` or `'apps'` to force a specific mode and skip auto-detect.
      * Defaults to `'auto'` when unset.

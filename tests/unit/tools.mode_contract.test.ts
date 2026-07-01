@@ -16,7 +16,7 @@ import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
 import { WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';
 import type { Input, ToolBase, ToolEntry } from '../../src/types.js';
-import { SERVER_MODES, ServerMode } from '../../src/types.js';
+import { SERVER_MODES, SERVER_MODE } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
 
@@ -211,12 +211,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 });
 
 describe('apps-mode widget pairing in getToolsForServerMode', () => {
-    function namesFor(input: Input, mode: ServerMode): string[] {
+    function namesFor(input: Input, mode: SERVER_MODE): string[] {
         return getToolsForServerMode(input, [], mode).map((t) => t.name);
     }
 
     it('tools: ["docs"] in apps mode includes no widget tools', () => {
-        const names = namesFor({ tools: ['docs'] }, ServerMode.APPS);
+        const names = namesFor({ tools: ['docs'] }, SERVER_MODE.APPS);
         expect(names).toContain(HELPER_TOOLS.DOCS_SEARCH);
         expect(names).toContain(HELPER_TOOLS.DOCS_FETCH);
         expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
@@ -226,7 +226,7 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
     });
 
     it('tools: ["search-actors"] in apps mode pairs only the search-actors widget', () => {
-        const names = namesFor({ tools: ['search-actors'] }, ServerMode.APPS);
+        const names = namesFor({ tools: ['search-actors'] }, SERVER_MODE.APPS);
         expect(names).toContain(HELPER_TOOLS.STORE_SEARCH);
         expect(names).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
@@ -234,7 +234,7 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
     });
 
     it('tools: ["call-actor"] in apps mode pairs call-actor-widget and the auto-injected get-actor-run-widget', () => {
-        const names = namesFor({ tools: ['call-actor'] }, ServerMode.APPS);
+        const names = namesFor({ tools: ['call-actor'] }, SERVER_MODE.APPS);
         expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
         expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
         expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
@@ -244,7 +244,7 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
     });
 
     it('tools: ["actors"] category in apps mode pairs all four actor widgets', () => {
-        const names = namesFor({ tools: ['actors'] }, ServerMode.APPS);
+        const names = namesFor({ tools: ['actors'] }, SERVER_MODE.APPS);
         expect(names).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
         expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
@@ -252,7 +252,7 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
     });
 
     it('default mode adds no widget tools regardless of selection', () => {
-        const names = namesFor({ tools: ['actors'] }, ServerMode.DEFAULT);
+        const names = namesFor({ tools: ['actors'] }, SERVER_MODE.DEFAULT);
         expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);

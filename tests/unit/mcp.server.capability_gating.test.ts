@@ -10,7 +10,7 @@ import { callActorApps } from '../../src/tools/actors/call_actor.js';
 import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
 import type { ServerModeOption } from '../../src/types.js';
-import { ServerMode } from '../../src/types.js';
+import { SERVER_MODE } from '../../src/types.js';
 
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
 
@@ -67,17 +67,17 @@ describe('ActorsMcpServer initialize handler', () => {
     };
 
     describe('mode resolution', () => {
-        const cases: { option: ServerModeOption; supportsUi: boolean; expectedMode: ServerMode }[] = [
-            { option: ServerMode.APPS, supportsUi: true, expectedMode: ServerMode.APPS },
-            { option: ServerMode.APPS, supportsUi: false, expectedMode: ServerMode.APPS },
-            { option: ServerMode.DEFAULT, supportsUi: true, expectedMode: ServerMode.DEFAULT },
-            { option: ServerMode.DEFAULT, supportsUi: false, expectedMode: ServerMode.DEFAULT },
+        const cases: { option: ServerModeOption; supportsUi: boolean; expectedMode: SERVER_MODE }[] = [
+            { option: SERVER_MODE.APPS, supportsUi: true, expectedMode: SERVER_MODE.APPS },
+            { option: SERVER_MODE.APPS, supportsUi: false, expectedMode: SERVER_MODE.APPS },
+            { option: SERVER_MODE.DEFAULT, supportsUi: true, expectedMode: SERVER_MODE.DEFAULT },
+            { option: SERVER_MODE.DEFAULT, supportsUi: false, expectedMode: SERVER_MODE.DEFAULT },
             {
                 option: 'auto',
                 supportsUi: true,
-                expectedMode: SERVER_MODE_AUTO_DETECTION_ENABLED ? ServerMode.APPS : ServerMode.DEFAULT,
+                expectedMode: SERVER_MODE_AUTO_DETECTION_ENABLED ? SERVER_MODE.APPS : SERVER_MODE.DEFAULT,
             },
-            { option: 'auto', supportsUi: false, expectedMode: ServerMode.DEFAULT },
+            { option: 'auto', supportsUi: false, expectedMode: SERVER_MODE.DEFAULT },
         ];
 
         for (const { option, supportsUi, expectedMode } of cases) {
@@ -113,20 +113,20 @@ describe('ActorsMcpServer initialize handler', () => {
 
     it('defaults to preliminary DEFAULT mode before initialize runs', () => {
         const server = track(makeServer('auto'));
-        expect(server.serverMode).toBe(ServerMode.DEFAULT);
+        expect(server.serverMode).toBe(SERVER_MODE.DEFAULT);
         expect(server.clientSupportsUi).toBe(false);
     });
 
     it('preliminary mode is APPS when option=apps, even before initialize', () => {
-        const server = track(makeServer(ServerMode.APPS));
-        expect(server.serverMode).toBe(ServerMode.APPS);
+        const server = track(makeServer(SERVER_MODE.APPS));
+        expect(server.serverMode).toBe(SERVER_MODE.APPS);
     });
 
     it('explicit option bypasses auto-detect — apps-capable client does not override default', async () => {
-        const server = track(makeServer(ServerMode.DEFAULT));
+        const server = track(makeServer(SERVER_MODE.DEFAULT));
         await dispatchInitialize(server, makeInitializeRequest(true));
 
-        expect(server.serverMode).toBe(ServerMode.DEFAULT);
+        expect(server.serverMode).toBe(SERVER_MODE.DEFAULT);
         expect(server.clientSupportsUi).toBe(true);
     });
 

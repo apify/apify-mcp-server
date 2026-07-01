@@ -5,7 +5,7 @@ import {
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../payments/const.js';
 import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
-import { ServerMode, TOOL_TYPE } from '../types.js';
+import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
 /**
@@ -65,7 +65,7 @@ export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>
 }
 
 type ToolPublicFieldOptions = {
-    mode?: ServerMode;
+    mode?: SERVER_MODE;
     filterWidgetMeta?: boolean;
 };
 
@@ -100,7 +100,7 @@ function fixZodInputSchemaRequired(inputSchema: ToolBase['inputSchema']): ToolBa
  */
 export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
     const { mode, filterWidgetMeta = false } = options;
-    const meta = filterWidgetMeta && mode !== ServerMode.APPS ? stripWidgetMeta(tool._meta) : tool._meta;
+    const meta = filterWidgetMeta && mode !== SERVER_MODE.APPS ? stripWidgetMeta(tool._meta) : tool._meta;
 
     return {
         name: tool.name,

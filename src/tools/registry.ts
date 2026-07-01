@@ -21,7 +21,7 @@
  */
 import { HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { ToolEntry } from '../types.js';
-import { ServerMode } from '../types.js';
+import { SERVER_MODE } from '../types.js';
 import { addActor } from './actors/add_actor.js';
 import { callActorApps, callActorDefault } from './actors/call_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
@@ -45,7 +45,7 @@ import { fetchActorDetailsWidget } from './widgets/fetch_actor_details_widget.js
 import { getActorRunWidget } from './widgets/get_actor_run_widget.js';
 import { searchActorsWidget } from './widgets/search_actors_widget.js';
 
-type ModeMap = Partial<Record<ServerMode, ToolEntry>>;
+type ModeMap = Partial<Record<SERVER_MODE, ToolEntry>>;
 
 /** A category tool entry: plain ToolEntry (mode-independent) or a mode map. */
 type CategoryToolEntry = ToolEntry | ModeMap;
@@ -59,7 +59,7 @@ function isModeMap(entry: CategoryToolEntry): entry is ModeMap {
  * Unified tool category definitions — single source of truth.
  *
  * Each entry is either a plain ToolEntry (mode-independent) or a mode map
- * with ServerMode keys mapping to their ToolEntry variant.
+ * with SERVER_MODE keys mapping to their ToolEntry variant.
  *
  * Use {@link getCategoryTools} to resolve entries into concrete ToolEntry arrays for a given mode.
  */
@@ -104,7 +104,7 @@ export type ToolCategoryMap = Record<(typeof CATEGORY_NAMES)[number], ToolEntry[
  * - Plain ToolEntry (has `name`) → always included, mode-independent
  * - ModeMap → look up `entry[mode]`; included only if the mode key exists
  */
-function resolveCategoryEntries(entries: readonly CategoryToolEntry[], mode: ServerMode): ToolEntry[] {
+function resolveCategoryEntries(entries: readonly CategoryToolEntry[], mode: SERVER_MODE): ToolEntry[] {
     const result: ToolEntry[] = [];
     for (const entry of entries) {
         if (isModeMap(entry)) {
@@ -126,9 +126,9 @@ function resolveCategoryEntries(entries: readonly CategoryToolEntry[], mode: Ser
  * (async execution, widget metadata), default mode gets standard implementations.
  * Apps-only tools are excluded in default mode.
  *
- * @param mode - Optional. Use `'default'` or `'apps'`. Defaults to `ServerMode.DEFAULT` when omitted.
+ * @param mode - Optional. Use `'default'` or `'apps'`. Defaults to `SERVER_MODE.DEFAULT` when omitted.
  */
-export function getCategoryTools(mode: ServerMode = ServerMode.DEFAULT): ToolCategoryMap {
+export function getCategoryTools(mode: SERVER_MODE = SERVER_MODE.DEFAULT): ToolCategoryMap {
     return Object.fromEntries(
         CATEGORY_NAMES.map((name) => [name, resolveCategoryEntries(toolCategories[name], mode)]),
     ) as ToolCategoryMap;

@@ -8,7 +8,7 @@
  */
 
 import { HELPER_TOOLS, RAG_WEB_BROWSER } from '../../const.js';
-import { ServerMode } from '../../types.js';
+import { SERVER_MODE } from '../../types.js';
 
 /**
  * Build server instructions for the given mode.
@@ -16,8 +16,8 @@ import { ServerMode } from '../../types.js';
  * Apps-only sections are omitted in default mode to prevent models from
  * attempting to call widget tools that are not registered.
  */
-export function getServerInstructions(mode: ServerMode = ServerMode.DEFAULT): string {
-    const isApps = mode === ServerMode.APPS;
+export function getServerInstructions(mode: SERVER_MODE = SERVER_MODE.DEFAULT): string {
+    const isApps = mode === SERVER_MODE.APPS;
 
     return `
 Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.

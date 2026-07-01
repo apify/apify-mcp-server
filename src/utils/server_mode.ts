@@ -1,5 +1,5 @@
 import { SERVER_MODE_AUTO_DETECTION_ENABLED } from '../const.js';
-import { ServerMode, type ServerModeOption } from '../types.js';
+import { SERVER_MODE, type ServerModeOption } from '../types.js';
 
 /**
  * Parse an untrusted raw mode string (from CLI flag, env var, or URL param) into a {@link ServerModeOption}.
@@ -15,19 +15,19 @@ import { ServerMode, type ServerModeOption } from '../types.js';
  */
 export function parseServerMode(rawMode: string | null | undefined): ServerModeOption {
     if (!rawMode) return 'auto';
-    if (rawMode === 'true' || rawMode === 'on' || rawMode === ServerMode.APPS || rawMode === 'openai')
-        return ServerMode.APPS;
-    if (rawMode === 'false' || rawMode === 'off' || rawMode === ServerMode.DEFAULT) return ServerMode.DEFAULT;
+    if (rawMode === 'true' || rawMode === 'on' || rawMode === SERVER_MODE.APPS || rawMode === 'openai')
+        return SERVER_MODE.APPS;
+    if (rawMode === 'false' || rawMode === 'off' || rawMode === SERVER_MODE.DEFAULT) return SERVER_MODE.DEFAULT;
     return 'auto';
 }
 
 /**
- * Resolve a {@link ServerModeOption} to a concrete {@link ServerMode}.
- * Concrete modes are returned as-is. `'auto'` resolves to {@link ServerMode.APPS}
- * when the client advertises MCP Apps UI support, {@link ServerMode.DEFAULT} otherwise.
+ * Resolve a {@link ServerModeOption} to a concrete {@link SERVER_MODE}.
+ * Concrete modes are returned as-is. `'auto'` resolves to {@link SERVER_MODE.APPS}
+ * when the client advertises MCP Apps UI support, {@link SERVER_MODE.DEFAULT} otherwise.
  */
-export function resolveServerMode(option: ServerModeOption, clientSupportsUi: boolean): ServerMode {
+export function resolveServerMode(option: ServerModeOption, clientSupportsUi: boolean): SERVER_MODE {
     if (option !== 'auto') return option;
-    if (!SERVER_MODE_AUTO_DETECTION_ENABLED) return ServerMode.DEFAULT;
-    return clientSupportsUi ? ServerMode.APPS : ServerMode.DEFAULT;
+    if (!SERVER_MODE_AUTO_DETECTION_ENABLED) return SERVER_MODE.DEFAULT;
+    return clientSupportsUi ? SERVER_MODE.APPS : SERVER_MODE.DEFAULT;
 }

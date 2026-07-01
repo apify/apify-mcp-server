@@ -80,7 +80,7 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { ServerMode, TOOL_TYPE } from '../types.js';
+import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { isPermissionApprovalError, remoteMcpFailureDetail } from '../utils/apify_errors.js';
 import { getHttpStatusCode, isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import {
@@ -183,7 +183,7 @@ export class ActorsMcpServer {
      * Finalized inside the `initialize` request handler (see constructor) once the
      * client's capabilities are known. Effectively set-once per connection.
      */
-    public serverMode: ServerMode;
+    public serverMode: SERVER_MODE;
     /**
      * Raw option captured from `options.serverMode` (or the legacy `uiMode`). Re-resolved
      * inside the initialize handler when set to `'auto'`; explicit `'default'`/`'apps'`
@@ -1856,7 +1856,7 @@ export class ActorsMcpServer {
      * Resolves widgets and determines which ones are ready to be served.
      */
     private async resolveWidgets(): Promise<void> {
-        if (this.serverMode !== ServerMode.APPS) {
+        if (this.serverMode !== SERVER_MODE.APPS) {
             return;
         }
 
