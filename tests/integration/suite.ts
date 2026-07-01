@@ -2161,6 +2161,29 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(items![0]['math.factorial.first']).toBe(1);
                     await client.close();
                 });
+
+                it('reads dataset items via resources/read', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.readResource({
+                        uri: `https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`,
+                    });
+                    const contents = result.contents[0] as { mimeType?: string; text?: string };
+                    expect(contents.mimeType).toBe('application/json');
+                    // The generic proxy returns the raw API body — a bare JSON array of items.
+                    const items = JSON.parse(contents.text as string) as unknown[];
+                    expect(Array.isArray(items)).toBe(true);
+                    await client.close();
+                });
+
+                it('reads a KV record via resources/read', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.readResource({
+                        uri: `https://api.apify.com/v2/key-value-stores/${defaultKvId}/records/INPUT`,
+                    });
+                    const contents = result.contents[0] as { text?: string };
+                    expect(contents.text).toContain('firstNumber');
+                    await client.close();
+                });
             });
 
             it('rejects get-key-value-store-record when required keyValueStoreId is missing', async () => {

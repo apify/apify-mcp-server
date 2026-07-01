@@ -20,6 +20,11 @@ const buildAvailableWidget = (uri: string, exists: boolean): AvailableWidget => 
     exists,
 });
 
+// `contents[0]` is a text|blob union; narrow it in tests that read the text/widget shape.
+function firstContent(result: { contents: unknown[] }): { mimeType?: string; text?: string; html?: string } {
+    return result.contents[0] as { mimeType?: string; text?: string; html?: string };
+}
+
 describe('createResourceService()', () => {
     describe('listResources()', () => {
         it('lists the Skyfire readme only when enabled', async () => {
@@ -80,8 +85,8 @@ describe('createResourceService()', () => {
 
             const result = await service.readResource('file://readme.md');
 
-            expect(result.contents[0].text).toBe(SKYFIRE_README_CONTENT);
-            expect(result.contents[0].mimeType).toBe('text/markdown');
+            expect(firstContent(result).text).toBe(SKYFIRE_README_CONTENT);
+            expect(firstContent(result).mimeType).toBe('text/markdown');
         });
 
         it('returns a plain-text fallback for an unknown URI', async () => {
@@ -92,8 +97,8 @@ describe('createResourceService()', () => {
 
             const result = await service.readResource('file://missing.md');
 
-            expect(result.contents[0].text).toBe('Resource file://missing.md not found');
-            expect(result.contents[0].mimeType).toBe('text/plain');
+            expect(firstContent(result).text).toBe('Resource file://missing.md not found');
+            expect(firstContent(result).mimeType).toBe('text/plain');
         });
 
         it('returns widget HTML when the widget exists', async () => {
@@ -111,9 +116,9 @@ describe('createResourceService()', () => {
 
             const result = await service.readResource(WIDGET_URIS.SEARCH_ACTORS);
 
-            expect(result.contents[0].mimeType).toBe('text/html;profile=mcp-app');
-            expect(result.contents[0].text).toContain('console.log("widget");');
-            expect(result.contents[0].html).toContain('<script type="module">console.log("widget");</script>');
+            expect(firstContent(result).mimeType).toBe('text/html;profile=mcp-app');
+            expect(firstContent(result).text).toContain('console.log("widget");');
+            expect(firstContent(result).html).toContain('<script type="module">console.log("widget");</script>');
         });
 
         it('returns a plain-text fallback for a widget URI not in the registry', async () => {
@@ -124,8 +129,8 @@ describe('createResourceService()', () => {
 
             const result = await service.readResource('ui://widget/unknown.html');
 
-            expect(result.contents[0].text).toContain('Not found in registry.');
-            expect(result.contents[0].mimeType).toBe('text/plain');
+            expect(firstContent(result).text).toContain('Not found in registry.');
+            expect(firstContent(result).mimeType).toBe('text/plain');
         });
 
         it('returns a plain-text fallback when the widget file is missing on disk', async () => {
@@ -139,14 +144,14 @@ describe('createResourceService()', () => {
 
             const result = await service.readResource(WIDGET_URIS.SEARCH_ACTORS);
 
-            expect(result.contents[0].text).toContain('File not found at');
-            expect(result.contents[0].text).toContain(WIDGET_REGISTRY[WIDGET_URIS.SEARCH_ACTORS].jsFilename);
-            expect(result.contents[0].mimeType).toBe('text/plain');
+            expect(firstContent(result).text).toContain('File not found at');
+            expect(firstContent(result).text).toContain(WIDGET_REGISTRY[WIDGET_URIS.SEARCH_ACTORS].jsFilename);
+            expect(firstContent(result).mimeType).toBe('text/plain');
         });
     });
 
     describe('listResourceTemplates()', () => {
-        it('returns an empty list', async () => {
+        it('returns no templates (the read proxy is advertised via server instructions)', async () => {
             const service = createResourceService({
                 getMode: () => 'default',
                 getAvailableWidgets: () => new Map(),
@@ -154,7 +159,7 @@ describe('createResourceService()', () => {
 
             const result = await service.listResourceTemplates();
 
-            expect(result).toEqual({ resourceTemplates: [] });
+            expect(result.resourceTemplates).toEqual([]);
         });
     });
 });
