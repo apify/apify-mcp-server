@@ -85,9 +85,9 @@ function prepareAlgoliaRequest(
     }
 
     // Return a bounded, match-centered snippet of `content` rather than the full indexed attribute
-    // (API-reference records inline the whole ~34.5k-char OpenAPI schema). Highlight markup is
-    // injected around matches with a strippable sentinel; skip full-content highlighting and the
-    // full-content attribute to keep the response small.
+    // (see DOCS_SNIPPET_MAX_WORDS for why). Highlight markup is injected around matches with a
+    // strippable sentinel; skip full-content highlighting and the full-content attribute to keep
+    // the response small.
     searchRequest.attributesToSnippet = [`content:${DOCS_SNIPPET_MAX_WORDS}`];
     searchRequest.snippetEllipsisText = '…';
     searchRequest.highlightPreTag = DOCS_SNIPPET_HIGHLIGHT_TAG;
