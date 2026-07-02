@@ -1,4 +1,4 @@
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
@@ -109,7 +109,7 @@ export function buildDatasetItemsSummaryNextStep(params: {
     if (offset + itemCount < totalItemCount) {
         return {
             summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`,
-            nextStep: `Call ${HelperTools.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`,
+            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`,
         };
     }
     const summary =
@@ -118,8 +118,8 @@ export function buildDatasetItemsSummaryNextStep(params: {
             : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
     return {
         summary,
-        nextStep: suggestTool(HelperTools.DATASET_GET, loadedToolNames)
-            ? `Use ${HelperTools.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`
+        nextStep: suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)
+            ? `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`
             : `No more pages. Inspect the returned items directly.`,
     };
 }
@@ -141,14 +141,14 @@ export function buildKvsKeysSummaryNextStep(params: {
     if (isTruncated && nextExclusiveStartKey) {
         return {
             summary,
-            nextStep: `Call ${HelperTools.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=${nextExclusiveStartKey} to fetch the next page.`,
+            nextStep: `Call ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=${nextExclusiveStartKey} to fetch the next page.`,
         };
     }
     return {
         summary,
         nextStep: firstKey
-            ? `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${keyValueStoreId} and recordKey=${firstKey} to read a value.`
-            : `Use ${HelperTools.KEY_VALUE_STORE_GET} with keyValueStoreId=${keyValueStoreId} to inspect the store.`,
+            ? `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${keyValueStoreId} and recordKey=${firstKey} to read a value.`
+            : `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with keyValueStoreId=${keyValueStoreId} to inspect the store.`,
     };
 }
 

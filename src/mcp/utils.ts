@@ -7,7 +7,7 @@ import log from '@apify/log';
 
 import { processInput } from '../input.js';
 import type { ActorStore, Input } from '../types.js';
-import { ServerMode } from '../types.js';
+import { SERVER_MODE } from '../types.js';
 import { loadToolsFromInput } from '../utils/tools_loader.js';
 
 /**
@@ -21,7 +21,7 @@ import { loadToolsFromInput } from '../utils/tools_loader.js';
 export async function processParamsGetTools(
     url: string,
     apifyClient: ApifyClient,
-    mode: ServerMode = ServerMode.DEFAULT,
+    mode: SERVER_MODE = SERVER_MODE.DEFAULT,
     actorStore?: ActorStore,
 ) {
     const input = parseInputParamsFromUrl(url);

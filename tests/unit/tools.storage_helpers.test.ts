@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import {
     buildDatasetItemsSummaryNextStep,
     buildStorageNotFound,
@@ -27,9 +27,9 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             itemCount: 5,
             totalItemCount: 5,
             offset: 0,
-            loadedToolNames: [HelperTools.DATASET_GET],
+            loadedToolNames: [HELPER_TOOLS.DATASET_GET],
         });
-        expect(t.nextStep).toContain(HelperTools.DATASET_GET);
+        expect(t.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         expect(t.nextStep).toContain('datasetId=ds-1');
     });
 
@@ -41,7 +41,7 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             offset: 0,
             loadedToolNames: [],
         });
-        expect(t.nextStep).not.toContain(HelperTools.DATASET_GET);
+        expect(t.nextStep).not.toContain(HELPER_TOOLS.DATASET_GET);
         expect(t.nextStep).toContain('No more pages');
     });
 
@@ -51,7 +51,7 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             itemCount: 20,
             totalItemCount: 100,
             offset: 0,
-            loadedToolNames: [HelperTools.DATASET_GET],
+            loadedToolNames: [HELPER_TOOLS.DATASET_GET],
         });
         const unloaded = buildDatasetItemsSummaryNextStep({
             datasetId: 'ds-1',
@@ -61,7 +61,7 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             loadedToolNames: [],
         });
         expect(loaded.nextStep).toBe(unloaded.nextStep);
-        expect(loaded.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
+        expect(loaded.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(loaded.nextStep).toContain('offset=20');
     });
 });

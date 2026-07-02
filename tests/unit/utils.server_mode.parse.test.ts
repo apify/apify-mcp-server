@@ -1,22 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { ServerMode } from '../../src/types.js';
+import { SERVER_MODE } from '../../src/types.js';
 import { parseServerMode } from '../../src/utils/server_mode.js';
 
 describe('parseServerMode', () => {
     it.each([
-        ['true', ServerMode.APPS],
-        ['on', ServerMode.APPS],
-        [ServerMode.APPS, ServerMode.APPS],
-        ['openai', ServerMode.APPS],
+        ['true', SERVER_MODE.APPS],
+        ['on', SERVER_MODE.APPS],
+        [SERVER_MODE.APPS, SERVER_MODE.APPS],
+        ['openai', SERVER_MODE.APPS],
     ])('maps %s → apps', (input, expected) => {
         expect(parseServerMode(input)).toBe(expected);
     });
 
     it.each([
-        ['false', ServerMode.DEFAULT],
-        ['off', ServerMode.DEFAULT],
-        [ServerMode.DEFAULT, ServerMode.DEFAULT],
+        ['false', SERVER_MODE.DEFAULT],
+        ['off', SERVER_MODE.DEFAULT],
+        [SERVER_MODE.DEFAULT, SERVER_MODE.DEFAULT],
     ])('maps %s → default', (input, expected) => {
         expect(parseServerMode(input)).toBe(expected);
     });

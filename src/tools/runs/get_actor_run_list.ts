@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { ApifyClient } from '../../apify_client.js';
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -35,7 +35,7 @@ const getUserRunsListArgs = z.object({
  */
 export const getActorRunList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_RUN_LIST_GET,
+    name: HELPER_TOOLS.ACTOR_RUN_LIST_GET,
     title: 'Get user runs list',
     description: `List Actor runs for the authenticated user with optional filtering and sorting.
 The results will include run details (including datasetId and keyValueStoreId) and can be filtered by status.

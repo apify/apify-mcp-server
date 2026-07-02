@@ -1,11 +1,11 @@
-import { type HelperTools } from '../const.js';
+import { type HelperToolName } from '../const.js';
 import {
     SKYFIRE_ENABLED_TOOLS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../payments/const.js';
 import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
-import { ServerMode, TOOL_TYPE } from '../types.js';
+import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
 /**
@@ -65,7 +65,7 @@ export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>
 }
 
 type ToolPublicFieldOptions = {
-    mode?: ServerMode;
+    mode?: SERVER_MODE;
     filterWidgetMeta?: boolean;
 };
 
@@ -100,7 +100,7 @@ function fixZodInputSchemaRequired(inputSchema: ToolBase['inputSchema']): ToolBa
  */
 export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
     const { mode, filterWidgetMeta = false } = options;
-    const meta = filterWidgetMeta && mode !== ServerMode.APPS ? stripWidgetMeta(tool._meta) : tool._meta;
+    const meta = filterWidgetMeta && mode !== SERVER_MODE.APPS ? stripWidgetMeta(tool._meta) : tool._meta;
 
     return {
         name: tool.name,
@@ -145,7 +145,7 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
 function isSkyfireEligible(tool: ToolEntry): boolean {
     return (
         tool.type === TOOL_TYPE.ACTOR ||
-        (tool.type === TOOL_TYPE.INTERNAL && SKYFIRE_ENABLED_TOOLS.has(tool.name as HelperTools))
+        (tool.type === TOOL_TYPE.INTERNAL && SKYFIRE_ENABLED_TOOLS.has(tool.name as HelperToolName))
     );
 }
 

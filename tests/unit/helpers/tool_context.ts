@@ -3,7 +3,7 @@ import { decode as decodeToon } from '@toon-format/toon';
 import Ajv from 'ajv';
 import { expect } from 'vitest';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
 import { FENCES } from '../../../src/utils/encode_text.js';
 import type { CachedUserInfo } from '../../../src/utils/userid_cache.js';
@@ -55,7 +55,7 @@ export function stubToolCallContext(
         apifyClient: client,
         extra: {},
         mcpServer: {},
-        apifyMcpServer: { options: { paymentProvider: undefined }, listToolNames: () => Object.values(HelperTools) },
+        apifyMcpServer: { options: { paymentProvider: undefined }, listToolNames: () => Object.values(HELPER_TOOLS) },
     } as unknown as InternalToolArgs;
 }
 

@@ -11,7 +11,7 @@ import {
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
-    HelperTools,
+    HELPER_TOOLS,
     TOOL_STATUS,
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
@@ -60,7 +60,7 @@ export const CALL_ACTOR_MCP_SERVER_SECTION = `For MCP server Actors:
 /** Shared "two ways to run" + USAGE section — identical in both modes. */
 export const CALL_ACTOR_USAGE_SECTION = `There are two ways to run Actors:
 1. Dedicated Actor tools (e.g., ${RAG_WEB_BROWSER_TOOL}): These are pre-configured tools, offering a simpler and more direct experience.
-2. Generic call-actor tool (${HelperTools.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
+2. Generic call-actor tool (${HELPER_TOOLS.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
 
 USAGE:
 - Always use dedicated tools when available (e.g., ${RAG_WEB_BROWSER_TOOL})
@@ -75,13 +75,13 @@ type CallActorErrorResponseParams = {
     error: unknown;
     actorId?: string;
     mcpSessionId?: string;
-    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
+    actorGetDetailsTool: typeof HELPER_TOOLS.ACTOR_GET_DETAILS;
 };
 
 const WIDGET_ADDENDUM = dedent`
     WIDGET ALTERNATIVE (apps mode):
-    - If the user explicitly asks to see live progress, call ${HelperTools.ACTOR_CALL_WIDGET} instead — it renders an interactive UI that tracks the run.
-    - For silent name resolution before this call, use ${HelperTools.STORE_SEARCH} (not ${HelperTools.STORE_SEARCH_WIDGET}, which renders UI).
+    - If the user explicitly asks to see live progress, call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead — it renders an interactive UI that tracks the run.
+    - For silent name resolution before this call, use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}, which renders UI).
 `;
 
 function buildCallActorDescriptionSections(includeWidget: boolean): string {
@@ -89,16 +89,16 @@ function buildCallActorDescriptionSections(includeWidget: boolean): string {
         'Call any Actor from the Apify Store.',
         dedent`
             WORKFLOW:
-            1. Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema
+            1. Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema
             2. Call this tool with the actor name and proper input based on the schema
 
-            If the actor name is not in "username/name" format and ${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
+            If the actor name is not in "username/name" format and ${HELPER_TOOLS.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
         `,
         CALL_ACTOR_MCP_SERVER_SECTION,
         dedent`
             IMPORTANT:
             - Waits up to waitSecs (default 30s) for completion; returns run status, storage IDs, and field metadata
-            - Use ${HelperTools.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
+            - Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
             - Use dedicated Actor tools when available for better experience
         `,
         CALL_ACTOR_USAGE_SECTION,
@@ -202,7 +202,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
             `Failed to call Actor '${actorName}': ${errMsg}`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
             // "if available" — search-actors may not be loaded in apps-mode partial tool selections.
-            `If ${HelperTools.STORE_SEARCH} is available in this session, you can use it to search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
+            `If ${HELPER_TOOLS.STORE_SEARCH} is available in this session, you can use it to search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
         ],
         isError: true,
         telemetry,
@@ -455,7 +455,7 @@ export async function resolveAndValidateActor(params: {
                     dedent`
                     Actor '${actorName}' was not found.
                     Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
-                    You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
+                    You can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.
                 `,
                 ],
                 isError: true,
@@ -608,7 +608,7 @@ export async function callActorPreExecute(
  * `taskMode` is honored — when true, `waitSecs` is ignored and the SDK waits until terminal.
  */
 export async function executeCallActor(toolArgs: InternalToolArgs): Promise<object> {
-    const preResult = await callActorPreExecute(toolArgs, { route: HelperTools.ACTOR_CALL });
+    const preResult = await callActorPreExecute(toolArgs, { route: HELPER_TOOLS.ACTOR_CALL });
     if ('earlyResponse' in preResult) {
         return preResult.earlyResponse;
     }
@@ -682,7 +682,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             error,
             actorId: resolvedActorId,
             mcpSessionId: toolArgs.mcpSessionId,
-            actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+            actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
         });
     }
 }
@@ -694,7 +694,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
 function createCallActorTool(description: string): ToolEntry {
     return Object.freeze({
         type: TOOL_TYPE.INTERNAL,
-        name: HelperTools.ACTOR_CALL,
+        name: HELPER_TOOLS.ACTOR_CALL,
         title: 'Call Actor',
         description,
         inputSchema: callActorInputSchema,

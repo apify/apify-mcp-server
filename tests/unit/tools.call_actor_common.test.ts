@@ -2,7 +2,12 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
-import { APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
+import {
+    APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    TOOL_STATUS,
+} from '../../src/const.js';
 import {
     buildCallActorAppsDescription,
     buildCallActorDescription,
@@ -16,14 +21,14 @@ describe('call_actor_common', () => {
         it('builds the description with public helper tools and waitSecs guidance', () => {
             const description = buildCallActorDescription();
 
-            expect(description).toContain(`Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema`);
+            expect(description).toContain(`Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema`);
             expect(description).toContain(
-                `${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`,
+                `${HELPER_TOOLS.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`,
             );
             expect(description).toContain('waitSecs');
-            expect(description).toContain(HelperTools.DATASET_GET_ITEMS);
+            expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
-            expect(description).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
+            expect(description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
         });
     });
 
@@ -31,10 +36,10 @@ describe('call_actor_common', () => {
         it('appends widget guidance to the shared description', () => {
             const description = buildCallActorAppsDescription();
 
-            expect(description).toContain(HelperTools.ACTOR_CALL_WIDGET);
-            expect(description).toContain(HelperTools.STORE_SEARCH_WIDGET);
+            expect(description).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(description).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
             expect(description).toContain('waitSecs');
-            expect(description).toContain(HelperTools.DATASET_GET_ITEMS);
+            expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         });
     });
 
@@ -47,13 +52,13 @@ describe('call_actor_common', () => {
                 error,
                 actorId: 'actor-123',
                 mcpSessionId: 'session-123',
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
             });
 
             expect(response.isError).toBe(true);
             const allText = response.content.map((c) => c.text).join('\n');
-            expect(allText).toContain(`If ${HelperTools.STORE_SEARCH} is available in this session`);
-            expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
+            expect(allText).toContain(`If ${HELPER_TOOLS.STORE_SEARCH} is available in this session`);
+            expect(allText).toContain(`using: ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
@@ -86,7 +91,7 @@ describe('call_actor_common', () => {
                 actorName: 'apify/some-actor',
                 error,
                 actorId: 'actor-456',
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
             });
 
             expect(response.isError).toBe(true);
@@ -107,12 +112,12 @@ describe('call_actor_common', () => {
             const response = buildCallActorErrorResponse({
                 actorName: 'apify/rag-web-browser',
                 error: new Error('boom'),
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
             });
 
             const allText = response.content.map((c) => c.text).join('\n');
-            expect(allText).toContain(`If ${HelperTools.STORE_SEARCH} is available in this session`);
-            expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
+            expect(allText).toContain(`If ${HELPER_TOOLS.STORE_SEARCH} is available in this session`);
+            expect(allText).toContain(`using: ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
                     toolStatus: TOOL_STATUS.FAILED,
@@ -141,7 +146,7 @@ describe('call_actor_common', () => {
                 actorName: 'compass/crawler-google-places',
                 error,
                 actorId: 'actor-789',
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
             });
 
             expect(response.isError).toBe(true);
@@ -150,7 +155,7 @@ describe('call_actor_common', () => {
             expect(allText).toContain('Account memory quota exceeded');
             expect(allText).toContain('callOptions.memory');
             // Regression: must not nudge the LLM toward aborting unrelated runs to free capacity.
-            expect(allText).not.toContain(HelperTools.ACTOR_RUNS_ABORT);
+            expect(allText).not.toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
             expect(allText).not.toContain('verify the Actor name');
         });
 
@@ -173,7 +178,7 @@ describe('call_actor_common', () => {
                 actorName: 'apify/instagram-scraper',
                 error,
                 actorId: 'actor-999',
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
             });
 
             expect(response.isError).toBe(true);

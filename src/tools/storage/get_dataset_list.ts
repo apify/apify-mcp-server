@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -35,7 +35,7 @@ const getUserDatasetsListArgs = z.object({
  */
 export const getDatasetList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.DATASET_LIST_GET,
+    name: HELPER_TOOLS.DATASET_LIST_GET,
     title: 'Get user datasets list',
     description: dedent`
         List datasets (collections of Actor run data) for the authenticated user.
@@ -75,8 +75,8 @@ export const getDatasetList: ToolEntry = Object.freeze({
             total: datasets.total,
             offset: datasets.offset,
             noun: 'datasets',
-            listToolName: HelperTools.DATASET_LIST_GET,
-            inspectHint: `Use ${HelperTools.DATASET_GET} with a datasetId from the list to inspect a dataset.`,
+            listToolName: HELPER_TOOLS.DATASET_LIST_GET,
+            inspectHint: `Use ${HELPER_TOOLS.DATASET_GET} with a datasetId from the list to inspect a dataset.`,
         });
         return buildStorageResponse({
             structuredContent: datasets as unknown as Record<string, unknown>,

@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
 import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import {
@@ -123,7 +123,7 @@ EXAMPLES:
  */
 export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_GET_DETAILS,
+    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
     title: 'Fetch Actor details',
     description: FETCH_ACTOR_DETAILS_DESCRIPTION,
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
@@ -147,7 +147,7 @@ export function buildActorNotFoundResponse(actorName: string): ReturnType<typeof
             dedent`
             Actor information for '${actorName}' was not found.
             Please verify Actor ID or name format and ensure that the Actor exists.
-            You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
+            You can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.
         `,
         ],
         isError: true,
@@ -242,7 +242,7 @@ export async function buildFetchActorDetailsResult(
 ): Promise<ReturnType<typeof buildMCPResponse>> {
     const { args, apifyToken, apifyClient, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HelperTools.ACTOR_GET_DETAILS });
+    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
     // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only

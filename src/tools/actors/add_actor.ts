@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { ApifyClient } from '../../apify_client.js';
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -15,12 +15,12 @@ export const addToolArgsSchema = z.object({
 });
 export const addActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_ADD,
+    name: HELPER_TOOLS.ACTOR_ADD,
     title: 'Add tool',
     description: `Add an Actor or MCP server to the Apify MCP Server as an available tool.
 This does not execute the Actor; it only registers it so it can be called later.
 
-You can first discover Actors using the ${HelperTools.STORE_SEARCH} tool, then add the selected Actor as a tool.
+You can first discover Actors using the ${HELPER_TOOLS.STORE_SEARCH} tool, then add the selected Actor as a tool.
 
 USAGE:
 - Use when a user has chosen an Actor to work with and you need to make it available as a callable tool.

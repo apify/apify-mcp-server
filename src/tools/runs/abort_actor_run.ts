@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -21,7 +21,7 @@ const abortRunArgs = z.object({
  */
 export const abortActorRun: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_RUNS_ABORT,
+    name: HELPER_TOOLS.ACTOR_RUNS_ABORT,
     title: 'Abort Actor run',
     description: `Abort an Actor run that is currently starting or running.
 For runs with status FINISHED, FAILED, ABORTING, or TIMED-OUT, this call has no effect.

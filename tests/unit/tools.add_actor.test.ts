@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { addActor } from '../../src/tools/actors/add_actor.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type { TextToolResult } from './helpers/tool_context.js';
@@ -44,7 +44,7 @@ function buildContext(
 
 describe('add-actor tool', () => {
     it('has the expected tool name', () => {
-        expect(addActor.name).toBe(HelperTools.ACTOR_ADD);
+        expect(addActor.name).toBe(HELPER_TOOLS.ACTOR_ADD);
     });
 
     it('sends list_changed and nudges the client to refresh via tools/list (#851)', async () => {

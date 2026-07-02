@@ -27,7 +27,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 - **Validate inputs with Zod**; no ad-hoc shape checks. AJV + Zod already validate
   before a tool runs — don't re-check the same constraint inside the tool body.
-- **Reference tool names via the `HelperTools` enum**, never hardcoded strings
+- **Reference tool names via the `HELPER_TOOLS` `as const` object**, never hardcoded strings
   (exception: integration tests).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.
 

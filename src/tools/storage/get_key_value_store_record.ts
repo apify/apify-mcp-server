@@ -2,7 +2,7 @@ import type { AudioContent, EmbeddedResource, ImageContent, ResourceLink } from 
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, KV_RECORD_MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS, KV_RECORD_MAX_INLINE_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -26,7 +26,7 @@ const getKeyValueStoreRecordArgs = z.object({
  */
 export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
+    name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
     title: 'Get key-value store record',
     description: dedent`
         Get a value stored in a key-value store under a specific key.

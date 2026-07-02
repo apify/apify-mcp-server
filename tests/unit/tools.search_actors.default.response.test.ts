@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { APIFY_STORE_URL, HelperTools, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
+import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
 import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
@@ -82,7 +82,7 @@ describe('search-actors without widget (searchActors)', () => {
                 simplifyPricingForUserTier: true,
             }),
         );
-        expect(structuredContent.instructions).toContain(HelperTools.ACTOR_GET_DETAILS);
+        expect(structuredContent.instructions).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
 
         expect(content).toHaveLength(1);
         expect((result as { _meta?: unknown })._meta).toBeUndefined();
@@ -92,7 +92,7 @@ describe('search-actors without widget (searchActors)', () => {
         expect(text).toContain(SEARCH_KEYWORDS);
         expect(text).toContain('Number of Actors found:** 1');
         expect(text).toContain('# Actors:');
-        expect(text).toContain(HelperTools.ACTOR_GET_DETAILS);
+        expect(text).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         expect(text).toContain(`## [${MOCK_STORE_ACTOR.title}](${APIFY_STORE_URL}/apify/web-scraper)`);
         expect(text).toContain('`apify/web-scraper`');
         expect(text).not.toContain('do NOT print or summarize');

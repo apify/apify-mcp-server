@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { ALLOWED_DOC_DOMAINS, FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { ALLOWED_DOC_DOMAINS, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
 import { fetchApifyDocsCache } from '../../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
@@ -54,15 +54,15 @@ export function isAllowedDocsUrl(url: string): boolean {
 function buildFetchErrorMessage(url: string, detail: string): string {
     return `Failed to fetch the documentation page at "${url}". ${detail} \
 Please verify the URL is correct and accessible. \
-You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`;
+You can search for available documentation pages using the ${HELPER_TOOLS.DOCS_SEARCH} tool.`;
 }
 
 export const fetchApifyDocs: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.DOCS_FETCH,
+    name: HELPER_TOOLS.DOCS_FETCH,
     title: 'Fetch Apify docs',
     description: `Fetch the full content of an Apify or Crawlee documentation page by its URL.
-Use this after finding a relevant page with the ${HelperTools.DOCS_SEARCH} tool.
+Use this after finding a relevant page with the ${HELPER_TOOLS.DOCS_SEARCH} tool.
 
 USAGE:
 - Use when you need the complete content of a specific docs page for detailed answers.
@@ -98,7 +98,7 @@ USAGE EXAMPLES:
 Only documentation URLs from Apify and Crawlee are allowed \
 (starting with ${ALLOWED_DOC_DOMAINS.map((d) => `"${d}"`).join(' or ')}). \
 Please provide a valid documentation URL. \
-You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`,
+You can find documentation URLs using the ${HELPER_TOOLS.DOCS_SEARCH} tool.`,
                 ],
                 isError: true,
                 telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },

@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -25,7 +25,7 @@ const getKeyValueStoreKeysArgs = z.object({
  */
 export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
+    name: HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
     title: 'Get key-value store keys',
     description: dedent`
         List keys in a key-value store with optional pagination.

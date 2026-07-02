@@ -7,7 +7,7 @@ import type { ApifyClient } from 'apify-client';
 
 import log from '@apify/log';
 
-import { defaults, HelperTools } from '../const.js';
+import { defaults, HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { addActor } from '../tools/actors/add_actor.js';
 import { getActorsAsTools } from '../tools/index.js';
@@ -23,7 +23,7 @@ import { getActorRun } from '../tools/runs/get_actor_run.js';
 import { getDatasetItems } from '../tools/storage/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/storage/get_key_value_store_record.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
-import { SERVER_MODES, ServerMode, TOOL_TYPE } from '../types.js';
+import { SERVER_MODES, SERVER_MODE, TOOL_TYPE } from '../types.js';
 
 /**
  * Tools auto-injected alongside any actor-running tool (call-actor / direct
@@ -90,7 +90,7 @@ function normalizeInput(input: Input): NormalizedInput {
 /**
  * Resolve the list of Actor names (`username/name`) to fetch from the input.
  *
- * **Mode-agnostic** — the result does NOT depend on `ServerMode`. An Actor tool
+ * **Mode-agnostic** — the result does NOT depend on `SERVER_MODE`. An Actor tool
  * is identified by name, and the same Actor entry is reused across modes; only
  * the *internal* tool variants around it differ by mode.
  *
@@ -181,7 +181,7 @@ export function toolNamesToInput(toolNames: string[]): Input {
 export function getToolsForServerMode(
     input: Input,
     actorTools: ToolEntry[],
-    mode: ServerMode = ServerMode.DEFAULT,
+    mode: SERVER_MODE = SERVER_MODE.DEFAULT,
 ): ToolEntry[] {
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
@@ -197,7 +197,7 @@ export function getToolsForServerMode(
         }
     }
     // Widgets are apps-only and not in any category; include it for direct selection
-    if (mode === ServerMode.APPS) {
+    if (mode === SERVER_MODE.APPS) {
         for (const widget of WIDGET_BY_BASE_TOOL.values()) {
             toolsByName.set(widget.name, widget);
         }
@@ -211,7 +211,7 @@ export function getToolsForServerMode(
             if (sel === 'preview') {
                 // 'preview' category is deprecated. It contained `call-actor` which is now default.
                 log.warning('Tool category "preview" is deprecated');
-                const callActorTool = toolsByName.get(HelperTools.ACTOR_CALL);
+                const callActorTool = toolsByName.get(HELPER_TOOLS.ACTOR_CALL);
                 if (callActorTool) internalSelections.push(callActorTool);
                 continue;
             }
@@ -268,13 +268,13 @@ export function getToolsForServerMode(
      * get-key-value-store-record → abort-actor-run. If the user explicitly selected these tools
      * via category before `actors`, the de-dup pass below preserves their selector order.
      */
-    const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
+    const hasCallActor = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === TOOL_TYPE.ACTOR);
-    const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
+    const hasAddActorTool = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_ADD);
     // `get-actor-run`'s nextStep templates point at `get-dataset-items` / `get-key-value-store-record`,
     // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session
     // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
-    const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
+    const hasGetActorRun = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_RUNS_GET);
 
     // Inject run-workflow helpers whenever any actor-running entrypoint is present; de-dup pass below drops repeats.
     const toolsToInject: ToolEntry[] = [];
@@ -283,7 +283,7 @@ export function getToolsForServerMode(
     }
 
     if (toolsToInject.length > 0) {
-        const callActorIndex = result.findIndex((entry) => entry.name === HelperTools.ACTOR_CALL);
+        const callActorIndex = result.findIndex((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);
         if (callActorIndex !== -1) {
             result.splice(callActorIndex + 1, 0, ...toolsToInject);
         } else {
@@ -294,9 +294,9 @@ export function getToolsForServerMode(
     // Apps mode: append a widget tool for each base tool already in the result.
     // Runs after the get-actor-run auto-inject, so an auto-injected base still
     // brings its widget sibling.
-    if (mode === ServerMode.APPS) {
+    if (mode === SERVER_MODE.APPS) {
         for (const entry of [...result]) {
-            const widget = WIDGET_BY_BASE_TOOL.get(entry.name as HelperTools);
+            const widget = WIDGET_BY_BASE_TOOL.get(entry.name as HelperToolName);
             // Push unconditionally; any duplicates are stripped by the de-dup pass below.
             if (widget) result.push(widget);
         }
@@ -311,7 +311,7 @@ export function getToolsForServerMode(
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
-    mode: ServerMode = ServerMode.DEFAULT,
+    mode: SERVER_MODE = SERVER_MODE.DEFAULT,
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
     const actorTools = await getActors(input, apifyClient, { actorStore });

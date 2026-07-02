@@ -38,8 +38,8 @@ Key entry points:
 Tool loading is intentionally split into two phases in [`src/utils/tools_loader.ts`](./src/utils/tools_loader.ts):
 
 - `getActors()` — async, mode-agnostic. Fetches Actor metadata and preserves the caller's requested tool/actor selection without choosing any mode-dependent tool variants.
-- `getToolsForServerMode()` — sync, mode-dependent. Takes the pre-fetched sources plus a resolved `ServerMode` and produces the concrete tool entries to expose to the client.
-- `loadToolsFromInput()` in `tools_loader.ts` — convenience wrapper running both phases back-to-back with an explicit `ServerMode`. **Not to be confused with** `ActorsMcpServer.loadToolsFromInput()` (the public method), which queues sources when mode is still `'auto'` and registers them onto the server — call the server method from transport entry points, the plain function only when you already have a resolved mode.
+- `getToolsForServerMode()` — sync, mode-dependent. Takes the pre-fetched sources plus a resolved `SERVER_MODE` and produces the concrete tool entries to expose to the client.
+- `loadToolsFromInput()` in `tools_loader.ts` — convenience wrapper running both phases back-to-back with an explicit `SERVER_MODE`. **Not to be confused with** `ActorsMcpServer.loadToolsFromInput()` (the public method), which queues sources when mode is still `'auto'` and registers them onto the server — call the server method from transport entry points, the plain function only when you already have a resolved mode.
 
 This split matters for `serverMode: 'auto'`.
 

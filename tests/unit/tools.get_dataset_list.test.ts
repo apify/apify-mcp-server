@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { getDatasetList } from '../../src/tools/storage/get_dataset_list.js';
 import { storageListOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -31,7 +31,7 @@ function stubApifyClient(listSpy: ReturnType<typeof vi.fn>): InternalToolArgs['a
 
 describe('get-dataset-list', () => {
     it('has the expected tool name', () => {
-        expect(getDatasetList.name).toBe(HelperTools.DATASET_LIST_GET);
+        expect(getDatasetList.name).toBe(HELPER_TOOLS.DATASET_LIST_GET);
     });
 
     it('returns the list response plus a summary and nextStep in structuredContent', async () => {
@@ -45,7 +45,7 @@ describe('get-dataset-list', () => {
         expect(structuredContent).toMatchObject(MOCK_LIST);
         expect(structuredContent.summary).toBe('Listed 2 of 2 datasets.');
         // Not truncated → nextStep points at inspecting a dataset, not pagination.
-        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         // content[0] ships the TOON-fenced data; content[1] carries the prose summary + nextStep.
         const { summary, nextStep, ...data } = structuredContent;
         expect(decodeFencedToolText(content[0].text)).toEqual(data);
@@ -77,7 +77,7 @@ describe('get-dataset-list', () => {
 
         expect(structuredContent.summary).toBe('Listed 2 of 25 datasets.');
         expect(structuredContent.nextStep).toBe(
-            `Call ${HelperTools.DATASET_LIST_GET} again with offset=2 to fetch the next page.`,
+            `Call ${HELPER_TOOLS.DATASET_LIST_GET} again with offset=2 to fetch the next page.`,
         );
     });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { getKeyValueStoreList } from '../../src/tools/storage/get_key_value_store_list.js';
 import { storageListOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -31,7 +31,7 @@ function stubApifyClient(listSpy: ReturnType<typeof vi.fn>): InternalToolArgs['a
 
 describe('get-key-value-store-list', () => {
     it('has the expected tool name', () => {
-        expect(getKeyValueStoreList.name).toBe(HelperTools.KEY_VALUE_STORE_LIST_GET);
+        expect(getKeyValueStoreList.name).toBe(HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET);
     });
 
     it('returns the list response plus a summary and nextStep in structuredContent', async () => {
@@ -46,7 +46,7 @@ describe('get-key-value-store-list', () => {
 
         expect(structuredContent).toMatchObject(MOCK_LIST);
         expect(structuredContent.summary).toBe('Listed 2 of 2 key-value stores.');
-        expect(structuredContent.nextStep).toContain(HelperTools.KEY_VALUE_STORE_GET);
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_GET);
         // content[0] ships the TOON-fenced data; content[1] carries the prose summary + nextStep.
         const { summary, nextStep, ...data } = structuredContent;
         expect(decodeFencedToolText(content[0].text)).toEqual(data);
@@ -63,7 +63,7 @@ describe('get-key-value-store-list', () => {
 
         expect(structuredContent.summary).toBe('Listed 2 of 30 key-value stores.');
         expect(structuredContent.nextStep).toBe(
-            `Call ${HelperTools.KEY_VALUE_STORE_LIST_GET} again with offset=2 to fetch the next page.`,
+            `Call ${HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET} again with offset=2 to fetch the next page.`,
         );
     });
 

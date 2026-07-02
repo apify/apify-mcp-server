@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
+import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
 import type {
     ActorStoreList,
     ConsoleLinkContext,
@@ -84,8 +84,8 @@ Usage:
 - You MUST always do at least two searches: first with broad keywords, then optionally with more specific terms if needed.
 
 Important limitations: This tool does not return full Actor documentation or detailed usage instructions - only summary information.
-Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without a separate ${HelperTools.ACTOR_GET_DETAILS} round-trip.
-For complete Actor details (per-field descriptions, defaults, README), use the ${HelperTools.ACTOR_GET_DETAILS} tool.
+Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without a separate ${HELPER_TOOLS.ACTOR_GET_DETAILS} round-trip.
+For complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.
 The search is limited to publicly available Actors and excludes rental and restricted Actors.
 
 Returns list of Actor cards with the following info:
@@ -107,7 +107,7 @@ Returns list of Actor cards with the following info:
  */
 export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.STORE_SEARCH,
+    name: HELPER_TOOLS.STORE_SEARCH,
     title: 'Search Actors',
     description: SEARCH_ACTORS_DESCRIPTION,
     inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
@@ -189,7 +189,7 @@ export const searchActors: ToolEntry = Object.freeze({
             userTier: userPlanTier,
             instructions: dedent`
                 If you need more detailed information about any of these Actors, including their
-                input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS}
+                input schemas and usage instructions, please use the ${HELPER_TOOLS.ACTOR_GET_DETAILS}
                 tool with the specific Actor name.
                 IMPORTANT: You MUST always do a second search with broader, more generic keywords
                 (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
@@ -210,7 +210,7 @@ export const searchActors: ToolEntry = Object.freeze({
         `;
         const footer = dedent`
             If you need more detailed information about any of these Actors, including their input
-            schemas and usage instructions, use the ${HelperTools.ACTOR_GET_DETAILS} tool with the
+            schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
             specific Actor name.
             IMPORTANT: You MUST always do a second search with broader, more generic keywords
             (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
