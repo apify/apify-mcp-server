@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.11.5 - **not yet released**
+## [0.11.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.5) (2026-07-02)
 
 ### 🚀 Features
 
@@ -21,7 +20,6 @@ All notable changes to this project will be documented in this file.
 - Align search-actors schema with output, trim redundant pricing ([#1036](https://github.com/apify/apify-mcp-server/pull/1036)) ([743774b](https://github.com/apify/apify-mcp-server/commit/743774bd93446aef6bbc744507d99f3233d09d57)) by [@mvanhorn](https://github.com/mvanhorn), closes [#889](https://github.com/apify/apify-mcp-server/issues/889)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.11.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.4) (2026-06-24)
 
 ### 🐛 Bug Fixes
