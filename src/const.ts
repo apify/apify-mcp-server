@@ -126,6 +126,22 @@ export const DOCS_SOURCES = [
     },
 ] as const;
 
+/**
+ * Word window for Algolia `attributesToSnippet` in `search-apify-docs`. Bounds each hit to a
+ * match-centered snippet instead of the full indexed `content` attribute — API-reference records
+ * inline the whole OpenAPI schema (~34.5k chars each), so 20 hits returned ~173k tokens. The agent
+ * fetches full pages via `fetch-apify-docs`.
+ */
+export const DOCS_SNIPPET_MAX_WORDS = 100;
+
+/**
+ * Sentinel used as Algolia `highlightPreTag`/`highlightPostTag` for docs snippets, stripped before
+ * returning. An empty-string tag is treated as "unset" and falls back to Algolia's default
+ * `<span class="algolia-docsearch-suggestion--highlight">` markup, so we set a private-use
+ * character (U+E000) and remove it.
+ */
+export const DOCS_SNIPPET_HIGHLIGHT_TAG = '\uE000';
+
 export const ALLOWED_DOC_DOMAINS = ['https://docs.apify.com', 'https://crawlee.dev'] as const;
 
 export const APIFY_STORE_URL = 'https://apify.com';
