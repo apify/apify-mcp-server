@@ -14,9 +14,12 @@ import { ServerMode } from '../../types.js';
  * Build server instructions for the given mode.
  *
  * Apps-only sections are omitted in default mode to prevent models from
- * attempting to call widget tools that are not registered.
+ * attempting to call widget tools that are not registered. The feedback section is
+ * emitted only when `feedbackAvailable` is true — i.e. `share-feedback` is actually
+ * served — so clients that never receive the tool (Anthropic surfaces, or a tool
+ * selection that excludes the `feedback` category) are not told to call it.
  */
-export function getServerInstructions(mode: ServerMode = ServerMode.DEFAULT): string {
+export function getServerInstructions(mode: ServerMode = ServerMode.DEFAULT, feedbackAvailable = false): string {
     const isApps = mode === ServerMode.APPS;
 
     return `
@@ -83,5 +86,14 @@ ${
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs \`${HelperTools.ACTOR_CALL}\`:**
   Prefer dedicated tools when available; use \`${HelperTools.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.
-`;
+${
+    feedbackAvailable
+        ? `
+## Reporting problems and feedback
+- **Before you tell the user you cannot complete a request — because a tool or Actor is missing, errored, or returned a confusing, wrong, or empty result — you MUST first call \`${HelperTools.FEEDBACK_SHARE}\`**, describing what you were trying to do and what blocked you. Do this yourself, without being asked; it is a required step, not optional.
+- \`${HelperTools.FEEDBACK_SHARE}\` is also how you rate an Actor or report what worked well.
+- Never include personal data, credentials, or secrets in a report.
+`
+        : ''
+}`;
 }

@@ -390,8 +390,8 @@ export type ToolCallTelemetryProperties = {
 
 /**
  * Segment 'MCP Agent Feedback' event payload: the `share-feedback` submission plus the same
- * session/client context carried by {@link ToolCallTelemetryProperties}. The internal repo consumes
- * this event for Slack/GitHub fan-out.
+ * session/client context carried by {@link ToolCallTelemetryProperties}. A downstream Segment
+ * destination consumes this event for Slack/GitHub fan-out.
  */
 export type AgentFeedbackTelemetryProperties = Pick<
     ToolCallTelemetryProperties,

@@ -346,7 +346,10 @@ export class ActorsMcpServer {
             await this.resolveWidgets();
 
             const result = await sdkInitHandler(request);
-            result.instructions = getServerInstructions(this.serverMode);
+            // Tools are final here (updateToolsAfterServerModeResolved ran above, after the
+            // Anthropic hard-block applied), so tool presence is the ground truth for whether to
+            // advertise share-feedback in the instructions.
+            result.instructions = getServerInstructions(this.serverMode, this.tools.has(HelperTools.FEEDBACK_SHARE));
             return result;
         });
     }
@@ -1409,7 +1412,7 @@ export class ActorsMcpServer {
             trackToolCall(params.userId, this.telemetryEnv, finalizedTelemetryData);
 
             // A successful share-feedback call also emits a dedicated feedback event carrying the
-            // submission. The internal repo consumes it for Slack/GitHub fan-out.
+            // submission. A downstream Segment destination fans it out to Slack/GitHub.
             if (
                 params.toolName === HelperTools.FEEDBACK_SHARE &&
                 params.toolStatus === TOOL_STATUS.SUCCEEDED &&

@@ -35,8 +35,7 @@ async function dispatchInitialize(server: ActorsMcpServer, clientName: string): 
             // eslint-disable-next-line no-underscore-dangle
             _requestHandlers: Map<string, InitHandler>;
         }
-    )// eslint-disable-next-line no-underscore-dangle
-    ._requestHandlers
+    )._requestHandlers // eslint-disable-next-line no-underscore-dangle
         .get('initialize');
     if (!handler) throw new Error('initialize handler not registered');
     await handler(makeInitializeRequest(clientName), {});
