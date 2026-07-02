@@ -64,6 +64,22 @@ export function getOrInitAnalyticsClient(telemetryEnv: TelemetryEnv): Analytics 
 }
 
 /**
+ * Flushes buffered events and closes the Segment client. Terminal — the client cannot be reused
+ * afterwards, so call this only at process shutdown (stdio). Without it, events produced in the last
+ * `SEGMENT_FLUSH_INTERVAL_MS` window are lost when the process exits. No-op if no client exists.
+ */
+export async function closeAnalyticsClient(): Promise<void> {
+    if (!analyticsClient) return;
+    try {
+        await analyticsClient.closeAndFlush();
+    } catch (error) {
+        log.error('Failed to flush Segment analytics client', { error });
+    } finally {
+        analyticsClient = null;
+    }
+}
+
+/**
  * Tracks a tool call event to Segment.
  * Segment requires either userId OR anonymousId, but not both. When the Apify user is known, use
  * userId; otherwise fall back to mcp_session_id so every unauthenticated call in the same session

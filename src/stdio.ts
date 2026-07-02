@@ -34,7 +34,7 @@ import { ApifyClient } from './apify_client.js';
 import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { getTelemetryEnv } from './telemetry.js';
+import { closeAnalyticsClient, getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
@@ -234,6 +234,13 @@ async function main() {
     const mcpSessionId = randomUUID();
 
     await mcpServer.connect(transport);
+
+    // Flush buffered Segment events before the process exits (dominant path: the client closes
+    // stdin, the transport ends, the loop empties). Mirrors the Sentry beforeExit cleanup in
+    // instrument.ts. No-op when telemetry is off (no client was ever created).
+    process.on('beforeExit', async () => {
+        await closeAnalyticsClient();
+    });
 
     const sdkOnMessage = transport.onmessage;
     transport.onmessage = (message) => {

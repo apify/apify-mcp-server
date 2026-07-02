@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { trackToolCall } from '../../src/telemetry.js';
+import { closeAnalyticsClient, trackToolCall } from '../../src/telemetry.js';
 
 // Mock the Segment Analytics client
 const mockTrack = vi.fn();
+const mockCloseAndFlush = vi.fn();
 vi.mock('@segment/analytics-node', () => ({
     // Vitest 4 constructs mocked classes via `Reflect.construct`, which requires a
     // constructable implementation. An arrow function has no [[Construct]], so it must
@@ -11,6 +12,7 @@ vi.mock('@segment/analytics-node', () => ({
     Analytics: vi.fn().mockImplementation(function () {
         return {
             track: mockTrack,
+            closeAndFlush: mockCloseAndFlush,
         };
     }),
 }));
@@ -133,5 +135,44 @@ describe('telemetry', () => {
             event: 'MCP Tool Call',
             properties,
         });
+    });
+});
+
+describe('closeAnalyticsClient()', () => {
+    const properties = {
+        app: 'mcp' as const,
+        app_version: '0.5.6',
+        mcp_client_name: 'test-client',
+        mcp_client_version: '1.0.0',
+        mcp_protocol_version: '2024-11-05',
+        mcp_client_capabilities: {},
+        mcp_session_id: 'session-123',
+        transport_type: 'stdio',
+        tool_name: 'test-tool',
+        tool_status: 'SUCCEEDED' as const,
+        tool_exec_time_ms: 100,
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('flushes and closes the Segment client', async () => {
+        // A track call lazily creates the singleton client; closing it must flush.
+        trackToolCall('user', 'DEV', properties);
+
+        await closeAnalyticsClient();
+
+        expect(mockCloseAndFlush).toHaveBeenCalledTimes(1);
+    });
+
+    it('is a no-op when there is no active client', async () => {
+        // First close nulls the client; a second close must not touch it.
+        await closeAnalyticsClient();
+        mockCloseAndFlush.mockClear();
+
+        await closeAnalyticsClient();
+
+        expect(mockCloseAndFlush).not.toHaveBeenCalled();
     });
 });
