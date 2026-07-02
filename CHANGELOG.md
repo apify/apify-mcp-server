@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Add large-dataset and scraper workflow eval cases ([#1033](https://github.com/apify/apify-mcp-server/pull/1033)) ([b755213](https://github.com/apify/apify-mcp-server/commit/b755213bf8dbffa2aa2224f68cb0f03c722c662a)) by [@RobertCrupa](https://github.com/RobertCrupa)
 - Add byte&#x2F;token cost metrics to workflow evals ([#1031](https://github.com/apify/apify-mcp-server/pull/1031)) ([e101595](https://github.com/apify/apify-mcp-server/commit/e1015957a2bfcef01f2a7b5753a574ece8c0d258)) by [@RobertCrupa](https://github.com/RobertCrupa)
 - Drop raw schema from get-dataset; stop nudging schema tool ([#986](https://github.com/apify/apify-mcp-server/pull/986)) ([fb5c418](https://github.com/apify/apify-mcp-server/commit/fb5c418ad84fb93ad779c1cd9ca32140b0c556d9)) by [@jirispilka](https://github.com/jirispilka), closes [#882](https://github.com/apify/apify-mcp-server/issues/882)
+- Cap search-apify-docs output with Algolia snippeting ([#1046](https://github.com/apify/apify-mcp-server/pull/1046)) ([59aad9b](https://github.com/apify/apify-mcp-server/commit/59aad9b3d02b12eff7e8c9a5b4df3d9c05b213cf)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#1042](https://github.com/apify/apify-mcp-server/issues/1042)
 
 ### 🐛 Bug Fixes
 
