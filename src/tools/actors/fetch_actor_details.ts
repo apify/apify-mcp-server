@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import {
@@ -14,7 +14,8 @@ import {
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { wrapJsonText } from '../../utils/encode_text.js';
+import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
@@ -141,18 +142,12 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
 /**
  * Build error response for when actor is not found.
  */
-export function buildActorNotFoundResponse(actorName: string): ReturnType<typeof buildMCPResponse> {
-    return buildMCPResponse({
-        texts: [
-            dedent`
-            Actor information for '${actorName}' was not found.
-            Please verify Actor ID or name format and ensure that the Actor exists.
-            You can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.
-        `,
-        ],
-        isError: true,
-        telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-    });
+export function buildActorNotFoundResponse(actorName: string): ToolResponse {
+    return respondUserError(dedent`
+        Actor information for '${actorName}' was not found.
+        Please verify Actor ID or name format and ensure that the Actor exists.
+        You can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.
+    `);
 }
 
 /**
@@ -191,9 +186,7 @@ export function buildActorDetailsTextResponse(options: {
     if (output.inputSchema) {
         // Console has no /input sub-page — link to the Actor detail page instead.
         const inputSchemaUrl = linkContext ? actorUrl : `${actorUrl}/input`;
-        texts.push(
-            [`# [Input schema](${inputSchemaUrl})`, '```json', JSON.stringify(details.inputSchema), '```'].join('\n'),
-        );
+        texts.push(`# [Input schema](${inputSchemaUrl})\n${wrapJsonText(details.inputSchema)}`);
     }
 
     if (output.outputSchema) {
@@ -237,9 +230,7 @@ export function buildActorDetailsTextResponse(options: {
  * Shared handler for the base fetch-actor-details tool.
  * Returns the same text + structured response in both modes.
  */
-export async function buildFetchActorDetailsResult(
-    toolArgs: InternalToolArgs,
-): Promise<ReturnType<typeof buildMCPResponse>> {
+export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
     const { args, apifyToken, apifyClient, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
@@ -286,7 +277,7 @@ export async function buildFetchActorDetailsResult(
         linkContext,
     });
 
-    return buildMCPResponse({ texts, structuredContent });
+    return respondOk(texts, { structuredContent });
 }
 
 /**

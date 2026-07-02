@@ -132,6 +132,20 @@ describe('buildActorDetailsTextResponse()', () => {
             expect(texts[0]).not.toContain('/input)');
         });
 
+        // Byte-identity guard for #937: the embedded ```json fence (formerly hand-rolled via
+        // ['```json', JSON.stringify(...), '```'].join('\n')) now comes from wrapJsonText — the
+        // exact same bytes. The fence must stay embedded in the text element, not become respondJson.
+        it('embeds the input schema in an unchanged ```json fence (R5)', () => {
+            const { texts } = buildActorDetailsTextResponse({
+                details: MOCK_DETAILS,
+                output: inputSchemaOnlyOutput,
+                linkContext,
+            });
+            expect(texts[0]).toBe(
+                `# [Input schema](https://console.apify.com/actors/actor-id-1)\n\`\`\`json\n${JSON.stringify(MOCK_DETAILS.inputSchema)}\n\`\`\``,
+            );
+        });
+
         it('appends the verbatim-links nudge as the last text', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,

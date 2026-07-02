@@ -7,10 +7,11 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { datasetSizeNextStepHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from './get_dataset_items.js';
-import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
+import { buildStorageResponse } from './storage_helpers.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -53,7 +54,7 @@ export const getDataset: ToolEntry = Object.freeze({
         const datasetId = stripQuoteWrappers(parsed.datasetId);
         const dataset = await client.dataset(datasetId).get();
         if (!dataset) {
-            return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
+            return respondUserError(`Dataset '${datasetId}' not found.`);
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         // The API also returns a raw `schema` (untyped in apify-client). It is 93–95% of the

@@ -5,7 +5,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk, respondServerError } from '../../utils/mcp.js';
 
 export const addToolArgsSchema = z.object({
     actor: z
@@ -47,9 +47,7 @@ USAGE EXAMPLES:
         } = toolArgs;
         const parsed = addToolArgsSchema.parse(args);
         if (apifyMcpServer.listAllToolNames().includes(parsed.actor)) {
-            return buildMCPResponse({
-                texts: [`Actor ${parsed.actor} is already available. No new tools were added.`],
-            });
+            return respondOk(`Actor ${parsed.actor} is already available. No new tools were added.`);
         }
 
         const apifyClient = new ApifyClient({ token: apifyToken });
@@ -57,21 +55,16 @@ USAGE EXAMPLES:
         // First error is the precise reason this Actor could not be added —
         // safe to forward verbatim (sanitized at source by ActorLoadError factories).
         if (errors[0]) {
-            return buildMCPResponse({
-                texts: [errors[0].message],
-                isError: true,
-            });
+            return respondServerError(errors[0].message);
         }
         await sendNotification({ method: 'notifications/tools/list_changed' });
         const toolNames = tools.map((t: ToolEntry) => t.name).join(', ');
         // Many MCP clients ignore `notifications/tools/list_changed`, so nudge the LLM to
         // re-list tools itself — otherwise the freshly added Actor stays invisible until the
         // client happens to refresh (apify-mcp-server#851).
-        return buildMCPResponse({
-            texts: [
-                `Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}. ` +
-                    `If they are not visible yet, refresh the tool list using the tools/list request before calling them.`,
-            ],
-        });
+        return respondOk(
+            `Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}. ` +
+                `If they are not visible yet, refresh the tool list using the tools/list request before calling them.`,
+        );
     },
 } as const);
