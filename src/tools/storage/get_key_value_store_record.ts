@@ -59,10 +59,27 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         if (record === undefined) {
             // getRecord returns undefined for both missing-store and missing-key; disambiguate.
             const storeInfo = await store.get();
-            const text = storeInfo
-                ? `Record '${recordKey}' not found in key-value store '${keyValueStoreId}'.`
-                : `Key-value store '${keyValueStoreId}' not found.`;
-            return buildStorageNotFound(text);
+            if (!storeInfo) {
+                // Missing store is a real bad input — keep the soft-fail so telemetry flags it.
+                return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
+            }
+            // Store exists but the key doesn't. This is a legitimate branch case (e.g. a checkpoint
+            // that has been cleared on success); returning `isError: true` forces callers to regex
+            // the text envelope to distinguish it from a real error. Emit a structured
+            // `{found: false, ...}` envelope so agents can branch on the boolean instead.
+            const apifyConsoleUrl = buildConsoleKeyValueStoreUrl(
+                await getConsoleLinkContext(apifyToken, client),
+                keyValueStoreId,
+            );
+            return buildStorageResponse({
+                structuredContent: {
+                    found: false,
+                    keyValueStoreId,
+                    recordKey,
+                },
+                summary: `Record '${recordKey}' not found in key-value store '${keyValueStoreId}'.`,
+                apifyConsoleUrl,
+            });
         }
         const apifyConsoleUrl = buildConsoleKeyValueStoreUrl(
             await getConsoleLinkContext(apifyToken, client),
