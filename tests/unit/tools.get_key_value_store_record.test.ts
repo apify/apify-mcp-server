@@ -225,17 +225,30 @@ describe('get-key-value-store-record', () => {
         });
     });
 
-    it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {
+    it('returns a structured {found: false} envelope when the store exists but the key does not', async () => {
+        // Missing record in an existing store is a legitimate branch case (a checkpoint that has been
+        // cleared on success, a probe for optional metadata) — it must not surface as isError, because
+        // callers would have to regex the text envelope to distinguish it from a real error.
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'kv-1', recordKey: 'MISSING' },
                 stubApifyClient({ record: undefined, store: MOCK_STORE }),
             ),
         );
-        const { content } = result as TextToolResult;
+        expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
+        const { isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
-        expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain("Record 'MISSING' not found in key-value store 'kv-1'");
+        expect(isError).not.toBe(true);
+        expect(structuredContent).toMatchObject({
+            found: false,
+            keyValueStoreId: 'kv-1',
+            recordKey: 'MISSING',
+        });
+        expect(structuredContent).not.toHaveProperty('key');
+        expect(structuredContent).not.toHaveProperty('value');
+        expect(structuredContent.summary).toBe("Record 'MISSING' not found in key-value store 'kv-1'.");
     });
 
     it('returns isError "store not found" when both getRecord and store get are undefined', async () => {

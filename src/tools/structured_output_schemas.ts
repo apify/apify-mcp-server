@@ -677,15 +677,22 @@ export const keyValueStoreKeysOutputSchema = {
 
 /**
  * Schema for a single record (get-key-value-store-record). Terminal: no nextStep.
+ *
+ * `found` disambiguates the "store exists but the key does not" case from a hit — callers can
+ * branch on the boolean instead of regex-matching a not-found text envelope. On a hit, `found`
+ * is omitted (existing shape preserved) and `key` + `value` are populated. On a miss, `found`
+ * is `false`, `recordKey` echoes the requested key, and `key`/`value` are absent.
  */
 export const keyValueStoreRecordOutputSchema = {
     type: 'object' as const,
     properties: {
+        found: { type: 'boolean', description: 'False when the store exists but the requested key does not. Omitted on a hit.' },
         keyValueStoreId: { type: 'string', description: 'Key-value store ID' },
-        key: { type: 'string', description: 'Record key' },
-        value: { description: 'The stored value (JSON, text, or binary)' },
+        recordKey: { type: 'string', description: 'The requested record key (present when found=false).' },
+        key: { type: 'string', description: 'Record key (present on a hit).' },
+        value: { description: 'The stored value (JSON, text, or binary). Present on a hit.' },
         contentType: { type: 'string', description: 'MIME type of the stored value' },
         summary: summaryProperty,
     },
-    required: ['keyValueStoreId', 'key', 'value', 'summary'],
+    required: ['keyValueStoreId', 'summary'],
 };
