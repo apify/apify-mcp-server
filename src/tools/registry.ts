@@ -83,6 +83,7 @@ export const toolCategories = {
         getDatasetList,
         getKeyValueStoreList,
     ],
+    dev: [],
 } satisfies Record<string, CategoryToolEntry[]>;
 
 /**
