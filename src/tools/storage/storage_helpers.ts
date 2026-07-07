@@ -58,10 +58,9 @@ export function buildStorageResponse(params: {
     const { structuredContent, summary, nextStep, apifyConsoleUrl } = params;
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
     const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
-    const dataText = JSON.stringify(structuredContent);
     const consoleLinkText = apifyConsoleLinkText(apifyConsoleUrl);
     return buildMCPResponse({
-        texts: [dataText, summaryText, ...(consoleLinkText ? [consoleLinkText] : [])],
+        texts: [JSON.stringify(structuredContent), summaryText, ...(consoleLinkText ? [consoleLinkText] : [])],
         structuredContent: full,
     });
 }
