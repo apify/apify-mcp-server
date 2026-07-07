@@ -8,13 +8,9 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
-import {
-    buildConsoleLinkContent,
-    buildStorageNotFound,
-    buildStorageResponse,
-    normalizeRecordKey,
-} from './storage_helpers.js';
+import { buildConsoleLinkContent, buildStorageResponse, normalizeRecordKey } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -62,7 +58,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             const text = storeInfo
                 ? `Record '${recordKey}' not found in key-value store '${keyValueStoreId}'.`
                 : `Key-value store '${keyValueStoreId}' not found.`;
-            return buildStorageNotFound(text);
+            return respondUserError(text);
         }
         const apifyConsoleUrl = buildConsoleKeyValueStoreUrl(
             await getConsoleLinkContext(apifyToken, client),

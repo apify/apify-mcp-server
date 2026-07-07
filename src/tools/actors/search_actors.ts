@@ -16,7 +16,7 @@ import { DEFAULT_CARD_OPTIONS, formatActorToActorCard, formatActorToStructuredCa
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
@@ -139,19 +139,6 @@ export function buildSearchActorsResult(
     };
 }
 
-export function buildSearchActorsEmptyResponse(query: string): ReturnType<typeof buildMCPResponse> {
-    const instructions = dedent`
-        No Actors were found for the search query "${query}".
-        You MUST retry with broader, more generic keywords - use just the platform name
-        (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
-    `;
-
-    return buildMCPResponse({
-        texts: [instructions],
-        structuredContent: { actors: [], query, count: 0, instructions },
-    });
-}
-
 /**
  * Default mode search-actors tool.
  * Returns text-based Actor cards without widget metadata.
@@ -175,7 +162,14 @@ export const searchActors: ToolEntry = Object.freeze({
         ]);
 
         if (actors.length === 0) {
-            return buildSearchActorsEmptyResponse(parsed.keywords);
+            const instructions = dedent`
+                No Actors were found for the search query "${parsed.keywords}".
+                You MUST retry with broader, more generic keywords - use just the platform name
+                (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
+            `;
+            return respondOk(instructions, {
+                structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
+            });
         }
 
         // Cache hit — the Promise.all above already resolved users/me for this token.
@@ -216,7 +210,6 @@ export const searchActors: ToolEntry = Object.freeze({
             (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
             you haven't missed a better Actor.${verbatimLinksNudge}
         `;
-        const texts = [`${header}\n\n${actorCardText}\n\n${footer}`];
-        return buildMCPResponse({ texts, structuredContent });
+        return respondOk(`${header}\n\n${actorCardText}\n\n${footer}`, { structuredContent });
     },
 } as const);

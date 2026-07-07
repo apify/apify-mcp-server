@@ -6,7 +6,7 @@ import type { ApifyClient } from '../apify_client.js';
 import { HTTP_PAYMENT_REQUIRED } from '../const.js';
 import { isActorRunLimitError } from './apify_errors.js';
 import { getHttpStatusCode } from './logging.js';
-import { buildMCPResponse } from './mcp.js';
+import { respondErrorNoTelemetry } from './mcp.js';
 
 const PAYMENT_REQUIRED_HEADER = 'payment-required';
 
@@ -121,5 +121,5 @@ export function buildPaymentRequiredResponse(errorOrMessage: unknown, precompute
         ? [JSON.stringify(paymentData), 'Payment required to run this Actor or access this resource.']
         : [message];
 
-    return buildMCPResponse({ texts, isError: true, structuredContent: paymentData });
+    return respondErrorNoTelemetry(texts, { structuredContent: paymentData });
 }

@@ -1,24 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
-import {
-    buildDatasetItemsSummaryNextStep,
-    buildStorageNotFound,
-    normalizeRecordKey,
-} from '../../src/tools/storage/storage_helpers.js';
+import { HELPER_TOOLS } from '../../src/const.js';
+import { buildDatasetItemsSummaryNextStep, normalizeRecordKey } from '../../src/tools/storage/storage_helpers.js';
 
-describe('buildStorageNotFound()', () => {
-    it('returns a SOFT_FAIL / INVALID_INPUT response with the supplied message', () => {
-        const result = buildStorageNotFound("Dataset 'ds-1' not found.");
-
-        expect(result.isError).toBe(true);
-        expect(result.content).toEqual([{ type: 'text', text: "Dataset 'ds-1' not found." }]);
-        expect(result.toolTelemetry).toEqual({
-            toolStatus: TOOL_STATUS.SOFT_FAIL,
-            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-        });
-    });
-});
+// `buildStorageNotFound` was deleted in #937 — its six call sites call `respondUserError(text)`
+// directly. The SOFT_FAIL + INVALID_INPUT contract it guarded is now covered by the `respondUserError`
+// unit test in `tests/unit/utils.mcp.test.ts`.
 
 describe('buildDatasetItemsSummaryNextStep()', () => {
     it('suggests get-dataset on the terminal page when loaded', () => {
