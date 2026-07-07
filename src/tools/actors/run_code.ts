@@ -34,9 +34,13 @@ export const runCodeArgs = z.object({
         .describe(
             `Seconds to wait for the run to finish. Range 0–${WAIT_SECS_MAX}; ${WAIT_SECS_MAX} is the MAXIMUM — values above ${WAIT_SECS_MAX} (e.g. 60) are rejected. Default ${CALL_ACTOR_WAIT_SECS_DEFAULT}. If the run isn't terminal within waitSecs, returns the current run status; use 0 to start and return immediately for long scripts.`,
         ),
+    // code-runtime is a platform-usage Actor, so the pay-per-event / pay-per-result caps
+    // (maxTotalChargeUsd, maxItems) are silently ignored by the platform — expose only the
+    // options that actually apply. See PR #1044 for the removed cost cap.
     callOptions: callOptionsSchema
+        .pick({ memory: true, timeout: true })
         .optional()
-        .describe('Optional run config: memory (MB), timeout (s), maxTotalChargeUsd (cost cap).'),
+        .describe('Optional run config: memory (MB), timeout (s).'),
 });
 
 const runCodeInputSchema = z.toJSONSchema(runCodeArgs) as ToolInputSchema;
