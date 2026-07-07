@@ -37,11 +37,12 @@ returns the same Actor record at runtime.)
 ## Returning results
 - \`console.log\` / \`console.info\` go to stdout; \`console.error\` / \`console.warn\` go to stderr.
 - When the script finishes, both are stored in the run's default dataset as a single item
-  \`{ stdout, stderr }\`, which the caller reads with ${HELPER_TOOLS.DATASET_GET_ITEMS}.
+  \`{ stdout, stderr, exitCode }\`, which the caller reads with ${HELPER_TOOLS.DATASET_GET_ITEMS}.
 - Your answer = what you print. Print a concise, JSON-stringified summary of the distilled result —
   never dump entire datasets (that wastes tokens and context).
-- If your script throws, the error is captured to stderr and the run still SUCCEEDS, so failures are
-  observable in the output.
+- If your script throws, the error is captured to stderr, \`exitCode\` is 1, and the run still
+  SUCCEEDS. Check \`exitCode\` (0 = ok, 1 = the script threw) to detect a failed script — not stderr,
+  which is also written by ordinary \`console.error\` / \`console.warn\` logging.
 - For long scripts, the run may still be RUNNING when \`${HELPER_TOOLS.CODE_RUN}\`'s wait cap (waitSecs)
   elapses — the caller then polls ${HELPER_TOOLS.ACTOR_RUNS_GET} until it finishes.
 

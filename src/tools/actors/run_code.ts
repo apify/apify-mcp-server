@@ -56,8 +56,9 @@ const RUN_CODE_DESCRIPTION = dedent`
     one script here — not as separate ${HELPER_TOOLS.ACTOR_CALL} / ${HELPER_TOOLS.DATASET_GET_ITEMS} calls.
     One script is faster, cheaper, and keeps large intermediate data out of the model context.
 
-    OUTPUT: the script's { stdout, stderr } is written to the run's default dataset; follow the
-    nextStep and read it with ${HELPER_TOOLS.DATASET_GET_ITEMS} using the returned datasetId.
+    OUTPUT: the script's { stdout, stderr, exitCode } is written to the run's default dataset; follow
+    the nextStep and read it with ${HELPER_TOOLS.DATASET_GET_ITEMS} using the returned datasetId.
+    exitCode is 0 on success, 1 if the script threw (check it, not stderr, to detect a failed script).
 
     WORKFLOW: (1) call ${HELPER_TOOLS.CODE_DOCS} (overview page) to learn the binding, and
     ${HELPER_TOOLS.ACTOR_GET_DETAILS} for each Actor you'll use to get its input/output schemas;
