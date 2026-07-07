@@ -17,9 +17,9 @@ Three files serving the MCP `resources/*` surface:
 
 ## API resources (`api_resources.ts`)
 
-Resource URIs are real Apify API GET URLs (`https://api.apify.com/v2/...`), so URLs that
-Actors and tools return in their responses can be read back verbatim — no scheme to
-translate. `isApifyApiUri()` gates reads to the configured API origin
+Resource URIs are real Apify API GET URLs (`https://api.apify.com/v2/...`), built from the storage
+IDs that Actors and tools return (e.g. a `datasetId` → `.../datasets/{id}/items`) — no custom scheme
+to translate. `isApifyApiUri()` gates reads to the configured API origin
 (`getApifyAPIBaseUrl()`): the apify-client attaches the session token as an `Authorization`
 header to **every** outbound request, so we must never hand it a non-Apify host.
 
