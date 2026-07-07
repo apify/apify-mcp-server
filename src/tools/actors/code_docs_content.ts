@@ -24,9 +24,10 @@ filter/aggregate locally — instead of sending every intermediate result back t
 ## Execution
 - Your code is an async script body with top-level \`await\`.
 - Two globals are injected: \`apify\` (the Apify binding) and \`console\`.
-- Sandbox: no filesystem, no package imports (no \`require\`/\`import\`), outbound \`fetch\` limited to the
-  apify.com domain and its subdomains (\`*.apify.com\`) only, limited permissions, single-use container
-  (nothing persists between runs).
+- Sandbox: no filesystem, no imports at all (no \`require\`/\`import\` — neither npm packages nor Node
+  \`node:*\` built-ins are available), outbound \`fetch\` limited to the apify.com domain and its
+  subdomains (\`*.apify.com\`) only, limited permissions, single-use container (nothing persists
+  between runs).
 
 ## Before using an Actor
 For every Actor you plan to run from your script, FIRST call the \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` tool to read

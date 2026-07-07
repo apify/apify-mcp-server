@@ -48,8 +48,8 @@ const runCodeInputSchema = z.toJSONSchema(runCodeArgs) as ToolInputSchema;
 const RUN_CODE_DESCRIPTION = dedent`
     Run a JavaScript/TypeScript script in a sandboxed Apify Actor (${APIFY_CODE_RUNTIME_ACTOR}) with an
     \`apify\` binding (search/run Actors, read/write datasets and key-value stores), then return the run
-    result. Limited permissions: no filesystem, no imports, outbound network limited to the apify.com
-    domain and its subdomains (*.apify.com) only.
+    result. Limited permissions: no filesystem, no imports (neither npm packages nor Node node:*
+    built-ins), outbound network limited to the apify.com domain and its subdomains (*.apify.com) only.
 
     USE THIS FIRST FOR ANY MULTI-STEP TASK. If the request needs 2+ Actor runs, feeds one Actor's output
     into another, or filters/transforms/joins/aggregates Actor results before answering, do it all in
