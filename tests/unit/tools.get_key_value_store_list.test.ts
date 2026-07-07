@@ -5,7 +5,6 @@ import { getKeyValueStoreList } from '../../src/tools/storage/get_key_value_stor
 import { storageListOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
-    decodeFencedToolText,
     expectSchemaConformingStructuredContent,
     stubToolCallContext,
     type TextToolResult,
@@ -47,9 +46,9 @@ describe('get-key-value-store-list', () => {
         expect(structuredContent).toMatchObject(MOCK_LIST);
         expect(structuredContent.summary).toBe('Listed 2 of 2 key-value stores.');
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_GET);
-        // content[0] ships the TOON-fenced data; content[1] carries the prose summary + nextStep.
+        // content[0] ships the JSON data; content[1] carries the prose summary + nextStep.
         const { summary, nextStep, ...data } = structuredContent;
-        expect(decodeFencedToolText(content[0].text)).toEqual(data);
+        expect(JSON.parse(content[0].text)).toEqual(data);
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 

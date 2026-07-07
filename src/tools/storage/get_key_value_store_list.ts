@@ -83,7 +83,6 @@ export const getKeyValueStoreList: ToolEntry = Object.freeze({
             structuredContent: stores as unknown as Record<string, unknown>,
             summary,
             nextStep,
-            toon: true,
         });
     },
 } as const);

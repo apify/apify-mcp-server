@@ -1,6 +1,5 @@
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
-import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
@@ -45,25 +44,21 @@ export function buildStorageNotFound(text: string) {
  * `structuredContent` carries the data plus `summary` (and `nextStep` unless terminal).
  * `nextStep` is omitted for terminal responses (e.g. get-key-value-store-record).
  *
- * `toon: true` (the list tools) emits a single text: the data TOON-encoded in a ```toon fence
- * (token-cheaper for uniform-row arrays; `summary`/`nextStep` are prose, not tabular, so they
- * stay out of the fence) followed by `summary`/`nextStep` as plain text. Single-object tools
- * leave it off and ship `content[0]` as the raw-JSON dump of `structuredContent` plus
- * `content[1]` with `summary`/`nextStep`. Either way `structuredContent` is the lossless source
- * of truth — programmatic consumers read it, not `content[]`.
+ * `content[0]` is the JSON-stringified `structuredContent`; `content[1]` carries `summary`/`nextStep`
+ * as plain text. `structuredContent` is the lossless source of truth — programmatic consumers read
+ * it, not `content[]`.
  */
 export function buildStorageResponse(params: {
     structuredContent: Record<string, unknown>;
     summary: string;
     nextStep?: string;
-    toon?: boolean;
     /** Personalized Apify Console link (Console UI token sessions); appended as a trailing text item. */
     apifyConsoleUrl?: string;
 }) {
-    const { structuredContent, summary, nextStep, toon, apifyConsoleUrl } = params;
+    const { structuredContent, summary, nextStep, apifyConsoleUrl } = params;
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
     const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
-    const dataText = toon ? encodeToon(structuredContent) : JSON.stringify(structuredContent);
+    const dataText = JSON.stringify(structuredContent);
     const consoleLinkText = apifyConsoleLinkText(apifyConsoleUrl);
     return buildMCPResponse({
         texts: [dataText, summaryText, ...(consoleLinkText ? [consoleLinkText] : [])],
