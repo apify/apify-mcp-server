@@ -4,7 +4,6 @@ import { parseBooleanOrNull } from '@apify/utilities';
 
 import {
     getValuesByDotKeys,
-    isValidHttpUrl,
     parseCommaSeparatedList,
     parseQueryParamList,
     stripQuoteWrappers,
@@ -178,26 +177,6 @@ describe('stripQuoteWrappers', () => {
     it('strips unpaired leading/trailing quote noise', () => {
         expect(stripQuoteWrappers('ds-1"')).toBe('ds-1');
         expect(stripQuoteWrappers('`ds-1')).toBe('ds-1');
-    });
-});
-
-describe('isValidUrl', () => {
-    it('should validate correct URLs', () => {
-        expect(isValidHttpUrl('http://example.com')).toBe(true);
-        expect(isValidHttpUrl('https://example.com/path?query=string#hash')).toBe(true);
-        expect(isValidHttpUrl('http://localhost:3000')).toBe(true);
-        expect(isValidHttpUrl('http://192.168.1.1')).toBe(true);
-    });
-
-    it('should invalidate incorrect URLs', () => {
-        expect(isValidHttpUrl('ftp://example.com')).toBe(false);
-        expect(isValidHttpUrl('example.com')).toBe(false);
-        expect(isValidHttpUrl('http:/example.com')).toBe(false);
-        expect(isValidHttpUrl('')).toBe(false);
-        expect(isValidHttpUrl('   ')).toBe(false);
-        expect(isValidHttpUrl('http//example.com')).toBe(false);
-        expect(isValidHttpUrl('https//example.com')).toBe(false);
-        expect(isValidHttpUrl('://example.com')).toBe(false);
     });
 });
 

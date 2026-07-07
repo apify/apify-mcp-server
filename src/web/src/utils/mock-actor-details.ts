@@ -1,5 +1,3 @@
-import type { ActorDetails, Actor } from '../types';
-
 /**
  * Mock response for actor details based on the real fetch-actor-details response structure
  * This can be used to populate the detail view for any actor
@@ -232,36 +230,3 @@ export const MOCK_ACTOR_DETAILS_RESPONSE = {
         },
     },
 };
-
-/**
- * Creates mock actor details for any actor
- * Merges the provided actor info with the mock template
- */
-export function createMockActorDetails(actor: Actor): ActorDetails {
-    return {
-        actorInfo: {
-            id: actor.id,
-            url: actor.url,
-            name: actor.name,
-            username: actor.username,
-            title: actor.title || actor.name,
-            description: actor.description,
-            pictureUrl: actor.pictureUrl,
-            stats: actor.stats,
-            currentPricingInfo: actor.currentPricingInfo,
-        },
-        readme: MOCK_ACTOR_DETAILS_RESPONSE.structuredContent.actorDetails.readme,
-        inputSchema: MOCK_ACTOR_DETAILS_RESPONSE.structuredContent.actorDetails.inputSchema,
-        actorCard: JSON.stringify(
-            {
-                id: actor.id,
-                name: actor.name,
-                username: actor.username,
-                title: actor.title || actor.name,
-                url: `https://apify.com/${actor.username}/${actor.name}`,
-            },
-            null,
-            2,
-        ),
-    };
-}

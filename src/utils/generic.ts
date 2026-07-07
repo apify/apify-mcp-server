@@ -122,21 +122,3 @@ export function computeValueBytes(value: unknown): number | undefined {
         return undefined;
     }
 }
-
-/**
- * Validates whether a given string is a well-formed URL.
- *
- * Allows only valid HTTP or HTTPS URLs.
- */
-export function isValidHttpUrl(urlString: string): boolean {
-    if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
-        return false;
-    }
-    try {
-        /* eslint-disable no-new */
-        new URL(urlString);
-        return true;
-    } catch {
-        return false;
-    }
-}
