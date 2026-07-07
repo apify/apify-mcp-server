@@ -5,7 +5,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools, MAX_INLINE_BYTES } from '../../src/const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { getKeyValueStoreRecord } from '../../src/tools/storage/get_key_value_store_record.js';
 import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -48,7 +48,7 @@ function stubApifyClient(opts: {
 
 describe('get-key-value-store-record', () => {
     it('has the expected tool name', () => {
-        expect(getKeyValueStoreRecord.name).toBe(HelperTools.KEY_VALUE_STORE_RECORD_GET);
+        expect(getKeyValueStoreRecord.name).toBe(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
     });
 
     it('returns a JSON record plus a terminal summary (no nextStep) in structuredContent', async () => {

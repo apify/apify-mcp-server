@@ -1,14 +1,14 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, TOOL_STATUS } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
+import { buildUsageMeta, respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import {
     applyConsoleLinks,
     type FetchActorRunResult,
@@ -40,9 +40,9 @@ Returns run result: status, storages (datasets/keyValueStores alias map), stats,
 - waitSecs (0–${WAIT_SECS_MAX}, default ${WAIT_SECS_DEFAULT}) waits up to that many seconds for terminal status before returning.
 
 USAGE:
-- Use to check the status of a run started with ${HelperTools.ACTOR_CALL}.
+- Use to check the status of a run started with ${HELPER_TOOLS.ACTOR_CALL}.
 - Pass waitSecs > 0 to block until terminal (or until the cap elapses).
-- If \`${HelperTools.ACTOR_CALL_WIDGET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` rendered a widget for this run, do NOT poll here — the widget self-polls.
+- If \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` or \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` rendered a widget for this run, do NOT poll here — the widget self-polls.
 
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc
@@ -54,7 +54,7 @@ USAGE EXAMPLES:
  */
 export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_RUNS_GET,
+    name: HELPER_TOOLS.ACTOR_RUNS_GET,
     title: 'Get Actor run',
     description: GET_ACTOR_RUN_DESCRIPTION,
     // `fixZodSchemaRequired` strips fields with a real `default` from `required` so MCP clients
@@ -76,18 +76,12 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
 // Response builders
 // -----------------------------------------------------------------------------
 
-export function buildGetActorRunError(runId: string, error: unknown): ReturnType<typeof buildMCPResponse> {
+export function buildGetActorRunError(runId: string, error: unknown): ToolResponse {
     const errMsg = error instanceof Error ? error.message : String(error);
-    return buildMCPResponse({
-        texts: [
-            dedent`
-            Failed to get Actor run '${runId}': ${errMsg}.
-            Please verify the run ID and ensure that the run exists.
-        `,
-        ],
-        isError: true,
-        telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
-    });
+    return respondUserError(dedent`
+        Failed to get Actor run '${runId}': ${errMsg}.
+        Please verify the run ID and ensure that the run exists.
+    `);
 }
 
 /**
@@ -97,36 +91,37 @@ export function buildGetActorRunError(runId: string, error: unknown): ReturnType
  */
 export function buildGetActorRunSuccessResponse(
     params: FetchActorRunResult & { widget: boolean; linkContext?: ConsoleLinkContext },
-): ReturnType<typeof buildMCPResponse> {
+): ToolResponse {
     const { run, structuredContent, widget, linkContext } = params;
 
     if (!widget) {
         // Mints the `apifyConsoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
         const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
-        return buildMCPResponse({
-            texts: [
+        return respondOk(
+            [
                 JSON.stringify(structuredContent),
                 `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinks}`,
             ],
-            structuredContent,
-            _meta: buildUsageMeta(run),
-        });
+            { structuredContent, meta: buildUsageMeta(run) },
+        );
     }
 
     // Override nextStep so the model reading structuredContent (content[0]) also sees no-poll guidance.
     const widgetContent = { ...structuredContent, nextStep: WIDGET_NO_POLL_NEXT_STEP };
-    return buildMCPResponse({
-        texts: [
+    return respondOk(
+        [
             JSON.stringify(widgetContent),
             `Actor run ${structuredContent.runId} status: ${structuredContent.status}. A run widget has been rendered.`,
         ],
-        structuredContent: widgetContent,
-        _meta: {
-            ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
-            ...(buildUsageMeta(run) ?? {}),
-            'openai/widgetDescription': `Actor run progress for ${structuredContent.actorName ?? structuredContent.runId}`,
+        {
+            structuredContent: widgetContent,
+            meta: {
+                ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
+                ...(buildUsageMeta(run) ?? {}),
+                'openai/widgetDescription': `Actor run progress for ${structuredContent.actorName ?? structuredContent.runId}`,
+            },
         },
-    });
+    );
 }
 
 /**

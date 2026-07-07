@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { getKeyValueStoreKeys } from '../../src/tools/storage/get_key_value_store_keys.js';
 import { keyValueStoreKeysOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -45,7 +45,7 @@ function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] 
 
 describe('get-key-value-store-keys', () => {
     it('has the expected tool name', () => {
-        expect(getKeyValueStoreKeys.name).toBe(HelperTools.KEY_VALUE_STORE_KEYS_GET);
+        expect(getKeyValueStoreKeys.name).toBe(HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET);
     });
 
     it('returns the keys response plus a summary and read nextStep in structuredContent', async () => {
@@ -62,7 +62,7 @@ describe('get-key-value-store-keys', () => {
         expect(structuredContent.summary).toBe('Listed 2 keys.');
         // nextStep points at reading the first listed key.
         expect(structuredContent.nextStep).toBe(
-            `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=kv-1 and recordKey=INPUT to read a value.`,
+            `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=kv-1 and recordKey=INPUT to read a value.`,
         );
         // content[0] ships the TOON-fenced data; content[1] carries the prose summary + nextStep.
         const { summary, nextStep, ...data } = structuredContent;
@@ -97,7 +97,7 @@ describe('get-key-value-store-keys', () => {
 
         expect(structuredContent.summary).toBe('Listed 2 keys (more available).');
         expect(structuredContent.nextStep).toBe(
-            `Call ${HelperTools.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=OUTPUT to fetch the next page.`,
+            `Call ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=OUTPUT to fetch the next page.`,
         );
     });
 
@@ -110,7 +110,7 @@ describe('get-key-value-store-keys', () => {
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
         expect(structuredContent.summary).toBe('Listed 0 keys.');
-        expect(structuredContent.nextStep).toContain(HelperTools.KEY_VALUE_STORE_GET);
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_GET);
     });
 
     it('forwards exclusiveStartKey and limit to listKeys', async () => {

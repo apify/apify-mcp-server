@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import { buildStats, buildStatusSummaryNextStep, type RunResponse, toIsoString } from '../actors/actor_run_response.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
@@ -21,7 +21,7 @@ const abortRunArgs = z.object({
  */
 export const abortActorRun: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_RUNS_ABORT,
+    name: HELPER_TOOLS.ACTOR_RUNS_ABORT,
     title: 'Abort Actor run',
     description: `Abort an Actor run that is currently starting or running.
 For runs with status FINISHED, FAILED, ABORTING, or TIMED-OUT, this call has no effect.
@@ -69,9 +69,6 @@ USAGE EXAMPLES:
             nextStep,
         };
 
-        return buildMCPResponse({
-            texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}`],
-            structuredContent,
-        });
+        return respondOk([JSON.stringify(structuredContent), `${summary}\n${nextStep}`], { structuredContent });
     },
 } as const);

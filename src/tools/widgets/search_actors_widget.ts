@@ -1,14 +1,14 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { formatActorForWidget } from '../../utils/actor_card.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { buildSearchActorsResult, searchActorsBaseArgsSchema } from '../actors/search_actors.js';
 import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
@@ -29,7 +29,7 @@ const SEARCH_ACTORS_WIDGET_DESCRIPTION = dedent`
     The response renders as an interactive widget the user can view directly.
 
     For silent name resolution before running an Actor (e.g., "scrape google maps" — you need to
-    find the right Actor first, then fetch its schema and call it), use ${HelperTools.STORE_SEARCH}
+    find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH}
     instead — it returns the same data without rendering a widget.
 
     Input: keywords (plus optional limit/offset). Output fields are fixed by the widget contract.
@@ -37,7 +37,7 @@ const SEARCH_ACTORS_WIDGET_DESCRIPTION = dedent`
 
 export const searchActorsWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.STORE_SEARCH_WIDGET,
+    name: HELPER_TOOLS.STORE_SEARCH_WIDGET,
     title: 'Search Actors (widget)',
     description: SEARCH_ACTORS_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(searchActorsWidgetArgsSchema) as ToolInputSchema,
@@ -78,8 +78,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
                 You MUST retry with broader, more generic keywords - use just the platform name
                 (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
             `;
-            return buildMCPResponse({
-                texts: [instructions],
+            return respondOk(instructions, {
                 structuredContent: {
                     actors: [],
                     query: parsed.keywords,
@@ -111,11 +110,10 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         ];
 
         const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
-        return buildMCPResponse({
-            texts,
+        return respondOk(texts, {
             structuredContent,
             // Response-level meta; only returned in apps mode (this handler is apps-only).
-            _meta: {
+            meta: {
                 ...widgetConfig?.meta,
                 'openai/widgetDescription': `Interactive actor search results showing ${actors.length} ${actors.length === 1 ? 'actor' : 'actors'} from Apify Store`,
             },

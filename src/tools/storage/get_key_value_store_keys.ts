@@ -1,15 +1,16 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreKeysOutputSchema } from '../structured_output_schemas.js';
-import { buildKvsKeysSummaryNextStep, buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
+import { buildKvsKeysSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -25,7 +26,7 @@ const getKeyValueStoreKeysArgs = z.object({
  */
 export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
+    name: HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
     title: 'Get key-value store keys',
     description: dedent`
         List keys in a key-value store with optional pagination.
@@ -65,7 +66,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
                 throw err;
             });
         if (!keys) {
-            return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
+            return respondUserError(`Key-value store '${keyValueStoreId}' not found.`);
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const { summary, nextStep } = buildKvsKeysSummaryNextStep({

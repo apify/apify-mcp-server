@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { CATEGORY_NAMES, getCategoryTools, toolCategories } from '../../src/tools/index.js';
 import type { ToolCategory, ToolEntry } from '../../src/types.js';
 
@@ -50,8 +50,8 @@ describe('getCategoryTools', () => {
         // call-actor still has mode-specific variants — distinct objects differing only in
         // description (apps mode appends a widget addendum).
         // search-actors and fetch-actor-details are mode-independent and share the same object.
-        const defaultCallActor = defaultResult.actors.find((t: ToolEntry) => t.name === HelperTools.ACTOR_CALL);
-        const appsCallActor = appsResult.actors.find((t: ToolEntry) => t.name === HelperTools.ACTOR_CALL);
+        const defaultCallActor = defaultResult.actors.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_CALL);
+        const appsCallActor = appsResult.actors.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_CALL);
         expect(defaultCallActor).toBeDefined();
         expect(appsCallActor).toBeDefined();
         expect(defaultCallActor).not.toBe(appsCallActor);
@@ -61,8 +61,8 @@ describe('getCategoryTools', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
-        const defaultGetRun = defaultResult.runs.find((t: ToolEntry) => t.name === HelperTools.ACTOR_RUNS_GET);
-        const appsGetRun = appsResult.runs.find((t: ToolEntry) => t.name === HelperTools.ACTOR_RUNS_GET);
+        const defaultGetRun = defaultResult.runs.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_RUNS_GET);
+        const appsGetRun = appsResult.runs.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_RUNS_GET);
 
         expect(defaultGetRun).toBeDefined();
         expect(appsGetRun).toBeDefined();
@@ -85,6 +85,10 @@ describe('getCategoryTools', () => {
         const actorNames = result.actors.map((t: ToolEntry) => t.name);
 
         // Verify workflow order: search → details → call
-        expect(actorNames).toEqual([HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL]);
+        expect(actorNames).toEqual([
+            HELPER_TOOLS.STORE_SEARCH,
+            HELPER_TOOLS.ACTOR_GET_DETAILS,
+            HELPER_TOOLS.ACTOR_CALL,
+        ]);
     });
 });

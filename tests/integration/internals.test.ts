@@ -9,7 +9,7 @@ import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { addActor } from '../../src/tools/actors/add_actor.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
 import type { Input } from '../../src/types.js';
-import { ServerMode } from '../../src/types.js';
+import { SERVER_MODE } from '../../src/types.js';
 import { loadToolsFromInput } from '../../src/utils/tools_loader.js';
 import { ACTOR_NORMAL_MODE } from '../const.js';
 import { expectArrayWeakEquals } from '../helpers.js';
@@ -23,7 +23,7 @@ describe('MCP server internals integration tests', () => {
         const actorsMcpServer = new ActorsMcpServer({
             setupSigintHandler: false,
             taskStore: new InMemoryTaskStore(),
-            serverMode: ServerMode.DEFAULT,
+            serverMode: SERVER_MODE.DEFAULT,
         });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const initialTools = await loadToolsFromInput(
@@ -78,7 +78,7 @@ describe('MCP server internals integration tests', () => {
         const actorsMCPServer = new ActorsMcpServer({
             setupSigintHandler: false,
             taskStore: new InMemoryTaskStore(),
-            serverMode: ServerMode.DEFAULT,
+            serverMode: SERVER_MODE.DEFAULT,
         });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient, 'default');
@@ -121,7 +121,7 @@ describe('MCP server internals integration tests', () => {
         const actorsMCPServer = new ActorsMcpServer({
             setupSigintHandler: false,
             taskStore: new InMemoryTaskStore(),
-            serverMode: ServerMode.DEFAULT,
+            serverMode: SERVER_MODE.DEFAULT,
         });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient, 'default');

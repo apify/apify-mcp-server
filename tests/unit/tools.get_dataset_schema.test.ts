@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { getDatasetSchema } from '../../src/tools/storage/get_dataset_schema.js';
 import { datasetSchemaOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -47,7 +47,7 @@ function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] 
 
 describe('get-dataset-schema', () => {
     it('has the expected tool name', () => {
-        expect(getDatasetSchema.name).toBe(HelperTools.DATASET_SCHEMA_GET);
+        expect(getDatasetSchema.name).toBe(HELPER_TOOLS.DATASET_SCHEMA_GET);
     });
 
     it('returns the inferred schema plus a summary and nextStep on the happy path', async () => {
@@ -63,7 +63,7 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.schema).toMatchObject({ type: 'array' });
         // MOCK_ITEMS has 2 items, each with 2 fields (title, count).
         expect(structuredContent.summary).toBe('Schema inferred from 2 items, 2 fields.');
-        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
@@ -90,7 +90,7 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.datasetId).toBe('ds-1');
         expect(structuredContent.schema).toEqual({});
         expect(structuredContent.summary).toBe("Dataset 'ds-1' is empty; no schema to infer.");
-        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
         // The required `schema` is still present (empty object) and the emit conforms to the schema.
         expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);

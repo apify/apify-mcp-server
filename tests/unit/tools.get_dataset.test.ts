@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { getDataset } from '../../src/tools/storage/get_dataset.js';
 import { datasetMetadataOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -34,7 +34,7 @@ function stubApifyClient(dataset: unknown): InternalToolArgs['apifyClient'] {
 
 describe('get-dataset', () => {
     it('has the expected tool name', () => {
-        expect(getDataset.name).toBe(HelperTools.DATASET_GET);
+        expect(getDataset.name).toBe(HELPER_TOOLS.DATASET_GET);
     });
 
     it('returns dataset metadata plus a summary and nextStep in structuredContent', async () => {
@@ -49,7 +49,7 @@ describe('get-dataset', () => {
         // structuredContent preserves the metadata and adds the narrative fields.
         expect(structuredContent).toMatchObject(MOCK_DATASET);
         expect(structuredContent.summary).toBe("Dataset 'my-dataset' has 42 items, 2 fields.");
-        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
         // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
         const { summary, nextStep, ...data } = structuredContent;

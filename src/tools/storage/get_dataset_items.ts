@@ -1,15 +1,16 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildDatasetItemsSummaryNextStep, buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
+import { buildDatasetItemsSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
 
 export const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
@@ -64,11 +65,11 @@ const getDatasetItemsArgs = z.object({
  */
 export const getDatasetItems: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.DATASET_GET_ITEMS,
+    name: HELPER_TOOLS.DATASET_GET_ITEMS,
     title: 'Get dataset items',
     description: dedent`
         Retrieve dataset items with pagination, sorting, and field selection.
-        Items can be large; when you only need specific columns, pass fields to reduce response size (use ${HelperTools.DATASET_GET} first if you don't know the field names).
+        Items can be large; when you only need specific columns, pass fields to reduce response size (use ${HELPER_TOOLS.DATASET_GET} first if you don't know the field names).
         For nested fields use dot notation (e.g., fields="metadata.url") — the server auto-flattens parent prefixes.
         Defaults limit to ${DEFAULT_DATASET_ITEMS_LIMIT}. Use clean=true to skip empty items and hidden fields.
 
@@ -123,7 +124,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
                 throw err;
             });
         if (!v) {
-            return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
+            return respondUserError(`Dataset '${datasetId}' not found.`);
         }
 
         const offset = parsed.offset ?? 0;

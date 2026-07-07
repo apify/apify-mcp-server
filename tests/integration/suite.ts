@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { ApifyClient } from '../../src/apify_client.js';
 import {
     defaults,
-    HelperTools,
+    HELPER_TOOLS,
     MAX_LIMIT_WITH_INPUT_SCHEMA,
     SERVER_MODE_AUTO_DETECTION_ENABLED,
 } from '../../src/const.js';
@@ -18,7 +18,7 @@ import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/actors/cal
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
+import type { SERVER_MODE, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
 import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
@@ -30,7 +30,7 @@ const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 // Helper to find tool by name, resolving categories for the given mode on each call.
 // This ensures we always validate against the correct mode-specific tool definition
 // (e.g. outputSchema may diverge between modes in the future).
-function findToolByName(name: string, mode: ServerMode): ToolEntry | undefined {
+function findToolByName(name: string, mode: SERVER_MODE): ToolEntry | undefined {
     const resolved = getCategoryTools(mode);
     for (const tools of Object.values(resolved)) {
         const tool = tools.find((t) => t.name === name);
@@ -126,16 +126,16 @@ function expectReadmeInStructuredContent(result: unknown, expectedActorFullName?
     expect(r.structuredContent?.inputSchema).toBeDefined();
 }
 
-function validateStructuredOutputForTool(result: unknown, toolName: string, mode: ServerMode): void {
+function validateStructuredOutputForTool(result: unknown, toolName: string, mode: SERVER_MODE): void {
     validateStructuredOutput(result, findToolByName(toolName, mode)?.outputSchema, toolName);
 }
 
 /** Validates that the listed tools have widget metadata (_meta) with MCP Apps ui.* keys. */
 function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
     const toolNames = [
-        HelperTools.STORE_SEARCH_WIDGET,
-        HelperTools.ACTOR_GET_DETAILS_WIDGET,
-        HelperTools.ACTOR_CALL_WIDGET,
+        HELPER_TOOLS.STORE_SEARCH_WIDGET,
+        HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
+        HELPER_TOOLS.ACTOR_CALL_WIDGET,
     ];
     for (const toolName of toolNames) {
         const tool = tools.tools.find((t) => t.name === toolName);
@@ -246,7 +246,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expectToolNamesToContain(names, getDefaultToolNames());
                 expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
                 // get-actor-run + storage/abort helpers are auto-injected alongside call-actor.
-                expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
+                expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                 await client.close();
             });
@@ -270,7 +270,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expectToolNamesToContain(names, expectedActors);
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                 // get-actor-run should be automatically included when call-actor is present
-                expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
+                expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
 
                 await client.close();
             });
@@ -310,7 +310,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                 // get-actor-run should be automatically included when call-actor is present
-                expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
+                expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
 
                 await client.close();
             });
@@ -524,13 +524,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const numberOfTools = getCategoryTools('default').actors.length + 1 + AUTO_INJECTED_TOOL_NAMES.length;
                 expect(names).toHaveLength(numberOfTools);
                 // get-actor-run should be automatically included when call-actor is present
-                expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
+                expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                 // Check that the Actor is not in the tools list
                 expect(names).not.toContain(selectedToolName);
 
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: {
@@ -557,7 +557,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 // Should fail without input (AJV validation error)
                 await expect(
                     client!.callTool({
-                        name: HelperTools.ACTOR_CALL,
+                        name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
                             actor: ACTOR_NORMAL_MODE,
                         },
@@ -566,7 +566,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Should succeed with input
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
@@ -579,7 +579,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ tools: ['actors'] });
 
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
@@ -588,7 +588,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     },
                 });
 
-                validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
+                validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
                 expectNormalModeTestStructuredContent(callResult);
 
                 const sc = (callResult as { structuredContent?: { status?: string; summary?: string } })
@@ -603,7 +603,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ tools: ['actors'] });
 
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
@@ -611,7 +611,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     },
                 });
 
-                validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
+                validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
 
                 const sc = (callResult as { structuredContent?: { runId?: string; status?: string } })
                     .structuredContent;
@@ -624,7 +624,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ tools: ['actors'] });
 
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
@@ -635,7 +635,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // previewOutput is deprecated and ignored; the response is the canonical RunResponse
                 // regardless of the flag. Validate the metadata is intact.
-                validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
+                validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
                 expectNormalModeTestStructuredContent(callResult);
             });
 
@@ -643,7 +643,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ tools: ['actors'] });
 
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
@@ -669,7 +669,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ tools: ['actors'] });
 
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
@@ -679,7 +679,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // The canonical response doesn't inline preview items — agents fetch them via
                 // get-dataset-items using the dataset id and the fields list surfaced here.
-                validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
+                validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
                 expectNormalModeTestStructuredContent(callResult);
 
                 const sc = (
@@ -698,7 +698,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ tools: ['actors'] });
 
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
@@ -708,7 +708,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 expect(callResult.isError).not.toBe(true);
                 // Schema validation must accept the alias entries (additionalProperties: full dataset shape).
-                validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
+                validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
                 const sc = (
                     callResult as {
                         structuredContent?: {
@@ -729,7 +729,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.STORE_SEARCH,
+                    name: HELPER_TOOLS.STORE_SEARCH,
                     arguments: {
                         keywords: query,
                         limit: 5,
@@ -746,7 +746,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn();
 
                 const result = await client.callTool({
-                    name: HelperTools.STORE_SEARCH,
+                    name: HELPER_TOOLS.STORE_SEARCH,
                     arguments: {
                         keywords: 'rental',
                         limit: MAX_LIMIT_WITH_INPUT_SCHEMA,
@@ -774,7 +774,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     }
                 });
                 // Add Actor dynamically
-                await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: ACTOR_NORMAL_MODE } });
+                await client.callTool({ name: HELPER_TOOLS.ACTOR_ADD, arguments: { actor: ACTOR_NORMAL_MODE } });
 
                 expect(hasReceivedNotification).toBe(true);
             });
@@ -783,7 +783,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ enableAddingActors: true });
                 const nonExistentActor = 'apify/this-actor-does-not-exist';
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_ADD,
+                    name: HELPER_TOOLS.ACTOR_ADD,
                     arguments: { actor: nonExistentActor },
                 });
                 expect(result).toBeDefined();
@@ -798,7 +798,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 async () => {
                     client = await createClientFn({ enableAddingActors: true, payment: 'x402' });
                     const result = await client.callTool({
-                        name: HelperTools.ACTOR_ADD,
+                        name: HELPER_TOOLS.ACTOR_ADD,
                         arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER },
                     });
                     expect(result).toBeDefined();
@@ -852,7 +852,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 await client.listTools();
 
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`,
                         input: { firstNumber: 2, secondNumber: 3 },
@@ -885,7 +885,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({
                     tools: ['docs'],
                 });
-                const toolName = HelperTools.DOCS_SEARCH;
+                const toolName = HELPER_TOOLS.DOCS_SEARCH;
 
                 const query = 'standby actor';
                 const result = await client.callTool({
@@ -911,7 +911,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 const documentUrl = 'https://docs.apify.com/academy/getting-started/creating-actors';
                 const result = await client.callTool({
-                    name: HelperTools.DOCS_FETCH,
+                    name: HELPER_TOOLS.DOCS_FETCH,
                     arguments: {
                         url: documentUrl,
                     },
@@ -929,7 +929,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 const forbiddenUrl = 'https://example.com/some-page';
                 const result = await client.callTool({
-                    name: HelperTools.DOCS_FETCH,
+                    name: HELPER_TOOLS.DOCS_FETCH,
                     arguments: {
                         url: forbiddenUrl,
                     },
@@ -952,7 +952,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 const crawleeDocsUrl = 'https://crawlee.dev/js/docs/quick-start';
                 const result = await client.callTool({
-                    name: HelperTools.DOCS_FETCH,
+                    name: HELPER_TOOLS.DOCS_FETCH,
                     arguments: {
                         url: crawleeDocsUrl,
                     },
@@ -970,7 +970,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({
                     tools: ['docs'],
                 });
-                const toolName = HelperTools.DOCS_SEARCH;
+                const toolName = HELPER_TOOLS.DOCS_SEARCH;
 
                 const query = 'standby actor';
                 const result = await client.callTool({
@@ -985,14 +985,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const content = result.content as { text: string; isError?: boolean }[];
                 expect(content.length).toBeGreaterThan(0);
 
-                validateStructuredOutputForTool(result, HelperTools.DOCS_SEARCH, 'default');
+                validateStructuredOutputForTool(result, HELPER_TOOLS.DOCS_SEARCH, 'default');
             });
 
             it('should return structured output for fetch-actor-details matching outputSchema', async () => {
                 client = await createClientFn({
                     tools: ['actors'],
                 });
-                const toolName = HelperTools.ACTOR_GET_DETAILS;
+                const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
                 const result = await client.callTool({
                     name: toolName,
@@ -1004,7 +1004,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const content = result.content as { text: string; isError?: boolean }[];
                 expect(content.length).toBeGreaterThan(0);
 
-                validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             });
 
             it('should return only input schema when output={ inputSchema: true }', async () => {
@@ -1013,7 +1013,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1041,7 +1041,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1069,7 +1069,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_EXAMPLE_MCP_SERVER,
                         output: {
@@ -1096,7 +1096,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1120,7 +1120,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({
                     tools: ['actors'],
                 });
-                const toolName = HelperTools.ACTOR_GET_DETAILS;
+                const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
                 // Test with output={ mcpTools: true } - should validate against schema even with selective fields
                 const result = await client.callTool({
@@ -1144,14 +1144,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(content.length).toBeGreaterThan(0);
 
                 // This should validate successfully - structured output must match schema
-                validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             });
 
             it('should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema', async () => {
                 client = await createClientFn({
                     tools: ['actors'],
                 });
-                const toolName = HelperTools.ACTOR_GET_DETAILS;
+                const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
                 // Test with output={ description: true, readme: true } - inputSchema should be undefined
                 const result = await client.callTool({
@@ -1175,7 +1175,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(content.length).toBeGreaterThan(0);
 
                 // This should validate successfully - structured output must match schema
-                validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             });
 
             it('should return only pricing when output={ pricing: true }', async () => {
@@ -1184,7 +1184,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1207,7 +1207,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
                 // Validate structured output
-                validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             });
 
             it('should return only readme when output={ readme: true }', async () => {
@@ -1216,7 +1216,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1239,7 +1239,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
                 // Validate structured output
-                validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             });
 
             it('should return README content (summary or full) in text and structured response for fetch-actor-details', async () => {
@@ -1272,7 +1272,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 validateStructuredOutput(
                     result,
-                    findToolByName(HelperTools.ACTOR_GET_DETAILS, 'default')?.outputSchema,
+                    findToolByName(HELPER_TOOLS.ACTOR_GET_DETAILS, 'default')?.outputSchema,
                     'fetch-actor-details',
                 );
             });
@@ -1315,7 +1315,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // When output is not provided, all fields should default to their default values
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                     },
@@ -1335,7 +1335,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1366,7 +1366,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(resultWithStructured.structuredContent?.inputSchema).toBeDefined();
 
                 // Validate against schema
-                validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             });
 
             it('should support granular output controls for rating and metadata', async () => {
@@ -1376,7 +1376,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Test 1: Only pricing (should include pricing, NOT other sections)
                 const pricingOnlyResult = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1408,7 +1408,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Test 2: Only rating
                 const ratingOnlyResult = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1441,7 +1441,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Test 3: Only metadata (should include developer, categories, last modified, deprecation status)
                 const metadataOnlyResult = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1472,7 +1472,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Test 4: Combination - pricing + rating + metadata (should exclude description, stats, readme, input-schema)
                 const combinationResult = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1504,10 +1504,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(combinationText).not.toContain('Input schema');
 
                 // Validate structured output for all test cases
-                validateStructuredOutputForTool(pricingOnlyResult, HelperTools.ACTOR_GET_DETAILS, 'default');
-                validateStructuredOutputForTool(ratingOnlyResult, HelperTools.ACTOR_GET_DETAILS, 'default');
-                validateStructuredOutputForTool(metadataOnlyResult, HelperTools.ACTOR_GET_DETAILS, 'default');
-                validateStructuredOutputForTool(combinationResult, HelperTools.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(pricingOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(ratingOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(metadataOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(combinationResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             });
 
             it('should dynamically test all output options and verify section presence/absence', async () => {
@@ -1610,7 +1610,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 // Test each output option individually
                 for (const option of outputOptions) {
                     const result = await client.callTool({
-                        name: HelperTools.ACTOR_GET_DETAILS,
+                        name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                         arguments: {
                             actor: ACTOR_NORMAL_MODE,
                             output: {
@@ -1642,12 +1642,12 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     }
 
                     // Validate structured output
-                    validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
+                    validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
                 }
 
                 // Test a combination: all actor card sections (description, stats, pricing, rating, metadata)
                 const allCardSectionsResult = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -1680,14 +1680,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(allCardText).not.toContain('README');
                 expect(allCardText).not.toContain('Input schema');
 
-                validateStructuredOutputForTool(allCardSectionsResult, HelperTools.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(allCardSectionsResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             });
 
             it('should return structured output for search-actors matching outputSchema', async () => {
                 client = await createClientFn({
                     tools: ['actors'],
                 });
-                const toolName = HelperTools.STORE_SEARCH;
+                const toolName = HELPER_TOOLS.STORE_SEARCH;
 
                 const result = await client.callTool({
                     name: toolName,
@@ -1701,14 +1701,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const content = result.content as { text: string; isError?: boolean }[];
                 expect(content.length).toBeGreaterThan(0);
 
-                validateStructuredOutputForTool(result, HelperTools.STORE_SEARCH, 'default');
+                validateStructuredOutputForTool(result, HELPER_TOOLS.STORE_SEARCH, 'default');
             });
 
             it('should return structured output for fetch-apify-docs matching outputSchema', async () => {
                 client = await createClientFn({
                     tools: ['docs'],
                 });
-                const toolName = HelperTools.DOCS_FETCH;
+                const toolName = HELPER_TOOLS.DOCS_FETCH;
 
                 const result = await client.callTool({
                     name: toolName,
@@ -1720,7 +1720,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const content = result.content as { text: string; isError?: boolean }[];
                 expect(content.length).toBeGreaterThan(0);
 
-                validateStructuredOutputForTool(result, HelperTools.DOCS_FETCH, 'default');
+                validateStructuredOutputForTool(result, HELPER_TOOLS.DOCS_FETCH, 'default');
             });
 
             it.for(Object.keys(getCategoryTools('default')))(
@@ -1750,20 +1750,20 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const loadedTools = await client.listTools();
                 const toolNames = getToolNames(loadedTools);
 
-                expect(toolNames).toContain(HelperTools.ACTOR_ADD);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_ADD);
             });
 
             it('should include add-actor when enableAddingActors is false and add-actor is selected directly', async () => {
                 client = await createClientFn({
                     enableAddingActors: false,
-                    tools: [HelperTools.ACTOR_ADD],
+                    tools: [HELPER_TOOLS.ACTOR_ADD],
                 });
 
                 const loadedTools = await client.listTools();
                 const toolNames = getToolNames(loadedTools);
 
                 // Must include add-actor since it was selected directly
-                expect(toolNames).toContain(HelperTools.ACTOR_ADD);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_ADD);
             });
 
             it('should handle multiple tool category keys input correctly', async () => {
@@ -1859,7 +1859,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                             {
                                 method: 'tools/call' as const,
                                 params: {
-                                    name: HelperTools.ACTOR_CALL,
+                                    name: HELPER_TOOLS.ACTOR_CALL,
                                     arguments: {
                                         actor: ACTOR_NORMAL_MODE,
                                         step: 'call',
@@ -1903,7 +1903,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
                     expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                     // get-actor-run should be automatically included when call-actor is present
-                    expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
+                    expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
 
                     await client.close();
                 },
@@ -1929,10 +1929,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     client = await createClientFn({ tools: ['docs'], useEnv: true });
                     const toolNames = getToolNames(await client.listTools());
 
-                    expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
-                    expect(toolNames).toContain(HelperTools.DOCS_FETCH);
-                    expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
-                    expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_GET);
+                    expect(toolNames).toContain(HELPER_TOOLS.DOCS_SEARCH);
+                    expect(toolNames).toContain(HELPER_TOOLS.DOCS_FETCH);
+                    expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+                    expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
                 },
             );
 
@@ -1941,11 +1941,11 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const tools = await client.listTools();
                 const names = tools.tools.map((t) => t.name);
 
-                const callIndex = names.indexOf(HelperTools.ACTOR_CALL);
-                const runIndex = names.indexOf(HelperTools.ACTOR_RUNS_GET);
-                const datasetIndex = names.indexOf(HelperTools.DATASET_GET_ITEMS);
-                const kvIndex = names.indexOf(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-                const abortIndex = names.indexOf(HelperTools.ACTOR_RUNS_ABORT);
+                const callIndex = names.indexOf(HELPER_TOOLS.ACTOR_CALL);
+                const runIndex = names.indexOf(HELPER_TOOLS.ACTOR_RUNS_GET);
+                const datasetIndex = names.indexOf(HELPER_TOOLS.DATASET_GET_ITEMS);
+                const kvIndex = names.indexOf(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+                const abortIndex = names.indexOf(HELPER_TOOLS.ACTOR_RUNS_ABORT);
 
                 expect(callIndex).toBeGreaterThanOrEqual(0);
                 expect(callIndex).toBeLessThan(runIndex);
@@ -1960,7 +1960,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ tools: ['docs'] });
                 const names = getToolNames(await client.listTools());
                 for (const name of AUTO_INJECTED_TOOL_NAMES) expect(names).not.toContain(name);
-                expect(names).not.toContain(HelperTools.ACTOR_RUNS_GET);
+                expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
                 await client.close();
             });
 
@@ -1972,7 +1972,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 beforeAll(async () => {
                     const setupClient = await createClientFn({ tools: ['actors', 'storage'] });
                     const callResult = await setupClient.callTool({
-                        name: HelperTools.ACTOR_CALL,
+                        name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
                             actor: ACTOR_NORMAL_MODE,
                             input: { firstNumber: 1, secondNumber: 2 },
@@ -2001,7 +2001,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 it('applies the default `limit` of 20 when omitted on get-dataset-items', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({
-                        name: HelperTools.DATASET_GET_ITEMS,
+                        name: HELPER_TOOLS.DATASET_GET_ITEMS,
                         arguments: { datasetId },
                     });
                     expect(result.isError).not.toBe(true);
@@ -2015,7 +2015,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 it("reads INPUT from the run's default KV store via get-actor-run + get-key-value-store-record", async () => {
                     client = await createClientFn({ tools: ['runs', 'storage'] });
                     const runResult = await client.callTool({
-                        name: HelperTools.ACTOR_RUNS_GET,
+                        name: HELPER_TOOLS.ACTOR_RUNS_GET,
                         arguments: { runId },
                     });
                     expect(runResult.isError).not.toBe(true);
@@ -2028,7 +2028,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(kvId).toBeDefined();
 
                     const kvResult = await client.callTool({
-                        name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
+                        name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
                         arguments: { keyValueStoreId: kvId!, recordKey: 'INPUT' },
                     });
                     expect(kvResult.isError).not.toBe(true);
@@ -2044,7 +2044,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 it('returns dataset metadata via get-dataset', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({
-                        name: HelperTools.DATASET_GET,
+                        name: HELPER_TOOLS.DATASET_GET,
                         arguments: { datasetId },
                     });
                     expect(result.isError).not.toBe(true);
@@ -2055,14 +2055,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } })
                         .structuredContent;
                     expect(sc?.summary).toContain('items');
-                    expect(sc?.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
+                    expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
                     await client.close();
                 });
 
                 it('infers schema from dataset items via get-dataset-schema', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({
-                        name: HelperTools.DATASET_SCHEMA_GET,
+                        name: HELPER_TOOLS.DATASET_SCHEMA_GET,
                         arguments: { datasetId },
                     });
                     expect(result.isError).not.toBe(true);
@@ -2074,14 +2074,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } })
                         .structuredContent;
                     expect(sc?.summary).toContain('Schema inferred');
-                    expect(sc?.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
+                    expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
                     await client.close();
                 });
 
                 it('lists user datasets and finds the run dataset via get-dataset-list', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({
-                        name: HelperTools.DATASET_LIST_GET,
+                        name: HELPER_TOOLS.DATASET_LIST_GET,
                         arguments: { desc: true, unnamed: true, limit: 20 },
                     });
                     expect(result.isError).not.toBe(true);
@@ -2096,21 +2096,21 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 it('returns key-value store metadata via get-key-value-store', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({
-                        name: HelperTools.KEY_VALUE_STORE_GET,
+                        name: HELPER_TOOLS.KEY_VALUE_STORE_GET,
                         arguments: { keyValueStoreId: defaultKvId },
                     });
                     expect(result.isError).not.toBe(true);
                     const { text } = (result.content as { text: string }[])[0];
                     expect(text).toContain(defaultKvId);
                     const sc = (result as { structuredContent?: { nextStep?: string } }).structuredContent;
-                    expect(sc?.nextStep).toContain(HelperTools.KEY_VALUE_STORE_KEYS_GET);
+                    expect(sc?.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET);
                     await client.close();
                 });
 
                 it('lists keys in the run KV store via get-key-value-store-keys', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({
-                        name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
+                        name: HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
                         arguments: { keyValueStoreId: defaultKvId, limit: 10 },
                     });
                     expect(result.isError).not.toBe(true);
@@ -2123,14 +2123,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } })
                         .structuredContent;
                     expect(sc?.summary).toContain('keys');
-                    expect(sc?.nextStep).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
+                    expect(sc?.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
                     await client.close();
                 });
 
                 it('lists user key-value stores and finds the run KV store via get-key-value-store-list', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({
-                        name: HelperTools.KEY_VALUE_STORE_LIST_GET,
+                        name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
                         arguments: { desc: true, unnamed: true, limit: 10 },
                     });
                     expect(result.isError).not.toBe(true);
@@ -2148,7 +2148,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 it('flattens 3-level nested fields via get-dataset-items', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({
-                        name: HelperTools.DATASET_GET_ITEMS,
+                        name: HELPER_TOOLS.DATASET_GET_ITEMS,
                         arguments: { datasetId, fields: 'math.factorial.first' },
                     });
                     expect(result.isError).not.toBe(true);
@@ -2190,7 +2190,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ tools: ['storage'] });
                 await expect(
                     client.callTool({
-                        name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
+                        name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
                         arguments: { recordKey: 'INPUT' },
                     }),
                 ).rejects.toThrow(/must have required property 'keyValueStoreId'/);
@@ -2238,7 +2238,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(new Set(fields).size).toBe(fields.length);
 
                 const outputResult = await client.callTool({
-                    name: HelperTools.DATASET_GET_ITEMS,
+                    name: HELPER_TOOLS.DATASET_GET_ITEMS,
                     arguments: {
                         datasetId: datasetId!,
                         fields: 'firstNumber,sum',
@@ -2287,14 +2287,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 // content[1] is the LLM-readable summary+nextStep; it must reference the datasetId
                 // and the follow-up tool name so the LLM can act on the result.
                 expect(content[1].text).toContain(datasetId);
-                expect(content[1].text).toContain(HelperTools.DATASET_GET_ITEMS);
+                expect(content[1].text).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
 
                 // Dataset field paths surface in `storages.datasets.default.fields`.
                 const fields = sc?.storages?.datasets?.default?.fields ?? [];
                 expect(fields).toEqual(expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']));
 
                 const outputResult = await client.callTool({
-                    name: HelperTools.DATASET_GET_ITEMS,
+                    name: HELPER_TOOLS.DATASET_GET_ITEMS,
                     arguments: { datasetId: datasetId!, fields: 'sum' },
                 });
 
@@ -2304,7 +2304,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(items!.length).toBeGreaterThan(0);
                 expect(items![0]).toHaveProperty('sum', 10);
 
-                validateStructuredOutputForTool(outputResult, HelperTools.DATASET_GET_ITEMS, 'default');
+                validateStructuredOutputForTool(outputResult, HELPER_TOOLS.DATASET_GET_ITEMS, 'default');
 
                 await client.close();
             });
@@ -2337,7 +2337,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(datasetId).toBeDefined();
 
                 const outputResult = await client.callTool({
-                    name: HelperTools.DATASET_GET_ITEMS,
+                    name: HELPER_TOOLS.DATASET_GET_ITEMS,
                     arguments: { datasetId: datasetId! },
                 });
 
@@ -2349,7 +2349,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(items![0]).toHaveProperty('secondNumber', input.secondNumber);
                 expect(items![0]).toHaveProperty('sum', input.firstNumber + input.secondNumber);
 
-                validateStructuredOutputForTool(outputResult, HelperTools.DATASET_GET_ITEMS, 'default');
+                validateStructuredOutputForTool(outputResult, HELPER_TOOLS.DATASET_GET_ITEMS, 'default');
             });
 
             it('should return structured output for get-actor-run matching outputSchema', async () => {
@@ -2357,7 +2357,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // First, start an async actor run to get a runId
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
@@ -2371,13 +2371,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Now test get-actor-run
                 const runResult = await client.callTool({
-                    name: HelperTools.ACTOR_RUNS_GET,
+                    name: HELPER_TOOLS.ACTOR_RUNS_GET,
                     arguments: { runId },
                 });
 
                 expect(runResult.content).toBeDefined();
                 // Validate structured output for get-actor-run
-                validateStructuredOutputForTool(runResult, HelperTools.ACTOR_RUNS_GET, 'default');
+                validateStructuredOutputForTool(runResult, HELPER_TOOLS.ACTOR_RUNS_GET, 'default');
             });
 
             it('should return Actor details both for full Actor name and ID', async () => {
@@ -2412,7 +2412,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // First, run an actor to get a datasetId
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 3, secondNumber: 4 },
@@ -2429,13 +2429,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Now test get-dataset-items
                 const datasetResult = await client.callTool({
-                    name: HelperTools.DATASET_GET_ITEMS,
+                    name: HELPER_TOOLS.DATASET_GET_ITEMS,
                     arguments: { datasetId },
                 });
 
                 expect(datasetResult.content).toBeDefined();
                 // Validate structured output for get-dataset-items
-                validateStructuredOutputForTool(datasetResult, HelperTools.DATASET_GET_ITEMS, 'default');
+                validateStructuredOutputForTool(datasetResult, HELPER_TOOLS.DATASET_GET_ITEMS, 'default');
 
                 // Validate structured content has items with actual results
                 const datasetWithStructured = datasetResult as {
@@ -2740,7 +2740,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 const stream = client.experimental.tasks.callToolStream(
                     {
-                        name: HelperTools.ACTOR_CALL,
+                        name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
                             actor: ACTOR_NORMAL_MODE,
                             input: {
@@ -2801,7 +2801,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     const stream = client.experimental.tasks.callToolStream(
                         {
-                            name: HelperTools.ACTOR_CALL,
+                            name: HELPER_TOOLS.ACTOR_CALL,
                             arguments: {
                                 actor: ACTOR_NORMAL_MODE,
                                 // waitSeconds keeps the run open long enough for the polling
@@ -2857,9 +2857,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(tools.tools.length).toBeGreaterThan(0);
 
                     // Verify that apps-only internal tools are present in apps mode
-                    expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-                    expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
-                    expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
+                    expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+                    expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+                    expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
 
                     // Verify that tools have widget metadata when UI mode is enabled
                     expectWidgetToolMeta(tools);
@@ -2874,9 +2874,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const toolNames = getToolNames(tools);
                 expect(tools.tools.length).toBeGreaterThan(0);
 
-                expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-                expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
-                expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
 
                 // Verify that tools have widget metadata when UI mode is enabled via URL parameter
                 expectWidgetToolMeta(tools);
@@ -2891,9 +2891,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const toolNames = getToolNames(tools);
                 expect(tools.tools.length).toBeGreaterThan(0);
 
-                expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-                expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
-                expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
                 expectWidgetToolMeta(tools);
 
                 await client.close();
@@ -2905,8 +2905,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const toolNames = getToolNames(tools);
 
                 // When serverMode is enabled, default tools include call-actor, so get-actor-run should be included
-                expect(toolNames).toContain(HelperTools.ACTOR_CALL);
-                expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
 
                 await client.close();
             });
@@ -2917,13 +2917,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const toolNames = getToolNames(tools);
 
                 // No actor tools selected — get-actor-run and its widget must not appear
-                expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_GET);
-                expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
+                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
                 // Docs tools should be present
-                expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
-                expect(toolNames).toContain(HelperTools.DOCS_FETCH);
+                expect(toolNames).toContain(HELPER_TOOLS.DOCS_SEARCH);
+                expect(toolNames).toContain(HELPER_TOOLS.DOCS_FETCH);
                 // call-actor should NOT be present since only 'docs' was selected
-                expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
+                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
 
                 await client.close();
             });
@@ -2951,12 +2951,12 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const tools = await client.listTools();
                 const toolNames = getToolNames(tools);
 
-                expect(toolNames).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
-                expect(toolNames).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+                expect(toolNames).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
                 for (const toolName of [
-                    HelperTools.STORE_SEARCH,
-                    HelperTools.ACTOR_GET_DETAILS,
-                    HelperTools.ACTOR_CALL,
+                    HELPER_TOOLS.STORE_SEARCH,
+                    HELPER_TOOLS.ACTOR_GET_DETAILS,
+                    HELPER_TOOLS.ACTOR_CALL,
                 ]) {
                     const tool = tools.tools.find((t) => t.name === toolName);
                     expect(tool).toBeDefined();
@@ -3028,18 +3028,18 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     // Kept independent of any production constant so this test pins the expected paid set
                     // and any silent drift (e.g. a tool losing paymentRequired) is caught here.
                     const paidToolNames = [
-                        HelperTools.ACTOR_CALL,
-                        HelperTools.ACTOR_RUNS_GET,
-                        HelperTools.ACTOR_RUNS_LOG,
-                        HelperTools.ACTOR_RUNS_ABORT,
-                        HelperTools.DATASET_GET,
-                        HelperTools.DATASET_GET_ITEMS,
-                        HelperTools.DATASET_SCHEMA_GET,
-                        HelperTools.KEY_VALUE_STORE_GET,
-                        HelperTools.KEY_VALUE_STORE_KEYS_GET,
-                        HelperTools.KEY_VALUE_STORE_RECORD_GET,
+                        HELPER_TOOLS.ACTOR_CALL,
+                        HELPER_TOOLS.ACTOR_RUNS_GET,
+                        HELPER_TOOLS.ACTOR_RUNS_LOG,
+                        HELPER_TOOLS.ACTOR_RUNS_ABORT,
+                        HELPER_TOOLS.DATASET_GET,
+                        HELPER_TOOLS.DATASET_GET_ITEMS,
+                        HELPER_TOOLS.DATASET_SCHEMA_GET,
+                        HELPER_TOOLS.KEY_VALUE_STORE_GET,
+                        HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+                        HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
                     ];
-                    const freeToolNames = [HelperTools.STORE_SEARCH, HelperTools.DOCS_SEARCH];
+                    const freeToolNames = [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.DOCS_SEARCH];
 
                     client = await createClientFn({
                         payment: 'x402',
@@ -3201,7 +3201,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     client = await createClientFn({ tools: ['actors'], payment: 'x402' });
 
                     const result = await client.callTool({
-                        name: HelperTools.ACTOR_CALL,
+                        name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
                             actor: ACTOR_NORMAL_MODE,
                             input: { firstNumber: 1, secondNumber: 2 },
@@ -3228,7 +3228,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // First, start an async actor run to get a runId
                 const callResult = await client.callTool({
-                    name: HelperTools.ACTOR_CALL,
+                    name: HELPER_TOOLS.ACTOR_CALL,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
@@ -3241,7 +3241,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Now test get-actor-run with waitSecs to drive it to terminal state.
                 const runResult = await client.callTool({
-                    name: HelperTools.ACTOR_RUNS_GET,
+                    name: HELPER_TOOLS.ACTOR_RUNS_GET,
                     arguments: { runId, waitSecs: 30 },
                 });
 
@@ -3283,7 +3283,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 // assertion; the failure must come from waitSecs validation, not from run lookup.
                 await expect(
                     client.callTool({
-                        name: HelperTools.ACTOR_RUNS_GET,
+                        name: HELPER_TOOLS.ACTOR_RUNS_GET,
                         arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
                     }),
                 ).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
@@ -3296,7 +3296,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.STORE_SEARCH_WIDGET,
+                    name: HELPER_TOOLS.STORE_SEARCH_WIDGET,
                     arguments: {
                         keywords: 'python',
                         limit: 5,
@@ -3333,7 +3333,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
 
                 const result = await client.callTool({
-                    name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
+                    name: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                     },

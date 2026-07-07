@@ -11,7 +11,7 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
-import { ServerMode } from '../types.js';
+import { SERVER_MODE } from '../types.js';
 import { isApifyApiUri, readApiResource } from './api_resources.js';
 import type { AvailableWidget } from './widgets.js';
 import { RESOURCE_MIME_TYPE } from './widgets.js';
@@ -41,7 +41,7 @@ type ResourceServiceOptions = {
      * client capabilities, and a captured value would freeze resource listings to
      * the preliminary mode.
      */
-    getMode: () => ServerMode;
+    getMode: () => SERVER_MODE;
     getAvailableWidgets: () => Map<string, AvailableWidget>;
 };
 
@@ -62,7 +62,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             });
         }
 
-        if (getMode() === ServerMode.APPS) {
+        if (getMode() === SERVER_MODE.APPS) {
             for (const widget of getAvailableWidgets().values()) {
                 if (!widget.exists) {
                     continue;
@@ -99,7 +99,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             };
         }
 
-        if (getMode() === ServerMode.APPS && uri.startsWith('ui://widget/')) {
+        if (getMode() === SERVER_MODE.APPS && uri.startsWith('ui://widget/')) {
             const widget = getAvailableWidgets().get(uri);
 
             if (!widget || !widget.exists) {

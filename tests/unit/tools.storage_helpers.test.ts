@@ -1,25 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { FAILURE_CATEGORY, HelperTools, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import {
     buildDatasetItemsSummaryNextStep,
-    buildStorageNotFound,
     classifyBinaryRecord,
     normalizeRecordKey,
 } from '../../src/tools/storage/storage_helpers.js';
 
-describe('buildStorageNotFound()', () => {
-    it('returns a SOFT_FAIL / INVALID_INPUT response with the supplied message', () => {
-        const result = buildStorageNotFound("Dataset 'ds-1' not found.");
-
-        expect(result.isError).toBe(true);
-        expect(result.content).toEqual([{ type: 'text', text: "Dataset 'ds-1' not found." }]);
-        expect(result.toolTelemetry).toEqual({
-            toolStatus: TOOL_STATUS.SOFT_FAIL,
-            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-        });
-    });
-});
+// `buildStorageNotFound` was deleted in #937 — its six call sites call `respondUserError(text)`
+// directly. The SOFT_FAIL + INVALID_INPUT contract it guarded is now covered by the `respondUserError`
+// unit test in `tests/unit/utils.mcp.test.ts`.
 
 describe('buildDatasetItemsSummaryNextStep()', () => {
     it('suggests get-dataset on the terminal page when loaded', () => {
@@ -28,9 +18,9 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             itemCount: 5,
             totalItemCount: 5,
             offset: 0,
-            loadedToolNames: [HelperTools.DATASET_GET],
+            loadedToolNames: [HELPER_TOOLS.DATASET_GET],
         });
-        expect(t.nextStep).toContain(HelperTools.DATASET_GET);
+        expect(t.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         expect(t.nextStep).toContain('datasetId=ds-1');
     });
 
@@ -42,7 +32,7 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             offset: 0,
             loadedToolNames: [],
         });
-        expect(t.nextStep).not.toContain(HelperTools.DATASET_GET);
+        expect(t.nextStep).not.toContain(HELPER_TOOLS.DATASET_GET);
         expect(t.nextStep).toContain('No more pages');
     });
 
@@ -52,7 +42,7 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             itemCount: 20,
             totalItemCount: 100,
             offset: 0,
-            loadedToolNames: [HelperTools.DATASET_GET],
+            loadedToolNames: [HELPER_TOOLS.DATASET_GET],
         });
         const unloaded = buildDatasetItemsSummaryNextStep({
             datasetId: 'ds-1',
@@ -62,7 +52,7 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             loadedToolNames: [],
         });
         expect(loaded.nextStep).toBe(unloaded.nextStep);
-        expect(loaded.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
+        expect(loaded.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(loaded.nextStep).toContain('offset=20');
     });
 });

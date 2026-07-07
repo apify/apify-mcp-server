@@ -1,14 +1,15 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
+import { buildStorageResponse } from './storage_helpers.js';
 
 const getKeyValueStoreArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -19,7 +20,7 @@ const getKeyValueStoreArgs = z.object({
  */
 export const getKeyValueStore: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.KEY_VALUE_STORE_GET,
+    name: HELPER_TOOLS.KEY_VALUE_STORE_GET,
     title: 'Get key-value store',
     description: dedent`
         Get details about a key-value store by ID or username~store-name.
@@ -48,12 +49,12 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
         const kvStore = await client.keyValueStore(keyValueStoreId).get();
         if (!kvStore) {
-            return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
+            return respondUserError(`Key-value store '${keyValueStoreId}' not found.`);
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const bytes = (kvStore.stats as { storageBytes?: number } | undefined)?.storageBytes;
         const summary = `Key-value store '${kvStore.name ?? keyValueStoreId}'${bytes !== undefined ? ` holds ${bytes} bytes` : ''}.`;
-        const nextStep = `Use ${HelperTools.KEY_VALUE_STORE_KEYS_GET} with keyValueStoreId=${keyValueStoreId} to list keys.`;
+        const nextStep = `Use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} with keyValueStoreId=${keyValueStoreId} to list keys.`;
         return buildStorageResponse({
             structuredContent: kvStore as unknown as Record<string, unknown>,
             summary,

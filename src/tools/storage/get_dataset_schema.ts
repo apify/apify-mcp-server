@@ -1,16 +1,16 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, HTTP_NOT_FOUND, TOOL_STATUS } from '../../const.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { datasetSchemaOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
+import { buildStorageResponse } from './storage_helpers.js';
 
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -26,7 +26,7 @@ const getDatasetSchemaArgs = z.object({
  */
 export const getDatasetSchema: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.DATASET_SCHEMA_GET,
+    name: HELPER_TOOLS.DATASET_SCHEMA_GET,
     title: 'Get dataset schema',
     description: dedent`
         Generate a JSON schema from a sample of dataset items.
@@ -68,7 +68,7 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
             });
 
         if (!datasetResponse) {
-            return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
+            return respondUserError(`Dataset '${datasetId}' not found.`);
         }
 
         const datasetItems = datasetResponse.items;
@@ -77,7 +77,7 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
             // Empty dataset: no items to infer from, but still emit a schema-conforming
             // response (empty schema = "any") rather than bare text.
             const summary = `Dataset '${datasetId}' is empty; no schema to infer.`;
-            const nextStep = `Use ${HelperTools.DATASET_GET} with datasetId=${datasetId} to check itemCount and stats.`;
+            const nextStep = `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to check itemCount and stats.`;
             return buildStorageResponse({ structuredContent: { datasetId, schema: {} }, summary, nextStep });
         }
 
@@ -88,17 +88,13 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         });
 
         if (!schema) {
-            // Schema generation failure is typically a server/processing error, not a user error
-            return buildMCPResponse({
-                texts: [`Failed to generate schema for dataset '${datasetId}'.`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.FAILED },
-            });
+            // A schema-generation failure is a server/processing error, not a user error.
+            return respondServerError(`Failed to generate schema for dataset '${datasetId}'.`);
         }
 
         const fieldCount = Object.keys(schema.items.properties ?? {}).length;
         const summary = `Schema inferred from ${datasetItems.length} ${datasetItems.length === 1 ? 'item' : 'items'}, ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'}.`;
-        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and fields="..." to project specific fields.`;
+        const nextStep = `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and fields="..." to project specific fields.`;
         return buildStorageResponse({ structuredContent: { datasetId, schema }, summary, nextStep });
     },
 } as const);

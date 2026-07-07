@@ -9,7 +9,7 @@ import { algoliasearch } from 'algoliasearch';
 
 import log from '@apify/log';
 
-import { DOCS_SOURCES } from '../const.js';
+import { DOCS_SNIPPET_HIGHLIGHT_TAG, DOCS_SNIPPET_MAX_WORDS, DOCS_SOURCES } from '../const.js';
 import { searchApifyDocsCache } from '../state.js';
 import type { ApifyDocsSearchResult } from '../types.js';
 
@@ -34,6 +34,8 @@ type AlgoliaResultHit = {
     content?: string | null;
     type?: string;
     hierarchy?: Record<string, string | null>;
+    /** Bounded, match-centered snippet of `content`; produced by `attributesToSnippet`. */
+    _snippetResult?: { content?: { value?: string } };
 };
 
 /**
@@ -82,6 +84,17 @@ function prepareAlgoliaRequest(
         searchRequest.facetFilters = indexConfig.facetFilters;
     }
 
+    // Return a bounded, match-centered snippet of `content` rather than the full indexed attribute
+    // (see DOCS_SNIPPET_MAX_WORDS for why). Highlight markup is injected around matches with a
+    // strippable sentinel; skip full-content highlighting and the full-content attribute to keep
+    // the response small.
+    searchRequest.attributesToSnippet = [`content:${DOCS_SNIPPET_MAX_WORDS}`];
+    searchRequest.snippetEllipsisText = '…';
+    searchRequest.highlightPreTag = DOCS_SNIPPET_HIGHLIGHT_TAG;
+    searchRequest.highlightPostTag = DOCS_SNIPPET_HIGHLIGHT_TAG;
+    searchRequest.attributesToHighlight = [];
+    searchRequest.attributesToRetrieve = ['url_without_anchor', 'anchor'];
+
     return searchRequest;
 }
 
@@ -110,9 +123,12 @@ function processAlgoliaResponse(results: AlgoliaResult[]): ApifyDocsSearchResult
                 url += `#${hit.anchor}`;
             }
 
+            // Bounded, match-centered snippet with the injected highlight sentinels stripped
+            // (see DOCS_SNIPPET_HIGHLIGHT_TAG). `content` isn't retrieved, so the snippet is the only source.
+            const content = hit._snippetResult?.content?.value?.split(DOCS_SNIPPET_HIGHLIGHT_TAG).join('');
             searchResults.push({
                 url,
-                ...(hit.content ? { content: hit.content } : {}),
+                ...(content ? { content } : {}),
             });
         }
     }

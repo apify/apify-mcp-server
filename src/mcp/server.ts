@@ -53,7 +53,7 @@ import {
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     FAILURE_CATEGORY,
-    HelperTools,
+    HELPER_TOOLS,
     TOOL_STATUS,
 } from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
@@ -81,14 +81,14 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { ServerMode, TOOL_TYPE } from '../types.js';
+import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { isPermissionApprovalError, remoteMcpFailureDetail } from '../utils/apify_errors.js';
 import { getHttpStatusCode, isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import {
-    buildMCPResponse,
-    buildResponseBytesTelemetry,
     computeToolResponseBytes,
     getToolCallErrorUserText,
+    respondErrorNoTelemetry,
+    respondOk,
 } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
@@ -184,7 +184,7 @@ export class ActorsMcpServer {
      * Finalized inside the `initialize` request handler (see constructor) once the
      * client's capabilities are known. Effectively set-once per connection.
      */
-    public serverMode: ServerMode;
+    public serverMode: SERVER_MODE;
     /**
      * Raw option captured from `options.serverMode` (or the legacy `uiMode`). Re-resolved
      * inside the initialize handler when set to `'auto'`; explicit `'default'`/`'apps'`
@@ -945,7 +945,7 @@ export class ActorsMcpServer {
                     await failInvalidParams(
                         dedent`
                     Missing arguments for tool "${name}".
-                    Please provide the required arguments for this tool. Check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool to see what parameters are required.
+                    Please provide the required arguments for this tool. Check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool to see what parameters are required.
                 `,
                         {
                             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -988,7 +988,7 @@ export class ActorsMcpServer {
                         dedent`
                     Invalid arguments for tool "${tool.name}".
                     Validation errors: ${errorMessages}.
-                    Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.
+                    Please check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.
                 `,
                         {
                             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -1022,7 +1022,7 @@ export class ActorsMcpServer {
                 // `taskSupport: 'optional'`, so without this both paths would 402 by default.
                 const { paymentProvider } = this.options;
                 const isCallActorTool =
-                    tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET;
+                    tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_CALL_WIDGET;
                 const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
 
                 const standbyRejection =
@@ -1107,7 +1107,7 @@ export class ActorsMcpServer {
                     // Tools that may emit notifications/progress during a sync wait must be opted in here.
                     // call-actor: emits during start+waitForFinish. get-actor-run: emits when waitSecs > 0.
                     const progressTrackerOptIn =
-                        tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_RUNS_GET;
+                        tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_RUNS_GET;
                     const progressTracker = progressTrackerOptIn
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
@@ -1148,7 +1148,7 @@ export class ActorsMcpServer {
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             toolStatus = TOOL_STATUS.SOFT_FAIL;
                             callDiagnostics = { ...callDiagnostics, failure_category: FAILURE_CATEGORY.INTERNAL_ERROR };
-                            return captureResult(buildMCPResponse({ texts: [msg], isError: true }));
+                            return captureResult(respondErrorNoTelemetry(msg));
                         }
 
                         // Only set up notification handlers if progressToken is provided by the client
@@ -1219,12 +1219,9 @@ export class ActorsMcpServer {
                             },
                         );
                         return captureResult(
-                            buildMCPResponse({
-                                texts: [
-                                    `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${remoteMcpFailureDetail(error)}`,
-                                ],
-                                isError: true,
-                            }),
+                            respondErrorNoTelemetry(
+                                `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${remoteMcpFailureDetail(error)}`,
+                            ),
                         );
                     } finally {
                         if (client) await client.close();
@@ -1331,13 +1328,15 @@ export class ActorsMcpServer {
                     validationMissingProperty: callDiagnostics.validation_missing_property,
                     validationAdditionalProperty: callDiagnostics.validation_additional_property,
                 });
-                return captureResult(
-                    buildMCPResponse({
-                        texts: [getToolCallErrorUserText(name, error)],
-                        isError: true,
-                        telemetry: { toolStatus },
-                    }),
-                );
+                // This framework outer-catch path bypasses extractToolTelemetry (returned via
+                // captureResult), so preserve the pre-existing wire shape { toolStatus } exactly:
+                // reuse the local ABORTED-aware toolStatus, do NOT re-derive from the error (which
+                // would drop ABORTED and leak failureCategory/failureHttpStatus onto the wire).
+                return captureResult({
+                    ...respondOk(getToolCallErrorUserText(name, error)),
+                    isError: true,
+                    toolTelemetry: { toolStatus },
+                });
             } finally {
                 if (shouldTrackTelemetry) {
                     this.logToolCallAndTelemetry({
@@ -1410,7 +1409,11 @@ export class ActorsMcpServer {
                 ...params.telemetryData,
                 tool_status: params.toolStatus,
                 tool_exec_time_ms: durationMs,
-                ...buildResponseBytesTelemetry(responseBytes),
+                ...(responseBytes && {
+                    tool_response_content_bytes: responseBytes.contentBytes,
+                    tool_response_structured_content_bytes: responseBytes.structuredContentBytes,
+                    tool_response_file_bytes: responseBytes.fileBytes,
+                }),
                 // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
                 ...params.callDiagnostics,
                 // Resource ids are read once here from the args + the tool's public output; no tool
@@ -1874,7 +1877,7 @@ export class ActorsMcpServer {
      * Resolves widgets and determines which ones are ready to be served.
      */
     private async resolveWidgets(): Promise<void> {
-        if (this.serverMode !== ServerMode.APPS) {
+        if (this.serverMode !== SERVER_MODE.APPS) {
             return;
         }
 

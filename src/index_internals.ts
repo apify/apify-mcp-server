@@ -3,7 +3,7 @@
 */
 
 import { ApifyClient } from './apify_client.js';
-import { APIFY_FAVICON_URL, defaults, HelperTools, SERVER_NAME, SERVER_TITLE } from './const.js';
+import { APIFY_FAVICON_URL, defaults, HELPER_TOOLS, type HelperToolName, SERVER_NAME, SERVER_TITLE } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import type { PaymentProvider } from './payments/types.js';
@@ -32,7 +32,8 @@ export {
     getServerCard,
     TTLLRUCache,
     actorNameToToolName,
-    HelperTools,
+    HELPER_TOOLS,
+    type HelperToolName,
     SERVER_NAME,
     SERVER_TITLE,
     defaults,
@@ -62,3 +63,8 @@ export {
      */
     redactSkyfirePayId,
 };
+
+/** @deprecated Use HELPER_TOOLS / HelperToolName. Kept for backward compatibility with apify-mcp-server-internal. */
+export const HelperTools = HELPER_TOOLS;
+/** @deprecated Use HelperToolName. */
+export type HelperTools = HelperToolName;

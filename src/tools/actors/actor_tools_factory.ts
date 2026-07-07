@@ -3,7 +3,12 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { ACTOR_MAX_MEMORY_MBYTES, HelperTools, RAG_WEB_BROWSER, RAG_WEB_BROWSER_ADDITIONAL_DESC } from '../../const.js';
+import {
+    ACTOR_MAX_MEMORY_MBYTES,
+    HELPER_TOOLS,
+    RAG_WEB_BROWSER,
+    RAG_WEB_BROWSER_ADDITIONAL_DESC,
+} from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { connectMCPClient } from '../../mcp/client.js';
@@ -41,7 +46,7 @@ const WAIT_SECS_INPUT_PROPERTY = {
     description:
         `Max seconds (0–45, default ${CALL_ACTOR_WAIT_SECS_DEFAULT}) to cap the wait for the Actor run to reach terminal state. ` +
         'For long-running Actors the response returns at the cap with the current run status; ' +
-        `follow \`nextStep\` to poll via ${HelperTools.ACTOR_RUNS_GET}. Set to 0 to fire-and-forget.`,
+        `follow \`nextStep\` to poll via ${HELPER_TOOLS.ACTOR_RUNS_GET}. Set to 0 to fire-and-forget.`,
 } as const;
 
 /**
@@ -122,7 +127,7 @@ export async function getNormalActorsAsTools(
         };
 
         let description = `This tool calls the Actor "${definition.actorFullName}" and retrieves its output results.
-Use this tool instead of the "${HelperTools.ACTOR_CALL}" if user requests this specific Actor.
+Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.
 Actor description: ${definition.description}`;
         if (isRag) {
             description += RAG_WEB_BROWSER_ADDITIONAL_DESC;

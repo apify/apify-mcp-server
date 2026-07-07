@@ -72,7 +72,7 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 
 - **Follow [CONTRIBUTING.md](./CONTRIBUTING.md) for all naming and coding standards.** It is the single source of truth for naming rules (function verbs, boolean prefixes, type suffixes, enumerations, file names, etc.), string formatting, parameters, error handling, and anti-patterns. Read it before writing code.
 - **Validate tool inputs with Zod.** No ad-hoc shape checks.
-- **Reference tool names via the `HelperTools` enum**, not hardcoded strings (exception: integration tests).
+- **Reference tool names via the `HELPER_TOOLS` `as const` object**, not hardcoded strings (exception: integration tests).
 - **Apps vs default mode**: only `*-widget` tools differ between modes. All non-widget tools (`call-actor`, `get-actor-run`, direct actor tools, `search-actors`, `fetch-actor-details`) share a single implementation across modes.
 - Per-directory detail lives in the child `AGENTS.md` files (see Child docs below).
 - Always follow the latest [MCP spec](https://modelcontextprotocol.io/specification/2025-11-25) and [MCP Apps spec](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx).

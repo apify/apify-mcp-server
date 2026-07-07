@@ -3,12 +3,12 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondServerError } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
 import { buildStartRunResponse } from '../actors/actor_run_response.js';
 import {
@@ -52,21 +52,21 @@ const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
     completion — do NOT poll or call any other tool after this.
 
     For silent async starts where no UI is needed (e.g., "start this in the background",
-    or when your next step is to fetch results via ${HelperTools.DATASET_GET_ITEMS}), use
-    ${HelperTools.ACTOR_CALL} instead — it returns the same runId without rendering a widget.
+    or when your next step is to fetch results via ${HELPER_TOOLS.DATASET_GET_ITEMS}), use
+    ${HELPER_TOOLS.ACTOR_CALL} instead — it returns the same runId without rendering a widget.
 
     WORKFLOW:
-    1. Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema
+    1. Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema
     2. Call this tool with the actor name and proper input based on the schema
 
-    If the actor name is not in "username/name" format, use ${HelperTools.STORE_SEARCH} to resolve the correct Actor first.
+    If the actor name is not in "username/name" format, use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first.
 
     Input: actor name and input JSON; callOptions (memory, timeout) are optional.
 `;
 
 export const callActorWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_CALL_WIDGET,
+    name: HELPER_TOOLS.ACTOR_CALL_WIDGET,
     title: 'Call Actor (widget)',
     description: CALL_ACTOR_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(callActorWidgetArgsSchema) as ToolInputSchema,
@@ -85,16 +85,13 @@ export const callActorWidget: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const rawActor = toolArgs.args?.actor;
         if (typeof rawActor === 'string' && rawActor.includes(':')) {
-            return buildMCPResponse({
-                texts: [
-                    `${HelperTools.ACTOR_CALL_WIDGET} does not render widgets for MCP tool calls.`,
-                    `Use ${HelperTools.ACTOR_CALL} for the "actorName:toolName" syntax.`,
-                ],
-                isError: true,
-            });
+            return respondServerError([
+                `${HELPER_TOOLS.ACTOR_CALL_WIDGET} does not render widgets for MCP tool calls.`,
+                `Use ${HELPER_TOOLS.ACTOR_CALL} for the "actorName:toolName" syntax.`,
+            ]);
         }
 
-        const preResult = await callActorPreExecute(toolArgs, { route: HelperTools.ACTOR_CALL_WIDGET });
+        const preResult = await callActorPreExecute(toolArgs, { route: HELPER_TOOLS.ACTOR_CALL_WIDGET });
         if ('earlyResponse' in preResult) {
             return preResult.earlyResponse;
         }
@@ -134,7 +131,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
                 error,
                 actorId: resolvedActorId,
                 mcpSessionId: toolArgs.mcpSessionId,
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
             });
         }
     },

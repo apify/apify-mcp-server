@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 import { ApifyClient } from '../../apify_client.js';
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk, respondServerError } from '../../utils/mcp.js';
 
 export const addToolArgsSchema = z.object({
     actor: z
@@ -15,12 +15,12 @@ export const addToolArgsSchema = z.object({
 });
 export const addActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_ADD,
+    name: HELPER_TOOLS.ACTOR_ADD,
     title: 'Add tool',
     description: `Add an Actor or MCP server to the Apify MCP Server as an available tool.
 This does not execute the Actor; it only registers it so it can be called later.
 
-You can first discover Actors using the ${HelperTools.STORE_SEARCH} tool, then add the selected Actor as a tool.
+You can first discover Actors using the ${HELPER_TOOLS.STORE_SEARCH} tool, then add the selected Actor as a tool.
 
 USAGE:
 - Use when a user has chosen an Actor to work with and you need to make it available as a callable tool.
@@ -47,9 +47,7 @@ USAGE EXAMPLES:
         } = toolArgs;
         const parsed = addToolArgsSchema.parse(args);
         if (apifyMcpServer.listAllToolNames().includes(parsed.actor)) {
-            return buildMCPResponse({
-                texts: [`Actor ${parsed.actor} is already available. No new tools were added.`],
-            });
+            return respondOk(`Actor ${parsed.actor} is already available. No new tools were added.`);
         }
 
         const apifyClient = new ApifyClient({ token: apifyToken });
@@ -57,21 +55,16 @@ USAGE EXAMPLES:
         // First error is the precise reason this Actor could not be added —
         // safe to forward verbatim (sanitized at source by ActorLoadError factories).
         if (errors[0]) {
-            return buildMCPResponse({
-                texts: [errors[0].message],
-                isError: true,
-            });
+            return respondServerError(errors[0].message);
         }
         await sendNotification({ method: 'notifications/tools/list_changed' });
         const toolNames = tools.map((t: ToolEntry) => t.name).join(', ');
         // Many MCP clients ignore `notifications/tools/list_changed`, so nudge the LLM to
         // re-list tools itself — otherwise the freshly added Actor stays invisible until the
         // client happens to refresh (apify-mcp-server#851).
-        return buildMCPResponse({
-            texts: [
-                `Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}. ` +
-                    `If they are not visible yet, refresh the tool list using the tools/list request before calling them.`,
-            ],
-        });
+        return respondOk(
+            `Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}. ` +
+                `If they are not visible yet, refresh the tool list using the tools/list request before calling them.`,
+        );
     },
 } as const);

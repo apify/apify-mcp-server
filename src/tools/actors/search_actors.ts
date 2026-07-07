@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
+import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
 import type {
     ActorStoreList,
     ConsoleLinkContext,
@@ -16,7 +16,7 @@ import { DEFAULT_CARD_OPTIONS, formatActorToActorCard, formatActorToStructuredCa
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
@@ -84,8 +84,8 @@ Usage:
 - You MUST always do at least two searches: first with broad keywords, then optionally with more specific terms if needed.
 
 Important limitations: This tool does not return full Actor documentation or detailed usage instructions - only summary information.
-Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without a separate ${HelperTools.ACTOR_GET_DETAILS} round-trip.
-For complete Actor details (per-field descriptions, defaults, README), use the ${HelperTools.ACTOR_GET_DETAILS} tool.
+Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without a separate ${HELPER_TOOLS.ACTOR_GET_DETAILS} round-trip.
+For complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.
 The search is limited to publicly available Actors and excludes rental and restricted Actors.
 
 Returns list of Actor cards with the following info:
@@ -107,7 +107,7 @@ Returns list of Actor cards with the following info:
  */
 export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.STORE_SEARCH,
+    name: HELPER_TOOLS.STORE_SEARCH,
     title: 'Search Actors',
     description: SEARCH_ACTORS_DESCRIPTION,
     inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
@@ -139,19 +139,6 @@ export function buildSearchActorsResult(
     };
 }
 
-export function buildSearchActorsEmptyResponse(query: string): ReturnType<typeof buildMCPResponse> {
-    const instructions = dedent`
-        No Actors were found for the search query "${query}".
-        You MUST retry with broader, more generic keywords - use just the platform name
-        (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
-    `;
-
-    return buildMCPResponse({
-        texts: [instructions],
-        structuredContent: { actors: [], query, count: 0, instructions },
-    });
-}
-
 /**
  * Default mode search-actors tool.
  * Returns text-based Actor cards without widget metadata.
@@ -175,7 +162,14 @@ export const searchActors: ToolEntry = Object.freeze({
         ]);
 
         if (actors.length === 0) {
-            return buildSearchActorsEmptyResponse(parsed.keywords);
+            const instructions = dedent`
+                No Actors were found for the search query "${parsed.keywords}".
+                You MUST retry with broader, more generic keywords - use just the platform name
+                (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
+            `;
+            return respondOk(instructions, {
+                structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
+            });
         }
 
         // Cache hit — the Promise.all above already resolved users/me for this token.
@@ -189,7 +183,7 @@ export const searchActors: ToolEntry = Object.freeze({
             userTier: userPlanTier,
             instructions: dedent`
                 If you need more detailed information about any of these Actors, including their
-                input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS}
+                input schemas and usage instructions, please use the ${HELPER_TOOLS.ACTOR_GET_DETAILS}
                 tool with the specific Actor name.
                 IMPORTANT: You MUST always do a second search with broader, more generic keywords
                 (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
@@ -210,13 +204,12 @@ export const searchActors: ToolEntry = Object.freeze({
         `;
         const footer = dedent`
             If you need more detailed information about any of these Actors, including their input
-            schemas and usage instructions, use the ${HelperTools.ACTOR_GET_DETAILS} tool with the
+            schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
             specific Actor name.
             IMPORTANT: You MUST always do a second search with broader, more generic keywords
             (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
             you haven't missed a better Actor.${verbatimLinksNudge}
         `;
-        const texts = [`${header}\n\n${actorCardText}\n\n${footer}`];
-        return buildMCPResponse({ texts, structuredContent });
+        return respondOk(`${header}\n\n${actorCardText}\n\n${footer}`, { structuredContent });
     },
 } as const);

@@ -1,13 +1,13 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { buildActorDetailsForWidget, buildCardOptions, fetchActorDetails } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
 import { actorDetailsOutputDefaults, buildActorNotFoundResponse } from '../actors/fetch_actor_details.js';
@@ -38,7 +38,7 @@ const FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION = dedent`
     The response renders as an interactive widget the user can view directly.
 
     For silent data lookups (e.g., fetching the input schema before calling an Actor, inspecting README
-    for decision making), use ${HelperTools.ACTOR_GET_DETAILS} instead — it returns the same data
+    for decision making), use ${HELPER_TOOLS.ACTOR_GET_DETAILS} instead — it returns the same data
     without rendering a widget.
 
     Input: the Actor ID or full name only. Output fields are fixed by the widget contract.
@@ -46,7 +46,7 @@ const FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION = dedent`
 
 export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
+    name: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
     title: 'Fetch Actor details (widget)',
     description: FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(fetchActorDetailsWidgetArgsSchema) as ToolInputSchema,
@@ -68,7 +68,7 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         const parsed = fetchActorDetailsWidgetArgsSchema.parse(toolArgs.args);
         const actorName = fixActorNameInputAndLog(parsed.actor, {
             mcpSessionId,
-            route: HelperTools.ACTOR_GET_DETAILS_WIDGET,
+            route: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
         });
 
         const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
@@ -97,11 +97,10 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         `,
         ];
 
-        return buildMCPResponse({
-            texts,
+        return respondOk(texts, {
             structuredContent,
             // Response-level meta; only returned in apps mode (this handler is apps-only).
-            _meta: {
+            meta: {
                 ...widgetConfig?.meta,
                 'openai/widgetDescription': `Actor details for ${actorName} from Apify Store`,
             },

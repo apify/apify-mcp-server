@@ -2,16 +2,16 @@ import type { AudioContent, EmbeddedResource, ImageContent, ResourceLink } from 
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
 import {
     buildConsoleLinkContent,
-    buildStorageNotFound,
     buildStorageResponse,
     classifyBinaryRecord,
     normalizeRecordKey,
@@ -27,7 +27,7 @@ const getKeyValueStoreRecordArgs = z.object({
  */
 export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
+    name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
     title: 'Get key-value store record',
     description: dedent`
         Get a value stored in a key-value store under a specific key.
@@ -63,7 +63,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             const text = storeInfo
                 ? `Record '${recordKey}' not found in key-value store '${keyValueStoreId}'.`
                 : `Key-value store '${keyValueStoreId}' not found.`;
-            return buildStorageNotFound(text);
+            return respondUserError(text);
         }
         const apifyConsoleUrl = buildConsoleKeyValueStoreUrl(
             await getConsoleLinkContext(apifyToken, client),

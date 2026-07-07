@@ -3,13 +3,7 @@ import type { ActorRun, Dataset, KeyValueClientListKeysResult } from 'apify-clie
 import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
-import {
-    DATASET_SIZE_HINT_BYTES,
-    FAILURE_CATEGORY,
-    HelperTools,
-    NARROW_OUTPUT_HINT,
-    TOOL_STATUS,
-} from '../../const.js';
+import { DATASET_SIZE_HINT_BYTES, HELPER_TOOLS, NARROW_OUTPUT_HINT } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import {
@@ -19,7 +13,7 @@ import {
     VERBATIM_LINKS_NUDGE,
 } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { cleanEmptyProperties } from '../../utils/schema_generation.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
@@ -411,7 +405,7 @@ function elapsedSecs(run: ActorRun): number {
 }
 
 function pollHint(runId: string): string {
-    return `Use ${HelperTools.ACTOR_RUNS_GET} with runId=${runId} and waitSecs=${POLL_HINT_WAIT_SECS} to`;
+    return `Use ${HELPER_TOOLS.ACTOR_RUNS_GET} with runId=${runId} and waitSecs=${POLL_HINT_WAIT_SECS} to`;
 }
 
 /**
@@ -492,7 +486,7 @@ function buildSucceededSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(fields)}`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(fields)}`,
         };
     }
 
@@ -501,7 +495,7 @@ function buildSucceededSummaryNextStep(
     if (itemCount === undefined && datasetId) {
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. Dataset metadata unavailable.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to inspect output.`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to inspect output.`,
         };
     }
 
@@ -510,7 +504,7 @@ function buildSucceededSummaryNextStep(
     if (itemCount === 0 && datasetId) {
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 
@@ -542,7 +536,7 @@ function buildTimedOutSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,
         };
     }
 
@@ -723,7 +717,7 @@ export function buildStartRunResponse(params: {
     actorRun: ActorRun;
     widget?: boolean;
     linkContext?: ConsoleLinkContext;
-}): ReturnType<typeof buildMCPResponse> {
+}): ToolResponse {
     const { actorName, actorRun, widget, linkContext } = params;
 
     // Start path returns before any metadata fetch, so every entry — default and aliases — is id-only.
@@ -769,10 +763,9 @@ export function buildStartRunResponse(params: {
           }
         : undefined;
 
-    return buildMCPResponse({
-        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinks}`],
+    return respondOk([JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinks}`], {
         structuredContent,
-        ...(widgetMeta && { _meta: widgetMeta }),
+        meta: widgetMeta,
     });
 }
 
@@ -819,11 +812,7 @@ export async function fetchActorRunData(params: {
     if (waitResult.kind === 'aborted') return { aborted: true };
     if (waitResult.kind === 'not-found') {
         return {
-            error: buildMCPResponse({
-                texts: [`Run with ID '${runId}' not found.`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-            }),
+            error: respondUserError(`Run with ID '${runId}' not found.`),
         };
     }
     const { run, actorName } = waitResult;

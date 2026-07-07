@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { extractDotPrefixes, getDatasetItems } from '../../src/tools/storage/get_dataset_items.js';
 import { datasetItemsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -70,7 +70,7 @@ function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] 
 
 describe('get-dataset-items', () => {
     it('has the expected tool name', () => {
-        expect(getDatasetItems.name).toBe(HelperTools.DATASET_GET_ITEMS);
+        expect(getDatasetItems.name).toBe(HELPER_TOOLS.DATASET_GET_ITEMS);
     });
 
     it('returns dataset items in structuredContent on happy path', async () => {
@@ -230,7 +230,7 @@ describe('get-dataset-items', () => {
         };
 
         expect(structuredContent.summary).toBe('Fetched all 1 items.');
-        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
         // summary + nextStep ship as a separate text block after the fenced data.
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
@@ -247,7 +247,7 @@ describe('get-dataset-items', () => {
 
         expect(structuredContent.summary).toBe('Fetched 20 of 100 items (offset=0).');
         expect(structuredContent.nextStep).toBe(
-            `Call ${HelperTools.DATASET_GET_ITEMS} again with offset=20 to fetch the next page.`,
+            `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=20 to fetch the next page.`,
         );
     });
 

@@ -10,7 +10,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import {
     SKYFIRE_ENABLED_TOOLS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
@@ -28,7 +28,7 @@ const MOCK_AJV_VALIDATE = vi.fn(() => true);
 
 function makeInternalTool(overrides: Partial<HelperTool> = {}): HelperTool {
     return {
-        name: HelperTools.ACTOR_CALL,
+        name: HELPER_TOOLS.ACTOR_CALL,
         description: 'Call an Actor',
         type: TOOL_TYPE.INTERNAL,
         inputSchema: {
@@ -78,7 +78,7 @@ function makeActorMcpTool(overrides: Partial<ActorMcpTool> = {}): ActorMcpTool {
 function makeNonEligibleInternalTool(): HelperTool {
     // search-apify-docs is NOT in SKYFIRE_ENABLED_TOOLS
     return makeInternalTool({
-        name: HelperTools.DOCS_SEARCH,
+        name: HELPER_TOOLS.DOCS_SEARCH,
         description: 'Search documentation',
     });
 }
@@ -147,7 +147,7 @@ describe('cloneToolEntry', () => {
 describe('applySkyfireAugmentation', () => {
     describe('eligible internal tools', () => {
         it('should augment an eligible internal tool', () => {
-            const original = makeInternalTool({ name: HelperTools.ACTOR_CALL });
+            const original = makeInternalTool({ name: HELPER_TOOLS.ACTOR_CALL });
             const result = applySkyfireAugmentation(original);
 
             // Returns a different object (cloned)
@@ -209,7 +209,7 @@ describe('applySkyfireAugmentation', () => {
 
     describe('idempotency', () => {
         it('should not double-append description when called twice', () => {
-            const original = makeInternalTool({ name: HelperTools.ACTOR_CALL });
+            const original = makeInternalTool({ name: HELPER_TOOLS.ACTOR_CALL });
             const firstPass = applySkyfireAugmentation(original);
             const secondPass = applySkyfireAugmentation(firstPass);
 
@@ -233,7 +233,7 @@ describe('applySkyfireAugmentation', () => {
 
     describe('frozen originals', () => {
         it('should not mutate a frozen internal tool', () => {
-            const original = Object.freeze(makeInternalTool({ name: HelperTools.ACTOR_CALL }));
+            const original = Object.freeze(makeInternalTool({ name: HELPER_TOOLS.ACTOR_CALL }));
             const result = applySkyfireAugmentation(original);
 
             // Result is augmented
@@ -263,7 +263,7 @@ describe('applySkyfireAugmentation', () => {
 
     describe('function preservation', () => {
         it('should preserve ajvValidate on augmented internal tool', () => {
-            const original = makeInternalTool({ name: HelperTools.ACTOR_CALL });
+            const original = makeInternalTool({ name: HELPER_TOOLS.ACTOR_CALL });
             const result = applySkyfireAugmentation(original) as HelperTool;
 
             expect(result.ajvValidate).toBe(original.ajvValidate);
@@ -271,7 +271,7 @@ describe('applySkyfireAugmentation', () => {
         });
 
         it('should preserve call function on augmented internal tool', () => {
-            const original = makeInternalTool({ name: HelperTools.ACTOR_CALL });
+            const original = makeInternalTool({ name: HELPER_TOOLS.ACTOR_CALL });
             const result = applySkyfireAugmentation(original) as HelperTool;
 
             expect(result.call).toBe(original.call);
@@ -289,7 +289,7 @@ describe('applySkyfireAugmentation', () => {
     describe('edge cases', () => {
         it('should handle tool with no description gracefully', () => {
             const original = makeInternalTool({
-                name: HelperTools.ACTOR_CALL,
+                name: HELPER_TOOLS.ACTOR_CALL,
                 description: undefined as unknown as string,
             });
             const result = applySkyfireAugmentation(original);
@@ -300,7 +300,7 @@ describe('applySkyfireAugmentation', () => {
 
         it('should handle tool with empty inputSchema properties', () => {
             const original = makeInternalTool({
-                name: HelperTools.ACTOR_CALL,
+                name: HELPER_TOOLS.ACTOR_CALL,
                 inputSchema: { type: 'object' as const, properties: {} },
             });
             const result = applySkyfireAugmentation(original);
@@ -318,12 +318,12 @@ describe('applySkyfireAugmentation', () => {
 describe('Skyfire eligibility matrix', () => {
     const testCases: { tool: ToolEntry; eligible: boolean; label: string }[] = [
         {
-            tool: makeInternalTool({ name: HelperTools.ACTOR_CALL }),
+            tool: makeInternalTool({ name: HELPER_TOOLS.ACTOR_CALL }),
             eligible: true,
             label: 'internal/eligible (call-actor)',
         },
         {
-            tool: makeInternalTool({ name: HelperTools.DATASET_GET_ITEMS }),
+            tool: makeInternalTool({ name: HELPER_TOOLS.DATASET_GET_ITEMS }),
             eligible: true,
             label: 'internal/eligible (get-dataset-items)',
         },

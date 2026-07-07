@@ -26,35 +26,36 @@ export const DATASET_SIZE_HINT_BYTES = 50000;
 export const NARROW_OUTPUT_HINT = 'narrow with fields= or page with offset';
 
 // MCP Server
-/** When `false`, `resolveServerMode('auto', ...)` forces {@link ServerMode.DEFAULT} regardless of client capabilities. */
+/** When `false`, `resolveServerMode('auto', ...)` forces {@link SERVER_MODE.DEFAULT} regardless of client capabilities. */
 export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
 
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
-export enum HelperTools {
-    ACTOR_ADD = 'add-actor',
-    ACTOR_CALL = 'call-actor',
-    ACTOR_CALL_WIDGET = 'call-actor-widget',
-    ACTOR_GET_DETAILS = 'fetch-actor-details',
-    ACTOR_GET_DETAILS_WIDGET = 'fetch-actor-details-widget',
-    ACTOR_RUNS_ABORT = 'abort-actor-run',
-    ACTOR_RUNS_GET = 'get-actor-run',
-    ACTOR_RUNS_GET_WIDGET = 'get-actor-run-widget',
-    ACTOR_RUNS_LOG = 'get-actor-log',
-    ACTOR_RUN_LIST_GET = 'get-actor-run-list',
-    DATASET_GET = 'get-dataset',
-    DATASET_LIST_GET = 'get-dataset-list',
-    DATASET_GET_ITEMS = 'get-dataset-items',
-    DATASET_SCHEMA_GET = 'get-dataset-schema',
-    KEY_VALUE_STORE_LIST_GET = 'get-key-value-store-list',
-    KEY_VALUE_STORE_GET = 'get-key-value-store',
-    KEY_VALUE_STORE_KEYS_GET = 'get-key-value-store-keys',
-    KEY_VALUE_STORE_RECORD_GET = 'get-key-value-store-record',
-    STORE_SEARCH = 'search-actors',
-    STORE_SEARCH_WIDGET = 'search-actors-widget',
-    DOCS_SEARCH = 'search-apify-docs',
-    DOCS_FETCH = 'fetch-apify-docs',
-}
+export const HELPER_TOOLS = {
+    ACTOR_ADD: 'add-actor',
+    ACTOR_CALL: 'call-actor',
+    ACTOR_CALL_WIDGET: 'call-actor-widget',
+    ACTOR_GET_DETAILS: 'fetch-actor-details',
+    ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
+    ACTOR_RUNS_ABORT: 'abort-actor-run',
+    ACTOR_RUNS_GET: 'get-actor-run',
+    ACTOR_RUNS_GET_WIDGET: 'get-actor-run-widget',
+    ACTOR_RUNS_LOG: 'get-actor-log',
+    ACTOR_RUN_LIST_GET: 'get-actor-run-list',
+    DATASET_GET: 'get-dataset',
+    DATASET_LIST_GET: 'get-dataset-list',
+    DATASET_GET_ITEMS: 'get-dataset-items',
+    DATASET_SCHEMA_GET: 'get-dataset-schema',
+    KEY_VALUE_STORE_LIST_GET: 'get-key-value-store-list',
+    KEY_VALUE_STORE_GET: 'get-key-value-store',
+    KEY_VALUE_STORE_KEYS_GET: 'get-key-value-store-keys',
+    KEY_VALUE_STORE_RECORD_GET: 'get-key-value-store-record',
+    STORE_SEARCH: 'search-actors',
+    STORE_SEARCH_WIDGET: 'search-actors-widget',
+    DOCS_SEARCH: 'search-apify-docs',
+    DOCS_FETCH: 'fetch-apify-docs',
+} as const;
+export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
@@ -124,6 +125,22 @@ export const DOCS_SOURCES = [
             'It handles blocking, crawling, proxies, and browsers for you.',
     },
 ] as const;
+
+/**
+ * Word window for Algolia `attributesToSnippet` in `search-apify-docs`. Bounds each hit to a
+ * match-centered snippet instead of the full indexed `content` attribute — API-reference records
+ * inline the whole OpenAPI schema (~34.5k chars each), so 20 hits returned ~173k tokens. The agent
+ * fetches full pages via `fetch-apify-docs`.
+ */
+export const DOCS_SNIPPET_MAX_WORDS = 100;
+
+/**
+ * Sentinel used as Algolia `highlightPreTag`/`highlightPostTag` for docs snippets, stripped before
+ * returning. An empty-string tag is treated as "unset" and falls back to Algolia's default
+ * `<span class="algolia-docsearch-suggestion--highlight">` markup, so we set a private-use
+ * character (U+E000) and remove it.
+ */
+export const DOCS_SNIPPET_HIGHLIGHT_TAG = '\uE000';
 
 export const ALLOWED_DOC_DOMAINS = ['https://docs.apify.com', 'https://crawlee.dev'] as const;
 
