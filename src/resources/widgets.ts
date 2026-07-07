@@ -6,7 +6,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import path from 'node:path';
+import { resolve } from 'node:path';
 
 import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps';
 import type { Resource } from '@modelcontextprotocol/sdk/types.js';
@@ -157,10 +157,10 @@ export type AvailableWidget = WidgetConfig & {
  */
 export async function resolveAvailableWidgets(baseDir: string): Promise<Map<string, AvailableWidget>> {
     const resolvedWidgets = new Map<string, AvailableWidget>();
-    const webDistPath = path.resolve(baseDir, '../web/dist');
+    const webDistPath = resolve(baseDir, '../web/dist');
 
     for (const [uri, config] of Object.entries(WIDGET_REGISTRY)) {
-        const jsPath = path.resolve(webDistPath, config.jsFilename);
+        const jsPath = resolve(webDistPath, config.jsFilename);
         const exists = existsSync(jsPath);
 
         resolvedWidgets.set(uri, {
