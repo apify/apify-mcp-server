@@ -18,6 +18,11 @@ export const unauthEnabledTools: string[] = [
     HELPER_TOOLS.DOCS_FETCH,
     HELPER_TOOLS.STORE_SEARCH,
     HELPER_TOOLS.ACTOR_GET_DETAILS,
+    // get-code-docs serves a fully static guide (no token, no network), so a
+    // docs-only server can start unauthenticated. run-code (paired with it by
+    // the loader) still needs a token, but the token gate keys off the tools the
+    // caller explicitly requested, so requesting get-code-docs alone stays unauth.
+    HELPER_TOOLS.CODE_DOCS,
 ];
 
 // Re-export from registry.ts

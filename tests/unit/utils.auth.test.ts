@@ -32,12 +32,26 @@ describe('isApiTokenRequired', () => {
                 toolCategoryKeys: ['search-actors', 'fetch-actor-details'],
             }),
         ).toBe(false);
+
+        // get-code-docs serves a static guide, so a docs-only server needs no token.
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['get-code-docs'],
+            }),
+        ).toBe(false);
     });
 
     it('should require token if any private tool is included', () => {
         expect(
             isApiTokenRequired({
                 toolCategoryKeys: ['search-actors', 'call-actor'],
+            }),
+        ).toBe(true);
+
+        // run-code starts an Actor, so it needs a token even paired with get-code-docs.
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['get-code-docs', 'run-code'],
             }),
         ).toBe(true);
     });
