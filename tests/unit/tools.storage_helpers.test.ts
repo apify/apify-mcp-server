@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FAILURE_CATEGORY, HelperTools, KV_RECORD_MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HelperTools, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
 import {
     buildDatasetItemsSummaryNextStep,
     buildStorageNotFound,
@@ -94,14 +94,14 @@ describe('classifyBinaryRecord()', () => {
     });
 
     it('links out a value above the size limit, reporting its byte length', () => {
-        const value = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
+        const value = Buffer.alloc(MAX_INLINE_BYTES + 1);
 
         const result = classifyBinaryRecord('application/octet-stream', value);
 
         expect(result).toEqual({
             kind: 'linkOut',
             mimeType: 'application/octet-stream',
-            bytes: KV_RECORD_MAX_INLINE_BYTES + 1,
+            bytes: MAX_INLINE_BYTES + 1,
         });
     });
 

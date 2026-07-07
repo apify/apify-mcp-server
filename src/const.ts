@@ -14,7 +14,7 @@ export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of me
  * other files) would blow up the context window. Text and JSON records are not capped — the
  * model reads them directly.
  */
-export const KV_RECORD_MAX_INLINE_BYTES = 256 * 1024;
+export const MAX_INLINE_BYTES = 256 * 1024;
 
 /**
  * Advisory threshold (uncompressed bytes) above which dataset tools append a size hint steering the

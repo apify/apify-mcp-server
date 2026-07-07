@@ -28,7 +28,7 @@ header to **every** outbound request, so we must never hand it a non-Apify host.
 body is JSON → object, text/xml → string, anything else → `Buffer`, empty → `undefined`.
 Binary and empty bodies are keyed off the JS type; a JSON body is re-serialized with `JSON.stringify`
 (keyed off the declared Content-Type) so `null` and bare-string primitives round-trip, and text/xml
-strings are emitted verbatim. Buffers over `KV_RECORD_MAX_INLINE_BYTES`
+strings are emitted verbatim. Buffers over `MAX_INLINE_BYTES`
 (256 KB) link out — an explanatory `text/plain` block naming the URL + size + type
 (`resources/read` has no `resource_link` content type) — instead of inlining base64. For a KVS
 record the URL is the store's `recordPublicUrl` (auth-free only when the store has a URL-signing key);

@@ -2,7 +2,7 @@ import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
-import { KV_RECORD_MAX_INLINE_BYTES } from '../../src/const.js';
+import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { isApifyApiUri, readApiResource } from '../../src/resources/api_resources.js';
 
 const API = 'https://api.apify.com';
@@ -160,7 +160,7 @@ describe('readApiResource()', () => {
     it('links to the signed record URL instead of inlining a binary above the size limit', async () => {
         // Inlining a multi-MB blob as base64 would blow up the client's context; link out instead.
         // The link is the store's signed recordPublicUrl, so a client can fetch it without a token.
-        const oversized = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
+        const oversized = Buffer.alloc(MAX_INLINE_BYTES + 1);
         const uri = `${API}/v2/key-value-stores/kv-1/records/BIG`;
         const { call } = callReturning(oversized, 'application/octet-stream');
 
@@ -171,14 +171,14 @@ describe('readApiResource()', () => {
         expect(contents).not.toHaveProperty('blob');
         expect(contents.text).toContain('too large to inline');
         expect(contents.text).toContain(signedUrl('kv-1', 'BIG'));
-        expect(contents.text).toContain(String(KV_RECORD_MAX_INLINE_BYTES + 1));
+        expect(contents.text).toContain(String(MAX_INLINE_BYTES + 1));
         expect(contents.text).toContain('application/octet-stream');
     });
 
     it('still mints a signed link for a record key with malformed percent-encoding', async () => {
         // A stray `%` in the key path used to throw in decodeURIComponent and drop the link to the
         // token-gated API URL; safeDecodeURIComponent keeps the raw segment so the signed link survives.
-        const oversized = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
+        const oversized = Buffer.alloc(MAX_INLINE_BYTES + 1);
         const uri = `${API}/v2/key-value-stores/kv-1/records/BIG%`;
         const { call } = callReturning(oversized, 'application/octet-stream');
 
@@ -188,7 +188,7 @@ describe('readApiResource()', () => {
     });
 
     it('falls back to the API URL when minting the signed link fails', async () => {
-        const oversized = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
+        const oversized = Buffer.alloc(MAX_INLINE_BYTES + 1);
         const uri = `${API}/v2/key-value-stores/kv-1/records/BIG`;
         const { call } = callReturning(oversized, 'application/octet-stream');
 

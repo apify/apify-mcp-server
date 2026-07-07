@@ -1,4 +1,4 @@
-import { FAILURE_CATEGORY, HelperTools, KV_RECORD_MAX_INLINE_BYTES, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, MAX_INLINE_BYTES, TOOL_STATUS } from '../../const.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
@@ -167,7 +167,7 @@ export function normalizeRecordKey(key: string): string {
 
 /**
  * How to surface a binary key-value-store record value: inline as base64 below
- * `KV_RECORD_MAX_INLINE_BYTES`, otherwise link out (inlining a multi-MB blob would blow up the
+ * `MAX_INLINE_BYTES`, otherwise link out (inlining a multi-MB blob would blow up the
  * client's context). `mimeType` is the Content-Type with parameters stripped and lowercased
  * (`Image/PNG; charset=…` → `image/png`), or `undefined` when no Content-Type was declared.
  */
@@ -183,7 +183,7 @@ export type BinaryRecordDisposition =
  */
 export function classifyBinaryRecord(contentType: string | undefined, value: Buffer): BinaryRecordDisposition {
     const mimeType = contentType?.split(';')[0].trim().toLowerCase();
-    if (value.length > KV_RECORD_MAX_INLINE_BYTES) {
+    if (value.length > MAX_INLINE_BYTES) {
         return { kind: 'linkOut', ...(mimeType !== undefined && { mimeType }), bytes: value.length };
     }
     return { kind: 'inline', ...(mimeType !== undefined && { mimeType }), base64: value.toString('base64') };
