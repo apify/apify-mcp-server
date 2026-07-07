@@ -197,10 +197,10 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toContain(uri);
     });
 
-    it('returns a paging instruction instead of inlining an oversized JSON body', async () => {
+    it('links an oversized JSON dataset body to a download URL with a paging hint', async () => {
         // A large dataset read with no limit parses to a JS array; serializing and inlining it would
-        // blow up the caller's context, exactly like an oversized binary. Return a paging instruction
-        // pointing back at the same URI rather than the data.
+        // blow up the caller's context, exactly like an oversized binary. Link out instead: a non-record
+        // endpoint has no signed URL, so the link is the same (token-gated) API URL, with a paging hint.
         const huge = [{ v: 'x'.repeat(MAX_INLINE_BYTES) }];
         const uri = `${API}/v2/datasets/ds-1/items`;
         const { call } = callReturning(huge, 'application/json');
@@ -210,14 +210,16 @@ describe('readApiResource()', () => {
         const contents = firstContent(result);
         expect(contents.mimeType).toBe('text/plain');
         expect(contents.text).toContain('too large to inline');
+        expect(contents.text).toContain(uri);
         expect(contents.text).toContain('limit');
         expect(contents.text).toContain('offset');
-        expect(contents.text).toContain(uri);
         // The body itself is not inlined.
         expect(contents.text).not.toContain('xxxxxxxxxx');
     });
 
-    it('returns a paging instruction instead of inlining an oversized text body', async () => {
+    it('links an oversized text KVS record to its signed download URL', async () => {
+        // A KVS record has no limit/offset paging, so an oversized text/JSON record must link out like a
+        // binary. Prefer the store's signed recordPublicUrl so the user can fetch it without a token.
         const uri = `${API}/v2/key-value-stores/kv-1/records/BIG_TEXT`;
         const { call } = callReturning('x'.repeat(MAX_INLINE_BYTES + 1), 'text/plain; charset=utf-8');
 
@@ -226,7 +228,17 @@ describe('readApiResource()', () => {
         const contents = firstContent(result);
         expect(contents.mimeType).toBe('text/plain');
         expect(contents.text).toContain('too large to inline');
+        expect(contents.text).toContain(signedUrl('kv-1', 'BIG_TEXT'));
         expect(contents.text).toContain(String(MAX_INLINE_BYTES + 1));
+    });
+
+    it('falls back to the API URL when an oversized text record link cannot be signed', async () => {
+        const uri = `${API}/v2/key-value-stores/kv-1/records/BIG_TEXT`;
+        const { call } = callReturning('x'.repeat(MAX_INLINE_BYTES + 1), 'text/plain; charset=utf-8');
+
+        const result = await readApiResource(uri, stubApifyClient({ call, recordPublicUrlThrows: true }));
+
+        expect(firstContent(result).text).toContain(uri);
     });
 
     it('returns empty text for an empty body', async () => {

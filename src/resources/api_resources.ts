@@ -168,16 +168,19 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     }
 
     // Symmetric with the binary link-out above: a body over the inline limit would blow up the caller's
-    // context, so return a paging instruction instead of the data. We measure the serialized bytes we would
-    // actually emit — not a Content-Length header, which reports the original wire body (a different size
-    // after re-serialization) and is often absent on chunked/gzip list responses. Unlike a binary, the
-    // remedy for an oversized list/dataset is to re-read the SAME uri with limit/offset, not a download.
+    // context, so link out instead of inlining. We measure the serialized bytes we would actually emit —
+    // not a Content-Length header, which reports the original wire body (a different size after
+    // re-serialization) and is often absent on chunked/gzip list responses. The link is the store's signed
+    // `recordPublicUrl` for a KVS record (fetchable without a token) and the token-gated API URL otherwise;
+    // limit/offset paging only works for a dataset/list, so it's offered as a secondary hint, not the sole
+    // remedy — a single record or log cannot be paged and would otherwise dead-end.
     const bytes = Buffer.byteLength(text);
     if (bytes > MAX_INLINE_BYTES) {
+        const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient);
         return buildTextResult(
             uri,
-            `Response body (~${bytes} bytes) is too large to inline. Page it by re-reading ${uri} ` +
-                `with limit/offset query params, e.g. ?limit=100&offset=0.`,
+            `Response body (~${bytes} bytes) is too large to inline. Download it from ${downloadUrl} ` +
+                `(may require your Apify API token), or for a dataset/list re-read the URL with a smaller limit/offset range.`,
         );
     }
     return buildTextResult(uri, text, mimeType);
