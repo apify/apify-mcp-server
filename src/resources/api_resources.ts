@@ -6,6 +6,7 @@ import type {
 
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
+import { MAX_INLINE_BYTES } from '../const.js';
 import { classifyBinaryRecord } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 
@@ -146,18 +147,38 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         };
     }
 
-    // A JSON body must be re-serialized so primitives round-trip as valid JSON: a bare JSON string
-    // `"hi"` parses to the JS string `hi`, and emitting it verbatim would drop the quotes; JSON `null`
-    // must stay `null`, not collapse to empty text. Branch on the declared Content-Type, not the parsed
-    // JS type, so the type alone can't misclassify a string body.
+    // Serialize the body to the exact text we would inline, then size-guard it below.
+    let text: string;
+    let mimeType: string;
     if (isJsonContentType(contentType)) {
-        return buildTextResult(uri, JSON.stringify(data), contentType ?? JSON_MIME_TYPE);
+        // A JSON body must be re-serialized so primitives round-trip as valid JSON: a bare JSON string
+        // `"hi"` parses to the JS string `hi`, and emitting it verbatim would drop the quotes; JSON `null`
+        // must stay `null`, not collapse to empty text. Branch on the declared Content-Type, not the parsed
+        // JS type, so the type alone can't misclassify a string body.
+        text = JSON.stringify(data);
+        mimeType = contentType ?? JSON_MIME_TYPE;
+    } else {
+        // text/xml bodies are JS strings, emitted verbatim with their FULL declared Content-Type — charset
+        // included, since a client needs it to decode the text. This is deliberately unlike the binary path,
+        // where `classifyBinaryRecord` strips the Content-Type to its base MIME type (only the base type is
+        // meaningful for a blob, and the image/audio routing keys off it). Any other parsed object (no/unknown
+        // Content-Type) is lossless-serialized as JSON.
+        text = typeof data === 'string' ? data : JSON.stringify(data);
+        mimeType = contentType ?? (typeof data === 'string' ? TEXT_MIME_TYPE : JSON_MIME_TYPE);
     }
-    // text/xml bodies are JS strings, emitted verbatim with their FULL declared Content-Type — charset
-    // included, since a client needs it to decode the text. This is deliberately unlike the binary path,
-    // where `classifyBinaryRecord` strips the Content-Type to its base MIME type (only the base type is
-    // meaningful for a blob, and the image/audio routing keys off it). Any other parsed object (no/unknown
-    // Content-Type) is lossless-serialized as JSON.
-    const text = typeof data === 'string' ? data : JSON.stringify(data);
-    return buildTextResult(uri, text, contentType ?? (typeof data === 'string' ? TEXT_MIME_TYPE : JSON_MIME_TYPE));
+
+    // Symmetric with the binary link-out above: a body over the inline limit would blow up the caller's
+    // context, so return a paging instruction instead of the data. We measure the serialized bytes we would
+    // actually emit — not a Content-Length header, which reports the original wire body (a different size
+    // after re-serialization) and is often absent on chunked/gzip list responses. Unlike a binary, the
+    // remedy for an oversized list/dataset is to re-read the SAME uri with limit/offset, not a download.
+    const bytes = Buffer.byteLength(text);
+    if (bytes > MAX_INLINE_BYTES) {
+        return buildTextResult(
+            uri,
+            `Response body (~${bytes} bytes) is too large to inline. Page it by re-reading ${uri} ` +
+                `with limit/offset query params, e.g. ?limit=100&offset=0.`,
+        );
+    }
+    return buildTextResult(uri, text, mimeType);
 }

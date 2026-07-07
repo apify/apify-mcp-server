@@ -33,9 +33,10 @@ strings are emitted verbatim. Buffers over `MAX_INLINE_BYTES`
 (`resources/read` has no `resource_link` content type) — instead of inlining base64. For a KVS
 record the URL is the store's `recordPublicUrl` (auth-free only when the store has a URL-signing key);
 an unsigned record URL and every other endpoint fall back to the token-gated API URL, so the block says
-the link may require the token. Text/JSON bodies are not size-capped (the model paginates via
-`limit`/`offset`). Errors never throw: a missing resource, bad token, or 5xx returns an explanatory
-`text` block.
+the link may require the token. A text/JSON body over the same `MAX_INLINE_BYTES` cap returns a paging
+instruction — re-read the same URI with `limit`/`offset` — instead of the body (measured on the
+serialized bytes we would emit, not a `Content-Length` header). Errors never throw: a missing resource,
+bad token, or 5xx returns an explanatory `text` block.
 
 Discovery is the server-instructions prose, not a fixed list: `resources/templates/list` returns
 nothing and `resources/list` serves only widgets + the usage guide. The read path is a generic

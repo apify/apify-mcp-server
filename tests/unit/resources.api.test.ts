@@ -197,6 +197,38 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toContain(uri);
     });
 
+    it('returns a paging instruction instead of inlining an oversized JSON body', async () => {
+        // A large dataset read with no limit parses to a JS array; serializing and inlining it would
+        // blow up the caller's context, exactly like an oversized binary. Return a paging instruction
+        // pointing back at the same URI rather than the data.
+        const huge = [{ v: 'x'.repeat(MAX_INLINE_BYTES) }];
+        const uri = `${API}/v2/datasets/ds-1/items`;
+        const { call } = callReturning(huge, 'application/json');
+
+        const result = await readApiResource(uri, stubApifyClient({ call }));
+
+        const contents = firstContent(result);
+        expect(contents.mimeType).toBe('text/plain');
+        expect(contents.text).toContain('too large to inline');
+        expect(contents.text).toContain('limit');
+        expect(contents.text).toContain('offset');
+        expect(contents.text).toContain(uri);
+        // The body itself is not inlined.
+        expect(contents.text).not.toContain('xxxxxxxxxx');
+    });
+
+    it('returns a paging instruction instead of inlining an oversized text body', async () => {
+        const uri = `${API}/v2/key-value-stores/kv-1/records/BIG_TEXT`;
+        const { call } = callReturning('x'.repeat(MAX_INLINE_BYTES + 1), 'text/plain; charset=utf-8');
+
+        const result = await readApiResource(uri, stubApifyClient({ call }));
+
+        const contents = firstContent(result);
+        expect(contents.mimeType).toBe('text/plain');
+        expect(contents.text).toContain('too large to inline');
+        expect(contents.text).toContain(String(MAX_INLINE_BYTES + 1));
+    });
+
     it('returns empty text for an empty body', async () => {
         // The client maps an empty record body to `undefined` (e.g. an Actor that writes an empty OUTPUT).
         const { call } = callReturning(undefined, 'application/json');

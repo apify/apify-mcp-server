@@ -9,10 +9,10 @@ export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of me
 
 // Tool output
 /**
- * Binary key-value store records larger than this are returned as a fetchable link instead of
- * inline base64. base64 inflates the payload ~33%, so inlining large binaries (images, audio,
- * other files) would blow up the context window. Text and JSON records are not capped — the
- * model reads them directly.
+ * Content larger than this is linked out or paged instead of inlined, since inlining it would blow up
+ * the context window (base64 inflates a binary payload ~33%, and a large text/JSON body is just as
+ * capable). Shared by the key-value-store-record tool and the API-resource proxy: binaries link to a
+ * fetchable URL, oversized text/JSON returns a paging instruction.
  */
 export const MAX_INLINE_BYTES = 256 * 1024;
 
