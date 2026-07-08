@@ -46,6 +46,11 @@ PR-by-PR breakdown of the audit above. Live plan (#777); sub-issues #750–#754,
 Checklist and notes for ChatGPT MCP Apps store submission. In progress — verify line
 references against current source before relying on them.
 
+### [refactoring-sweep-2026-07.md](./refactoring-sweep-2026-07.md)
+Full-codebase sweep results: defects and refactorings filed as #1064/#1065/#1066, plus the
+unfiled M/L backlog (types.ts split, payment seam, `internals.js` narrowing, test import
+time). Pull from the backlog instead of re-sweeping.
+
 ### [web-widget-bundle-size.md](./web-widget-bundle-size.md)
 Keeping widget bundles small (narrow `@apify/ui-library/dist/src/...` imports, markdown stack
 cost). Re-measure when changing widget dependencies or markdown rendering.
