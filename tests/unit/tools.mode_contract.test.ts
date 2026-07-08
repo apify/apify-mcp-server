@@ -72,6 +72,11 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(defaultCategories.storage)).toEqual(expected);
             expect(toolNames(appsCategories.storage)).toEqual(expected);
         });
+
+        it('should have correct tools in dev category (both modes)', () => {
+            expect(toolNames(defaultCategories.dev)).toEqual([]);
+            expect(toolNames(appsCategories.dev)).toEqual([]);
+        });
     });
 
     describe('tool name invariance across modes', () => {
