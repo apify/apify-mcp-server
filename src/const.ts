@@ -16,6 +16,9 @@ export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of me
  */
 export const MAX_INLINE_BYTES = 256 * 1024;
 
+/** Hard cap on bytes the API-resource proxy downloads; enforced mid-flight by axios `maxContentLength`. */
+export const MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024;
+
 /**
  * Advisory threshold (uncompressed bytes) above which dataset tools append a size hint steering the
  * caller to narrow the fetch. A soft hint, not a truncation cap; ~50 KB mirrors the ~25k-token budget.

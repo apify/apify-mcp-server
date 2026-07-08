@@ -3,10 +3,11 @@ import type {
     ReadResourceResult,
     TextResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
+import { isAxiosError } from 'axios';
 
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
-import { MAX_INLINE_BYTES } from '../const.js';
+import { MAX_DOWNLOAD_BYTES, MAX_INLINE_BYTES } from '../const.js';
 import { classifyBinaryRecord } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 
@@ -88,6 +89,15 @@ function buildTextResult(uri: string, text: string, mimeType: string = TEXT_MIME
  * string, anything else to a Buffer, an empty body to `undefined`. We branch on that resulting
  * JS type, not the MIME type. Errors (a missing resource, a bad token, a 5xx) never throw; they
  * return an explanatory text block, matching the resources/read soft-fail contract.
+ *
+ * The download itself goes straight through `apifyClient.httpClient.axios` (the same axios
+ * instance apify-client builds internally, so token/origin headers and Content-Type parsing
+ * still apply) instead of `httpClient.call()`. This is one attempt, no retries: `call()` would
+ * retry the size-cap abort below as if it were a flaky network error, adding 8 retries and
+ * ~127s of backoff for what is a deliberate, permanent rejection. The download is capped at
+ * `MAX_DOWNLOAD_BYTES` (5 MB) via axios's `maxContentLength`, checked incrementally as bytes
+ * arrive — so an oversized dataset/log is aborted mid-flight instead of being buffered whole
+ * before the (separate, smaller) `MAX_INLINE_BYTES` inline check ever runs.
  */
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
     if (!apifyClient) {
@@ -100,15 +110,36 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         );
     }
 
-    let response: { data: unknown; headers: Record<string, unknown> };
+    let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
     try {
         // Default responseType is `arraybuffer`, which lets the client's parse interceptor decode
         // the body by Content-Type. Do NOT set `forceBuffer` — that would keep everything as raw bytes.
-        response = await apifyClient.httpClient.call({ url: uri, method: 'GET', responseType: 'arraybuffer' });
+        response = await apifyClient.httpClient.axios.request<unknown>({
+            url: uri,
+            method: 'GET',
+            responseType: 'arraybuffer',
+            maxContentLength: MAX_DOWNLOAD_BYTES,
+        });
     } catch (err) {
+        if (isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength')) {
+            const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient);
+            return buildTextResult(
+                uri,
+                `Response body exceeds the ${MAX_DOWNLOAD_BYTES}-byte download limit. Download it from ${downloadUrl} ` +
+                    `(may require your Apify API token), or for a dataset/list re-read the URL with a smaller limit/offset range.`,
+            );
+        }
         const status = getHttpStatusCode(err);
         const message = err instanceof Error ? err.message : String(err);
         return buildTextResult(uri, `Failed to read ${uri}: ${status ? `HTTP ${status}: ` : ''}${message}`);
+    }
+
+    // `validateStatus: null` on this axios instance resolves non-2xx responses instead of throwing,
+    // so a failed request must be checked here rather than in the catch block above.
+    if (response.status >= 300) {
+        const body = response.data as { error?: { message?: unknown } } | undefined;
+        const message = typeof body?.error?.message === 'string' ? body.error.message : response.statusText;
+        return buildTextResult(uri, `Failed to read ${uri}: HTTP ${response.status}: ${message}`);
     }
 
     const contentTypeHeader = response.headers['content-type'];

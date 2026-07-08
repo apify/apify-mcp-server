@@ -23,21 +23,30 @@ to translate. `isApifyApiUri()` gates reads to the configured API origin
 (`getApifyAPIBaseUrl()`): the apify-client attaches the session token as an `Authorization`
 header to **every** outbound request, so we must never hand it a non-Apify host.
 
-`readApiResource()` is a generic proxy: `apifyClient.httpClient.call({ method: 'GET', responseType: 'arraybuffer' })`
-(do **not** set `forceBuffer` — that skips the client's Content-Type parsing). The parsed
-body is JSON → object, text/xml → string, anything else → `Buffer`, empty → `undefined`.
+`readApiResource()` is a generic proxy: `apifyClient.httpClient.axios.request({ method: 'GET', responseType: 'arraybuffer', maxContentLength: MAX_DOWNLOAD_BYTES })`
+(do **not** set `forceBuffer` — that skips the client's Content-Type parsing). It calls the
+apify-client's own axios instance directly instead of `httpClient.call()`, deliberately skipping
+apify-client's retry wrapper: that wrapper would misclassify the `maxContentLength` abort below as a
+retryable network error and retry it 8 times (~127s of backoff) instead of failing fast — so this is
+one attempt, no retries. `MAX_DOWNLOAD_BYTES` (5 MB) is enforced mid-flight by axios as bytes arrive, so
+an oversized dataset/log is aborted during download instead of being buffered whole first; on trip, the
+proxy links out the same way as an oversized inline body (below), skipping straight past the parse step.
+The parsed body is JSON → object, text/xml → string, anything else → `Buffer`, empty → `undefined`.
 Binary and empty bodies are keyed off the JS type; a JSON body is re-serialized with `JSON.stringify`
 (keyed off the declared Content-Type) so `null` and bare-string primitives round-trip, and text/xml
 strings are emitted verbatim. Buffers over `MAX_INLINE_BYTES`
-(256 KB) link out — an explanatory `text/plain` block naming the URL + size + type
+(256 KB, unchanged) link out — an explanatory `text/plain` block naming the URL + size + type
 (`resources/read` has no `resource_link` content type) — instead of inlining base64. For a KVS
 record the URL is the store's `recordPublicUrl` (auth-free only when the store has a URL-signing key);
 an unsigned record URL and every other endpoint fall back to the token-gated API URL, so the block says
 the link may require the token. A text/JSON body over the same `MAX_INLINE_BYTES` cap links out the same
 way — the signed `recordPublicUrl` for a KVS record, else the token-gated API URL — with a hint to page a
 dataset/list via `limit`/`offset` (measured on the serialized bytes we would emit, not a `Content-Length`
-header; a single record or log can't be paged, so the link is the real remedy). Errors never throw: a
-missing resource, bad token, or 5xx returns an explanatory `text` block.
+header; a single record or log can't be paged, so the link is the real remedy). Errors never throw past
+this function: this axios instance resolves non-2xx responses (`validateStatus: null`) instead of
+throwing, so a missing resource or 5xx is checked on the resolved `status` and returned as an
+explanatory `text` block; only network-level failures (and the `maxContentLength` abort) reach the
+`catch`.
 
 Discovery is the server-instructions prose, not a fixed list: `resources/templates/list` returns
 nothing and `resources/list` serves only widgets + the usage guide. The read path is a generic
