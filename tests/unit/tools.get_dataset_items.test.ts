@@ -187,7 +187,7 @@ describe('get-dataset-items', () => {
         };
 
         expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/ds-1');
-        // content: [0] fenced data, [1] summary/nextStep, [2] Apify Console link.
+        // content: [0] plain JSON, [1] summary/nextStep, [2] Apify Console link.
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
@@ -205,7 +205,7 @@ describe('get-dataset-items', () => {
         expect(structuredContent.summary).toBe('Fetched all 1 items.');
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
-        // summary + nextStep ship as a separate text block after the fenced data.
+        // summary + nextStep ship as a separate text block after the plain JSON.
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 

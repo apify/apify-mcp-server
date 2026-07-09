@@ -181,7 +181,7 @@ describe('get-key-value-store-keys', () => {
         });
         const { content } = result as TextToolResult;
 
-        // content: [0] fenced data, [1] summary/nextStep, [2] Apify Console link.
+        // content: [0] plain JSON, [1] summary/nextStep, [2] Apify Console link.
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
