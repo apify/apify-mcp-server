@@ -51,7 +51,7 @@ export async function getActorMCPServerURL(realActorId: string, mcpServerPath: s
     // Parse the standby URL up front so the origin comparison below is between two
     // values normalised by the same parser — WHATWG lowercases hostnames, and Apify
     // Actor IDs are mixed-case, so a raw-string comparison would reject legitimate URLs.
-    const standby = new URL(`${await getActorStandbyURL(realActorId, standbyBaseUrl)}/`);
+    const standby = new URL(`https://${realActorId}.${standbyBaseUrl}/`);
 
     const resolved = new URL(mcpServerPath, standby);
     if (resolved.origin !== standby.origin) {
@@ -75,11 +75,4 @@ export async function getRealActorID(actorIdOrName: string, apifyToken: string):
         throw new Error(`Actor ${actorIdOrName} not found`);
     }
     return info.id;
-}
-
-/**
- * Returns standby URL for given Actor ID.
- */
-export async function getActorStandbyURL(realActorId: string, standbyBaseUrl = 'apify.actor'): Promise<string> {
-    return `https://${realActorId}.${standbyBaseUrl}`;
 }

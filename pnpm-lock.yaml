@@ -256,9 +256,6 @@ importers:
       express:
         specifier: ^4.21.2
         version: 4.22.2
-      mcp-client-capabilities:
-        specifier: ^0.0.14
-        version: 0.0.14
       yargs:
         specifier: ^17.7.2
         version: 17.7.2
@@ -3305,9 +3302,6 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
-
-  mcp-client-capabilities@0.0.14:
-    resolution: {integrity: sha512-HPNxasWHzqQmTevk4P7n+La1MtbcFjnr7MbIeBeVvdb08fCWeOtyDOyhhuEStMRj8mHoMt/senEhOj3l+WMyTw==}
 
   mdast-util-find-and-replace@3.0.2:
     resolution: {integrity: sha512-Tmd1Vg/m3Xz43afeNxDIhWRtFZgM2VLyaf4vSTYwudTyeuTneoL3qtWMA5jeLyz/O1vDJmmV4QuScFCA2tBPwg==}
@@ -7307,8 +7301,6 @@ snapshots:
   markdown-table@3.0.4: {}
 
   math-intrinsics@1.1.0: {}
-
-  mcp-client-capabilities@0.0.14: {}
 
   mdast-util-find-and-replace@3.0.2:
     dependencies:

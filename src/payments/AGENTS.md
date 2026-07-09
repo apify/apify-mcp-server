@@ -19,7 +19,7 @@ The cross-file invariant no single file shows you:
 - `resolve.ts` — `resolvePaymentProvider(?payment=)` → `skyfire | x402`. Async: the
   x402 branch fetches payment requirements from the Apify API.
 - `skyfire.ts` — injects `skyfire-pay-id` (a JWT starting `ey…`) into the schemas of
-  tools in `SKYFIRE_ENABLED_TOOLS`; forwards it as a header.
+  tools with `paymentRequired: true`; forwards it as a header.
 - `x402.ts` — reads payment from the JSON-RPC `_meta` key `x402/payment`; HTTP 402
   flow; forwards the `PAYMENT-SIGNATURE` header.
 - `const.ts` — `PAYMENT_PROTOCOL_HEADER` and the Skyfire instruction strings (x402's live in `x402.ts`).
@@ -31,8 +31,10 @@ The cross-file invariant no single file shows you:
 - **Every payment field passes through `prepareToolCallContext`** before validation
   and logging. Don't read a payment field anywhere downstream of it — by design it's
   already gone.
-- **Add a new pay-eligible tool by adding it to `SKYFIRE_ENABLED_TOOLS`**, not by
-  hand-injecting the schema field elsewhere.
+- **Make a tool pay-eligible by setting `paymentRequired: true` on its definition**, not by
+  hand-injecting the schema field elsewhere — both `skyfire.ts` and `x402.ts` gate on that
+  flag. `SKYFIRE_ENABLED_TOOLS` (`const.ts`) is the expected-list the Skyfire integration test
+  asserts against; keep it in sync with the `paymentRequired` tools or that test fails.
 - `skyfire-pay-id` is injected only at the top level, so `redactSkyfirePayId` redacts top-level only; if you ever nest a payment field, make the redactor recursive or it leaks.
 
 ## Local commands
