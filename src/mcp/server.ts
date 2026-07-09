@@ -62,13 +62,14 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getServerInfo } from '../server_card.js';
-import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { buildAgentFeedbackProperties, getTelemetryEnv, trackAgentFeedback, trackToolCall } from '../telemetry.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
 import { buildPermissionApprovalResponse, checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorsAsToolsResult } from '../tools/index.js';
+import { appendReportProblemNudge } from '../tools/report_problem/report_problem.js';
 import type {
     ActorsMcpServerOptions,
     ActorStore,
@@ -90,6 +91,7 @@ import {
     respondErrorNoTelemetry,
     respondOk,
 } from '../utils/mcp.js';
+import { isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
 import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -191,15 +193,19 @@ export class ActorsMcpServer {
      * values bypass auto-detect.
      */
     private readonly serverModeOption: ServerModeOption;
-    /** True once mode is final. False for `'auto'` until the initialize handler resolves client capabilities. */
+    /** True once the server mode is final: at construction for explicit `default`/`apps`, or after
+     *  the initialize handler resolves `'auto'`. Composing before this in `'auto'` mode would use
+     *  the preliminary DEFAULT mode and produce the wrong (non-widget) tool variants, so composition
+     *  waits for it. Distinct from {@link clientKnown}, which only withholds client-gated tools. */
     private serverModeResolved: boolean;
     /**
-     * Tool requests queued before mode is final. Actor tools are upserted immediately
-     * (mode-agnostic); we also capture the exact actor-tool slice fetched for each
-     * request so the flush composes every entry against *its own* actor list rather
-     * than the accumulated union across unrelated requests.
+     * Tool sources queued until composition is possible. Enqueued when the mode is not yet resolved
+     * (`'auto'` before initialize), and re-composed by the initialize flush — which is also when the
+     * client becomes known, so any client-gated tools withheld by an eager compose are added then.
+     * We capture the exact actor-tool slice fetched for each request so the flush composes every
+     * entry against *its own* actor list rather than the accumulated union across unrelated requests.
      */
-    private pendingToolsAfterModeResolved: { input: Input; actorTools: ToolEntry[] }[] = [];
+    private pendingToolsUntilClientKnown: { input: Input; actorTools: ToolEntry[] }[] = [];
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -331,6 +337,8 @@ export class ActorsMcpServer {
                 this.serverModeResolved = true;
             }
 
+            // Setting this makes `clientKnown` true, so the queued compose below (and any later
+            // load) resolves the tool set for this client and applies the per-client blocklist.
             (this.options as Record<string, unknown>).initializeRequestData = request;
 
             log.info('Resolved server mode for client capabilities', {
@@ -340,30 +348,70 @@ export class ActorsMcpServer {
                 capabilities: request?.params?.capabilities,
             });
 
-            this.updateToolsAfterServerModeResolved();
+            this.composePendingToolsForClient();
 
             await this.resolveWidgets();
 
             const result = await sdkInitHandler(request);
-            result.instructions = getServerInstructions(this.serverMode);
+            // Tools are final here (composePendingToolsForClient ran above, applying the per-client
+            // blocklist), so tool presence is the ground truth for whether to advertise
+            // report-problem in the instructions.
+            result.instructions = getServerInstructions(this.serverMode, this.tools.has(HELPER_TOOLS.PROBLEM_REPORT));
             return result;
         });
     }
 
-    private updateToolsAfterServerModeResolved(): void {
-        if (this.pendingToolsAfterModeResolved.length === 0) return;
+    /** True once the connecting client is known (set in the initialize handler, or hydrated by a
+     *  recovery path). Only client-gated tools wait for this so the per-client blocklist can be
+     *  applied; client-agnostic tools compose regardless. */
+    private get clientKnown(): boolean {
+        return this.options.initializeRequestData != null;
+    }
 
-        const tools = this.pendingToolsAfterModeResolved.flatMap(({ input, actorTools }) =>
-            getToolsForServerMode(input, actorTools, this.serverMode),
+    /**
+     * Compose the tool list for the current connection: resolve mode-specific tools, then drop
+     * report-problem unless it is currently servable (see {@link isReportProblemServable}). Every
+     * other tool composes eagerly, so a recovery/rehydration load without an initialize still
+     * restores them. report-problem is withheld until the client is known and re-added by the
+     * initialize flush. Used by every input-driven load path and the flush. (loadActorsAsTools
+     * upserts actor tools directly; actor tools are never gated, so they need no filtering.)
+     */
+    private composeToolsForClient(input: Input, actorTools: ToolEntry[]): ToolEntry[] {
+        return getToolsForServerMode(input, actorTools, this.serverMode).filter(
+            (tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT || this.isReportProblemServable(),
+        );
+    }
+
+    /**
+     * Whether report-problem may be served on this connection right now:
+     * - Its only function is forwarding submissions via telemetry, so it is never servable when
+     *   telemetry is disabled (it would just fake an acknowledgement into the void).
+     * - It cannot be judged until the connecting client is known, so it is withheld until then;
+     *   the initialize flush re-composes and adds it if the client allows.
+     * Every other tool is unconditionally servable, so recovery loads compose them eagerly and they
+     * survive a load that never sees an initialize.
+     */
+    private isReportProblemServable(): boolean {
+        return (
+            !!this.telemetryEnabled &&
+            this.clientKnown &&
+            !isReportProblemBlockedForClient(this.options.initializeRequestData)
+        );
+    }
+
+    private composePendingToolsForClient(): void {
+        if (this.pendingToolsUntilClientKnown.length === 0) return;
+
+        const tools = this.pendingToolsUntilClientKnown.flatMap(({ input, actorTools }) =>
+            this.composeToolsForClient(input, actorTools),
         );
 
-        this.pendingToolsAfterModeResolved = [];
+        this.pendingToolsUntilClientKnown = [];
 
-        // Notify after the flush so shared-state handlers (e.g. Redis recovery) see
-        // the final tool set, including mode-specific helpers added here. Pre-init,
-        // `loadToolsByName` may have fired `upsertTools(actorTools, true)` with actor
-        // tools only (helpers still queued), and `loadToolsFromUrl` / `loadToolsFromInput`
-        // don't notify at all — this call reconciles both paths to the complete set.
+        // Notify after the flush so shared-state handlers (e.g. Redis recovery) see the final tool
+        // set. Load paths already upserted the client-agnostic tools pre-init; re-upserting is
+        // idempotent, and this pass adds the client-gated tools (e.g. report-problem) now that the
+        // client is known, reconciling shared state to the complete set.
         if (tools.length > 0) this.upsertTools(tools, true);
     }
 
@@ -458,16 +506,21 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
+        // 'auto' before initialize: mode not final — composing now would pick wrong variants, so
+        // defer the whole source to the initialize flush (actor tools are mode-agnostic, upsert now).
         if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push({ input: restoreInput, actorTools });
+            this.pendingToolsUntilClientKnown.push({ input: restoreInput, actorTools });
             if (actorTools.length > 0) this.upsertTools(actorTools, true);
             return;
         }
-
-        const toolsToLoad = getToolsForServerMode(restoreInput, actorTools, this.serverMode);
+        // Mode is final: compose eagerly so client-agnostic tools restore even without an initialize
+        // (recovery / rehydration). Client-gated tools are withheld until the client is known; queue
+        // the source so the initialize flush re-composes and adds them.
+        const toolsToLoad = this.composeToolsForClient(restoreInput, actorTools);
         if (toolsToLoad.length > 0) {
             this.upsertTools(toolsToLoad, actorTools.length > 0);
         }
+        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input: restoreInput, actorTools });
     }
 
     /**
@@ -496,7 +549,7 @@ export class ActorsMcpServer {
         });
 
         if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push({ input, actorTools });
+            this.pendingToolsUntilClientKnown.push({ input, actorTools });
             if (actorTools.length > 0) {
                 log.debug('Loading actor tools from query parameters before mode resolution');
                 this.upsertTools(actorTools, false);
@@ -504,17 +557,19 @@ export class ActorsMcpServer {
             return;
         }
 
-        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
+        const tools = this.composeToolsForClient(input, actorTools);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
         }
+        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools });
     }
 
     /**
-     * Two-phase: getActors (async, mode-agnostic Apify fetch) then getToolsForServerMode
-     * (sync, mode-dependent compose). When mode is unresolved, queue actorTools and let
-     * the initialize handler compose them later.
+     * Two-phase: getActors (async, client-agnostic Apify fetch) then composeToolsForClient
+     * (sync compose + servability filter). If the mode isn't resolved yet ('auto' before initialize)
+     * the whole source is queued for the flush. Otherwise tools compose immediately; client-gated
+     * tools are withheld until the client is known, and the source is queued so the flush adds them.
      *
      * Don't move the getActors await into the initialize handler — clients time out
      * waiting for InitializeResult. The queue buffers already-fetched data, not network
@@ -526,12 +581,13 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
         if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push({ input, actorTools });
+            this.pendingToolsUntilClientKnown.push({ input, actorTools });
             if (actorTools.length > 0) this.upsertTools(actorTools);
             return;
         }
-        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
+        const tools = this.composeToolsForClient(input, actorTools);
         if (tools.length > 0) this.upsertTools(tools);
+        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools });
     }
 
     /** Delete tools from the server and notify the handler.
@@ -556,6 +612,9 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
+        // Client gating (e.g. hiding report-problem from Anthropic surfaces) is applied earlier, in
+        // composeToolsForClient — the single compose choke point where the client is known. Do not
+        // filter here: this is a low-level commit point reached before the client is known too.
         for (const tool of tools) {
             const stored = this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
             this.tools.set(stored.name, stored);
@@ -837,8 +896,16 @@ export class ActorsMcpServer {
             // Captured by `captureResult` so the `finally` block can measure response size for telemetry.
             let toolResult: unknown = null;
             const captureResult = <T>(r: T): T => {
-                toolResult = r;
-                return r;
+                // On a failed result, nudge the agent to report the blocker via report-problem at the
+                // moment it decides what to do next. Gated on the tool actually being served (see
+                // isReportProblemServable), so clients where it is blocklisted or telemetry is off never see it.
+                const augmented = appendReportProblemNudge(r, {
+                    failingToolName: resolvedToolName,
+                    available: this.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
+                    failureCategory: callDiagnostics.failure_category,
+                });
+                toolResult = augmented;
+                return augmented;
             };
             const failInvalidParams = async (
                 message: string,
@@ -1404,6 +1471,20 @@ export class ActorsMcpServer {
                 ...deriveResourceIds(params.args, params.result),
             };
             trackToolCall(params.userId, this.telemetryEnv, finalizedTelemetryData);
+
+            // A successful report-problem call also emits a dedicated feedback event carrying the
+            // submission. A downstream Segment destination fans it out to Slack/GitHub.
+            if (
+                params.toolName === HELPER_TOOLS.PROBLEM_REPORT &&
+                params.toolStatus === TOOL_STATUS.SUCCEEDED &&
+                params.args
+            ) {
+                trackAgentFeedback(
+                    params.userId,
+                    this.telemetryEnv,
+                    buildAgentFeedbackProperties(finalizedTelemetryData, params.args),
+                );
+            }
         }
     }
 
@@ -1651,6 +1732,14 @@ export class ActorsMcpServer {
             // Check if task was cancelled before storing result
             if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
 
+            // On a failed result, nudge the agent to report the blocker via report-problem (mirrors the
+            // synchronous CallTool path, which task-mode calls like call-actor bypass).
+            result = appendReportProblemNudge(result, {
+                failingToolName: tool.name,
+                available: this.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
+                failureCategory: callDiagnostics.failure_category,
+            });
+
             // Store the result in the task store
             log.debug('[executeToolAndUpdateTask] Storing completed result', {
                 taskId,
@@ -1792,16 +1881,26 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            const failedResult = {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: userText,
-                    },
-                ],
-                isError: true,
-                internalToolStatus: toolStatus,
-            };
+            // Nudge on a genuinely-failed task result too, so the sync and task paths behave
+            // identically. appendReportProblemNudge self-suppresses user-resolvable categories
+            // (INVALID_INPUT/AUTH/APPROVAL), so only real defects (INTERNAL_ERROR/unknown) get it.
+            const failedResult = appendReportProblemNudge(
+                {
+                    content: [
+                        {
+                            type: 'text' as const,
+                            text: userText,
+                        },
+                    ],
+                    isError: true,
+                    internalToolStatus: toolStatus,
+                },
+                {
+                    failingToolName: tool.name,
+                    available: this.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
+                    failureCategory: callDiagnostics.failure_category,
+                },
+            );
             await storeTaskResultOrSkipIfExpired(
                 this.taskStore,
                 tool.name,
