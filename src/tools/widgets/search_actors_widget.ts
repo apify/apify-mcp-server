@@ -8,7 +8,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { formatActorForWidget } from '../../utils/actor_card.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { buildSearchActorsResult, searchActorsBaseArgsSchema } from '../actors/search_actors.js';
 import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
@@ -78,8 +78,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
                 You MUST retry with broader, more generic keywords - use just the platform name
                 (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
             `;
-            return buildMCPResponse({
-                texts: [instructions],
+            return respondOk(instructions, {
                 structuredContent: {
                     actors: [],
                     query: parsed.keywords,
@@ -111,11 +110,10 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         ];
 
         const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
-        return buildMCPResponse({
-            texts,
+        return respondOk(texts, {
             structuredContent,
             // Response-level meta; only returned in apps mode (this handler is apps-only).
-            _meta: {
+            meta: {
                 ...widgetConfig?.meta,
                 'openai/widgetDescription': `Interactive actor search results showing ${actors.length} ${actors.length === 1 ? 'actor' : 'actors'} from Apify Store`,
             },

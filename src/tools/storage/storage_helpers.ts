@@ -1,7 +1,7 @@
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 
 function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
     return loadedToolNames.includes(toolName) ? toolName : undefined;
@@ -27,19 +27,6 @@ export function buildConsoleLinkContent(apifyConsoleUrl: string | undefined): { 
 }
 
 /**
- * Soft-fail not-found response for storage tools. Centralizes
- * `isError: true` + SOFT_FAIL/INVALID_INPUT telemetry so call sites
- * only supply the message.
- */
-export function buildStorageNotFound(text: string) {
-    return buildMCPResponse({
-        texts: [text],
-        isError: true,
-        telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-    });
-}
-
-/**
  * Build a storage tool response, mirroring `actor_run_response.ts`:
  * `structuredContent` carries the data plus `summary` (and `nextStep` unless terminal).
  * `nextStep` is omitted for terminal responses (e.g. get-key-value-store-record).
@@ -59,8 +46,7 @@ export function buildStorageResponse(params: {
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
     const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
     const consoleLinkText = apifyConsoleLinkText(apifyConsoleUrl);
-    return buildMCPResponse({
-        texts: [JSON.stringify(structuredContent), summaryText, ...(consoleLinkText ? [consoleLinkText] : [])],
+    return respondOk([JSON.stringify(structuredContent), summaryText, ...(consoleLinkText ? [consoleLinkText] : [])], {
         structuredContent: full,
     });
 }

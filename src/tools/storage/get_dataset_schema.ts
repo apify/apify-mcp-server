@@ -1,16 +1,16 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, HTTP_NOT_FOUND, TOOL_STATUS } from '../../const.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { datasetSchemaOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
+import { buildStorageResponse } from './storage_helpers.js';
 
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -68,7 +68,7 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
             });
 
         if (!datasetResponse) {
-            return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
+            return respondUserError(`Dataset '${datasetId}' not found.`);
         }
 
         const datasetItems = datasetResponse.items;
@@ -88,12 +88,8 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         });
 
         if (!schema) {
-            // Schema generation failure is typically a server/processing error, not a user error
-            return buildMCPResponse({
-                texts: [`Failed to generate schema for dataset '${datasetId}'.`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.FAILED },
-            });
+            // A schema-generation failure is a server/processing error, not a user error.
+            return respondServerError(`Failed to generate schema for dataset '${datasetId}'.`);
         }
 
         const fieldCount = Object.keys(schema.items.properties ?? {}).length;

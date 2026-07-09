@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.11.5",
+  "version": "0.11.6",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -62,7 +62,6 @@
     "dedent": "^1.7.2",
     "dotenv": "^17.4.1",
     "express": "^4.21.2",
-    "mcp-client-capabilities": "^0.0.14",
     "yargs": "^17.7.2",
     "zod": "^4.1.13"
   },

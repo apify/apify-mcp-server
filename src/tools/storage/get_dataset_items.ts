@@ -8,8 +8,9 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildDatasetItemsSummaryNextStep, buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
+import { buildDatasetItemsSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
 
 export const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
@@ -123,7 +124,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
                 throw err;
             });
         if (!v) {
-            return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
+            return respondUserError(`Dataset '${datasetId}' not found.`);
         }
 
         const offset = parsed.offset ?? 0;

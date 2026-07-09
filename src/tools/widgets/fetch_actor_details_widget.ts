@@ -7,7 +7,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { buildActorDetailsForWidget, buildCardOptions, fetchActorDetails } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
 import { actorDetailsOutputDefaults, buildActorNotFoundResponse } from '../actors/fetch_actor_details.js';
@@ -97,11 +97,10 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         `,
         ];
 
-        return buildMCPResponse({
-            texts,
+        return respondOk(texts, {
             structuredContent,
             // Response-level meta; only returned in apps mode (this handler is apps-only).
-            _meta: {
+            meta: {
                 ...widgetConfig?.meta,
                 'openai/widgetDescription': `Actor details for ${actorName} from Apify Store`,
             },
