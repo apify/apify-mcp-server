@@ -80,7 +80,6 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
             structuredContent: { keyValueStoreId, ...keys },
             summary,
             nextStep,
-            toon: true,
             apifyConsoleUrl: buildConsoleKeyValueStoreUrl(linkContext, keyValueStoreId),
         });
     },

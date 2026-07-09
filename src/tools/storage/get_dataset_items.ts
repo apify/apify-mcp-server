@@ -146,6 +146,6 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             offset,
             loadedToolNames: apifyMcpServer.listToolNames(),
         });
-        return buildStorageResponse({ structuredContent, summary, nextStep, toon: true, apifyConsoleUrl });
+        return buildStorageResponse({ structuredContent, summary, nextStep, apifyConsoleUrl });
     },
 } as const);
