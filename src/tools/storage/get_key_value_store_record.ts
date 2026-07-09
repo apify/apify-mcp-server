@@ -13,7 +13,7 @@ import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js
 import {
     buildConsoleLinkContent,
     buildStorageResponse,
-    classifyBinaryRecord,
+    classifyBinaryRecordSize,
     normalizeRecordKey,
 } from './storage_helpers.js';
 
@@ -87,7 +87,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         if (Buffer.isBuffer(value)) {
             // Shared with the API-resource proxy: normalizes the MIME type (so the image/audio checks below
             // don't miss `Image/PNG`) and decides inline-vs-link-out at the same byte threshold.
-            const disposition = classifyBinaryRecord(contentType, value);
+            const disposition = classifyBinaryRecordSize(contentType, value);
             const { mimeType } = disposition;
             const structuredContent = {
                 keyValueStoreId,

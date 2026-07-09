@@ -167,7 +167,7 @@ export type BinaryRecordDisposition =
  * It does NOT mint the link-out URL — the two callers build different URLs (a signed record URL vs the
  * API URL) via async calls — so the caller handles `linkOut` by minting its own URL.
  */
-export function classifyBinaryRecord(contentType: string | undefined, value: Buffer): BinaryRecordDisposition {
+export function classifyBinaryRecordSize(contentType: string | undefined, value: Buffer): BinaryRecordDisposition {
     const mimeType = contentType?.split(';')[0].trim().toLowerCase();
     if (value.length > MAX_INLINE_BYTES) {
         return { kind: 'linkOut', ...(mimeType !== undefined && { mimeType }), bytes: value.length };

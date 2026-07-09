@@ -8,7 +8,7 @@ import { isAxiosError } from 'axios';
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
 import { MAX_DOWNLOAD_BYTES, MAX_INLINE_BYTES } from '../const.js';
-import { classifyBinaryRecord } from '../tools/storage/storage_helpers.js';
+import { classifyBinaryRecordSize } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 
 const JSON_MIME_TYPE = 'application/json';
@@ -154,7 +154,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     }
 
     if (Buffer.isBuffer(data)) {
-        const disposition = classifyBinaryRecord(contentType, data);
+        const disposition = classifyBinaryRecordSize(contentType, data);
         // Above the inline limit, link out with an explanatory text block (resources/read has no
         // resource_link content type), matching the soft-fail contract. The link is only auth-free for a
         // key-value-store record whose store has a URL-signing key; an unsigned record URL and every other
@@ -191,7 +191,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     } else {
         // text/xml bodies are JS strings, emitted verbatim with their FULL declared Content-Type — charset
         // included, since a client needs it to decode the text. This is deliberately unlike the binary path,
-        // where `classifyBinaryRecord` strips the Content-Type to its base MIME type (only the base type is
+        // where `classifyBinaryRecordSize` strips the Content-Type to its base MIME type (only the base type is
         // meaningful for a blob, and the image/audio routing keys off it). Any other parsed object (no/unknown
         // Content-Type) is lossless-serialized as JSON.
         text = typeof data === 'string' ? data : JSON.stringify(data);

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import {
     buildDatasetItemsSummaryNextStep,
-    classifyBinaryRecord,
+    classifyBinaryRecordSize,
     normalizeRecordKey,
 } from '../../src/tools/storage/storage_helpers.js';
 
@@ -74,11 +74,11 @@ describe('normalizeRecordKey()', () => {
     });
 });
 
-describe('classifyBinaryRecord()', () => {
+describe('classifyBinaryRecordSize()', () => {
     it('inlines a value at or below the size limit as base64', () => {
         const value = Buffer.from('binary-data');
 
-        const result = classifyBinaryRecord('image/png', value);
+        const result = classifyBinaryRecordSize('image/png', value);
 
         expect(result).toEqual({ kind: 'inline', mimeType: 'image/png', base64: value.toString('base64') });
     });
@@ -86,7 +86,7 @@ describe('classifyBinaryRecord()', () => {
     it('links out a value above the size limit, reporting its byte length', () => {
         const value = Buffer.alloc(MAX_INLINE_BYTES + 1);
 
-        const result = classifyBinaryRecord('application/octet-stream', value);
+        const result = classifyBinaryRecordSize('application/octet-stream', value);
 
         expect(result).toEqual({
             kind: 'linkOut',
@@ -96,13 +96,13 @@ describe('classifyBinaryRecord()', () => {
     });
 
     it('strips Content-Type parameters and lowercases the MIME type', () => {
-        const result = classifyBinaryRecord('Image/PNG; charset=utf-8', Buffer.from('x'));
+        const result = classifyBinaryRecordSize('Image/PNG; charset=utf-8', Buffer.from('x'));
 
         expect(result.mimeType).toBe('image/png');
     });
 
     it('omits mimeType when no Content-Type is declared', () => {
-        const result = classifyBinaryRecord(undefined, Buffer.from('x'));
+        const result = classifyBinaryRecordSize(undefined, Buffer.from('x'));
 
         expect(result).not.toHaveProperty('mimeType');
     });
