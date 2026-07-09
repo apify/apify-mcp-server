@@ -6,6 +6,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
+import { REPORT_PROBLEM_NUDGE } from '../../src/tools/report_problem/report_problem.js';
 import type { McpTool, McpToolCall, McpToolResult } from './types.js';
 
 export class McpClient {
@@ -14,13 +15,16 @@ export class McpClient {
     private tools: McpTool[] = [];
     private instructions: string | null = null;
     private toolTimeoutMs: number;
+    private failTools: Set<string>;
 
     /**
      * Create MCP client
      * @param toolTimeoutSeconds - Timeout for tool calls in seconds (default: 60)
+     * @param failTools - Tool names to force-fail with a synthetic INTERNAL_ERROR (see callTool)
      */
-    constructor(toolTimeoutSeconds = 60) {
+    constructor(toolTimeoutSeconds = 60, failTools: string[] = []) {
         this.toolTimeoutMs = toolTimeoutSeconds * 1000;
+        this.failTools = new Set(failTools);
     }
 
     /**
@@ -110,6 +114,18 @@ export class McpClient {
     async callTool(toolCall: McpToolCall): Promise<McpToolResult> {
         if (!this.client) {
             throw new Error('MCP client is not started');
+        }
+
+        // Deterministic failure injection: force-fail listed tools with a synthetic INTERNAL_ERROR
+        // carrying the real server nudge, so the agent sees exactly what production appends on a genuine
+        // failure. The live server + API cannot reproduce an INTERNAL_ERROR on demand, so evals that
+        // exercise error-driven behavior (e.g. report-problem) rely on this.
+        if (this.failTools.has(toolCall.name)) {
+            return {
+                toolName: toolCall.name,
+                success: false,
+                error: `The ${toolCall.name} tool failed with an internal error.\n\n${REPORT_PROBLEM_NUDGE}`,
+            };
         }
 
         try {
