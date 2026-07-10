@@ -10,7 +10,11 @@ import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { buildSearchActorsResult, searchActorsBaseArgsSchema } from '../actors/search_actors.js';
+import {
+    buildNoActorsFoundInstructions,
+    buildSearchActorsResult,
+    searchActorsBaseArgsSchema,
+} from '../actors/search_actors.js';
 import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -73,11 +77,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         if (actors.length === 0) {
             // Honor the widget tool's declared outputSchema: widgetActors is required, so
             // emit an empty array rather than dropping the field.
-            const instructions = dedent`
-                No Actors were found for the search query "${parsed.keywords}".
-                You MUST retry with broader, more generic keywords - use just the platform name
-                (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
-            `;
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords);
             return respondOk(instructions, {
                 structuredContent: {
                     actors: [],
