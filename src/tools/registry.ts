@@ -73,7 +73,6 @@ export const toolCategories = {
         { default: callActorDefault, apps: callActorApps },
     ],
     docs: [searchApifyDocs, fetchApifyDocs],
-    'report-problem': [reportProblem],
     runs: [getActorRun, getActorRunList, getActorRunLog, abortActorRun],
     storage: [
         getDataset,
@@ -85,7 +84,7 @@ export const toolCategories = {
         getDatasetList,
         getKeyValueStoreList,
     ],
-    dev: [],
+    dev: [reportProblem],
 } satisfies Record<string, CategoryToolEntry[]>;
 
 /**
@@ -136,7 +135,7 @@ export function getCategoryTools(mode: SERVER_MODE = SERVER_MODE.DEFAULT): ToolC
     ) as ToolCategoryMap;
 }
 
-export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] = ['actors', 'docs', 'report-problem'];
+export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] = ['actors', 'docs'];
 
 /**
  * Apps-mode pairing: each base tool name maps to its widget sibling.

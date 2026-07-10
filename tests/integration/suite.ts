@@ -1751,9 +1751,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 validateStructuredOutputForTool(result, HELPER_TOOLS.DOCS_FETCH, 'default');
             });
 
-            // report-problem is telemetry-gated (off in this suite), so it can't load standalone here;
-            // its gating is covered by unit tests. Exclude it from the category sweep.
-            it.for(Object.keys(getCategoryTools('default')).filter((category) => category !== 'report-problem'))(
+            // The `dev` category holds only report-problem, which is telemetry-gated (off in this suite),
+            // so it can't load standalone here; its gating is covered by unit tests. Exclude it from the
+            // category sweep.
+            it.for(Object.keys(getCategoryTools('default')).filter((category) => category !== 'dev'))(
                 'should load correct tools for %s category',
                 async (category) => {
                     client = await createClientFn({

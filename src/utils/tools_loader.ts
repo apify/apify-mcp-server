@@ -18,6 +18,7 @@ import {
     toolCategoriesEnabledByDefault,
     WIDGET_BY_BASE_TOOL,
 } from '../tools/registry.js';
+import { reportProblem } from '../tools/report_problem/report_problem.js';
 import { abortActorRun } from '../tools/runs/abort_actor_run.js';
 import { getActorRun } from '../tools/runs/get_actor_run.js';
 import { getDatasetItems } from '../tools/storage/get_dataset_items.js';
@@ -254,6 +255,11 @@ export function getToolsForServerMode(
         for (const cat of toolCategoriesEnabledByDefault) {
             result.push(...categories[cat]);
         }
+        // report-problem is default-served but lives in the `dev` category (not a default category),
+        // so inject it here for the default (no-selectors) case. Server-side servability gating
+        // (telemetry on + client allowed + client known) still applies downstream in
+        // composeToolsForClient; this only puts it in the default candidate set.
+        result.push(reportProblem);
     }
 
     // Actor tools (pre-fetched, mode-agnostic)

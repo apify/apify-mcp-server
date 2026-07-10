@@ -148,6 +148,31 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
     );
 });
 
+describe('getToolsForServerMode report-problem default injection', () => {
+    // report-problem lives in the `dev` category but is injected into the default (no-selectors)
+    // candidate set. Server-side servability gating is applied later in composeToolsForClient; here
+    // we only assert membership of the candidate set. See getToolsForServerMode in tools_loader.ts.
+    it('includes report-problem in the default set when no tools= selector is given', () => {
+        const toolNames = getToolsForServerMode({}, [], 'default').map((t) => t.name);
+        expect(toolNames).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+    });
+
+    it('excludes report-problem under an explicit tools=storage selector', () => {
+        const toolNames = getToolsForServerMode({ tools: ['storage'] }, [], 'default').map((t) => t.name);
+        expect(toolNames).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+    });
+
+    it('includes report-problem via the dev category selector (tools=dev)', () => {
+        const toolNames = getToolsForServerMode({ tools: ['dev'] }, [], 'default').map((t) => t.name);
+        expect(toolNames).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+    });
+
+    it('excludes report-problem in add-actor-only mode', () => {
+        const toolNames = getToolsForServerMode({ enableAddingActors: true }, [], 'default').map((t) => t.name);
+        expect(toolNames).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+    });
+});
+
 describe('loadToolsFromInput explicit widget selection', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
 

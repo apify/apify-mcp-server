@@ -370,16 +370,18 @@ export class ActorsMcpServer {
 
     /**
      * Compose the tool list for the current connection: resolve mode-specific tools, then drop
-     * report-problem unless it is currently servable (see {@link isReportProblemServable}). Every
-     * other tool composes eagerly, so a recovery/rehydration load without an initialize still
-     * restores them. report-problem is withheld until the client is known and re-added by the
-     * initialize flush. Used by every input-driven load path and the flush. (loadActorsAsTools
-     * upserts actor tools directly; actor tools are never gated, so they need no filtering.)
+     * report-problem unless it is currently servable (see {@link isReportProblemServable}).
+     * report-problem is a default-injected tool (via tools_loader) rather than a category member,
+     * gated here by servability. Every other tool composes eagerly, so a recovery/rehydration load
+     * without an initialize still restores them. report-problem is withheld until the client is known
+     * and re-added by the initialize flush. Used by every input-driven load path and the flush.
+     * (loadActorsAsTools upserts actor tools directly; actor tools are never gated, so they need no
+     * filtering.)
      */
     private composeToolsForClient(input: Input, actorTools: ToolEntry[]): ToolEntry[] {
-        return getToolsForServerMode(input, actorTools, this.serverMode).filter(
-            (tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT || this.isReportProblemServable(),
-        );
+        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
+        if (this.isReportProblemServable()) return tools;
+        return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
     }
 
     /**
