@@ -1,4 +1,4 @@
-import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
@@ -17,11 +17,7 @@ import {
     respondUserError,
     type ToolResponse,
 } from '../../src/utils/mcp.js';
-
-/** Read the text off a content block; '' for non-text blocks. Keeps assertions on text responses tidy. */
-function textOf(block: ContentBlock): string {
-    return 'text' in block ? block.text : '';
-}
+import { textOf } from './helpers/tool_context.js';
 
 describe('respondOk()', () => {
     it('returns a success response with the raw text and no isError/telemetry', () => {
@@ -35,7 +31,7 @@ describe('respondOk()', () => {
     it('keeps bare JSON bare in content[0] (no fence) — the raw-JSON mirror channel', () => {
         const structuredContent = { runId: 'r1', status: 'RUNNING' };
         const result = respondOk([JSON.stringify(structuredContent), 'summary'], { structuredContent });
-        const firstText = textOf(result.content[0]);
+        const firstText = textOf((result.content ?? [])[0]);
         expect(firstText).toBe('{"runId":"r1","status":"RUNNING"}');
         expect(firstText.startsWith('```')).toBe(false);
         expect(result.structuredContent).toEqual(structuredContent);
@@ -52,7 +48,7 @@ describe('respondJson()', () => {
         const value = { a: 1, b: [2, 3] };
         const result = respondJson(value);
         expect(result.content).toEqual([{ type: 'text', text: wrapJsonText(value) }]);
-        expect(textOf(result.content[0]).startsWith('```json\n')).toBe(true);
+        expect(textOf((result.content ?? [])[0]).startsWith('```json\n')).toBe(true);
         expect(result.isError).toBe(false);
         expect('toolTelemetry' in result).toBe(false);
     });

@@ -1,10 +1,15 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
 import { expect } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
 import type { CachedUserInfo } from '../../../src/utils/userid_cache.js';
+
+/** Read the text off a content block; '' for non-text blocks. Keeps assertions on text responses tidy. */
+export function textOf(block: ContentBlock): string {
+    return 'text' in block ? block.text : '';
+}
 
 /** Default `CachedUserInfo` for tests that mock `getUserInfoCached`. */
 export function mockUserInfo(overrides: Partial<CachedUserInfo> = {}): CachedUserInfo {

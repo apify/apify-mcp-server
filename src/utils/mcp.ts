@@ -66,10 +66,14 @@ declare const toolResponseBrand: unique symbol;
  * means a raw `{ content, isError }` literal (or a bare `{}`) fails to compile — the only way to produce a
  * `ToolResponse` is a constructor here. `content` is the full MCP `ContentBlock` union so image/audio/
  * resource returns type-check.
+ *
+ * `content` and `isError` are optional because the escape hatches may omit them: `respondAborted()`
+ * returns `{}` (both absent) and `respondRaw()` passes a `CallToolResult` through unchanged (which may
+ * omit `isError`). Consumers reading either field must guard (`?.`, an `in` check, or the `textOf` helper).
  */
 export type ToolResponse = {
-    content: ContentBlock[];
-    isError: boolean;
+    content?: ContentBlock[];
+    isError?: boolean;
     toolTelemetry?: ToolTelemetryContext;
     structuredContent?: unknown;
     _meta?: Record<string, unknown>;
