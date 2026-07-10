@@ -61,11 +61,12 @@ export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
 /**
  * Client-name substrings (lowercased, matched against `clientInfo.name`) that `report-problem` is
  * hidden from. Applied once per connection in the compose step, where the client is known.
- * `report-problem` is hidden from Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code)
- * pending the directory review. Substring matching covers new client builds without a maintained
- * allowlist; over-matching only hides an optional tool, which is the safe failure mode.
+ * `report-problem` is hidden from Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code /
+ * `local-agent-mode-apify`) pending the directory review. Substring matching covers new client builds
+ * without a maintained allowlist; over-matching only hides an optional tool, which is the safe failure
+ * mode.
  */
-export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic'];
+export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
