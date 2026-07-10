@@ -5,9 +5,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
-import { APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED, FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
+import {
+    APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    TOOL_STATUS,
+} from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
+import type { PaymentProvider } from '../../src/payments/types.js';
 import * as telemetry from '../../src/telemetry.js';
+import * as callActor from '../../src/tools/actors/call_actor.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -400,5 +407,265 @@ describe('executeToolAndUpdateTask()', () => {
             expect(task.status).toBe('completed');
             expect(result).toEqual({});
         });
+    });
+});
+
+describe('CallToolRequestSchema handler — task-augmented pre-flight failures', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    // x402 payload the payment provider returns; asserted intact in the stored structuredContent.
+    const X402_PAYLOAD = { x402Version: 1, accepts: [{ scheme: 'exact', resource: 'test' }] };
+
+    /** Skyfire-like provider whose getPaymentRequiredData populates the x402 structuredContent. */
+    function makePaymentProvider(): PaymentProvider {
+        return {
+            id: 'skyfire',
+            allowsUnauthenticated: true,
+            decorateToolSchema: (tool) => tool,
+            validatePayment: (args) => (args['skyfire-pay-id'] ? null : 'Missing skyfire-pay-id'),
+            getPaymentRequiredData: () => X402_PAYLOAD,
+            getPaymentHeaders: (args): Record<string, string> =>
+                args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {},
+            removePaymentFields: (args) => {
+                const { 'skyfire-pay-id': _removed, ...rest } = args;
+                return rest;
+            },
+            redactForLogging: (args) => ({ ...(args as Record<string, unknown>), 'skyfire-pay-id': '[REDACTED]' }),
+        };
+    }
+
+    /** Drives a task-augmented call and returns the CreateTaskResult (already terminal on pre-flight failure). */
+    async function callTask(
+        server: ActorsMcpServer,
+        tool: ToolEntry,
+        args: Record<string, unknown>,
+    ): Promise<{ task: { taskId: string; status: string } }> {
+        server.upsertTools([tool]);
+        const handler = getRequestHandler(server, 'tools/call');
+        return (await handler(
+            {
+                method: 'tools/call',
+                params: { name: tool.name, arguments: args, _meta: { mcpSessionId: 's1' }, task: { ttl: 60_000 } },
+            },
+            { signal: { aborted: false }, sendNotification: vi.fn() },
+        )) as { task: { taskId: string; status: string } };
+    }
+
+    /** notifications/tasks/status statuses emitted via server.notification, in order. */
+    function statusNotificationStatuses(notifySpy: ReturnType<typeof vi.spyOn>): (string | undefined)[] {
+        return (notifySpy.mock.calls as unknown[][])
+            .map((c) => c[0] as { method?: string; params?: { status?: string } })
+            .filter((n) => n.method === 'notifications/tasks/status')
+            .map((n) => n.params?.status);
+    }
+
+    it('resolves a payment pre-flight failure as a terminal completed task, one completed notification', async () => {
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                const notifySpy = vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                const { tool, received } = makeRecorderTool('payment-tool', {
+                    paymentRequired: true,
+                    taskSupport: 'optional',
+                });
+                const res = await callTask(server, tool, {});
+
+                // CreateTaskResult is already terminal — no observable `working` phase.
+                expect(res.task.status).toBe('completed');
+                // The tool implementation never ran.
+                expect(received.called).toBe(false);
+                // Stored result carries the x402 payload intact.
+                const stored = (await server.taskStore.getTaskResult(res.task.taskId)) as Record<string, unknown>;
+                expect(stored.isError).toBe(true);
+                expect(stored.structuredContent).toEqual(X402_PAYLOAD);
+                // Exactly one status notification, and it is `completed`.
+                expect(statusNotificationStatuses(notifySpy)).toEqual(['completed']);
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
+    });
+
+    it('stores a payment pre-flight result deep-equal to the sync (non-task) path result', async () => {
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                const handler = getRequestHandler(server, 'tools/call');
+
+                // Non-task sync path returns the paymentRequiredResult directly.
+                const syncTool = makeRecorderTool('payment-tool-sync', { paymentRequired: true }).tool;
+                server.upsertTools([syncTool]);
+                const syncResult = await handler(
+                    {
+                        method: 'tools/call',
+                        params: { name: 'payment-tool-sync', arguments: {}, _meta: { mcpSessionId: 's1' } },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+
+                // Task path stores the same failure as a completed result.
+                const taskTool = makeRecorderTool('payment-tool-task', {
+                    paymentRequired: true,
+                    taskSupport: 'optional',
+                }).tool;
+                const res = await callTask(server, taskTool, {});
+                const stored = await server.taskStore.getTaskResult(res.task.taskId);
+
+                expect(stored).toEqual(syncResult);
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
+    });
+
+    it('resolves a standby pre-flight rejection as a terminal completed task, one completed notification', async () => {
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
+                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
+                const notifySpy = vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const res = await callTask(server, tool, { actor: 'apify/some-actor' });
+
+                expect(res.task.status).toBe('completed');
+                expect(received.called).toBe(false);
+                const stored = await server.taskStore.getTaskResult(res.task.taskId);
+                expect(stored).toEqual(standbyResult);
+                expect(statusNotificationStatuses(notifySpy)).toEqual(['completed']);
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
+    });
+
+    it('prefers the standby rejection over a payment-required failure when both apply', async () => {
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
+                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
+                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                // paymentRequired + missing skyfire-pay-id would also yield paymentRequiredResult.
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    paymentRequired: true,
+                    taskSupport: 'optional',
+                });
+                const res = await callTask(server, tool, { actor: 'apify/some-actor' });
+
+                const stored = (await server.taskStore.getTaskResult(res.task.taskId)) as Record<string, unknown>;
+                // Standby result wins — not the x402 payment payload.
+                expect(stored).toEqual(standbyResult);
+                expect(stored.structuredContent).toBeUndefined();
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
+    });
+
+    it('records telemetry once with the sync-path pre-flight properties, no taskId', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                const { tool } = makeRecorderTool('payment-tool', { paymentRequired: true, taskSupport: 'optional' });
+                await callTask(server, tool, {});
+            },
+            {
+                token: undefined,
+                telemetry: { enabled: true },
+                allowUnauthMode: true,
+                paymentProvider: makePaymentProvider(),
+            },
+        );
+        // Same properties the sync 402 pre-flight path records (FAILURE_CLASSES[0]).
+        expectFailureClassTelemetry(trackSpy, FAILURE_CLASSES[0]);
+        expect(trackSpy.mock.calls[0][2]).not.toHaveProperty('taskId');
+    });
+
+    it('records standby telemetry with INVALID_INPUT and no failure_http_status', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
+                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
+                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                await callTask(server, tool, { actor: 'apify/some-actor' });
+            },
+            {
+                token: undefined,
+                telemetry: { enabled: true },
+                allowUnauthMode: true,
+                paymentProvider: makePaymentProvider(),
+            },
+        );
+        expect(trackSpy.mock.calls).toHaveLength(1);
+        const properties = trackSpy.mock.calls[0][2] as Record<string, unknown>;
+        expect(properties.tool_status).toBe(TOOL_STATUS.SOFT_FAIL);
+        expect(properties.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
+        // Standby is not a 402 — the sync short-circuit omits failure_http_status and so must this path.
+        expect(properties).not.toHaveProperty('failure_http_status');
+        expect(properties).not.toHaveProperty('taskId');
+    });
+
+    it('stores a standby pre-flight result deep-equal to the sync (non-task) path result', async () => {
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
+                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
+                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                server.upsertTools([tool]);
+                const handler = getRequestHandler(server, 'tools/call');
+
+                // Non-task sync path returns the standbyRejection directly.
+                const syncResult = await handler(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: tool.name,
+                            arguments: { actor: 'apify/some-actor' },
+                            _meta: { mcpSessionId: 's1' },
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+
+                // Task path stores the same failure as a completed result.
+                const res = await callTask(server, tool, { actor: 'apify/some-actor' });
+                const stored = await server.taskStore.getTaskResult(res.task.taskId);
+
+                expect(stored).toEqual(syncResult);
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
+    });
+
+    it('returns a completed task even when the task expires before the result store', async () => {
+        // The one case storeTaskResultOrSkipIfExpired tolerates: TTL elapsed between createTask and
+        // the result store. The store throws not-found (swallowed) and the task is gone — the wire
+        // CreateTaskResult must still report `completed`, never the pre-write `working` snapshot.
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                const notifySpy = vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                vi.spyOn(server.taskStore, 'storeTaskResult').mockRejectedValue(
+                    new Error('Task with ID some-task not found'),
+                );
+                vi.spyOn(server.taskStore, 'getTask').mockResolvedValue(null);
+                const { tool, received } = makeRecorderTool('payment-tool', {
+                    paymentRequired: true,
+                    taskSupport: 'optional',
+                });
+                const res = await callTask(server, tool, {});
+
+                expect(res.task.status).toBe('completed');
+                expect(received.called).toBe(false);
+                // Task is gone from the store — no status notification can be emitted.
+                expect(statusNotificationStatuses(notifySpy)).toEqual([]);
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
     });
 });

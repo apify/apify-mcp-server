@@ -1035,6 +1035,38 @@ export class ActorsMcpServer {
                         mcpSessionId,
                     });
 
+                    // Pre-flight failure is already known — the outcome needs no work. Resolve the
+                    // task synchronously: store the failure as the terminal `completed` result and emit
+                    // exactly one `completed` status notification (no `updateTaskStatus('working')`, so no
+                    // `working` notification). Standby rejection wins over the generic payment-required
+                    // short-circuit, matching the sync path's precedence. Telemetry rides the handler's
+                    // outer `finally` (shouldTrackTelemetry stays true), firing once with the sync-path
+                    // properties.
+                    const preflightResult = standbyRejection ?? paymentRequiredResult;
+                    if (preflightResult) {
+                        toolStatus = TOOL_STATUS.SOFT_FAIL;
+                        callDiagnostics = {
+                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                            ...(standbyRejection ? {} : { failure_http_status: 402 }),
+                            ...buildActorFields(actorName, actorId),
+                        };
+                        await storeTaskResultOrSkipIfExpired(
+                            this.taskStore,
+                            tool.name,
+                            task.taskId,
+                            'completed',
+                            preflightResult,
+                            mcpSessionId,
+                        );
+                        await emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
+                        captureResult(preflightResult);
+                        // createTask returned status `working`; synthesize the terminal status instead of
+                        // re-fetching — if the task expired before the result store (the one case
+                        // storeTaskResultOrSkipIfExpired tolerates), a re-fetch would come back empty and a
+                        // `working` fallback would contradict the tasks/get 404 the client sees next.
+                        return { task: { ...task, status: 'completed' as const } };
+                    }
+
                     // Execute the tool asynchronously and update task status
                     setImmediate(() => {
                         this.executeToolAndUpdateTask({
@@ -1042,8 +1074,6 @@ export class ActorsMcpServer {
                             tool,
                             toolArgs: toolArgs!,
                             logSafeArgs,
-                            standbyRejection,
-                            paymentRequiredResult,
                             apifyClient: apifyClient!,
                             apifyToken,
                             progressToken,
@@ -1426,8 +1456,6 @@ export class ActorsMcpServer {
         tool: ToolEntry;
         toolArgs: Record<string, unknown>;
         logSafeArgs: unknown;
-        standbyRejection?: Record<string, unknown> | null;
-        paymentRequiredResult?: Record<string, unknown>;
         apifyClient: ApifyClient;
         apifyToken: string;
         progressToken: string | number | undefined;
@@ -1441,8 +1469,6 @@ export class ActorsMcpServer {
             tool,
             toolArgs,
             logSafeArgs,
-            standbyRejection,
-            paymentRequiredResult,
             apifyClient,
             apifyToken,
             progressToken,
@@ -1537,25 +1563,6 @@ export class ActorsMcpServer {
 
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
-
-            // Mirror the sync-path ordering: standby rejection wins over the generic 402 so the
-            // stored task result carries the precise reason the agent should act on.
-            if (standbyRejection) {
-                toolStatus = TOOL_STATUS.SOFT_FAIL;
-                callDiagnostics = {
-                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                    ...buildActorFields(actorName, actorId),
-                };
-                result = standbyRejection;
-            } else if (paymentRequiredResult) {
-                toolStatus = TOOL_STATUS.SOFT_FAIL;
-                callDiagnostics = {
-                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                    failure_http_status: 402,
-                    ...buildActorFields(actorName, actorId),
-                };
-                result = paymentRequiredResult;
-            }
 
             // Callback to propagate Actor run statusMessage into the task store and emit a push notification.
             // TODO(TC-3): cancel arriving while this is scheduled throws cancelled → working;
