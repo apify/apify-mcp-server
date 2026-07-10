@@ -4,6 +4,7 @@ import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { emitTaskStatusNotification } from '../../src/mcp/server.js';
+import { getRequestHandler } from './helpers/mcp_server.js';
 
 // Helper to create a minimal TaskStore mock
 function makeTaskStore(task: Record<string, unknown> | undefined) {
@@ -109,18 +110,6 @@ describe('emitTaskStatusNotification', () => {
 });
 
 describe('tasks/result _meta.related-task injection', () => {
-    type HandlerFn = (req: Record<string, unknown>, extra: Record<string, unknown>) => Promise<Record<string, unknown>>;
-
-    // Helper to dispatch a handler by method name via the SDK's internal handler map
-    function getHandler(server: unknown, method: string) {
-        // eslint-disable-next-line no-underscore-dangle
-        const handler = (
-            server as { server: { _requestHandlers: Map<string, HandlerFn> } }
-        ).server._requestHandlers.get(method);
-        if (!handler) throw new Error(`Handler "${method}" not registered`);
-        return handler;
-    }
-
     // Minimal fake CallToolRequest required by InMemoryTaskStore.createTask
     const fakeRequest = { method: 'tools/call', params: { name: 'test-tool', arguments: {} } };
 
@@ -137,7 +126,7 @@ describe('tasks/result _meta.related-task injection', () => {
             undefined,
         );
 
-        const handler = getHandler(server as never, 'tasks/result');
+        const handler = getRequestHandler(server, 'tasks/result');
         const result = await handler(
             { method: 'tasks/result', params: { taskId: task.taskId } },
             { sendNotification: vi.fn() },
@@ -167,7 +156,7 @@ describe('tasks/result _meta.related-task injection', () => {
             undefined,
         );
 
-        const handler = getHandler(server as never, 'tasks/result');
+        const handler = getRequestHandler(server, 'tasks/result');
         const result = (await handler(
             { method: 'tasks/result', params: { taskId: task.taskId } },
             { sendNotification: vi.fn() },
