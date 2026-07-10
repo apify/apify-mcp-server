@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildAgentFeedbackProperties, trackAgentFeedback, trackToolCall } from '../../src/telemetry.js';
+import { buildReportedProblemProperties, trackReportedProblem, trackToolCall } from '../../src/telemetry.js';
 import type { ToolCallTelemetryProperties } from '../../src/types.js';
 
 // Mock the Segment Analytics client
@@ -137,7 +137,7 @@ describe('telemetry', () => {
     });
 });
 
-describe('buildAgentFeedbackProperties', () => {
+describe('buildReportedProblemProperties', () => {
     const context = {
         app: 'mcp',
         app_version: '0.5.6',
@@ -153,7 +153,7 @@ describe('buildAgentFeedbackProperties', () => {
     } as ToolCallTelemetryProperties;
 
     it('maps the feedback args to snake_case properties and carries the session context', () => {
-        const properties = buildAgentFeedbackProperties(context, {
+        const properties = buildReportedProblemProperties(context, {
             message: 'stuck on call-actor',
             actorId: 'apify/rag-web-browser',
             actorRunId: 'run-1',
@@ -176,7 +176,7 @@ describe('buildAgentFeedbackProperties', () => {
     });
 
     it('omits optional fields that were not provided and does not leak tool-call fields', () => {
-        const properties = buildAgentFeedbackProperties(context, { message: 'just a note' });
+        const properties = buildReportedProblemProperties(context, { message: 'just a note' });
 
         expect(properties).toEqual({
             app: 'mcp',
@@ -193,12 +193,12 @@ describe('buildAgentFeedbackProperties', () => {
     });
 });
 
-describe('trackAgentFeedback', () => {
+describe('trackReportedProblem', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('sends the MCP Agent Feedback event with the Apify userId', () => {
+    it('sends the MCP Reported Problem event with the Apify userId', () => {
         const properties = {
             app: 'mcp' as const,
             app_version: '0.5.6',
@@ -210,11 +210,11 @@ describe('trackAgentFeedback', () => {
             message: 'stuck on call-actor',
         };
 
-        trackAgentFeedback('test-user-123', 'DEV', properties);
+        trackReportedProblem('test-user-123', 'DEV', properties);
 
         expect(mockTrack).toHaveBeenCalledWith({
             userId: 'test-user-123',
-            event: 'MCP Agent Feedback',
+            event: 'MCP Reported Problem',
             properties,
         });
     });
@@ -231,11 +231,11 @@ describe('trackAgentFeedback', () => {
             message: 'stuck on call-actor',
         };
 
-        trackAgentFeedback(null, 'DEV', properties);
+        trackReportedProblem(null, 'DEV', properties);
 
         const callArgs = mockTrack.mock.calls[0][0];
         expect(callArgs.anonymousId).toBe('session-123');
         expect(callArgs).not.toHaveProperty('userId');
-        expect(callArgs.event).toBe('MCP Agent Feedback');
+        expect(callArgs.event).toBe('MCP Reported Problem');
     });
 });

@@ -62,7 +62,7 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getServerInfo } from '../server_card.js';
-import { buildAgentFeedbackProperties, getTelemetryEnv, trackAgentFeedback, trackToolCall } from '../telemetry.js';
+import { buildReportedProblemProperties, getTelemetryEnv, trackReportedProblem, trackToolCall } from '../telemetry.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
@@ -1501,10 +1501,10 @@ export class ActorsMcpServer {
                 params.toolStatus === TOOL_STATUS.SUCCEEDED &&
                 params.args
             ) {
-                trackAgentFeedback(
+                trackReportedProblem(
                     params.userId,
                     this.telemetryEnv,
-                    buildAgentFeedbackProperties(finalizedTelemetryData, params.args),
+                    buildReportedProblemProperties(finalizedTelemetryData, params.args),
                 );
             }
         }

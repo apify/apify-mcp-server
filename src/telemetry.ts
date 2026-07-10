@@ -7,7 +7,7 @@ import log from '@apify/log';
 
 import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import type { reportProblemArgsSchema } from './tools/report_problem/report_problem.js';
-import type { AgentFeedbackTelemetryProperties, TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
+import type { ReportedProblemTelemetryProperties, TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
 
 type ReportProblemArgs = z.infer<typeof reportProblemArgsSchema>;
 
@@ -25,7 +25,7 @@ const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
 // Event names following apify-core naming convention (Title Case)
 const SEGMENT_EVENTS = {
     TOOL_CALL: 'MCP Tool Call',
-    AGENT_FEEDBACK: 'MCP Agent Feedback',
+    REPORTED_PROBLEM: 'MCP Reported Problem',
 } as const;
 
 /**
@@ -98,15 +98,15 @@ export function trackToolCall(
 }
 
 /**
- * Shapes an 'MCP Agent Feedback' event payload from a `report-problem` submission. Reuses the
+ * Shapes an 'MCP Reported Problem' event payload from a `report-problem` submission. Reuses the
  * session/client context already assembled for the tool-call event and maps the validated tool args
  * to snake_case, dropping any absent optional fields. Tool-call-specific fields on `context`
  * (tool_name, tool_status, …) are intentionally not carried over.
  */
-export function buildAgentFeedbackProperties(
+export function buildReportedProblemProperties(
     context: ToolCallTelemetryProperties,
     args: Record<string, unknown>,
-): AgentFeedbackTelemetryProperties {
+): ReportedProblemTelemetryProperties {
     const { message, actorId, actorRunId, relatedTools } = args as ReportProblemArgs;
 
     return {
@@ -125,24 +125,24 @@ export function buildAgentFeedbackProperties(
 }
 
 /**
- * Tracks an agent feedback submission (`report-problem`) to Segment. Identity handling mirrors
+ * Tracks a reported-problem submission (`report-problem`) to Segment. Identity handling mirrors
  * {@link trackToolCall}: a known Apify user is sent as `userId`, otherwise the session id is the
  * `anonymousId` so a session's submissions share one identity.
  */
-export function trackAgentFeedback(
+export function trackReportedProblem(
     userId: string | null,
     telemetryEnv: TelemetryEnv,
-    properties: AgentFeedbackTelemetryProperties,
+    properties: ReportedProblemTelemetryProperties,
 ): void {
     const client = getOrInitAnalyticsClient(telemetryEnv);
 
     try {
         client?.track({
             ...(userId ? { userId } : { anonymousId: properties.mcp_session_id || crypto.randomUUID() }),
-            event: SEGMENT_EVENTS.AGENT_FEEDBACK,
+            event: SEGMENT_EVENTS.REPORTED_PROBLEM,
             properties,
         });
     } catch (error) {
-        log.error('Failed to track agent feedback event', { error, userId });
+        log.error('Failed to track reported problem event', { error, userId });
     }
 }
