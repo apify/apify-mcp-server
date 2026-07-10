@@ -6,12 +6,63 @@ import { wrapJsonText } from '../../src/utils/encode_text.js';
 import {
     computeToolResponseBytes,
     getToolCallErrorUserText,
+    injectMcpSessionId,
     respondErrorNoTelemetry,
     respondJson,
     respondOk,
     respondServerError,
     respondUserError,
 } from '../../src/utils/mcp.js';
+
+describe('injectMcpSessionId()', () => {
+    it('returns a new params object with _meta.mcpSessionId when params is undefined', () => {
+        const result = injectMcpSessionId(undefined, 'session-123');
+        expect(result).toEqual({
+            _meta: { mcpSessionId: 'session-123' },
+        });
+        expect(typeof result).toBe('object');
+    });
+
+    it('mutates and returns the same object when params exists without _meta', () => {
+        const input = { foo: 'bar' };
+        const result = injectMcpSessionId(input, 'session-456');
+        expect(result === input).toBe(true);
+        expect(result).toEqual({
+            foo: 'bar',
+            _meta: { mcpSessionId: 'session-456' },
+        });
+    });
+
+    it('preserves existing _meta fields when setting mcpSessionId', () => {
+        const input = {
+            someParam: 'value',
+            _meta: {
+                apifyToken: 'token-abc',
+                progressToken: 'progress-xyz',
+            },
+        };
+        const result = injectMcpSessionId(input, 'session-789');
+        expect(result === input).toBe(true);
+        expect(result._meta).toEqual({
+            apifyToken: 'token-abc',
+            progressToken: 'progress-xyz',
+            mcpSessionId: 'session-789',
+        });
+    });
+
+    it('overwrites an existing mcpSessionId with the new value', () => {
+        const input = {
+            _meta: {
+                mcpSessionId: 'old-session',
+                apifyToken: 'token',
+            },
+        };
+        const result = injectMcpSessionId(input, 'new-session');
+        expect(result === input).toBe(true);
+        expect(result._meta?.mcpSessionId).toBe('new-session');
+        expect(result._meta?.apifyToken).toBe('token');
+    });
+});
 
 describe('respondOk()', () => {
     it('returns a success response with the raw text and no isError/telemetry', () => {

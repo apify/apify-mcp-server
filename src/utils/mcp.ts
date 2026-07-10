@@ -1,5 +1,5 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import type { AjvErrorDetails, FailureCategory, ToolTelemetryContext } from '../types.js';
+import type { AjvErrorDetails, ApifyRequestParams, FailureCategory, ToolTelemetryContext } from '../types.js';
 import { ACTOR_RUN_LIMIT_MESSAGE, isActorRunLimitError } from './apify_errors.js';
 import { wrapJsonText } from './encode_text.js';
 import { getHttpStatusCode } from './logging.js';
@@ -7,6 +7,21 @@ import { classifyFailureCategory, getToolStatusFromError } from './tool_status.j
 
 /** MCP `_meta` key for Apify Actor run information. Namespaced per MCP spec. */
 export const APIFY_ACTOR_RUN_META_KEY = 'com.apify/ActorRun';
+
+/**
+ * Injects the MCP session ID into request parameters.
+ * Always ensures a params object exists, even for requests that normally have no params (e.g., listTasks/getTasks),
+ * otherwise mcpSessionId injection fails, breaking session isolation in multi-node setups.
+ * @param params Request parameters (may be undefined)
+ * @param mcpSessionId Session ID to inject
+ * @returns Params object with _meta.mcpSessionId set
+ */
+export function injectMcpSessionId(params: ApifyRequestParams | undefined, mcpSessionId: string): ApifyRequestParams {
+    const result = (params || {}) as ApifyRequestParams;
+    result._meta ??= {};
+    result._meta.mcpSessionId = mcpSessionId;
+    return result;
+}
 
 /**
  * Builds usage metadata for MCP response from a source object containing Apify run costs.
