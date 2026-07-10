@@ -8,7 +8,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { fetchActorRunData } from '../actors/actor_run_response.js';
-import { buildGetActorRunError, buildGetActorRunSuccessResponse } from '../runs/get_actor_run.js';
+import { buildGetActorRunError, buildGetActorRunWidgetResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -71,7 +71,7 @@ export const getActorRunWidget: ToolEntry = Object.freeze({
             if ('aborted' in fetchResult) return {};
             if ('error' in fetchResult) return fetchResult.error;
 
-            return buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: true });
+            return buildGetActorRunWidgetResponse({ ...fetchResult.result });
         } catch (error) {
             logHttpError(error, 'Failed to get Actor run (widget)', { runId: parsed.runId });
             return buildGetActorRunError(parsed.runId, error);

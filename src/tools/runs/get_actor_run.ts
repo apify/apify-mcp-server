@@ -86,25 +86,30 @@ export function buildGetActorRunError(runId: string, error: unknown): ToolRespon
 
 /**
  * Build the success response. `content[0]` is the JSON-stringified `structuredContent`
- * mirror (per MCP spec); `content[1]` carries an LLM-readable narrative — `summary` +
- * `nextStep` in default mode, a short pointer in widget mode.
+ * mirror (per MCP spec); `content[1]` carries an LLM-readable narrative of `summary` + `nextStep`.
  */
 export function buildGetActorRunSuccessResponse(
-    params: FetchActorRunResult & { widget: boolean; linkContext?: ConsoleLinkContext },
+    params: FetchActorRunResult & { linkContext?: ConsoleLinkContext },
 ): ToolResponse {
-    const { run, structuredContent, widget, linkContext } = params;
+    const { run, structuredContent, linkContext } = params;
 
-    if (!widget) {
-        // Mints the `apifyConsoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
-        const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
-        return respondOk(
-            [
-                JSON.stringify(structuredContent),
-                `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinks}`,
-            ],
-            { structuredContent, meta: buildUsageMeta(run) },
-        );
-    }
+    // Mints the `apifyConsoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
+    const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
+    return respondOk(
+        [
+            JSON.stringify(structuredContent),
+            `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinks}`,
+        ],
+        { structuredContent, meta: buildUsageMeta(run) },
+    );
+}
+
+/**
+ * Build the widget success response. `content[1]` carries a short pointer instead of the
+ * summary/nextStep narrative. Used only by `*-widget` tools; does not apply console links.
+ */
+export function buildGetActorRunWidgetResponse(params: FetchActorRunResult): ToolResponse {
+    const { run, structuredContent } = params;
 
     // Override nextStep so the model reading structuredContent (content[0]) also sees no-poll guidance.
     const widgetContent = { ...structuredContent, nextStep: WIDGET_NO_POLL_NEXT_STEP };
@@ -150,7 +155,6 @@ export const getActorRun: ToolEntry = Object.freeze({
 
             return buildGetActorRunSuccessResponse({
                 ...fetchResult.result,
-                widget: false,
                 linkContext: await getConsoleLinkContext(apifyToken, client),
             });
         } catch (error) {

@@ -88,7 +88,6 @@ export const actorExecutor: ActorExecutor = {
 
         return buildGetActorRunSuccessResponse({
             ...fetchResult.result,
-            widget: false,
             linkContext: await getConsoleLinkContext(apifyClient.token, apifyClient),
         }) as ActorExecutionResult;
     },

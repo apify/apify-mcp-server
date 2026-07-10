@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
     buildStartRunResponse,
+    buildStartRunWidgetResponse,
     buildStatusSummaryNextStep,
     collapseArrayIndices,
     type RunDataset,
@@ -731,11 +732,10 @@ describe('buildStartRunResponse()', () => {
         expect(content[1].text).toContain(VERBATIM_LINKS_NUDGE);
     });
 
-    it('includes widget metadata and no-poll nextStep when widget=true', () => {
-        const result = buildStartRunResponse({
+    it('buildStartRunWidgetResponse includes widget metadata and a no-poll nextStep', () => {
+        const result = buildStartRunWidgetResponse({
             actorName: 'apify/rag-web-browser',
             actorRun,
-            widget: true,
         });
 
         const { structuredContent, _meta } = result as {

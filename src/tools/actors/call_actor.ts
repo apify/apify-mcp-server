@@ -612,7 +612,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
         if ('error' in fetchResult) return fetchResult.error;
 
         return {
-            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false, linkContext }),
+            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, linkContext }),
             toolTelemetry: { actorId: resolvedActorId },
         };
     } catch (error) {
