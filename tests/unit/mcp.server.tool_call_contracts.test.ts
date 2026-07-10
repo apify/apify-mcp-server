@@ -17,8 +17,7 @@ import { getRequestHandler, makeRecorderTool, makeThrowingTool, withServer } fro
  * Pins the handler-level behavior contracts that umbrella #658 will merge (the sync
  * `CallToolRequestSchema` catch and the `executeToolAndUpdateTask` catch). Failure classes are
  * fabricated by throwing from a fake tool's `call`; both the sync path (result shapes) and the task
- * path (terminal status mapping) assert the same source-of-truth per class. See DESIGN
- * `.devforge/2-design.md`.
+ * path (terminal status mapping) assert the same source-of-truth per class.
  */
 
 const PERMISSION_HTTP_STATUS = 403;

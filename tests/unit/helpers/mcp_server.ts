@@ -1,7 +1,7 @@
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 
 import type { ALLOWED_TASK_TOOL_EXECUTION_MODES } from '../../../src/const.js';
-import type { ActorsMcpServer } from '../../../src/mcp/server.js';
+import { ActorsMcpServer } from '../../../src/mcp/server.js';
 import type { ActorsMcpServerOptions, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../../src/types.js';
 import { TOOL_TYPE } from '../../../src/types.js';
 import { compileSchema } from '../../../src/utils/ajv.js';
@@ -40,7 +40,6 @@ export async function withServer<T>(
     run: (server: ActorsMcpServer) => Promise<T>,
     options?: Partial<ActorsMcpServerOptions>,
 ): Promise<T> {
-    const { ActorsMcpServer } = await import('../../../src/mcp/server.js');
     const server = new ActorsMcpServer({
         taskStore: new InMemoryTaskStore(),
         setupSigintHandler: false,
