@@ -38,8 +38,10 @@ export const REPORT_PROBLEM_INVALID_INPUT_NUDGE = `If this looks like a bug rath
  * token) rather than potential Apify defects. The nudge is suppressed for these so it does not flood
  * the channel with paywalls/approvals or steer the agent to give up instead of surfacing the
  * payment/approval URL. `INVALID_INPUT` gets the softer {@link REPORT_PROBLEM_INVALID_INPUT_NUDGE}
- * instead of being suppressed outright. `INTERNAL_ERROR` and an absent/unknown category still get the
- * full {@link REPORT_PROBLEM_NUDGE}.
+ * instead of being suppressed outright — except when the failure carries a 402 HTTP status, a payment
+ * (billing) state that is suppressed via `failureHttpStatus` in {@link appendReportProblemNudge} even
+ * though 402 is classified `INVALID_INPUT`. `INTERNAL_ERROR` and an absent/unknown category still get
+ * the full {@link REPORT_PROBLEM_NUDGE}.
  */
 const NON_NUDGE_FAILURE_CATEGORIES = new Set<string>([
     FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
@@ -50,16 +52,19 @@ const NON_NUDGE_FAILURE_CATEGORIES = new Set<string>([
  * Append a report-problem nudge to a failed tool result's text content, returning a shallow copy with
  * a new `content` array (never mutates the input). Returns the original unchanged unless the result is
  * an error with a text `content[]`, `report-problem` is actually served (`available`), the failing tool
- * is not `report-problem` itself, and `failureCategory` is not an expected, user-resolvable state (see
- * {@link NON_NUDGE_FAILURE_CATEGORIES}). Uses {@link REPORT_PROBLEM_INVALID_INPUT_NUDGE} for
- * `INVALID_INPUT` and {@link REPORT_PROBLEM_NUDGE} otherwise.
+ * is not `report-problem` itself, `failureHttpStatus` is not 402 (a payment/billing state, suppressed
+ * even though it is classified `INVALID_INPUT`), and `failureCategory` is not an expected,
+ * user-resolvable state (see {@link NON_NUDGE_FAILURE_CATEGORIES}). Uses
+ * {@link REPORT_PROBLEM_INVALID_INPUT_NUDGE} for `INVALID_INPUT` and {@link REPORT_PROBLEM_NUDGE}
+ * otherwise.
  */
 export function appendReportProblemNudge<T>(
     result: T,
-    opts: { failingToolName?: string; available: boolean; failureCategory?: string },
+    opts: { failingToolName?: string; available: boolean; failureCategory?: string; failureHttpStatus?: number },
 ): T {
     if (!opts.available) return result;
     if (opts.failingToolName === HELPER_TOOLS.PROBLEM_REPORT) return result;
+    if (opts.failureHttpStatus === 402) return result; // payment required: billing state, not a defect
     if (opts.failureCategory !== undefined && NON_NUDGE_FAILURE_CATEGORIES.has(opts.failureCategory)) return result;
     const r = result as { isError?: unknown; content?: unknown };
     if (r?.isError !== true || !Array.isArray(r.content)) return result;

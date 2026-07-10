@@ -110,7 +110,7 @@ describe('reportProblem', () => {
             expect(nudgeCount(result)).toBe(0);
         });
 
-        it('appends the softer nudge for INVALID_INPUT (payment/standby, or a genuine input bug)', () => {
+        it('appends the softer nudge for a genuine INVALID_INPUT with no 402 (input bug)', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
@@ -118,6 +118,18 @@ describe('reportProblem', () => {
             });
             expect(result.content.filter((c) => c.text === REPORT_PROBLEM_INVALID_INPUT_NUDGE)).toHaveLength(1);
             expect(nudgeCount(result)).toBe(0);
+        });
+
+        it('does not append any nudge for a 402 payment response, though 402 is classified INVALID_INPUT', () => {
+            const result = appendReportProblemNudge(errorResult(), {
+                failingToolName: HELPER_TOOLS.ACTOR_CALL,
+                available: true,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                failureHttpStatus: 402,
+            });
+            expect(result.content.filter((c) => c.text === REPORT_PROBLEM_INVALID_INPUT_NUDGE)).toHaveLength(0);
+            expect(nudgeCount(result)).toBe(0);
+            expect(result.content).toHaveLength(1);
         });
 
         it('appends for a genuine INTERNAL_ERROR failure', () => {

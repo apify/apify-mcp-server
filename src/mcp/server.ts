@@ -401,6 +401,25 @@ export class ActorsMcpServer {
         );
     }
 
+    /**
+     * Append the report-problem nudge to a failed tool result. Thin wrapper over
+     * {@link appendReportProblemNudge} that fills in whether report-problem is served on this
+     * connection; suppression by category/402 is handled inside the helper.
+     */
+    private withReportProblemNudge<T>(
+        result: T,
+        failingToolName: string | undefined,
+        failureCategory?: string,
+        failureHttpStatus?: number,
+    ): T {
+        return appendReportProblemNudge(result, {
+            failingToolName,
+            available: this.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
+            failureCategory,
+            failureHttpStatus,
+        });
+    }
+
     private composePendingToolsForClient(): void {
         if (this.pendingToolsUntilClientKnown.length === 0) return;
 
@@ -901,11 +920,12 @@ export class ActorsMcpServer {
                 // On a failed result, nudge the agent to report the blocker via report-problem at the
                 // moment it decides what to do next. Gated on the tool actually being served (see
                 // isReportProblemServable), so clients where it is blocklisted or telemetry is off never see it.
-                const augmented = appendReportProblemNudge(r, {
-                    failingToolName: resolvedToolName,
-                    available: this.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
-                    failureCategory: callDiagnostics.failure_category,
-                });
+                const augmented = this.withReportProblemNudge(
+                    r,
+                    resolvedToolName,
+                    callDiagnostics.failure_category,
+                    callDiagnostics.failure_http_status,
+                );
                 toolResult = augmented;
                 return augmented;
             };
@@ -1736,11 +1756,12 @@ export class ActorsMcpServer {
 
             // On a failed result, nudge the agent to report the blocker via report-problem (mirrors the
             // synchronous CallTool path, which task-mode calls like call-actor bypass).
-            result = appendReportProblemNudge(result, {
-                failingToolName: tool.name,
-                available: this.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
-                failureCategory: callDiagnostics.failure_category,
-            });
+            result = this.withReportProblemNudge(
+                result,
+                tool.name,
+                callDiagnostics.failure_category,
+                callDiagnostics.failure_http_status,
+            );
 
             // Store the result in the task store
             log.debug('[executeToolAndUpdateTask] Storing completed result', {
@@ -1883,10 +1904,11 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            // Nudge on a genuinely-failed task result too, so the sync and task paths behave
-            // identically. appendReportProblemNudge self-suppresses user-resolvable categories
-            // (INVALID_INPUT/AUTH/APPROVAL), so only real defects (INTERNAL_ERROR/unknown) get it.
-            const failedResult = appendReportProblemNudge(
+            // Nudge on a genuinely-failed task result. INTERNAL_ERROR and an unknown category get the
+            // full nudge; a genuine INVALID_INPUT gets the softer nudge; payment (402) is suppressed via
+            // the HTTP status and AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES.
+            // The 402 branch above returns before reaching here, so this only sees non-payment failures.
+            const failedResult = this.withReportProblemNudge(
                 {
                     content: [
                         {
@@ -1897,11 +1919,9 @@ export class ActorsMcpServer {
                     isError: true,
                     internalToolStatus: toolStatus,
                 },
-                {
-                    failingToolName: tool.name,
-                    available: this.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
-                    failureCategory: callDiagnostics.failure_category,
-                },
+                tool.name,
+                callDiagnostics.failure_category,
+                callDiagnostics.failure_http_status,
             );
             await storeTaskResultOrSkipIfExpired(
                 this.taskStore,
