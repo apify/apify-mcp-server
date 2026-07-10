@@ -167,6 +167,60 @@ export async function emitTaskStatusNotification(
     }
 }
 
+/** Module-level cache for resolved widgets. Shared across all instances in the process. */
+let cachedWidgetsPromise: Promise<Map<string, AvailableWidget>> | undefined;
+
+/**
+ * Load and cache available widgets once per process. Concurrent callers share the
+ * in-flight promise. On rejection, clears the cache to allow retry.
+ */
+async function loadAvailableWidgetsOnce(): Promise<Map<string, AvailableWidget>> {
+    if (cachedWidgetsPromise) {
+        return cachedWidgetsPromise;
+    }
+
+    cachedWidgetsPromise = (async () => {
+        const { fileURLToPath } = await import('node:url');
+        const path = await import('node:path');
+
+        const filename = fileURLToPath(import.meta.url);
+        const dirName = path.dirname(filename);
+
+        const resolved = await resolveAvailableWidgets(dirName);
+
+        const readyWidgets: string[] = [];
+        const missingWidgets: string[] = [];
+
+        for (const [uri, widget] of resolved.entries()) {
+            if (widget.exists) {
+                readyWidgets.push(widget.name);
+            } else {
+                missingWidgets.push(widget.name);
+                log.softFail(`Widget file not found: ${widget.jsPath} (widget: ${uri})`);
+            }
+        }
+
+        if (readyWidgets.length > 0) {
+            log.debug('Ready widgets', { widgets: readyWidgets });
+        }
+
+        if (missingWidgets.length > 0) {
+            log.softFail('Some widgets are not ready', {
+                widgets: missingWidgets,
+                note: 'These widgets will not be available. Ensure web/dist files are built and included in deployment.',
+            });
+        }
+
+        return resolved;
+    })().catch((error) => {
+        // Clear cache on rejection to allow retry on next session
+        cachedWidgetsPromise = undefined;
+        throw error;
+    });
+
+    return cachedWidgetsPromise;
+}
+
 /**
  * Create Apify MCP server
  */
@@ -1865,37 +1919,8 @@ export class ActorsMcpServer {
         }
 
         try {
-            const { fileURLToPath } = await import('node:url');
-            const path = await import('node:path');
-
-            const filename = fileURLToPath(import.meta.url);
-            const dirName = path.dirname(filename);
-
-            const resolved = await resolveAvailableWidgets(dirName);
+            const resolved = await loadAvailableWidgetsOnce();
             this.availableWidgets = resolved;
-
-            const readyWidgets: string[] = [];
-            const missingWidgets: string[] = [];
-
-            for (const [uri, widget] of resolved.entries()) {
-                if (widget.exists) {
-                    readyWidgets.push(widget.name);
-                } else {
-                    missingWidgets.push(widget.name);
-                    log.softFail(`Widget file not found: ${widget.jsPath} (widget: ${uri})`);
-                }
-            }
-
-            if (readyWidgets.length > 0) {
-                log.debug('Ready widgets', { widgets: readyWidgets });
-            }
-
-            if (missingWidgets.length > 0) {
-                log.softFail('Some widgets are not ready', {
-                    widgets: missingWidgets,
-                    note: 'These widgets will not be available. Ensure web/dist files are built and included in deployment.',
-                });
-            }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             log.softFail(`Failed to resolve widgets: ${errorMessage}`);
