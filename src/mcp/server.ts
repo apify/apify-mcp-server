@@ -97,10 +97,10 @@ import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
+    applyToolTelemetry,
     classifyFailureCategory,
     deriveResourceIds,
     extractAjvErrorDetails,
-    extractToolTelemetry,
     getToolStatusFromError,
 } from '../utils/tool_status.js';
 import {
@@ -1198,9 +1198,12 @@ export class ActorsMcpServer {
                         })) as Record<string, unknown>;
 
                         // Extract diagnostics and strip internal fields from res before returning to client.
-                        const diag = extractToolTelemetry(res, actorName, actorId);
-                        toolStatus = diag.toolStatus;
-                        callDiagnostics = { ...callDiagnostics, ...diag.callDiagnostics };
+                        ({ toolStatus, callDiagnostics } = applyToolTelemetry(
+                            res,
+                            actorName,
+                            actorId,
+                            callDiagnostics,
+                        ));
                         return captureResult(res);
                     } finally {
                         progressTracker?.stop();
@@ -1329,6 +1332,15 @@ export class ActorsMcpServer {
                             return captureResult({});
                         }
 
+                        // Mirror the INTERNAL branch: read the telemetry the executor embedded on error
+                        // results (e.g. respondUserError → SOFT_FAIL/INVALID_INPUT), strip it from the wire,
+                        // and set failure_category so the report-problem nudge picks the softer variant.
+                        ({ toolStatus, callDiagnostics } = applyToolTelemetry(
+                            executorResult as Record<string, unknown>,
+                            actorName,
+                            actorId,
+                            callDiagnostics,
+                        ));
                         return captureResult(executorResult);
                     } finally {
                         if (progressTracker) {
@@ -1696,9 +1708,7 @@ export class ActorsMcpServer {
                         taskMode: true,
                     })) as Record<string, unknown>;
 
-                    const diag = extractToolTelemetry(res, actorName, actorId);
-                    toolStatus = diag.toolStatus;
-                    callDiagnostics = { ...callDiagnostics, ...diag.callDiagnostics };
+                    ({ toolStatus, callDiagnostics } = applyToolTelemetry(res, actorName, actorId, callDiagnostics));
                     result = res;
                 } finally {
                     if (progressTracker) {
@@ -1742,6 +1752,14 @@ export class ActorsMcpServer {
                         // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                         result = {};
                     } else {
+                        // Mirror the INTERNAL task branch: extract embedded telemetry so failure_category
+                        // drives the success-path nudge below and toolTelemetry is stripped from the wire.
+                        ({ toolStatus, callDiagnostics } = applyToolTelemetry(
+                            executorResult as Record<string, unknown>,
+                            actorName,
+                            actorId,
+                            callDiagnostics,
+                        ));
                         result = executorResult;
                     }
                 } finally {

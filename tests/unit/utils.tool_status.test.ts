@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import { buildStartRunResponse } from '../../src/tools/actors/actor_run_response.js';
 import {
+    applyToolTelemetry,
     classifyFailureCategory,
     deriveResourceIds,
     extractAjvErrorDetails,
@@ -209,6 +210,28 @@ describe('extractToolTelemetry', () => {
         const { toolStatus, callDiagnostics } = extractToolTelemetry({ content: 'ok' }, undefined, undefined);
         expect(toolStatus).toBe(TOOL_STATUS.SUCCEEDED);
         expect(callDiagnostics).toEqual({});
+    });
+});
+
+describe('applyToolTelemetry', () => {
+    it('merges extracted diagnostics onto the prior diagnostics', () => {
+        const res: Record<string, unknown> = {
+            isError: true,
+            toolTelemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+        };
+
+        const { toolStatus, callDiagnostics } = applyToolTelemetry(res, 'apify/web-scraper', 'abc123', {
+            validation_keyword: 'required',
+        });
+
+        expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
+        // Prior keys are preserved; extracted keys are folded in.
+        expect(callDiagnostics).toMatchObject({
+            validation_keyword: 'required',
+            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            actor_name: 'apify/web-scraper',
+        });
+        expect(res.toolTelemetry).toBeUndefined();
     });
 });
 
