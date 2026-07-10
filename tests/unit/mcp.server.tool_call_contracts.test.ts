@@ -116,18 +116,6 @@ async function runSync(server: ActorsMcpServer, tool: ToolEntry): Promise<Record
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 
-/** Polls (real timers) until `predicate` returns truthy, then returns that value. Throws `message` if it never does. */
-async function pollUntil<T>(predicate: () => Promise<T> | T, message: string): Promise<NonNullable<T>> {
-    for (let i = 0; i < 2000; i++) {
-        const value = await predicate();
-        if (value) return value;
-        await new Promise((resolve) => {
-            setImmediate(resolve);
-        });
-    }
-    throw new Error(message);
-}
-
 /** Asserts the telemetry `properties` shape `trackToolCall` received for a failure class. */
 function expectFailureClassTelemetry(
     trackSpy: { mock: { calls: [unknown, unknown, Record<string, unknown>][] } },
@@ -155,10 +143,13 @@ async function runTaskAndReadBack(server: ActorsMcpServer, tool: ToolEntry) {
         },
         { signal: { aborted: false }, sendNotification: vi.fn() },
     )) as { task: { taskId: string } };
-    const task = await pollUntil(async () => {
+    const task = await vi.waitFor(async () => {
         const current = await server.taskStore.getTask(res.task.taskId);
-        return current && TERMINAL_STATUSES.has(current.status) ? current : null;
-    }, `Task ${res.task.taskId} did not reach a terminal status`);
+        if (!current || !TERMINAL_STATUSES.has(current.status)) {
+            throw new Error(`Task ${res.task.taskId} did not reach a terminal status`);
+        }
+        return current;
+    });
     const result = await server.taskStore.getTaskResult(res.task.taskId);
     return { task, result: result as Record<string, unknown> };
 }
@@ -276,7 +267,9 @@ describe('executeToolAndUpdateTask()', () => {
                         await runTaskAndReadBack(server, tool);
                         // The task path stores the terminal result *before* finishTaskTracking fires
                         // trackToolCall, so terminal status alone does not imply telemetry was emitted.
-                        await pollUntil(() => trackSpy.mock.calls.length > 0, 'trackToolCall spy was not called');
+                        await vi.waitFor(() => {
+                            if (trackSpy.mock.calls.length === 0) throw new Error('trackToolCall spy was not called');
+                        });
                     },
                     { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
                 );
