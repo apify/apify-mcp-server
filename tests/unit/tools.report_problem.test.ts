@@ -27,6 +27,12 @@ describe('reportProblem', () => {
         });
     });
 
+    describe('annotations', () => {
+        it('is not read-only (submitting a report writes to the Apify team)', () => {
+            expect((reportProblem as HelperTool).annotations?.readOnlyHint).toBe(false);
+        });
+    });
+
     describe('input validation', () => {
         const validate = (reportProblem as HelperTool).ajvValidate;
 

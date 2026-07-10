@@ -108,7 +108,7 @@ export const reportProblem: ToolEntry = Object.freeze({
     paymentRequired: false,
     annotations: {
         title: 'Report a problem',
-        readOnlyHint: true,
+        readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: false,
         openWorldHint: false,
