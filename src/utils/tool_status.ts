@@ -148,6 +148,23 @@ export function extractAjvErrorDetails(errors: ErrorObject[] | null | undefined)
 }
 
 /**
+ * Removes the server-internal `toolTelemetry` field from a tool response, in place.
+ *
+ * The MCP SDK's `CallToolResultSchema` is a `z.looseObject`, so every key left on the response is
+ * passed through to the client. `toolTelemetry` carries server-internal outcome data (toolStatus,
+ * failureCategory, …) that must never reach the wire, so it has to be stripped on *every* return
+ * path — not just the ones that read it via `extractToolTelemetry()`.
+ *
+ * @see https://github.com/apify/apify-mcp-server/issues/1052
+ */
+export function stripToolTelemetry<T>(res: T): T {
+    if (res !== null && typeof res === 'object') {
+        delete (res as { toolTelemetry?: unknown }).toolTelemetry;
+    }
+    return res;
+}
+
+/**
  * Reads `toolTelemetry` from a tool response, strips it, and returns toolStatus + callDiagnostics.
  *
  * toolStatus resolution:
@@ -164,7 +181,7 @@ export function extractToolTelemetry(
     actorId: string | undefined,
 ): { toolStatus: ToolStatus; callDiagnostics: CallDiagnostics } {
     const telemetry = res.toolTelemetry as ToolTelemetryContext | undefined;
-    delete res.toolTelemetry;
+    stripToolTelemetry(res);
 
     // Tool-reported actorId (e.g. from call-actor) takes precedence over server-side actorId
     const actorFields = buildActorFields(actorName, telemetry?.actorId ?? actorId);
