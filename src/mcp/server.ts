@@ -1152,7 +1152,6 @@ export class ActorsMcpServer {
                     mcpSessionId,
                     progressToken,
                     progressTracker,
-                    abortSignal: extra.signal,
                     shouldForwardNotifications: true,
                     extra,
                     actorName,
@@ -1315,11 +1314,11 @@ export class ActorsMcpServer {
      *
      * `extractToolTelemetry` runs once here (INTERNAL case) and strips `toolTelemetry` in place, so
      * callers must not re-strip. The caller constructs `progressTracker`; dispatch consumes it and stops
-     * it in the branch `finally`. `abortSignal` is the ACTOR abort source (the request signal for sync,
-     * the task cancel-watcher signal for task) — dispatch never reads a signal from a closure.
-     * `shouldForwardNotifications` gates only the ACTOR_MCP raw-notification forwarder (true for sync, false
-     * for task, whose originating request is already answered). `taskMode` is a passthrough to
-     * `tool.call` / `executeActorTool`, never a dispatch selector.
+     * it in the branch `finally`. The abort source is `extra.signal`: the request signal for sync; the
+     * task caller passes a `taskExtra` whose `signal` is the cancel watcher's, so a client disconnect
+     * never cancels a task. `shouldForwardNotifications` gates only the ACTOR_MCP raw-notification
+     * forwarder (true for sync, false for task, whose originating request is already answered).
+     * `taskMode` is a passthrough to `tool.call` / `executeActorTool`, never a dispatch selector.
      */
     private async dispatchToolCall(params: {
         tool: ToolEntry;
@@ -1330,15 +1329,14 @@ export class ActorsMcpServer {
         mcpSessionId: string | undefined;
         progressToken: string | number | undefined;
         progressTracker: ReturnType<typeof createProgressTracker>;
-        abortSignal: AbortSignal | undefined;
         shouldForwardNotifications: boolean;
         extra: RequestHandlerExtra<Request, Notification>;
         actorName?: string;
         actorId?: string;
         taskMode: boolean;
-        // Present only for the task caller; its presence selects the "for task" log message variant
-        // and adds the `taskId` field (log-only — no effect on dispatch behavior).
-        taskId?: string;
+        // Caller-supplied log decoration (task mode: ' for task' suffix + taskId field), applied
+        // mechanically to the per-branch "Calling …" lines — no effect on dispatch behavior.
+        logContext?: { messageSuffix: string; fields: Record<string, unknown> };
     }): Promise<{ result: Record<string, unknown>; toolStatus: ToolStatus; callDiagnostics: CallDiagnostics }> {
         const {
             tool,
@@ -1349,13 +1347,12 @@ export class ActorsMcpServer {
             mcpSessionId,
             progressToken,
             progressTracker,
-            abortSignal,
             shouldForwardNotifications,
             extra,
             actorName,
             actorId,
             taskMode,
-            taskId,
+            logContext,
         } = params;
 
         let result: Record<string, unknown> = {};
@@ -1366,8 +1363,8 @@ export class ActorsMcpServer {
         switch (tool.type) {
             case TOOL_TYPE.INTERNAL: {
                 try {
-                    log.info(taskId !== undefined ? 'Calling internal tool for task' : 'Calling internal tool', {
-                        ...(taskId !== undefined && { taskId }),
+                    log.info(`Calling internal tool${logContext?.messageSuffix ?? ''}`, {
+                        ...logContext?.fields,
                         toolName: tool.name,
                         mcpSessionId,
                         input: logSafeArgs,
@@ -1431,7 +1428,8 @@ export class ActorsMcpServer {
                         }
                     }
 
-                    log.info('Calling Actor-MCP', {
+                    log.info(`Calling Actor-MCP${logContext?.messageSuffix ?? ''}`, {
+                        ...logContext?.fields,
                         toolName: tool.name,
                         actorMcpToolName: tool.originToolName,
                         actorId: tool.actorId,
@@ -1466,7 +1464,7 @@ export class ActorsMcpServer {
 
                     result = { ...res };
                 } catch (error) {
-                    toolStatus = getToolStatusFromError(error, Boolean(abortSignal?.aborted));
+                    toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                     const failureDetail =
                         error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
                     callDiagnostics = {
@@ -1490,8 +1488,8 @@ export class ActorsMcpServer {
 
             case TOOL_TYPE.ACTOR: {
                 try {
-                    log.info(taskId !== undefined ? 'Calling Actor for task' : 'Calling Actor', {
-                        ...(taskId !== undefined && { taskId }),
+                    log.info(`Calling Actor${logContext?.messageSuffix ?? ''}`, {
+                        ...logContext?.fields,
                         toolName: tool.name,
                         actorName: tool.actorFullName,
                         mcpSessionId,
@@ -1503,7 +1501,7 @@ export class ActorsMcpServer {
                         apifyClient,
                         callOptions: { memory: tool.memoryMbytes },
                         progressTracker,
-                        abortSignal,
+                        abortSignal: extra.signal,
                         mcpSessionId,
                         datasetItemsSchema: tool.datasetItemsSchema,
                         taskMode,
@@ -1614,6 +1612,26 @@ export class ActorsMcpServer {
             });
         };
 
+        // Terminal step shared by every task outcome: store the result (expiry-tolerant),
+        // emit the status notification, record telemetry.
+        const completeTask = async (
+            storeStatus: 'completed' | 'failed',
+            taskResult: Record<string, unknown>,
+            status: ToolStatus,
+            diagnostics: CallDiagnostics | undefined,
+        ): Promise<void> => {
+            await storeTaskResultOrSkipIfExpired(
+                this.taskStore,
+                tool.name,
+                taskId,
+                storeStatus,
+                taskResult,
+                mcpSessionId,
+            );
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
+            finishTaskTracking(status, diagnostics, taskResult);
+        };
+
         // Once a task is cancelled the spec forbids writing a result; every storage path
         // must short-circuit here. `logSuffix` is concatenated after "Task was cancelled"
         // so we keep the existing log format and the existing telemetry status per path.
@@ -1692,13 +1710,12 @@ export class ActorsMcpServer {
                 mcpSessionId,
                 progressToken,
                 progressTracker,
-                abortSignal: cancelWatcher.signal,
                 shouldForwardNotifications: false,
                 extra: taskExtra,
                 actorName,
                 actorId,
                 taskMode: true,
-                taskId,
+                logContext: { messageSuffix: ' for task', fields: { taskId } },
             });
             result = dispatchResult.result;
             toolStatus = dispatchResult.toolStatus;
@@ -1712,11 +1729,8 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            await storeTaskResultOrSkipIfExpired(this.taskStore, tool.name, taskId, 'completed', result, mcpSessionId);
+            await completeTask('completed', result, toolStatus, callDiagnostics);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
-            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-
-            finishTaskTracking(toolStatus, callDiagnostics, result);
         } catch (error) {
             // Reached only when the task expired before the `working` transition (updateTaskStatus
             // above rethrows the store's unknown-taskId error). The tool never ran and the task is
@@ -1753,16 +1767,12 @@ export class ActorsMcpServer {
                     })
                 )
                     return;
-                await storeTaskResultOrSkipIfExpired(
-                    this.taskStore,
-                    tool.name,
-                    taskId,
+                await completeTask(
                     'completed',
                     errorResult.response,
-                    mcpSessionId,
+                    errorResult.toolStatus,
+                    errorResult.callDiagnostics,
                 );
-                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-                finishTaskTracking(errorResult.toolStatus, errorResult.callDiagnostics, errorResult.response);
                 return;
             }
 
@@ -1778,16 +1788,12 @@ export class ActorsMcpServer {
                     })
                 )
                     return;
-                await storeTaskResultOrSkipIfExpired(
-                    this.taskStore,
-                    tool.name,
-                    taskId,
+                await completeTask(
                     'completed',
                     errorResult.response,
-                    mcpSessionId,
+                    errorResult.toolStatus,
+                    errorResult.callDiagnostics,
                 );
-                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-                finishTaskTracking(errorResult.toolStatus, errorResult.callDiagnostics, errorResult.response);
                 return;
             }
 
@@ -1840,17 +1846,7 @@ export class ActorsMcpServer {
                 isError: true,
                 internalToolStatus: toolStatus,
             };
-            await storeTaskResultOrSkipIfExpired(
-                this.taskStore,
-                tool.name,
-                taskId,
-                'failed',
-                failedResult,
-                mcpSessionId,
-            );
-            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-
-            finishTaskTracking(toolStatus, callDiagnostics, failedResult);
+            await completeTask('failed', failedResult, toolStatus, callDiagnostics);
         } finally {
             cancelWatcher.dispose();
         }
