@@ -834,6 +834,10 @@ export class ActorsMcpServer {
             let callDiagnostics: CallDiagnostics = {};
             let shouldTrackTelemetry = true;
             let resolvedToolName = name;
+            // Set only on the pre-flight task path — the one task-mode flow whose telemetry rides
+            // this handler's `finally` — so its `Tool call completed` log line keeps the taskId the
+            // async path logs via finishTaskTracking.
+            let preflightTaskId: string | undefined;
             // Captured by `captureResult` so the `finally` block can measure response size for telemetry.
             let toolResult: unknown = null;
             const captureResult = <T>(r: T): T => {
@@ -1041,24 +1045,42 @@ export class ActorsMcpServer {
                     // `working` notification). Standby rejection wins over the generic payment-required
                     // short-circuit, matching the sync path's precedence. Telemetry rides the handler's
                     // outer `finally` (shouldTrackTelemetry stays true), firing once with the sync-path
-                    // properties.
+                    // properties plus the taskId on the log line.
                     const preflightResult = standbyRejection ?? paymentRequiredResult;
                     if (preflightResult) {
                         toolStatus = TOOL_STATUS.SOFT_FAIL;
+                        preflightTaskId = task.taskId;
                         callDiagnostics = {
                             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                             ...(standbyRejection ? {} : { failure_http_status: 402 }),
                             ...buildActorFields(actorName, actorId),
                         };
-                        await storeTaskResultOrSkipIfExpired(
-                            this.taskStore,
-                            tool.name,
-                            task.taskId,
-                            'completed',
-                            preflightResult,
-                            mcpSessionId,
-                        );
-                        await emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
+                        try {
+                            await storeTaskResultOrSkipIfExpired(
+                                this.taskStore,
+                                tool.name,
+                                task.taskId,
+                                'completed',
+                                preflightResult,
+                                mcpSessionId,
+                            );
+                        } catch (error) {
+                            // A store failure (not expiry) would otherwise fall through to the generic
+                            // catch and return a task-less tool result the client rejects as a
+                            // CreateTaskResult parse error; surface it as a protocol error instead.
+                            throw new McpError(
+                                ErrorCode.InternalError,
+                                `Failed to store the pre-flight result for task "${task.taskId}": ${
+                                    error instanceof Error ? error.message : String(error)
+                                }`,
+                            );
+                        }
+                        // Defer so the client sees the CreateTaskResult (and learns the taskId) before
+                        // the terminal status notification — the async path's post-response ordering.
+                        // emitTaskStatusNotification never throws and no-ops if the task expired.
+                        setImmediate(() => {
+                            void emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
+                        });
                         captureResult(preflightResult);
                         // createTask returned status `working`; synthesize the terminal status instead of
                         // re-fetching — if the task expired before the result store (the one case
@@ -1362,6 +1384,7 @@ export class ActorsMcpServer {
                         callDiagnostics,
                         args,
                         result: toolResult,
+                        taskId: preflightTaskId,
                     });
                 }
             }

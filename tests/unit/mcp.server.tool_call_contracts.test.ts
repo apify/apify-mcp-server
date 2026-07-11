@@ -459,6 +459,16 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
             .map((n) => n.params?.status);
     }
 
+    /** Flush the setImmediate-deferred status notification (emitted after the response). */
+    async function flushDeferredNotification(): Promise<void> {
+        await new Promise((resolve) => {
+            setImmediate(resolve);
+        });
+        await new Promise((resolve) => {
+            setImmediate(resolve);
+        });
+    }
+
     it('resolves a payment pre-flight failure as a terminal completed task, one completed notification', async () => {
         await withServer(
             async (server) => {
@@ -478,7 +488,9 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 const stored = (await server.taskStore.getTaskResult(res.task.taskId)) as Record<string, unknown>;
                 expect(stored.isError).toBe(true);
                 expect(stored.structuredContent).toEqual(X402_PAYLOAD);
-                // Exactly one status notification, and it is `completed`.
+                // Exactly one status notification, `completed`, emitted after the response.
+                expect(statusNotificationStatuses(notifySpy)).toEqual([]);
+                await flushDeferredNotification();
                 expect(statusNotificationStatuses(notifySpy)).toEqual(['completed']);
             },
             { paymentProvider: makePaymentProvider() },
@@ -531,6 +543,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 expect(received.called).toBe(false);
                 const stored = await server.taskStore.getTaskResult(res.task.taskId);
                 expect(stored).toEqual(standbyResult);
+                await flushDeferredNotification();
                 expect(statusNotificationStatuses(notifySpy)).toEqual(['completed']);
             },
             { paymentProvider: makePaymentProvider() },
@@ -642,6 +655,54 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
         );
     });
 
+    it('surfaces a non-expiry store failure as an InternalError protocol error', async () => {
+        // A store outage (anything but the tolerated task-not-found) must reject as a protocol
+        // error — a task-less tool result would fail the client's CreateTaskResult parse opaquely.
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                vi.spyOn(server.taskStore, 'storeTaskResult').mockRejectedValue(new Error('store unavailable'));
+                const { tool } = makeRecorderTool('payment-tool', { paymentRequired: true, taskSupport: 'optional' });
+                server.upsertTools([tool]);
+                const handler = getRequestHandler(server, 'tools/call');
+                await expect(
+                    handler(
+                        {
+                            method: 'tools/call',
+                            params: {
+                                name: 'payment-tool',
+                                arguments: {},
+                                _meta: { mcpSessionId: 's1' },
+                                task: { ttl: 60_000 },
+                            },
+                        },
+                        { signal: { aborted: false }, sendNotification: vi.fn() },
+                    ),
+                ).rejects.toMatchObject({ code: ErrorCode.InternalError });
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
+    });
+
+    it('logs Tool call completed with the taskId for a pre-flight task failure', async () => {
+        // The pre-flight path's telemetry rides the handler finally; the log line must keep the
+        // taskId the async path logs via finishTaskTracking, so hosted log queries keep
+        // classifying this class as task-mode.
+        await withServer(
+            async (server) => {
+                const infoSpy = vi.spyOn(log, 'info').mockImplementation(() => log);
+                silenceLogs();
+                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                const { tool } = makeRecorderTool('payment-tool', { paymentRequired: true, taskSupport: 'optional' });
+                const res = await callTask(server, tool, {});
+                const completedCall = infoSpy.mock.calls.find(([message]) => message === 'Tool call completed');
+                expect(completedCall?.[1]).toMatchObject({ taskId: res.task.taskId });
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
+    });
+
     it('returns a completed task even when the task expires before the result store', async () => {
         // The one case storeTaskResultOrSkipIfExpired tolerates: TTL elapsed between createTask and
         // the result store. The store throws not-found (swallowed) and the task is gone — the wire
@@ -663,6 +724,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 expect(res.task.status).toBe('completed');
                 expect(received.called).toBe(false);
                 // Task is gone from the store — no status notification can be emitted.
+                await flushDeferredNotification();
                 expect(statusNotificationStatuses(notifySpy)).toEqual([]);
             },
             { paymentProvider: makePaymentProvider() },
