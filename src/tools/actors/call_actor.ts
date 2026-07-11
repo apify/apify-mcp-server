@@ -135,7 +135,7 @@ function buildPermissionApprovalTexts(error: ApifyApiError): string[] {
     return [error.message, ...(approvalUrl ? [`Approve here: ${approvalUrl}`] : [])];
 }
 
-/** Exported for native actor tool error handling in server.ts — no logging, no telemetry. */
+/** Exported for the shared tool-call error mapper (src/mcp/tool_call_error_mapper.ts) — no logging, no telemetry. */
 export function buildPermissionApprovalResponse(error: ApifyApiError): ToolResponse {
     return respondErrorNoTelemetry(buildPermissionApprovalTexts(error));
 }

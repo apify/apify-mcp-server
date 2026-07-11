@@ -17,6 +17,13 @@ export type ToolCallErrorParams = {
     isAborted: boolean;
 };
 
+/** Discriminants of `ToolCallErrorResult` — reference these, never string literals. */
+export const TOOL_CALL_ERROR_KIND = {
+    PAYMENT: 'payment',
+    APPROVAL: 'approval',
+    EXECUTION: 'execution',
+} as const;
+
 /** Shared shape for the two branches that carry a ready-to-return `response` (402 and approval). */
 type ResponseErrorResult = {
     toolStatus: ToolStatus;
@@ -30,10 +37,10 @@ type ResponseErrorResult = {
  * blocks own everything else (logging, store writes, cancel guards, wire-field wrapping).
  */
 export type ToolCallErrorResult =
-    | ({ kind: 'payment' } & ResponseErrorResult)
-    | ({ kind: 'approval' } & ResponseErrorResult)
+    | ({ kind: typeof TOOL_CALL_ERROR_KIND.PAYMENT } & ResponseErrorResult)
+    | ({ kind: typeof TOOL_CALL_ERROR_KIND.APPROVAL } & ResponseErrorResult)
     | {
-          kind: 'execution';
+          kind: typeof TOOL_CALL_ERROR_KIND.EXECUTION;
           toolStatus: ToolStatus;
           callDiagnostics: CallDiagnostics;
           userText: string;
@@ -50,7 +57,7 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
 
     if (isX402PaymentRequiredError(error)) {
         return {
-            kind: 'payment',
+            kind: TOOL_CALL_ERROR_KIND.PAYMENT,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: {
                 failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -63,7 +70,7 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
 
     if (isPermissionApprovalError(error)) {
         return {
-            kind: 'approval',
+            kind: TOOL_CALL_ERROR_KIND.APPROVAL,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: {
                 failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
@@ -76,7 +83,7 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
 
     const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
     return {
-        kind: 'execution',
+        kind: TOOL_CALL_ERROR_KIND.EXECUTION,
         toolStatus: getToolStatusFromError(error, isAborted),
         callDiagnostics: {
             failure_category: classifyFailureCategory(error),

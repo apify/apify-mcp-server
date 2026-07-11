@@ -107,7 +107,7 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { buildToolCallErrorResult } from './tool_call_error_mapper.js';
+import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import {
     createTaskCancellationWatcher,
     isTaskCancelled,
@@ -1300,7 +1300,11 @@ export class ActorsMcpServer {
                 // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
                 // returns them as JSON-RPC errors. failInvalidParams already set callDiagnostics
                 // with the correct semantic category (e.g. AUTH), so we must not overwrite it.
-                // An McpError is never a 402/approval error, so re-throwing first is order-equivalent.
+                // Re-throwing first is order-equivalent only because no McpError with an HTTP-range
+                // code reaches this catch: an McpError(402) WOULD satisfy the x402 predicate
+                // (getHttpStatusCode falls through to `.code`), but every remote-McpError route is
+                // sealed by an inner catch (ACTOR_MCP branch, call-actor MCP passthrough) and all
+                // in-repo McpErrors use negative ErrorCode.* values.
                 if (error instanceof McpError) {
                     throw error;
                 }
@@ -1314,13 +1318,15 @@ export class ActorsMcpServer {
                 toolStatus = errorResult.toolStatus;
 
                 // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
-                // content[0].text (JSON) + isError: true. No log here (unlike the task path).
-                if (errorResult.kind === 'payment') {
+                // content[0].text (JSON) + isError: true. No log here (unlike the task path). The
+                // concurrent-run limit also surfaces as 402 but is excluded by the predicate and
+                // falls through to the generic run-limit handling below.
+                if (errorResult.kind === TOOL_CALL_ERROR_KIND.PAYMENT) {
                     callDiagnostics = errorResult.callDiagnostics;
                     return captureResult(errorResult.response);
                 }
 
-                if (errorResult.kind === 'approval') {
+                if (errorResult.kind === TOOL_CALL_ERROR_KIND.APPROVAL) {
                     callDiagnostics = errorResult.callDiagnostics;
                     logHttpError(error, 'Permission approval required while calling tool', {
                         toolName: name,
@@ -1702,7 +1708,7 @@ export class ActorsMcpServer {
             });
 
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
-            if (errorResult.kind === 'payment') {
+            if (errorResult.kind === TOOL_CALL_ERROR_KIND.PAYMENT) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this 402.
@@ -1725,7 +1731,7 @@ export class ActorsMcpServer {
                 return;
             }
 
-            if (errorResult.kind === 'approval') {
+            if (errorResult.kind === TOOL_CALL_ERROR_KIND.APPROVAL) {
                 logHttpError(error, 'Permission approval required while calling tool (task mode)', {
                     toolName: tool.name,
                 });
