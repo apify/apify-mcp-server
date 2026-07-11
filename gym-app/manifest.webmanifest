@@ -1,0 +1,17 @@
+{
+    "name": "Coachlog",
+    "short_name": "Coachlog",
+    "description": "Trainingsschema's maken en progressie bijhouden voor je klanten",
+    "lang": "nl",
+    "start_url": "./index.html",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#f9f9f7",
+    "theme_color": "#2a78d6",
+    "icons": [
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" }
+    ]
+}
