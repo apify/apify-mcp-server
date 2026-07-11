@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coachlog — schema's & progressie</title>
+</head>
+<body>
+<!-- APP START -->
+<style>
+  :root {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --accent-strong: #1c5cab;
+    --wash: rgba(42, 120, 214, 0.10);
+    --good: #006300;
+    --danger: #d03b3b;
+    --shadow: 0 1px 2px rgba(11, 11, 11, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5;
+      --accent-strong: #6da7ec;
+      --wash: rgba(57, 135, 229, 0.12);
+      --good: #0ca30c;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="light"] {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --accent-strong: #1c5cab;
+    --wash: rgba(42, 120, 214, 0.10);
+    --good: #006300;
+    --danger: #d03b3b;
+    --shadow: 0 1px 2px rgba(11, 11, 11, 0.06);
+  }
+  :root[data-theme="dark"] {
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5;
+    --accent-strong: #6da7ec;
+    --wash: rgba(57, 135, 229, 0.12);
+    --good: #0ca30c;
+    --danger: #d03b3b;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app { max-width: 640px; margin: 0 auto; padding: 0 16px 96px; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 0 10px;
+    position: sticky; top: 0; z-index: 5;
+    background: var(--page);
+    border-bottom: 1px solid var(--grid);
+    margin-bottom: 16px;
+  }
+  .topbar h1 { font-size: 18px; font-weight: 650; margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .brand { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+
+  .eyebrow {
+    font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); margin: 24px 0 8px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  .card.tappable { cursor: pointer; }
+  .card.tappable:hover { border-color: var(--accent); }
+
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row .grow { flex: 1; min-width: 0; }
+  .title { font-weight: 650; }
+  .sub { color: var(--ink-2); font-size: 14px; }
+  .mut { color: var(--muted); font-size: 13px; }
+
+  button {
+    font: inherit; cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink);
+    border-radius: 8px; padding: 9px 14px;
+  }
+  button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+  button.ghost { background: transparent; }
+  button.danger { color: var(--danger); }
+  button.small { padding: 5px 10px; font-size: 14px; border-radius: 7px; }
+  button.wide { width: 100%; padding: 12px; font-size: 16px; }
+  button.back { padding: 6px 10px; font-size: 15px; }
+
+  input, select, textarea {
+    font: inherit; color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--baseline);
+    border-radius: 8px; padding: 9px 10px;
+    width: 100%;
+  }
+  input[type="number"] { font-variant-numeric: tabular-nums; }
+  label.field { display: block; margin-bottom: 10px; }
+  label.field span { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
+
+  .seg { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+  .seg button { flex: 1; border: none; background: transparent; padding: 7px 4px; font-size: 13px; border-radius: 6px; color: var(--ink-2); }
+  .seg button[aria-pressed="true"] { background: var(--wash); color: var(--accent-strong); font-weight: 650; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat .lbl { font-size: 12px; color: var(--muted); }
+  .stat .val { font-size: 20px; font-weight: 650; margin-top: 2px; }
+  .stat .delta { font-size: 13px; margin-top: 2px; }
+  .delta.up { color: var(--good); }
+  .delta.down { color: var(--danger); }
+
+  .chart-wrap { position: relative; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; }
+  .tooltip {
+    position: absolute; pointer-events: none; display: none;
+    background: var(--ink); color: var(--page);
+    font-size: 13px; line-height: 1.35;
+    padding: 6px 9px; border-radius: 7px;
+    transform: translate(-50%, -110%);
+    white-space: nowrap; z-index: 3;
+  }
+  .tooltip .tv { font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  .set-row { display: grid; grid-template-columns: 28px 1fr 1fr 34px; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .set-row .n { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .ex-row { display: grid; grid-template-columns: 1fr 62px 62px 76px 34px; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .col-head { font-size: 12px; color: var(--muted); }
+
+  .empty { text-align: center; color: var(--ink-2); padding: 28px 12px; }
+  .empty p { margin: 0 0 14px; }
+
+  .divider { border: none; border-top: 1px solid var(--grid); margin: 24px 0; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge { display: inline-block; font-size: 12px; color: var(--accent-strong); background: var(--wash); border-radius: 99px; padding: 2px 9px; font-weight: 600; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card.tappable { transition: border-color 120ms ease; }
+  }
+</style>
+
+<div id="app"></div>
+
+<script>
+(() => {
+  'use strict';
+  const KEY = 'coachlog-v1';
+  const $app = document.getElementById('app');
+
+  // ---------- data ----------
+  const emptyDb = () => ({ clients: [], schemas: [], workouts: [] });
+  let db = loadDb();
+  function loadDb() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return emptyDb();
+      const d = JSON.parse(raw);
+      return { clients: d.clients || [], schemas: d.schemas || [], workouts: d.workouts || [] };
+    } catch { return emptyDb(); }
+  }
+  function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+  function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); }
+
+  const clientById = (id) => db.clients.find((c) => c.id === id);
+  const schemaById = (id) => db.schemas.find((s) => s.id === id);
+  const schemasOf = (clientId) => db.schemas.filter((s) => s.clientId === clientId);
+  const workoutsOf = (clientId) => db.workouts.filter((w) => w.clientId === clientId).sort((a, b) => a.date.localeCompare(b.date));
+
+  // ---------- helpers ----------
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const num = (v) => { const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+  const todayIso = () => new Date().toISOString().slice(0, 10);
+  const fmtDate = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+  const fmtDateFull = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'long' });
+  const fmtKg = (n) => (Math.round(n * 10) / 10).toLocaleString('nl-NL') + ' kg';
+
+  // metrics per workout for one exercise name
+  function exerciseMetrics(entry) {
+    const sets = entry.sets.filter((s) => s.weight > 0 || s.reps > 0);
+    if (!sets.length) return null;
+    const top = Math.max(...sets.map((s) => s.weight));
+    const volume = sets.reduce((t, s) => t + s.weight * s.reps, 0);
+    const e1rm = Math.max(...sets.map((s) => s.reps > 0 ? s.weight * (1 + s.reps / 30) : s.weight));
+    return { top, volume, e1rm };
+  }
+
+  function progressSeries(clientId, exName, metric) {
+    const key = exName.trim().toLowerCase();
+    const pts = [];
+    for (const w of workoutsOf(clientId)) {
+      for (const e of w.entries) {
+        if (e.name.trim().toLowerCase() !== key) continue;
+        const m = exerciseMetrics(e);
+        if (m) pts.push({ date: w.date, value: m[metric] });
+      }
+    }
+    return pts;
+  }
+
+  function loggedExercises(clientId) {
+    const seen = new Map();
+    for (const w of workoutsOf(clientId)) {
+      for (const e of w.entries) {
+        const key = e.name.trim().toLowerCase();
+        if (key && !seen.has(key)) seen.set(key, e.name.trim());
+      }
+    }
+    return [...seen.values()];
+  }
+
+  // ---------- chart ----------
+  function niceTicks(min, max, count) {
+    if (min === max) { min = Math.max(0, min - 1); max = max + 1; }
+    const span = max - min;
+    const step0 = span / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= step0) || 10 * mag;
+    const lo = Math.floor(min / step) * step;
+    const hi = Math.ceil(max / step) * step;
+    const ticks = [];
+    for (let v = lo; v <= hi + step / 2; v += step) ticks.push(Math.round(v * 100) / 100);
+    return ticks;
+  }
+
+  function renderChart(container, points, unit) {
+    const W = 600, H = 260, padL = 44, padR = 16, padT = 14, padB = 30;
+    const iw = W - padL - padR, ih = H - padT - padB;
+    const vals = points.map((p) => p.value);
+    const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 4);
+    const yMin = ticks[0], yMax = ticks[ticks.length - 1];
+    const x = (i) => points.length === 1 ? padL + iw / 2 : padL + (i / (points.length - 1)) * iw;
+    const y = (v) => padT + ih - ((v - yMin) / (yMax - yMin || 1)) * ih;
+    const fmtVal = (v) => unit === 'kg' ? fmtKg(v) : Math.round(v).toLocaleString('nl-NL') + ' kg';
+
+    const grid = ticks.map((t) =>
+      `<line x1="${padL}" y1="${y(t)}" x2="${W - padR}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/>` +
+      `<text x="${padL - 8}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" style="font-variant-numeric:tabular-nums">${t.toLocaleString('nl-NL')}</text>`
+    ).join('');
+
+    const lineD = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+    const areaD = points.length > 1
+      ? `${lineD} L${x(points.length - 1).toFixed(1)},${(padT + ih).toFixed(1)} L${x(0).toFixed(1)},${(padT + ih).toFixed(1)} Z`
+      : '';
+
+    // x labels: first, last, and up to 2 in between
+    const labelIdx = new Set([0, points.length - 1]);
+    if (points.length > 4) { labelIdx.add(Math.round((points.length - 1) / 3)); labelIdx.add(Math.round(2 * (points.length - 1) / 3)); }
+    const xLabels = [...labelIdx].map((i) =>
+      `<text x="${x(i)}" y="${H - 8}" text-anchor="${i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'}" font-size="11" fill="var(--muted)">${esc(fmtDate(points[i].date))}</text>`
+    ).join('');
+
+    const dots = points.map((p, i) =>
+      `<circle cx="${x(i)}" cy="${y(p.value)}" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>`
+    ).join('');
+
+    const last = points[points.length - 1];
+    const endLabel = `<text x="${x(points.length - 1) - 8}" y="${y(last.value) - 10}" text-anchor="end" font-size="12" font-weight="650" fill="var(--ink)" style="font-variant-numeric:tabular-nums">${esc(fmtVal(last.value))}</text>`;
+
+    container.innerHTML =
+      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Progressiegrafiek">` +
+      grid +
+      `<line x1="${padL}" y1="${padT + ih}" x2="${W - padR}" y2="${padT + ih}" stroke="var(--baseline)" stroke-width="1"/>` +
+      (areaD ? `<path d="${areaD}" fill="var(--wash)"/>` : '') +
+      (points.length > 1 ? `<path d="${lineD}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '') +
+      `<line class="xh" x1="0" y1="${padT}" x2="0" y2="${padT + ih}" stroke="var(--baseline)" stroke-width="1" visibility="hidden"/>` +
+      dots + endLabel + xLabels +
+      `</svg><div class="tooltip"></div>`;
+
+    // hover: nearest point -> crosshair + tooltip
+    const svg = container.querySelector('svg');
+    const tip = container.querySelector('.tooltip');
+    const xh = svg.querySelector('.xh');
+    const onMove = (ev) => {
+      const rect = svg.getBoundingClientRect();
+      const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      const px = ((cx - rect.left) / rect.width) * W;
+      let best = 0, bd = Infinity;
+      points.forEach((_, i) => { const d = Math.abs(x(i) - px); if (d < bd) { bd = d; best = i; } });
+      const p = points[best];
+      xh.setAttribute('x1', x(best)); xh.setAttribute('x2', x(best));
+      xh.setAttribute('visibility', 'visible');
+      tip.style.display = 'block';
+      tip.style.left = (x(best) / W * rect.width) + 'px';
+      tip.style.top = (y(p.value) / H * rect.height) + 'px';
+      tip.innerHTML = `${esc(fmtDate(p.date))}<br><span class="tv">${esc(fmtVal(p.value))}</span>`;
+    };
+    const onLeave = () => { tip.style.display = 'none'; xh.setAttribute('visibility', 'hidden'); };
+    svg.addEventListener('mousemove', onMove);
+    svg.addEventListener('touchstart', onMove, { passive: true });
+    svg.addEventListener('touchmove', onMove, { passive: true });
+    svg.addEventListener('mouseleave', onLeave);
+  }
+
+  // ---------- views ----------
+  function render() {
+    const hash = location.hash.slice(1) || '/';
+    const parts = hash.split('/').filter(Boolean);
+    window.scrollTo(0, 0);
+    if (parts[0] === 'klant' && parts[2] === 'schema') return viewSchema(parts[1], parts[3]);
+    if (parts[0] === 'klant' && parts[2] === 'training') return viewWorkout(parts[1], parts[3]);
+    if (parts[0] === 'klant') return viewClient(parts[1]);
+    return viewHome();
+  }
+
+  function topbar(title, backHash) {
+    return `<div class="topbar">` +
+      (backHash != null ? `<button class="back" data-nav="${esc(backHash)}" aria-label="Terug">←</button>` : '') +
+      (backHash != null ? `<h1>${esc(title)}</h1>` : `<h1><span class="brand">Coachlog</span></h1>`) +
+      `</div>`;
+  }
+
+  // --- home: client list ---
+  function viewHome() {
+    const cards = db.clients.map((c) => {
+      const ws = workoutsOf(c.id);
+      const last = ws[ws.length - 1];
+      return `<div class="card tappable" data-nav="/klant/${c.id}" role="link" tabindex="0">
+        <div class="row">
+          <div class="grow">
+            <div class="title">${esc(c.name)}</div>
+            <div class="sub">${ws.length} training${ws.length === 1 ? '' : 'en'}${last ? ' · laatste: ' + esc(fmtDate(last.date)) : ''}</div>
+            ${c.goal ? `<div class="mut">Doel: ${esc(c.goal)}</div>` : ''}
+          </div>
+          <span class="mut">›</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    $app.innerHTML = topbar('Coachlog') +
+      `<div class="eyebrow">Klanten</div>` +
+      (cards || `<div class="empty"><p>Nog geen klanten. Voeg je eerste klant toe, of bekijk de app met voorbeelddata.</p><button class="primary" id="demo-btn">Voorbeelddata laden</button></div>`) +
+      `<form class="card" id="add-client">
+        <label class="field"><span>Naam nieuwe klant</span><input name="name" required placeholder="bijv. Sanne de Vries"></label>
+        <label class="field"><span>Doel (optioneel)</span><input name="goal" placeholder="bijv. kracht opbouwen, 5 kg afvallen"></label>
+        <button class="primary wide" type="submit">Klant toevoegen</button>
+      </form>
+      <hr class="divider">
+      <div class="eyebrow">Gegevens</div>
+      <div class="actions">
+        <button id="export-btn">Exporteer back-up</button>
+        <button id="import-btn">Importeer back-up</button>
+        <input type="file" id="import-file" accept="application/json" hidden>
+      </div>
+      <p class="mut">Alles wordt lokaal op dit apparaat bewaard. Maak regelmatig een back-up.</p>`;
+
+    bindNav();
+    document.getElementById('add-client').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const f = new FormData(ev.target);
+      const name = String(f.get('name')).trim();
+      if (!name) return;
+      const c = { id: uid(), name, goal: String(f.get('goal')).trim() };
+      db.clients.push(c); save();
+      location.hash = `/klant/${c.id}`;
+    });
+    const demo = document.getElementById('demo-btn');
+    if (demo) demo.addEventListener('click', () => { loadDemo(); save(); render(); });
+    document.getElementById('export-btn').addEventListener('click', exportJson);
+    const fileInput = document.getElementById('import-file');
+    document.getElementById('import-btn').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', importJson);
+  }
+
+  // --- client detail ---
+  const uiState = { metric: 'top', exercise: {} };
+  function viewClient(id) {
+    const c = clientById(id);
+    if (!c) { location.hash = '/'; return; }
+    const schemas = schemasOf(id);
+    const workouts = workoutsOf(id);
+    const exercises = loggedExercises(id);
+    const selEx = uiState.exercise[id] && exercises.includes(uiState.exercise[id]) ? uiState.exercise[id] : exercises[0];
+
+    // stats
+    const last = workouts[workouts.length - 1];
+    let statHtml = `<div class="stat-grid">
+      <div class="stat"><div class="lbl">Trainingen</div><div class="val">${workouts.length}</div></div>
+      <div class="stat"><div class="lbl">Laatste</div><div class="val">${last ? esc(fmtDate(last.date)) : '—'}</div></div>
+      ${progressStat(id, selEx)}
+    </div>`;
+
+    const metricNames = { top: 'Zwaarste set', volume: 'Volume', e1rm: 'Geschat 1RM' };
+
+    $app.innerHTML = topbar(c.name, '/') +
+      (c.goal ? `<p class="sub" style="margin:0 0 12px">Doel: ${esc(c.goal)}</p>` : '') +
+      statHtml +
+      `<div style="margin-top:16px" class="actions">` +
+      (schemas.length
+        ? schemas.map((s) => `<button class="primary" data-nav="/klant/${id}/training/${s.id}">Start: ${esc(s.name)}</button>`).join('')
+        : '') +
+      `</div>` +
+
+      `<div class="eyebrow">Progressie</div>` +
+      (exercises.length ? `
+        <div class="card">
+          <label class="field"><span>Oefening</span>
+            <select id="ex-select">${exercises.map((e) => `<option ${e === selEx ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select>
+          </label>
+          <div class="seg" role="group" aria-label="Meetwaarde">
+            ${['top', 'volume', 'e1rm'].map((m) => `<button data-metric="${m}" aria-pressed="${uiState.metric === m}">${metricNames[m]}</button>`).join('')}
+          </div>
+          <div class="chart-wrap" id="chart" style="margin-top:12px"></div>
+          <p class="mut" id="chart-note" style="margin:6px 0 0"></p>
+        </div>`
+        : `<div class="empty"><p>Nog geen trainingen gelogd. Start een training om progressie te zien.</p></div>`) +
+
+      `<div class="eyebrow">Schema's</div>` +
+      schemas.map((s) => `<div class="card tappable" data-nav="/klant/${id}/schema/${s.id}" role="link" tabindex="0">
+          <div class="row"><div class="grow">
+            <div class="title">${esc(s.name)}</div>
+            <div class="sub">${s.exercises.map((e) => esc(e.name)).join(' · ') || 'nog geen oefeningen'}</div>
+          </div><span class="mut">›</span></div>
+        </div>`).join('') +
+      `<button class="wide" data-nav="/klant/${id}/schema/nieuw">+ Nieuw schema</button>` +
+
+      `<div class="eyebrow">Logboek</div>` +
+      (workouts.length ? [...workouts].reverse().slice(0, 20).map((w) => {
+        const schema = schemaById(w.schemaId);
+        const summary = w.entries.map((e) => {
+          const m = exerciseMetrics(e);
+          return m ? `${esc(e.name)} ${fmtKg(m.top)}` : esc(e.name);
+        }).join(' · ');
+        return `<div class="card">
+          <div class="row">
+            <div class="grow">
+              <div class="title">${esc(fmtDateFull(w.date))} ${schema ? `<span class="badge">${esc(schema.name)}</span>` : ''}</div>
+              <div class="sub">${summary}</div>
+              ${w.notes ? `<div class="mut">${esc(w.notes)}</div>` : ''}
+            </div>
+            <button class="small danger ghost" data-del-workout="${w.id}" aria-label="Verwijder training">✕</button>
+          </div>
+        </div>`;
+      }).join('') : `<p class="mut">Nog geen trainingen.</p>`) +
+
+      `<hr class="divider">
+       <button class="danger ghost" id="del-client">Klant verwijderen</button>`;
+
+    bindNav();
+
+    if (exercises.length) {
+      const draw = () => {
+        const pts = progressSeries(id, document.getElementById('ex-select').value, uiState.metric);
+        const note = document.getElementById('chart-note');
+        if (pts.length) {
+          renderChart(document.getElementById('chart'), pts, uiState.metric === 'volume' ? 'vol' : 'kg');
+          note.textContent = uiState.metric === 'e1rm'
+            ? 'Geschat 1RM via de Epley-formule op basis van de beste set.'
+            : uiState.metric === 'volume' ? 'Volume = som van gewicht × herhalingen per training.' : 'Zwaarste set per training.';
+        }
+      };
+      document.getElementById('ex-select').addEventListener('change', (ev) => {
+        uiState.exercise[id] = ev.target.value; render();
+      });
+      document.querySelectorAll('[data-metric]').forEach((b) => b.addEventListener('click', () => {
+        uiState.metric = b.dataset.metric; render();
+      }));
+      draw();
+    }
+
+    document.querySelectorAll('[data-del-workout]').forEach((b) => b.addEventListener('click', () => {
+      if (!confirm('Deze training verwijderen?')) return;
+      db.workouts = db.workouts.filter((w) => w.id !== b.dataset.delWorkout);
+      save(); render();
+    }));
+    document.getElementById('del-client').addEventListener('click', () => {
+      if (!confirm(`${c.name} en alle bijbehorende schema's en trainingen verwijderen?`)) return;
+      db.clients = db.clients.filter((x) => x.id !== id);
+      db.schemas = db.schemas.filter((s) => s.clientId !== id);
+      db.workouts = db.workouts.filter((w) => w.clientId !== id);
+      save(); location.hash = '/';
+    });
+  }
+
+  function progressStat(clientId, exName) {
+    if (!exName) return `<div class="stat"><div class="lbl">Progressie</div><div class="val">—</div></div>`;
+    const pts = progressSeries(clientId, exName, 'top');
+    if (pts.length < 2) return `<div class="stat"><div class="lbl">${esc(exName)}</div><div class="val">${pts.length ? esc(fmtKg(pts[0].value)) : '—'}</div></div>`;
+    const d = pts[pts.length - 1].value - pts[0].value;
+    const cls = d > 0 ? 'up' : d < 0 ? 'down' : '';
+    const sign = d > 0 ? '+' : '';
+    return `<div class="stat"><div class="lbl">${esc(exName)}</div><div class="val">${esc(fmtKg(pts[pts.length - 1].value))}</div><div class="delta ${cls}">${sign}${esc(fmtKg(d))} totaal</div></div>`;
+  }
+
+  // --- schema editor ---
+  function viewSchema(clientId, schemaId) {
+    const c = clientById(clientId);
+    if (!c) { location.hash = '/'; return; }
+    const isNew = schemaId === 'nieuw';
+    const schema = isNew
+      ? { id: uid(), clientId, name: '', exercises: [] }
+      : schemaById(schemaId);
+    if (!schema) { location.hash = `/klant/${clientId}`; return; }
+    const draft = JSON.parse(JSON.stringify(schema));
+    if (!draft.exercises.length) draft.exercises.push({ id: uid(), name: '', sets: 3, reps: 10, weight: 0 });
+
+    const paint = () => {
+      $app.innerHTML = topbar(isNew ? 'Nieuw schema' : 'Schema bewerken', `/klant/${clientId}`) +
+        `<form id="schema-form">
+          <label class="field"><span>Naam schema</span><input name="name" required placeholder="bijv. Full body A" value="${esc(draft.name)}"></label>
+          <div class="eyebrow">Oefeningen</div>
+          <div class="ex-row">
+            <span class="col-head">Oefening</span><span class="col-head">Sets</span><span class="col-head">Herh.</span><span class="col-head">Gewicht</span><span></span>
+          </div>
+          ${draft.exercises.map((e, i) => `<div class="ex-row">
+            <input data-ex="${i}" data-f="name" required placeholder="bijv. Squat" value="${esc(e.name)}">
+            <input data-ex="${i}" data-f="sets" type="number" min="1" inputmode="numeric" value="${e.sets}">
+            <input data-ex="${i}" data-f="reps" type="number" min="1" inputmode="numeric" value="${e.reps}">
+            <input data-ex="${i}" data-f="weight" type="text" inputmode="decimal" value="${e.weight || ''}" placeholder="kg">
+            <button type="button" class="small danger ghost" data-rm="${i}" aria-label="Verwijder oefening">✕</button>
+          </div>`).join('')}
+          <button type="button" id="add-ex" class="small" style="margin:4px 0 16px">+ Oefening</button>
+          <button class="primary wide" type="submit">Schema opslaan</button>
+        </form>` +
+        (!isNew ? `<hr class="divider"><button class="danger ghost" id="del-schema">Schema verwijderen</button>` : '');
+
+      bindNav();
+      const syncDraft = () => {
+        document.querySelectorAll('[data-ex]').forEach((inp) => {
+          const e = draft.exercises[+inp.dataset.ex];
+          const f = inp.dataset.f;
+          e[f] = f === 'name' ? inp.value : num(inp.value);
+        });
+        draft.name = document.querySelector('[name="name"]').value;
+      };
+      document.getElementById('add-ex').addEventListener('click', () => {
+        syncDraft();
+        draft.exercises.push({ id: uid(), name: '', sets: 3, reps: 10, weight: 0 });
+        paint();
+      });
+      document.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => {
+        syncDraft();
+        draft.exercises.splice(+b.dataset.rm, 1);
+        if (!draft.exercises.length) draft.exercises.push({ id: uid(), name: '', sets: 3, reps: 10, weight: 0 });
+        paint();
+      }));
+      document.getElementById('schema-form').addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        syncDraft();
+        draft.name = draft.name.trim();
+        draft.exercises = draft.exercises.filter((e) => e.name.trim());
+        if (!draft.name || !draft.exercises.length) return;
+        if (isNew) db.schemas.push(draft);
+        else db.schemas[db.schemas.findIndex((s) => s.id === schemaId)] = draft;
+        save(); location.hash = `/klant/${clientId}`;
+      });
+      const del = document.getElementById('del-schema');
+      if (del) del.addEventListener('click', () => {
+        if (!confirm('Dit schema verwijderen? Gelogde trainingen blijven bewaard.')) return;
+        db.schemas = db.schemas.filter((s) => s.id !== schemaId);
+        save(); location.hash = `/klant/${clientId}`;
+      });
+    };
+    paint();
+  }
+
+  // --- workout logging ---
+  function viewWorkout(clientId, schemaId) {
+    const c = clientById(clientId);
+    const schema = schemaById(schemaId);
+    if (!c || !schema) { location.hash = c ? `/klant/${clientId}` : '/'; return; }
+
+    // prefill: last workout with this schema, else schema targets
+    const prev = [...workoutsOf(clientId)].reverse().find((w) => w.schemaId === schemaId);
+    const draft = schema.exercises.map((ex) => {
+      const prevEntry = prev && prev.entries.find((e) => e.name.trim().toLowerCase() === ex.name.trim().toLowerCase());
+      const sets = prevEntry
+        ? prevEntry.sets.map((s) => ({ reps: s.reps, weight: s.weight }))
+        : Array.from({ length: ex.sets || 3 }, () => ({ reps: ex.reps || 10, weight: ex.weight || 0 }));
+      return { name: ex.name, sets };
+    });
+
+    const paint = () => {
+      $app.innerHTML = topbar(`Training — ${c.name}`, `/klant/${clientId}`) +
+        `<form id="wo-form">
+          <label class="field"><span>Datum</span><input type="date" name="date" value="${todayIso()}" required></label>
+          ${draft.map((ex, xi) => `<div class="card">
+            <div class="title" style="margin-bottom:8px">${esc(ex.name)}</div>
+            <div class="set-row"><span></span><span class="col-head">Gewicht (kg)</span><span class="col-head">Herhalingen</span><span></span></div>
+            ${ex.sets.map((s, si) => `<div class="set-row">
+              <span class="n">${si + 1}</span>
+              <input data-set="${xi}.${si}" data-f="weight" type="text" inputmode="decimal" value="${s.weight || ''}" placeholder="kg">
+              <input data-set="${xi}.${si}" data-f="reps" type="number" min="0" inputmode="numeric" value="${s.reps || ''}" placeholder="herh.">
+              <button type="button" class="small danger ghost" data-rm-set="${xi}.${si}" aria-label="Verwijder set">✕</button>
+            </div>`).join('')}
+            <button type="button" class="small" data-add-set="${xi}">+ Set</button>
+          </div>`).join('')}
+          <label class="field"><span>Notities (optioneel)</span><textarea name="notes" rows="2" placeholder="bijv. voelde sterk, knie licht gevoelig"></textarea></label>
+          <button class="primary wide" type="submit">Training opslaan</button>
+        </form>`;
+
+      bindNav();
+      const syncDraft = () => {
+        document.querySelectorAll('[data-set]').forEach((inp) => {
+          const [xi, si] = inp.dataset.set.split('.').map(Number);
+          draft[xi].sets[si][inp.dataset.f] = num(inp.value);
+        });
+      };
+      document.querySelectorAll('[data-add-set]').forEach((b) => b.addEventListener('click', () => {
+        syncDraft();
+        const sets = draft[+b.dataset.addSet].sets;
+        const lastSet = sets[sets.length - 1];
+        sets.push(lastSet ? { ...lastSet } : { reps: 10, weight: 0 });
+        const dateVal = document.querySelector('[name="date"]').value;
+        const notesVal = document.querySelector('[name="notes"]').value;
+        paint();
+        document.querySelector('[name="date"]').value = dateVal;
+        document.querySelector('[name="notes"]').value = notesVal;
+      }));
+      document.querySelectorAll('[data-rm-set]').forEach((b) => b.addEventListener('click', () => {
+        syncDraft();
+        const [xi, si] = b.dataset.rmSet.split('.').map(Number);
+        draft[xi].sets.splice(si, 1);
+        paint();
+      }));
+      document.getElementById('wo-form').addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        syncDraft();
+        const f = new FormData(ev.target);
+        const entries = draft
+          .map((ex) => ({ name: ex.name, sets: ex.sets.filter((s) => s.weight > 0 || s.reps > 0) }))
+          .filter((ex) => ex.sets.length);
+        if (!entries.length) { alert('Vul minstens één set in.'); return; }
+        db.workouts.push({
+          id: uid(), clientId, schemaId,
+          date: String(f.get('date')),
+          notes: String(f.get('notes')).trim(),
+          entries,
+        });
+        save(); location.hash = `/klant/${clientId}`;
+      });
+    };
+    paint();
+  }
+
+  // ---------- export / import ----------
+  function exportJson() {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `coachlog-backup-${todayIso()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function importJson(ev) {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const d = JSON.parse(reader.result);
+        if (!Array.isArray(d.clients)) throw new Error('ongeldig bestand');
+        if (!confirm('Huidige gegevens vervangen door deze back-up?')) return;
+        db = { clients: d.clients, schemas: d.schemas || [], workouts: d.workouts || [] };
+        save(); render();
+      } catch {
+        alert('Dit bestand is geen geldige Coachlog-back-up.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ---------- demo data ----------
+  function loadDemo() {
+    const cid = uid(), sid = uid();
+    db.clients.push({ id: cid, name: 'Demo — Sanne', goal: 'Kracht opbouwen' });
+    db.schemas.push({
+      id: sid, clientId: cid, name: 'Full body A',
+      exercises: [
+        { id: uid(), name: 'Squat', sets: 4, reps: 8, weight: 60 },
+        { id: uid(), name: 'Bankdrukken', sets: 4, reps: 8, weight: 40 },
+        { id: uid(), name: 'Deadlift', sets: 3, reps: 5, weight: 80 },
+      ],
+    });
+    const day = 24 * 3600 * 1000;
+    for (let i = 0; i < 10; i++) {
+      const date = new Date(Date.now() - (9 - i) * 6 * day).toISOString().slice(0, 10);
+      const bump = (base) => base + i * 2.5 + (i % 3 === 2 ? -2.5 : 0);
+      db.workouts.push({
+        id: uid(), clientId: cid, schemaId: sid, date, notes: '',
+        entries: [
+          { name: 'Squat', sets: [1, 2, 3, 4].map(() => ({ reps: 8, weight: bump(60) })) },
+          { name: 'Bankdrukken', sets: [1, 2, 3, 4].map(() => ({ reps: 8, weight: bump(40) })) },
+          { name: 'Deadlift', sets: [1, 2, 3].map(() => ({ reps: 5, weight: bump(80) })) },
+        ],
+      });
+    }
+  }
+
+  // ---------- nav ----------
+  function bindNav() {
+    document.querySelectorAll('[data-nav]').forEach((el) => {
+      const go = () => { location.hash = el.dataset.nav; };
+      el.addEventListener('click', (ev) => { if (ev.target.closest('button') !== el && ev.target.closest('button')) return; go(); });
+      if (el.tagName !== 'BUTTON') el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); });
+    });
+  }
+
+  window.addEventListener('hashchange', render);
+  render();
+})();
+</script>
+<!-- APP END -->
+</body>
+</html>
