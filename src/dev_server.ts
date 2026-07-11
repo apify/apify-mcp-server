@@ -210,7 +210,7 @@ export function createExpressApp(): express.Express {
 
             // Inject session ID into request params for the reused existing session
             if (sessionId && req.body) {
-                req.body.params = injectMcpSessionId(req.body?.params, sessionId);
+                req.body.params = injectMcpSessionId(req.body.params, sessionId);
             }
 
             // Handle the request with existing transport - no need to reconnect

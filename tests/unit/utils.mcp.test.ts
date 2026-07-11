@@ -33,34 +33,20 @@ describe('injectMcpSessionId()', () => {
         });
     });
 
-    it('preserves existing _meta fields when setting mcpSessionId', () => {
+    it('preserves other _meta fields and overwrites an existing mcpSessionId', () => {
         const input = {
             someParam: 'value',
             _meta: {
                 apifyToken: 'token-abc',
-                progressToken: 'progress-xyz',
+                mcpSessionId: 'old-session',
             },
         };
         const result = injectMcpSessionId(input, 'session-789');
         expect(result === input).toBe(true);
         expect(result._meta).toEqual({
             apifyToken: 'token-abc',
-            progressToken: 'progress-xyz',
             mcpSessionId: 'session-789',
         });
-    });
-
-    it('overwrites an existing mcpSessionId with the new value', () => {
-        const input = {
-            _meta: {
-                mcpSessionId: 'old-session',
-                apifyToken: 'token',
-            },
-        };
-        const result = injectMcpSessionId(input, 'new-session');
-        expect(result === input).toBe(true);
-        expect(result._meta?.mcpSessionId).toBe('new-session');
-        expect(result._meta?.apifyToken).toBe('token');
     });
 });
 
