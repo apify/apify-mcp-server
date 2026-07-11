@@ -1153,7 +1153,7 @@ export class ActorsMcpServer {
                     progressToken,
                     progressTracker,
                     abortSignal: extra.signal,
-                    forwardNotifications: true,
+                    shouldForwardNotifications: true,
                     extra,
                     actorName,
                     actorId,
@@ -1317,7 +1317,7 @@ export class ActorsMcpServer {
      * callers must not re-strip. The caller constructs `progressTracker`; dispatch consumes it and stops
      * it in the branch `finally`. `abortSignal` is the ACTOR abort source (the request signal for sync,
      * the task cancel-watcher signal for task) — dispatch never reads a signal from a closure.
-     * `forwardNotifications` gates only the ACTOR_MCP raw-notification forwarder (true for sync, false
+     * `shouldForwardNotifications` gates only the ACTOR_MCP raw-notification forwarder (true for sync, false
      * for task, whose originating request is already answered). `taskMode` is a passthrough to
      * `tool.call` / `executeActorTool`, never a dispatch selector.
      */
@@ -1331,7 +1331,7 @@ export class ActorsMcpServer {
         progressToken: string | number | undefined;
         progressTracker: ReturnType<typeof createProgressTracker>;
         abortSignal: AbortSignal | undefined;
-        forwardNotifications: boolean;
+        shouldForwardNotifications: boolean;
         extra: RequestHandlerExtra<Request, Notification>;
         actorName?: string;
         actorId?: string;
@@ -1350,7 +1350,7 @@ export class ActorsMcpServer {
             progressToken,
             progressTracker,
             abortSignal,
-            forwardNotifications,
+            shouldForwardNotifications,
             extra,
             actorName,
             actorId,
@@ -1413,9 +1413,9 @@ export class ActorsMcpServer {
                     }
 
                     // Only set up notification handlers if progressToken is provided by the client.
-                    // Gated off for tasks (forwardNotifications=false): the originating request is
+                    // Gated off for tasks (shouldForwardNotifications=false): the originating request is
                     // already answered, so forwarding against its progressToken would misroute.
-                    if (forwardNotifications && progressToken !== undefined && progressToken !== null) {
+                    if (shouldForwardNotifications && progressToken !== undefined && progressToken !== null) {
                         // Set up notification handlers for the client
                         for (const schema of ServerNotificationSchema.options) {
                             const method = schema.shape.method.value;
@@ -1442,7 +1442,9 @@ export class ActorsMcpServer {
                         {
                             name: tool.originToolName,
                             arguments: toolArgs,
-                            _meta: { progressToken },
+                            // Without forwarding there is no route back for remote progress — don't
+                            // hand the remote a token nobody listens to.
+                            ...(shouldForwardNotifications ? { _meta: { progressToken } } : {}),
                         },
                         CallToolResultSchema,
                         {
@@ -1527,12 +1529,12 @@ export class ActorsMcpServer {
             default:
                 // Exhaustiveness guard mirroring getToolFullName: a new TOOL_TYPE member makes `tool`
                 // non-`never` here and fails `satisfies never` at compile time. Unreachable at runtime —
-                // ToolEntry is a closed 3-way union. Returns SOFT_FAIL to preserve the old fall-through.
-                return {
-                    result: tool satisfies never,
-                    toolStatus: TOOL_STATUS.SOFT_FAIL,
-                    callDiagnostics,
-                };
+                // ToolEntry is a closed 3-way union — but if forced via untyped injection, reject like
+                // the pre-extraction ladder did instead of returning the tool definition to the client.
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Unknown tool type "${(tool satisfies never as ToolEntry).type}"`,
+                );
         }
 
         return { result, toolStatus, callDiagnostics };
@@ -1691,7 +1693,7 @@ export class ActorsMcpServer {
                 progressToken,
                 progressTracker,
                 abortSignal: cancelWatcher.signal,
-                forwardNotifications: false,
+                shouldForwardNotifications: false,
                 extra: taskExtra,
                 actorName,
                 actorId,
