@@ -1,9 +1,11 @@
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
+import * as mcpClient from '../../src/mcp/client.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
 import * as telemetry from '../../src/telemetry.js';
@@ -370,17 +372,47 @@ describe('executeToolAndUpdateTask()', () => {
         }
     });
 
-    it('stores an empty {} completed result for an ACTOR_MCP tool in task mode', async () => {
-        // KNOWN GAP (#1063): executeToolAndUpdateTask has no ACTOR_MCP dispatch branch, so `result`
-        // stays the initial {} and is stored as `completed`. This pins today's buggy behavior. FLIP
-        // WHEN #1063 LANDS: the task path will then dispatch the ACTOR_MCP tool and store a real
-        // result, so update this test to assert that result instead of {}.
+    it('dispatches an ACTOR_MCP tool run as a task and surfaces a connect failure as a completed error result', async () => {
+        // #1063 CLOSED: executeToolAndUpdateTask now dispatches ACTOR_MCP through the shared switch.
+        // makeActorMcpTool points at an unreachable serverUrl, so connectMCPClient returns null and the
+        // ACTOR_MCP branch stores its connect-failure soft-fail result — a `completed` task carrying an
+        // `isError` body (matching the sync path), not the old empty {} masquerading as a success.
         await withServer(async (server) => {
             silenceLogs();
+            // The connect-failure branch logs via the transport; the harness has none, so stub it.
+            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
             const { task, result } = await runTaskAndReadBack(server, makeActorMcpTool());
             expect(task.status).toBe('completed');
-            expect(result).toEqual({});
+            expect(result.isError).toBe(true);
+            expect((result.content as { text: string }[])[0].text).toContain('Failed to connect to MCP server');
         });
+    });
+
+    it('dispatches an ACTOR_MCP tool run as a task and stores the real proxied result', async () => {
+        // Gap closure, success path: with a reachable proxied tool, the task stores the real callTool
+        // result as `completed` (not {}), and telemetry fires once with the ACTOR_MCP-derived status.
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        const proxiedResult = { content: [{ type: 'text', text: 'proxied ok' }] };
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                const stubClient = {
+                    callTool: vi.fn().mockResolvedValue(proxiedResult),
+                    close: vi.fn().mockResolvedValue(undefined),
+                    setNotificationHandler: vi.fn(),
+                } as unknown as Client;
+                vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(stubClient);
+                const { task, result } = await runTaskAndReadBack(server, makeActorMcpTool());
+                expect(task.status).toBe('completed');
+                expect(result).toEqual(proxiedResult);
+                await vi.waitFor(() => {
+                    if (trackSpy.mock.calls.length === 0) throw new Error('trackToolCall spy was not called');
+                });
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+        expect(trackSpy.mock.calls).toHaveLength(1);
+        expect(trackSpy.mock.calls[0][2].tool_status).toBe(TOOL_STATUS.SUCCEEDED);
     });
 });
 
