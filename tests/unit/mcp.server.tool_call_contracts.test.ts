@@ -22,8 +22,32 @@ import { getRequestHandler, makeRecorderTool, makeThrowingTool, withServer } fro
 
 const PERMISSION_HTTP_STATUS = 403;
 
-/** A 402 x402 payment-required condition. Any object with `statusCode: 402` satisfies the predicate. */
+/** x402 payload as the axios interceptor decodes it from the `payment-required` header. */
+const X402_PAYMENT_DATA = {
+    x402Version: 1,
+    accepts: [{ scheme: 'exact', network: 'base-sepolia', maxAmountRequired: '10000' }],
+};
+
+/** The wire `content` `buildPaymentRequiredResponse` produces for X402_PAYMENT_DATA. */
+const X402_RESPONSE_CONTENT = [
+    { type: 'text', text: JSON.stringify(X402_PAYMENT_DATA) },
+    { type: 'text', text: 'Payment required to run this Actor or access this resource.' },
+];
+
+/**
+ * A 402 x402 payment-required condition. Any object with `statusCode: 402` satisfies the predicate;
+ * the payment payload rides the same `Symbol.for('paymentRequiredData')` property the production
+ * axios interceptor attaches, so the handler exercises the full x402 response build.
+ */
 function makePaymentRequiredError(): Error {
+    return Object.assign(new Error('Payment required'), {
+        statusCode: 402,
+        [Symbol.for('paymentRequiredData')]: X402_PAYMENT_DATA,
+    });
+}
+
+/** A 402 with no captured payment payload — exercises the message-only fallback branch. */
+function makeBarePaymentRequiredError(): Error {
     return Object.assign(new Error('Payment required'), { statusCode: 402 });
 }
 
@@ -42,9 +66,11 @@ type FailureClass = {
     label: string;
     makeError: () => unknown;
     taskStatus: 'completed' | 'failed';
-    /** Set only for the generic class — 402/approval store no internalToolStatus. */
-    internalToolStatus?: string;
+    /** Exact stored task-store payload — deep-equal pin, so any added/dropped key fails. */
+    storedResult: Record<string, unknown>;
     telemetry: { tool_status: string; failure_category: string; failure_http_status?: number };
+    /** Failure-class keys expected on top of BASE_TELEMETRY_KEYS (exact-key-set pin). */
+    telemetryExtraKeys: string[];
 };
 
 const FAILURE_CLASSES: FailureClass[] = [
@@ -52,32 +78,69 @@ const FAILURE_CLASSES: FailureClass[] = [
         label: '402 payment-required',
         makeError: makePaymentRequiredError,
         taskStatus: 'completed',
+        storedResult: { content: X402_RESPONSE_CONTENT, isError: true, structuredContent: X402_PAYMENT_DATA },
         telemetry: {
             tool_status: TOOL_STATUS.SOFT_FAIL,
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
             failure_http_status: 402,
         },
+        telemetryExtraKeys: ['failure_category', 'failure_http_status'],
     },
     {
         label: 'permission-approval',
         makeError: makePermissionApprovalError,
         taskStatus: 'completed',
+        storedResult: { content: [{ type: 'text', text: 'needs approval' }], isError: true },
         telemetry: {
             tool_status: TOOL_STATUS.SOFT_FAIL,
             failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
             failure_http_status: PERMISSION_HTTP_STATUS,
         },
+        telemetryExtraKeys: ['failure_category', 'failure_http_status'],
     },
     {
         label: 'generic execution error',
         makeError: () => new Error('boom'),
         taskStatus: 'failed',
-        internalToolStatus: TOOL_STATUS.FAILED,
+        storedResult: {
+            content: [
+                {
+                    type: 'text',
+                    text: 'Error calling tool "test-throwing-tool": boom. Verify the tool name and input parameters.',
+                },
+            ],
+            isError: true,
+            internalToolStatus: TOOL_STATUS.FAILED,
+        },
         telemetry: {
             tool_status: TOOL_STATUS.FAILED,
             failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
         },
+        telemetryExtraKeys: ['failure_category', 'failure_detail'],
     },
+];
+
+/**
+ * Keys `prepareTelemetryData` + the handler `finally` finalization put on every tool-call Segment
+ * event, sync and task paths alike — pinned empirically. This suite is the only CI guard for these
+ * shapes (dashboards consume them; the internal repo does not), so the pin is an exact key set: a
+ * key appearing or disappearing must be a conscious edit here.
+ */
+const BASE_TELEMETRY_KEYS = [
+    'app',
+    'app_version',
+    'mcp_client_capabilities',
+    'mcp_client_name',
+    'mcp_client_version',
+    'mcp_protocol_version',
+    'mcp_session_id',
+    'tool_exec_time_ms',
+    'tool_name',
+    'tool_response_content_bytes',
+    'tool_response_file_bytes',
+    'tool_response_structured_content_bytes',
+    'tool_status',
+    'transport_type',
 ];
 
 /** Silence the error-path logging the failure branches emit, keeping test output clean. */
@@ -122,6 +185,7 @@ function expectFailureClassTelemetry(
 ): void {
     expect(trackSpy.mock.calls).toHaveLength(1);
     const properties = trackSpy.mock.calls[0][2];
+    expect(Object.keys(properties).sort()).toEqual([...BASE_TELEMETRY_KEYS, ...fc.telemetryExtraKeys].sort());
     expect(properties.tool_status).toBe(fc.telemetry.tool_status);
     expect(properties.failure_category).toBe(fc.telemetry.failure_category);
     if (fc.telemetry.failure_http_status === undefined) {
@@ -157,13 +221,28 @@ describe('CallToolRequestSchema handler', () => {
     afterEach(() => vi.restoreAllMocks());
 
     describe('sync failure result shapes', () => {
-        it('returns the payment-required response shape for a 402 failure', async () => {
+        it('returns the x402 payment-required response shape for a 402 failure', async () => {
             await withServer(async (server) => {
                 silenceLogs();
                 const result = await runSync(server, makeThrowingTool({ error: makePaymentRequiredError() }));
                 expect(result.isError).toBe(true);
-                expect(result.content).toEqual([{ type: 'text', text: 'Payment required' }]);
+                // Per the x402 MCP transport spec the payload rides both structuredContent and
+                // content[0].text as JSON — payment clients parse these; pin both exactly.
+                expect(result.content).toEqual(X402_RESPONSE_CONTENT);
+                expect(result.structuredContent).toEqual(X402_PAYMENT_DATA);
                 // Server-internal telemetry/status must not leak onto the wire.
+                expect(result.toolTelemetry).toBeUndefined();
+                expect('internalToolStatus' in result).toBe(false);
+            });
+        });
+
+        it('returns the message-only payment-required response for a 402 without payment data', async () => {
+            await withServer(async (server) => {
+                silenceLogs();
+                const result = await runSync(server, makeThrowingTool({ error: makeBarePaymentRequiredError() }));
+                expect(result.isError).toBe(true);
+                expect(result.content).toEqual([{ type: 'text', text: 'Payment required' }]);
+                expect(result.structuredContent).toBeUndefined();
                 expect(result.toolTelemetry).toBeUndefined();
                 expect('internalToolStatus' in result).toBe(false);
             });
@@ -209,6 +288,32 @@ describe('CallToolRequestSchema handler', () => {
         });
     });
 
+    it('rejects arguments failing the input schema as an InvalidParams protocol error', async () => {
+        // Pins the deliberate divergence from SDK 1.29 defaults: validation failures surface as
+        // McpError protocol errors, never as isError tool results. The taskSupport-gate test above
+        // covers the other failInvalidParams instance; this one covers AJV validation.
+        await withServer(async (server) => {
+            silenceLogs();
+            const { tool, received } = makeRecorderTool('strict-schema-tool');
+            const schema = { type: 'object', properties: { x: { type: 'string' } }, required: ['x'] };
+            tool.inputSchema = schema as ToolInputSchema;
+            tool.ajvValidate = compileSchema(schema);
+            server.upsertTools([tool]);
+            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            const handler = getRequestHandler(server, 'tools/call');
+            await expect(
+                handler(
+                    {
+                        method: 'tools/call',
+                        params: { name: 'strict-schema-tool', arguments: {}, _meta: { mcpSessionId: 's1' } },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                ),
+            ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+            expect(received.called).toBe(false);
+        });
+    });
+
     describe('tool-call telemetry properties per failure class', () => {
         // Telemetry on: no token + allowUnauthMode so prepareTelemetryData skips the userInfo network
         // call (userId null) while trackToolCall still fires. Assert the properties shape per class.
@@ -240,12 +345,10 @@ describe('executeToolAndUpdateTask()', () => {
                     const { task, result } = await runTaskAndReadBack(server, tool);
 
                     expect(task.status).toBe(fc.taskStatus);
-                    if (fc.internalToolStatus === undefined) {
-                        expect('internalToolStatus' in result).toBe(false);
-                    } else {
-                        expect(result.isError).toBe(true);
-                        expect(result.internalToolStatus).toBe(fc.internalToolStatus);
-                    }
+                    // Exact-object pin: a payment client fetches this via tasks/result, so the
+                    // payload must not drift, and no internal key (toolTelemetry,
+                    // internalToolStatus on completed classes) may appear.
+                    expect(result).toEqual(fc.storedResult);
                 });
             });
         }
@@ -269,11 +372,19 @@ describe('executeToolAndUpdateTask()', () => {
                         await vi.waitFor(() => {
                             if (trackSpy.mock.calls.length === 0) throw new Error('trackToolCall spy was not called');
                         });
+                        // Let any queued duplicate fire land before the single-call assertion below.
+                        await new Promise((resolve) => {
+                            setImmediate(resolve);
+                        });
+                        await new Promise((resolve) => {
+                            setImmediate(resolve);
+                        });
                     },
                     { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
                 );
                 expectFailureClassTelemetry(trackSpy, fc);
                 expect(trackSpy.mock.calls[0][2]).not.toHaveProperty('taskId');
+                expect(trackSpy.mock.calls[0][2]).not.toHaveProperty('task_id');
             });
         }
     });
