@@ -18,6 +18,10 @@ implementations, not by importing from here.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
+- `tool_call_error_mapper.ts` — `buildToolCallErrorResult()`: pure classifier both
+  `server.ts` tool-call catches share. Maps an error to a `kind: 'payment' | 'approval'
+  | 'execution'` result (status, diagnostics, response/userText). Never throws, logs,
+  or writes the store — the catch blocks own logging, store writes, and wire wrapping.
 - `const.ts` — the invariant constants below (the single source for these values).
 
 ## Gotchas & invariants
