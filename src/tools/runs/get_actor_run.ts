@@ -8,7 +8,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildUsageMeta, respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
+import { buildUsageMeta, respondAborted, respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import {
     applyConsoleLinks,
     type FetchActorRunResult,
@@ -145,7 +145,7 @@ export const getActorRun: ToolEntry = Object.freeze({
 
             // Per MCP spec, receivers SHOULD NOT send a response for a cancelled request:
             // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation
-            if ('aborted' in fetchResult) return {};
+            if ('aborted' in fetchResult) return respondAborted();
             if ('error' in fetchResult) return fetchResult.error;
 
             return buildGetActorRunSuccessResponse({

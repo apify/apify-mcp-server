@@ -1,3 +1,5 @@
+import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
+
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
 import type { AjvErrorDetails, FailureCategory, ToolTelemetryContext } from '../types.js';
 import { ACTOR_RUN_LIMIT_MESSAGE, isActorRunLimitError } from './apify_errors.js';
@@ -50,14 +52,32 @@ function buildMCPResponse(options: {
         ...(telemetry && { toolTelemetry: telemetry }),
         ...(structuredContent !== undefined && { structuredContent }),
         ...(_meta !== undefined && { _meta }),
-    };
+    } as unknown as ToolResponse;
 }
 
 /**
- * Shared return type of the `respond*` constructors. Replaces the
- * `ReturnType<typeof buildMCPResponse>` annotations now that `buildMCPResponse` is private.
+ * Module-private brand. Phantom `declare`d symbol — never assigned or emitted at runtime, so it adds
+ * nothing to the wire. Its only job is to make `ToolResponse` unforgeable at compile time.
  */
-export type ToolResponse = ReturnType<typeof buildMCPResponse>;
+declare const toolResponseBrand: unique symbol;
+
+/**
+ * Shared return type of the `respond*` constructors and of every `HelperTool.call`. The required brand
+ * means a raw `{ content, isError }` literal (or a bare `{}`) fails to compile — the only way to produce a
+ * `ToolResponse` is a constructor here. `content` is the full MCP `ContentBlock` union so image/audio/
+ * resource returns type-check.
+ *
+ * `content` and `isError` are optional because the escape hatches may omit them: `respondAborted()`
+ * returns `{}` (both absent) and `respondRaw()` passes a `CallToolResult` through unchanged (which may
+ * omit `isError`). Consumers reading either field must guard (`?.`, an `in` check, or the `textOf` helper).
+ */
+export type ToolResponse = {
+    content?: ContentBlock[];
+    isError?: boolean;
+    toolTelemetry?: ToolTelemetryContext;
+    structuredContent?: unknown;
+    _meta?: Record<string, unknown>;
+} & { readonly [toolResponseBrand]: never };
 
 /** Normalise a `string | string[]` text argument to the array `buildMCPResponse` expects. */
 function toTexts(texts: string | string[]): string[] {
@@ -166,6 +186,24 @@ export function respondErrorNoTelemetry(
     opts?: { structuredContent?: unknown },
 ): ToolResponse {
     return { ...respondOk(texts, opts), isError: true };
+}
+
+/**
+ * Brands an already-well-formed MCP result without reshaping it — runtime identity. For content this
+ * module can't build: binary/resource blocks (image, audio, resource_link, embedded resource) and opaque
+ * remote tool results. Returns the exact object passed in (no `isError` injection, no key reorder), so the
+ * wire bytes stay identical.
+ */
+export function respondRaw(result: CallToolResult): ToolResponse {
+    return result as unknown as ToolResponse;
+}
+
+/**
+ * Empty response for MCP cancellation paths — per spec, receivers SHOULD NOT reply to a cancelled request.
+ * Returns runtime `{}`, branded.
+ */
+export function respondAborted(): ToolResponse {
+    return {} as unknown as ToolResponse;
 }
 
 /**
