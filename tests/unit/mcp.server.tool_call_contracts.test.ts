@@ -14,10 +14,10 @@ import { compileSchema } from '../../src/utils/ajv.js';
 import { getRequestHandler, makeRecorderTool, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
 /**
- * Pins the handler-level behavior contracts that umbrella #658 will merge (the sync
- * `CallToolRequestSchema` catch and the `executeToolAndUpdateTask` catch). Failure classes are
- * fabricated by throwing from a fake tool's `call`; both the sync path (result shapes) and the task
- * path (terminal status mapping) assert the same source-of-truth per class.
+ * Pins the handler-level behavior contracts the sync `CallToolRequestSchema` catch and the
+ * `executeToolAndUpdateTask` catch must share. Failure classes are fabricated by throwing from a
+ * fake tool's `call`; both the sync path (result shapes) and the task path (terminal status
+ * mapping) assert the same source-of-truth per class.
  */
 
 const PERMISSION_HTTP_STATUS = 403;
@@ -356,9 +356,9 @@ describe('executeToolAndUpdateTask()', () => {
 
     describe('task-call telemetry properties per failure class', () => {
         // Same seam and per-class expectations as the sync block: the task catch builds its
-        // callDiagnostics via its own duplicated inline logic (the duplication #658 merges), so pin
-        // it separately. Telemetry fires once via finishTaskTracking; the emitted properties carry
-        // no task-specific key (taskId appears only in the log line, not in the Segment properties).
+        // callDiagnostics via its own duplicated inline logic, so pin it separately. Telemetry fires
+        // once via finishTaskTracking; the emitted properties carry no task-specific key (taskId
+        // appears only in the log line, not in the Segment properties).
         for (const fc of FAILURE_CLASSES) {
             it(`emits telemetry properties for a ${fc.label} failure in task mode`, async () => {
                 const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
@@ -390,10 +390,9 @@ describe('executeToolAndUpdateTask()', () => {
     });
 
     it('stores an empty {} completed result for an ACTOR_MCP tool in task mode', async () => {
-        // KNOWN GAP (#1063): executeToolAndUpdateTask has no ACTOR_MCP dispatch branch, so `result`
-        // stays the initial {} and is stored as `completed`. This pins today's buggy behavior. FLIP
-        // WHEN #1063 LANDS: the task path will then dispatch the ACTOR_MCP tool and store a real
-        // result, so update this test to assert that result instead of {}.
+        // KNOWN GAP: executeToolAndUpdateTask has no ACTOR_MCP dispatch branch, so `result` stays the
+        // initial {} and is stored as `completed`. This pins today's buggy behavior — if that branch
+        // is added, update this test to assert the real result instead of {}.
         await withServer(async (server) => {
             silenceLogs();
             const { task, result } = await runTaskAndReadBack(server, makeActorMcpTool());
