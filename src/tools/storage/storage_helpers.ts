@@ -1,7 +1,28 @@
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
+import { getHttpStatusCode } from '../../utils/logging.js';
 import { respondOk } from '../../utils/mcp.js';
+
+/**
+ * Wrap a storage SDK promise to convert a 404 rejection into null.
+ *
+ * The Apify SDK soft-catches 404 on `.get()`, `.getStatistics()`, and `.getRecord()` (returning
+ * falsy instead of throwing), but list methods like `.listItems()` and `.listKeys()` throw
+ * ApifyApiError on a missing storage. This helper wraps those list calls to provide consistent
+ * 404 handling: resolves with the promise's value, returns null if it rejects with a 404, or
+ * rethrows any other error. Call sites check `if (!result) return respondUserError(...)` as usual.
+ */
+export async function catchNotFound<T>(promise: Promise<T>): Promise<T | null> {
+    try {
+        return await promise;
+    } catch (err: unknown) {
+        if (getHttpStatusCode(err) === HTTP_NOT_FOUND) {
+            return null;
+        }
+        throw err;
+    }
+}
 
 function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
     return loadedToolNames.includes(toolName) ? toolName : undefined;

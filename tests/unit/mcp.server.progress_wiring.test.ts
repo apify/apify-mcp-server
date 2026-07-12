@@ -5,6 +5,7 @@ import { HELPER_TOOLS } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { respondRaw } from '../../src/utils/mcp.js';
 import { ProgressTracker } from '../../src/utils/progress.js';
 
 /**
@@ -47,7 +48,7 @@ function makeRecorderTool(name: string): {
         annotations: {},
         call: async (toolArgs: InternalToolArgs) => {
             received.progressTracker = toolArgs.progressTracker;
-            return { content: [{ type: 'text', text: 'ok' }] };
+            return respondRaw({ content: [{ type: 'text', text: 'ok' }] });
         },
     } as ToolEntry;
     return { tool, received };

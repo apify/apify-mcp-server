@@ -15,6 +15,7 @@ import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
 import type { HelperTool } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { respondRaw } from '../../src/utils/mcp.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -30,7 +31,7 @@ function makeTool(paymentRequired = true): HelperTool {
         paymentRequired,
         inputSchema: { type: 'object', properties: { actor: { type: 'string' } } },
         ajvValidate: vi.fn(() => true) as never,
-        call: vi.fn(async () => ({ content: [] })),
+        call: vi.fn(async () => respondRaw({ content: [] })),
     };
 }
 
