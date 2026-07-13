@@ -17,7 +17,7 @@ import { SERVER_MODE } from '../../types.js';
  * attempting to call widget tools that are not registered. The report-problem line is
  * emitted only when `reportProblemAvailable` is true — i.e. `report-problem` is actually
  * served — so clients that never receive the tool (Anthropic surfaces, telemetry off, or a
- * tool selection that excludes the `report-problem` category) are not told to call it.
+ * `tools=` selection that omits report-problem) are not told to call it.
  */
 export function getServerInstructions(mode: SERVER_MODE = SERVER_MODE.DEFAULT, reportProblemAvailable = false): string {
     const isApps = mode === SERVER_MODE.APPS;
