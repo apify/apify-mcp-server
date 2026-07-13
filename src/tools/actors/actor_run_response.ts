@@ -774,25 +774,20 @@ export function buildStartRunResponse(params: {
  * nextStep is replaced with a no-poll message and widget _meta is included so the UI renders
  * automatically. Used only by `*-widget` tools.
  */
-export function buildStartRunWidgetResponse(params: {
-    actorName: string;
-    actorRun: ActorRun;
-    linkContext?: ConsoleLinkContext;
-}): ToolResponse {
-    const { actorName, actorRun, linkContext } = params;
+export function buildStartRunWidgetResponse(params: { actorName: string; actorRun: ActorRun }): ToolResponse {
+    const { actorName, actorRun } = params;
 
     const { base, summary } = buildStartRunSharedContent(actorName, actorRun);
     const nextStep = WIDGET_NO_POLL_NEXT_STEP;
 
     const structuredContent: RunResponse = { ...base, nextStep };
-    const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
 
     const widgetMeta = {
         ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
         'openai/widgetDescription': `Actor run progress for ${actorName}`,
     };
 
-    return respondOk([JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinks}`], {
+    return respondOk([JSON.stringify(structuredContent), `${summary}\n${nextStep}`], {
         structuredContent,
         meta: widgetMeta,
     });
