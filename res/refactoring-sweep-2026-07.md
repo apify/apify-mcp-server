@@ -112,9 +112,10 @@ Likely heavy barrel imports (`tools/index.js`, server construction) pulled by mo
 
 Follow-up sweep focused on simplification, cross-verified against the internal repo
 checkout. Everything else it surfaced was already filed (#658 + #1061–#1063, #1064,
-#1065, #1070–#1078) or sits in the backlog above. New findings only.
+#1065, #1070–#1078) or sits in the backlog above. New findings only. The dead-code
+deletes are filed as **#1087**, the internals.js first slice as **#1088**.
 
-### Dead code — safe deletes (S)
+### Dead code — safe deletes (S) — filed as #1087
 
 - **Prompts subsystem**: `prompts/index.ts` is a literally empty array; the `PromptBase`
   type, the `prompts: {}` capability, and `setupPromptHandlers` (~40 lines in
@@ -144,7 +145,8 @@ checkout. Everything else it surfaced was already filed (#658 + #1061–#1063, #
 
 ### Status updates on the backlog above
 
-- **`internals.js` narrowing is unblocked for a first slice.** 12 re-exports have zero
+- **`internals.js` narrowing is unblocked for a first slice — filed as #1088**
+  (the upstream half of internal#648 step 1). 12 re-exports have zero
   references anywhere in internal: `APIFY_FAVICON_URL`, `HELPER_TOOLS`,
   `type HelperToolName`, `SERVER_NAME`, `SERVER_TITLE`, `addActor`,
   `toolCategoriesEnabledByDefault`, `type ServerCard`, `getActorsAsTools`,
