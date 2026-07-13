@@ -67,9 +67,9 @@ import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
 import { buildPermissionApprovalResponse, checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
+import { appendReportProblemNudge } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorsAsToolsResult } from '../tools/index.js';
-import { appendReportProblemNudge } from '../tools/report_problem/report_problem.js';
 import type {
     ActorsMcpServerOptions,
     ActorStore,

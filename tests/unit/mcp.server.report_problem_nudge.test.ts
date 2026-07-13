@@ -8,7 +8,7 @@ import {
     REPORT_PROBLEM_INVALID_INPUT_NUDGE,
     REPORT_PROBLEM_NUDGE,
     reportProblem,
-} from '../../src/tools/report_problem/report_problem.js';
+} from '../../src/tools/dev/report_problem.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';

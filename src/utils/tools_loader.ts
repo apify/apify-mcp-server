@@ -10,6 +10,7 @@ import log from '@apify/log';
 import { defaults, HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { addActor } from '../tools/actors/add_actor.js';
+import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
     CATEGORY_NAME_SET,
@@ -18,7 +19,6 @@ import {
     toolCategoriesEnabledByDefault,
     WIDGET_BY_BASE_TOOL,
 } from '../tools/registry.js';
-import { reportProblem } from '../tools/report_problem/report_problem.js';
 import { abortActorRun } from '../tools/runs/abort_actor_run.js';
 import { getActorRun } from '../tools/runs/get_actor_run.js';
 import { getDatasetItems } from '../tools/storage/get_dataset_items.js';

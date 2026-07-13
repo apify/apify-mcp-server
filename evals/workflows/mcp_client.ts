@@ -6,7 +6,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import { REPORT_PROBLEM_NUDGE } from '../../src/tools/report_problem/report_problem.js';
+import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
 import type { McpTool, McpToolCall, McpToolResult } from './types.js';
 
 export class McpClient {

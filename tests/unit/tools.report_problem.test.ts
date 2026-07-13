@@ -6,7 +6,7 @@ import {
     REPORT_PROBLEM_NUDGE,
     appendReportProblemNudge,
     reportProblem,
-} from '../../src/tools/report_problem/report_problem.js';
+} from '../../src/tools/dev/report_problem.js';
 import type { HelperTool } from '../../src/types.js';
 import { type TextToolResult, stubToolCallContext } from './helpers/tool_context.js';
 

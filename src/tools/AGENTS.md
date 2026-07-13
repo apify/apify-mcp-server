@@ -21,7 +21,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `docs/` — search and fetch Apify docs.
-  - `report_problem/` — the `report-problem` tool for reporting a problem with a tool or Actor.
+  - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
 
 ## Rules when editing here
