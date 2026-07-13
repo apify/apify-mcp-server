@@ -796,7 +796,7 @@ export async function fetchActorRunData(params: {
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
-}): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
+}): Promise<{ error: ToolResponse } | { aborted: true } | { result: FetchActorRunResult }> {
     const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
 
     const waitResult = await waitForRunWithProgress({

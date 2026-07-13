@@ -18,6 +18,7 @@ import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { PaymentProvider } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/registry.js';
+import type { ToolResponse } from './utils/mcp.js';
 import type { PricingTier, StructuredPricingInfo } from './utils/pricing_info.js';
 import type { ProgressTracker } from './utils/progress.js';
 
@@ -184,7 +185,7 @@ export type HelperTool = ToolBase & {
      * @param toolArgs - Arguments and server references
      * @returns Promise resolving to the tool's output
      */
-    call: (toolArgs: InternalToolArgs) => Promise<object>;
+    call: (toolArgs: InternalToolArgs) => Promise<ToolResponse>;
 };
 
 /**

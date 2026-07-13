@@ -19,6 +19,7 @@ import type {
     InitializeResult,
     Notification,
     Request,
+    Task,
     TaskStatusNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
@@ -718,6 +719,19 @@ export class ActorsMcpServer {
     }
 
     /**
+     * Fetches a task by ID, softFail-logging and throwing a client-facing McpError if it doesn't exist.
+     */
+    private async getTaskOrThrow(taskId: string, mcpSessionId: string | undefined, logTag: string): Promise<Task> {
+        const task = await this.taskStore.getTask(taskId, mcpSessionId);
+        if (!task) {
+            // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
+            log.softFail(`[${logTag}] Task not found`, { taskId, mcpSessionId, statusCode: 404 });
+            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
+        }
+        return task;
+    }
+
+    /**
      * Sets up MCP request handlers for long-running tasks.
      */
     private setupTaskHandlers(): void {
@@ -739,12 +753,7 @@ export class ActorsMcpServer {
             const { taskId } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (task) return task;
-
-            // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-            log.softFail('[GetTaskRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
+            return await this.getTaskOrThrow(taskId, mcpSessionId, 'GetTaskRequestSchema');
         });
 
         // Get task result payload
@@ -754,12 +763,7 @@ export class ActorsMcpServer {
             const { taskId } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[GetTaskPayloadRequestSchema] Getting task result', { taskId, mcpSessionId });
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (!task) {
-                // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-                log.softFail('[GetTaskPayloadRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-                throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
-            }
+            const task = await this.getTaskOrThrow(taskId, mcpSessionId, 'GetTaskPayloadRequestSchema');
             if (task.status !== 'completed' && task.status !== 'failed') {
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -785,12 +789,7 @@ export class ActorsMcpServer {
             const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[CancelTaskRequestSchema] Cancelling task', { taskId, mcpSessionId });
 
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (!task) {
-                // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-                log.softFail('[CancelTaskRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-                throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
-            }
+            const task = await this.getTaskOrThrow(taskId, mcpSessionId, 'CancelTaskRequestSchema');
             if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
                 // Client error (cancel on terminal task) — softFail to avoid polluting error logs.
                 log.softFail('[CancelTaskRequestSchema] Task already in terminal state', {

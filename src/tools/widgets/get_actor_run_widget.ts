@@ -7,6 +7,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
+import { respondAborted } from '../../utils/mcp.js';
 import { fetchActorRunData } from '../actors/actor_run_response.js';
 import { buildGetActorRunError, buildGetActorRunSuccessResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
@@ -68,7 +69,7 @@ export const getActorRunWidget: ToolEntry = Object.freeze({
 
             // Widget always passes waitSecs=0 with no abort signal, so 'aborted' is unreachable
             // here — the discriminator just keeps the type-checker happy.
-            if ('aborted' in fetchResult) return {};
+            if ('aborted' in fetchResult) return respondAborted();
             if ('error' in fetchResult) return fetchResult.error;
 
             return buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: true });

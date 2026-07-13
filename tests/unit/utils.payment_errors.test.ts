@@ -35,7 +35,7 @@ describe('buildPaymentRequiredResponse()', () => {
 
         expect(result.isError).toBe(true);
         expect(result.structuredContent).toEqual(SAMPLE_PAYMENT_REQUIRED);
-        expect(result.content[0]).toEqual({
+        expect((result.content ?? [])[0]).toEqual({
             type: 'text',
             text: JSON.stringify(SAMPLE_PAYMENT_REQUIRED),
         });
@@ -45,7 +45,7 @@ describe('buildPaymentRequiredResponse()', () => {
         const result = buildPaymentRequiredResponse(new Error('Payment required'), SAMPLE_PAYMENT_REQUIRED);
 
         expect(result.content).toHaveLength(2);
-        expect(result.content[1]).toEqual({
+        expect((result.content ?? [])[1]).toEqual({
             type: 'text',
             text: 'Payment required to run this Actor or access this resource.',
         });

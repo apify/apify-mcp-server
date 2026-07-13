@@ -7,7 +7,6 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
-    decodeFencedToolText,
     expectSoftFailInvalidInput,
     expectSchemaConformingStructuredContent,
     mockUserInfo,
@@ -64,9 +63,9 @@ describe('get-key-value-store-keys', () => {
         expect(structuredContent.nextStep).toBe(
             `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=kv-1 and recordKey=INPUT to read a value.`,
         );
-        // content[0] ships the TOON-fenced data; content[1] carries the prose summary + nextStep.
+        // content[0] ships the JSON data; content[1] carries the prose summary + nextStep.
         const { summary, nextStep, ...data } = structuredContent;
-        expect(decodeFencedToolText(content[0].text)).toEqual(data);
+        expect(JSON.parse(content[0].text)).toEqual(data);
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
@@ -182,7 +181,7 @@ describe('get-key-value-store-keys', () => {
         });
         const { content } = result as TextToolResult;
 
-        // content: [0] fenced data, [1] summary/nextStep, [2] Apify Console link.
+        // content: [0] plain JSON, [1] summary/nextStep, [2] Apify Console link.
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import type {
     BlobResourceContents,
     ListResourcesResult,
@@ -116,8 +118,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
 
             try {
                 log.debug('Reading widget file', { uri, jsPath: widget.jsPath });
-                const fs = await import('node:fs');
-                const widgetJs = fs.readFileSync(widget.jsPath, 'utf-8');
+                const widgetJs = readFileSync(widget.jsPath, 'utf-8');
 
                 const widgetHtml = `<!DOCTYPE html>
 <html lang="en">

@@ -1,4 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 import type { ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
@@ -30,7 +31,14 @@ import {
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { logHttpError } from '../../utils/logging.js';
-import { respondErrorNoTelemetry, respondServerError, respondUserError, type ToolResponse } from '../../utils/mcp.js';
+import {
+    respondAborted,
+    respondErrorNoTelemetry,
+    respondRaw,
+    respondServerError,
+    respondUserError,
+    type ToolResponse,
+} from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
@@ -328,7 +336,7 @@ export async function handleMcpToolCall(params: {
     mcpServerUrl: string | false;
     apifyToken: string;
     mcpSessionId?: string;
-}): Promise<object | null> {
+}): Promise<ToolResponse | null> {
     const { baseActorName, mcpToolName, input, isActorMcpServer, mcpServerUrl, apifyToken, mcpSessionId } = params;
 
     if (!isActorMcpServer) {
@@ -359,8 +367,8 @@ export async function handleMcpToolCall(params: {
         // the remote tool's payload still flows through `content`. Also forward `isError` so a
         // failing remote tool surfaces as a failure here.
         const isErrorFromRemote = result.isError === true;
-        return {
-            content: result.content,
+        return respondRaw({
+            content: result.content as ContentBlock[],
             isError: isErrorFromRemote,
             structuredContent: {
                 runId: 'mcp-passthrough',
@@ -371,7 +379,7 @@ export async function handleMcpToolCall(params: {
                 summary: `Called MCP tool '${mcpToolName}' on '${baseActorName}'.`,
                 nextStep: 'Response content carries the remote MCP tool result; no Apify run was started.',
             },
-        };
+        });
     } catch (error) {
         logHttpError(error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {
             actorName: baseActorName,
@@ -393,7 +401,7 @@ export async function resolveAndValidateActor(params: {
     actorName: string;
     input: Record<string, unknown>;
     toolArgs: InternalToolArgs;
-}): Promise<{ error: object } | { actor: ToolEntry }> {
+}): Promise<{ error: ToolResponse } | { actor: ToolEntry }> {
     const { actorName, input, toolArgs } = params;
     const { apifyClient } = toolArgs;
 
@@ -493,7 +501,7 @@ export async function callActorPreExecute(
     toolArgs: InternalToolArgs,
     options: { route: string },
 ): Promise<
-    | { earlyResponse: object }
+    | { earlyResponse: ToolResponse }
     | {
           parsed: CallActorParsedArgs;
           baseActorName: string;
@@ -546,7 +554,7 @@ export async function callActorPreExecute(
  * Shared start-then-wait flow for call-actor variants (default + apps).
  * `taskMode` is honored — when true, `waitSecs` is ignored and the SDK waits until terminal.
  */
-export async function executeCallActor(toolArgs: InternalToolArgs): Promise<object> {
+export async function executeCallActor(toolArgs: InternalToolArgs): Promise<ToolResponse> {
     const preResult = await callActorPreExecute(toolArgs, { route: HELPER_TOOLS.ACTOR_CALL });
     if ('earlyResponse' in preResult) {
         return preResult.earlyResponse;
@@ -573,7 +581,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
         const { apifyClient } = toolArgs;
         const abortSignal = toolArgs.extra.signal;
 
-        if (abortSignal?.aborted) return {};
+        if (abortSignal?.aborted) return respondAborted();
 
         const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
         log.debug('Started Actor run', {
@@ -586,7 +594,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
         // Abort can arrive while start() was in flight — abort the newly created run.
         if (abortSignal?.aborted) {
             await abortRunOnSignal(actorRun.id, apifyClient);
-            return {};
+            return respondAborted();
         }
 
         const linkContext = await getConsoleLinkContext(toolArgs.apifyToken, apifyClient);
@@ -608,7 +616,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             onAbort: abortRunOnSignal,
         });
 
-        if ('aborted' in fetchResult) return {};
+        if ('aborted' in fetchResult) return respondAborted();
         if ('error' in fetchResult) return fetchResult.error;
 
         return {

@@ -5,7 +5,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { encodeToon } from '../../utils/encode_text.js';
+import { respondRaw } from '../../utils/mcp.js';
 import { actorRunListOutputSchema } from '../structured_output_schemas.js';
 
 const getUserRunsListArgs = z.object({
@@ -64,6 +64,9 @@ USAGE EXAMPLES:
         const runs = await client
             .runs()
             .list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
-        return { content: [{ type: 'text', text: encodeToon(runs) }], structuredContent: runs };
+        return respondRaw({
+            content: [{ type: 'text', text: JSON.stringify(runs) }],
+            structuredContent: runs as unknown as Record<string, unknown>,
+        });
     },
 } as const);

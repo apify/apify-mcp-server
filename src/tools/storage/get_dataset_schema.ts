@@ -1,16 +1,15 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
-import { getHttpStatusCode } from '../../utils/logging.js';
 import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { datasetSchemaOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageResponse } from './storage_helpers.js';
+import { buildStorageResponse, catchNotFound } from './storage_helpers.js';
 
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -55,17 +54,9 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         const parsed = getDatasetSchemaArgs.parse(args);
         const datasetId = stripQuoteWrappers(parsed.datasetId);
 
-        // `listItems()` throws ApifyApiError on a missing dataset (the SDK only soft-catches
-        // 404 on `.get()` / `.getStatistics()`), so translate 404 into a soft-fail.
-        const datasetResponse = await client
-            .dataset(datasetId)
-            .listItems({ clean: parsed.clean, limit: parsed.limit })
-            .catch((err: unknown) => {
-                if (getHttpStatusCode(err) === HTTP_NOT_FOUND) {
-                    return null;
-                }
-                throw err;
-            });
+        const datasetResponse = await catchNotFound(
+            client.dataset(datasetId).listItems({ clean: parsed.clean, limit: parsed.limit }),
+        );
 
         if (!datasetResponse) {
             return respondUserError(`Dataset '${datasetId}' not found.`);

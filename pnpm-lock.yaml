@@ -232,9 +232,6 @@ importers:
       '@sentry/node':
         specifier: ^10.38.0
         version: 10.53.1
-      '@toon-format/toon':
-        specifier: 2.3.0
-        version: 2.3.0
       ajv:
         specifier: ^8.17.1
         version: 8.20.0
@@ -256,9 +253,6 @@ importers:
       express:
         specifier: ^4.21.2
         version: 4.22.2
-      mcp-client-capabilities:
-        specifier: ^0.0.14
-        version: 0.0.14
       yargs:
         specifier: ^17.7.2
         version: 17.7.2
@@ -2231,9 +2225,6 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@toon-format/toon@2.3.0':
-    resolution: {integrity: sha512-/Ew9etdRQKVMnm9fDaCG0JjyAOK/O7T0M97oum1aW4W+UR8ZhVVPBanIV7oWgHBiGlnVxV9M55PWQCHofDV07w==}
-
   '@tootallnate/quickjs-emscripten@0.23.0':
     resolution: {integrity: sha512-C5Mc6rdnsaJDjO3UpGW/CQTHtCKaYlScZTly4JIu97Jxo/odCiH0ITnDXSJPTOrEKk/ycSZ0AOgTmkDtkOsvIA==}
 
@@ -3305,9 +3296,6 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
-
-  mcp-client-capabilities@0.0.14:
-    resolution: {integrity: sha512-HPNxasWHzqQmTevk4P7n+La1MtbcFjnr7MbIeBeVvdb08fCWeOtyDOyhhuEStMRj8mHoMt/senEhOj3l+WMyTw==}
 
   mdast-util-find-and-replace@3.0.2:
     resolution: {integrity: sha512-Tmd1Vg/m3Xz43afeNxDIhWRtFZgM2VLyaf4vSTYwudTyeuTneoL3qtWMA5jeLyz/O1vDJmmV4QuScFCA2tBPwg==}
@@ -6118,8 +6106,6 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@toon-format/toon@2.3.0': {}
-
   '@tootallnate/quickjs-emscripten@0.23.0': {}
 
   '@types/body-parser@1.19.6':
@@ -7307,8 +7293,6 @@ snapshots:
   markdown-table@3.0.4: {}
 
   math-intrinsics@1.1.0: {}
-
-  mcp-client-capabilities@0.0.14: {}
 
   mdast-util-find-and-replace@3.0.2:
     dependencies:

@@ -8,7 +8,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
-import { respondUserError } from '../../utils/mcp.js';
+import { respondRaw, respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
 import {
     buildConsoleLinkContent,
@@ -100,7 +100,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             if (disposition.kind === 'linkOut') {
                 // base64-inlining a large binary would blow up the context window; return a link instead.
                 const uri = await store.getRecordPublicUrl(recordKey);
-                return {
+                return respondRaw({
                     structuredContent,
                     content: [
                         {
@@ -112,25 +112,25 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                         } satisfies ResourceLink,
                         ...consoleLinkContent,
                     ],
-                };
+                });
             }
             const data = disposition.base64;
             if (mimeType?.startsWith('image/')) {
-                return {
+                return respondRaw({
                     structuredContent,
                     content: [{ type: 'image', data, mimeType } satisfies ImageContent, ...consoleLinkContent],
-                };
+                });
             }
             if (mimeType?.startsWith('audio/')) {
-                return {
+                return respondRaw({
                     structuredContent,
                     content: [{ type: 'audio', data, mimeType } satisfies AudioContent, ...consoleLinkContent],
-                };
+                });
             }
             // The blob is inlined, so the uri is just an identifier — build it from the store's API
             // URL instead of getRecordPublicUrl, which fetches store metadata to sign a link nobody follows.
             const uri = `${store.url}/records/${recordKey}`;
-            return {
+            return respondRaw({
                 structuredContent,
                 content: [
                     {
@@ -139,7 +139,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                     } satisfies EmbeddedResource,
                     ...consoleLinkContent,
                 ],
-            };
+            });
         }
         // Text/JSON values serialize cleanly — return them as structuredContent per the storage-tool contract.
         // apify-client maps an empty record body to `undefined`, which drops the schema-required `value` on
