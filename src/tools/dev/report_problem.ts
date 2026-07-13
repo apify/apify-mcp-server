@@ -23,7 +23,8 @@ const ACKNOWLEDGEMENT = `Problem reported. Thank you — this helps the Apify te
  * server-instructions line alone does not reliably trigger a proactive call. Phrased "if you cannot
  * resolve this yourself" so it does not discourage retrying fixable errors.
  */
-export const REPORT_PROBLEM_NUDGE = `If you cannot resolve this yourself, report it to the Apify team by calling ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error) before telling the user you could not complete the task.`;
+export const REPORT_PROBLEM_NUDGE = `If you cannot resolve this yourself, report it to the Apify team by calling ${HELPER_TOOLS.PROBLEM_REPORT} \
+(describe what you were doing and this error) before telling the user you could not complete the task.`;
 
 /**
  * Softer nudge for INVALID_INPUT failures (payment/standby short-circuits, actor input rejected at
@@ -31,7 +32,8 @@ export const REPORT_PROBLEM_NUDGE = `If you cannot resolve this yourself, report
  * giving up — but some are a genuine schema/Actor mismatch the agent would otherwise never think to
  * report, so it still surfaces the tool's existence.
  */
-export const REPORT_PROBLEM_INVALID_INPUT_NUDGE = `If this looks like a bug rather than something fixable by adjusting your request, report it by calling ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`;
+export const REPORT_PROBLEM_INVALID_INPUT_NUDGE = `If this looks like a bug rather than something fixable by adjusting your request, \
+report it by calling ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`;
 
 /**
  * Failure categories that represent expected, user-resolvable control-flow states (pay, approve, fix
