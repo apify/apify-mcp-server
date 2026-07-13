@@ -140,6 +140,34 @@ export function buildSearchActorsResult(
 }
 
 /**
+ * Builds the empty-results guidance message for when no Actors are found.
+ * Interpolates the search keywords into the message.
+ */
+export function buildNoActorsFoundInstructions(keywords: string): string {
+    return dedent`
+        No Actors were found for the search query "${keywords}".
+        You MUST retry with broader, more generic keywords - use just the platform name
+        (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
+    `;
+}
+
+/**
+ * Builds the footer/instructions guidance for successful search results.
+ * Includes guidance on using ACTOR_GET_DETAILS and performing a second broader search.
+ * Interpolates the verbatim links nudge if applicable.
+ */
+export function buildSearchActorsFooter(verbatimLinksNudge: string): string {
+    return dedent`
+        If you need more detailed information about any of these Actors, including their input
+        schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
+        specific Actor name.
+        IMPORTANT: You MUST always do a second search with broader, more generic keywords
+        (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
+        you haven't missed a better Actor.${verbatimLinksNudge}
+    `;
+}
+
+/**
  * Default mode search-actors tool.
  * Returns text-based Actor cards without widget metadata.
  */
@@ -162,11 +190,7 @@ export const searchActors: ToolEntry = Object.freeze({
         ]);
 
         if (actors.length === 0) {
-            const instructions = dedent`
-                No Actors were found for the search query "${parsed.keywords}".
-                You MUST retry with broader, more generic keywords - use just the platform name
-                (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
-            `;
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords);
             return respondOk(instructions, {
                 structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
             });
@@ -181,14 +205,7 @@ export const searchActors: ToolEntry = Object.freeze({
             query: parsed.keywords,
             count: actors.length,
             userTier: userPlanTier,
-            instructions: dedent`
-                If you need more detailed information about any of these Actors, including their
-                input schemas and usage instructions, please use the ${HELPER_TOOLS.ACTOR_GET_DETAILS}
-                tool with the specific Actor name.
-                IMPORTANT: You MUST always do a second search with broader, more generic keywords
-                (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
-                you haven't missed a better Actor.${verbatimLinksNudge}
-            `,
+            instructions: buildSearchActorsFooter(verbatimLinksNudge),
         };
 
         // Build header and footer with separate `dedent` calls and concatenate around
@@ -202,14 +219,7 @@ export const searchActors: ToolEntry = Object.freeze({
 
             # Actors:
         `;
-        const footer = dedent`
-            If you need more detailed information about any of these Actors, including their input
-            schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
-            specific Actor name.
-            IMPORTANT: You MUST always do a second search with broader, more generic keywords
-            (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
-            you haven't missed a better Actor.${verbatimLinksNudge}
-        `;
+        const footer = buildSearchActorsFooter(verbatimLinksNudge);
         return respondOk(`${header}\n\n${actorCardText}\n\n${footer}`, { structuredContent });
     },
 } as const);
