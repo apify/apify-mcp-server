@@ -243,7 +243,7 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 Legend for the **Enabled by default** column:
 - ✅ — in the default tool set.
 - ⚡ — auto-injected when `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present (which is true in the default configuration).
-- ✅¹ — served by default, but only when telemetry is enabled and the client is not an Anthropic surface (Claude.ai / Claude Desktop / Claude Code). To disable, pass an explicit `tools=` list that omits it.
+- ✅¹ — served by default, but only when telemetry is enabled and the client is not withheld: Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code) or `local-agent-mode-apify`. To disable, pass an explicit `tools=` list that omits it.
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
