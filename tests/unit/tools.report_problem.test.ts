@@ -54,8 +54,24 @@ describe('reportProblem', () => {
             );
         });
 
+        it('accepts a related tool name at the 100-character cap', () => {
+            expect(validate({ message: 'stuck', relatedTools: ['t'.repeat(100)] })).toBe(true);
+        });
+
+        it('rejects a related tool name longer than 100 characters', () => {
+            expect(validate({ message: 'stuck', relatedTools: ['t'.repeat(101)] })).toBe(false);
+        });
+
         it('rejects an over-long actorId', () => {
             expect(validate({ message: 'stuck', actorId: 'a'.repeat(201) })).toBe(false);
+        });
+
+        it('accepts an actorRunId at the 200-character cap', () => {
+            expect(validate({ message: 'stuck', actorRunId: 'r'.repeat(200) })).toBe(true);
+        });
+
+        it('rejects an over-long actorRunId', () => {
+            expect(validate({ message: 'stuck', actorRunId: 'r'.repeat(201) })).toBe(false);
         });
 
         it('accepts the optional actor, run, and related-tools fields', () => {
