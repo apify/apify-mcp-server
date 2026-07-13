@@ -27,17 +27,15 @@ import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAbo
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
-// report-problem is served only when telemetry is enabled — its sole function is forwarding
-// submissions via telemetry (see isReportProblemServable in mcp/server.ts). This suite runs with telemetry
-// off (the helper default, so runs emit no Sentry/Segment data), so report-problem is absent from
-// the served default set here. Its served/hidden/acknowledge behavior is covered by the unit tests
+// report-problem is telemetry-gated and lives in the dev category, so getDefaultTools
+// (actors + docs) never contains it, and this telemetry-off suite would not be served it anyway.
+// Its served/hidden/acknowledge behavior is covered by the unit tests
 // (tests/unit/mcp.server.report_problem_gating.test.ts, tests/unit/tools.report_problem.test.ts).
-// These helpers give the default set as this suite actually sees it, with report-problem excluded.
 function servedDefaultTools(): ToolEntry[] {
-    return getDefaultTools('default').filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
+    return getDefaultTools('default');
 }
 function servedDefaultToolNames(): string[] {
-    return getDefaultToolNames().filter((name) => name !== HELPER_TOOLS.PROBLEM_REPORT);
+    return getDefaultToolNames();
 }
 
 // Helper to find tool by name, resolving categories for the given mode on each call.
