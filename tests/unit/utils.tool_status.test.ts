@@ -10,6 +10,7 @@ import {
     extractAjvErrorDetails,
     extractToolTelemetry,
     getToolStatusFromError,
+    stripToolTelemetry,
 } from '../../src/utils/tool_status.js';
 
 describe('getToolStatusFromError', () => {
@@ -209,6 +210,32 @@ describe('extractToolTelemetry', () => {
         const { toolStatus, callDiagnostics } = extractToolTelemetry({ content: 'ok' }, undefined, undefined);
         expect(toolStatus).toBe(TOOL_STATUS.SUCCEEDED);
         expect(callDiagnostics).toEqual({});
+    });
+});
+
+describe('stripToolTelemetry', () => {
+    it('removes the server-internal toolTelemetry field, preserving the rest of the response', () => {
+        const res = {
+            content: [{ type: 'text', text: 'boom' }],
+            isError: true,
+            toolTelemetry: { toolStatus: TOOL_STATUS.FAILED },
+        };
+
+        const stripped = stripToolTelemetry(res);
+
+        expect(stripped).not.toHaveProperty('toolTelemetry');
+        expect(stripped).toEqual({ content: [{ type: 'text', text: 'boom' }], isError: true });
+        // Strips in place, so the captured response and the returned one are the same object.
+        expect(stripped).toBe(res);
+    });
+
+    it('leaves a response without toolTelemetry untouched', () => {
+        expect(stripToolTelemetry({ content: 'ok', isError: false })).toEqual({ content: 'ok', isError: false });
+    });
+
+    it('passes through non-object responses', () => {
+        expect(stripToolTelemetry(undefined)).toBeUndefined();
+        expect(stripToolTelemetry(null)).toBeNull();
     });
 });
 

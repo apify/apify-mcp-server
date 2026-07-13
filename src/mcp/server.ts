@@ -101,6 +101,7 @@ import {
     extractAjvErrorDetails,
     extractToolTelemetry,
     getToolStatusFromError,
+    stripToolTelemetry,
 } from '../utils/tool_status.js';
 import {
     buildActorFields,
@@ -835,9 +836,15 @@ export class ActorsMcpServer {
             let resolvedToolName = name;
             // Captured by `captureResult` so the `finally` block can measure response size for telemetry.
             let toolResult: unknown = null;
+            // Single wire boundary: every tool-call response leaves the handler through here, so this
+            // is where the server-internal `toolTelemetry` field is guaranteed to be stripped. The
+            // tool-dispatch paths read it via `extractToolTelemetry()` (which also strips it), but the
+            // framework paths that bypass that helper — notably the outer `catch` — would otherwise
+            // pass it straight to the client, since `CallToolResultSchema` is a passthrough schema.
             const captureResult = <T>(r: T): T => {
-                toolResult = r;
-                return r;
+                const result = stripToolTelemetry(r);
+                toolResult = result;
+                return result;
             };
             const failInvalidParams = async (
                 message: string,
@@ -1310,14 +1317,13 @@ export class ActorsMcpServer {
                     validationMissingProperty: callDiagnostics.validation_missing_property,
                     validationAdditionalProperty: callDiagnostics.validation_additional_property,
                 });
-                // This framework outer-catch path bypasses extractToolTelemetry (returned via
-                // captureResult), so preserve the pre-existing wire shape { toolStatus } exactly:
-                // reuse the local ABORTED-aware toolStatus, do NOT re-derive from the error (which
-                // would drop ABORTED and leak failureCategory/failureHttpStatus onto the wire).
+                // The ABORTED-aware `toolStatus` computed above is already what the `finally` block
+                // reports to telemetry, so it does not need to ride along on the response. Attaching
+                // it here as `toolTelemetry` is what leaked it to the client (#1052): this path
+                // bypasses `extractToolTelemetry()`, the only other place the field is stripped.
                 return captureResult({
                     ...respondOk(getToolCallErrorUserText(name, error)),
                     isError: true,
-                    toolTelemetry: { toolStatus },
                 });
             } finally {
                 if (shouldTrackTelemetry) {
