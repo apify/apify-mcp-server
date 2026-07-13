@@ -186,6 +186,12 @@
   .divider { border: none; border-top: 1px solid var(--grid); margin: 24px 0; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .badge { display: inline-block; font-size: 12px; color: var(--accent-strong); background: var(--wash); border-radius: 99px; padding: 2px 9px; font-weight: 600; }
+  .badge.pr { color: var(--good); background: transparent; border: 1px solid var(--good); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border-radius: 99px; padding: 8px 14px; font-size: 14px; }
+  .chip[aria-pressed="true"] { background: var(--wash); border-color: var(--accent); color: var(--accent-strong); font-weight: 600; }
+  .cols2 { grid-template-columns: repeat(2, 1fr); }
 
   @media (prefers-reduced-motion: no-preference) {
     .card.tappable { transition: border-color 120ms ease; }
@@ -237,19 +243,6 @@
     return { top, volume, e1rm };
   }
 
-  function progressSeries(clientId, exName, metric) {
-    const key = exName.trim().toLowerCase();
-    const pts = [];
-    for (const w of workoutsOf(clientId)) {
-      for (const e of w.entries) {
-        if (e.name.trim().toLowerCase() !== key) continue;
-        const m = exerciseMetrics(e);
-        if (m) pts.push({ date: w.date, value: m[metric] });
-      }
-    }
-    return pts;
-  }
-
   function loggedExercises(clientId) {
     const seen = new Map();
     for (const w of workoutsOf(clientId)) {
@@ -259,6 +252,52 @@
       }
     }
     return [...seen.values()];
+  }
+
+  // all exercise names known for this client: from schemas + logged workouts
+  function knownExercises(clientId) {
+    const seen = new Map();
+    for (const s of schemasOf(clientId)) {
+      for (const e of s.exercises) {
+        const key = e.name.trim().toLowerCase();
+        if (key && !seen.has(key)) seen.set(key, e.name.trim());
+      }
+    }
+    for (const n of loggedExercises(clientId)) {
+      const key = n.toLowerCase();
+      if (!seen.has(key)) seen.set(key, n);
+    }
+    return [...seen.values()];
+  }
+
+  // most recent logged entry of an exercise, any workout
+  function lastEntryFor(clientId, name) {
+    const key = name.trim().toLowerCase();
+    const ws = workoutsOf(clientId);
+    for (let i = ws.length - 1; i >= 0; i--) {
+      const entry = ws[i].entries.find((e) => e.name.trim().toLowerCase() === key);
+      if (entry) return { entry, date: ws[i].date };
+    }
+    return null;
+  }
+
+  // all sessions of one exercise, chronological, with metrics and PR markers
+  function exerciseSessions(clientId, name) {
+    const key = name.trim().toLowerCase();
+    const sessions = [];
+    for (const w of workoutsOf(clientId)) {
+      for (const e of w.entries) {
+        if (e.name.trim().toLowerCase() !== key) continue;
+        const m = exerciseMetrics(e);
+        if (m) sessions.push({ date: w.date, sets: e.sets, ...m });
+      }
+    }
+    let best = -Infinity;
+    for (let i = 0; i < sessions.length; i++) {
+      sessions[i].isPr = i > 0 && sessions[i].top > best;
+      if (sessions[i].top > best) best = sessions[i].top;
+    }
+    return sessions;
   }
 
   // ---------- chart ----------
@@ -344,6 +383,60 @@
     svg.addEventListener('mouseleave', onLeave);
   }
 
+  function renderBarChart(container, points) {
+    const W = 600, H = 240, padL = 48, padR = 16, padT = 14, padB = 30;
+    const iw = W - padL - padR, ih = H - padT - padB;
+    const ticks = niceTicks(0, Math.max(...points.map((p) => p.value)), 4);
+    const yMax = ticks[ticks.length - 1];
+    const y = (v) => padT + ih - (v / (yMax || 1)) * ih;
+    const band = iw / points.length;
+    const bw = Math.max(2, Math.min(24, band - 2));
+    const bx = (i) => padL + i * band + (band - bw) / 2;
+    const fmtVal = (v) => Math.round(v).toLocaleString('nl-NL') + ' kg';
+
+    const grid = ticks.map((t) =>
+      `<line x1="${padL}" y1="${y(t)}" x2="${W - padR}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/>` +
+      `<text x="${padL - 8}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" style="font-variant-numeric:tabular-nums">${t.toLocaleString('nl-NL')}</text>`
+    ).join('');
+
+    // rounded top corners, square baseline
+    const bars = points.map((p, i) => {
+      const x0 = bx(i), yv = y(p.value), h = padT + ih - yv;
+      const r = Math.min(4, bw / 2, h);
+      return `<path d="M${x0.toFixed(1)},${padT + ih} L${x0.toFixed(1)},${(yv + r).toFixed(1)} Q${x0.toFixed(1)},${yv.toFixed(1)} ${(x0 + r).toFixed(1)},${yv.toFixed(1)} L${(x0 + bw - r).toFixed(1)},${yv.toFixed(1)} Q${(x0 + bw).toFixed(1)},${yv.toFixed(1)} ${(x0 + bw).toFixed(1)},${(yv + r).toFixed(1)} L${(x0 + bw).toFixed(1)},${padT + ih} Z" fill="var(--accent)"/>`;
+    }).join('');
+
+    const xLabels =
+      `<text x="${bx(0)}" y="${H - 8}" text-anchor="start" font-size="11" fill="var(--muted)">${esc(fmtDate(points[0].date))}</text>` +
+      (points.length > 1 ? `<text x="${bx(points.length - 1) + bw}" y="${H - 8}" text-anchor="end" font-size="11" fill="var(--muted)">${esc(fmtDate(points[points.length - 1].date))}</text>` : '');
+
+    container.innerHTML =
+      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Volume per training">` +
+      grid + bars +
+      `<line x1="${padL}" y1="${padT + ih}" x2="${W - padR}" y2="${padT + ih}" stroke="var(--baseline)" stroke-width="1"/>` +
+      xLabels +
+      `</svg><div class="tooltip"></div>`;
+
+    const svg = container.querySelector('svg');
+    const tip = container.querySelector('.tooltip');
+    const onMove = (ev) => {
+      const rect = svg.getBoundingClientRect();
+      const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      const px = ((cx - rect.left) / rect.width) * W;
+      let best = 0, bd = Infinity;
+      points.forEach((_, i) => { const d = Math.abs(bx(i) + bw / 2 - px); if (d < bd) { bd = d; best = i; } });
+      const p = points[best];
+      tip.style.display = 'block';
+      tip.style.left = ((bx(best) + bw / 2) / W * rect.width) + 'px';
+      tip.style.top = (y(p.value) / H * rect.height) + 'px';
+      tip.innerHTML = `${esc(fmtDate(p.date))}<br><span class="tv">${esc(fmtVal(p.value))}</span>`;
+    };
+    svg.addEventListener('mousemove', onMove);
+    svg.addEventListener('touchstart', onMove, { passive: true });
+    svg.addEventListener('touchmove', onMove, { passive: true });
+    svg.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  }
+
   // ---------- views ----------
   function render() {
     const hash = location.hash.slice(1) || '/';
@@ -351,6 +444,8 @@
     window.scrollTo(0, 0);
     if (parts[0] === 'klant' && parts[2] === 'schema') return viewSchema(parts[1], parts[3]);
     if (parts[0] === 'klant' && parts[2] === 'training') return viewWorkout(parts[1], parts[3]);
+    if (parts[0] === 'klant' && parts[2] === 'oefening') return viewExercise(parts[1], parts[3]);
+    if (parts[0] === 'klant' && parts[2] === 'vrij') return viewPickExercises(parts[1]);
     if (parts[0] === 'klant') return viewClient(parts[1]);
     return viewHome();
   }
@@ -415,47 +510,45 @@
   }
 
   // --- client detail ---
-  const uiState = { metric: 'top', exercise: {} };
+  const uiState = { metric: 'top' };
+  let pendingFree = []; // exercises picked for a free session, set by viewPickExercises
   function viewClient(id) {
     const c = clientById(id);
     if (!c) { location.hash = '/'; return; }
     const schemas = schemasOf(id);
     const workouts = workoutsOf(id);
     const exercises = loggedExercises(id);
-    const selEx = uiState.exercise[id] && exercises.includes(uiState.exercise[id]) ? uiState.exercise[id] : exercises[0];
 
     // stats
     const last = workouts[workouts.length - 1];
-    let statHtml = `<div class="stat-grid">
+    const statHtml = `<div class="stat-grid">
       <div class="stat"><div class="lbl">Trainingen</div><div class="val">${workouts.length}</div></div>
       <div class="stat"><div class="lbl">Laatste</div><div class="val">${last ? esc(fmtDate(last.date)) : '—'}</div></div>
-      ${progressStat(id, selEx)}
+      <div class="stat"><div class="lbl">Oefeningen</div><div class="val">${exercises.length}</div></div>
     </div>`;
 
-    const metricNames = { top: 'Zwaarste set', volume: 'Volume', e1rm: 'Geschat 1RM' };
+    const exerciseCards = exercises.map((name) => {
+      const sessions = exerciseSessions(id, name);
+      const lastSession = sessions[sessions.length - 1];
+      const pr = Math.max(...sessions.map((s) => s.top));
+      return `<div class="card tappable" data-nav="/klant/${id}/oefening/${encodeURIComponent(name)}" role="link" tabindex="0">
+        <div class="row"><div class="grow">
+          <div class="title">${esc(name)}</div>
+          <div class="sub">PR ${esc(fmtKg(pr))} · laatst gedaan ${esc(fmtDate(lastSession.date))}</div>
+        </div><span class="mut">›</span></div>
+      </div>`;
+    }).join('');
 
     $app.innerHTML = topbar(c.name, '/') +
       (c.goal ? `<p class="sub" style="margin:0 0 12px">Doel: ${esc(c.goal)}</p>` : '') +
       statHtml +
       `<div style="margin-top:16px" class="actions">` +
-      (schemas.length
-        ? schemas.map((s) => `<button class="primary" data-nav="/klant/${id}/training/${s.id}">Start: ${esc(s.name)}</button>`).join('')
-        : '') +
+      schemas.map((s) => `<button class="primary" data-nav="/klant/${id}/training/${s.id}">Start: ${esc(s.name)}</button>`).join('') +
+      `<button class="primary" data-nav="/klant/${id}/vrij">+ Vrije training</button>` +
       `</div>` +
 
-      `<div class="eyebrow">Progressie</div>` +
-      (exercises.length ? `
-        <div class="card">
-          <label class="field"><span>Oefening</span>
-            <select id="ex-select">${exercises.map((e) => `<option ${e === selEx ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select>
-          </label>
-          <div class="seg" role="group" aria-label="Meetwaarde">
-            ${['top', 'volume', 'e1rm'].map((m) => `<button data-metric="${m}" aria-pressed="${uiState.metric === m}">${metricNames[m]}</button>`).join('')}
-          </div>
-          <div class="chart-wrap" id="chart" style="margin-top:12px"></div>
-          <p class="mut" id="chart-note" style="margin:6px 0 0"></p>
-        </div>`
-        : `<div class="empty"><p>Nog geen trainingen gelogd. Start een training om progressie te zien.</p></div>`) +
+      `<div class="eyebrow">Progressie per oefening</div>` +
+      (exerciseCards || `<div class="empty"><p>Nog geen trainingen gelogd. Start een training om progressie te zien.</p></div>`) +
 
       `<div class="eyebrow">Schema's</div>` +
       schemas.map((s) => `<div class="card tappable" data-nav="/klant/${id}/schema/${s.id}" role="link" tabindex="0">
@@ -476,7 +569,7 @@
         return `<div class="card">
           <div class="row">
             <div class="grow">
-              <div class="title">${esc(fmtDateFull(w.date))} ${schema ? `<span class="badge">${esc(schema.name)}</span>` : ''}</div>
+              <div class="title">${esc(fmtDateFull(w.date))} <span class="badge">${schema ? esc(schema.name) : 'Vrije training'}</span></div>
               <div class="sub">${summary}</div>
               ${w.notes ? `<div class="mut">${esc(w.notes)}</div>` : ''}
             </div>
@@ -489,26 +582,6 @@
        <button class="danger ghost" id="del-client">Klant verwijderen</button>`;
 
     bindNav();
-
-    if (exercises.length) {
-      const draw = () => {
-        const pts = progressSeries(id, document.getElementById('ex-select').value, uiState.metric);
-        const note = document.getElementById('chart-note');
-        if (pts.length) {
-          renderChart(document.getElementById('chart'), pts, uiState.metric === 'volume' ? 'vol' : 'kg');
-          note.textContent = uiState.metric === 'e1rm'
-            ? 'Geschat 1RM via de Epley-formule op basis van de beste set.'
-            : uiState.metric === 'volume' ? 'Volume = som van gewicht × herhalingen per training.' : 'Zwaarste set per training.';
-        }
-      };
-      document.getElementById('ex-select').addEventListener('change', (ev) => {
-        uiState.exercise[id] = ev.target.value; render();
-      });
-      document.querySelectorAll('[data-metric]').forEach((b) => b.addEventListener('click', () => {
-        uiState.metric = b.dataset.metric; render();
-      }));
-      draw();
-    }
 
     document.querySelectorAll('[data-del-workout]').forEach((b) => b.addEventListener('click', () => {
       if (!confirm('Deze training verwijderen?')) return;
@@ -524,14 +597,106 @@
     });
   }
 
-  function progressStat(clientId, exName) {
-    if (!exName) return `<div class="stat"><div class="lbl">Progressie</div><div class="val">—</div></div>`;
-    const pts = progressSeries(clientId, exName, 'top');
-    if (pts.length < 2) return `<div class="stat"><div class="lbl">${esc(exName)}</div><div class="val">${pts.length ? esc(fmtKg(pts[0].value)) : '—'}</div></div>`;
-    const d = pts[pts.length - 1].value - pts[0].value;
-    const cls = d > 0 ? 'up' : d < 0 ? 'down' : '';
-    const sign = d > 0 ? '+' : '';
-    return `<div class="stat"><div class="lbl">${esc(exName)}</div><div class="val">${esc(fmtKg(pts[pts.length - 1].value))}</div><div class="delta ${cls}">${sign}${esc(fmtKg(d))} totaal</div></div>`;
+  // --- exercise progress page ---
+  function viewExercise(clientId, encName) {
+    const c = clientById(clientId);
+    if (!c) { location.hash = '/'; return; }
+    const wanted = decodeURIComponent(encName).toLowerCase();
+    const name = loggedExercises(clientId).find((n) => n.toLowerCase() === wanted);
+    if (!name) { location.hash = `/klant/${clientId}`; return; }
+    const sessions = exerciseSessions(clientId, name);
+    const first = sessions[0], last = sessions[sessions.length - 1];
+
+    const prTop = Math.max(...sessions.map((s) => s.top));
+    const prDate = sessions.find((s) => s.top === prTop).date;
+    const pr1rm = Math.max(...sessions.map((s) => s.e1rm));
+    const delta = last.top - first.top;
+    const deltaCls = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
+    const deltaSign = delta > 0 ? '+' : '';
+    const deltaPct = first.top > 0 ? ` (${deltaSign}${Math.round((delta / first.top) * 100)}%)` : '';
+
+    if (uiState.metric !== 'top' && uiState.metric !== 'e1rm') uiState.metric = 'top';
+    const metricNames = { top: 'Zwaarste set', e1rm: 'Geschat 1RM' };
+
+    $app.innerHTML = topbar(name, `/klant/${clientId}`) +
+      `<div class="stat-grid cols2">
+        <div class="stat"><div class="lbl">PR · zwaarste set</div><div class="val">${esc(fmtKg(prTop))}</div><div class="mut">op ${esc(fmtDateFull(prDate))}</div></div>
+        <div class="stat"><div class="lbl">PR · geschat 1RM</div><div class="val">${esc(fmtKg(pr1rm))}</div><div class="mut">Epley-formule</div></div>
+        <div class="stat"><div class="lbl">Laatst gedaan</div><div class="val">${esc(fmtDate(last.date))}</div><div class="mut">${sessions.length} sessie${sessions.length === 1 ? '' : 's'} sinds ${esc(fmtDate(first.date))}</div></div>
+        <div class="stat"><div class="lbl">Totale progressie</div><div class="val">${deltaSign}${esc(fmtKg(delta))}</div><div class="delta ${deltaCls}">${esc(fmtKg(first.top))} → ${esc(fmtKg(last.top))}${deltaPct}</div></div>
+      </div>` +
+
+      `<div class="eyebrow">Gewicht per training</div>
+      <div class="card">
+        <div class="seg" role="group" aria-label="Meetwaarde">
+          ${['top', 'e1rm'].map((m) => `<button data-metric="${m}" aria-pressed="${uiState.metric === m}">${metricNames[m]}</button>`).join('')}
+        </div>
+        <div class="chart-wrap" id="line-chart" style="margin-top:12px"></div>
+        <p class="mut" style="margin:6px 0 0">${uiState.metric === 'e1rm' ? 'Geschat 1RM via de Epley-formule op basis van de beste set.' : 'Zwaarste set per training.'}</p>
+      </div>` +
+
+      `<div class="eyebrow">Volume per training</div>
+      <div class="card">
+        <div class="chart-wrap" id="bar-chart"></div>
+        <p class="mut" style="margin:6px 0 0">Volume = som van gewicht × herhalingen per training.</p>
+      </div>` +
+
+      `<div class="eyebrow">Alle sessies</div>` +
+      [...sessions].reverse().map((s) => `<div class="card">
+        <div class="row"><div class="grow">
+          <div class="title">${esc(fmtDateFull(s.date))} ${s.isPr ? '<span class="badge pr">🏆 PR</span>' : ''}</div>
+          <div class="sub">${s.sets.map((st) => `${esc(fmtKg(st.weight))} × ${st.reps}`).join(' · ')}</div>
+        </div>
+        <div class="mut" style="font-variant-numeric:tabular-nums">${esc(fmtKg(s.top))}</div></div>
+      </div>`).join('');
+
+    bindNav();
+    renderChart(document.getElementById('line-chart'), sessions.map((s) => ({ date: s.date, value: s[uiState.metric] })), 'kg');
+    renderBarChart(document.getElementById('bar-chart'), sessions.map((s) => ({ date: s.date, value: s.volume })));
+    document.querySelectorAll('[data-metric]').forEach((b) => b.addEventListener('click', () => {
+      uiState.metric = b.dataset.metric; render();
+    }));
+  }
+
+  // --- free workout: pick exercises for this session ---
+  function viewPickExercises(clientId) {
+    const c = clientById(clientId);
+    if (!c) { location.hash = '/'; return; }
+    const known = knownExercises(clientId);
+    const selected = new Set(pendingFree.filter((n) => known.some((k) => k.toLowerCase() === n.toLowerCase())));
+
+    const paint = () => {
+      $app.innerHTML = topbar('Vrije training', `/klant/${clientId}`) +
+        `<p class="sub" style="margin:0 0 12px">Kies de oefeningen voor deze sessie — elke training kan anders zijn.</p>` +
+        (known.length ? `<div class="chips">${known.map((n) =>
+          `<button type="button" class="chip" data-ex-name="${esc(n)}" aria-pressed="${selected.has(n)}">${esc(n)}</button>`
+        ).join('')}</div>` : '') +
+        `<form class="card" id="new-ex" style="margin-top:16px">
+          <label class="field"><span>Nieuwe oefening</span><input name="name" placeholder="bijv. Lat pulldown"></label>
+          <button type="submit">+ Toevoegen en selecteren</button>
+        </form>
+        <button class="primary wide" id="start-free" ${selected.size ? '' : 'disabled'} style="margin-top:8px">Start training (${selected.size} oefening${selected.size === 1 ? '' : 'en'})</button>`;
+
+      bindNav();
+      document.querySelectorAll('[data-ex-name]').forEach((b) => b.addEventListener('click', () => {
+        const n = b.dataset.exName;
+        if (selected.has(n)) selected.delete(n); else selected.add(n);
+        paint();
+      }));
+      document.getElementById('new-ex').addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        const n = String(new FormData(ev.target).get('name')).trim();
+        if (!n) return;
+        if (!known.some((k) => k.toLowerCase() === n.toLowerCase())) known.push(n);
+        selected.add(known.find((k) => k.toLowerCase() === n.toLowerCase()));
+        paint();
+      });
+      document.getElementById('start-free').addEventListener('click', () => {
+        pendingFree = known.filter((n) => selected.has(n));
+        location.hash = `/klant/${clientId}/training/vrij`;
+      });
+    };
+    paint();
   }
 
   // --- schema editor ---
@@ -609,21 +774,26 @@
   // --- workout logging ---
   function viewWorkout(clientId, schemaId) {
     const c = clientById(clientId);
-    const schema = schemaById(schemaId);
-    if (!c || !schema) { location.hash = c ? `/klant/${clientId}` : '/'; return; }
+    const isFree = schemaId === 'vrij';
+    const schema = isFree ? null : schemaById(schemaId);
+    if (!c || (!isFree && !schema)) { location.hash = c ? `/klant/${clientId}` : '/'; return; }
+    if (isFree && !pendingFree.length) { location.hash = `/klant/${clientId}/vrij`; return; }
 
-    // prefill: last workout with this schema, else schema targets
-    const prev = [...workoutsOf(clientId)].reverse().find((w) => w.schemaId === schemaId);
-    const draft = schema.exercises.map((ex) => {
-      const prevEntry = prev && prev.entries.find((e) => e.name.trim().toLowerCase() === ex.name.trim().toLowerCase());
-      const sets = prevEntry
-        ? prevEntry.sets.map((s) => ({ reps: s.reps, weight: s.weight }))
+    // prefill: most recent logged sets of this exercise (any session), else schema targets
+    const prefill = (ex) => {
+      const prev = lastEntryFor(clientId, ex.name);
+      return prev
+        ? prev.entry.sets.map((s) => ({ reps: s.reps, weight: s.weight }))
         : Array.from({ length: ex.sets || 3 }, () => ({ reps: ex.reps || 10, weight: ex.weight || 0 }));
-      return { name: ex.name, sets };
-    });
+    };
+    const baseList = isFree ? pendingFree.map((n) => ({ name: n })) : schema.exercises;
+    const draft = baseList.map((ex) => ({ name: ex.name, sets: prefill(ex) }));
 
     const paint = () => {
+      const extraOptions = knownExercises(clientId)
+        .filter((n) => !draft.some((d) => d.name.toLowerCase() === n.toLowerCase()));
       $app.innerHTML = topbar(`Training — ${c.name}`, `/klant/${clientId}`) +
+        `<p style="margin:0 0 12px"><span class="badge">${schema ? esc(schema.name) : 'Vrije training'}</span></p>` +
         `<form id="wo-form">
           <label class="field"><span>Datum</span><input type="date" name="date" value="${todayIso()}" required></label>
           ${draft.map((ex, xi) => `<div class="card">
@@ -637,6 +807,12 @@
             </div>`).join('')}
             <button type="button" class="small" data-add-set="${xi}">+ Set</button>
           </div>`).join('')}
+          <div class="card">
+            <label class="field"><span>Oefening toevoegen aan deze sessie</span>
+              <input id="extra-ex" list="ex-list" placeholder="bijv. Lat pulldown"></label>
+            <datalist id="ex-list">${extraOptions.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+            <button type="button" class="small" id="add-extra">+ Oefening</button>
+          </div>
           <label class="field"><span>Notities (optioneel)</span><textarea name="notes" rows="2" placeholder="bijv. voelde sterk, knie licht gevoelig"></textarea></label>
           <button class="primary wide" type="submit">Training opslaan</button>
         </form>`;
@@ -665,6 +841,18 @@
         draft[xi].sets.splice(si, 1);
         paint();
       }));
+      document.getElementById('add-extra').addEventListener('click', () => {
+        const inp = document.getElementById('extra-ex');
+        const name = inp.value.trim();
+        if (!name || draft.some((d) => d.name.toLowerCase() === name.toLowerCase())) return;
+        syncDraft();
+        draft.push({ name, sets: prefill({ name }) });
+        const dateVal = document.querySelector('[name="date"]').value;
+        const notesVal = document.querySelector('[name="notes"]').value;
+        paint();
+        document.querySelector('[name="date"]').value = dateVal;
+        document.querySelector('[name="notes"]').value = notesVal;
+      });
       document.getElementById('wo-form').addEventListener('submit', (ev) => {
         ev.preventDefault();
         syncDraft();
@@ -674,12 +862,15 @@
           .filter((ex) => ex.sets.length);
         if (!entries.length) { alert('Vul minstens één set in.'); return; }
         db.workouts.push({
-          id: uid(), clientId, schemaId,
+          id: uid(), clientId,
+          schemaId: isFree ? null : schemaId,
           date: String(f.get('date')),
           notes: String(f.get('notes')).trim(),
           entries,
         });
-        save(); location.hash = `/klant/${clientId}`;
+        save();
+        if (isFree) pendingFree = [];
+        location.hash = `/klant/${clientId}`;
       });
     };
     paint();

@@ -1,4 +1,4 @@
-const CACHE = 'coachlog-v1';
+const CACHE = 'coachlog-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-512.png', './icon-180.png'];
 
 self.addEventListener('install', (event) => {
