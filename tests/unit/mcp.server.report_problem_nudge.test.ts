@@ -1,7 +1,6 @@
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { FAILURE_CATEGORY } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import {
@@ -74,20 +73,13 @@ const nudgeTexts = (r: Record<string, unknown>): string[] => (r.content as { tex
 describe('report-problem nudge on the direct ACTOR path', () => {
     afterEach(() => vi.clearAllMocks());
 
-    it('uses the softer nudge for an INVALID_INPUT actor error, not the full report nudge', async () => {
+    it('appends the softer INVALID_INPUT nudge and strips internal toolTelemetry on dispatch', async () => {
         const result = await dispatchActorCall(respondUserError("Run with ID 'x' not found."));
 
         const texts = nudgeTexts(result);
         expect(result.isError).toBe(true);
         expect(texts).toContain(REPORT_PROBLEM_INVALID_INPUT_NUDGE);
         expect(texts).not.toContain(REPORT_PROBLEM_NUDGE);
-    });
-
-    it('strips internal toolTelemetry from an actor error result before it reaches the client', async () => {
-        const result = await dispatchActorCall(
-            respondUserError('bad input', { category: FAILURE_CATEGORY.INVALID_INPUT }),
-        );
-
         expect(result.toolTelemetry).toBeUndefined();
     });
 });

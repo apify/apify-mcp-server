@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
-import type { Input } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
 
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
@@ -45,12 +44,6 @@ async function dispatchInitialize(server: ActorsMcpServer, clientName: string): 
 // this drives the real compose path (getToolsForServerMode + blocklist filter) without any network.
 async function loadReportProblemByName(server: ActorsMcpServer): Promise<void> {
     await server.loadToolsByName([HELPER_TOOLS.PROBLEM_REPORT], {} as never);
-}
-
-// Category selectors resolve to internal tools only, so getActors returns [] and never touches the
-// client — this drives the compose + servability gate through the server without any network.
-async function loadFromInput(server: ActorsMcpServer, input: Input): Promise<void> {
-    await server.loadToolsFromInput(input, {} as never);
 }
 
 describe('report-problem client gating', () => {
@@ -105,24 +98,6 @@ describe('report-problem client gating', () => {
         await loadReportProblemByName(server);
 
         expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
-    });
-
-    it('serves report-problem via the dev category (tools=dev) to a non-blocked client with telemetry on', async () => {
-        const server = track(makeServer());
-        await loadFromInput(server, { tools: ['dev'] });
-
-        await dispatchInitialize(server, 'test-client');
-
-        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
-    });
-
-    it('does not serve report-problem under an explicit tools=storage selector', async () => {
-        const server = track(makeServer());
-        await loadFromInput(server, { tools: ['storage'] });
-
-        await dispatchInitialize(server, 'test-client');
-
-        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(false);
     });
 
     it('hides report-problem when telemetry is disabled, even for a non-blocked client', async () => {

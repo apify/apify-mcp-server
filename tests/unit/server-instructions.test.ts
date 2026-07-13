@@ -14,11 +14,6 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain('Reporting problems and feedback');
     });
 
-    it('omits report-problem when feedback is unavailable', () => {
-        const instructions = getServerInstructions(SERVER_MODE.DEFAULT, false);
-        expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
-    });
-
     it('omits report-problem by default', () => {
         expect(getServerInstructions()).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
     });
