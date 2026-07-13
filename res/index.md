@@ -49,7 +49,8 @@ references against current source before relying on them.
 ### [refactoring-sweep-2026-07.md](./refactoring-sweep-2026-07.md)
 Full-codebase sweep results: defects and refactorings filed as #1064/#1065/#1066, plus the
 unfiled M/L backlog (types.ts split, payment seam, `internals.js` narrowing, test import
-time). Pull from the backlog instead of re-sweeping.
+time). The 2026-07-13 addendum adds internal-repo-verified dead-code deletes and unblocks
+the `internals.js` first slice. Pull from the backlog instead of re-sweeping.
 
 ### [web-widget-bundle-size.md](./web-widget-bundle-size.md)
 Keeping widget bundles small (narrow `@apify/ui-library/dist/src/...` imports, markdown stack
