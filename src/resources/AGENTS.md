@@ -54,10 +54,12 @@ no-token and bad-origin pre-flight guards throw `InvalidParams` directly. This a
 non-2xx responses (`validateStatus: null`) instead of throwing, so a non-2xx is caught on the resolved
 `status` and re-thrown; only network-level failures (and the `maxContentLength` abort) reach the `catch`.
 The size link-outs are the exception — they are **successful** reads returning a download pointer, not
-failures, so they still return a `text` block. The sibling `resource_service.ts` throws the same
-`InvalidParams` error from its generic "not found" fallback (a non-Apify URL never reaches
-`readApiResource`, so bad-origin is handled there in practice); its widget-not-found branches stay as
-content.
+failures, so they still return a `text` block. A 401/403 failure appends an actionable hint via
+`getHttpErrorHint()` (shared with the `tools/call` error path in `utils/mcp.ts`): 401 points at
+`APIFY_TOKEN`, 403 flags a private resource or insufficient access. The sibling `resource_service.ts`
+throws the same `InvalidParams` error from its generic "not found" fallback (a non-Apify URL never
+reaches `readApiResource`, so bad-origin is handled there in practice); its widget-not-found branches
+stay as content.
 
 Discovery is the server-instructions prose, not a fixed list: `resources/templates/list` returns
 nothing and `resources/list` serves only widgets + the usage guide. The read path is a generic

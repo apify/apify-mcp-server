@@ -2198,7 +2198,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 it('rejects resources/read of a non-Apify URL with a JSON-RPC error', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     await expect(client.readResource({ uri: 'https://example.com/steal-my-token' })).rejects.toThrow(
-                        /not found/i,
+                        /Failed to read/i,
                     );
                     await client.close();
                 });

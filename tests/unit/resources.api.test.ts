@@ -366,4 +366,40 @@ describe('readApiResource()', () => {
         expect(error.code).toBe(ErrorCode.InternalError);
         expect(error.message).toContain(`Failed to read ${uri}: HTTP 500: Internal Server Error`);
     });
+
+    it('appends the auth hint for a 401 response', async () => {
+        const uri = `${API}/v2/datasets/ds-1/items`;
+        const client = stubApifyClient({
+            request: async () => ({
+                data: { error: { message: 'Token invalid' } },
+                headers: {},
+                status: 401,
+                statusText: 'Unauthorized',
+            }),
+        });
+
+        const error = await expectReadError(readApiResource(uri, client));
+
+        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error.message).toContain('HTTP 401: Token invalid');
+        expect(error.message).toContain('check APIFY_TOKEN');
+    });
+
+    it('appends the private-resource hint for a 403 response', async () => {
+        const uri = `${API}/v2/datasets/ds-1/items`;
+        const client = stubApifyClient({
+            request: async () => ({
+                data: { error: { message: 'Forbidden' } },
+                headers: {},
+                status: 403,
+                statusText: 'Forbidden',
+            }),
+        });
+
+        const error = await expectReadError(readApiResource(uri, client));
+
+        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error.message).toContain('HTTP 403: Forbidden');
+        expect(error.message).toContain('may be private');
+    });
 });

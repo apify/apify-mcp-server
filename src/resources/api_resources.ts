@@ -11,6 +11,7 @@ import { getApifyAPIBaseUrl } from '../apify_client.js';
 import { MAX_DOWNLOAD_BYTES, MAX_INLINE_BYTES } from '../const.js';
 import { classifyBinaryRecordSize } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
+import { getHttpErrorHint } from '../utils/mcp.js';
 
 const JSON_MIME_TYPE = 'application/json';
 const TEXT_MIME_TYPE = 'text/plain';
@@ -115,12 +116,12 @@ function buildTextResult(uri: string, text: string, mimeType: string = TEXT_MIME
  */
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
     if (!apifyClient) {
-        throw new McpError(ErrorCode.InvalidParams, `Cannot read ${uri}: no Apify token in this session.`);
+        throw new McpError(ErrorCode.InvalidParams, `Failed to read ${uri}: no Apify token in this session.`);
     }
     if (!isApifyApiUri(uri)) {
         throw new McpError(
             ErrorCode.InvalidParams,
-            `Cannot read ${uri}: only Apify API URLs (${getApifyAPIBaseUrl()}) are readable as resources.`,
+            `Failed to read ${uri}: only Apify API URLs (${getApifyAPIBaseUrl()}) are readable as resources.`,
         );
     }
 
@@ -140,14 +141,15 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
             return buildTextResult(
                 uri,
                 `Response body exceeds the ${MAX_DOWNLOAD_BYTES}-byte download limit. Download it from ${downloadUrl} ` +
-                    `(may require your Apify API token), or for a dataset/list re-read the URL with a smaller limit/offset range.`,
+                    `(may require your Apify API token). For a dataset/list, re-read with a smaller limit/offset range.`,
             );
         }
         const status = getHttpStatusCode(err);
         const message = err instanceof Error ? err.message : String(err);
+        const hint = getHttpErrorHint(status);
         throw new McpError(
             statusToErrorCode(status),
-            `Failed to read ${uri}: ${status ? `HTTP ${status}: ` : ''}${message}`,
+            `Failed to read ${uri}: ${status ? `HTTP ${status}: ` : ''}${message}${hint ? `. ${hint}` : ''}`,
         );
     }
 
@@ -156,9 +158,10 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     if (response.status >= 300) {
         const body = response.data as { error?: { message?: unknown } } | undefined;
         const message = typeof body?.error?.message === 'string' ? body.error.message : response.statusText;
+        const hint = getHttpErrorHint(response.status);
         throw new McpError(
             statusToErrorCode(response.status),
-            `Failed to read ${uri}: HTTP ${response.status}: ${message}`,
+            `Failed to read ${uri}: HTTP ${response.status}: ${message}${hint ? `. ${hint}` : ''}`,
         );
     }
 
@@ -183,7 +186,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
             const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient);
             return buildTextResult(
                 uri,
-                `Content (${disposition.mimeType ?? 'binary'}, ${disposition.bytes} bytes) is too large to inline. ` +
+                `Response body (${disposition.mimeType ?? 'binary'}, ${disposition.bytes} bytes) is too large to inline. ` +
                     `Download it from ${downloadUrl} (may require your Apify API token).`,
             );
         }
@@ -231,7 +234,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         return buildTextResult(
             uri,
             `Response body (~${bytes} bytes) is too large to inline. Download it from ${downloadUrl} ` +
-                `(may require your Apify API token), or for a dataset/list re-read the URL with a smaller limit/offset range.`,
+                `(may require your Apify API token). For a dataset/list, re-read with a smaller limit/offset range.`,
         );
     }
     return buildTextResult(uri, text, mimeType);
