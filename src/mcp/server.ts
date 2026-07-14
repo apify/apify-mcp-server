@@ -169,6 +169,34 @@ export async function emitTaskStatusNotification(
 }
 
 /**
+ * Shared diagnostics for a pre-flight failure (standby-provider conflict or missing/invalid payment
+ * signature) — a call outcome already known before any Actor runs. Standby rejection wins over the
+ * generic payment-required failure so the agent gets the precise reason instead of a generic 402.
+ * Pure: callers own their own post-handling (return the result directly, or store + notify + synthesize
+ * a terminal task) — call this only once `standbyRejection ?? paymentRequiredResult` is already truthy.
+ */
+function buildPreflightFailureOutcome(
+    standbyRejection: Record<string, unknown> | null,
+    paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
+    actorName: string | undefined,
+    actorId: string | undefined,
+): {
+    toolStatus: ToolStatus;
+    callDiagnostics: CallDiagnostics;
+    result: Record<string, unknown> | ReturnType<typeof buildPaymentRequiredResponse>;
+} {
+    return {
+        toolStatus: TOOL_STATUS.SOFT_FAIL,
+        callDiagnostics: {
+            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            ...(standbyRejection ? {} : { failure_http_status: 402 }),
+            ...buildActorFields(actorName, actorId),
+        },
+        result: (standbyRejection ?? paymentRequiredResult)!,
+    };
+}
+
+/**
  * Create Apify MCP server
  */
 export class ActorsMcpServer {
@@ -1047,20 +1075,22 @@ export class ActorsMcpServer {
                     // properties plus the taskId on the log line.
                     const preflightResult = standbyRejection ?? paymentRequiredResult;
                     if (preflightResult) {
-                        toolStatus = TOOL_STATUS.SOFT_FAIL;
+                        const outcome = buildPreflightFailureOutcome(
+                            standbyRejection,
+                            paymentRequiredResult,
+                            actorName,
+                            actorId,
+                        );
+                        toolStatus = outcome.toolStatus;
+                        callDiagnostics = outcome.callDiagnostics;
                         preflightTaskId = task.taskId;
-                        callDiagnostics = {
-                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                            ...(standbyRejection ? {} : { failure_http_status: 402 }),
-                            ...buildActorFields(actorName, actorId),
-                        };
                         try {
                             await storeTaskResultOrSkipIfExpired(
                                 this.taskStore,
                                 tool.name,
                                 task.taskId,
                                 'completed',
-                                preflightResult,
+                                outcome.result,
                                 mcpSessionId,
                             );
                         } catch (error) {
@@ -1080,7 +1110,7 @@ export class ActorsMcpServer {
                         setImmediate(() => {
                             void emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
                         });
-                        captureResult(preflightResult);
+                        captureResult(outcome.result);
                         // createTask returned status `working`; synthesize the terminal status instead of
                         // re-fetching — if the task expired before the result store (the one case
                         // storeTaskResultOrSkipIfExpired tolerates), a re-fetch would come back empty and a
@@ -1117,23 +1147,28 @@ export class ActorsMcpServer {
                 // Sync path: standby rejection wins over the generic payment-required short-circuit
                 // so the agent gets the precise reason instead of a 402.
                 if (standbyRejection) {
-                    toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    callDiagnostics = {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        ...buildActorFields(actorName, actorId),
-                    };
-                    return captureResult(standbyRejection);
+                    const outcome = buildPreflightFailureOutcome(
+                        standbyRejection,
+                        paymentRequiredResult,
+                        actorName,
+                        actorId,
+                    );
+                    toolStatus = outcome.toolStatus;
+                    callDiagnostics = outcome.callDiagnostics;
+                    return captureResult(outcome.result);
                 }
 
                 // Check payment validation (already computed by prepareToolCallContext)
                 if (paymentRequiredResult) {
-                    toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    callDiagnostics = {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        failure_http_status: 402,
-                        ...buildActorFields(actorName, actorId),
-                    };
-                    return captureResult(paymentRequiredResult);
+                    const outcome = buildPreflightFailureOutcome(
+                        standbyRejection,
+                        paymentRequiredResult,
+                        actorName,
+                        actorId,
+                    );
+                    toolStatus = outcome.toolStatus;
+                    callDiagnostics = outcome.callDiagnostics;
+                    return captureResult(outcome.result);
                 }
 
                 // Handle internal tool
