@@ -11,22 +11,22 @@ import { buildStorageListSummaryNextStep, buildStorageResponse } from './storage
 const getUserDatasetsListArgs = z.object({
     offset: z
         .number()
-        .describe('Number of array elements that should be skipped at the start. The default value is 0.')
+        .describe('Number of array elements that should be skipped at the start. Default is 0.')
         .default(0),
     limit: z
         .number()
         .max(20)
-        .describe('Maximum number of array elements to return. The default value is 10, the maximum is 20.')
+        .describe('Maximum number of array elements to return. Default is 10. Maximum is 20.')
         .default(10),
     desc: z
         .boolean()
         .describe(
-            'If true or 1 then the datasets are sorted by the createdAt field in descending order. Default: sorted in ascending order.',
+            'If true or 1 then the datasets are sorted by the createdAt field in descending order. Default is false (ascending order).',
         )
         .default(false),
     unnamed: z
         .boolean()
-        .describe('If true or 1 then all the datasets are returned. By default only named datasets are returned.')
+        .describe('If true or 1 then all the datasets are returned. Default is false (named datasets only).')
         .default(false),
 });
 
@@ -38,12 +38,11 @@ export const getDatasetList: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.DATASET_LIST_GET,
     title: 'Get user datasets list',
     description: dedent`
-        List datasets (collections of Actor run data) for the authenticated user.
-        Actor runs automatically produce unnamed datasets (set unnamed=true to include them). Users can also create named datasets.
-
-        The results will include datasets with itemCount, access settings, and usage stats, sorted by createdAt (ascending by default).
+        List the datasets owned by the authenticated user — collections of structured data produced by Actor runs.
+        Returns summaries only, not their contents — use ${HELPER_TOOLS.DATASET_GET} to inspect one from the list.
+        Actor runs automatically produce unnamed datasets (set unnamed=true to include them); users can also create named datasets.
         Each dataset's stats.inflatedBytes is its approximate uncompressed byte size — use it with itemCount to gauge size before fetching.
-        Use limit (max 20), offset, and desc to paginate and sort.
+        Sorted by createdAt (ascending by default); use limit (max 20), offset, and desc to paginate and sort.
 
         USAGE:
         - Use when you need to browse available datasets (named or unnamed) to locate data.

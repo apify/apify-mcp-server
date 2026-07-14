@@ -28,9 +28,9 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.DATASET_SCHEMA_GET,
     title: 'Get dataset schema',
     description: dedent`
-        Generate a JSON schema from a sample of dataset items.
-        The schema describes the structure of the data and can be used for validation, documentation, or processing.
-        Use this to understand the dataset before fetching many items.
+        Generate a JSON schema inferred from a sample of dataset items — field names and types.
+        Not the full field list, item counts, or stats — use ${HELPER_TOOLS.DATASET_GET} for those.
+        The schema can be used for validation, documentation, or processing.
 
         USAGE:
         - Use when you need to infer the structure of dataset items for downstream processing or validation.

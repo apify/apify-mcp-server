@@ -32,6 +32,11 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   (exception: integration tests).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.
 
+**Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool
+returns, then a disambiguation line naming the sibling tool(s) it's confused with via
+`${HELPER_TOOLS.X}` (never a hardcoded name), proportional caveats, then `USAGE:` (one bullet) and
+`USAGE EXAMPLES:` (exactly two `user_input:` bullets). Match this shape when touching these files.
+
 ## Related, owned elsewhere (don't restate)
 
 - Tool-name cap + hash dedupe, transport: [`../mcp/AGENTS.md`](../mcp/AGENTS.md).

@@ -25,9 +25,8 @@ export const getDataset: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.DATASET_GET,
     title: 'Get dataset',
     description: dedent`
-        Get metadata for a dataset (collection of structured data created by an Actor run).
-        The results will include dataset details such as itemCount, fields, and stats.
-        Use fields to understand structure for filtering with ${HELPER_TOOLS.DATASET_GET_ITEMS}.
+        Get metadata for a dataset — a collection of structured data produced by an Actor run.
+        Returns the field list and item counts, not the row data — use ${HELPER_TOOLS.DATASET_GET_ITEMS} for the data, ${HELPER_TOOLS.DATASET_SCHEMA_GET} for inferred field types.
         stats.inflatedBytes (when present) is the approximate uncompressed byte size — use it with itemCount to pick a safe limit and fields before fetching.
         Note: itemCount updates may be delayed by up to ~5 seconds.
 
@@ -36,7 +35,7 @@ export const getDataset: ToolEntry = Object.freeze({
 
         USAGE EXAMPLES:
         - user_input: Show info for dataset xyz123
-        - user_input: What fields does username~my-dataset have?`,
+        - user_input: How many items does dataset xyz123 have?`,
     inputSchema: z.toJSONSchema(getDatasetArgs) as ToolInputSchema,
     outputSchema: datasetMetadataOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getDatasetArgs)),
