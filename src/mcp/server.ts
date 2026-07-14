@@ -1144,22 +1144,10 @@ export class ActorsMcpServer {
                     return { task };
                 }
 
-                // Sync path: standby rejection wins over the generic payment-required short-circuit
-                // so the agent gets the precise reason instead of a 402.
-                if (standbyRejection) {
-                    const outcome = buildPreflightFailureOutcome(
-                        standbyRejection,
-                        paymentRequiredResult,
-                        actorName,
-                        actorId,
-                    );
-                    toolStatus = outcome.toolStatus;
-                    callDiagnostics = outcome.callDiagnostics;
-                    return captureResult(outcome.result);
-                }
-
-                // Check payment validation (already computed by prepareToolCallContext)
-                if (paymentRequiredResult) {
+                // Sync path: short-circuit on either pre-flight failure. buildPreflightFailureOutcome
+                // encodes the precedence — standby rejection wins over the generic payment-required
+                // 402, so the agent gets the precise reason.
+                if (standbyRejection || paymentRequiredResult) {
                     const outcome = buildPreflightFailureOutcome(
                         standbyRejection,
                         paymentRequiredResult,
