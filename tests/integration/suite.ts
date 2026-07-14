@@ -2168,7 +2168,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                         uri: `https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`,
                     });
                     const contents = result.contents[0] as { mimeType?: string; text?: string };
-                    expect(contents.mimeType).toBe('application/json');
+                    // The proxy passes through the API's declared Content-Type, which carries a charset
+                    // (e.g. `application/json; charset=utf-8`), so match the base type rather than the exact string.
+                    expect(contents.mimeType).toContain('application/json');
                     // The generic proxy returns the raw API body — a bare JSON array of items.
                     const items = JSON.parse(contents.text as string) as unknown[];
                     expect(Array.isArray(items)).toBe(true);
