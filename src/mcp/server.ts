@@ -443,6 +443,29 @@ export class ActorsMcpServer {
     }
 
     /**
+     * Buffer-or-compose gate shared by the actor-tools loaders: if the server mode isn't
+     * resolved yet, queue `actorTools` for `updateToolsAfterServerModeResolved` and
+     * (if non-empty) upsert them immediately with the given `shouldNotify`; otherwise
+     * compose the mode-specific set via `getToolsForServerMode` and upsert that with
+     * `shouldNotify`.
+     *
+     * Callers pass different `shouldNotify` values: `loadToolsByName` forwards
+     * `actorTools.length > 0` (notify only when actor tools were fetched), while
+     * `loadToolsFromUrl` and `loadToolsFromInput` pass `false` and defer to the
+     * post-initialize reconcile. See `updateToolsAfterServerModeResolved` for the full
+     * rationale.
+     */
+    private registerFetchedActorTools(input: Input, actorTools: ToolEntry[], shouldNotify: boolean): void {
+        if (!this.serverModeResolved) {
+            this.pendingToolsAfterModeResolved.push({ input, actorTools });
+            if (actorTools.length > 0) this.upsertTools(actorTools, shouldNotify);
+            return;
+        }
+        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
+        if (tools.length > 0) this.upsertTools(tools, shouldNotify);
+    }
+
+    /**
      * Loads missing toolNames from a provided list of tool names.
      * Skips toolNames that are already loaded and loads only the missing ones.
      * @param toolNames - Array of tool names to ensure are loaded
@@ -459,16 +482,7 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push({ input: restoreInput, actorTools });
-            if (actorTools.length > 0) this.upsertTools(actorTools, true);
-            return;
-        }
-
-        const toolsToLoad = getToolsForServerMode(restoreInput, actorTools, this.serverMode);
-        if (toolsToLoad.length > 0) {
-            this.upsertTools(toolsToLoad, actorTools.length > 0);
-        }
+        this.registerFetchedActorTools(restoreInput, actorTools, actorTools.length > 0);
     }
 
     /**
@@ -496,20 +510,8 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push({ input, actorTools });
-            if (actorTools.length > 0) {
-                log.debug('Loading actor tools from query parameters before mode resolution');
-                this.upsertTools(actorTools, false);
-            }
-            return;
-        }
-
-        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
-        if (tools.length > 0) {
-            log.debug('Loading tools from query parameters');
-            this.upsertTools(tools, false);
-        }
+        log.debug('Loading tools from query parameters');
+        this.registerFetchedActorTools(input, actorTools, false);
     }
 
     /**
@@ -526,13 +528,7 @@ export class ActorsMcpServer {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });
-        if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push({ input, actorTools });
-            if (actorTools.length > 0) this.upsertTools(actorTools);
-            return;
-        }
-        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
-        if (tools.length > 0) this.upsertTools(tools);
+        this.registerFetchedActorTools(input, actorTools, false);
     }
 
     /** Delete tools from the server and notify the handler.
