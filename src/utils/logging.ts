@@ -152,7 +152,7 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
     log.error(message, { error, ...data });
 }
 
-const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';
+export const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';
 const REDACTED_VALUE = '[REDACTED]';
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
