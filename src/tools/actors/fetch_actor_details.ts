@@ -2,7 +2,7 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import type { ConsoleLinkContext, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import {
     type ActorDetailsResult,
@@ -116,28 +116,6 @@ EXAMPLES:
 - What does apify/rag-web-browser do?
 - What is the input schema for apify/web-scraper?
 - What tools does apify/actors-mcp-server provide?`;
-
-/**
- * Tool metadata for the mode-independent `fetch-actor-details` — everything
- * except the `call` handler. No widget `_meta`; the `-widget` sibling (apps-only)
- * carries its own widget metadata.
- */
-export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
-    title: 'Fetch Actor details',
-    description: FETCH_ACTOR_DETAILS_DESCRIPTION,
-    inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
-    outputSchema: actorDetailsOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
-    annotations: {
-        title: 'Fetch Actor details',
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-    },
-};
 
 /**
  * Build error response for when actor is not found.
@@ -285,6 +263,19 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
  * Returns full text response with output schema fetch.
  */
 export const fetchActorDetails: ToolEntry = Object.freeze({
-    ...fetchActorDetailsMetadata,
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+    title: 'Fetch Actor details',
+    description: FETCH_ACTOR_DETAILS_DESCRIPTION,
+    inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
+    outputSchema: actorDetailsOutputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
+    annotations: {
+        title: 'Fetch Actor details',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs) => buildFetchActorDetailsResult(toolArgs),
 } as const);

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import type { ConsoleLinkContext, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
@@ -47,30 +47,6 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc
 - user_input: Wait for run y2h7sK3Wc to finish`;
-
-/**
- * Shared tool metadata for `get-actor-run` — everything except the `call` handler.
- * Mode-independent. Widget `_meta` lives in the widget variant.
- */
-export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.ACTOR_RUNS_GET,
-    title: 'Get Actor run',
-    description: GET_ACTOR_RUN_DESCRIPTION,
-    // `fixZodSchemaRequired` strips fields with a real `default` from `required` so MCP clients
-    // that read `tools/list` see `waitSecs` as optional (matching its runtime behavior).
-    inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorRunArgs)) as ToolInputSchema,
-    outputSchema: actorRunOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
-    paymentRequired: true,
-    annotations: {
-        title: 'Get Actor run',
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-    },
-};
 
 // -----------------------------------------------------------------------------
 // Response builders
@@ -128,7 +104,23 @@ export function buildGetActorRunSuccessResponse(
  * Default mode `get-actor-run` — returns without any widget metadata.
  */
 export const getActorRun: ToolEntry = Object.freeze({
-    ...getActorRunMetadata,
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.ACTOR_RUNS_GET,
+    title: 'Get Actor run',
+    description: GET_ACTOR_RUN_DESCRIPTION,
+    // `fixZodSchemaRequired` strips fields with a real `default` from `required` so MCP clients
+    // that read `tools/list` see `waitSecs` as optional (matching its runtime behavior).
+    inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorRunArgs)) as ToolInputSchema,
+    outputSchema: actorRunOutputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
+    paymentRequired: true,
+    annotations: {
+        title: 'Get Actor run',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, apifyToken, progressTracker, mcpSessionId, extra } = toolArgs;
         const parsed = getActorRunArgs.parse(args);

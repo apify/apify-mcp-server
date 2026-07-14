@@ -5,7 +5,6 @@ import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
 import type {
     ActorStoreList,
     ConsoleLinkContext,
-    HelperTool,
     InternalToolArgs,
     StructuredActorCard,
     ToolEntry,
@@ -101,27 +100,6 @@ Returns list of Actor cards with the following info:
 - **Input fields:** Inline list of input field names and types (e.g. \`url: string, maxResults?: number\`); \`?\` marks optional fields
 `;
 
-/**
- * Tool metadata for the base search-actors tool — mode-independent, no widget `_meta`.
- * Used by `searchActors` in both default and apps modes.
- */
-export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.STORE_SEARCH,
-    title: 'Search Actors',
-    description: SEARCH_ACTORS_DESCRIPTION,
-    inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
-    outputSchema: actorSearchOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),
-    annotations: {
-        title: 'Search Actors',
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-    },
-};
-
 export type SearchActorsResult = {
     actorCardText: string;
     actorCardStructured: StructuredActorCard[];
@@ -172,7 +150,20 @@ export function buildSearchActorsFooter(verbatimLinksNudge: string): string {
  * Returns text-based Actor cards without widget metadata.
  */
 export const searchActors: ToolEntry = Object.freeze({
-    ...searchActorsMetadata,
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.STORE_SEARCH,
+    title: 'Search Actors',
+    description: SEARCH_ACTORS_DESCRIPTION,
+    inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
+    outputSchema: actorSearchOutputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),
+    annotations: {
+        title: 'Search Actors',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, apifyMcpServer } = toolArgs;
         const parsed = searchActorsBaseArgsSchema.parse(args);

@@ -117,47 +117,53 @@ deletes are filed as **#1087**, the internals.js first slice as **#1088**.
 
 ### Dead code — safe deletes (S) — filed as #1087
 
+Done on branch `claude/apify-mcp-simplification-4hehpt` (pending merge to default):
+
+- **`actor-detail-widget` build target**: built by `web/build.js` but absent from
+  `WIDGET_REGISTRY`, so never served — `fetch-actor-details-widget` reuses the
+  search-actors bundle, whose `ActorSearch` already renders the detail view. Deleted
+  `actor-detail-widget.tsx` + `.dev.ts` + `actor-detail.html` + the build entry.
+- **`getRealActorID`** (`mcp/actors.ts`): zero call sites in both repos. Deleted.
+- **Dead exported types** `DatasetItem`, `ActorDefinitionStorage` (`types.ts`): zero
+  references in both repos. Deleted.
+- **`*Metadata` single-use indirection**: `getActorRunMetadata`,
+  `fetchActorDetailsMetadata`, `searchActorsMetadata` were each spread into exactly one
+  sibling tool; widgets build their own entries. Inlined.
+- **`mock-actor-details.ts`**: the dead block was the nested `actorDetails` sub-block,
+  read only by the now-deleted `actor-detail-widget.dev.ts`. The surviving top-level
+  `{actorInfo, readme, inputSchema}` block is the shape the real `fetch-actor-details`
+  tool emits and is what `mock-openai.ts` actually consumes. Trimmed; the twice-pasted
+  README/inputSchema/pricing is de-duped.
+
+Still open (excluded from this branch to avoid conflicts with in-flight `server.ts` PRs):
+
 - **Prompts subsystem**: `prompts/index.ts` is a literally empty array; the `PromptBase`
   type, the `prompts: {}` capability, and `setupPromptHandlers` (~40 lines in
   `server.ts`) can never serve a prompt. Zero internal-repo references. Delete the
   subsystem (caveat: `prompts/list` then returns MethodNotFound instead of `{prompts: []}`
   — confirm no client probes it unconditionally).
-- **`actor-detail-widget` build target**: built by `web/build.js` but absent from
-  `WIDGET_REGISTRY`, so never served — `fetch-actor-details-widget` reuses the
-  search-actors bundle, whose `ActorSearch` already renders the detail view. The
-  standalone widget has also drifted (reads prop `details`; the served path reads
-  `actorDetails`). Delete `actor-detail-widget.tsx` + `.dev.ts` + `actor-detail.html` +
-  the build entry (~57 LOC + one shipped dist artifact).
-- **`getRealActorID`** (`mcp/actors.ts`): zero call sites in both repos.
-- **Dead exported types** `DatasetItem`, `ActorDefinitionStorage` (`types.ts`): zero
-  references in both repos.
 - **Needlessly wide visibility**: `listActorToolNames` is `public` with no external
   callers (siblings are `private`); `emitTaskStatusNotification` is module-exported but
   only called inside `server.ts`.
-- **`*Metadata` single-use indirection**: `getActorRunMetadata`,
-  `fetchActorDetailsMetadata`, `searchActorsMetadata` are each spread into exactly one
-  sibling tool; widgets build their own entries. Inline them.
-- **`mock-actor-details.ts`**: half the fixture (~115 lines — top-level
-  `actorInfo`/`readme`/`inputSchema`) mirrors the pre-split `fetch-actor-details`
-  response shape; all consumers read only `actorDetails`. The README, input schema, and
-  pricing matrix are each pasted twice within the file. Dev-only (guarded by
-  `IS_DEV_BUILD`, dead-code-eliminated in prod) — trim to the current shape.
 
 ### Status updates on the backlog above
 
-- **`internals.js` narrowing is unblocked for a first slice — filed as #1088**
-  (the upstream half of internal#648 step 1). 12 re-exports have zero
+Both items below are done on branch `claude/apify-mcp-simplification-4hehpt` (pending
+merge to default):
+
+- **`internals.js` narrowing, first slice — filed as #1088**
+  (the upstream half of internal#648 step 1). 12 re-exports had zero
   references anywhere in internal: `APIFY_FAVICON_URL`, `HELPER_TOOLS`,
   `type HelperToolName`, `SERVER_NAME`, `SERVER_TITLE`, `addActor`,
   `toolCategoriesEnabledByDefault`, `type ServerCard`, `getActorsAsTools`,
   `readJsonFile`, `parseCommaSeparatedList`, `redactSkyfirePayId` (internal's own sweep
-  doc lists the same set). Deleting those re-export lines needs no server-method
-  conversion. Keep the still-consumed deprecated aliases (`addTool`, `HelperTools`
-  const) until internal's tests migrate.
-- **`redactSkyfirePayId` migration already happened** — the `skyfire.ts` TODO and the
-  `@deprecated` note claiming internal still imports it are stale (#604 unblocked). Drop
-  the re-export, fix both comments, and dedupe `SKYFIRE_PAY_ID_KEY` (declared in both
-  `logging.ts` and `skyfire.ts`).
+  doc lists the same set). Removed those re-export lines; no server-method conversion
+  needed. Kept the still-consumed deprecated aliases (`addTool`, `HelperTools` const)
+  until internal's tests migrate.
+- **`redactSkyfirePayId` migration** — the `skyfire.ts` TODO and the `@deprecated` note
+  claiming internal still imports it were stale (#604 unblocked). Dropped the re-export,
+  fixed both comments, and deduped `SKYFIRE_PAY_ID_KEY` — now declared once in
+  `logging.ts`, imported by `skyfire.ts`.
 
 ### New M items
 

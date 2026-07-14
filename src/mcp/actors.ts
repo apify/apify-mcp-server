@@ -1,6 +1,5 @@
 import type { ActorDefinition } from 'apify-client';
 
-import { ApifyClient } from '../apify_client.js';
 import type { ActorDefinitionPruned } from '../types.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
 import { MCP_STREAMABLE_ENDPOINT } from './const.js';
@@ -61,18 +60,4 @@ export async function getActorMCPServerURL(realActorId: string, mcpServerPath: s
     resolved.username = '';
     resolved.password = '';
     return resolved.toString();
-}
-
-/**
- * Gets Actor ID from the Actor object.
- */
-export async function getRealActorID(actorIdOrName: string, apifyToken: string): Promise<string> {
-    const apifyClient = new ApifyClient({ token: apifyToken });
-
-    const actor = apifyClient.actor(actorIdOrName);
-    const info = await actor.get();
-    if (!info) {
-        throw new Error(`Actor ${actorIdOrName} not found`);
-    }
-    return info.id;
 }
