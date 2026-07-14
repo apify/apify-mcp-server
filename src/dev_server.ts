@@ -16,6 +16,7 @@ import { parseBooleanOrNull } from '@apify/utilities';
 import { ApifyClient } from './apify_client.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { resolvePaymentProvider } from './payments/index.js';
+import { injectMcpSessionId } from './utils/mcp.js';
 import { parseServerMode } from './utils/server_mode.js';
 
 // DEV ONLY. This is a local dev/standby-emulation server, not the hosted HTTP server.
@@ -208,9 +209,8 @@ export function createExpressApp(): express.Express {
             }
 
             // Inject session ID into request params for the reused existing session
-            if (req.body?.params && sessionId) {
-                req.body.params._meta ??= {};
-                req.body.params._meta.mcpSessionId = sessionId;
+            if (sessionId && req.body) {
+                req.body.params = injectMcpSessionId(req.body.params, sessionId);
             }
 
             // Handle the request with existing transport - no need to reconnect
