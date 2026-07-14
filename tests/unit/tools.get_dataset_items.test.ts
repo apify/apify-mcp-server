@@ -5,10 +5,8 @@ import { extractDotPrefixes, getDatasetItems } from '../../src/tools/storage/get
 import { datasetItemsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
-import { dotFlatten } from '../../src/utils/encode_text.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
-    decodeFencedToolText,
     expectSoftFailInvalidInput,
     expectSchemaConformingStructuredContent,
     mockUserInfo,
@@ -83,39 +81,14 @@ describe('get-dataset-items', () => {
         expect(structuredContent.itemCount).toBe(MOCK_ITEMS.length);
     });
 
-    it('encodes the data payload (without summary/nextStep) into the fenced content text', async () => {
+    it('encodes the data payload (without summary/nextStep) into the JSON content text', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
         );
         const { content, structuredContent } = result as TextToolResult;
 
         const { summary, nextStep, ...data } = structuredContent as Record<string, unknown>;
-        expect(decodeFencedToolText(content[0].text)).toEqual(data);
-    });
-
-    it('content round-trips to structuredContent for nested items (dot-flattened when TOON wins)', async () => {
-        // Real dataset items are routinely nested; the flat happy-path mock can't exercise the
-        // dot-flatten path where the TOON text keys differ from the structuredContent keys.
-        const nestedItems = [
-            { url: 'https://a', metadata: { httpStatus: 200, depth: 1 } },
-            { url: 'https://b', metadata: { httpStatus: 404, depth: 2 } },
-            { url: 'https://c', metadata: { httpStatus: 200, depth: 3 } },
-        ];
-        const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext(
-                { datasetId: 'ds-1' },
-                stubApifyClient(async () => ({ items: nestedItems, total: 3 })),
-            ),
-        );
-        const { content, structuredContent } = result as TextToolResult;
-        const [{ text }] = content;
-
-        // Uniform nested rows favour TOON; assert the lift actually happened, then that the fenced
-        // text round-trips to the dot-flattened data (summary/nextStep stay outside the fence).
-        const { summary, nextStep, ...data } = structuredContent as Record<string, unknown>;
-        expect(text.startsWith('```toon\n')).toBe(true);
-        expect(text).toContain('metadata.httpStatus');
-        expect(decodeFencedToolText(text)).toEqual(dotFlatten(JSON.parse(JSON.stringify(data))));
+        expect(JSON.parse(content[0].text)).toEqual(data);
     });
 
     it('defaults `limit` to 20 when caller omits it', async () => {
@@ -214,7 +187,7 @@ describe('get-dataset-items', () => {
         };
 
         expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/ds-1');
-        // content: [0] fenced data, [1] summary/nextStep, [2] Apify Console link.
+        // content: [0] plain JSON, [1] summary/nextStep, [2] Apify Console link.
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
@@ -232,7 +205,7 @@ describe('get-dataset-items', () => {
         expect(structuredContent.summary).toBe('Fetched all 1 items.');
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
-        // summary + nextStep ship as a separate text block after the fenced data.
+        // summary + nextStep ship as a separate text block after the plain JSON.
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
@@ -260,7 +233,7 @@ describe('get-dataset-items', () => {
         };
 
         const { summary, nextStep, ...data } = structuredContent;
-        expect(decodeFencedToolText(content[0].text)).toEqual(data);
+        expect(JSON.parse(content[0].text)).toEqual(data);
         expect(structuredContent).not.toHaveProperty('desc');
     });
 });

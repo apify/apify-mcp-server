@@ -4,6 +4,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { respondRaw } from '../../utils/mcp.js';
 
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
@@ -44,6 +45,6 @@ USAGE EXAMPLES:
         const v = (await client.run(parsed.runId).log().get()) ?? '';
         const lines = v.split('\n');
         const text = lines.slice(lines.length - parsed.lines - 1, lines.length).join('\n');
-        return { content: [{ type: 'text', text }] };
+        return respondRaw({ content: [{ type: 'text', text }] });
     },
 } as const);

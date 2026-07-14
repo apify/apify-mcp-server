@@ -18,7 +18,7 @@ import {
 } from '../../src/tools/actors/call_actor.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
-import type { TextToolResult } from './helpers/tool_context.js';
+import { textOf, type TextToolResult } from './helpers/tool_context.js';
 
 vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/actors/actor_tools_factory.js');
@@ -67,7 +67,7 @@ describe('call_actor_common', () => {
             });
 
             expect(response.isError).toBe(true);
-            const allText = response.content.map((c) => c.text).join('\n');
+            const allText = (response.content ?? []).map(textOf).join('\n');
             expect(allText).toContain(`If ${HELPER_TOOLS.STORE_SEARCH} is available in this session`);
             expect(allText).toContain(`using: ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(
@@ -106,7 +106,7 @@ describe('call_actor_common', () => {
             });
 
             expect(response.isError).toBe(true);
-            const allText = response.content.map((c) => c.text).join('\n');
+            const allText = (response.content ?? []).map(textOf).join('\n');
             expect(allText).toContain('This Actor requires full access to your account');
             expect(allText).toContain(approvalUrl);
             expect(response.toolTelemetry).toEqual(
@@ -126,7 +126,7 @@ describe('call_actor_common', () => {
                 actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
             });
 
-            const allText = response.content.map((c) => c.text).join('\n');
+            const allText = (response.content ?? []).map(textOf).join('\n');
             expect(allText).toContain(`If ${HELPER_TOOLS.STORE_SEARCH} is available in this session`);
             expect(allText).toContain(`using: ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(
@@ -161,7 +161,7 @@ describe('call_actor_common', () => {
             });
 
             expect(response.isError).toBe(true);
-            const allText = response.content.map((c) => c.text).join('\n');
+            const allText = (response.content ?? []).map(textOf).join('\n');
             expect(allText).toContain('memory limit of 8192MB');
             expect(allText).toContain('Account memory quota exceeded');
             expect(allText).toContain('callOptions.memory');
@@ -203,7 +203,7 @@ describe('call_actor_common', () => {
             });
 
             expect(response.isError).toBe(true);
-            const allText = response.content.map((c) => c.text).join('\n');
+            const allText = (response.content ?? []).map(textOf).join('\n');
             expect(allText).toContain('account limit for concurrent Actor runs');
             expect(allText).toContain('console.apify.com/billing/subscription');
             // Run-limit must not fall through to the generic "verify the Actor name" hint.
@@ -269,7 +269,7 @@ describe('call_actor_common', () => {
             const response = buildPermissionApprovalResponse(makeError(approvalUrl));
 
             expect(response.isError).toBe(true);
-            const allText = response.content.map((c) => c.text).join('\n');
+            const allText = (response.content ?? []).map(textOf).join('\n');
             expect(allText).toContain('This Actor requires full access to your account');
             expect(allText).toContain(approvalUrl);
         });
@@ -279,7 +279,10 @@ describe('call_actor_common', () => {
 
             expect(response.isError).toBe(true);
             expect(response.content).toHaveLength(1);
-            expect(response.content[0]?.text).toContain('This Actor requires full access to your account');
+            const firstBlock = (response.content ?? [])[0];
+            expect(firstBlock && 'text' in firstBlock ? firstBlock.text : undefined).toContain(
+                'This Actor requires full access to your account',
+            );
         });
     });
 

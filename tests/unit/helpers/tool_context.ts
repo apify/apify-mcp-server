@@ -1,33 +1,19 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { decode as decodeToon } from '@toon-format/toon';
+import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
 import { expect } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
-import { FENCES } from '../../../src/utils/encode_text.js';
 import type { CachedUserInfo } from '../../../src/utils/userid_cache.js';
+
+/** Read the text off a content block; '' for non-text blocks. Keeps assertions on text responses tidy. */
+export function textOf(block: ContentBlock): string {
+    return 'text' in block ? block.text : '';
+}
 
 /** Default `CachedUserInfo` for tests that mock `getUserInfoCached`. */
 export function mockUserInfo(overrides: Partial<CachedUserInfo> = {}): CachedUserInfo {
     return { userId: 'USER_ID', userPlanTier: 'FREE', isOrganization: false, ...overrides };
-}
-
-/** Inverse of `wrapJsonText`; imports prod's fence constants so the two halves can't drift. */
-export function parseFencedJson(text: string): unknown {
-    return JSON.parse(text.slice(FENCES.json.prefix.length, -FENCES.json.suffix.length));
-}
-
-/**
- * Inverse of `encodeToon` — decodes the fenced tool text whether it shipped TOON or fell back to
- * JSON. Tolerates prose after the closing fence (storage list tools append summary/nextStep).
- * For flat payloads (what the array-endpoint mocks use) the TOON round-trip is exact.
- */
-export function decodeFencedToolText(text: string): unknown {
-    const format = text.startsWith(FENCES.toon.prefix) ? 'toon' : 'json';
-    const { prefix, suffix } = FENCES[format];
-    const body = text.slice(prefix.length, text.indexOf(suffix, prefix.length));
-    return format === 'toon' ? decodeToon(body) : JSON.parse(body);
 }
 
 /**

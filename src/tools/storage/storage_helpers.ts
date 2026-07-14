@@ -1,8 +1,28 @@
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
-import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
+import { getHttpStatusCode } from '../../utils/logging.js';
 import { respondOk } from '../../utils/mcp.js';
+
+/**
+ * Wrap a storage SDK promise to convert a 404 rejection into null.
+ *
+ * The Apify SDK soft-catches 404 on `.get()`, `.getStatistics()`, and `.getRecord()` (returning
+ * falsy instead of throwing), but list methods like `.listItems()` and `.listKeys()` throw
+ * ApifyApiError on a missing storage. This helper wraps those list calls to provide consistent
+ * 404 handling: resolves with the promise's value, returns null if it rejects with a 404, or
+ * rethrows any other error. Call sites check `if (!result) return respondUserError(...)` as usual.
+ */
+export async function catchNotFound<T>(promise: Promise<T>): Promise<T | null> {
+    try {
+        return await promise;
+    } catch (err: unknown) {
+        if (getHttpStatusCode(err) === HTTP_NOT_FOUND) {
+            return null;
+        }
+        throw err;
+    }
+}
 
 function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
     return loadedToolNames.includes(toolName) ? toolName : undefined;
@@ -32,27 +52,22 @@ export function buildConsoleLinkContent(apifyConsoleUrl: string | undefined): { 
  * `structuredContent` carries the data plus `summary` (and `nextStep` unless terminal).
  * `nextStep` is omitted for terminal responses (e.g. get-key-value-store-record).
  *
- * `toon: true` (the list tools) emits a single text: the data TOON-encoded in a ```toon fence
- * (token-cheaper for uniform-row arrays; `summary`/`nextStep` are prose, not tabular, so they
- * stay out of the fence) followed by `summary`/`nextStep` as plain text. Single-object tools
- * leave it off and ship `content[0]` as the raw-JSON dump of `structuredContent` plus
- * `content[1]` with `summary`/`nextStep`. Either way `structuredContent` is the lossless source
- * of truth — programmatic consumers read it, not `content[]`.
+ * `content[0]` is the JSON-stringified `structuredContent`; `content[1]` carries `summary`/`nextStep`
+ * as plain text. `structuredContent` is the lossless source of truth — programmatic consumers read
+ * it, not `content[]`.
  */
 export function buildStorageResponse(params: {
     structuredContent: Record<string, unknown>;
     summary: string;
     nextStep?: string;
-    toon?: boolean;
     /** Personalized Apify Console link (Console UI token sessions); appended as a trailing text item. */
     apifyConsoleUrl?: string;
 }) {
-    const { structuredContent, summary, nextStep, toon, apifyConsoleUrl } = params;
+    const { structuredContent, summary, nextStep, apifyConsoleUrl } = params;
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
     const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
-    const dataText = toon ? encodeToon(structuredContent) : JSON.stringify(structuredContent);
     const consoleLinkText = apifyConsoleLinkText(apifyConsoleUrl);
-    return respondOk([dataText, summaryText, ...(consoleLinkText ? [consoleLinkText] : [])], {
+    return respondOk([JSON.stringify(structuredContent), summaryText, ...(consoleLinkText ? [consoleLinkText] : [])], {
         structuredContent: full,
     });
 }

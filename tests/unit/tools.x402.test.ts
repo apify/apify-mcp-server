@@ -14,6 +14,7 @@ import {
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { respondRaw } from '../../src/utils/mcp.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -69,7 +70,7 @@ function makePaidTool(overrides: Partial<HelperTool> = {}): HelperTool {
         paymentRequired: true,
         inputSchema: { type: 'object' as const, properties: {} },
         ajvValidate: vi.fn(() => true) as never,
-        call: vi.fn(async () => ({ content: [] })),
+        call: vi.fn(async () => respondRaw({ content: [] })),
         ...overrides,
     };
 }
