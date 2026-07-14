@@ -1,3 +1,4 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SKYFIRE_README_CONTENT } from '../../src/payments/const.js';
@@ -89,16 +90,17 @@ describe('createResourceService()', () => {
             expect(firstContent(result).mimeType).toBe('text/markdown');
         });
 
-        it('returns a plain-text fallback for an unknown URI', async () => {
+        it('throws InvalidParams for an unknown URI', async () => {
             const service = createResourceService({
                 getMode: () => 'default',
                 getAvailableWidgets: () => new Map(),
             });
 
-            const result = await service.readResource('file://missing.md');
+            const error = await service.readResource('file://missing.md').catch((e: unknown) => e);
 
-            expect(firstContent(result).text).toBe('Resource file://missing.md not found');
-            expect(firstContent(result).mimeType).toBe('text/plain');
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+            expect((error as McpError).message).toContain('file://missing.md');
         });
 
         it('returns widget HTML when the widget exists', async () => {

@@ -2184,6 +2184,24 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(contents.text).toContain('firstNumber');
                     await client.close();
                 });
+
+                it('rejects resources/read of a nonexistent dataset with a JSON-RPC error', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    await expect(
+                        client.readResource({
+                            uri: 'https://api.apify.com/v2/datasets/this-dataset-does-not-exist-xyz/items',
+                        }),
+                    ).rejects.toThrow(/Failed to read/i);
+                    await client.close();
+                });
+
+                it('rejects resources/read of a non-Apify URL with a JSON-RPC error', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    await expect(client.readResource({ uri: 'https://example.com/steal-my-token' })).rejects.toThrow(
+                        /not found/i,
+                    );
+                    await client.close();
+                });
             });
 
             it('rejects get-key-value-store-record when required keyValueStoreId is missing', async () => {

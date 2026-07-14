@@ -9,7 +9,8 @@ Three files serving the MCP `resources/*` surface:
   read-resource requests. Takes an optional `apifyClient` on list/read; the server
   builds it from the per-request token (`_meta.apifyToken || options.token`). This is
   token-only by design — it does not forward payment headers like the CallTool path, so a
-  payment-only session (x402/Skyfire, no token) gets no client and every read soft-fails.
+  payment-only session (x402/Skyfire, no token) gets no client and every read fails with an
+  `InvalidParams` JSON-RPC error.
 - `api_resources.ts` — a thin MCP-resource proxy over the Apify API: any Apify API GET
   endpoint is readable as a resource, identified by its real API URL.
 - `widgets.ts` — the registry of UI widgets (the metadata that maps a widget name to
@@ -42,11 +43,21 @@ an unsigned record URL and every other endpoint fall back to the token-gated API
 the link may require the token. A text/JSON body over the same `MAX_INLINE_BYTES` cap links out the same
 way — the signed `recordPublicUrl` for a KVS record, else the token-gated API URL — with a hint to page a
 dataset/list via `limit`/`offset` (measured on the serialized bytes we would emit, not a `Content-Length`
-header; a single record or log can't be paged, so the link is the real remedy). Errors never throw past
-this function: this axios instance resolves non-2xx responses (`validateStatus: null`) instead of
-throwing, so a missing resource or 5xx is checked on the resolved `status` and returned as an
-explanatory `text` block; only network-level failures (and the `maxContentLength` abort) reach the
-`catch`.
+header; a single record or log can't be paged, so the link is the real remedy).
+
+Genuine failures **throw** an `McpError` so the SDK returns a JSON-RPC error, not success-shaped content
+for an unreadable resource (the direction SEP-2164 makes a MUST; success-content for a nonexistent
+resource is the anti-pattern). `statusToErrorCode()` maps the code: 3xx/4xx except 429 → `InvalidParams`
+(-32602: bad URI, missing/invalid token, private or nonexistent resource — SEP-2164 remaps "nonexistent"
+here too); 429, 5xx, or no status (network failure) → `InternalError` (-32603: transient/upstream). The
+no-token and bad-origin pre-flight guards throw `InvalidParams` directly. This axios instance resolves
+non-2xx responses (`validateStatus: null`) instead of throwing, so a non-2xx is caught on the resolved
+`status` and re-thrown; only network-level failures (and the `maxContentLength` abort) reach the `catch`.
+The size link-outs are the exception — they are **successful** reads returning a download pointer, not
+failures, so they still return a `text` block. The sibling `resource_service.ts` throws the same
+`InvalidParams` error from its generic "not found" fallback (a non-Apify URL never reaches
+`readApiResource`, so bad-origin is handled there in practice); its widget-not-found branches stay as
+content.
 
 Discovery is the server-instructions prose, not a fixed list: `resources/templates/list` returns
 nothing and `resources/list` serves only widgets + the usage guide. The read path is a generic

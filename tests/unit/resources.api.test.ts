@@ -1,4 +1,5 @@
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
 import { describe, expect, it } from 'vitest';
 
@@ -11,6 +12,13 @@ const API = 'https://api.apify.com';
 // `contents[0]` is a text|blob union; narrow it in tests that read one shape.
 function firstContent(result: ReadResourceResult): { mimeType?: string; text?: string; blob?: string } {
     return result.contents[0] as { mimeType?: string; text?: string; blob?: string };
+}
+
+/** Await a read that must reject, asserting it threw an McpError and returning it for further checks. */
+async function expectReadError(promise: Promise<unknown>): Promise<McpError> {
+    const error = await promise.catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(McpError);
+    return error as McpError;
 }
 
 type RequestConfig = { url: string; maxContentLength?: number };
@@ -70,17 +78,18 @@ describe('isApifyApiUri()', () => {
 });
 
 describe('readApiResource()', () => {
-    it('returns an explanatory text block when there is no token', async () => {
-        const result = await readApiResource(`${API}/v2/datasets/ds-1/items`, undefined);
+    it('throws InvalidParams when there is no token', async () => {
+        const error = await expectReadError(readApiResource(`${API}/v2/datasets/ds-1/items`, undefined));
 
-        expect(firstContent(result).mimeType).toBe('text/plain');
-        expect(firstContent(result).text).toContain('no Apify token');
+        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error.message).toContain('no Apify token');
     });
 
-    it('refuses to read a non-Apify URL (no token leak to other hosts)', async () => {
-        const result = await readApiResource('https://example.com/steal-my-token', stubApifyClient());
+    it('throws InvalidParams for a non-Apify URL (no token leak to other hosts)', async () => {
+        const error = await expectReadError(readApiResource('https://example.com/steal-my-token', stubApifyClient()));
 
-        expect(firstContent(result).text).toContain('only Apify API URLs');
+        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error.message).toContain('only Apify API URLs');
     });
 
     it('passes the full URL through to httpClient.axios.request', async () => {
@@ -276,17 +285,18 @@ describe('readApiResource()', () => {
         expect(firstContent(result).mimeType).toBe('application/json');
     });
 
-    it('returns an explanatory text block when the request fails', async () => {
+    it('throws when the request fails, mapping the error status to a code', async () => {
         const client = stubApifyClient({
             request: async () => {
                 throw Object.assign(new Error('not found'), { statusCode: 404 });
             },
         });
 
-        const result = await readApiResource(`${API}/v2/datasets/missing/items`, client);
+        const error = await expectReadError(readApiResource(`${API}/v2/datasets/missing/items`, client));
 
-        expect(firstContent(result).text).toContain('Failed to read');
-        expect(firstContent(result).text).toContain('404');
+        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error.message).toContain('Failed to read');
+        expect(error.message).toContain('404');
     });
 
     it('links to the signed record URL when axios aborts a KVS record download over the limit', async () => {
@@ -328,7 +338,7 @@ describe('readApiResource()', () => {
         expect(contents.text).toContain('offset');
     });
 
-    it('returns HTTP status and the parsed error message for a resolved non-2xx response', async () => {
+    it('throws InvalidParams with the parsed error message for a resolved non-2xx 4xx response', async () => {
         const uri = `${API}/v2/datasets/missing/items`;
         const client = stubApifyClient({
             request: async () => ({
@@ -339,19 +349,21 @@ describe('readApiResource()', () => {
             }),
         });
 
-        const result = await readApiResource(uri, client);
+        const error = await expectReadError(readApiResource(uri, client));
 
-        expect(firstContent(result).text).toBe(`Failed to read ${uri}: HTTP 404: Dataset was not found`);
+        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error.message).toContain(`Failed to read ${uri}: HTTP 404: Dataset was not found`);
     });
 
-    it('falls back to statusText for a resolved non-2xx response with no parsable error body', async () => {
+    it('throws InternalError falling back to statusText for a resolved 5xx with no parsable error body', async () => {
         const uri = `${API}/v2/datasets/missing/items`;
         const client = stubApifyClient({
             request: async () => ({ data: undefined, headers: {}, status: 500, statusText: 'Internal Server Error' }),
         });
 
-        const result = await readApiResource(uri, client);
+        const error = await expectReadError(readApiResource(uri, client));
 
-        expect(firstContent(result).text).toBe(`Failed to read ${uri}: HTTP 500: Internal Server Error`);
+        expect(error.code).toBe(ErrorCode.InternalError);
+        expect(error.message).toContain(`Failed to read ${uri}: HTTP 500: Internal Server Error`);
     });
 });

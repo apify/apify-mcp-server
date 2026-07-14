@@ -8,6 +8,7 @@ import type {
     Resource,
     TextResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
@@ -157,15 +158,10 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             }
         }
 
-        return {
-            contents: [
-                {
-                    uri,
-                    mimeType: 'text/plain',
-                    text: `Resource ${uri} not found`,
-                },
-            ],
-        };
+        // A URI that is neither an Apify API URL, the usage guide, nor a served widget is not a
+        // readable resource — throw so the SDK returns a JSON-RPC error instead of success-shaped
+        // "not found" content (see SEP-2164 and src/resources/AGENTS.md).
+        throw new McpError(ErrorCode.InvalidParams, `Resource ${uri} not found`);
     };
 
     // Read is a generic proxy over any Apify API GET URL, advertised in the server instructions;

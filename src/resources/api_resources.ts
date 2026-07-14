@@ -3,6 +3,7 @@ import type {
     ReadResourceResult,
     TextResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { isAxiosError } from 'axios';
 
 import type { ApifyClient } from '../apify_client.js';
@@ -17,6 +18,17 @@ const TEXT_MIME_TYPE = 'text/plain';
 /** True when the declared Content-Type is JSON, so the body must be re-serialized to round-trip primitives. */
 function isJsonContentType(contentType: string | undefined): boolean {
     return contentType?.split(';')[0].trim().toLowerCase() === JSON_MIME_TYPE;
+}
+
+/**
+ * Maps a failed read's HTTP status to a JSON-RPC error code:
+ * - 3xx/4xx except 429 → `InvalidParams` (the request/resource is the problem — bad URI, missing/invalid
+ *   token, private resource, or a resource that does not exist; SEP-2164 remaps "nonexistent" here too).
+ * - 429, 5xx, or no status (network failure) → `InternalError` (transient or upstream).
+ */
+function statusToErrorCode(status: number | undefined): ErrorCode {
+    if (status !== undefined && status < 500 && status !== 429) return ErrorCode.InvalidParams;
+    return ErrorCode.InternalError;
 }
 
 /**
@@ -87,8 +99,10 @@ function buildTextResult(uri: string, text: string, mimeType: string = TEXT_MIME
  * A thin proxy: the apify-client injects the session token (and the MCP-origin header),
  * performs the GET, and parses the body by Content-Type — JSON to an object, text/xml to a
  * string, anything else to a Buffer, an empty body to `undefined`. We branch on that resulting
- * JS type, not the MIME type. Errors (a missing resource, a bad token, a 5xx) never throw; they
- * return an explanatory text block, matching the resources/read soft-fail contract.
+ * JS type, not the MIME type. Genuine failures (no token, bad origin, a missing resource, a bad
+ * token, a 5xx, a network error) throw an `McpError` so the SDK returns a JSON-RPC error rather
+ * than success-shaped content for an unreadable resource (see SEP-2164). Size link-outs are NOT
+ * failures — they are successful reads returning a download pointer — so they still return content.
  *
  * The download itself goes straight through `apifyClient.httpClient.axios` (the same axios
  * instance apify-client builds internally, so token/origin headers and Content-Type parsing
@@ -101,11 +115,11 @@ function buildTextResult(uri: string, text: string, mimeType: string = TEXT_MIME
  */
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
     if (!apifyClient) {
-        return buildTextResult(uri, `Cannot read ${uri}: no Apify token in this session.`);
+        throw new McpError(ErrorCode.InvalidParams, `Cannot read ${uri}: no Apify token in this session.`);
     }
     if (!isApifyApiUri(uri)) {
-        return buildTextResult(
-            uri,
+        throw new McpError(
+            ErrorCode.InvalidParams,
             `Cannot read ${uri}: only Apify API URLs (${getApifyAPIBaseUrl()}) are readable as resources.`,
         );
     }
@@ -131,7 +145,10 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         }
         const status = getHttpStatusCode(err);
         const message = err instanceof Error ? err.message : String(err);
-        return buildTextResult(uri, `Failed to read ${uri}: ${status ? `HTTP ${status}: ` : ''}${message}`);
+        throw new McpError(
+            statusToErrorCode(status),
+            `Failed to read ${uri}: ${status ? `HTTP ${status}: ` : ''}${message}`,
+        );
     }
 
     // `validateStatus: null` on this axios instance resolves non-2xx responses instead of throwing,
@@ -139,7 +156,10 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     if (response.status >= 300) {
         const body = response.data as { error?: { message?: unknown } } | undefined;
         const message = typeof body?.error?.message === 'string' ? body.error.message : response.statusText;
-        return buildTextResult(uri, `Failed to read ${uri}: HTTP ${response.status}: ${message}`);
+        throw new McpError(
+            statusToErrorCode(response.status),
+            `Failed to read ${uri}: HTTP ${response.status}: ${message}`,
+        );
     }
 
     const contentTypeHeader = response.headers['content-type'];
