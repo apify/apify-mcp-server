@@ -37,7 +37,7 @@ Zero tolerance for errors — fix before proceeding, don't defer.
 
 When the user says "test with mcpc", **use mcpc** — do not invent a substitute (no curl, no ad-hoc Node/Python scripts, no unit tests in place of an e2e probe). Use the **apify CLI** (`apify datasets`, `apify key-value-stores`, `apify actors`, …) for ground-truth data — never curl the Apify API.
 
-After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (default) / `@stdio-full` (non-default tools) is listed, `mcpc @stdio restart`; otherwise `mcpc --config .mcp.json stdio connect @stdio`. Use the `mcpc-tester` subagent for systematic spec/edge-case coverage; call mcpc directly for quick checks.
+After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (default) / `@stdio-full` (non-default tools) is listed, `mcpc @stdio restart`; otherwise `mcpc connect .mcp.json:stdio @stdio` (non-default tools: `mcpc connect .mcp.json:stdio-full @stdio-full`). Use the `mcpc-tester` subagent for systematic spec/edge-case coverage; call mcpc directly for quick checks.
 
 ## Testing
 
