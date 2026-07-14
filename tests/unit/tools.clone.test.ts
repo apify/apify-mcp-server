@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ActorTool, HelperTool } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { respondRaw } from '../../src/utils/mcp.js';
 import { cloneToolEntry } from '../../src/utils/tools.js';
 
 // ---------------------------------------------------------------------------
@@ -29,7 +30,7 @@ function makeInternalTool(overrides: Partial<HelperTool> = {}): HelperTool {
             properties: { actor: { type: 'string' } },
         },
         ajvValidate: MOCK_AJV_VALIDATE as never,
-        call: vi.fn(async () => ({ content: [] })),
+        call: vi.fn(async () => respondRaw({ content: [] })),
         ...overrides,
     };
 }

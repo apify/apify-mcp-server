@@ -1,16 +1,15 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
-import { getHttpStatusCode } from '../../utils/logging.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildDatasetItemsSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
+import { buildDatasetItemsSummaryNextStep, buildStorageResponse, catchNotFound } from './storage_helpers.js';
 
 export const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
@@ -103,12 +102,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const datasetId = stripQuoteWrappers(parsed.datasetId);
-        // `dataset(id).listItems()` throws ApifyApiError on a missing dataset
-        // instead of returning undefined (only `.get()` and `.getStatistics()`
-        // soft-catch 404 in the SDK), so translate 404 into a soft-fail.
-        const v = await client
-            .dataset(datasetId)
-            .listItems({
+        const v = await catchNotFound(
+            client.dataset(datasetId).listItems({
                 clean: parsed.clean,
                 offset: parsed.offset,
                 limit: effectiveLimit,
@@ -116,13 +111,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
                 omit,
                 desc: parsed.desc,
                 flatten,
-            })
-            .catch((err: unknown) => {
-                if (getHttpStatusCode(err) === HTTP_NOT_FOUND) {
-                    return null;
-                }
-                throw err;
-            });
+            }),
+        );
         if (!v) {
             return respondUserError(`Dataset '${datasetId}' not found.`);
         }
@@ -146,6 +136,6 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             offset,
             loadedToolNames: apifyMcpServer.listToolNames(),
         });
-        return buildStorageResponse({ structuredContent, summary, nextStep, toon: true, apifyConsoleUrl });
+        return buildStorageResponse({ structuredContent, summary, nextStep, apifyConsoleUrl });
     },
 } as const);

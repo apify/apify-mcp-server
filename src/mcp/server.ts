@@ -19,6 +19,7 @@ import type {
     InitializeResult,
     Notification,
     Request,
+    Task,
     TaskStatusNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
@@ -511,6 +512,29 @@ export class ActorsMcpServer {
     }
 
     /**
+     * Buffer-or-compose gate shared by the actor-tools loaders. If the server mode isn't resolved
+     * yet ('auto' before initialize), queue the whole source for `composePendingToolsForClient` and
+     * (if non-empty) upsert the mode-agnostic actor tools immediately with the given `shouldNotify`.
+     * Once the mode is resolved, compose the client-specific set via `composeToolsForClient` (which
+     * withholds report-problem until the client is known) and upsert it; if the client still isn't
+     * known, queue the source so the initialize flush re-composes and adds the client-gated tools.
+     *
+     * Callers pass different `shouldNotify` values: `loadToolsByName` forwards `actorTools.length > 0`
+     * (notify only when actor tools were fetched), while `loadToolsFromUrl` and `loadToolsFromInput`
+     * pass `false` and defer to the post-initialize reconcile. See `composePendingToolsForClient`.
+     */
+    private registerFetchedActorTools(input: Input, actorTools: ToolEntry[], shouldNotify: boolean): void {
+        if (!this.serverModeResolved) {
+            this.pendingToolsUntilClientKnown.push({ input, actorTools });
+            if (actorTools.length > 0) this.upsertTools(actorTools, shouldNotify);
+            return;
+        }
+        const tools = this.composeToolsForClient(input, actorTools);
+        if (tools.length > 0) this.upsertTools(tools, shouldNotify);
+        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools });
+    }
+
+    /**
      * Loads missing toolNames from a provided list of tool names.
      * Skips toolNames that are already loaded and loads only the missing ones.
      * @param toolNames - Array of tool names to ensure are loaded
@@ -527,21 +551,7 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        // 'auto' before initialize: mode not final — composing now would pick wrong variants, so
-        // defer the whole source to the initialize flush (actor tools are mode-agnostic, upsert now).
-        if (!this.serverModeResolved) {
-            this.pendingToolsUntilClientKnown.push({ input: restoreInput, actorTools });
-            if (actorTools.length > 0) this.upsertTools(actorTools, true);
-            return;
-        }
-        // Mode is final: compose eagerly so client-agnostic tools restore even without an initialize
-        // (recovery / rehydration). Client-gated tools are withheld until the client is known; queue
-        // the source so the initialize flush re-composes and adds them.
-        const toolsToLoad = this.composeToolsForClient(restoreInput, actorTools);
-        if (toolsToLoad.length > 0) {
-            this.upsertTools(toolsToLoad, actorTools.length > 0);
-        }
-        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input: restoreInput, actorTools });
+        this.registerFetchedActorTools(restoreInput, actorTools, actorTools.length > 0);
     }
 
     /**
@@ -569,21 +579,8 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        if (!this.serverModeResolved) {
-            this.pendingToolsUntilClientKnown.push({ input, actorTools });
-            if (actorTools.length > 0) {
-                log.debug('Loading actor tools from query parameters before mode resolution');
-                this.upsertTools(actorTools, false);
-            }
-            return;
-        }
-
-        const tools = this.composeToolsForClient(input, actorTools);
-        if (tools.length > 0) {
-            log.debug('Loading tools from query parameters');
-            this.upsertTools(tools, false);
-        }
-        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools });
+        log.debug('Loading tools from query parameters');
+        this.registerFetchedActorTools(input, actorTools, false);
     }
 
     /**
@@ -601,14 +598,7 @@ export class ActorsMcpServer {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });
-        if (!this.serverModeResolved) {
-            this.pendingToolsUntilClientKnown.push({ input, actorTools });
-            if (actorTools.length > 0) this.upsertTools(actorTools);
-            return;
-        }
-        const tools = this.composeToolsForClient(input, actorTools);
-        if (tools.length > 0) this.upsertTools(tools);
-        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools });
+        this.registerFetchedActorTools(input, actorTools, false);
     }
 
     /** Delete tools from the server and notify the handler.
@@ -776,6 +766,19 @@ export class ActorsMcpServer {
     }
 
     /**
+     * Fetches a task by ID, softFail-logging and throwing a client-facing McpError if it doesn't exist.
+     */
+    private async getTaskOrThrow(taskId: string, mcpSessionId: string | undefined, logTag: string): Promise<Task> {
+        const task = await this.taskStore.getTask(taskId, mcpSessionId);
+        if (!task) {
+            // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
+            log.softFail(`[${logTag}] Task not found`, { taskId, mcpSessionId, statusCode: 404 });
+            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
+        }
+        return task;
+    }
+
+    /**
      * Sets up MCP request handlers for long-running tasks.
      */
     private setupTaskHandlers(): void {
@@ -797,12 +800,7 @@ export class ActorsMcpServer {
             const { taskId } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (task) return task;
-
-            // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-            log.softFail('[GetTaskRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
+            return await this.getTaskOrThrow(taskId, mcpSessionId, 'GetTaskRequestSchema');
         });
 
         // Get task result payload
@@ -812,12 +810,7 @@ export class ActorsMcpServer {
             const { taskId } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[GetTaskPayloadRequestSchema] Getting task result', { taskId, mcpSessionId });
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (!task) {
-                // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-                log.softFail('[GetTaskPayloadRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-                throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
-            }
+            const task = await this.getTaskOrThrow(taskId, mcpSessionId, 'GetTaskPayloadRequestSchema');
             if (task.status !== 'completed' && task.status !== 'failed') {
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -843,12 +836,7 @@ export class ActorsMcpServer {
             const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[CancelTaskRequestSchema] Cancelling task', { taskId, mcpSessionId });
 
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (!task) {
-                // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-                log.softFail('[CancelTaskRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-                throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
-            }
+            const task = await this.getTaskOrThrow(taskId, mcpSessionId, 'CancelTaskRequestSchema');
             if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
                 // Client error (cancel on terminal task) — softFail to avoid polluting error logs.
                 log.softFail('[CancelTaskRequestSchema] Task already in terminal state', {
