@@ -642,21 +642,22 @@ export class ActorsMcpServer {
         return meta?.apifyToken || this.options.token;
     }
 
+    /**
+     * Token-scoped client for resources/read (the API proxy needs auth). Deliberately token-only:
+     * unlike the CallTool path it does NOT forward provider/payment headers, so a payment-only
+     * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
+     */
+    private resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
+        const token = this.resolveApifyToken(params._meta);
+        return token ? new ApifyClient({ token }) : undefined;
+    }
+
     private setupResourceHandlers(): void {
         const resourceService = createResourceService({
             paymentProvider: this.options.paymentProvider,
             getMode: () => this.serverMode,
             getAvailableWidgets: () => this.availableWidgets,
         });
-
-        // Build a token-scoped client for resources/read (the API proxy needs auth). This is deliberately
-        // token-only: unlike the CallTool path it does NOT forward provider/payment headers, so a
-        // payment-only session (x402/Skyfire, no Apify token) has no client and every read soft-fails by
-        // design. Resources are scoped to token sessions; the server-instructions state a read needs a token.
-        const resolveApifyClient = (params: ApifyRequestParams): ApifyClient | undefined => {
-            const token = this.resolveApifyToken(params._meta);
-            return token ? new ApifyClient({ token }) : undefined;
-        };
 
         this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
             return await resourceService.listResources();
@@ -665,7 +666,7 @@ export class ActorsMcpServer {
         this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
             return await resourceService.readResource(
                 request.params.uri,
-                resolveApifyClient(request.params as ApifyRequestParams),
+                this.resolveApifyClient(request.params as ApifyRequestParams),
             );
         });
 

@@ -105,6 +105,13 @@ describe('isApifyApiUri()', () => {
         expect(isApifyApiUri('ui://widget/search.html')).toBe(false);
         expect(isApifyApiUri('not a url')).toBe(false);
     });
+
+    it('rejects userinfo-bearing URLs even on the API host', () => {
+        // axios drops the default Authorization header for credentials-bearing URLs, so such a
+        // read would silently run unauthenticated; refuse it at the gate instead.
+        expect(isApifyApiUri('https://evil.com@api.apify.com/v2/datasets/ds-1/items')).toBe(false);
+        expect(isApifyApiUri('https://user:pass@api.apify.com/v2/datasets/ds-1/items')).toBe(false);
+    });
 });
 
 describe('readApiResource()', () => {
@@ -120,6 +127,8 @@ describe('readApiResource()', () => {
 
         expect(error.code).toBe(ErrorCode.InvalidParams);
         expect(error.message).toContain('only Apify API URLs');
+        // Spec error shape: the failing URI rides in error.data, not only in the message text.
+        expect(error.data).toEqual({ uri: 'https://example.com/steal-my-token' });
     });
 
     it('requests the full URL as a stream capped at MAX_INLINE_BYTES', async () => {
@@ -338,6 +347,7 @@ describe('readApiResource()', () => {
 
         expect(error.code).toBe(ErrorCode.InvalidParams);
         expect(error.message).toContain(`Failed to read ${uri}: HTTP 404: Dataset was not found`);
+        expect(error.data).toEqual({ uri });
     });
 
     it('throws InternalError falling back to statusText for a resolved 5xx with no parsable error body', async () => {

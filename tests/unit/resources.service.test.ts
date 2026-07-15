@@ -101,6 +101,7 @@ describe('createResourceService()', () => {
             expect(error).toBeInstanceOf(McpError);
             expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
             expect((error as McpError).message).toContain('file://missing.md');
+            expect((error as McpError).data).toEqual({ uri: 'file://missing.md' });
         });
 
         it('throws the origin refusal for a non-Apify https URL', async () => {

@@ -48,11 +48,16 @@ function statusToErrorCode(status: number | undefined): ErrorCode {
  *
  * This is the security gate for the generic read proxy: the apify-client attaches the
  * session token as an `Authorization` header to every outbound request, so we must only
- * hand it Apify API URLs — never an arbitrary host.
+ * hand it Apify API URLs — never an arbitrary host. Userinfo-bearing URLs
+ * (`user@api.apify.com`) are rejected even when the host is genuinely ours: axios drops
+ * the default `Authorization` header for credentials-bearing URLs, so the read would
+ * silently run unauthenticated.
  */
 export function isApifyApiUri(uri: string): boolean {
     try {
-        return new URL(uri).origin === new URL(getApifyAPIBaseUrl()).origin;
+        const url = new URL(uri);
+        if (url.username || url.password) return false;
+        return url.origin === new URL(getApifyAPIBaseUrl()).origin;
     } catch {
         return false;
     }
@@ -173,10 +178,13 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         throw new McpError(
             ErrorCode.InvalidParams,
             `Failed to read ${uri}: only Apify API URLs (${getApifyAPIBaseUrl()}) are readable as resources.`,
+            { uri },
         );
     }
     if (!apifyClient) {
-        throw new McpError(ErrorCode.InvalidParams, `Failed to read ${uri}: no Apify token in this session.`);
+        throw new McpError(ErrorCode.InvalidParams, `Failed to read ${uri}: no Apify token in this session.`, {
+            uri,
+        });
     }
 
     let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
@@ -195,6 +203,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         throw new McpError(
             statusToErrorCode(status),
             `Failed to read ${uri}: ${status ? `HTTP ${status}: ` : ''}${message}${hint ? `. ${hint}` : ''}`,
+            { uri },
         );
     }
 
@@ -209,7 +218,9 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
             // A drop mid-body (reset, truncation, bad gzip). Never return partial content.
             logHttpError(err, `resources/read response interrupted`, { uri });
             const message = err instanceof Error ? err.message : String(err);
-            throw new McpError(ErrorCode.InternalError, `Failed to read ${uri}: response interrupted: ${message}`);
+            throw new McpError(ErrorCode.InternalError, `Failed to read ${uri}: response interrupted: ${message}`, {
+                uri,
+            });
         }
     }
 
@@ -225,6 +236,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         throw new McpError(
             statusToErrorCode(response.status),
             `Failed to read ${uri}: HTTP ${response.status}: ${message}${hint ? `. ${hint}` : ''}`,
+            { uri },
         );
     }
 
