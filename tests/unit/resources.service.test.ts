@@ -103,6 +103,21 @@ describe('createResourceService()', () => {
             expect((error as McpError).message).toContain('file://missing.md');
         });
 
+        it('throws the origin refusal for a non-Apify https URL', async () => {
+            // http(s) URIs route to readApiResource, whose origin gate owns the refusal — the user
+            // sees why the read was rejected, not the generic not-a-readable-resource fallback.
+            const service = createResourceService({
+                getMode: () => 'default',
+                getAvailableWidgets: () => new Map(),
+            });
+
+            const error = await service.readResource('https://example.com/steal-my-token').catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+            expect((error as McpError).message).toContain('only Apify API URLs');
+        });
+
         it('returns widget HTML when the widget exists', async () => {
             const fs = await import('node:fs');
             const readFileSync = vi.mocked(fs.readFileSync);

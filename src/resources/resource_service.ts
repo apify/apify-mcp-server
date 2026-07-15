@@ -15,7 +15,7 @@ import log from '@apify/log';
 import type { ApifyClient } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { SERVER_MODE } from '../types.js';
-import { isApifyApiUri, readApiResource } from './api_resources.js';
+import { readApiResource } from './api_resources.js';
 import type { AvailableWidget } from './widgets.js';
 import { RESOURCE_MIME_TYPE } from './widgets.js';
 
@@ -84,7 +84,9 @@ export function createResourceService(options: ResourceServiceOptions): Resource
     };
 
     const readResource = async (uri: string, apifyClient?: ApifyClient): Promise<ExtendedReadResourceResult> => {
-        if (isApifyApiUri(uri)) {
+        // Route every http(s) URI to the API proxy — it owns the single origin gate, so a
+        // non-Apify URL gets the explanatory origin refusal instead of the generic fallback.
+        if (/^https?:\/\//i.test(uri)) {
             // API contents carry no widget `_meta`/`html`; the extended shape only adds optional fields.
             return (await readApiResource(uri, apifyClient)) as ExtendedReadResourceResult;
         }
@@ -158,7 +160,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             }
         }
 
-        // A URI that is neither an Apify API URL, the usage guide, nor a served widget is not a
+        // A URI that is neither an http(s) URL, the usage guide, nor a served widget is not a
         // readable resource — throw so the SDK returns a JSON-RPC error instead of success-shaped
         // "not found" content (see SEP-2164 and src/resources/AGENTS.md).
         throw new McpError(ErrorCode.InvalidParams, `Failed to read ${uri}: not a readable resource.`);

@@ -177,13 +177,20 @@ export type BinaryRecordDisposition =
     | { kind: 'linkOut'; mimeType?: string; bytes: number };
 
 /**
- * Classify a binary record value for transport. Shared by the get-key-value-store-record tool and the
- * API-resource proxy so the MIME normalization, inline threshold, and base64 encoding stay in one place.
- * It does NOT mint the link-out URL — the two callers build different URLs (a signed record URL vs the
- * API URL) via async calls — so the caller handles `linkOut` by minting its own URL.
+ * Base MIME type of a Content-Type header: parameters stripped, lowercased
+ * (`Image/PNG; charset=…` → `image/png`), `undefined` when no header was declared.
+ * Shared by the get-key-value-store-record tool and the API-resource proxy.
+ */
+export function parseBaseMimeType(contentType: string | undefined): string | undefined {
+    return contentType?.split(';')[0].trim().toLowerCase();
+}
+
+/**
+ * Classify a binary record value for transport. It does NOT mint the link-out URL — the caller
+ * handles `linkOut` by minting its own URL (a signed record URL vs the API URL) via async calls.
  */
 export function classifyBinaryRecordSize(contentType: string | undefined, value: Buffer): BinaryRecordDisposition {
-    const mimeType = contentType?.split(';')[0].trim().toLowerCase();
+    const mimeType = parseBaseMimeType(contentType);
     if (value.length > MAX_INLINE_BYTES) {
         return { kind: 'linkOut', ...(mimeType !== undefined && { mimeType }), bytes: value.length };
     }

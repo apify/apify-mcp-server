@@ -10,7 +10,8 @@ Three files serving the MCP `resources/*` surface:
   builds it from the per-request token (`_meta.apifyToken || options.token`). This is
   token-only by design — it does not forward payment headers like the CallTool path, so a
   payment-only session (x402/Skyfire, no token) gets no client and every read fails with an
-  `InvalidParams` JSON-RPC error.
+  `InvalidParams` JSON-RPC error. It routes every http(s) URI to `readApiResource()`, which
+  owns the single origin gate; only non-http schemes fall through to widgets/usage-guide/fallback.
 - `api_resources.ts` — a thin MCP-resource proxy over the Apify API: any Apify API GET
   endpoint is readable as a resource, identified by its real API URL.
 - `widgets.ts` — the registry of UI widgets (the metadata that maps a widget name to
@@ -19,51 +20,39 @@ Three files serving the MCP `resources/*` surface:
 ## API resources (`api_resources.ts`)
 
 Resource URIs are real Apify API GET URLs (`https://api.apify.com/v2/...`), built from the storage
-IDs that Actors and tools return (e.g. a `datasetId` → `.../datasets/{id}/items`) — no custom scheme
-to translate. `isApifyApiUri()` gates reads to the configured API origin
-(`getApifyAPIBaseUrl()`): the apify-client attaches the session token as an `Authorization`
-header to **every** outbound request, so we must never hand it a non-Apify host.
+IDs that Actors and tools return (e.g. a `datasetId` → `.../datasets/{id}/items`) — no custom scheme.
+`isApifyApiUri()` gates reads to the configured API origin (`getApifyAPIBaseUrl()`): the apify-client
+attaches the session token as an `Authorization` header to **every** outbound request, so we must
+never hand it a non-Apify host.
 
-`readApiResource()` is a generic proxy: `apifyClient.httpClient.axios.request({ method: 'GET', responseType: 'arraybuffer', maxContentLength: MAX_DOWNLOAD_BYTES })`
-(do **not** set `forceBuffer` — that skips the client's Content-Type parsing). It calls the
-apify-client's own axios instance directly instead of `httpClient.call()`, deliberately skipping
-apify-client's retry wrapper: that wrapper would misclassify the `maxContentLength` abort below as a
-retryable network error and retry it 8 times (~127s of backoff) instead of failing fast — so this is
-one attempt, no retries. `MAX_DOWNLOAD_BYTES` (5 MB) is enforced mid-flight by axios as bytes arrive, so
-an oversized dataset/log is aborted during download instead of being buffered whole first; on trip, the
-proxy links out the same way as an oversized inline body (below), skipping straight past the parse step.
-The parsed body is JSON → object, text/xml → string, anything else → `Buffer`, empty → `undefined`.
-Binary and empty bodies are keyed off the JS type; a JSON body is re-serialized with `JSON.stringify`
-(keyed off the declared Content-Type) so `null` and bare-string primitives round-trip, and text/xml
-strings are emitted verbatim. Buffers over `MAX_INLINE_BYTES`
-(256 KB, unchanged) link out — an explanatory `text/plain` block naming the URL + size + type
-(`resources/read` has no `resource_link` content type) — instead of inlining base64. For a KVS
-record the URL is the store's `recordPublicUrl` (auth-free only when the store has a URL-signing key);
-an unsigned record URL and every other endpoint fall back to the token-gated API URL, so the block says
-the link may require the token. A text/JSON body over the same `MAX_INLINE_BYTES` cap links out the same
-way — the signed `recordPublicUrl` for a KVS record, else the token-gated API URL — with a hint to page a
-dataset/list via `limit`/`offset` (measured on the serialized bytes we would emit, not a `Content-Length`
-header; a single record or log can't be paged, so the link is the real remedy).
+`readApiResource()` streams the body verbatim —
+`apifyClient.httpClient.axios.request({ method: 'GET', responseType: 'stream', maxContentLength: MAX_INLINE_BYTES })`
+— and branches on the declared Content-Type: textual base types (text/*, JSON, XML) return as `text`
+with the full header (charset included), everything else (including no Content-Type) as a base64
+`blob` with the base MIME type, an empty body as empty text preserving the Content-Type. The body is
+never parsed, so JSON primitives and bytes round-trip exactly. axios enforces `MAX_INLINE_BYTES`
+(256 KB) mid-consumption on streamed responses (axios ≥1.16: byte-counting wrapper throws
+`ERR_BAD_RESPONSE`, counting decoded bytes), so an oversized body aborts at the limit instead of
+buffering — the abort happens after the request resolves, outside any retry wrapper. On trip, the
+proxy links out: an explanatory `text/plain` block (`resources/read` has no `resource_link` type)
+carrying the store's `recordPublicUrl` for a KVS record (auth-free only with a URL-signing key) or
+the token-gated API URL otherwise, plus a `limit`/`offset` paging hint for datasets/lists. It calls
+the client's axios instance directly instead of `httpClient.call()`: with a stream body, `call()`
+would hand non-2xx responses to `ApifyApiError` unconsumed (junk message, stranded socket per retry)
+— so this is one attempt, no retries, and the error body is read here to surface the API's message.
 
-Genuine failures **throw** an `McpError` so the SDK returns a JSON-RPC error, not success-shaped content
-for an unreadable resource (the direction SEP-2164 makes a MUST; success-content for a nonexistent
-resource is the anti-pattern). `statusToErrorCode()` maps the code: 3xx/4xx except 429 → `InvalidParams`
-(-32602: bad URI, missing/invalid token, private or nonexistent resource — SEP-2164 remaps "nonexistent"
-here too); 429, 5xx, or no status (network failure) → `InternalError` (-32603: transient/upstream). The
-no-token and bad-origin pre-flight guards throw `InvalidParams` directly. This axios instance resolves
-non-2xx responses (`validateStatus: null`) instead of throwing, so a non-2xx is caught on the resolved
-`status` and re-thrown; only network-level failures (and the `maxContentLength` abort) reach the `catch`.
-The size link-outs are the exception — they are **successful** reads returning a download pointer, not
-failures, so they still return a `text` block. A 401/403 failure appends an actionable hint via
-`getHttpErrorHint()` (shared with the `tools/call` error path in `utils/mcp.ts`): 401 points at
-`APIFY_TOKEN`, 403 flags a private resource or insufficient access. The sibling `resource_service.ts`
-throws the same `InvalidParams` error from its generic "not found" fallback (a non-Apify URL never
-reaches `readApiResource`, so bad-origin is handled there in practice); its widget-not-found branches
-stay as content.
+Genuine failures **throw** an `McpError` so the SDK returns a JSON-RPC error, not success-shaped
+content for an unreadable resource (the direction SEP-2164 makes a MUST). `statusToErrorCode()`:
+3xx/4xx except 429 → `InvalidParams` (bad URI, missing/invalid token, private or nonexistent
+resource); 429, 5xx, or no status (network, mid-stream drop) → `InternalError`. The no-token and
+bad-origin guards throw `InvalidParams` directly; 401/403 append a hint via `getHttpErrorHint()`
+(shared with `tools/call` in `utils/mcp.ts`); non-2xx and network failures are logged via
+`logHttpError` (5xx → exception). Size link-outs are the exception — **successful** reads returning
+a download pointer. The sibling `resource_service.ts` throws the same `InvalidParams` from its
+generic non-http fallback; widget-not-found branches stay as content.
 
 Discovery is the server-instructions prose, not a fixed list: `resources/templates/list` returns
-nothing and `resources/list` serves only widgets + the usage guide. The read path is a generic
-proxy, so any Apify API GET URL works whether or not it was ever listed.
+nothing and `resources/list` serves only widgets + the usage guide.
 
 ## Gotcha
 
