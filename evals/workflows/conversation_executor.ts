@@ -25,6 +25,8 @@ export type ConversationExecutorOptions = {
     model?: string;
     /** Additional instructions from MCP server (optional) */
     serverInstructions?: string | null;
+    /** Evaluation-only strategy instructions. */
+    agentInstructions?: string;
 };
 
 /**
@@ -39,6 +41,7 @@ export async function executeConversation(options: ConversationExecutorOptions):
         maxTurns = MAX_CONVERSATION_TURNS,
         model = MODELS.agent,
         serverInstructions,
+        agentInstructions,
     } = options;
 
     const turns: ConversationTurn[] = [];
@@ -47,6 +50,9 @@ export async function executeConversation(options: ConversationExecutorOptions):
     let systemPrompt = AGENT_SYSTEM_PROMPT;
     if (serverInstructions) {
         systemPrompt += `\n\n## MCP Server Instructions\n\n${serverInstructions}`;
+    }
+    if (agentInstructions) {
+        systemPrompt += `\n\n## Evaluation Instructions\n\n${agentInstructions}`;
     }
 
     const messages: ChatCompletionMessageParam[] = [
@@ -58,9 +64,13 @@ export async function executeConversation(options: ConversationExecutorOptions):
     let completed = false;
     let promptTokens = 0;
     let completionTokens = 0;
-    // Track whether the provider ever reported usage; if it never does, totals stay undefined
-    // rather than a fabricated 0 that reads as a real measurement.
+    let totalTokens = 0;
+    let cachedPromptTokens = 0;
+    let reasoningTokens = 0;
+    // Missing provider metrics stay undefined rather than becoming fabricated zeroes.
     let hasUsage = false;
+    let hasCachedPromptTokens = false;
+    let hasReasoningTokens = false;
 
     // Fetch tools initially
     let tools: ChatCompletionTool[] = mcpToolsToOpenAiTools(mcpClient.getTools());
@@ -76,6 +86,15 @@ export async function executeConversation(options: ConversationExecutorOptions):
             hasUsage = true;
             promptTokens += llmResponse.usage.promptTokens;
             completionTokens += llmResponse.usage.completionTokens;
+            totalTokens += llmResponse.usage.totalTokens;
+            if (llmResponse.usage.cachedPromptTokens !== undefined) {
+                hasCachedPromptTokens = true;
+                cachedPromptTokens += llmResponse.usage.cachedPromptTokens;
+            }
+            if (llmResponse.usage.reasoningTokens !== undefined) {
+                hasReasoningTokens = true;
+                reasoningTokens += llmResponse.usage.reasoningTokens;
+            }
         }
 
         // Check if LLM wants to call tools
@@ -85,6 +104,7 @@ export async function executeConversation(options: ConversationExecutorOptions):
                 turnNumber,
                 toolCalls: [],
                 toolResults: [],
+                usage: llmResponse.usage,
                 finalResponse: llmResponse.content || '',
             });
 
@@ -100,6 +120,7 @@ export async function executeConversation(options: ConversationExecutorOptions):
                 arguments: JSON.parse(tc.arguments),
             })),
             toolResults: [],
+            usage: llmResponse.usage,
         };
 
         // Add assistant message with tool calls to conversation
@@ -178,6 +199,8 @@ export async function executeConversation(options: ConversationExecutorOptions):
         totalTurns: turnNumber,
         promptTokens: hasUsage ? promptTokens : undefined,
         completionTokens: hasUsage ? completionTokens : undefined,
-        totalTokens: hasUsage ? promptTokens + completionTokens : undefined,
+        totalTokens: hasUsage ? totalTokens : undefined,
+        cachedPromptTokens: hasCachedPromptTokens ? cachedPromptTokens : undefined,
+        reasoningTokens: hasReasoningTokens ? reasoningTokens : undefined,
     };
 }

@@ -24,6 +24,8 @@ export type McpToolResult = {
     result?: unknown;
     /** Error message if execution failed */
     error?: string;
+    /** Evaluation policy violated by this call. */
+    policyViolation?: string;
     /** UTF-8 byte size of the serialized content the agent receives (set when the result is fed to the LLM) */
     resultBytes?: number;
 };
@@ -48,6 +50,14 @@ export type McpTool = {
 /**
  * A single turn in the conversation (agent action)
  */
+export type TokenUsage = {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    cachedPromptTokens?: number;
+    reasoningTokens?: number;
+};
+
 export type ConversationTurn = {
     /** Turn number (1-indexed) */
     turnNumber: number;
@@ -58,6 +68,8 @@ export type ConversationTurn = {
     }[];
     /** Tool results for this turn (if any) */
     toolResults: McpToolResult[];
+    /** Token usage for this agent call. */
+    usage?: TokenUsage;
     /** Final text response from agent (if no more tool calls) */
     finalResponse?: string;
 };
@@ -82,4 +94,8 @@ export type ConversationHistory = {
     completionTokens?: number;
     /** Total tokens billed across all agent LLM calls (prompt + completion) */
     totalTokens?: number;
+    /** Cached prompt tokens reported across all agent LLM calls */
+    cachedPromptTokens?: number;
+    /** Reasoning tokens reported across all agent LLM calls */
+    reasoningTokens?: number;
 };

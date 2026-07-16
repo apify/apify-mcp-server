@@ -6,7 +6,14 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import type { McpTool, McpToolCall, McpToolResult } from './types.js';
+
+export type McpToolPolicy = {
+    disallowedTools?: string[];
+    allowedCallActorTargets?: string[];
+    disallowedCallActorTargets?: string[];
+};
 
 export class McpClient {
     private client: Client | null = null;
@@ -14,13 +21,11 @@ export class McpClient {
     private tools: McpTool[] = [];
     private instructions: string | null = null;
     private toolTimeoutMs: number;
+    private toolPolicy: McpToolPolicy;
 
-    /**
-     * Create MCP client
-     * @param toolTimeoutSeconds - Timeout for tool calls in seconds (default: 60)
-     */
-    constructor(toolTimeoutSeconds = 60) {
+    constructor(toolTimeoutSeconds = 60, toolPolicy: McpToolPolicy = {}) {
         this.toolTimeoutMs = toolTimeoutSeconds * 1000;
+        this.toolPolicy = toolPolicy;
     }
 
     /**
@@ -87,7 +92,8 @@ export class McpClient {
         }
 
         const response = await this.client.listTools();
-        this.tools = response.tools as McpTool[];
+        const disallowedTools = new Set(this.toolPolicy.disallowedTools);
+        this.tools = (response.tools as McpTool[]).filter((tool) => !disallowedTools.has(tool.name));
     }
 
     /**
@@ -110,6 +116,16 @@ export class McpClient {
     async callTool(toolCall: McpToolCall): Promise<McpToolResult> {
         if (!this.client) {
             throw new Error('MCP client is not started');
+        }
+
+        const policyViolation = this.getPolicyViolation(toolCall);
+        if (policyViolation) {
+            return {
+                toolName: toolCall.name,
+                success: false,
+                error: policyViolation,
+                policyViolation,
+            };
         }
 
         try {
@@ -140,6 +156,30 @@ export class McpClient {
                 error: error instanceof Error ? error.message : String(error),
             };
         }
+    }
+
+    private getPolicyViolation(toolCall: McpToolCall): string | undefined {
+        if (this.toolPolicy.disallowedTools?.includes(toolCall.name)) {
+            return `Evaluation policy forbids tool "${toolCall.name}".`;
+        }
+        if (toolCall.name !== HELPER_TOOLS.ACTOR_CALL) return undefined;
+
+        const hasTargetPolicy =
+            this.toolPolicy.allowedCallActorTargets !== undefined ||
+            this.toolPolicy.disallowedCallActorTargets !== undefined;
+        if (!hasTargetPolicy) return undefined;
+
+        const { actor } = toolCall.arguments;
+        if (typeof actor !== 'string') return 'Evaluation policy requires call-actor to have an Actor target.';
+
+        const actorTarget = actor.split(':', 1)[0];
+        if (this.toolPolicy.allowedCallActorTargets && !this.toolPolicy.allowedCallActorTargets.includes(actorTarget)) {
+            return `Evaluation policy does not allow call-actor target "${actorTarget}".`;
+        }
+        if (this.toolPolicy.disallowedCallActorTargets?.includes(actorTarget)) {
+            return `Evaluation policy forbids call-actor target "${actorTarget}".`;
+        }
+        return undefined;
     }
 
     /**

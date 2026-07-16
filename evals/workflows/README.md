@@ -46,6 +46,12 @@ pnpm run evals:workflow -- --concurrency 8
 
 # Save results to JSON file
 pnpm run evals:workflow -- --output
+
+# Run paired Code Mode evaluations
+pnpm run evals:workflow -- \
+  --test-cases-path evals/workflows/code_mode_test_cases.json \
+  --results-path evals/workflows/code_mode_results.json \
+  --tool-timeout 600 --concurrency 1 --output
 ```
 
 **Exit codes:**
@@ -139,21 +145,14 @@ while (turnNumber < maxTurns) {
 
 **Location:** `run-workflow-evals.ts`
 
-### 4. Judge Sees Tool Calls, Not Results
+### 4. Judge Sees Bounded Tool Results
 
-**Decision:** Judge sees tool calls with arguments and agent responses, but NOT raw tool results.
+**Decision:** Judge sees tool calls, final responses, and up to 4,000 characters from each tool result.
 
 **Why:**
-- Evaluates agent behavior (tool selection, arguments)
-- Tool results are often very long and noisy
-- Agent should summarize results, judge evaluates the summary
-
-**Judge input format:**
-```
-USER: Find actors for Google Maps
-AGENT: [Called tool: search-actors with args: {"keywords":"google maps","limit":5}]
-AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
-```
+- Tool evidence lets the judge detect unsupported final answers
+- Per-result bounds prevent large datasets from dominating judge context
+- Errors and Code Runtime output remain visible
 
 **Location:** `workflow-judge.ts`
 
@@ -248,7 +247,8 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 | `--tool-timeout <seconds>` | | Tool call timeout | `60` |
 | `--concurrency <number>` | `-c` | Number of tests to run in parallel | `4` |
 | `--output` | `-o` | Save results to JSON file | `false` |
-| `--baseline <path>` | | Results JSON to compare against (prints byte/token deltas) | `results.json` |
+| `--results-path <path>` | | Results JSON file | `results.json` |
+| `--baseline <path>` | | Results JSON to compare against (prints byte/token deltas) | results path |
 | `--help` | | Show help message | - |
 
 ### Line Range Filtering
@@ -342,20 +342,20 @@ pnpm run evals:workflow -- --tool-timeout 300
 
 ### Saving Results to File
 
-The `--output` (or `-o`) option saves test results to `evals/workflows/results.json` for tracking over time.
+The `--output` (or `-o`) option saves test results to `evals/workflows/results.json`, or `--results-path`, for tracking over time.
 
 **How it works:**
-- Results are stored per combination of: `agentModel:judgeModel:testId`
-- Running the same test with the same models **overwrites** the previous result
-- Running with different model combinations **adds** new entries
-- Results are **versioned in git** for historical tracking
+- Every run appends an attempt; previous attempts remain available
+- Records include agent and judge token usage separately
+- Records include tool calls, policy violations, final response, and complete conversation trace
+- Results can be versioned in git or written to an ignored local path
 
 **Data structure:**
 ```json
 {
-  "version": "1.0",
-  "results": {
-    "anthropic/claude-haiku-4.5:x-ai/grok-4.1-fast:search-google-maps": {
+  "version": "2.0",
+  "attempts": [
+    {
       "timestamp": "2026-01-07T10:45:23.123Z",
       "agentModel": "anthropic/claude-haiku-4.5",
       "judgeModel": "x-ai/grok-4.1-fast",
@@ -368,9 +368,15 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
       "promptTokens": 6231,
       "completionTokens": 412,
       "totalTokens": 6643,
+      "judgeUsage": { "promptTokens": 1800, "completionTokens": 40, "totalTokens": 1840 },
+      "toolCalls": 3,
+      "failedToolCalls": 0,
+      "policyViolations": [],
+      "finalResponse": "...",
+      "toolCallTrace": [],
       "error": null
     }
-  }
+  ]
 }
 ```
 
@@ -378,13 +384,17 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
 - `timestamp` - ISO timestamp when test was run
 - `agentModel` - LLM model used for the agent
 - `judgeModel` - LLM model used for judging
-- `testId` - Test case identifier
+- `testId`, `pairId`, `arm` - Test and experiment identifiers
 - `verdict` - `PASS` or `FAIL`
 - `reason` - Judge reasoning or error message
 - `durationMs` - Test duration in milliseconds
 - `turns` - Number of conversation turns
 - `resultBytes` - Total UTF-8 bytes of tool results returned to the agent across the conversation (measured at the point each result is fed to the LLM, so it reflects what the agent actually receives). Compare across branches to quantify byte savings.
-- `promptTokens` / `completionTokens` / `totalTokens` - Tokens billed across all agent LLM calls (summed over turns; judge calls excluded). Tokens — not bytes — are what fill the context window, so this is the primary cost signal. Bytes are a deterministic, tokenizer-free proxy.
+- `promptTokens` / `completionTokens` / `totalTokens` - Tokens billed across all agent LLM calls; judge calls excluded
+- `cachedPromptTokens` / `reasoningTokens` - Provider-reported agent usage details
+- `judgeUsage` - Judge tokens, kept separate from agent usage
+- `toolCalls`, `failedToolCalls`, `policyViolations` - Execution counters and policy failures
+- `finalResponse`, `toolCallTrace` - Agent answer and tool-call trace (name, arguments, success, byte size), including generated Code Mode scripts; result bodies are excluded to keep the file compact
 - `error` - Error message if execution failed, `null` otherwise
 
 **Examples:**
@@ -404,10 +414,13 @@ pnpm run evals:workflow -- --agent-model openai/gpt-4o --output
 # Compare different judge models
 pnpm run evals:workflow -- --judge-model x-ai/grok-4.1-fast --output
 pnpm run evals:workflow -- --judge-model openai/gpt-4o --output
+
+# Save a separate benchmark
+pnpm run evals:workflow -- --output --results-path evals/workflows/code_mode_results.json
 ```
 
 **Partial runs:**
-When using filters (`--category`, `--id`), only the filtered tests are updated in the results file. Other entries remain unchanged.
+When using filters (`--category`, `--id`), attempts are appended only for matching tests. Existing attempts remain unchanged.
 
 **Version control:**
 The `results.json` file is tracked in git, allowing you to:
@@ -419,7 +432,7 @@ The `results.json` file is tracked in git, allowing you to:
 
 Every run automatically compares against a baseline and prints per-test and aggregate **deltas** for tool bytes and tokens — no manual file diffing. This is how you answer "did this change grow the response size?".
 
-- **Default baseline** is the committed `evals/workflows/results.json`. Each test is matched by its `agentModel:judgeModel:testId` key.
+- **Default baseline** is the selected results path. Each test is matched by agent model and test ID.
 - **Custom baseline:** `--baseline <path>` compares against any saved results file.
 - Deltas read as `▼ -2.1 KB / -10.2%` (reduction) or `▲ +900 / +3.4%` (increase). Lower is better for both metrics.
 - This is **reporting only** — a regression never fails the run. Task success (all tests PASS) is the hard gate.
@@ -447,7 +460,12 @@ File: `test-cases.json`
     "prompt": "User prompt for agent",
     "requirements": "What agent must do to pass",
     "maxTurns": 10,
-    "tools": ["actors", "docs"]
+    "tools": ["actors", "docs"],
+    "disallowedTools": ["add-actor"],
+    "agentInstructions": "Use regular MCP tools.",
+    "allowedCallActorTargets": ["apify/code-runtime"],
+    "pairId": "test-pair",
+    "arm": "code-mode"
   }
 ]
 ```
@@ -460,7 +478,11 @@ File: `test-cases.json`
 
 **Optional:**
 - `maxTurns` - Override default (10)
-- `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
+- `tools` - Server-side tool allowlist passed as `--tools`
+- `disallowedTools` - Hide tools from the agent and reject direct calls
+- `allowedCallActorTargets` / `disallowedCallActorTargets` - Restrict Actor IDs used through `call-actor`
+- `agentInstructions` - Evaluation-only system instructions
+- `pairId` / `arm` - Group standard and Code Mode variants of the same prompt
 
 ## Performance
 

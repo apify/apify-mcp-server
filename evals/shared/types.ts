@@ -38,11 +38,29 @@ export type ToolSelectionTestCase = {
  * Test case for workflow evaluation (multi-turn agent conversations)
  * Used in: evals/workflows/
  */
+export const WORKFLOW_EVAL_ARM = {
+    STANDARD: 'standard',
+    CODE_MODE: 'code-mode',
+} as const;
+export type WorkflowEvalArm = (typeof WORKFLOW_EVAL_ARM)[keyof typeof WORKFLOW_EVAL_ARM];
+
 export type WorkflowTestCase = {
     /** Maximum number of turns allowed (optional, defaults to config value) */
     maxTurns?: number;
     /** Tools to enable for this test (optional, e.g., ["actors", "docs", "apify/rag-web-browser"]) */
     tools?: string[];
+    /** Enabled tools to hide from the agent and reject if called. */
+    disallowedTools?: string[];
+    /** Actor IDs the generic call-actor tool may run. */
+    allowedCallActorTargets?: string[];
+    /** Actor IDs the generic call-actor tool may not run. */
+    disallowedCallActorTargets?: string[];
+    /** Evaluation-only instructions appended to the agent system prompt. */
+    agentInstructions?: string;
+    /** Groups variants of the same task. */
+    pairId?: string;
+    /** Strategy variant for paired evaluations. */
+    arm?: WorkflowEvalArm;
 } & BaseTestCase;
 
 /**

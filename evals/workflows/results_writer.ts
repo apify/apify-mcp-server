@@ -1,37 +1,43 @@
 /**
- * Results writer for persisting test results to JSON file
- * Stores latest result per (agentModel, judgeModel, testId) combination
+ * Results writer for persisting workflow evaluation attempts.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import type { EvaluationResult, ResultsDatabase, TestResultRecord } from './output_formatter.js';
-import { sumResultBytes } from './output_formatter.js';
+import {
+    getFailedToolCallCount,
+    getFinalResponse,
+    getPolicyViolations,
+    getToolCallCount,
+    getToolCallTrace,
+    sumResultBytes,
+} from './output_formatter.js';
 
 /**
- * Build composite key for storing results
- * Format: "{agentModel}:{judgeModel}:{testId}"
+ * Build composite key used by legacy results files.
  */
 export function buildResultKey(agentModel: string, judgeModel: string, testId: string): string {
     return `${agentModel}:${judgeModel}:${testId}`;
 }
 
+function getRecords(database: ResultsDatabase): TestResultRecord[] {
+    return [...Object.values(database.results ?? {}), ...(database.attempts ?? [])];
+}
+
 /**
- * Find the baseline record for byte/token deltas, matched by agent model + test ID.
- * The judge model is excluded on purpose: tool bytes and agent token counts are
- * produced by the agent, not the judge, so a baseline recorded with a different
- * judge is still a valid comparison. When several judges recorded the same
- * agent/test, prefer a record that carries metrics, then the most recent.
+ * Find newest baseline record with metrics for an agent model and test.
  */
 export function findBaselineRecord(
     database: ResultsDatabase,
     agentModel: string,
     testId: string,
 ): TestResultRecord | undefined {
-    const hasMetrics = (r: TestResultRecord): boolean => r.resultBytes !== undefined || r.totalTokens !== undefined;
+    const hasMetrics = (record: TestResultRecord): boolean =>
+        record.resultBytes !== undefined || record.totalTokens !== undefined;
     let best: TestResultRecord | undefined;
-    for (const record of Object.values(database.results)) {
+    for (const record of getRecords(database)) {
         if (record.agentModel !== agentModel || record.testId !== testId) continue;
         if (
             best === undefined ||
@@ -45,27 +51,24 @@ export function findBaselineRecord(
 }
 
 /**
- * Load existing results database from file
- * Returns empty database if file doesn't exist
+ * Load existing results, or create an empty append-only database.
  */
 export function loadResultsDatabase(filePath: string): ResultsDatabase {
     if (!existsSync(filePath)) {
         return {
-            version: '1.0',
-            results: {},
+            version: '2.0',
+            attempts: [],
         };
     }
 
     try {
-        const fileContent = readFileSync(filePath, 'utf-8');
-        const data = JSON.parse(fileContent) as ResultsDatabase;
-
-        // Validate structure
-        if (!data.version || !data.results || typeof data.results !== 'object') {
-            throw new Error('Invalid database structure: missing version or results field');
+        const database = JSON.parse(readFileSync(filePath, 'utf-8')) as ResultsDatabase;
+        const hasResults = database.results && typeof database.results === 'object';
+        const hasAttempts = Array.isArray(database.attempts);
+        if (!database.version || (!hasResults && !hasAttempts)) {
+            throw new Error('Invalid database structure: missing version, results, or attempts field');
         }
-
-        return data;
+        return database;
     } catch (error) {
         throw new Error(
             `Failed to load results database from ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
@@ -73,20 +76,11 @@ export function loadResultsDatabase(filePath: string): ResultsDatabase {
     }
 }
 
-/**
- * Save results database to file with pretty formatting
- */
 export function saveResultsDatabase(filePath: string, database: ResultsDatabase): void {
     try {
-        // Ensure parent directory exists
-        const dir = dirname(filePath);
-        if (!existsSync(dir)) {
-            mkdirSync(dir, { recursive: true });
-        }
-
-        // Write with pretty formatting (2-space indent)
-        const json = JSON.stringify(database, null, 2);
-        writeFileSync(filePath, json, 'utf-8');
+        const directory = dirname(filePath);
+        if (!existsSync(directory)) mkdirSync(directory, { recursive: true });
+        writeFileSync(filePath, JSON.stringify(database, null, 2), 'utf-8');
     } catch (error) {
         throw new Error(
             `Failed to save results database to ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
@@ -95,53 +89,43 @@ export function saveResultsDatabase(filePath: string, database: ResultsDatabase)
 }
 
 /**
- * Convert EvaluationResult to TestResultRecord
+ * Convert one evaluation attempt to its persisted form.
  */
 export function convertEvaluationResultToRecord(
     result: EvaluationResult,
     agentModel: string,
     judgeModel: string,
 ): TestResultRecord {
-    // Handle error cases
-    if (result.error) {
-        return {
-            timestamp: new Date().toISOString(),
-            agentModel,
-            judgeModel,
-            testId: result.testCase.id,
-            verdict: 'FAIL',
-            reason: result.error,
-            durationMs: result.durationMs,
-            turns: result.conversation.totalTurns,
-            resultBytes: sumResultBytes(result.conversation),
-            promptTokens: result.conversation.promptTokens ?? 0,
-            completionTokens: result.conversation.completionTokens ?? 0,
-            totalTokens: result.conversation.totalTokens ?? 0,
-            error: result.error,
-        };
-    }
-
-    // Normal case
+    const { conversation } = result;
     return {
         timestamp: new Date().toISOString(),
         agentModel,
         judgeModel,
         testId: result.testCase.id,
-        verdict: result.judgeResult.verdict,
-        reason: result.judgeResult.reason,
+        pairId: result.testCase.pairId,
+        arm: result.testCase.arm,
+        verdict: result.error ? 'FAIL' : result.judgeResult.verdict,
+        reason: result.error ?? result.judgeResult.reason,
         durationMs: result.durationMs,
-        turns: result.conversation.totalTurns,
-        resultBytes: sumResultBytes(result.conversation),
-        promptTokens: result.conversation.promptTokens ?? 0,
-        completionTokens: result.conversation.completionTokens ?? 0,
-        totalTokens: result.conversation.totalTokens ?? 0,
-        error: null,
+        turns: conversation.totalTurns,
+        resultBytes: sumResultBytes(conversation),
+        promptTokens: conversation.promptTokens,
+        completionTokens: conversation.completionTokens,
+        totalTokens: conversation.totalTokens,
+        cachedPromptTokens: conversation.cachedPromptTokens,
+        reasoningTokens: conversation.reasoningTokens,
+        judgeUsage: result.judgeResult.usage,
+        toolCalls: getToolCallCount(conversation),
+        failedToolCalls: getFailedToolCallCount(conversation),
+        policyViolations: getPolicyViolations(conversation),
+        finalResponse: getFinalResponse(conversation),
+        toolCallTrace: getToolCallTrace(conversation),
+        error: result.error ?? null,
     };
 }
 
 /**
- * Update results database with new evaluation results
- * Only updates entries for tests that ran (preserves other entries)
+ * Append evaluation attempts without replacing earlier runs.
  */
 export function updateResultsWithEvaluations(
     database: ResultsDatabase,
@@ -149,18 +133,11 @@ export function updateResultsWithEvaluations(
     agentModel: string,
     judgeModel: string,
 ): ResultsDatabase {
-    // Clone database to avoid mutation
-    const updatedDatabase: ResultsDatabase = {
-        version: database.version,
-        results: { ...database.results },
+    return {
+        version: '2.0',
+        attempts: [
+            ...getRecords(database),
+            ...results.map((result) => convertEvaluationResultToRecord(result, agentModel, judgeModel)),
+        ],
     };
-
-    // Update each test result
-    for (const result of results) {
-        const record = convertEvaluationResultToRecord(result, agentModel, judgeModel);
-        const key = buildResultKey(agentModel, judgeModel, result.testCase.id);
-        updatedDatabase.results[key] = record;
-    }
-
-    return updatedDatabase;
 }

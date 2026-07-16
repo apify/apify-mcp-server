@@ -80,7 +80,7 @@ Evaluation criteria:
 Important notes:
 - Focus on whether requirements were met, not on writing style
 - The agent may use different tools than expected if they accomplish the same goal
-- Tool results are not shown (only tool calls and agent responses)
+- Tool results are shown as bounded evidence and may be truncated
 - Minor inefficiencies are acceptable if the task was completed
 
 Provide your evaluation with a verdict (PASS or FAIL) and a brief explanation (1-2 sentences).`;

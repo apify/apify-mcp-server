@@ -9,7 +9,9 @@ import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 import type { WorkflowTestCase } from '../shared/types.js';
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
 import type { LlmClient } from './llm_client.js';
-import type { ConversationHistory } from './types.js';
+import type { ConversationHistory, McpToolResult, TokenUsage } from './types.js';
+
+const MAX_TOOL_RESULT_CHARS = 4_000;
 
 /**
  * Judge evaluation result
@@ -21,6 +23,8 @@ export type JudgeResult = {
     reason: string;
     /** Raw response from judge (for debugging) */
     rawResponse: string;
+    /** Token usage for the judge call. */
+    usage?: TokenUsage;
 };
 
 /**
@@ -51,11 +55,20 @@ const JUDGE_RESPONSE_SCHEMA: ResponseFormatJSONSchema = {
     },
 };
 
+function formatToolResultForJudge(toolResult: McpToolResult): string {
+    const serialized = JSON.stringify(
+        toolResult.success
+            ? toolResult.result
+            : { error: toolResult.error, policyViolation: toolResult.policyViolation },
+    );
+    if (serialized.length <= MAX_TOOL_RESULT_CHARS) return serialized;
+    return `${serialized.slice(0, MAX_TOOL_RESULT_CHARS)}...[truncated ${serialized.length - MAX_TOOL_RESULT_CHARS} chars]`;
+}
+
 /**
- * Format conversation for judge evaluation
- * Judge sees: tool calls + arguments + final responses (NOT tool results)
+ * Format conversation for judge evaluation with bounded tool-result evidence.
  */
-function formatConversationForJudge(conversation: ConversationHistory): string {
+export function formatConversationForJudge(conversation: ConversationHistory): string {
     const lines: string[] = [];
 
     // User prompt
@@ -69,6 +82,12 @@ function formatConversationForJudge(conversation: ConversationHistory): string {
             for (const toolCall of turn.toolCalls) {
                 lines.push(`AGENT: [Called tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.arguments)}]`);
             }
+        }
+        for (const toolResult of turn.toolResults) {
+            lines.push(
+                `TOOL: [${toolResult.toolName} ${toolResult.success ? 'succeeded' : 'failed'}] ` +
+                    formatToolResultForJudge(toolResult),
+            );
         }
 
         // Show final response (if present)
@@ -142,6 +161,7 @@ export async function evaluateConversation(
             verdict,
             reason,
             rawResponse,
+            usage: response.usage,
         };
     } catch (error) {
         throw new Error(

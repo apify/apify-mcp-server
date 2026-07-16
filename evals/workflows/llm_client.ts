@@ -10,15 +10,7 @@ import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/reso
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
 import { OPENROUTER_CONFIG } from './config.js';
-
-/**
- * Token usage reported by the LLM API for a single call
- */
-export type LlmUsage = {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-};
+import type { TokenUsage } from './types.js';
 
 /**
  * Response from LLM - either text or tool calls
@@ -33,7 +25,7 @@ export type LlmResponse = {
         arguments: string;
     }[];
     /** Token usage for this call (undefined if the provider did not report it) */
-    usage?: LlmUsage;
+    usage?: TokenUsage;
 };
 
 /**
@@ -78,11 +70,13 @@ export class LlmClient {
             throw new Error('LLM returned no message');
         }
 
-        const usage: LlmUsage | undefined = response.usage
+        const usage: TokenUsage | undefined = response.usage
             ? {
                   promptTokens: response.usage.prompt_tokens,
                   completionTokens: response.usage.completion_tokens,
                   totalTokens: response.usage.total_tokens,
+                  cachedPromptTokens: response.usage.prompt_tokens_details?.cached_tokens,
+                  reasoningTokens: response.usage.completion_tokens_details?.reasoning_tokens,
               }
             : undefined;
 

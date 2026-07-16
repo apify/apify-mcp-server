@@ -48,6 +48,7 @@ type CliArgs = {
     toolTimeout?: number;
     concurrency?: number;
     output?: boolean;
+    resultsPath?: string;
     baseline?: string;
 };
 
@@ -77,7 +78,11 @@ async function runSingleTest(
     logWithPrefix(testId, `[${index + 1}/${total}] Running...`);
 
     // Create FRESH MCP instance per test for isolation
-    const mcpClient = new McpClient(argv.toolTimeout);
+    const mcpClient = new McpClient(argv.toolTimeout, {
+        disallowedTools: testCase.disallowedTools,
+        allowedCallActorTargets: testCase.allowedCallActorTargets,
+        disallowedCallActorTargets: testCase.disallowedCallActorTargets,
+    });
     const startTime = Date.now();
     let result: EvaluationResult;
 
@@ -96,6 +101,7 @@ async function runSingleTest(
             maxTurns: testCase.maxTurns,
             model: argv.agentModel,
             serverInstructions,
+            agentInstructions: testCase.agentInstructions,
         });
 
         // Judge conversation
@@ -103,16 +109,26 @@ async function runSingleTest(
 
         const durationMs = Date.now() - startTime;
 
+        const policyViolation = conversation.turns.some((turn) =>
+            turn.toolResults.some((toolResult) => toolResult.policyViolation),
+        );
+        const finalJudgeResult = policyViolation
+            ? {
+                  ...judgeResult,
+                  verdict: 'FAIL' as const,
+                  reason: 'Agent violated the evaluation tool policy.',
+              }
+            : judgeResult;
         result = {
             testCase,
             conversation,
-            judgeResult,
+            judgeResult: finalJudgeResult,
             durationMs,
         };
 
         logWithPrefix(
             testId,
-            `  ${judgeResult.verdict === 'PASS' ? '✅' : '❌'} ${judgeResult.verdict} (${durationMs}ms)`,
+            `  ${finalJudgeResult.verdict === 'PASS' ? '✅' : '❌'} ${finalJudgeResult.verdict} (${durationMs}ms)`,
         );
     } catch (error) {
         const durationMs = Date.now() - startTime;
@@ -205,8 +221,12 @@ async function main() {
         .option('output', {
             alias: 'o',
             type: 'boolean',
-            description: 'Save test results to JSON file (evals/workflows/results.json)',
+            description: 'Save test results to JSON file',
             default: false,
+        })
+        .option('results-path', {
+            type: 'string',
+            description: 'Results JSON file (default: evals/workflows/results.json)',
         })
         .option('baseline', {
             type: 'string',
@@ -318,7 +338,10 @@ async function main() {
     // Load baseline for byte/token deltas (read before --output overwrites results.json).
     // Matched by agent model + test ID; the judge model is ignored because bytes/tokens
     // come from the agent, so a baseline recorded with a different judge still compares.
-    const baselinePath = argv.baseline ?? path.join(process.cwd(), 'evals/workflows/results.json');
+    const resultsPath = argv.resultsPath
+        ? path.resolve(process.cwd(), argv.resultsPath)
+        : path.join(process.cwd(), 'evals/workflows/results.json');
+    const baselinePath = argv.baseline ? path.resolve(process.cwd(), argv.baseline) : resultsPath;
     const baselineByTestId = new Map<string, TestResultRecord>();
     let baselineWithMetrics = 0;
     try {
@@ -374,7 +397,6 @@ async function main() {
 
     // Save results to file if --output flag is present
     if (argv.output) {
-        const resultsPath = path.join(process.cwd(), 'evals/workflows/results.json');
         try {
             const database = loadResultsDatabase(resultsPath);
             const updatedDatabase = updateResultsWithEvaluations(database, results, argv.agentModel!, argv.judgeModel!);

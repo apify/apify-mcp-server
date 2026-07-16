@@ -1,0 +1,77 @@
+{
+  "version": "1.0",
+  "testCases": [
+    {
+      "id": "code-mode-instagram-5-standard",
+      "pairId": "code-mode-instagram-5",
+      "arm": "standard",
+      "category": "code-mode",
+      "query": "Show me the 5 latest posts from the natgeo Instagram profile. For each post, return its URL, publication time, and caption.",
+      "reference": "The agent must return five recent natgeo Instagram posts. Each result must include a post URL, publication time, and caption.",
+      "agentInstructions": "Use regular MCP Actor and storage tools. Do not use apify/code-runtime.",
+      "tools": ["actors", "get-dataset-items"],
+      "disallowedCallActorTargets": ["apify/code-runtime"],
+      "maxTurns": 18
+    },
+    {
+      "id": "code-mode-instagram-5-runtime",
+      "pairId": "code-mode-instagram-5",
+      "arm": "code-mode",
+      "category": "code-mode",
+      "query": "Show me the 5 latest posts from the natgeo Instagram profile. For each post, return its URL, publication time, and caption.",
+      "reference": "The agent must call apify/code-runtime and return five recent natgeo Instagram posts. Each result must include a post URL, publication time, and caption.",
+      "agentInstructions": "Complete the task through apify/code-runtime. Put Actor execution and result processing inside the JavaScript passed to it.",
+      "tools": ["actors", "get-dataset-items"],
+      "allowedCallActorTargets": ["apify/code-runtime"],
+      "maxTurns": 18
+    },
+    {
+      "id": "code-mode-maps-filter-standard",
+      "pairId": "code-mode-maps-filter",
+      "arm": "standard",
+      "category": "code-mode",
+      "query": "Scrape 100 cafes in Prague from Google Maps. Keep places rated at least 4.5 with at least 200 reviews, then return the top 10 by review count with name, website URL, rating, and review count.",
+      "reference": "The agent must use Google Maps data and return no more than ten Prague cafes. Every result must have rating at least 4.5 and review count at least 200, be sorted by review count descending, and include name, website URL when available, rating, and review count.",
+      "agentInstructions": "Use regular MCP Actor and storage tools. Do not use apify/code-runtime.",
+      "tools": ["actors", "get-dataset-items"],
+      "disallowedCallActorTargets": ["apify/code-runtime"],
+      "maxTurns": 20
+    },
+    {
+      "id": "code-mode-maps-filter-runtime",
+      "pairId": "code-mode-maps-filter",
+      "arm": "code-mode",
+      "category": "code-mode",
+      "query": "Scrape 100 cafes in Prague from Google Maps. Keep places rated at least 4.5 with at least 200 reviews, then return the top 10 by review count with name, website URL, rating, and review count.",
+      "reference": "The agent must call apify/code-runtime and return no more than ten Prague cafes from Google Maps. Every result must have rating at least 4.5 and review count at least 200, be sorted by review count descending, and include name, website URL when available, rating, and review count.",
+      "agentInstructions": "Complete the task through apify/code-runtime. Put Actor execution, filtering, sorting, and projection inside the JavaScript passed to it.",
+      "tools": ["actors", "get-dataset-items"],
+      "allowedCallActorTargets": ["apify/code-runtime"],
+      "maxTurns": 20
+    },
+    {
+      "id": "code-mode-maps-websites-standard",
+      "pairId": "code-mode-maps-websites",
+      "arm": "standard",
+      "category": "code-mode",
+      "query": "Scrape 20 cafes in Prague from Google Maps. For each place with a website, scrape only its landing page. Return the place name and website URL only when the landing page contains the string 'prague', case-insensitive.",
+      "reference": "The agent must scrape Google Maps places, visit each available website landing page, filter page content case-insensitively for 'prague', and return only matching place names with website URLs.",
+      "agentInstructions": "Use regular MCP Actor and storage tools. Do not use apify/code-runtime.",
+      "tools": ["actors", "get-dataset-items"],
+      "disallowedCallActorTargets": ["apify/code-runtime"],
+      "maxTurns": 30
+    },
+    {
+      "id": "code-mode-maps-websites-runtime",
+      "pairId": "code-mode-maps-websites",
+      "arm": "code-mode",
+      "category": "code-mode",
+      "query": "Scrape 20 cafes in Prague from Google Maps. For each place with a website, scrape only its landing page. Return the place name and website URL only when the landing page contains the string 'prague', case-insensitive.",
+      "reference": "The agent must call apify/code-runtime, scrape Google Maps places, visit each available website landing page, filter page content case-insensitively for 'prague', and return only matching place names with website URLs.",
+      "agentInstructions": "Complete the task through apify/code-runtime. Put Actor chaining, bounded fan-out, and filtering inside the JavaScript passed to it.",
+      "tools": ["actors", "get-dataset-items"],
+      "allowedCallActorTargets": ["apify/code-runtime"],
+      "maxTurns": 30
+    }
+  ]
+}

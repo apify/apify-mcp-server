@@ -3,7 +3,7 @@
  */
 
 import type { WorkflowTestCase } from './test_cases_loader.js';
-import type { ConversationHistory } from './types.js';
+import type { ConversationHistory, TokenUsage } from './types.js';
 import type { JudgeResult } from './workflow_judge.js';
 
 /**
@@ -29,6 +29,58 @@ export function sumResultBytes(conversation: ConversationHistory): number {
         }
     }
     return total;
+}
+
+export function getToolCallCount(conversation: ConversationHistory): number {
+    return conversation.turns.reduce((total, turn) => total + turn.toolCalls.length, 0);
+}
+
+export function getFailedToolCallCount(conversation: ConversationHistory): number {
+    return conversation.turns.reduce(
+        (total, turn) => total + turn.toolResults.filter((toolResult) => !toolResult.success).length,
+        0,
+    );
+}
+
+export function getPolicyViolations(conversation: ConversationHistory): string[] {
+    return conversation.turns.flatMap((turn) =>
+        turn.toolResults.flatMap((toolResult) => (toolResult.policyViolation ? [toolResult.policyViolation] : [])),
+    );
+}
+
+export function getFinalResponse(conversation: ConversationHistory): string {
+    for (let index = conversation.turns.length - 1; index >= 0; index--) {
+        const { finalResponse } = conversation.turns[index];
+        if (finalResponse !== undefined) return finalResponse;
+    }
+    return '';
+}
+
+export type ToolCallTraceEntry = {
+    turnNumber: number;
+    name: string;
+    arguments: Record<string, unknown>;
+    success: boolean;
+    error?: string;
+    policyViolation?: string;
+    resultBytes?: number;
+};
+
+export function getToolCallTrace(conversation: ConversationHistory): ToolCallTraceEntry[] {
+    return conversation.turns.flatMap((turn) =>
+        turn.toolCalls.map((toolCall, index) => {
+            const toolResult = turn.toolResults[index];
+            return {
+                turnNumber: turn.turnNumber,
+                name: toolCall.name,
+                arguments: toolCall.arguments,
+                success: toolResult?.success ?? false,
+                error: toolResult?.error,
+                policyViolation: toolResult?.policyViolation,
+                resultBytes: toolResult?.resultBytes,
+            };
+        }),
+    );
 }
 
 /**
@@ -276,6 +328,10 @@ export type TestResultRecord = {
     judgeModel: string;
     /** Test case ID */
     testId: string;
+    /** Paired experiment ID */
+    pairId?: string;
+    /** Experiment strategy */
+    arm?: WorkflowTestCase['arm'];
     /** Test verdict (PASS or FAIL) */
     verdict: 'PASS' | 'FAIL';
     /** Judge reasoning or error message */
@@ -292,15 +348,31 @@ export type TestResultRecord = {
     completionTokens?: number;
     /** Total tokens billed across all agent LLM calls (prompt + completion; absent in records written before this metric, or when the provider omits usage) */
     totalTokens?: number;
+    /** Cached prompt tokens reported across all agent LLM calls */
+    cachedPromptTokens?: number;
+    /** Reasoning tokens reported across all agent LLM calls */
+    reasoningTokens?: number;
+    /** Judge token usage, kept separate from agent usage */
+    judgeUsage?: TokenUsage;
+    /** Number of MCP tool calls */
+    toolCalls?: number;
+    /** Number of failed MCP tool calls */
+    failedToolCalls?: number;
+    /** Evaluation policy violations */
+    policyViolations?: string[];
+    /** Final response returned by the agent */
+    finalResponse?: string;
+    /** Tool calls and outcomes, including generated Code Mode scripts but excluding result bodies */
+    toolCallTrace?: ToolCallTraceEntry[];
     /** Error message if execution failed, null otherwise */
     error: string | null;
 };
 
 /**
- * Results database structure
- * Keys are in format: "{agentModel}:{judgeModel}:{testId}"
+ * Results database structure. Legacy keyed results remain readable; new attempts append to `attempts`.
  */
 export type ResultsDatabase = {
     version: string;
-    results: Record<string, TestResultRecord>;
+    results?: Record<string, TestResultRecord>;
+    attempts?: TestResultRecord[];
 };

@@ -1,3 +1,4 @@
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { describe, expect, it } from 'vitest';
 
 import { executeConversation } from '../../evals/workflows/conversation_executor.js';
@@ -39,19 +40,54 @@ const finalResponse = (usage?: LlmResponse['usage']): LlmResponse => ({
 });
 
 describe('executeConversation()', () => {
+    it('appends evaluation instructions to the system prompt', async () => {
+        let messages: ChatCompletionMessageParam[] = [];
+        const llmClient = {
+            callLlm: async (receivedMessages: ChatCompletionMessageParam[]): Promise<LlmResponse> => {
+                messages = receivedMessages;
+                return finalResponse();
+            },
+        } as unknown as LlmClient;
+
+        await executeConversation({
+            userPrompt: 'go',
+            agentInstructions: 'Use Code Mode.',
+            mcpClient: makeMcpClient({ toolName: 'search-actors', success: true }),
+            llmClient,
+        });
+
+        expect(messages[0].content).toContain('## Evaluation Instructions');
+        expect(messages[0].content).toContain('Use Code Mode.');
+    });
+
     it('accumulates token usage across multiple turns', async () => {
         const conversation = await executeConversation({
             userPrompt: 'go',
             mcpClient: makeMcpClient({ toolName: 'search-actors', success: true, result: { items: [] } }),
             llmClient: makeLlmClient([
-                toolCallResponse({ promptTokens: 10, completionTokens: 5, totalTokens: 15 }),
-                finalResponse({ promptTokens: 20, completionTokens: 7, totalTokens: 27 }),
+                toolCallResponse({
+                    promptTokens: 10,
+                    completionTokens: 5,
+                    totalTokens: 15,
+                    cachedPromptTokens: 3,
+                    reasoningTokens: 2,
+                }),
+                finalResponse({
+                    promptTokens: 20,
+                    completionTokens: 7,
+                    totalTokens: 27,
+                    cachedPromptTokens: 4,
+                    reasoningTokens: 1,
+                }),
             ]),
         });
 
         expect(conversation.promptTokens).toBe(30);
         expect(conversation.completionTokens).toBe(12);
         expect(conversation.totalTokens).toBe(42);
+        expect(conversation.cachedPromptTokens).toBe(7);
+        expect(conversation.reasoningTokens).toBe(3);
+        expect(conversation.turns.map((turn) => turn.usage?.totalTokens)).toEqual([15, 27]);
     });
 
     it('records resultBytes on a successful tool result', async () => {
@@ -91,5 +127,7 @@ describe('executeConversation()', () => {
         expect(conversation.promptTokens).toBe(20);
         expect(conversation.completionTokens).toBe(7);
         expect(conversation.totalTokens).toBe(27);
+        expect(conversation.cachedPromptTokens).toBeUndefined();
+        expect(conversation.reasoningTokens).toBeUndefined();
     });
 });

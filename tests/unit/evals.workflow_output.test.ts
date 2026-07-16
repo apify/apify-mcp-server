@@ -142,6 +142,11 @@ describe('formatResultsTable()', () => {
             promptTokens: 0,
             completionTokens: 0,
             totalTokens,
+            toolCalls: 0,
+            failedToolCalls: 0,
+            policyViolations: [],
+            finalResponse: '',
+            toolCallTrace: [],
             error: null,
         };
     }

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ResultsDatabase, TestResultRecord } from '../../evals/workflows/output_formatter.js';
-import { buildResultKey, findBaselineRecord } from '../../evals/workflows/results_writer.js';
+import type { EvaluationResult, ResultsDatabase, TestResultRecord } from '../../evals/workflows/output_formatter.js';
+import {
+    buildResultKey,
+    findBaselineRecord,
+    updateResultsWithEvaluations,
+} from '../../evals/workflows/results_writer.js';
 
 function makeRecord(overrides: Partial<TestResultRecord>): TestResultRecord {
     return {
@@ -17,18 +21,45 @@ function makeRecord(overrides: Partial<TestResultRecord>): TestResultRecord {
         promptTokens: 0,
         completionTokens: 0,
         totalTokens: 500,
+        toolCalls: 1,
+        failedToolCalls: 0,
+        policyViolations: [],
+        finalResponse: 'done',
+        toolCallTrace: [],
         error: null,
         ...overrides,
     };
 }
 
 function makeDatabase(records: TestResultRecord[]): ResultsDatabase {
-    const results: ResultsDatabase['results'] = {};
+    const results: NonNullable<ResultsDatabase['results']> = {};
     for (const record of records) {
         results[buildResultKey(record.agentModel, record.judgeModel, record.testId)] = record;
     }
     return { version: '1.0', results };
 }
+
+describe('updateResultsWithEvaluations()', () => {
+    it('appends repeated attempts', () => {
+        const result = {
+            testCase: { id: 'test', category: 'code-mode', query: 'query', reference: 'reference' },
+            conversation: {
+                userPrompt: 'query',
+                turns: [],
+                completed: true,
+                hitMaxTurns: false,
+                totalTurns: 1,
+            },
+            judgeResult: { verdict: 'PASS', reason: 'ok', rawResponse: '' },
+            durationMs: 100,
+        } satisfies EvaluationResult;
+
+        const first = updateResultsWithEvaluations({ version: '2.0', attempts: [] }, [result], 'agent', 'judge');
+        const second = updateResultsWithEvaluations(first, [result], 'agent', 'judge');
+
+        expect(second.attempts).toHaveLength(2);
+    });
+});
 
 describe('findBaselineRecord()', () => {
     it('matches by agent model and test ID regardless of the judge model', () => {
