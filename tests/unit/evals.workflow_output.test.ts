@@ -7,6 +7,7 @@ import {
     formatTokens,
     formatWithDelta,
     getCallActorTargets,
+    getToolCallTrace,
     sumResultBytes,
 } from '../../evals/workflows/output_formatter.js';
 import type { ConversationHistory } from '../../evals/workflows/types.js';
@@ -58,6 +59,44 @@ describe('sumResultBytes()', () => {
             },
         ]);
         expect(sumResultBytes(conversation)).toBe(30);
+    });
+});
+
+describe('getToolCallTrace()', () => {
+    it("carries each tool call's startedAt and durationMs through to the trace entry", () => {
+        const conversation = makeConversation([
+            {
+                turnNumber: 1,
+                toolCalls: [{ name: 'call-actor', arguments: { actor: 'apify/code-runtime' } }],
+                toolResults: [
+                    {
+                        toolName: 'call-actor',
+                        success: true,
+                        result: {},
+                        startedAt: '2026-01-01T00:00:00.000Z',
+                        durationMs: 4321,
+                    },
+                ],
+            },
+        ]);
+
+        const [entry] = getToolCallTrace(conversation);
+        expect(entry.startedAt).toBe('2026-01-01T00:00:00.000Z');
+        expect(entry.durationMs).toBe(4321);
+    });
+
+    it('leaves startedAt/durationMs undefined when the tool result never recorded them', () => {
+        const conversation = makeConversation([
+            {
+                turnNumber: 1,
+                toolCalls: [{ name: 'search-actors', arguments: {} }],
+                toolResults: [{ toolName: 'search-actors', success: true, result: {} }],
+            },
+        ]);
+
+        const [entry] = getToolCallTrace(conversation);
+        expect(entry.startedAt).toBeUndefined();
+        expect(entry.durationMs).toBeUndefined();
     });
 });
 

@@ -146,4 +146,36 @@ describe('executeConversation()', () => {
         expect(turns).toBe(conversation.turns);
         expect(turns).toHaveLength(3);
     });
+
+    it('records when each LLM call and tool call started and how long it took', async () => {
+        const llmClient = {
+            callLlm: async (): Promise<LlmResponse> => {
+                await new Promise((resolve) => setTimeout(resolve, 5));
+                return toolCallResponse();
+            },
+        } as unknown as LlmClient;
+        const mcpClient = {
+            getTools: () => [],
+            getInstructions: () => null,
+            callTool: async (): Promise<McpToolResult> => {
+                await new Promise((resolve) => setTimeout(resolve, 5));
+                return { toolName: 'search-actors', success: true, result: { items: [] } };
+            },
+        } as unknown as McpClient;
+
+        const conversation = await executeConversation({
+            userPrompt: 'go',
+            mcpClient,
+            llmClient,
+            maxTurns: 1,
+        });
+
+        const [turn] = conversation.turns;
+        expect(turn.llmStartedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(turn.llmDurationMs).toBeGreaterThanOrEqual(5);
+
+        const [toolResult] = turn.toolResults;
+        expect(toolResult.startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(toolResult.durationMs).toBeGreaterThanOrEqual(5);
+    });
 });

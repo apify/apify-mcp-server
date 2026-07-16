@@ -413,7 +413,7 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
 - `cachedPromptTokens` / `reasoningTokens` - Provider-reported agent usage details
 - `judgeUsage` - Judge tokens, kept separate from agent usage
 - `toolCalls`, `failedToolCalls`, `policyViolations` - Execution counters and policy failures
-- `finalResponse`, `toolCallTrace` - Agent answer and tool-call trace (name, arguments, success, byte size), including generated Code Mode scripts; result bodies are excluded to keep the file compact
+- `finalResponse`, `toolCallTrace` - Agent answer and tool-call trace (name, arguments, success, byte size, `startedAt`/`durationMs`), including generated Code Mode scripts; result bodies are excluded to keep the file compact
 - `usedCodeRuntime` - Whether the agent called `apify/code-runtime` at least once. Informational only — does not gate pass/fail, since a code-mode-arm agent may legitimately call other Actors directly for discovery.
 - `error` - Error message if execution failed, `null` otherwise
 
@@ -483,6 +483,17 @@ Each entry: `testId`, `category`, `arm`, `pairId`, `query`, `durationMs`,
 `error`, `verdict`, `judgeReason`, and `conversation` (the full
 `ConversationHistory` — every turn's `toolCalls`, `toolResults` (including
 `result`, the raw tool output), `usage`, and `finalResponse`).
+
+Every turn also carries `llmStartedAt` (ISO timestamp) / `llmDurationMs` for
+its LLM call, and every tool result carries `startedAt` / `durationMs` for
+that specific call — enough to reconstruct a full timeline of where time
+went (LLM thinking vs. a specific nested Actor call). These same two fields
+are also included in `results.json`'s compact `toolCallTrace`.
+
+**Traces are written even when a test times out (`--test-timeout`) or
+errors** — the run's error/timeout path preserves whatever turns completed
+before the cutoff, so a stuck test's trace still shows exactly which tool
+call it was in and how long that call had already been running.
 
 > **Bootstrap note:** records written before these metrics existed have no `resultBytes`/`*Tokens` fields, so the first run after this change shows `(no baseline)` for them and writes fresh values with `--output`. Subsequent runs show real deltas.
 

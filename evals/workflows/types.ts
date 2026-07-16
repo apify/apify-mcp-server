@@ -28,6 +28,10 @@ export type McpToolResult = {
     policyViolation?: string;
     /** UTF-8 byte size of the serialized content the agent receives (set when the result is fed to the LLM) */
     resultBytes?: number;
+    /** ISO timestamp when this tool call started (before the MCP request was sent) */
+    startedAt?: string;
+    /** Wall-clock time the call took, in milliseconds (request + response, not just server-side execution) */
+    durationMs?: number;
 };
 
 /**
@@ -72,6 +76,10 @@ export type ConversationTurn = {
     usage?: TokenUsage;
     /** Final text response from agent (if no more tool calls) */
     finalResponse?: string;
+    /** ISO timestamp when this turn's LLM call started */
+    llmStartedAt?: string;
+    /** Wall-clock time the LLM call took, in milliseconds */
+    llmDurationMs?: number;
 };
 
 /**

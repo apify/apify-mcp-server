@@ -81,6 +81,8 @@ export type ToolCallTraceEntry = {
     error?: string;
     policyViolation?: string;
     resultBytes?: number;
+    startedAt?: string;
+    durationMs?: number;
 };
 
 export function getToolCallTrace(conversation: ConversationHistory): ToolCallTraceEntry[] {
@@ -95,6 +97,8 @@ export function getToolCallTrace(conversation: ConversationHistory): ToolCallTra
                 error: toolResult?.error,
                 policyViolation: toolResult?.policyViolation,
                 resultBytes: toolResult?.resultBytes,
+                startedAt: toolResult?.startedAt,
+                durationMs: toolResult?.durationMs,
             };
         }),
     );

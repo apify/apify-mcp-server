@@ -85,7 +85,10 @@ export async function executeConversation(options: ConversationExecutorOptions):
         turnNumber++;
 
         // Call LLM with current conversation state and current tools
+        const llmStartedAt = new Date().toISOString();
+        const llmCallStart = Date.now();
         const llmResponse = await llmClient.callLlm(messages, model, tools);
+        const llmDurationMs = Date.now() - llmCallStart;
 
         // Accumulate token usage across the agent loop (cost grows with tool-result size)
         if (llmResponse.usage) {
@@ -112,6 +115,8 @@ export async function executeConversation(options: ConversationExecutorOptions):
                 toolResults: [],
                 usage: llmResponse.usage,
                 finalResponse: llmResponse.content || '',
+                llmStartedAt,
+                llmDurationMs,
             });
 
             completed = true;
@@ -127,6 +132,8 @@ export async function executeConversation(options: ConversationExecutorOptions):
             })),
             toolResults: [],
             usage: llmResponse.usage,
+            llmStartedAt,
+            llmDurationMs,
         };
 
         // Add assistant message with tool calls to conversation
@@ -169,10 +176,14 @@ export async function executeConversation(options: ConversationExecutorOptions):
             }
 
             // Execute tool via MCP
+            const toolStartedAt = new Date().toISOString();
+            const toolCallStart = Date.now();
             const result = await mcpClient.callTool({
                 name: toolCall.name,
                 arguments: args,
             });
+            result.startedAt = toolStartedAt;
+            result.durationMs = Date.now() - toolCallStart;
 
             // Serialize the tool result exactly as the agent (LLM) receives it,
             // and record its byte size to measure the data volume tools return.
