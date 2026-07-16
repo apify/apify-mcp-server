@@ -433,4 +433,21 @@ describe('readApiResource()', () => {
         expect(error.message).toContain('HTTP 403: Forbidden');
         expect(error.message).toContain('may be private');
     });
+
+    it('inlines a body of exactly MAX_INLINE_BYTES (boundary — link-out is strictly over the limit)', async () => {
+        // axios aborts only when bytes exceed maxContentLength, so a body of exactly the limit is not
+        // aborted and inlines; only MAX_INLINE_BYTES + 1 links out (covered by the abortingStream tests).
+        const exact = Buffer.alloc(MAX_INLINE_BYTES, 0x61); // 'a' repeated to exactly the limit
+        const { request } = requestReturning(streamOf(exact), 'text/plain; charset=utf-8');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/EXACT`,
+            stubApifyClient({ request }),
+        );
+
+        const contents = firstContent(result);
+        expect(contents.text).toHaveLength(MAX_INLINE_BYTES);
+        expect(contents.text).not.toContain('exceeds');
+        expect(contents.mimeType).toBe('text/plain; charset=utf-8');
+    });
 });

@@ -15,11 +15,7 @@ import { getHttpErrorHint } from '../utils/mcp.js';
 
 const TEXT_MIME_TYPE = 'text/plain';
 
-/**
- * Base MIME types emitted as `text` contents; everything else (including a missing
- * Content-Type) is emitted as a base64 `blob`. JSON and XML are text so the raw body
- * stays readable and byte-exact — the proxy never parses or re-serializes it.
- */
+/** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */
 function isTextualMimeType(baseMimeType: string | undefined): boolean {
     if (!baseMimeType) return false;
     return (
@@ -38,9 +34,19 @@ function isTextualMimeType(baseMimeType: string | undefined): boolean {
  *   token, private resource, or a resource that does not exist; SEP-2164 remaps "nonexistent" here too).
  * - 429, 5xx, or no status (network failure) → `InternalError` (transient or upstream).
  */
-function statusToErrorCode(status: number | undefined): ErrorCode {
+function getErrorCodeForStatus(status: number | undefined): ErrorCode {
     if (status !== undefined && status < 500 && status !== 429) return ErrorCode.InvalidParams;
     return ErrorCode.InternalError;
+}
+
+/** Throw the standard resources/read failure McpError. Callers log the error first — the log source differs by site. */
+function throwReadFailure(uri: string, status: number | undefined, message: string): never {
+    const hint = getHttpErrorHint(status);
+    throw new McpError(
+        getErrorCodeForStatus(status),
+        `Failed to read ${uri}: ${status ? `HTTP ${status}: ` : ''}${message}${hint ? `. ${hint}` : ''}`,
+        { uri },
+    );
 }
 
 /**
@@ -102,20 +108,12 @@ async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Pr
     }
 }
 
-/**
- * Single text-contents result. Defaults to text/plain (link-outs); pass `mimeType`
- * to preserve a body's declared Content-Type (e.g. an empty record).
- */
+/** Single text-contents result; pass `mimeType` to preserve a body's declared Content-Type. */
 function buildTextResult(uri: string, text: string, mimeType: string = TEXT_MIME_TYPE): ReadResourceResult {
     return { contents: [{ uri, mimeType, text } satisfies TextResourceContents] };
 }
 
-/**
- * Successful read of a body too large to inline: a download pointer instead of the content.
- * NOT a failure (no McpError) — the resource is readable, just not inline. The link is only
- * auth-free for a key-value-store record whose store has a URL-signing key; an unsigned record
- * URL and every other (token-gated) API URL still need the Apify token.
- */
+/** Body too large to inline: a download-pointer text result. NOT a failure — the resource is readable, just not inline. */
 async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promise<ReadResourceResult> {
     const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient);
     return buildTextResult(
@@ -179,7 +177,6 @@ function parseApiErrorMessage(body: Buffer | undefined): string | undefined {
  * is aborted at ~`MAX_INLINE_BYTES`, never buffered whole.
  */
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
-    // Origin first: a non-Apify URL is never readable, with or without a token.
     if (!isApifyApiUri(uri)) {
         throw new McpError(
             ErrorCode.InvalidParams,
@@ -195,6 +192,9 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
 
     let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
     try {
+        // The raw axios instance skips `httpClient.call()` → `ensureNodeInit()`, so reads do NOT honor
+        // `HTTPS_PROXY` (auth + MCP-origin headers are instance defaults and still apply — not a leak).
+        // Fine for direct egress; a proxy-mandatory deployment needs an apify-client init hook.
         response = await apifyClient.httpClient.axios.request<unknown>({
             url: uri,
             method: 'GET',
@@ -203,14 +203,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         });
     } catch (err) {
         logHttpError(err, `resources/read request failed`, { uri });
-        const status = getHttpStatusCode(err);
-        const message = err instanceof Error ? err.message : String(err);
-        const hint = getHttpErrorHint(status);
-        throw new McpError(
-            statusToErrorCode(status),
-            `Failed to read ${uri}: ${status ? `HTTP ${status}: ` : ''}${message}${hint ? `. ${hint}` : ''}`,
-            { uri },
-        );
+        throwReadFailure(uri, getHttpStatusCode(err), err instanceof Error ? err.message : String(err));
     }
 
     let body: Buffer | undefined;
@@ -235,17 +228,13 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     // bodies are small JSON; if one somehow crossed the limit, fall back to the status text).
     if (response.status >= 300) {
         const message = parseApiErrorMessage(body) ?? response.statusText;
-        const hint = getHttpErrorHint(response.status);
         logHttpError(Object.assign(new Error(message), { statusCode: response.status }), `resources/read failed`, {
             uri,
         });
-        throw new McpError(
-            statusToErrorCode(response.status),
-            `Failed to read ${uri}: HTTP ${response.status}: ${message}${hint ? `. ${hint}` : ''}`,
-            { uri },
-        );
+        throwReadFailure(uri, response.status, message);
     }
 
+    // Second clause is runtime-redundant (undefined ⟺ overLimit) but narrows `body` to Buffer below.
     if (overLimit || body === undefined) {
         return buildLinkOutResult(uri, apifyClient);
     }
@@ -253,8 +242,8 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     const contentTypeHeader = response.headers['content-type'];
     const contentType = typeof contentTypeHeader === 'string' ? contentTypeHeader : undefined;
 
-    // An empty body (e.g. an Actor that wrote an empty OUTPUT) is empty text preserving the
-    // declared Content-Type, matching the empty-record behavior of get-key-value-store-record.
+    // Empty body → empty text preserving the declared Content-Type, matching get-key-value-store-record
+    // (even for a binary type: an empty blob carries no bytes).
     if (body.length === 0) {
         return buildTextResult(uri, '', contentType);
     }

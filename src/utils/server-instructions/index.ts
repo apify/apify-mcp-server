@@ -7,6 +7,7 @@
  * avoiding hallucinated calls to tools absent from `tools/list`.
  */
 
+import { getApifyAPIBaseUrl } from '../../apify_client.js';
 import { HELPER_TOOLS, RAG_WEB_BROWSER } from '../../const.js';
 import { SERVER_MODE } from '../../types.js';
 
@@ -21,6 +22,9 @@ import { SERVER_MODE } from '../../types.js';
  */
 export function getServerInstructions(mode: SERVER_MODE = SERVER_MODE.DEFAULT, reportProblemAvailable = false): string {
     const isApps = mode === SERVER_MODE.APPS;
+    // Derive the API base from config so examples match the gate/templates under an
+    // APIFY_API_BASE_URL / staging override, instead of a hardcoded api.apify.com.
+    const apiBaseUrl = getApifyAPIBaseUrl();
 
     return `
 Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.
@@ -49,10 +53,10 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - **Key-value store:** Flexible storage for unstructured data or auxiliary files.
 
 ## Apify API resources
-- Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`https://api.apify.com/v2/...\` URL to \`resources/read\`; the server injects the session's Apify token and returns the response body. Reads require an Apify token — a session without one (e.g. payment-only x402/Skyfire) fails with a JSON-RPC error.
-- Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`https://api.apify.com/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
+- Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`${apiBaseUrl}/v2/...\` URL to \`resources/read\`; the server injects the session's Apify token and returns the response body. Reads require an Apify token — a session without one (e.g. payment-only x402/Skyfire) fails with a JSON-RPC error.
+- Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`${apiBaseUrl}/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
 - Reads inline up to ~256 KB; a larger response is not downloaded — it returns a short notice with a download URL instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap.
-- Examples: \`https://api.apify.com/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`https://api.apify.com/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
+- Examples: \`${apiBaseUrl}/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`${apiBaseUrl}/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
 ${
     isApps
         ? `
