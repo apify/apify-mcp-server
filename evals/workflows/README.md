@@ -1,6 +1,6 @@
 # Workflow Evaluation System
 
-Tests AI agents performing multi-turn conversations with Apify MCP tools, evaluated by an LLM judge.
+Tests AI agents performing multi-turn conversations with Apify MCP tools, evaluated by an LLM judge. Runs on the [Opik](https://github.com/comet-ml/opik) TS SDK (self-hosted): test cases become an Opik dataset, each run is an Opik experiment, and every conversation is a trace with `llm` and `tool` spans.
 
 ---
 
@@ -10,6 +10,16 @@ Tests AI agents performing multi-turn conversations with Apify MCP tools, evalua
 - Node.js installed
 - Apify account with API token
 - OpenRouter API key
+- Docker (for the local Opik server)
+- A running local Opik server
+
+**Start Opik locally (once):**
+```bash
+git clone https://github.com/comet-ml/opik.git
+cd opik
+./opik.sh
+```
+Opik then serves its UI at `http://localhost:5173` and its API at `http://localhost:5173/api`. The runner talks to the API URL.
 
 **Run evaluations:**
 ```bash
@@ -20,7 +30,7 @@ export OPENROUTER_API_KEY="your_openrouter_key"
 # 2. Build the MCP server
 pnpm run build
 
-# 3. Run tests
+# 3. Run tests (fails fast if Opik is unreachable)
 pnpm run evals:workflow
 ```
 
@@ -31,12 +41,6 @@ pnpm run evals:workflow -- --category search
 
 # Run specific test
 pnpm run evals:workflow -- --id search-google-maps
-
-# Filter by line range in test_cases.json
-pnpm run evals:workflow -- --lines 277-283
-
-# Show detailed conversation logs
-pnpm run evals:workflow -- --verbose
 
 # Increase timeout for long-running Actors (default: 60s)
 pnpm run evals:workflow -- --tool-timeout 300
@@ -50,7 +54,19 @@ pnpm run evals:workflow -- --output
 
 **Exit codes:**
 - `0` = All tests passed ✅
-- `1` = Any test failed or error occurred ❌
+- `1` = Any test failed, an error occurred, or Opik was unreachable ❌
+
+---
+
+## Viewing results in Opik
+
+Open `http://localhost:5173` after a run.
+
+- **Project `workflow-evals`** holds one trace per test. Open a trace to see the tree: per-turn `llm` spans (messages, model, token usage) and per-call `tool` spans (arguments + the full raw tool result, plus `resultBytes`/duration in span metadata). Trace metadata carries `agentModel`, `turns`, total tokens, and total tool bytes. The `workflow_judge` score (1 = PASS, 0 = FAIL) and the judge's reason are attached to the trace.
+- **Dataset `workflow-evals`** mirrors `test_cases.json`. Every run upserts it; identical items are deduped by content.
+- **Experiments** are named `<git-branch>/<agent-model-short>` (e.g. `feat-opik-evals/claude-haiku-4.5`) with metadata for the agent/judge models, tool timeout, git branch + commit, and the active filters. To compare a change, run the eval on two branches and compare the two experiments side by side in the Opik UI.
+
+The judge's own LLM call runs inside the scoring metric with an untracked client, so it stays out of the traces (only the agent's calls appear as `llm` spans).
 
 ---
 
@@ -62,10 +78,11 @@ Tests AI agents executing tasks using Apify MCP server tools through multi-turn 
 - Multi-turn conversations with tool calling
 - Dynamic tool discovery during execution
 - MCP server instructions automatically added to agent system prompt
-- LLM-based evaluation against requirements
+- LLM-based evaluation against requirements (an Opik scoring metric)
 - Isolated MCP server per test
 - Configurable tool call timeout (default: 60 seconds)
 - Strict pass/fail (all tests must pass)
+- Opik tracing: each test is a trace with per-turn `llm` spans (messages, model, token usage) and per-call `tool` spans (arguments + full raw result)
 
 ## Critical Design Decisions
 
@@ -215,24 +232,35 @@ const conversation = await executeConversation({
 ### Core Files
 
 - `types.ts` - Type definitions
-- `config.ts` - Models, prompts, constants
-- `mcp-client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions)
-- `llm-client.ts` - OpenRouter wrapper
-- `convert-mcp-tools.ts` - MCP → OpenAI tool format
-- `conversation-executor.ts` - Multi-turn loop with dynamic tools and server instructions
-- `workflow-judge.ts` - Judge evaluation
-- `test-cases-loader.ts` - Load/filter test cases
-- `output-formatter.ts` - Results formatting
-- `run-workflow-evals.ts` - Main CLI entry
+- `config.ts` - Models, prompts, constants, Opik connection config
+- `mcp_client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions)
+- `llm_client.ts` - OpenRouter wrapper (accepts an injected, optionally traced, OpenAI client)
+- `conversation_executor.ts` - Multi-turn loop with dynamic tools and server instructions
+- `workflow_judge.ts` - Judge evaluation logic (prompt, structured output)
+- `workflow_judge_metric.ts` - Opik scoring metric wrapping `workflow_judge.ts`
+- `opik_client.ts` - Opik client factory, server preflight, git metadata, experiment/dataset naming
+- `test_cases_loader.ts` - Load/filter test cases
+- `output_formatter.ts` - Results formatting
+- `results_writer.ts` - Persist results to `results.json`
+- `run_workflow_evals.ts` - Main CLI entry (Opik `evaluate()` runner)
 
 ## Configuration
 
-### Environment Variables (Required)
+### Environment Variables
 
+Required:
 ```bash
 export APIFY_TOKEN="your_apify_token"           # Get from https://console.apify.com/account/integrations
 export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai/keys
 ```
+
+Optional (Opik connection):
+```bash
+export OPIK_URL_OVERRIDE="http://localhost:5173/api"  # Opik API URL (default). Never the Comet cloud URL.
+export OPIK_API_KEY="..."                             # Only needed for a remote/Comet Opik; not for local
+```
+
+The runner defaults to the local server (`http://localhost:5173/api`), workspace `default`, project `workflow-evals`. It never falls through to Opik's Comet-cloud default.
 
 ### CLI Options
 
@@ -240,70 +268,20 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 |--------|-------|-------------|---------|
 | `--category <name>` | | Filter tests by category | All categories |
 | `--id <id>` | | Run specific test by ID | All tests |
-| `--lines <range>` | `-l` | Filter by line range in test-cases.json | All tests |
-| `--verbose` | | Show detailed conversation logs | `false` |
 | `--test-cases-path <path>` | | Custom test cases file path | `test_cases.json` |
 | `--agent-model <model>` | | Override agent model | `anthropic/claude-haiku-4.5` |
 | `--judge-model <model>` | | Override judge model | `deepseek/deepseek-v4-flash` |
 | `--tool-timeout <seconds>` | | Tool call timeout | `60` |
-| `--concurrency <number>` | `-c` | Number of tests to run in parallel | `4` |
+| `--concurrency <number>` | `-c` | Number of tests to run in parallel (Opik `taskThreads`) | `4` |
 | `--output` | `-o` | Save results to JSON file | `false` |
 | `--baseline <path>` | | Results JSON to compare against (prints byte/token deltas) | `results.json` |
 | `--help` | | Show help message | - |
 
-### Line Range Filtering
-
-The `--lines` (or `-l`) option filters test cases by their line numbers in the `test_cases.json` file.
-
-**Format options:**
-- **Single line:** `--lines 100` (includes tests that contain line 100)
-- **Range:** `--lines 10-20` (includes tests that overlap with lines 10-20)
-- **Multiple ranges:** `--lines 10-20,50-60,100` (comma-separated, includes tests that overlap with any range)
-
-**Overlap logic (inclusive):**
-- A test case is included if it overlaps with ANY specified range
-- Example: `--lines 277-283` includes tests that start before line 283 AND end after line 277
-
-**Combine with other filters (AND logic):**
-```bash
-# Line range + category
-pnpm run evals:workflow -- --lines 100-200 --category call
-
-# Line range + ID pattern
-pnpm run evals:workflow -- --lines 50-100 --id "search.*"
-
-# All three filters
-pnpm run evals:workflow -- --lines 277-283 --category mcp --verbose
-```
-
-**Error handling:**
-- Invalid format (e.g., `abc-def`) → Error with usage examples
-- Invalid range (e.g., `300-200`) → Error: start must be ≤ end
-- Out of bounds (e.g., `500-600` when file has 319 lines) → Error with line count
-
-**Use cases:**
-- Debug specific test cases by examining their location in the JSON file
-- Run tests added in a specific PR by targeting the affected line ranges
-- Quickly iterate on a subset of tests during development
-
-**Examples:**
-```bash
-# Single test at specific line
-pnpm run evals:workflow -- --lines 283
-
-# Range of tests
-pnpm run evals:workflow -- --lines 277-283
-
-# Multiple ranges
-pnpm run evals:workflow -- --lines 10-20,50-60,100-110
-
-# With verbose output for debugging
-pnpm run evals:workflow -- --lines 277-283 --verbose
-```
+Filters (`--category`, `--id`) still sync the full test set into the Opik dataset; only the matching items are run and recorded as experiment items.
 
 ### Concurrency
 
-The `--concurrency` (or `-c`) option controls how many tests run in parallel.
+The `--concurrency` (or `-c`) option controls how many tests run in parallel; it maps to Opik's `taskThreads`.
 
 **Concurrency recommendations:**
 - **Default (4)**: Balanced performance for most systems

@@ -5,8 +5,35 @@
  * Note: Temperature is set to 0.15 for deterministic results (see llm-client.ts)
  */
 
+import { sanitizeEnvValue } from '../shared/config.js';
+
 // Re-export shared config for convenience
 export { OPENROUTER_CONFIG, sanitizeEnvValue, sanitizeProcessEnv, validateEnvVars } from '../shared/config.js';
+
+/**
+ * Opik project and dataset names (self-hosted). Traces/experiments land in this project,
+ * test cases are synced into this dataset.
+ */
+export const OPIK_PROJECT_NAME = 'workflow-evals';
+export const OPIK_DATASET_NAME = 'workflow-evals';
+
+/**
+ * Default Opik base URL for the local self-hosted server. NEVER fall through to the SDK's
+ * Comet-cloud default. Start Opik locally with:
+ *   git clone https://github.com/comet-ml/opik.git && cd opik && ./opik.sh
+ */
+export const OPIK_DEFAULT_URL = 'http://localhost:5173/api';
+
+/**
+ * Opik connection config. URL is overridable via OPIK_URL_OVERRIDE; OPIK_API_KEY is respected
+ * if set (not required locally). Workspace defaults to "default".
+ */
+export const OPIK_CONFIG = {
+    apiUrl: sanitizeEnvValue(process.env.OPIK_URL_OVERRIDE) || OPIK_DEFAULT_URL,
+    apiKey: sanitizeEnvValue(process.env.OPIK_API_KEY) || '',
+    workspaceName: 'default',
+    projectName: OPIK_PROJECT_NAME,
+};
 
 /**
  * Default model configuration for agent and judge

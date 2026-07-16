@@ -10,7 +10,7 @@ import { mcpToolsToOpenAiTools } from '../shared/openai_tools.js';
 import { AGENT_SYSTEM_PROMPT, MAX_CONVERSATION_TURNS, MODELS } from './config.js';
 import type { LlmClient } from './llm_client.js';
 import type { McpClient } from './mcp_client.js';
-import type { ConversationHistory, ConversationTurn, McpToolResult } from './types.js';
+import type { ConversationHistory, ConversationTurn, McpToolCall, McpToolResult } from './types.js';
 
 export type ConversationExecutorOptions = {
     /** User's initial prompt */
@@ -25,6 +25,11 @@ export type ConversationExecutorOptions = {
     model?: string;
     /** Additional instructions from MCP server (optional) */
     serverInstructions?: string | null;
+    /**
+     * Optional per-tool-call hook for tracing (eval-only). Called after each MCP tool call with
+     * the call, its result (including resultBytes), and the wall-clock duration in milliseconds.
+     */
+    onToolResult?: (toolCall: McpToolCall, result: McpToolResult, durationMs: number) => void;
 };
 
 /**
@@ -39,6 +44,7 @@ export async function executeConversation(options: ConversationExecutorOptions):
         maxTurns = MAX_CONVERSATION_TURNS,
         model = MODELS.agent,
         serverInstructions,
+        onToolResult,
     } = options;
 
     const turns: ConversationTurn[] = [];
@@ -142,15 +148,19 @@ export async function executeConversation(options: ConversationExecutorOptions):
             }
 
             // Execute tool via MCP
+            const toolStart = Date.now();
             const result = await mcpClient.callTool({
                 name: toolCall.name,
                 arguments: args,
             });
+            const toolDurationMs = Date.now() - toolStart;
 
             // Serialize the tool result exactly as the agent (LLM) receives it,
             // and record its byte size to measure the data volume tools return.
             const content = result.success ? JSON.stringify(result.result) : JSON.stringify({ error: result.error });
             result.resultBytes = Buffer.byteLength(content, 'utf8');
+
+            onToolResult?.({ name: toolCall.name, arguments: args }, result, toolDurationMs);
 
             turn.toolResults.push(result);
 

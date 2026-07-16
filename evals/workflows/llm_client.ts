@@ -37,20 +37,32 @@ export type LlmResponse = {
 };
 
 /**
+ * Build a raw OpenAI client pointed at OpenRouter.
+ * Exposed so callers can wrap it (e.g. with Opik's trackOpenAI) before injecting it.
+ */
+export function createOpenRouterClient(): OpenAI {
+    if (!OPENROUTER_CONFIG.apiKey) {
+        throw new Error('OPENROUTER_API_KEY environment variable is required');
+    }
+
+    return new OpenAI({
+        baseURL: OPENROUTER_CONFIG.baseURL,
+        apiKey: OPENROUTER_CONFIG.apiKey,
+    });
+}
+
+/**
  * LLM client for chat completions with optional tool support
  */
 export class LlmClient {
     private openai: OpenAI;
 
-    constructor() {
-        if (!OPENROUTER_CONFIG.apiKey) {
-            throw new Error('OPENROUTER_API_KEY environment variable is required');
-        }
-
-        this.openai = new OpenAI({
-            baseURL: OPENROUTER_CONFIG.baseURL,
-            apiKey: OPENROUTER_CONFIG.apiKey,
-        });
+    /**
+     * @param openaiClient - Optional pre-built client to use (e.g. a trackOpenAI-wrapped
+     *   instance for tracing). Defaults to a plain OpenRouter client.
+     */
+    constructor(openaiClient?: OpenAI) {
+        this.openai = openaiClient ?? createOpenRouterClient();
     }
 
     /**

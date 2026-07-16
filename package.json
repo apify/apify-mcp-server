@@ -78,6 +78,8 @@
     "@types/yargs-parser": "^21.0.3",
     "eventsource": "^3.0.2",
     "openai": "^6.10.0",
+    "opik": "2.1.23",
+    "opik-openai": "2.1.23",
     "oxfmt": "0.51.0",
     "oxlint": "^1.64.0",
     "oxlint-tsgolint": "0.22.1",
