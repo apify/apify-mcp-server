@@ -3,6 +3,8 @@
  * Handles spawning, connecting, and communicating with the MCP server
  */
 
+import type { ChildProcess } from 'node:child_process';
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -187,7 +189,16 @@ export class McpClient {
      * Uses a timeout to prevent indefinite waiting during cleanup
      */
     async cleanup(cleanupTimeoutMs = 2000): Promise<void> {
-        // Create timeout promise
+        // Grab the child process reference BEFORE calling close() — the SDK's own
+        // StdioClientTransport.close() clears its private `_process` field synchronously
+        // the instant it's called, then spends up to ~4s internally (wait for close, SIGTERM,
+        // wait again, SIGKILL) actually terminating it. If our outer race below times out first
+        // (2s < 4s worst case), grabbing `_process` from `this.transport` at that point would
+        // already be undefined — a no-op fallback that can never actually kill anything. Capturing
+        // it here keeps a live reference we can act on regardless of the SDK's own timing.
+        // eslint-disable-next-line no-underscore-dangle, @typescript-eslint/no-explicit-any
+        const child = (this.transport as any)?._process as ChildProcess | undefined;
+
         const timeoutPromise = new Promise<void>((resolve) => {
             setTimeout(() => resolve(), cleanupTimeoutMs);
         });
@@ -206,20 +217,24 @@ export class McpClient {
         // Race between cleanup and timeout
         await Promise.race([cleanupPromise, timeoutPromise]);
 
-        // Force kill transport process if it's still running
-        if (this.transport) {
-            try {
-                // Access the underlying child process and force kill it
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const transportAny = this.transport as any;
-                // eslint-disable-next-line no-underscore-dangle
-                if (transportAny._process && transportAny._process.kill) {
-                    // eslint-disable-next-line no-underscore-dangle
-                    transportAny._process.kill('SIGKILL');
+        // If the child is still alive once our own budget runs out, kill it directly rather than
+        // leaving the SDK's own (possibly still in-progress) shutdown to finish it. A child left
+        // running past this point — e.g. still finishing a tool call a --test-timeout abandoned —
+        // can write its response to stdout after we've moved on, throwing an unhandled EPIPE in
+        // that (now orphaned) process.
+        if (child && child.exitCode === null && child.signalCode === null) {
+            await new Promise<void>((resolve) => {
+                const done = () => resolve();
+                child.once('exit', done);
+                try {
+                    child.kill('SIGKILL');
+                } catch {
+                    // Already gone
+                    done();
                 }
-            } catch {
-                // Ignore errors during force kill
-            }
+                // SIGKILL isn't instant either — don't let this hang cleanup() indefinitely.
+                setTimeout(done, 1000);
+            });
         }
 
         // Always reset state regardless of cleanup success
