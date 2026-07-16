@@ -54,6 +54,13 @@ export const MAX_CONVERSATION_TURNS = 10;
 export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
 
 /**
+ * Default wall-clock timeout for one whole test case (agent conversation + judging), in seconds.
+ * Bounds a single test that's stuck in a long tool-retry loop from blocking the run indefinitely.
+ * Override via CLI: --test-timeout 600
+ */
+export const DEFAULT_TEST_TIMEOUT_SECONDS = 300;
+
+/**
  * Judge prompt template for evaluating conversations
  * Uses structured output (JSON schema) - no format instructions needed
  *

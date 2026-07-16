@@ -21,12 +21,13 @@ import { hideBin } from 'yargs/helpers';
 import { filterByLineRanges } from '../shared/line_range_filter.js';
 import type { LineRange } from '../shared/line_range_parser.js';
 import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line_range_parser.js';
-import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config.js';
+import { DEFAULT_TEST_TIMEOUT_SECONDS, DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config.js';
 import { executeConversation } from './conversation_executor.js';
 import { LlmClient } from './llm_client.js';
 import { McpClient } from './mcp_client.js';
 import type { EvaluationResult, TestResultRecord } from './output_formatter.js';
 import { formatDetailedResult, formatResultsTable } from './output_formatter.js';
+import { raceWithTimeout, TestTimeoutError } from './race_with_timeout.js';
 import {
     findBaselineRecord,
     loadResultsDatabase,
@@ -52,6 +53,7 @@ type CliArgs = {
     resultsPath?: string;
     baseline?: string;
     traces?: string;
+    testTimeout?: number;
 };
 
 /**
@@ -89,38 +91,51 @@ async function runSingleTest(
     let result: EvaluationResult;
 
     try {
-        // Start MCP server with test-specific tools (if configured)
-        await mcpClient.start(apifyToken, testCase.tools);
+        const runTest = async () => {
+            // Start MCP server with test-specific tools (if configured)
+            await mcpClient.start(apifyToken, testCase.tools);
 
-        // Get server instructions (if provided)
-        const serverInstructions = mcpClient.getInstructions();
+            // Get server instructions (if provided)
+            const serverInstructions = mcpClient.getInstructions();
 
-        // Execute conversation (tools fetched dynamically inside)
-        const conversation = await executeConversation({
-            userPrompt: testCase.query,
-            mcpClient,
-            llmClient,
-            maxTurns: testCase.maxTurns,
-            model: argv.agentModel,
-            serverInstructions,
-            agentInstructions: testCase.agentInstructions,
-        });
+            // Execute conversation (tools fetched dynamically inside)
+            const conversation = await executeConversation({
+                userPrompt: testCase.query,
+                mcpClient,
+                llmClient,
+                maxTurns: testCase.maxTurns,
+                model: argv.agentModel,
+                serverInstructions,
+                agentInstructions: testCase.agentInstructions,
+            });
 
-        // Judge conversation
-        const judgeResult = await evaluateConversation(testCase, conversation, llmClient, argv.judgeModel);
+            // Judge conversation
+            const judgeResult = await evaluateConversation(testCase, conversation, llmClient, argv.judgeModel);
+
+            const policyViolation = conversation.turns.some((turn) =>
+                turn.toolResults.some((toolResult) => toolResult.policyViolation),
+            );
+            const finalJudgeResult = policyViolation
+                ? {
+                      ...judgeResult,
+                      verdict: 'FAIL' as const,
+                      reason: 'Agent violated the evaluation tool policy.',
+                  }
+                : judgeResult;
+            return { conversation, judgeResult: finalJudgeResult };
+        };
+
+        // Keep a direct reference so a late rejection (test timed out, but the abandoned
+        // work keeps running and eventually throws) doesn't surface as an unhandled rejection.
+        const testPromise = runTest();
+        testPromise.catch(() => {});
+
+        const { conversation, judgeResult: finalJudgeResult } = await raceWithTimeout(
+            testPromise,
+            argv.testTimeout ?? DEFAULT_TEST_TIMEOUT_SECONDS,
+        );
 
         const durationMs = Date.now() - startTime;
-
-        const policyViolation = conversation.turns.some((turn) =>
-            turn.toolResults.some((toolResult) => toolResult.policyViolation),
-        );
-        const finalJudgeResult = policyViolation
-            ? {
-                  ...judgeResult,
-                  verdict: 'FAIL' as const,
-                  reason: 'Agent violated the evaluation tool policy.',
-              }
-            : judgeResult;
         result = {
             testCase,
             conversation,
@@ -134,6 +149,7 @@ async function runSingleTest(
         );
     } catch (error) {
         const durationMs = Date.now() - startTime;
+        const timedOut = error instanceof TestTimeoutError;
 
         result = {
             testCase,
@@ -146,14 +162,14 @@ async function runSingleTest(
             },
             judgeResult: {
                 verdict: 'FAIL',
-                reason: 'Error during execution',
+                reason: timedOut ? 'Test exceeded its wall-clock timeout' : 'Error during execution',
                 rawResponse: '',
             },
             durationMs,
             error: error instanceof Error ? error.message : String(error),
         };
 
-        logWithPrefix(testId, `  🔥 ERROR (${durationMs}ms)`);
+        logWithPrefix(testId, `  ${timedOut ? '⏱️  TIMEOUT' : '🔥 ERROR'} (${durationMs}ms)`);
     } finally {
         // ALWAYS cleanup MCP client for this test
         try {
@@ -213,6 +229,11 @@ async function main() {
             type: 'number',
             description: `Tool call timeout in seconds (default: ${DEFAULT_TOOL_TIMEOUT_SECONDS})`,
             default: DEFAULT_TOOL_TIMEOUT_SECONDS,
+        })
+        .option('test-timeout', {
+            type: 'number',
+            description: `Wall-clock timeout in seconds for one whole test case (agent + judge), default: ${DEFAULT_TEST_TIMEOUT_SECONDS}`,
+            default: DEFAULT_TEST_TIMEOUT_SECONDS,
         })
         .option('concurrency', {
             alias: 'c',

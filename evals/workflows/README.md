@@ -245,6 +245,7 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 | `--agent-model <model>` | | Override agent model | `anthropic/claude-haiku-4.5` |
 | `--judge-model <model>` | | Override judge model | `deepseek/deepseek-v4-flash` |
 | `--tool-timeout <seconds>` | | Tool call timeout | `60` |
+| `--test-timeout <seconds>` | | Wall-clock timeout for one whole test case (agent + judge) | `300` |
 | `--concurrency <number>` | `-c` | Number of tests to run in parallel | `4` |
 | `--output` | `-o` | Save results to JSON file | `false` |
 | `--results-path <path>` | | Results JSON file | `results.json` |
@@ -339,6 +340,23 @@ The `--tool-timeout` option sets the maximum time (in seconds) to wait for a sin
 ```bash
 # Long-running Actor calls
 pnpm run evals:workflow -- --tool-timeout 300
+```
+
+### Test Timeout
+
+`--tool-timeout` bounds one tool call; `--test-timeout` bounds the whole test
+case — the agent's full multi-turn conversation plus judging — so a test
+stuck retrying (e.g. a bad tool-call loop) can't block the run indefinitely.
+Default: `300` seconds.
+
+When a test times out, it's recorded as `FAIL` with reason `"Test exceeded
+its wall-clock timeout"` and the run moves on to the next test. The
+abandoned work isn't cancelled mid-flight (no cancellation token threads
+through the LLM/MCP clients) — the harness just stops waiting for it and
+cleans up that test's MCP client.
+
+```bash
+pnpm run evals:workflow -- --test-timeout 600   # for slower models / long chains
 ```
 
 ### Saving Results to File
