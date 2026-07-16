@@ -2,6 +2,7 @@
  * Output formatter for evaluation results
  */
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import type { WorkflowTestCase } from './test_cases_loader.js';
 import type { ConversationHistory, TokenUsage } from './types.js';
 import type { JudgeResult } from './workflow_judge.js';
@@ -46,6 +47,22 @@ export function getPolicyViolations(conversation: ConversationHistory): string[]
     return conversation.turns.flatMap((turn) =>
         turn.toolResults.flatMap((toolResult) => (toolResult.policyViolation ? [toolResult.policyViolation] : [])),
     );
+}
+
+/**
+ * Distinct Actor IDs the agent targeted through call-actor (MCP tool-suffix stripped).
+ * Informational only — not used to gate pass/fail.
+ */
+export function getCallActorTargets(conversation: ConversationHistory): string[] {
+    const targets = new Set<string>();
+    for (const turn of conversation.turns) {
+        for (const toolCall of turn.toolCalls) {
+            if (toolCall.name !== HELPER_TOOLS.ACTOR_CALL) continue;
+            const { actor } = toolCall.arguments;
+            if (typeof actor === 'string') targets.add(actor.split(':', 1)[0]);
+        }
+    }
+    return [...targets];
 }
 
 export function getFinalResponse(conversation: ConversationHistory): string {
@@ -360,6 +377,8 @@ export type TestResultRecord = {
     failedToolCalls?: number;
     /** Evaluation policy violations */
     policyViolations?: string[];
+    /** Whether the agent called apify/code-runtime at least once (informational, not a pass/fail gate) */
+    usedCodeRuntime?: boolean;
     /** Final response returned by the agent */
     finalResponse?: string;
     /** Tool calls and outcomes, including generated Code Mode scripts but excluding result bodies */

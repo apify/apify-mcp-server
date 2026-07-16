@@ -7,6 +7,7 @@ import { dirname } from 'node:path';
 
 import type { EvaluationResult, ResultsDatabase, TestResultRecord } from './output_formatter.js';
 import {
+    getCallActorTargets,
     getFailedToolCallCount,
     getFinalResponse,
     getPolicyViolations,
@@ -14,6 +15,8 @@ import {
     getToolCallTrace,
     sumResultBytes,
 } from './output_formatter.js';
+
+const CODE_RUNTIME_ACTOR_ID = 'apify/code-runtime';
 
 /**
  * Build composite key used by legacy results files.
@@ -118,6 +121,7 @@ export function convertEvaluationResultToRecord(
         toolCalls: getToolCallCount(conversation),
         failedToolCalls: getFailedToolCallCount(conversation),
         policyViolations: getPolicyViolations(conversation),
+        usedCodeRuntime: getCallActorTargets(conversation).includes(CODE_RUNTIME_ACTOR_ID),
         finalResponse: getFinalResponse(conversation),
         toolCallTrace: getToolCallTrace(conversation),
         error: result.error ?? null,

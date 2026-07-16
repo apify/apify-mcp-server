@@ -6,6 +6,7 @@ import {
     formatResultsTable,
     formatTokens,
     formatWithDelta,
+    getCallActorTargets,
     sumResultBytes,
 } from '../../evals/workflows/output_formatter.js';
 import type { ConversationHistory } from '../../evals/workflows/types.js';
@@ -57,6 +58,45 @@ describe('sumResultBytes()', () => {
             },
         ]);
         expect(sumResultBytes(conversation)).toBe(30);
+    });
+});
+
+describe('getCallActorTargets()', () => {
+    it('returns distinct Actor IDs targeted through call-actor', () => {
+        const conversation = makeConversation([
+            {
+                turnNumber: 1,
+                toolCalls: [
+                    { name: 'call-actor', arguments: { actor: 'apify/code-runtime' } },
+                    { name: 'call-actor', arguments: { actor: 'apify/instagram-scraper' } },
+                    { name: 'call-actor', arguments: { actor: 'apify/code-runtime' } },
+                    { name: 'search-actors', arguments: { keywords: 'maps' } },
+                ],
+                toolResults: [],
+            },
+        ]);
+
+        expect(getCallActorTargets(conversation)).toEqual(['apify/code-runtime', 'apify/instagram-scraper']);
+    });
+
+    it('strips an MCP tool-name suffix from the Actor target', () => {
+        const conversation = makeConversation([
+            {
+                turnNumber: 1,
+                toolCalls: [{ name: 'call-actor', arguments: { actor: 'apify/actors-mcp-server:fetch-apify-docs' } }],
+                toolResults: [],
+            },
+        ]);
+
+        expect(getCallActorTargets(conversation)).toEqual(['apify/actors-mcp-server']);
+    });
+
+    it('returns an empty array when call-actor was never invoked', () => {
+        const conversation = makeConversation([
+            { turnNumber: 1, toolCalls: [{ name: 'search-actors', arguments: {} }], toolResults: [] },
+        ]);
+
+        expect(getCallActorTargets(conversation)).toEqual([]);
     });
 });
 

@@ -395,6 +395,7 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
 - `judgeUsage` - Judge tokens, kept separate from agent usage
 - `toolCalls`, `failedToolCalls`, `policyViolations` - Execution counters and policy failures
 - `finalResponse`, `toolCallTrace` - Agent answer and tool-call trace (name, arguments, success, byte size), including generated Code Mode scripts; result bodies are excluded to keep the file compact
+- `usedCodeRuntime` - Whether the agent called `apify/code-runtime` at least once. Informational only — does not gate pass/fail, since a code-mode-arm agent may legitimately call other Actors directly for discovery.
 - `error` - Error message if execution failed, `null` otherwise
 
 **Examples:**
@@ -463,9 +464,9 @@ File: `test-cases.json`
     "tools": ["actors", "docs"],
     "disallowedTools": ["add-actor"],
     "agentInstructions": "Use regular MCP tools.",
-    "allowedCallActorTargets": ["apify/code-runtime"],
+    "disallowedCallActorTargets": ["apify/code-runtime"],
     "pairId": "test-pair",
-    "arm": "code-mode"
+    "arm": "standard"
   }
 ]
 ```
@@ -480,7 +481,7 @@ File: `test-cases.json`
 - `maxTurns` - Override default (10)
 - `tools` - Server-side tool allowlist passed as `--tools`
 - `disallowedTools` - Hide tools from the agent and reject direct calls
-- `allowedCallActorTargets` / `disallowedCallActorTargets` - Restrict Actor IDs used through `call-actor`
+- `allowedCallActorTargets` / `disallowedCallActorTargets` - Restrict Actor IDs used through `call-actor` (optional; the shipped Code Mode cases only set `disallowedCallActorTargets: ["apify/code-runtime"]` on the standard arm — the code-mode arm leaves Actor targets unrestricted so the agent can call any Actor directly for discovery and still use `apify/code-runtime` for the actual processing)
 - `agentInstructions` - Evaluation-only system instructions
 - `pairId` / `arm` - Group standard and Code Mode variants of the same prompt
 
