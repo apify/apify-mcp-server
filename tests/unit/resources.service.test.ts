@@ -169,15 +169,44 @@ describe('createResourceService()', () => {
     });
 
     describe('listResourceTemplates()', () => {
-        it('returns no templates (the read proxy is advertised via server instructions)', async () => {
+        it('advertises the common API URL shapes with descriptions', async () => {
             const service = createResourceService({
                 getMode: () => 'default',
                 getAvailableWidgets: () => new Map(),
             });
 
-            const result = await service.listResourceTemplates();
+            const { resourceTemplates } = await service.listResourceTemplates();
 
-            expect(result.resourceTemplates).toEqual([]);
+            expect(resourceTemplates.map((t) => t.name)).toEqual([
+                'dataset-items',
+                'key-value-store-record',
+                'key-value-store-keys',
+                'actor-run',
+                'actor-run-log',
+            ]);
+            for (const template of resourceTemplates) {
+                expect(template.uriTemplate).toMatch(/^https:\/\/api\.apify\.com\/v2\//);
+                expect(template.description).toBeTruthy();
+            }
+            // dataset-items advertises `format` (7 response types), so it must not pin a mimeType —
+            // the spec allows a template mimeType only when all matching resources share one type.
+            expect(resourceTemplates.find((t) => t.name === 'dataset-items')).not.toHaveProperty('mimeType');
+        });
+
+        it('exposes paging parameters as RFC 6570 query expansions', async () => {
+            const service = createResourceService({
+                getMode: () => 'default',
+                getAvailableWidgets: () => new Map(),
+            });
+
+            const { resourceTemplates } = await service.listResourceTemplates();
+            const byName = new Map(resourceTemplates.map((t) => [t.name, t.uriTemplate]));
+
+            expect(byName.get('dataset-items')).toContain('{?limit,offset,');
+            // KV key listings page with exclusiveStartKey, not offset.
+            expect(byName.get('key-value-store-keys')).toContain('{?limit,exclusiveStartKey}');
+            // A single record has no paging parameters at all.
+            expect(byName.get('key-value-store-record')).not.toContain('{?');
         });
     });
 });

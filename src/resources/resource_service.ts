@@ -13,6 +13,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
+import { getApifyAPIBaseUrl } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { SERVER_MODE } from '../types.js';
 import { readApiResource } from './api_resources.js';
@@ -166,11 +167,52 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         throw new McpError(ErrorCode.InvalidParams, `Failed to read ${uri}: not a readable resource.`, { uri });
     };
 
-    // Read is a generic proxy over any Apify API GET URL, advertised in the server instructions;
-    // there are no fixed templates to enumerate.
-    const listResourceTemplates = async (): Promise<ListResourceTemplatesResult> => ({
-        resourceTemplates: [],
-    });
+    // Advertise the common URL shapes so clients that never surface the server instructions can
+    // still discover the read proxy and its paging parameters (RFC 6570 `{?var}` = query params).
+    // Advertisement only, NOT a route table: the read path stays a generic proxy, and any other
+    // Apify API GET URL is readable the same way.
+    const listResourceTemplates = async (): Promise<ListResourceTemplatesResult> => {
+        const api = getApifyAPIBaseUrl();
+        return {
+            resourceTemplates: [
+                {
+                    uriTemplate: `${api}/v2/datasets/{datasetId}/items{?limit,offset,clean,fields,format}`,
+                    name: 'dataset-items',
+                    // No mimeType: `format` selects among 7 response types (json/jsonl/xml/html/csv/xlsx/rss),
+                    // and the spec allows a template mimeType only when all matching resources share one.
+                    description:
+                        'Items of a dataset, read via resources/read (the server injects the Apify token). ' +
+                        'Page with limit/offset; format defaults to JSON — responses inline up to 256 KB, ' +
+                        'larger ones return a download URL.',
+                },
+                {
+                    uriTemplate: `${api}/v2/key-value-stores/{storeId}/records/{recordKey}`,
+                    name: 'key-value-store-record',
+                    description:
+                        'A single record, returned whole in its stored Content-Type via resources/read. ' +
+                        'Not pageable — a record over 256 KB returns a download URL instead.',
+                },
+                {
+                    uriTemplate: `${api}/v2/key-value-stores/{storeId}/keys{?limit,exclusiveStartKey}`,
+                    name: 'key-value-store-keys',
+                    description: 'Keys of a key-value store. Page with limit/exclusiveStartKey (not offset).',
+                    mimeType: 'application/json',
+                },
+                {
+                    uriTemplate: `${api}/v2/actor-runs/{runId}`,
+                    name: 'actor-run',
+                    description: 'Metadata of an Actor run: status, storage IDs, usage.',
+                    mimeType: 'application/json',
+                },
+                {
+                    uriTemplate: `${api}/v2/logs/{runId}`,
+                    name: 'actor-run-log',
+                    description: 'Log of an Actor run. Inlines up to 256 KB, larger returns a download URL.',
+                    mimeType: 'text/plain',
+                },
+            ],
+        };
+    };
 
     return {
         listResources,
