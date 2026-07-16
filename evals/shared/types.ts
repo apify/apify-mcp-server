@@ -43,6 +43,12 @@ export type WorkflowTestCase = {
     maxTurns?: number;
     /** Tools to enable for this test (optional, e.g., ["actors", "docs", "apify/rag-web-browser"]) */
     tools?: string[];
+    /**
+     * Tool names the harness force-fails with a synthetic INTERNAL_ERROR carrying the real
+     * report-problem nudge (optional). Lets an eval deterministically throw a nudge-eligible error
+     * that the live server + API cannot reproduce on demand. See mcp_client.ts.
+     */
+    failTools?: string[];
 } & BaseTestCase;
 
 /**

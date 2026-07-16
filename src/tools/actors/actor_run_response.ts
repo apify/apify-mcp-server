@@ -4,7 +4,7 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { DATASET_SIZE_HINT_BYTES, HELPER_TOOLS, NARROW_OUTPUT_HINT } from '../../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
+import { buildActorRunWidgetMeta } from '../../resources/widgets.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import {
     buildConsoleDatasetUrl,
@@ -702,24 +702,11 @@ async function waitForRunWithProgress(opts: {
 // -----------------------------------------------------------------------------
 
 /**
- * Build a RunResponse from an already-started ActorRun without waiting.
- * Used when waitSecs=0 (default and apps modes) and by widget variants that return immediately.
- * Storage metadata contains IDs only; pollers/widgets fetch updates via get-actor-run.
- *
- * Pass `widget: true` for widget-rendered responses: nextStep is replaced with a no-poll
- * message and widget _meta is included so the UI renders automatically.
- *
- * Invariant: `widget: true` is only valid from `*-widget` tools. Non-widget tools (call-actor,
- * direct actor tools) must omit it or pass `false`.
+ * Shared construction for the immediate start response, used by both the base and widget
+ * builders below. Returns the full `RunResponse` with the computed (non-widget) `nextStep`;
+ * `buildStartRunWidgetResponse` overrides `nextStep` on its own copy.
  */
-export function buildStartRunResponse(params: {
-    actorName: string;
-    actorRun: ActorRun;
-    widget?: boolean;
-    linkContext?: ConsoleLinkContext;
-}): ToolResponse {
-    const { actorName, actorRun, widget, linkContext } = params;
-
+function buildStartRunSharedContent(actorName: string, actorRun: ActorRun): RunResponse {
     // Start path returns before any metadata fetch, so every entry — default and aliases — is id-only.
     const datasetIds = buildStorageAliasIds(actorRun.storageIds?.datasets, actorRun.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(
@@ -733,15 +720,13 @@ export function buildStartRunResponse(params: {
         Object.fromEntries(Object.entries(kvIds).map(([alias, id]) => [alias, { id }])),
     );
 
-    const { summary, nextStep: computedNextStep } = buildStatusSummaryNextStep({
+    const { summary, nextStep } = buildStatusSummaryNextStep({
         run: actorRun,
         dataset: datasets?.default,
         keyValueStore: keyValueStores?.default,
     });
 
-    const nextStep = widget ? WIDGET_NO_POLL_NEXT_STEP : computedNextStep;
-
-    const structuredContent: RunResponse = {
+    return {
         runId: actorRun.id,
         actorId: actorRun.actId,
         actorName,
@@ -754,19 +739,50 @@ export function buildStartRunResponse(params: {
         summary,
         nextStep,
     };
+}
+
+/**
+ * Build a RunResponse from an already-started ActorRun without waiting.
+ * Used when waitSecs=0 (default and apps modes).
+ * Storage metadata contains IDs only; pollers fetch updates via get-actor-run.
+ */
+export function buildStartRunResponse(params: {
+    actorName: string;
+    actorRun: ActorRun;
+    linkContext?: ConsoleLinkContext;
+}): ToolResponse {
+    const { actorName, actorRun, linkContext } = params;
+
+    const structuredContent = buildStartRunSharedContent(actorName, actorRun);
     const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
 
-    const widgetMeta = widget
-        ? {
-              ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
-              'openai/widgetDescription': `Actor run progress for ${actorName}`,
-          }
-        : undefined;
+    return respondOk(
+        [
+            JSON.stringify(structuredContent),
+            `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinks}`,
+        ],
+        { structuredContent },
+    );
+}
 
-    return respondOk([JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinks}`], {
-        structuredContent,
-        meta: widgetMeta,
-    });
+/**
+ * Build a RunResponse from an already-started ActorRun for widget-rendered responses:
+ * nextStep is replaced with a no-poll message and widget _meta is included so the UI renders
+ * automatically. Used only by `*-widget` tools.
+ */
+export function buildStartRunWidgetResponse(params: { actorName: string; actorRun: ActorRun }): ToolResponse {
+    const { actorName, actorRun } = params;
+
+    const base = buildStartRunSharedContent(actorName, actorRun);
+    const structuredContent = { ...base, nextStep: WIDGET_NO_POLL_NEXT_STEP };
+
+    return respondOk(
+        [JSON.stringify(structuredContent), `${structuredContent.summary}\n${structuredContent.nextStep}`],
+        {
+            structuredContent,
+            meta: buildActorRunWidgetMeta(actorName),
+        },
+    );
 }
 
 // -----------------------------------------------------------------------------

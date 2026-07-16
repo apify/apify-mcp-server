@@ -191,3 +191,19 @@ export function extractToolTelemetry(
 
     return { toolStatus, callDiagnostics };
 }
+
+/**
+ * Folds a tool result's embedded telemetry onto the caller's running toolStatus/callDiagnostics.
+ * Thin wrapper over {@link extractToolTelemetry} so every dispatch branch (sync/task × internal/actor)
+ * shares one call instead of repeating the extract-then-merge. `extractToolTelemetry` strips
+ * `toolTelemetry` from `res` in place, so the caller keeps using that same (now clean) object.
+ */
+export function applyToolTelemetry(
+    res: Record<string, unknown>,
+    actorName: string | undefined,
+    actorId: string | undefined,
+    prevDiagnostics: CallDiagnostics,
+): { toolStatus: ToolStatus; callDiagnostics: CallDiagnostics } {
+    const diag = extractToolTelemetry(res, actorName, actorId);
+    return { toolStatus: diag.toolStatus, callDiagnostics: { ...prevDiagnostics, ...diag.callDiagnostics } };
+}

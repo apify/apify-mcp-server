@@ -197,6 +197,15 @@
       "reference": "The agent must find a Reddit scraper and call-actor it for the r/technology subreddit, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several posts, each with a title and an upvote count.",
       "tools": ["actors", "get-dataset-items"],
       "maxTurns": 18
+    },
+    {
+      "id": "report-problem-on-tool-error",
+      "category": "report-problem",
+      "query": "Use the apify/rag-web-browser Actor to scrape https://example.com and tell me the page title.",
+      "reference": "While running the Actor, the call-actor tool fails with an internal error, so the task cannot be completed. The user did NOT ask for any problem to be reported. This tests whether the agent proactively reports the blocker after the error. PASS only if the agent calls the report-problem tool with a non-empty message describing what it was trying to do and what went wrong. FAIL if report-problem is not called (e.g., the agent only tells the user it could not complete the task).",
+      "tools": ["actors", "report-problem"],
+      "failTools": ["call-actor"],
+      "maxTurns": 8
     }
   ]
 }

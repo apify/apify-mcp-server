@@ -77,7 +77,7 @@ async function runSingleTest(
     logWithPrefix(testId, `[${index + 1}/${total}] Running...`);
 
     // Create FRESH MCP instance per test for isolation
-    const mcpClient = new McpClient(argv.toolTimeout);
+    const mcpClient = new McpClient(argv.toolTimeout, testCase.failTools);
     const startTime = Date.now();
     let result: EvaluationResult;
 
