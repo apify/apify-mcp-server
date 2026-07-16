@@ -249,6 +249,7 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 | `--output` | `-o` | Save results to JSON file | `false` |
 | `--results-path <path>` | | Results JSON file | `results.json` |
 | `--baseline <path>` | | Results JSON to compare against (prints byte/token deltas) | results path |
+| `--traces <path>` | | Write full per-turn traces (LLM output, tool calls, full args/results, untruncated) to this JSON file | not written |
 | `--help` | | Show help message | - |
 
 ### Line Range Filtering
@@ -446,6 +447,24 @@ pnpm run evals:workflow
 cp evals/workflows/results.json /tmp/baseline.json
 pnpm run evals:workflow -- --baseline /tmp/baseline.json   # prints byte/token deltas vs the baseline
 ```
+
+### Full Traces (`--traces`)
+
+`results.json`'s `toolCallTrace` is deliberately compact — it excludes tool
+result bodies to stay small over time. To inspect exactly what happened in
+one test case (every LLM final response, every tool call's full arguments,
+every tool result's full untruncated content), pass `--traces <path>`. It
+writes one JSON array, one entry per test case, and is meant for manual
+review — not for committing or diffing.
+
+```bash
+pnpm run evals:workflow --test-cases-path evals/workflows/code_mode_test_cases.json --traces /tmp/code_mode_traces.json
+```
+
+Each entry: `testId`, `category`, `arm`, `pairId`, `query`, `durationMs`,
+`error`, `verdict`, `judgeReason`, and `conversation` (the full
+`ConversationHistory` — every turn's `toolCalls`, `toolResults` (including
+`result`, the raw tool output), `usage`, and `finalResponse`).
 
 > **Bootstrap note:** records written before these metrics existed have no `resultBytes`/`*Tokens` fields, so the first run after this change shows `(no baseline)` for them and writes fresh values with `--output`. Subsequent runs show real deltas.
 

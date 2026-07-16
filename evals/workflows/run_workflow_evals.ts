@@ -35,6 +35,7 @@ import {
 } from './results_writer.js';
 import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test_cases_loader.js';
 import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test_cases_loader.js';
+import { writeTraces } from './traces_writer.js';
 import { evaluateConversation } from './workflow_judge.js';
 
 type CliArgs = {
@@ -50,6 +51,7 @@ type CliArgs = {
     output?: boolean;
     resultsPath?: string;
     baseline?: string;
+    traces?: string;
 };
 
 /**
@@ -234,6 +236,11 @@ async function main() {
                 'Results JSON file to compare against; prints byte/token deltas per test ' +
                 '(default: evals/workflows/results.json)',
         })
+        .option('traces', {
+            type: 'string',
+            description:
+                'Write full per-turn traces (LLM output, tool calls, full args/results, untruncated) to this JSON file',
+        })
         .help().argv) as CliArgs;
 
     console.log('='.repeat(100));
@@ -406,6 +413,19 @@ async function main() {
         } catch (error) {
             console.error(`❌ Failed to save results: ${error}`);
             console.error('   Results will still be displayed but not persisted.');
+            console.log();
+        }
+    }
+
+    // Save full per-turn traces if --traces flag is present
+    if (argv.traces) {
+        try {
+            const tracesPath = path.resolve(process.cwd(), argv.traces);
+            writeTraces(tracesPath, results);
+            console.log(`✅ Traces saved to: ${tracesPath}`);
+            console.log();
+        } catch (error) {
+            console.error(`❌ Failed to save traces: ${error}`);
             console.log();
         }
     }
