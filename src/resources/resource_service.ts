@@ -178,10 +178,12 @@ export function createResourceService(options: ResourceServiceOptions): Resource
                 {
                     uriTemplate: `${api}/v2/datasets/{datasetId}/items{?limit,offset,clean,fields,format}`,
                     name: 'dataset-items',
+                    // No mimeType: `format` selects among 7 response types (json/jsonl/xml/html/csv/xlsx/rss),
+                    // and the spec allows a template mimeType only when all matching resources share one.
                     description:
                         'Items of a dataset, read via resources/read (the server injects the Apify token). ' +
-                        'Page with limit/offset — responses inline up to 256 KB, larger ones return a download URL.',
-                    mimeType: 'application/json',
+                        'Page with limit/offset; format defaults to JSON — responses inline up to 256 KB, ' +
+                        'larger ones return a download URL.',
                 },
                 {
                     uriTemplate: `${api}/v2/key-value-stores/{storeId}/records/{recordKey}`,

@@ -188,6 +188,9 @@ describe('createResourceService()', () => {
                 expect(template.uriTemplate).toMatch(/^https:\/\/api\.apify\.com\/v2\//);
                 expect(template.description).toBeTruthy();
             }
+            // dataset-items advertises `format` (7 response types), so it must not pin a mimeType —
+            // the spec allows a template mimeType only when all matching resources share one type.
+            expect(resourceTemplates.find((t) => t.name === 'dataset-items')).not.toHaveProperty('mimeType');
         });
 
         it('exposes paging parameters as RFC 6570 query expansions', async () => {
