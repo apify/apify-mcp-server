@@ -1,6 +1,38 @@
 import { describe, expect, it } from 'vitest';
 
-import { typeObjectToString } from '../../src/utils/actor_details.js';
+import { resolveReadmeContent, typeObjectToString } from '../../src/utils/actor_details.js';
+
+describe('resolveReadmeContent()', () => {
+    it('prefers the summary when present and fullReadmeOnly is not set', () => {
+        const result = resolveReadmeContent({ readme: '# Full', readmeSummary: 'Short summary.' });
+        expect(result).toEqual({ content: 'Short summary.', heading: '# README summary' });
+    });
+
+    it('falls back to the full readme when there is no summary', () => {
+        const result = resolveReadmeContent({ readme: '# Full' });
+        expect(result).toEqual({ content: '# Full', heading: '# README' });
+    });
+
+    it('always returns the full readme when fullReadmeOnly is true, even with a summary present', () => {
+        const result = resolveReadmeContent({
+            readme: '# Full',
+            readmeSummary: 'Short summary.',
+            fullReadmeOnly: true,
+        });
+        expect(result).toEqual({ content: '# Full', heading: '# README' });
+    });
+
+    it('ignores a blank summary the same way with or without fullReadmeOnly', () => {
+        expect(resolveReadmeContent({ readme: '# Full', readmeSummary: '   ' })).toEqual({
+            content: '# Full',
+            heading: '# README',
+        });
+        expect(resolveReadmeContent({ readme: '# Full', readmeSummary: '   ', fullReadmeOnly: true })).toEqual({
+            content: '# Full',
+            heading: '# README',
+        });
+    });
+});
 
 describe('typeObjectToString', () => {
     it('formats a flat object of string-typed fields', () => {

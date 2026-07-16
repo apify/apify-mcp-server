@@ -40,12 +40,17 @@ function typeValueToString(value: unknown): string {
 /**
  * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
  * Returns the content string and appropriate heading for text output.
+ *
+ * An Actor can opt out of the summary entirely via `fullReadmeOnly: true` in its
+ * `.actor/actor.json` (see fetchActorDetails() for where that's read) — for an Actor whose
+ * README documents an API contract (exact method names/shapes), the auto-generated summary
+ * can omit the one section that matters and there's no per-call way to request the raw text.
  */
-export function resolveReadmeContent(details: { readmeSummary?: string; readme: string }): {
+export function resolveReadmeContent(details: { readmeSummary?: string; readme: string; fullReadmeOnly?: boolean }): {
     content: string;
     heading: string;
 } {
-    if (details.readmeSummary?.trim()) {
+    if (!details.fullReadmeOnly && details.readmeSummary?.trim()) {
         return { content: details.readmeSummary, heading: '# README summary' };
     }
     return { content: details.readme, heading: '# README' };
@@ -60,6 +65,7 @@ export type ActorDetailsResult = {
     inputSchema: ActorInputSchema;
     readme: string;
     readmeSummary?: string;
+    fullReadmeOnly?: boolean;
 };
 
 export async function fetchActorDetails(
@@ -98,6 +104,11 @@ export async function fetchActorDetails(
         inputSchema.properties = shortenProperties(inputSchema.properties);
         const actorCard = formatActorToActorCard(actorInfoWithPicture, cardOptions);
         const actorCardStructured = formatActorToStructuredCard(actorInfoWithPicture, cardOptions);
+        // Not part of apify-client's ActorDefinition type (it only models the platform's
+        // recognized actor.json fields) — read defensively in case an unrecognized top-level
+        // key doesn't survive the platform's own build validation into this response.
+        const fullReadmeOnly =
+            (buildInfo.actorDefinition as unknown as Record<string, unknown>).fullReadmeOnly === true;
         return {
             actorInfo: actorInfoWithPicture,
             buildInfo,
@@ -106,6 +117,7 @@ export async function fetchActorDetails(
             inputSchema,
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
             readmeSummary: actorInfo.readmeSummary,
+            fullReadmeOnly,
         };
     } catch (error) {
         logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
