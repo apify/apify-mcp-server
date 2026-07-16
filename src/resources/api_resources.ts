@@ -130,6 +130,12 @@ function isMaxContentLengthAbort(err: unknown): boolean {
     return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
 }
 
+/** `charset` parameter of a Content-Type header, lowercased; `undefined` when absent. */
+function parseCharset(contentType: string | undefined): string | undefined {
+    const match = /;\s*charset\s*=\s*"?([^";]+)"?/i.exec(contentType ?? '');
+    return match?.[1].trim().toLowerCase();
+}
+
 /** Drain a response stream into one Buffer. Chunks are Buffers (`objectMode: false`). */
 async function collectStream(data: unknown): Promise<Buffer> {
     const chunks: Buffer[] = [];
@@ -254,11 +260,15 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     }
 
     const baseMimeType = parseBaseMimeType(contentType);
-    if (isTextualMimeType(baseMimeType)) {
-        // Verbatim, with the FULL declared Content-Type — charset included, a client needs it to decode.
-        return buildTextResult(uri, body.toString('utf-8'), contentType);
+    const charset = parseCharset(contentType) ?? 'utf-8';
+    // Decode with the DECLARED charset, not hardcoded UTF-8 — latin1 bytes decoded as UTF-8 mangle
+    // irreversibly to U+FFFD. A charset Node cannot decode falls through to the blob branch (lossless
+    // base64 beats text in a wrong encoding), the same rule as apify-client's body_parser. The full
+    // Content-Type — charset included — rides along on the text result.
+    if (isTextualMimeType(baseMimeType) && Buffer.isEncoding(charset)) {
+        return buildTextResult(uri, body.toString(charset), contentType);
     }
-    // Binary: base MIME type only (parameters are meaningless for a blob).
+    // Binary or undecodable text: base MIME type only (parameters are meaningless for a blob).
     return {
         contents: [
             {

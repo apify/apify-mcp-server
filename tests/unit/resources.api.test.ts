@@ -194,6 +194,37 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toBe('hello world');
     });
 
+    it('decodes a text body with its declared non-UTF-8 charset', async () => {
+        // latin1 bytes are not valid UTF-8; a hardcoded UTF-8 decode would mangle them to U+FFFD.
+        const body = Buffer.from('Café à côté', 'latin1');
+        const { request } = requestReturning(streamOf(body), 'text/plain; charset=latin1');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/NOTE`,
+            stubApifyClient({ request }),
+        );
+
+        expect(firstContent(result).text).toBe('Café à côté');
+        expect(firstContent(result).mimeType).toBe('text/plain; charset=latin1');
+    });
+
+    it('returns a lossless blob instead of text for a charset Node cannot decode', async () => {
+        // `iso-8859-1` is not a Buffer encoding label. Decoding with the wrong charset would corrupt
+        // the bytes irreversibly, so the body ships as base64 — same rule as apify-client's body_parser.
+        const body = Buffer.from('Café à côté', 'latin1');
+        const { request } = requestReturning(streamOf(body), 'text/plain; charset=iso-8859-1');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/NOTE`,
+            stubApifyClient({ request }),
+        );
+
+        const contents = firstContent(result);
+        expect(contents.blob).toBe(body.toString('base64'));
+        expect(contents).not.toHaveProperty('text');
+        expect(contents.mimeType).toBe('text/plain');
+    });
+
     it('returns an XML body as text', async () => {
         const { request } = requestReturning(streamOf('<a>1</a>'), 'application/xml');
 

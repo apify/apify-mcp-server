@@ -29,9 +29,10 @@ header for those, silently degrading to unauthenticated).
 `readApiResource()` streams the body verbatim —
 `httpClient.axios.request({ method: 'GET', responseType: 'stream', maxContentLength: MAX_INLINE_BYTES })`
 — and branches on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` with
-the full header, everything else (including no Content-Type) as a base64 `blob` with the base MIME
-type, empty body as empty text preserving the Content-Type. The body is never parsed, so bytes
-round-trip exactly. axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
+the full header, decoded with the declared charset (default utf-8; a charset Node cannot decode
+falls through to blob — lossless beats mangled text, same rule as apify-client's body_parser);
+everything else (including no Content-Type) as a base64 `blob` with the base MIME type; empty body
+as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly. axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
 responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
 after the request resolves, outside any retry wrapper. On trip, the proxy links out: a `text/plain`
 block carrying the store's signed `recordPublicUrl` for a KVS record, else the token-gated API URL,
