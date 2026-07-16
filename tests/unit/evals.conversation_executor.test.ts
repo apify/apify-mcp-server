@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { executeConversation } from '../../evals/workflows/conversation_executor.js';
 import type { LlmClient, LlmResponse } from '../../evals/workflows/llm_client.js';
 import type { McpClient } from '../../evals/workflows/mcp_client.js';
-import type { McpToolResult } from '../../evals/workflows/types.js';
+import type { ConversationTurn, McpToolResult } from '../../evals/workflows/types.js';
 
 /** LLM client that replays a scripted list of responses, one per turn. */
 function makeLlmClient(responses: LlmResponse[]): LlmClient {
@@ -129,5 +129,21 @@ describe('executeConversation()', () => {
         expect(conversation.totalTokens).toBe(27);
         expect(conversation.cachedPromptTokens).toBeUndefined();
         expect(conversation.reasoningTokens).toBeUndefined();
+    });
+
+    it('pushes turns into a caller-supplied array as they happen, not just at the end', async () => {
+        const turns: ConversationTurn[] = [];
+
+        const conversation = await executeConversation({
+            userPrompt: 'go',
+            mcpClient: makeMcpClient({ toolName: 'search-actors', success: true, result: { items: [] } }),
+            llmClient: makeLlmClient([toolCallResponse(), toolCallResponse(), finalResponse()]),
+            turns,
+        });
+
+        // Same array reference throughout — a caller that raced this call against a timeout
+        // (see run_workflow_evals.ts) can read `turns` for whatever completed before the cutoff.
+        expect(turns).toBe(conversation.turns);
+        expect(turns).toHaveLength(3);
     });
 });

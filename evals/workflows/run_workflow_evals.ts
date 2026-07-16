@@ -37,6 +37,7 @@ import {
 import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test_cases_loader.js';
 import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test_cases_loader.js';
 import { writeTraces } from './traces_writer.js';
+import type { ConversationTurn } from './types.js';
 import { evaluateConversation } from './workflow_judge.js';
 
 type CliArgs = {
@@ -90,6 +91,10 @@ async function runSingleTest(
     const startTime = Date.now();
     let result: EvaluationResult;
 
+    // Shared with executeConversation() so a timed-out test still has whatever turns
+    // completed before the cutoff, instead of an empty conversation (see the catch block).
+    const turnsSoFar: ConversationTurn[] = [];
+
     try {
         const runTest = async () => {
             // Start MCP server with test-specific tools (if configured)
@@ -107,6 +112,7 @@ async function runSingleTest(
                 model: argv.agentModel,
                 serverInstructions,
                 agentInstructions: testCase.agentInstructions,
+                turns: turnsSoFar,
             });
 
             // Judge conversation
@@ -155,10 +161,10 @@ async function runSingleTest(
             testCase,
             conversation: {
                 userPrompt: testCase.query,
-                turns: [],
+                turns: turnsSoFar,
                 completed: false,
                 hitMaxTurns: false,
-                totalTurns: 0,
+                totalTurns: turnsSoFar.length,
             },
             judgeResult: {
                 verdict: 'FAIL',

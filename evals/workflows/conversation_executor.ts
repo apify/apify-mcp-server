@@ -27,6 +27,13 @@ export type ConversationExecutorOptions = {
     serverInstructions?: string | null;
     /** Evaluation-only strategy instructions. */
     agentInstructions?: string;
+    /**
+     * Turns are pushed into this array as they happen, instead of a locally-scoped one, when
+     * provided. Lets a caller that raced this call against a timeout (see run_workflow_evals.ts)
+     * still read whatever turns completed before the cutoff, rather than losing the whole
+     * in-progress conversation.
+     */
+    turns?: ConversationTurn[];
 };
 
 /**
@@ -42,9 +49,8 @@ export async function executeConversation(options: ConversationExecutorOptions):
         model = MODELS.agent,
         serverInstructions,
         agentInstructions,
+        turns = [],
     } = options;
-
-    const turns: ConversationTurn[] = [];
 
     // Build system prompt with optional server instructions
     let systemPrompt = AGENT_SYSTEM_PROMPT;
