@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import type { EvaluationResult, ResultsDatabase, TestResultRecord } from './output_formatter.js';
 import {
     getCallActorTargets,
@@ -15,8 +16,19 @@ import {
     getToolCallTrace,
     sumResultBytes,
 } from './output_formatter.js';
+import type { ConversationHistory } from './types.js';
 
 const CODE_RUNTIME_ACTOR_ID = 'apify/code-runtime';
+// The MCP server also exposes a pre-loaded Actor as its own dedicated tool (see `tools_loader.ts`),
+// so code-runtime usage must be detected on both paths: generic call-actor, and this direct tool.
+const CODE_RUNTIME_TOOL_NAME = actorNameToToolName(CODE_RUNTIME_ACTOR_ID);
+
+function wasCodeRuntimeInvoked(conversation: ConversationHistory): boolean {
+    if (getCallActorTargets(conversation).includes(CODE_RUNTIME_ACTOR_ID)) return true;
+    return conversation.turns.some((turn) =>
+        turn.toolCalls.some((toolCall) => toolCall.name === CODE_RUNTIME_TOOL_NAME),
+    );
+}
 
 /**
  * Build composite key used by legacy results files.
@@ -121,7 +133,7 @@ export function convertEvaluationResultToRecord(
         toolCalls: getToolCallCount(conversation),
         failedToolCalls: getFailedToolCallCount(conversation),
         policyViolations: getPolicyViolations(conversation),
-        usedCodeRuntime: getCallActorTargets(conversation).includes(CODE_RUNTIME_ACTOR_ID),
+        usedCodeRuntime: wasCodeRuntimeInvoked(conversation),
         finalResponse: getFinalResponse(conversation),
         toolCallTrace: getToolCallTrace(conversation),
         error: result.error ?? null,

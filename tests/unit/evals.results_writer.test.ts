@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { EvaluationResult, ResultsDatabase, TestResultRecord } from '../../evals/workflows/output_formatter.js';
 import {
     buildResultKey,
+    convertEvaluationResultToRecord,
     findBaselineRecord,
     updateResultsWithEvaluations,
 } from '../../evals/workflows/results_writer.js';
@@ -38,6 +39,38 @@ function makeDatabase(records: TestResultRecord[]): ResultsDatabase {
     }
     return { version: '1.0', results };
 }
+
+describe('convertEvaluationResultToRecord() usedCodeRuntime', () => {
+    function makeResult(toolCalls: { name: string; arguments: Record<string, unknown> }[]): EvaluationResult {
+        return {
+            testCase: { id: 'test', category: 'code-mode', query: 'query', reference: 'reference' },
+            conversation: {
+                userPrompt: 'query',
+                turns: [{ turnNumber: 1, toolCalls, toolResults: [] }],
+                completed: true,
+                hitMaxTurns: false,
+                totalTurns: 1,
+            },
+            judgeResult: { verdict: 'PASS', reason: 'ok', rawResponse: '' },
+            durationMs: 100,
+        };
+    }
+
+    it('detects code-runtime called through generic call-actor', () => {
+        const result = makeResult([{ name: 'call-actor', arguments: { actor: 'apify/code-runtime' } }]);
+        expect(convertEvaluationResultToRecord(result, 'agent', 'judge').usedCodeRuntime).toBe(true);
+    });
+
+    it('detects code-runtime called through its dedicated pre-loaded tool', () => {
+        const result = makeResult([{ name: 'apify--code-runtime', arguments: { code: 'console.log(1)' } }]);
+        expect(convertEvaluationResultToRecord(result, 'agent', 'judge').usedCodeRuntime).toBe(true);
+    });
+
+    it('is false when neither path was used', () => {
+        const result = makeResult([{ name: 'call-actor', arguments: { actor: 'apify/instagram-scraper' } }]);
+        expect(convertEvaluationResultToRecord(result, 'agent', 'judge').usedCodeRuntime).toBe(false);
+    });
+});
 
 describe('updateResultsWithEvaluations()', () => {
     it('appends repeated attempts', () => {
