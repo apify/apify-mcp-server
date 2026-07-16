@@ -5,70 +5,54 @@
 
 Three files serving the MCP `resources/*` surface:
 
-- `resource_service.ts` — handles `ListResources` / `ListResourceTemplates` /
-  read-resource requests. Takes an optional `apifyClient` on list/read; the server
-  builds it from the per-request token (`_meta.apifyToken || options.token`). This is
-  token-only by design — it does not forward payment headers like the CallTool path, so a
-  payment-only session (x402/Skyfire, no token) gets no client and every read fails with an
-  `InvalidParams` JSON-RPC error.
-- `api_resources.ts` — a thin MCP-resource proxy over the Apify API: any Apify API GET
-  endpoint is readable as a resource, identified by its real API URL.
-- `widgets.ts` — the registry of UI widgets (the metadata that maps a widget name to
-  its resource); the widgets themselves are built in [`../web`](../web/AGENTS.md).
+- `resource_service.ts` — handles `ListResources` / `ListResourceTemplates` / read-resource
+  requests. Takes an optional `apifyClient` on read, built by the server from the per-request
+  token (`_meta.apifyToken || options.token`). Token-only by design — no payment headers, so a
+  payment-only session (x402/Skyfire) gets no client and every read fails with `InvalidParams`.
+  Routes every http(s) URI to `readApiResource()`, which owns the single origin gate; non-http
+  schemes fall through to widgets/usage-guide/fallback.
+- `api_resources.ts` — a thin streaming MCP-resource proxy: any Apify API GET endpoint is
+  readable as a resource, identified by its real API URL.
+- `widgets.ts` — the registry of UI widgets; the widgets themselves are built in
+  [`../web`](../web/AGENTS.md).
 
 ## API resources (`api_resources.ts`)
 
 Resource URIs are real Apify API GET URLs (`https://api.apify.com/v2/...`), built from the storage
-IDs that Actors and tools return (e.g. a `datasetId` → `.../datasets/{id}/items`) — no custom scheme
-to translate. `isApifyApiUri()` gates reads to the configured API origin
-(`getApifyAPIBaseUrl()`): the apify-client attaches the session token as an `Authorization`
-header to **every** outbound request, so we must never hand it a non-Apify host.
+IDs that Actors and tools return. This is a deliberate deviation from the MCP spec's `https://`
+scheme guidance (SHOULD only be used for client-fetchable URLs — ours are token-gated): the
+identity with the platform's own URLs is the feature. Revisit when tools start emitting
+`resource_link`s, where clients may fetch `https://` URIs directly. `isApifyApiUri()` gates reads
+to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
+header for those, silently degrading to unauthenticated).
 
-`readApiResource()` is a generic proxy: `apifyClient.httpClient.axios.request({ method: 'GET', responseType: 'arraybuffer', maxContentLength: MAX_DOWNLOAD_BYTES })`
-(do **not** set `forceBuffer` — that skips the client's Content-Type parsing). It calls the
-apify-client's own axios instance directly instead of `httpClient.call()`, deliberately skipping
-apify-client's retry wrapper: that wrapper would misclassify the `maxContentLength` abort below as a
-retryable network error and retry it 8 times (~127s of backoff) instead of failing fast — so this is
-one attempt, no retries. `MAX_DOWNLOAD_BYTES` (5 MB) is enforced mid-flight by axios as bytes arrive, so
-an oversized dataset/log is aborted during download instead of being buffered whole first; on trip, the
-proxy links out the same way as an oversized inline body (below), skipping straight past the parse step.
-The parsed body is JSON → object, text/xml → string, anything else → `Buffer`, empty → `undefined`.
-Binary and empty bodies are keyed off the JS type; a JSON body is re-serialized with `JSON.stringify`
-(keyed off the declared Content-Type) so `null` and bare-string primitives round-trip, and text/xml
-strings are emitted verbatim. Buffers over `MAX_INLINE_BYTES`
-(256 KB, unchanged) link out — an explanatory `text/plain` block naming the URL + size + type
-(`resources/read` has no `resource_link` content type) — instead of inlining base64. For a KVS
-record the URL is the store's `recordPublicUrl` (auth-free only when the store has a URL-signing key);
-an unsigned record URL and every other endpoint fall back to the token-gated API URL, so the block says
-the link may require the token. A text/JSON body over the same `MAX_INLINE_BYTES` cap links out the same
-way — the signed `recordPublicUrl` for a KVS record, else the token-gated API URL — with a hint to page a
-dataset/list via `limit`/`offset` (measured on the serialized bytes we would emit, not a `Content-Length`
-header; a single record or log can't be paged, so the link is the real remedy).
+`readApiResource()` streams the body verbatim —
+`httpClient.axios.request({ method: 'GET', responseType: 'stream', maxContentLength: MAX_INLINE_BYTES })`
+— and branches on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` with
+the full header, decoded with the declared charset (default utf-8; a charset Node cannot decode
+falls through to blob — lossless beats mangled text, same rule as apify-client's body_parser);
+everything else (including no Content-Type) as a base64 `blob` with the base MIME type; empty body
+as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly. axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
+responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
+after the request resolves, outside any retry wrapper. On trip, the proxy links out: a `text/plain`
+block carrying the store's signed `recordPublicUrl` for a KVS record, else the token-gated API URL,
+plus a `limit`/`offset` paging hint. It calls the client's axios instance directly, not
+`httpClient.call()`: with a stream body, `call()` hands non-2xx responses to `ApifyApiError`
+unconsumed (junk message, stranded socket per retry) — one attempt, no retries; the error body is
+read here to surface the API's message.
 
-Genuine failures **throw** an `McpError` so the SDK returns a JSON-RPC error, not success-shaped content
-for an unreadable resource (the direction SEP-2164 makes a MUST; success-content for a nonexistent
-resource is the anti-pattern). `statusToErrorCode()` maps the code: 3xx/4xx except 429 → `InvalidParams`
-(-32602: bad URI, missing/invalid token, private or nonexistent resource — SEP-2164 remaps "nonexistent"
-here too); 429, 5xx, or no status (network failure) → `InternalError` (-32603: transient/upstream). The
-no-token and bad-origin pre-flight guards throw `InvalidParams` directly. This axios instance resolves
-non-2xx responses (`validateStatus: null`) instead of throwing, so a non-2xx is caught on the resolved
-`status` and re-thrown; only network-level failures (and the `maxContentLength` abort) reach the `catch`.
-The size link-outs are the exception — they are **successful** reads returning a download pointer, not
-failures, so they still return a `text` block. A 401/403 failure appends an actionable hint via
-`getHttpErrorHint()` (shared with the `tools/call` error path in `utils/mcp.ts`): 401 points at
-`APIFY_TOKEN`, 403 flags a private resource or insufficient access. The sibling `resource_service.ts`
-throws the same `InvalidParams` error from its generic "not found" fallback (a non-Apify URL never
-reaches `readApiResource`, so bad-origin is handled there in practice); its widget-not-found branches
-stay as content.
-
-Discovery is the server-instructions prose, not a fixed list: `resources/templates/list` returns
-nothing and `resources/list` serves only widgets + the usage guide. The read path is a generic
-proxy, so any Apify API GET URL works whether or not it was ever listed.
+Genuine failures **throw** an `McpError` carrying `data: { uri }` (SEP-2164 / draft spec: a
+JSON-RPC error, never success-shaped content): 3xx/4xx except 429 → `InvalidParams`; 429, 5xx, no
+status (network, mid-stream drop) → `InternalError`. 401/403 append a hint via `getHttpErrorHint()`
+(shared with `tools/call`); failures are logged via `logHttpError` (5xx → exception). Size
+link-outs are **successful** reads returning a download pointer, not failures. Discovery is the
+server-instructions prose plus `resources/templates/list`, which advertises the common URL shapes
+(dataset items, KVS record/keys, run, log) as RFC 6570 templates with paging params — advertisement
+only, not a route table: the read path stays generic and accepts any Apify API GET URL.
 
 ## Gotcha
 
-`widgets.ts` is **metadata only** — it registers and locates widgets. The actual
-React widget code and design rules live in [`../web/AGENTS.md`](../web/AGENTS.md);
-keep the two in sync (a widget registered here must exist there, and vice versa).
+`widgets.ts` is **metadata only** — it registers and locates widgets. The actual React widget code
+and design rules live in [`../web/AGENTS.md`](../web/AGENTS.md); keep the two in sync.
 
 After any change here run the root [Verification](../../AGENTS.md) steps.

@@ -11,13 +11,10 @@ export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of me
 /**
  * Content larger than this is linked out instead of inlined, since inlining it would blow up the context
  * window (base64 inflates a binary payload ~33%, and a large text/JSON body overflows it just as easily).
- * The key-value-store-record tool and the API-resource proxy both cap binaries here (link to a fetchable
- * URL); the proxy additionally links oversized text/JSON to a download URL.
+ * The key-value-store-record tool caps binaries here (link to a fetchable URL); the API-resource proxy
+ * caps every body here — its download is also aborted mid-flight at this limit via axios `maxContentLength`.
  */
 export const MAX_INLINE_BYTES = 256 * 1024;
-
-/** Hard cap on bytes the API-resource proxy downloads; enforced mid-flight by axios `maxContentLength`. */
-export const MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024;
 
 /**
  * Advisory threshold (uncompressed bytes) above which dataset tools append a size hint steering the

@@ -46,10 +46,10 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - **Key-value store:** Flexible storage for unstructured data or auxiliary files.
 
 ## Apify API resources
-- Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`https://api.apify.com/v2/...\` URL to \`resources/read\`; the server injects the session's Apify token and returns the response body. Reads require an Apify token — a session without one (e.g. payment-only x402/Skyfire) soft-fails with an explanatory message.
+- Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`https://api.apify.com/v2/...\` URL to \`resources/read\`; the server injects the session's Apify token and returns the response body. Reads require an Apify token — a session without one (e.g. payment-only x402/Skyfire) fails with a JSON-RPC error.
 - Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`https://api.apify.com/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
-- Reads inline up to ~256 KB; a larger response returns a short notice instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap, and responses over 5 MB are not downloaded at all — the notice carries a download URL instead.
-- Examples: \`https://api.apify.com/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`https://api.apify.com/v2/key-value-stores/{storeId}/records/{recordKey}\`.
+- Reads inline up to ~256 KB; a larger response is not downloaded — it returns a short notice with a download URL instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap.
+- Examples: \`https://api.apify.com/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`https://api.apify.com/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
 ${
     isApps
         ? `
