@@ -45,7 +45,9 @@ JSON-RPC error, never success-shaped content): 3xx/4xx except 429 → `InvalidPa
 status (network, mid-stream drop) → `InternalError`. 401/403 append a hint via `getHttpErrorHint()`
 (shared with `tools/call`); failures are logged via `logHttpError` (5xx → exception). Size
 link-outs are **successful** reads returning a download pointer, not failures. Discovery is the
-server-instructions prose; `resources/templates/list` returns nothing.
+server-instructions prose plus `resources/templates/list`, which advertises the common URL shapes
+(dataset items, KVS record/keys, run, log) as RFC 6570 templates with paging params — advertisement
+only, not a route table: the read path stays generic and accepts any Apify API GET URL.
 
 ## Gotcha
 

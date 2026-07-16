@@ -2204,6 +2204,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     );
                     await client.close();
                 });
+
+                it('advertises API URL templates via resources/templates/list', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const { resourceTemplates } = await client.listResourceTemplates();
+                    const datasetItems = resourceTemplates.find((t) => t.name === 'dataset-items');
+                    expect(datasetItems?.uriTemplate).toContain('/v2/datasets/{datasetId}/items{?limit,offset,');
+                    await client.close();
+                });
             });
 
             it('rejects get-key-value-store-record when required keyValueStoreId is missing', async () => {
