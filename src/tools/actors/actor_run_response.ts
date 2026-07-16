@@ -4,7 +4,7 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { DATASET_SIZE_HINT_BYTES, HELPER_TOOLS, NARROW_OUTPUT_HINT } from '../../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
+import { buildActorRunWidgetMeta } from '../../resources/widgets.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import {
     buildConsoleDatasetUrl,
@@ -703,13 +703,10 @@ async function waitForRunWithProgress(opts: {
 
 /**
  * Shared construction for the immediate start response, used by both the base and widget
- * builders below. Returns `base` (structuredContent minus `nextStep`), the computed `summary`,
- * and `computedNextStep` (the non-widget nextStep) — each builder picks its own `nextStep`/meta.
+ * builders below. Returns the full `RunResponse` with the computed (non-widget) `nextStep`;
+ * `buildStartRunWidgetResponse` overrides `nextStep` on its own copy.
  */
-function buildStartRunSharedContent(
-    actorName: string,
-    actorRun: ActorRun,
-): { base: Omit<RunResponse, 'nextStep'>; summary: string; computedNextStep: string } {
+function buildStartRunSharedContent(actorName: string, actorRun: ActorRun): RunResponse {
     // Start path returns before any metadata fetch, so every entry — default and aliases — is id-only.
     const datasetIds = buildStorageAliasIds(actorRun.storageIds?.datasets, actorRun.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(
@@ -723,13 +720,13 @@ function buildStartRunSharedContent(
         Object.fromEntries(Object.entries(kvIds).map(([alias, id]) => [alias, { id }])),
     );
 
-    const { summary, nextStep: computedNextStep } = buildStatusSummaryNextStep({
+    const { summary, nextStep } = buildStatusSummaryNextStep({
         run: actorRun,
         dataset: datasets?.default,
         keyValueStore: keyValueStores?.default,
     });
 
-    const base: Omit<RunResponse, 'nextStep'> = {
+    return {
         runId: actorRun.id,
         actorId: actorRun.actId,
         actorName,
@@ -740,9 +737,8 @@ function buildStartRunSharedContent(
             ...(keyValueStores && { keyValueStores }),
         },
         summary,
+        nextStep,
     };
-
-    return { base, summary, computedNextStep };
 }
 
 /**
@@ -757,16 +753,16 @@ export function buildStartRunResponse(params: {
 }): ToolResponse {
     const { actorName, actorRun, linkContext } = params;
 
-    const { base, summary, computedNextStep } = buildStartRunSharedContent(actorName, actorRun);
-    const nextStep = computedNextStep;
-
-    const structuredContent: RunResponse = { ...base, nextStep };
+    const structuredContent = buildStartRunSharedContent(actorName, actorRun);
     const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
 
-    return respondOk([JSON.stringify(structuredContent), `${summary}\n${nextStep}${consoleLinks}`], {
-        structuredContent,
-        meta: undefined,
-    });
+    return respondOk(
+        [
+            JSON.stringify(structuredContent),
+            `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinks}`,
+        ],
+        { structuredContent },
+    );
 }
 
 /**
@@ -777,20 +773,16 @@ export function buildStartRunResponse(params: {
 export function buildStartRunWidgetResponse(params: { actorName: string; actorRun: ActorRun }): ToolResponse {
     const { actorName, actorRun } = params;
 
-    const { base, summary } = buildStartRunSharedContent(actorName, actorRun);
-    const nextStep = WIDGET_NO_POLL_NEXT_STEP;
+    const base = buildStartRunSharedContent(actorName, actorRun);
+    const structuredContent = { ...base, nextStep: WIDGET_NO_POLL_NEXT_STEP };
 
-    const structuredContent: RunResponse = { ...base, nextStep };
-
-    const widgetMeta = {
-        ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
-        'openai/widgetDescription': `Actor run progress for ${actorName}`,
-    };
-
-    return respondOk([JSON.stringify(structuredContent), `${summary}\n${nextStep}`], {
-        structuredContent,
-        meta: widgetMeta,
-    });
+    return respondOk(
+        [JSON.stringify(structuredContent), `${structuredContent.summary}\n${structuredContent.nextStep}`],
+        {
+            structuredContent,
+            meta: buildActorRunWidgetMeta(actorName),
+        },
+    );
 }
 
 // -----------------------------------------------------------------------------

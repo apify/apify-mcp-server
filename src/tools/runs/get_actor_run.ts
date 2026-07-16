@@ -2,7 +2,7 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
+import { buildActorRunWidgetMeta } from '../../resources/widgets.js';
 import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
@@ -88,7 +88,7 @@ export function buildGetActorRunError(runId: string, error: unknown): ToolRespon
  * Build the success response. `content[0]` is the JSON-stringified `structuredContent`
  * mirror (per MCP spec); `content[1]` carries an LLM-readable narrative of `summary` + `nextStep`.
  */
-export function buildGetActorRunSuccessResponse(
+export function buildGetActorRunResponse(
     params: FetchActorRunResult & { linkContext?: ConsoleLinkContext },
 ): ToolResponse {
     const { run, structuredContent, linkContext } = params;
@@ -121,9 +121,8 @@ export function buildGetActorRunWidgetResponse(params: FetchActorRunResult): Too
         {
             structuredContent: widgetContent,
             meta: {
-                ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
+                ...buildActorRunWidgetMeta(structuredContent.actorName ?? structuredContent.runId),
                 ...(buildUsageMeta(run) ?? {}),
-                'openai/widgetDescription': `Actor run progress for ${structuredContent.actorName ?? structuredContent.runId}`,
             },
         },
     );
@@ -153,7 +152,7 @@ export const getActorRun: ToolEntry = Object.freeze({
             if ('aborted' in fetchResult) return {};
             if ('error' in fetchResult) return fetchResult.error;
 
-            return buildGetActorRunSuccessResponse({
+            return buildGetActorRunResponse({
                 ...fetchResult.result,
                 linkContext: await getConsoleLinkContext(apifyToken, client),
             });

@@ -648,16 +648,18 @@ describe('get-actor-run default response', () => {
 // buildStartRunResponse — the "fire and forget" (waitSecs=0) response builder
 // -----------------------------------------------------------------------------
 
-describe('buildStartRunResponse()', () => {
-    const actorRun = {
-        id: 'run-abc',
-        actId: 'actor-xyz',
-        status: 'RUNNING',
-        startedAt: new Date('2026-01-02T03:04:05.000Z'),
-        defaultDatasetId: 'dataset-abc',
-        defaultKeyValueStoreId: 'kv-abc',
-    } as unknown as ActorRun;
+// Shared by buildStartRunResponse() and buildStartRunWidgetResponse() below — both builders
+// consume the same ActorRun shape.
+const actorRun = {
+    id: 'run-abc',
+    actId: 'actor-xyz',
+    status: 'RUNNING',
+    startedAt: new Date('2026-01-02T03:04:05.000Z'),
+    defaultDatasetId: 'dataset-abc',
+    defaultKeyValueStoreId: 'kv-abc',
+} as unknown as ActorRun;
 
+describe('buildStartRunResponse()', () => {
     it('builds correct RunResponse shape without widget metadata', () => {
         const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun });
 
@@ -731,8 +733,10 @@ describe('buildStartRunResponse()', () => {
         expect(content[1].text).toContain('Apify Console: run https://console.apify.com/actors/runs/run-abc');
         expect(content[1].text).toContain(VERBATIM_LINKS_NUDGE);
     });
+});
 
-    it('buildStartRunWidgetResponse includes widget metadata and a no-poll nextStep', () => {
+describe('buildStartRunWidgetResponse()', () => {
+    it('includes widget metadata and a no-poll nextStep', () => {
         const result = buildStartRunWidgetResponse({
             actorName: 'apify/rag-web-browser',
             actorRun,
