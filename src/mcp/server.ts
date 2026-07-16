@@ -1097,6 +1097,15 @@ export class ActorsMcpServer {
                             // A store failure (not expiry) would otherwise fall through to the generic
                             // catch and return a task-less tool result the client rejects as a
                             // CreateTaskResult parse error; surface it as a protocol error instead.
+                            // The pre-flight outcome left toolStatus=SOFT_FAIL, but a genuine store
+                            // outage is a hard failure — correct it before throwing so the handler
+                            // `finally` logs FAILED/INTERNAL_ERROR (the outer McpError re-throw preserves
+                            // these), not the stale pre-flight SOFT_FAIL.
+                            toolStatus = TOOL_STATUS.FAILED;
+                            callDiagnostics = {
+                                failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
+                                ...buildActorFields(actorName, actorId),
+                            };
                             throw new McpError(
                                 ErrorCode.InternalError,
                                 `Failed to store the pre-flight result for task "${task.taskId}": ${
