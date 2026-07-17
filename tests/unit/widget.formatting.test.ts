@@ -114,4 +114,27 @@ describe('formatPricing()', () => {
             'from $0.25 / 1,000 each tweet. cheaper for higher plans',
         );
     });
+
+    it('uses the true cheapest tier, not GOLD, when a higher tier is cheaper', () => {
+        // compass/crawler-google-places-shaped: price decreases monotonically per tier,
+        // DIAMOND ($0.76/1,000) is cheaper than GOLD ($2.10/1,000).
+        const price = formatPricing({
+            model: 'PAY_PER_EVENT',
+            events: [
+                {
+                    title: 'Scraped place',
+                    tieredPricing: [
+                        { tier: 'FREE', priceUsd: 0.004 },
+                        { tier: 'BRONZE', priceUsd: 0.004 },
+                        { tier: 'SILVER', priceUsd: 0.003 },
+                        { tier: 'GOLD', priceUsd: 0.0021 },
+                        { tier: 'PLATINUM', priceUsd: 0.00126 },
+                        { tier: 'DIAMOND', priceUsd: 0.00076 },
+                    ],
+                },
+            ],
+        });
+
+        expect(price).toBe('from $0.76 / 1,000 scraped places');
+    });
 });
