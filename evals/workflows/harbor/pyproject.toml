@@ -1,0 +1,11 @@
+[project]
+name = "apify-mcp-evals-harbor"
+version = "0.0.0"
+description = "uv-managed Harbor + Opik runner for the Apify MCP workflow evals"
+requires-python = ">=3.12,<3.13"
+dependencies = ["harbor==0.18.0", "opik==2.1.31"]
+
+# Deps-only project: uv manages the environment but does not build/install this dir as a
+# package (the ts_executor_agent module is put on PYTHONPATH by the orchestrator instead).
+[tool.uv]
+package = false

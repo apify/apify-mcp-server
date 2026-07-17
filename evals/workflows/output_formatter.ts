@@ -1,236 +1,89 @@
 /**
- * Output formatter for evaluation results
+ * End-of-run console summary for the workflow-eval orchestrator.
+ *
+ * Harbor executes the trials and Opik stores the traces; this only renders a table of each
+ * executed trial's verdict (derived from the verifier reward) plus its judge reason, and the
+ * pass/fail totals the orchestrator uses for its exit code.
  */
 
-import type { WorkflowTestCase } from './test_cases_loader.js';
-import type { ConversationHistory } from './types.js';
-import type { JudgeResult } from './workflow_judge.js';
-
-/**
- * Single evaluation result
- */
-export type EvaluationResult = {
-    testCase: WorkflowTestCase;
-    conversation: ConversationHistory;
-    judgeResult: JudgeResult;
-    durationMs: number;
-    error?: string;
+/** Outcome of one executed Harbor trial, built from its result.json + verifier stdout. */
+export type TrialOutcome = {
+    /** Test case id (task name without the org prefix). */
+    id: string;
+    category?: string;
+    /** Verifier reward: 1 = PASS, 0 = FAIL, null = no reward recorded (verifier crashed). */
+    reward: number | null;
+    /** Judge reason (from verifier stdout) or an error explanation. */
+    reason: string;
 };
 
-/**
- * Sum the byte size of all tool results returned to the agent across a conversation.
- * This is the data volume returned by the tools, independent of the model's own output.
- */
-export function sumResultBytes(conversation: ConversationHistory): number {
-    let total = 0;
-    for (const turn of conversation.turns) {
-        for (const toolResult of turn.toolResults) {
-            total += toolResult.resultBytes ?? 0;
-        }
-    }
-    return total;
+/** A trial passed only when it recorded a reward of exactly 1. */
+export function isPass(outcome: TrialOutcome): boolean {
+    return outcome.reward === 1;
 }
 
-/**
- * Format a byte count as a human-readable string (B / KB / MB).
- */
-export function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+/** Pass/fail/error totals for the run. */
+export function summarize(outcomes: TrialOutcome[]): {
+    total: number;
+    passed: number;
+    failed: number;
+    errored: number;
+} {
+    const total = outcomes.length;
+    const passed = outcomes.filter(isPass).length;
+    const errored = outcomes.filter((outcome) => outcome.reward === null).length;
+    return { total, passed, failed: total - passed - errored, errored };
 }
 
-/**
- * Format a token count with thousands separators.
- */
-export function formatTokens(tokens: number): string {
-    return tokens.toLocaleString('en-US');
-}
-
-/**
- * Render a metric value followed by its change vs an optional baseline.
- * Lower-is-better metrics (bytes, tokens): ▼ marks a reduction, ▲ an increase.
- * Returns just the formatted value when no baseline exists.
- */
-export function formatWithDelta(current: number, baseline: number | undefined, format: (n: number) => string): string {
-    if (baseline === undefined) return `${format(current)} (no baseline)`;
-
-    const diff = current - baseline;
-    if (diff === 0) return `${format(current)} (= baseline)`;
-
-    const arrow = diff > 0 ? '▲' : '▼';
-    const sign = diff > 0 ? '+' : '-';
-    const pct = baseline === 0 ? 'n/a' : `${sign}${Math.abs((diff / baseline) * 100).toFixed(1)}%`;
-    return `${format(current)} (${arrow} ${sign}${format(Math.abs(diff))} / ${pct})`;
-}
-
-/**
- * Format results as a table.
- *
- * @param results - Evaluation results to render
- * @param baseline - Optional prior results keyed by test ID; when present, byte/token deltas are shown
- */
-export function formatResultsTable(results: EvaluationResult[], baseline?: Map<string, TestResultRecord>): string {
+/** Render the results table plus a summary block. `skipped` lists cases the harness could not run. */
+export function formatResultsTable(outcomes: TrialOutcome[], skipped: string[] = []): string {
     const lines: string[] = [];
-
-    // Header
     lines.push('='.repeat(100));
     lines.push('Workflow Evaluation Results');
     lines.push('='.repeat(100));
     lines.push('');
 
-    // Individual results
-    for (const result of results) {
+    for (const outcome of outcomes) {
         let status: string;
-        if (result.error) {
+        if (outcome.reward === null) {
             status = '🔥 ERROR';
-        } else if (result.judgeResult.verdict === 'PASS') {
+        } else if (isPass(outcome)) {
             status = '✅ PASS';
         } else {
             status = '❌ FAIL';
         }
-
-        lines.push(`${status} | ${result.testCase.id} | ${result.testCase.category}`);
-        lines.push(`  Query: ${result.testCase.query.slice(0, 80)}${result.testCase.query.length > 80 ? '...' : ''}`);
-
-        if (result.error) {
-            lines.push(`  Error: ${result.error}`);
-        } else {
-            const prior = baseline?.get(result.testCase.id);
-            const bytes = sumResultBytes(result.conversation);
-            const tokens = result.conversation.totalTokens ?? 0;
-            lines.push(`  Turns: ${result.conversation.totalTurns} | Duration: ${result.durationMs}ms`);
-            lines.push(`  Tool bytes: ${formatWithDelta(bytes, prior?.resultBytes, formatBytes)}`);
-            lines.push(`  Tokens: ${formatWithDelta(tokens, prior?.totalTokens, formatTokens)}`);
-            lines.push(`  Reason: ${result.judgeResult.reason}`);
-        }
-
+        lines.push(`${status} | ${outcome.id}${outcome.category ? ` | ${outcome.category}` : ''}`);
+        lines.push(`  Reason: ${outcome.reason}`);
         lines.push('');
     }
 
+    for (const id of skipped) {
+        lines.push(`⏭️  SKIPPED | ${id} (not supported by this harness)`);
+    }
+    if (skipped.length > 0) {
+        lines.push('');
+    }
+
+    const { total, passed, failed, errored } = summarize(outcomes);
     lines.push('-'.repeat(100));
-    lines.push('');
-
-    // Summary stats at the END
-    const totalTests = results.length;
-    const passedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'PASS').length;
-    const failedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'FAIL').length;
-    const errorTests = results.filter((r) => r.error).length;
-
-    const totalBytes = results.reduce((sum, r) => sum + sumResultBytes(r.conversation), 0);
-    const totalTokens = results.reduce((sum, r) => sum + (r.conversation.totalTokens ?? 0), 0);
-
-    // Aggregate deltas over the subset of tests whose baseline record has the metric, so
-    // the comparison is like-for-like. A legacy baseline may predate a metric (field absent),
-    // so bytes and tokens are matched independently.
-    let bytesMatched = 0;
-    let bytesCurrent = 0;
-    let bytesBaseline = 0;
-    let tokensMatched = 0;
-    let tokensCurrent = 0;
-    let tokensBaseline = 0;
-    if (baseline) {
-        for (const result of results) {
-            const prior = baseline.get(result.testCase.id);
-            if (!prior) continue;
-            // Records written before these metrics existed lack the field, so match each independently.
-            const priorBytes = prior.resultBytes;
-            if (priorBytes !== undefined) {
-                bytesMatched++;
-                bytesCurrent += sumResultBytes(result.conversation);
-                bytesBaseline += priorBytes;
-            }
-            const priorTokens = prior.totalTokens;
-            if (priorTokens !== undefined) {
-                tokensMatched++;
-                tokensCurrent += result.conversation.totalTokens ?? 0;
-                tokensBaseline += priorTokens;
-            }
-        }
-    }
-
-    lines.push(`📊 Summary:`);
-    lines.push(`  Total tests: ${totalTests}`);
-    lines.push(`  Passed: ${passedTests} ✅`);
-    lines.push(`  Failed: ${failedTests} ❌`);
-    lines.push(`  Errors: ${errorTests} 🔥`);
-    if (totalTests > 0) {
-        lines.push(
-            `  Tool bytes returned: ${formatBytes(totalBytes)} total, ${formatBytes(Math.round(totalBytes / totalTests))} avg/test`,
-        );
-        lines.push(
-            `  Tokens used: ${formatTokens(totalTokens)} total, ${formatTokens(Math.round(totalTokens / totalTests))} avg/test`,
-        );
-    }
-    if (bytesMatched > 0 || tokensMatched > 0) {
-        lines.push('');
-        lines.push(`  vs baseline:`);
-        if (bytesMatched > 0) {
-            lines.push(
-                `    Tool bytes (${bytesMatched}/${totalTests}): ${formatWithDelta(bytesCurrent, bytesBaseline, formatBytes)}`,
-            );
-        }
-        if (tokensMatched > 0) {
-            lines.push(
-                `    Tokens (${tokensMatched}/${totalTests}): ${formatWithDelta(tokensCurrent, tokensBaseline, formatTokens)}`,
-            );
-        }
+    lines.push('📊 Summary:');
+    lines.push(`  Executed: ${total}`);
+    lines.push(`  Passed: ${passed} ✅`);
+    lines.push(`  Failed: ${failed} ❌`);
+    lines.push(`  Errors: ${errored} 🔥`);
+    if (skipped.length > 0) {
+        lines.push(`  Skipped: ${skipped.length} ⏭️`);
     }
     lines.push('');
 
-    // Final verdict - ALL tests must pass
-    if (totalTests === 0) {
-        lines.push('⚠️  No tests run');
-    } else if (passedTests === totalTests && errorTests === 0) {
-        lines.push(`✅ Overall: PASS (${passedTests}/${totalTests} tests passed)`);
+    if (total === 0) {
+        lines.push('⚠️  No trials executed');
+    } else if (passed === total) {
+        lines.push(`✅ Overall: PASS (${passed}/${total} trials passed)`);
     } else {
-        lines.push(
-            `❌ Overall: FAIL (${passedTests}/${totalTests} tests passed, ${failedTests} failed, ${errorTests} errors)`,
-        );
+        lines.push(`❌ Overall: FAIL (${passed}/${total} trials passed, ${failed} failed, ${errored} errors)`);
     }
-
     lines.push('='.repeat(100));
 
     return lines.join('\n');
 }
-
-/**
- * Single test result record stored in results database
- */
-export type TestResultRecord = {
-    /** ISO timestamp when test was run */
-    timestamp: string;
-    /** Agent LLM model used */
-    agentModel: string;
-    /** Judge LLM model used */
-    judgeModel: string;
-    /** Test case ID */
-    testId: string;
-    /** Test verdict (PASS or FAIL) */
-    verdict: 'PASS' | 'FAIL';
-    /** Judge reasoning or error message */
-    reason: string;
-    /** Test duration in milliseconds */
-    durationMs: number;
-    /** Number of conversation turns */
-    turns: number;
-    /** Total bytes of tool results returned to the agent across the conversation (absent in records written before this metric) */
-    resultBytes?: number;
-    /** Prompt tokens billed across all agent LLM calls (absent in records written before this metric, or when the provider omits usage) */
-    promptTokens?: number;
-    /** Completion tokens billed across all agent LLM calls (absent in records written before this metric, or when the provider omits usage) */
-    completionTokens?: number;
-    /** Total tokens billed across all agent LLM calls (prompt + completion; absent in records written before this metric, or when the provider omits usage) */
-    totalTokens?: number;
-    /** Error message if execution failed, null otherwise */
-    error: string | null;
-};
-
-/**
- * Results database structure
- * Keys are in format: "{agentModel}:{judgeModel}:{testId}"
- */
-export type ResultsDatabase = {
-    version: string;
-    results: Record<string, TestResultRecord>;
-};

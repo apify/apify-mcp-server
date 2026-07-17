@@ -1,57 +1,50 @@
 /**
- * Configuration for workflow evaluation system
- * Includes model settings and prompts specific to workflow evaluations
+ * Configuration for workflow evaluations.
  *
- * Note: Temperature is set to 0.15 for deterministic results (see llm-client.ts)
+ * Models, prompts, and constants shared by the in-container agent entrypoint
+ * (run_single_trial.ts), the verifier (run_judge.ts), and the host-side
+ * orchestrator (run_workflow_evals.ts). Opik itself is driven by the Python
+ * `opik harbor run` wrapper; the constants here only tell the orchestrator
+ * which env to hand that wrapper so it targets the local self-hosted server.
  */
 
-import { sanitizeEnvValue } from '../shared/config.js';
-
-// Re-export shared config for convenience
-export { OPENROUTER_CONFIG, sanitizeEnvValue, sanitizeProcessEnv, validateEnvVars } from '../shared/config.js';
+// Re-export shared config for convenience.
+export { OPENROUTER_CONFIG, sanitizeEnvValue } from '../shared/config.js';
 
 /**
- * Opik project and dataset names (self-hosted). Traces/experiments land in this project,
- * test cases are synced into this dataset.
+ * Opik project the Harbor traces land in. Set as OPIK_PROJECT_NAME for the
+ * `opik harbor run` child so every trial trace is grouped here.
  */
 export const OPIK_PROJECT_NAME = 'workflow-evals';
-export const OPIK_DATASET_NAME = 'workflow-evals';
+
+/** Opik workspace for the self-hosted server. Never the Comet-cloud default. */
+export const OPIK_WORKSPACE = 'default';
 
 /**
- * Default Opik base URL for the local self-hosted server. NEVER fall through to the SDK's
- * Comet-cloud default. Start Opik locally with:
- *   git clone https://github.com/comet-ml/opik.git && cd opik && ./opik.sh
+ * Local self-hosted Opik API URL. Overridable via OPIK_URL_OVERRIDE; the
+ * orchestrator passes this to the child so the Python SDK never falls through
+ * to Comet cloud.
  */
-export const OPIK_DEFAULT_URL = 'http://localhost:5173/api';
+export const OPIK_LOCAL_API_URL = 'http://localhost:5173/api';
+
+/** Prebuilt Docker image tag every generated task's environment references. */
+export const DOCKER_IMAGE_TAG = 'apify-mcp-evals:local';
 
 /**
- * Opik connection config. URL is overridable via OPIK_URL_OVERRIDE; OPIK_API_KEY is respected
- * if set (not required locally). Workspace defaults to "default".
- */
-export const OPIK_CONFIG = {
-    apiUrl: sanitizeEnvValue(process.env.OPIK_URL_OVERRIDE) || OPIK_DEFAULT_URL,
-    apiKey: sanitizeEnvValue(process.env.OPIK_API_KEY) || '',
-    workspaceName: 'default',
-    projectName: OPIK_PROJECT_NAME,
-};
-
-/**
- * Default model configuration for agent and judge
- * These can be overridden via CLI arguments:
+ * Default model configuration for agent and judge. Overridable via CLI:
  *   --agent-model <model>
  *   --judge-model <model>
  */
 export const MODELS = {
-    // Agent model - the AI that performs tasks using tools
+    // Agent model - the AI that performs tasks using tools.
     agent: 'anthropic/claude-haiku-4.5',
-
-    // Judge model - evaluates conversation quality
+    // Judge model - evaluates conversation quality.
     judge: 'deepseek/deepseek-v4-flash',
 };
 
 /**
- * System prompt for the agent
- * Note: MCP server instructions are automatically appended to this prompt if provided by the server
+ * System prompt for the agent.
+ * MCP server instructions are appended to this prompt when the server provides them.
  */
 export const AGENT_SYSTEM_PROMPT = `You are a helpful AI assistant with access to Apify tools for web scraping and automation.
 
@@ -66,27 +59,22 @@ Guidelines:
 
 Available tools will be provided to you automatically.`;
 
-/**
- * Maximum number of conversation turns before timeout
- */
+/** Maximum number of conversation turns before timeout. */
 export const MAX_CONVERSATION_TURNS = 10;
 
 /**
- * Default timeout for MCP tool calls (in seconds)
- * This is the maximum time to wait for a single tool call to complete.
- *
- * Note: Actor runs that take longer than this will timeout.
- * For long-running Actors, increase this value via CLI: --tool-timeout 600
+ * Default timeout for MCP tool calls (in seconds). Maximum time to wait for a
+ * single tool call. Long-running Actors need a higher value: --tool-timeout 600.
  */
 export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
 
 /**
- * Judge prompt template for evaluating conversations
- * Uses structured output (JSON schema) - no format instructions needed
+ * Judge prompt template for evaluating conversations. Uses structured output
+ * (JSON schema), so no format instructions are needed.
  *
  * Variables:
- * - {{reference}}: The requirements the agent should meet
- * - {{conversation}}: The formatted conversation to evaluate
+ * - {{reference}}: the requirements the agent should meet
+ * - {{conversation}}: the formatted conversation to evaluate
  */
 export const JUDGE_PROMPT_TEMPLATE = `You are evaluating whether an AI agent successfully completed a user's task using available tools.
 

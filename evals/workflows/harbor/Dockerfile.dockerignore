@@ -1,0 +1,21 @@
+# BuildKit uses this per-Dockerfile ignore file (named <Dockerfile>.dockerignore) for the
+# `apify-mcp-evals:local` image build. Keeps the context small and correct: host node_modules
+# (wrong-platform binaries) and build output are rebuilt inside the image.
+.git
+# Never bake secrets into the image.
+.env*
+**/.env*
+*.pem
+**/*.pem
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.venv
+**/.venv
+evals/workflows/harbor/tasks
+evals/workflows/harbor/jobs
+storage
+apify_storage
+crawlee_storage
+.idea
+.vscode

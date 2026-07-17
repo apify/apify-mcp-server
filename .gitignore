@@ -32,6 +32,10 @@ key.pem
 # Ignore MCP config for Opencode client
 opencode.json
 
+# Workflow eval Harbor build output (regenerated each run)
+evals/workflows/harbor/tasks
+evals/workflows/harbor/jobs
+
 # Python cache files
 __pycache__/
 *.pyc

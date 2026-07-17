@@ -9,7 +9,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 
 const root = process.cwd();
 const rootDoc = join(root, 'AGENTS.md');
-const SKIP = new Set(['node_modules', 'dist', 'coverage', '.git']);
+const SKIP = new Set(['node_modules', 'dist', 'coverage', '.git', '.venv']);
 
 // `withFileTypes` reports the entry kind without a stat() that would follow — and
 // throw on — a broken symlink, so the walk never crashes on one.
