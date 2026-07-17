@@ -101,6 +101,26 @@ const longPayPerEvent = {
     },
 } as unknown as PricingInfo;
 
+// E9: twitter-x-scraper-shaped — Actor start (one-time) + per-tweet result event flagged isPrimaryEvent.
+const primaryFlaggedPayPerEvent = {
+    pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
+    pricingPerEvent: {
+        actorChargeEvents: {
+            start: {
+                eventTitle: 'Actor start',
+                eventDescription: 'Actor start event',
+                eventPriceUsd: 0.0004,
+            },
+            'result-item': {
+                eventTitle: 'Each tweet',
+                eventDescription: 'Each tweet',
+                eventPriceUsd: 0.00025,
+                isPrimaryEvent: true,
+            },
+        },
+    },
+} as unknown as PricingInfo;
+
 // E4: single-tier actor — raw data has only one bucket.
 const singleTierPayPerEvent = {
     pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
@@ -193,6 +213,28 @@ describe('pricingInfoToStructured (complete mode)', () => {
                     description: 'A Google Maps place scraped',
                     priceUsd: undefined,
                     tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }],
+                },
+            ],
+        });
+    });
+
+    it('E9: PAY_PER_EVENT passes isPrimaryEvent through per event', () => {
+        expect(pricingInfoToStructured(primaryFlaggedPayPerEvent, 'GOLD')).toEqual({
+            model: 'PAY_PER_EVENT',
+            userTier: 'GOLD',
+            events: [
+                {
+                    title: 'Actor start',
+                    description: 'Actor start event',
+                    priceUsd: 0.0004,
+                    tieredPricing: undefined,
+                },
+                {
+                    title: 'Each tweet',
+                    description: 'Each tweet',
+                    priceUsd: 0.00025,
+                    tieredPricing: undefined,
+                    isPrimaryEvent: true,
                 },
             ],
         });
@@ -323,6 +365,25 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                     title: 'Scraped place',
                     description: 'A Google Maps place scraped',
                     priceUsd: 0.004,
+                },
+            ],
+        });
+    });
+
+    it('E9: PAY_PER_EVENT simplified passes isPrimaryEvent through per event', () => {
+        expect(pricingInfoToSimplifiedStructured(primaryFlaggedPayPerEvent, 'GOLD')).toEqual({
+            model: 'PAY_PER_EVENT',
+            events: [
+                {
+                    title: 'Actor start',
+                    description: 'Actor start event',
+                    priceUsd: 0.0004,
+                },
+                {
+                    title: 'Each tweet',
+                    description: 'Each tweet',
+                    priceUsd: 0.00025,
+                    isPrimaryEvent: true,
                 },
             ],
         });
