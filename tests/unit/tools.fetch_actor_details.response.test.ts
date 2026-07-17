@@ -204,4 +204,18 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(content[0].text).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');
         expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
     });
+
+    // Regression: a 401 (invalid/expired APIFY_TOKEN) must not surface as "Actor ... was not
+    // found" — that message wrongly nudges the caller to retry search-actors instead of fixing
+    // the credential. fetchActorDetails() is expected to propagate auth errors (see
+    // utils.actor_details.test.ts); this asserts the tool handler doesn't swallow them either.
+    it('propagates a 401 from fetchActorDetails instead of returning the not-found response', async () => {
+        vi.mocked(fetchActorDetails).mockRejectedValue(
+            Object.assign(new Error('Authentication token is not valid'), {
+                statusCode: 401,
+            }),
+        );
+
+        await expect(callWithToken('apify_api_test')).rejects.toMatchObject({ statusCode: 401 });
+    });
 });

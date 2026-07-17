@@ -8,7 +8,7 @@ import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, Structu
 import { getActorMcpUrlCached } from './actor.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
 import { searchActorsByKeywords } from './actor_search.js';
-import { logHttpError } from './logging.js';
+import { getHttpStatusCode, logHttpError } from './logging.js';
 import type { PricingTier } from './pricing_info.js';
 
 const ACTOR_DETAILS_PICTURE_SEARCH_LIMIT = 5;
@@ -109,7 +109,12 @@ export async function fetchActorDetails(
         };
     } catch (error) {
         logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
-        return null;
+        // 404/400 is a genuine "Actor doesn't exist" — same treatment as the not-found check
+        // above. Anything else (401/403/5xx) must propagate: it's a different failure class
+        // (e.g. invalid token) the caller should surface as such, not as "not found".
+        const statusCode = getHttpStatusCode(error);
+        if (statusCode === 404 || statusCode === 400) return null;
+        throw error;
     }
 }
 

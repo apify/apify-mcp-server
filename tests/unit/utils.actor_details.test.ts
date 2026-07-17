@@ -1,6 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
+import { describe, expect, it, vi } from 'vitest';
 
-import { typeObjectToString } from '../../src/utils/actor_details.js';
+import type { ApifyClient } from '../../src/apify_client.js';
+import { fetchActorDetails, typeObjectToString } from '../../src/utils/actor_details.js';
+
+vi.mock('../../src/utils/actor_search.js', () => ({
+    searchActorsByKeywords: vi.fn().mockResolvedValue([]),
+}));
+
+function apifyApiError(status: number, message: string): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type: message, message } }, status } as AxiosResponse, 1);
+}
+
+function stubApifyClient(getActor: () => Promise<unknown>): ApifyClient {
+    return {
+        token: 'test-token',
+        actor: () => ({
+            get: getActor,
+            defaultBuild: async () => ({ get: getActor }),
+        }),
+    } as unknown as ApifyClient;
+}
 
 describe('typeObjectToString', () => {
     it('formats a flat object of string-typed fields', () => {
@@ -92,5 +113,21 @@ describe('typeObjectToString', () => {
                 },
             }),
         ).toBe('{ outer: { keep: string, tags: string[] } }');
+    });
+});
+
+describe('fetchActorDetails()', () => {
+    it('returns null on a genuine 404 (Actor does not exist)', async () => {
+        const client = stubApifyClient(() => Promise.reject(apifyApiError(404, 'Actor was not found')));
+
+        const result = await fetchActorDetails(client, 'apify/no-such-actor');
+
+        expect(result).toBeNull();
+    });
+
+    it('propagates a 401 (invalid/expired token) instead of reporting not-found', async () => {
+        const client = stubApifyClient(() => Promise.reject(apifyApiError(401, 'Authentication token is not valid')));
+
+        await expect(fetchActorDetails(client, 'apify/instagram-scraper')).rejects.toMatchObject({ statusCode: 401 });
     });
 });
