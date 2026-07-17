@@ -26,6 +26,7 @@ import { addActor } from './actors/add_actor.js';
 import { callActorApps, callActorDefault } from './actors/call_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
 import { searchActors } from './actors/search_actors.js';
+import { reportProblem } from './dev/report_problem.js';
 import { fetchApifyDocs } from './docs/fetch_apify_docs.js';
 import { searchApifyDocs } from './docs/search_apify_docs.js';
 import { abortActorRun } from './runs/abort_actor_run.js';
@@ -83,7 +84,7 @@ export const toolCategories = {
         getDatasetList,
         getKeyValueStoreList,
     ],
-    dev: [],
+    dev: [reportProblem],
 } satisfies Record<string, CategoryToolEntry[]>;
 
 /**

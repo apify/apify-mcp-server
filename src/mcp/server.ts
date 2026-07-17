@@ -19,6 +19,7 @@ import type {
     InitializeResult,
     Notification,
     Request,
+    Task,
     TaskStatusNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
@@ -62,11 +63,12 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getServerInfo } from '../server_card.js';
-import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { buildReportedProblemProperties, getTelemetryEnv, trackReportedProblem, trackToolCall } from '../telemetry.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
 import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
+import { appendReportProblemNudge } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorsAsToolsResult } from '../tools/index.js';
 import type {
@@ -85,14 +87,16 @@ import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { remoteMcpFailureDetail } from '../utils/apify_errors.js';
 import { isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import { computeToolResponseBytes, respondErrorNoTelemetry, respondOk } from '../utils/mcp.js';
+import { isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
+import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
+    applyToolTelemetry,
     classifyFailureCategory,
     deriveResourceIds,
     extractAjvErrorDetails,
-    extractToolTelemetry,
     getToolStatusFromError,
 } from '../utils/tool_status.js';
 import {
@@ -163,6 +167,34 @@ export async function emitTaskStatusNotification(
 }
 
 /**
+ * Shared diagnostics for a pre-flight failure (standby-provider conflict or missing/invalid payment
+ * signature) — a call outcome already known before any Actor runs. Standby rejection wins over the
+ * generic payment-required failure so the agent gets the precise reason instead of a generic 402.
+ * Pure: callers own their own post-handling (return the result directly, or store + notify + synthesize
+ * a terminal task) — call this only once `standbyRejection ?? paymentRequiredResult` is already truthy.
+ */
+function buildPreflightFailureOutcome(
+    standbyRejection: Record<string, unknown> | null,
+    paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
+    actorName: string | undefined,
+    actorId: string | undefined,
+): {
+    toolStatus: ToolStatus;
+    callDiagnostics: CallDiagnostics;
+    result: Record<string, unknown> | ReturnType<typeof buildPaymentRequiredResponse>;
+} {
+    return {
+        toolStatus: TOOL_STATUS.SOFT_FAIL,
+        callDiagnostics: {
+            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            ...(standbyRejection ? {} : { failure_http_status: 402 }),
+            ...buildActorFields(actorName, actorId),
+        },
+        result: (standbyRejection ?? paymentRequiredResult)!,
+    };
+}
+
+/**
  * Create Apify MCP server
  */
 export class ActorsMcpServer {
@@ -186,15 +218,19 @@ export class ActorsMcpServer {
      * values bypass auto-detect.
      */
     private readonly serverModeOption: ServerModeOption;
-    /** True once mode is final. False for `'auto'` until the initialize handler resolves client capabilities. */
+    /** True once the server mode is final: at construction for explicit `default`/`apps`, or after
+     *  the initialize handler resolves `'auto'`. Composing before this in `'auto'` mode would use
+     *  the preliminary DEFAULT mode and produce the wrong (non-widget) tool variants, so composition
+     *  waits for it. Distinct from {@link clientKnown}, which only withholds client-gated tools. */
     private serverModeResolved: boolean;
     /**
-     * Tool requests queued before mode is final. Actor tools are upserted immediately
-     * (mode-agnostic); we also capture the exact actor-tool slice fetched for each
-     * request so the flush composes every entry against *its own* actor list rather
-     * than the accumulated union across unrelated requests.
+     * Tool sources queued until composition is possible. Enqueued when the mode is not yet resolved
+     * (`'auto'` before initialize), and re-composed by the initialize flush — which is also when the
+     * client becomes known, so any client-gated tools withheld by an eager compose are added then.
+     * We capture the exact actor-tool slice fetched for each request so the flush composes every
+     * entry against *its own* actor list rather than the accumulated union across unrelated requests.
      */
-    private pendingToolsAfterModeResolved: { input: Input; actorTools: ToolEntry[] }[] = [];
+    private pendingToolsUntilClientKnown: { input: Input; actorTools: ToolEntry[] }[] = [];
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -326,6 +362,8 @@ export class ActorsMcpServer {
                 this.serverModeResolved = true;
             }
 
+            // Setting this makes `clientKnown` true, so the queued compose below (and any later
+            // load) resolves the tool set for this client and applies the per-client blocklist.
             (this.options as Record<string, unknown>).initializeRequestData = request;
 
             log.info('Resolved server mode for client capabilities', {
@@ -335,30 +373,91 @@ export class ActorsMcpServer {
                 capabilities: request?.params?.capabilities,
             });
 
-            this.updateToolsAfterServerModeResolved();
+            this.composePendingToolsForClient();
 
             await this.resolveWidgets();
 
             const result = await sdkInitHandler(request);
-            result.instructions = getServerInstructions(this.serverMode);
+            // Tools are final here (composePendingToolsForClient ran above, applying the per-client
+            // blocklist), so tool presence is the ground truth for whether to advertise
+            // report-problem in the instructions.
+            result.instructions = getServerInstructions(this.serverMode, this.tools.has(HELPER_TOOLS.PROBLEM_REPORT));
             return result;
         });
     }
 
-    private updateToolsAfterServerModeResolved(): void {
-        if (this.pendingToolsAfterModeResolved.length === 0) return;
+    /** True once the connecting client is known (set in the initialize handler, or hydrated by a
+     *  recovery path). Only client-gated tools wait for this so the per-client blocklist can be
+     *  applied; client-agnostic tools compose regardless. */
+    private get clientKnown(): boolean {
+        return this.options.initializeRequestData != null;
+    }
 
-        const tools = this.pendingToolsAfterModeResolved.flatMap(({ input, actorTools }) =>
-            getToolsForServerMode(input, actorTools, this.serverMode),
+    /**
+     * Compose the tool list for the current connection: resolve mode-specific tools, then drop
+     * report-problem unless it is currently servable (see {@link isReportProblemServable}).
+     * report-problem is a default-injected tool (via tools_loader) rather than a category member,
+     * gated here by servability. Every other tool composes eagerly, so a recovery/rehydration load
+     * without an initialize still restores them. report-problem is withheld until the client is known
+     * and re-added by the initialize flush. Used by every input-driven load path and the flush.
+     * (loadActorsAsTools upserts actor tools directly; actor tools are never gated, so they need no
+     * filtering.)
+     */
+    private composeToolsForClient(input: Input, actorTools: ToolEntry[]): ToolEntry[] {
+        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
+        if (this.isReportProblemServable()) return tools;
+        return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
+    }
+
+    /**
+     * Whether report-problem may be served on this connection right now:
+     * - Its only function is forwarding submissions via telemetry, so it is never servable when
+     *   telemetry is disabled (it would just fake an acknowledgement into the void).
+     * - It cannot be judged until the connecting client is known, so it is withheld until then;
+     *   the initialize flush re-composes and adds it if the client allows.
+     * Every other tool is unconditionally servable, so recovery loads compose them eagerly and they
+     * survive a load that never sees an initialize.
+     */
+    private isReportProblemServable(): boolean {
+        return (
+            !!this.telemetryEnabled &&
+            this.clientKnown &&
+            !isReportProblemBlockedForClient(this.options.initializeRequestData)
+        );
+    }
+
+    /**
+     * Append the report-problem nudge to a failed tool result. Thin wrapper over
+     * {@link appendReportProblemNudge} that fills in whether report-problem is served on this
+     * connection; suppression by category/402 is handled inside the helper.
+     */
+    private withReportProblemNudge<T>(
+        result: T,
+        failingToolName: string | undefined,
+        failureCategory?: string,
+        failureHttpStatus?: number,
+    ): T {
+        return appendReportProblemNudge(result, {
+            failingToolName,
+            available: this.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
+            failureCategory,
+            failureHttpStatus,
+        });
+    }
+
+    private composePendingToolsForClient(): void {
+        if (this.pendingToolsUntilClientKnown.length === 0) return;
+
+        const tools = this.pendingToolsUntilClientKnown.flatMap(({ input, actorTools }) =>
+            this.composeToolsForClient(input, actorTools),
         );
 
-        this.pendingToolsAfterModeResolved = [];
+        this.pendingToolsUntilClientKnown = [];
 
-        // Notify after the flush so shared-state handlers (e.g. Redis recovery) see
-        // the final tool set, including mode-specific helpers added here. Pre-init,
-        // `loadToolsByName` may have fired `upsertTools(actorTools, true)` with actor
-        // tools only (helpers still queued), and `loadToolsFromUrl` / `loadToolsFromInput`
-        // don't notify at all — this call reconciles both paths to the complete set.
+        // Notify after the flush so shared-state handlers (e.g. Redis recovery) see the final tool
+        // set. Load paths already upserted the client-agnostic tools pre-init; re-upserting is
+        // idempotent, and this pass adds the client-gated tools (e.g. report-problem) now that the
+        // client is known, reconciling shared state to the complete set.
         if (tools.length > 0) this.upsertTools(tools, true);
     }
 
@@ -437,6 +536,29 @@ export class ActorsMcpServer {
     }
 
     /**
+     * Buffer-or-compose gate shared by the actor-tools loaders. If the server mode isn't resolved
+     * yet ('auto' before initialize), queue the whole source for `composePendingToolsForClient` and
+     * (if non-empty) upsert the mode-agnostic actor tools immediately with the given `shouldNotify`.
+     * Once the mode is resolved, compose the client-specific set via `composeToolsForClient` (which
+     * withholds report-problem until the client is known) and upsert it; if the client still isn't
+     * known, queue the source so the initialize flush re-composes and adds the client-gated tools.
+     *
+     * Callers pass different `shouldNotify` values: `loadToolsByName` forwards `actorTools.length > 0`
+     * (notify only when actor tools were fetched), while `loadToolsFromUrl` and `loadToolsFromInput`
+     * pass `false` and defer to the post-initialize reconcile. See `composePendingToolsForClient`.
+     */
+    private registerFetchedActorTools(input: Input, actorTools: ToolEntry[], shouldNotify: boolean): void {
+        if (!this.serverModeResolved) {
+            this.pendingToolsUntilClientKnown.push({ input, actorTools });
+            if (actorTools.length > 0) this.upsertTools(actorTools, shouldNotify);
+            return;
+        }
+        const tools = this.composeToolsForClient(input, actorTools);
+        if (tools.length > 0) this.upsertTools(tools, shouldNotify);
+        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools });
+    }
+
+    /**
      * Loads missing toolNames from a provided list of tool names.
      * Skips toolNames that are already loaded and loads only the missing ones.
      * @param toolNames - Array of tool names to ensure are loaded
@@ -453,16 +575,7 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push({ input: restoreInput, actorTools });
-            if (actorTools.length > 0) this.upsertTools(actorTools, true);
-            return;
-        }
-
-        const toolsToLoad = getToolsForServerMode(restoreInput, actorTools, this.serverMode);
-        if (toolsToLoad.length > 0) {
-            this.upsertTools(toolsToLoad, actorTools.length > 0);
-        }
+        this.registerFetchedActorTools(restoreInput, actorTools, actorTools.length > 0);
     }
 
     /**
@@ -490,26 +603,15 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push({ input, actorTools });
-            if (actorTools.length > 0) {
-                log.debug('Loading actor tools from query parameters before mode resolution');
-                this.upsertTools(actorTools, false);
-            }
-            return;
-        }
-
-        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
-        if (tools.length > 0) {
-            log.debug('Loading tools from query parameters');
-            this.upsertTools(tools, false);
-        }
+        log.debug('Loading tools from query parameters');
+        this.registerFetchedActorTools(input, actorTools, false);
     }
 
     /**
-     * Two-phase: getActors (async, mode-agnostic Apify fetch) then getToolsForServerMode
-     * (sync, mode-dependent compose). When mode is unresolved, queue actorTools and let
-     * the initialize handler compose them later.
+     * Two-phase: getActors (async, client-agnostic Apify fetch) then composeToolsForClient
+     * (sync compose + servability filter). If the mode isn't resolved yet ('auto' before initialize)
+     * the whole source is queued for the flush. Otherwise tools compose immediately; client-gated
+     * tools are withheld until the client is known, and the source is queued so the flush adds them.
      *
      * Don't move the getActors await into the initialize handler — clients time out
      * waiting for InitializeResult. The queue buffers already-fetched data, not network
@@ -520,13 +622,7 @@ export class ActorsMcpServer {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });
-        if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push({ input, actorTools });
-            if (actorTools.length > 0) this.upsertTools(actorTools);
-            return;
-        }
-        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
-        if (tools.length > 0) this.upsertTools(tools);
+        this.registerFetchedActorTools(input, actorTools, false);
     }
 
     /** Delete tools from the server and notify the handler.
@@ -551,6 +647,9 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
+        // Client gating (e.g. hiding report-problem from Anthropic surfaces) is applied earlier, in
+        // composeToolsForClient — the single compose choke point where the client is known. Do not
+        // filter here: this is a low-level commit point reached before the client is known too.
         for (const tool of tools) {
             const stored = this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
             this.tools.set(stored.name, stored);
@@ -691,6 +790,19 @@ export class ActorsMcpServer {
     }
 
     /**
+     * Fetches a task by ID, softFail-logging and throwing a client-facing McpError if it doesn't exist.
+     */
+    private async getTaskOrThrow(taskId: string, mcpSessionId: string | undefined, logTag: string): Promise<Task> {
+        const task = await this.taskStore.getTask(taskId, mcpSessionId);
+        if (!task) {
+            // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
+            log.softFail(`[${logTag}] Task not found`, { taskId, mcpSessionId, statusCode: 404 });
+            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
+        }
+        return task;
+    }
+
+    /**
      * Sets up MCP request handlers for long-running tasks.
      */
     private setupTaskHandlers(): void {
@@ -712,12 +824,7 @@ export class ActorsMcpServer {
             const { taskId } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (task) return task;
-
-            // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-            log.softFail('[GetTaskRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
+            return await this.getTaskOrThrow(taskId, mcpSessionId, 'GetTaskRequestSchema');
         });
 
         // Get task result payload
@@ -727,12 +834,7 @@ export class ActorsMcpServer {
             const { taskId } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[GetTaskPayloadRequestSchema] Getting task result', { taskId, mcpSessionId });
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (!task) {
-                // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-                log.softFail('[GetTaskPayloadRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-                throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
-            }
+            const task = await this.getTaskOrThrow(taskId, mcpSessionId, 'GetTaskPayloadRequestSchema');
             if (task.status !== 'completed' && task.status !== 'failed') {
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -758,12 +860,7 @@ export class ActorsMcpServer {
             const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[CancelTaskRequestSchema] Cancelling task', { taskId, mcpSessionId });
 
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (!task) {
-                // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-                log.softFail('[CancelTaskRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-                throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
-            }
+            const task = await this.getTaskOrThrow(taskId, mcpSessionId, 'CancelTaskRequestSchema');
             if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
                 // Client error (cancel on terminal task) — softFail to avoid polluting error logs.
                 log.softFail('[CancelTaskRequestSchema] Task already in terminal state', {
@@ -836,8 +933,17 @@ export class ActorsMcpServer {
             // Captured by `captureResult` so the `finally` block can measure response size for telemetry.
             let toolResult: unknown = null;
             const captureResult = <T>(r: T): T => {
-                toolResult = r;
-                return r;
+                // On a failed result, nudge the agent to report the blocker via report-problem at the
+                // moment it decides what to do next. Gated on the tool actually being served (see
+                // isReportProblemServable), so clients where it is blocklisted or telemetry is off never see it.
+                const augmented = this.withReportProblemNudge(
+                    r,
+                    resolvedToolName,
+                    callDiagnostics.failure_category,
+                    callDiagnostics.failure_http_status,
+                );
+                toolResult = augmented;
+                return augmented;
             };
             const failInvalidParams = async (
                 message: string,
@@ -1043,26 +1149,37 @@ export class ActorsMcpServer {
                     // properties plus the taskId on the log line.
                     const preflightResult = standbyRejection ?? paymentRequiredResult;
                     if (preflightResult) {
-                        toolStatus = TOOL_STATUS.SOFT_FAIL;
+                        const outcome = buildPreflightFailureOutcome(
+                            standbyRejection,
+                            paymentRequiredResult,
+                            actorName,
+                            actorId,
+                        );
+                        toolStatus = outcome.toolStatus;
+                        callDiagnostics = outcome.callDiagnostics;
                         preflightTaskId = task.taskId;
-                        callDiagnostics = {
-                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                            ...(standbyRejection ? {} : { failure_http_status: 402 }),
-                            ...buildActorFields(actorName, actorId),
-                        };
                         try {
                             await storeTaskResultOrSkipIfExpired(
                                 this.taskStore,
                                 tool.name,
                                 task.taskId,
                                 'completed',
-                                preflightResult,
+                                outcome.result,
                                 mcpSessionId,
                             );
                         } catch (error) {
                             // A store failure (not expiry) would otherwise fall through to the generic
                             // catch and return a task-less tool result the client rejects as a
                             // CreateTaskResult parse error; surface it as a protocol error instead.
+                            // The pre-flight outcome left toolStatus=SOFT_FAIL, but a genuine store
+                            // outage is a hard failure — correct it before throwing so the handler
+                            // `finally` logs FAILED/INTERNAL_ERROR (the outer McpError re-throw preserves
+                            // these), not the stale pre-flight SOFT_FAIL.
+                            toolStatus = TOOL_STATUS.FAILED;
+                            callDiagnostics = {
+                                failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
+                                ...buildActorFields(actorName, actorId),
+                            };
                             throw new McpError(
                                 ErrorCode.InternalError,
                                 `Failed to store the pre-flight result for task "${task.taskId}": ${
@@ -1076,7 +1193,7 @@ export class ActorsMcpServer {
                         setImmediate(() => {
                             void emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
                         });
-                        captureResult(preflightResult);
+                        captureResult(outcome.result);
                         // createTask returned status `working`; synthesize the terminal status instead of
                         // re-fetching — if the task expired before the result store (the one case
                         // storeTaskResultOrSkipIfExpired tolerates), a re-fetch would come back empty and a
@@ -1110,26 +1227,19 @@ export class ActorsMcpServer {
                     return { task };
                 }
 
-                // Sync path: standby rejection wins over the generic payment-required short-circuit
-                // so the agent gets the precise reason instead of a 402.
-                if (standbyRejection) {
-                    toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    callDiagnostics = {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        ...buildActorFields(actorName, actorId),
-                    };
-                    return captureResult(standbyRejection);
-                }
-
-                // Check payment validation (already computed by prepareToolCallContext)
-                if (paymentRequiredResult) {
-                    toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    callDiagnostics = {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        failure_http_status: 402,
-                        ...buildActorFields(actorName, actorId),
-                    };
-                    return captureResult(paymentRequiredResult);
+                // Sync path: short-circuit on either pre-flight failure. buildPreflightFailureOutcome
+                // encodes the precedence — standby rejection wins over the generic payment-required
+                // 402, so the agent gets the precise reason.
+                if (standbyRejection || paymentRequiredResult) {
+                    const outcome = buildPreflightFailureOutcome(
+                        standbyRejection,
+                        paymentRequiredResult,
+                        actorName,
+                        actorId,
+                    );
+                    toolStatus = outcome.toolStatus;
+                    callDiagnostics = outcome.callDiagnostics;
+                    return captureResult(outcome.result);
                 }
 
                 // Progress tracker: opt in for the two INTERNAL tools that emit during a sync wait
@@ -1300,6 +1410,20 @@ export class ActorsMcpServer {
                 ...deriveResourceIds(params.args, params.result),
             };
             trackToolCall(params.userId, this.telemetryEnv, finalizedTelemetryData);
+
+            // A successful report-problem call also emits a dedicated feedback event carrying the
+            // submission. A downstream Segment destination fans it out to Slack/GitHub.
+            if (
+                params.toolName === HELPER_TOOLS.PROBLEM_REPORT &&
+                params.toolStatus === TOOL_STATUS.SUCCEEDED &&
+                params.args
+            ) {
+                trackReportedProblem(
+                    params.userId,
+                    this.telemetryEnv,
+                    buildReportedProblemProperties(finalizedTelemetryData, params.args),
+                );
+            }
         }
     }
 
@@ -1382,9 +1506,7 @@ export class ActorsMcpServer {
                     })) as Record<string, unknown>;
 
                     // Extract diagnostics and strip internal fields from res before returning to client.
-                    const diag = extractToolTelemetry(res, actorName, actorId);
-                    toolStatus = diag.toolStatus;
-                    callDiagnostics = { ...callDiagnostics, ...diag.callDiagnostics };
+                    ({ toolStatus, callDiagnostics } = applyToolTelemetry(res, actorName, actorId, callDiagnostics));
                     result = res;
                 } finally {
                     progressTracker?.stop();
@@ -1515,6 +1637,15 @@ export class ActorsMcpServer {
                         break;
                     }
 
+                    // Mirror the INTERNAL branch: read the telemetry the executor embedded on error
+                    // results (e.g. respondUserError → SOFT_FAIL/INVALID_INPUT), strip it from the wire,
+                    // and set failure_category so the report-problem nudge picks the softer variant.
+                    ({ toolStatus, callDiagnostics } = applyToolTelemetry(
+                        executorResult as Record<string, unknown>,
+                        actorName,
+                        actorId,
+                        callDiagnostics,
+                    ));
                     result = executorResult;
                 } finally {
                     if (progressTracker) {
@@ -1724,6 +1855,15 @@ export class ActorsMcpServer {
             // Check if task was cancelled before storing result
             if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
 
+            // On a failed result, nudge the agent to report the blocker via report-problem (mirrors the
+            // synchronous CallTool path, which task-mode calls like call-actor bypass).
+            result = this.withReportProblemNudge(
+                result,
+                tool.name,
+                callDiagnostics.failure_category,
+                callDiagnostics.failure_http_status,
+            );
+
             // Store the result in the task store
             log.debug('[executeToolAndUpdateTask] Storing completed result', {
                 taskId,
@@ -1836,16 +1976,26 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            const failedResult = {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: userText,
-                    },
-                ],
-                isError: true,
-                internalToolStatus: toolStatus,
-            };
+            // Nudge on a genuinely-failed task result (mirrors the completed path and the sync
+            // captureResult). INTERNAL_ERROR and an unknown category get the full nudge; a genuine
+            // INVALID_INPUT gets the softer nudge; payment (402) is suppressed via the HTTP status and
+            // AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES. The 402 branch above
+            // returns before reaching here, so this only sees non-payment failures.
+            const failedResult = this.withReportProblemNudge(
+                {
+                    content: [
+                        {
+                            type: 'text' as const,
+                            text: userText,
+                        },
+                    ],
+                    isError: true,
+                    internalToolStatus: toolStatus,
+                },
+                tool.name,
+                callDiagnostics.failure_category,
+                callDiagnostics.failure_http_status,
+            );
             await completeTask('failed', failedResult, toolStatus, callDiagnostics);
         } finally {
             cancelWatcher.dispose();

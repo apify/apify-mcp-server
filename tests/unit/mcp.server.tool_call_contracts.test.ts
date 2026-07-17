@@ -540,7 +540,9 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
             async (server) => {
                 silenceLogs();
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
-                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
+                const standbySpy = vi
+                    .spyOn(callActor, 'checkPaymentProviderStandbyConflict')
+                    .mockResolvedValue(standbyResult);
                 const notifySpy = vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
                 const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
@@ -551,6 +553,8 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 expect(stored).toEqual(standbyResult);
                 await flushDeferredNotification();
                 expect(statusNotificationStatuses(notifySpy)).toEqual(['completed']);
+                // No second, asynchronous re-evaluation of the already-known outcome (criterion 13).
+                expect(standbySpy).toHaveBeenCalledTimes(1);
             },
             { paymentProvider: makePaymentProvider() },
         );

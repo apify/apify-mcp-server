@@ -18,6 +18,8 @@ const MOCK_RUN_RUNNING = {
     status: 'RUNNING',
     startedAt: new Date('2026-04-20T12:00:00.000Z'),
     stats: { runTimeSecs: 5, computeUnits: 0.01, memMaxBytes: 1024 },
+    usageTotalUsd: 0.0002,
+    usageUsd: { ACTOR_COMPUTE_UNITS: 0.0002 },
 };
 
 const MOCK_ACTOR = {
@@ -48,6 +50,7 @@ describe('get-actor-run-widget response', () => {
             _meta?: {
                 ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown };
                 'openai/widgetDescription'?: string;
+                'com.apify/ActorRun'?: { usageTotalUsd?: number; usageUsd?: unknown };
             };
         };
 
@@ -71,6 +74,11 @@ describe('get-actor-run-widget response', () => {
         expect(_meta?.ui?.visibility).toEqual(['model', 'app']);
         expect(_meta?.ui?.csp).toBeDefined();
         expect(_meta?.['openai/widgetDescription']).toContain('apify/rag-web-browser');
+        // Widget _meta also carries run usage metadata (buildUsageMeta), alongside widget-specific meta.
+        expect(_meta?.['com.apify/ActorRun']).toEqual({
+            usageTotalUsd: 0.0002,
+            usageUsd: { ACTOR_COMPUTE_UNITS: 0.0002 },
+        });
     });
 
     it('carries widget _meta on the tool definition', () => {
