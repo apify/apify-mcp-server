@@ -1,0 +1,15 @@
+{
+  "$comment": "Domain engines only. The generic engines come from shepherd's base registry.",
+  "uses": {
+    "dig": {
+      "roles": ["architect"],
+      "engine": "../.claude/skills/dig/SKILL.md",
+      "scope": "follow as instruction text (NOT Skill-invoked). Run dig's Plan mode — its exploration + Available-resources map + the required Design-output sections (approach, files, interfaces, test strategy/oracle, risks, data flow). SKIP dig's intent-detection, its EnterPlanMode/ExitPlanMode gate, and GitHub-issue creation — the orchestrator owns the gate. Write the design to .shepherd/2-design.md."
+    },
+    "mcpc-tester": {
+      "roles": ["reviewer", "final_reviewer"],
+      "engine": "../.claude/agents/mcpc-tester.md",
+      "scope": "follow as instruction text. pnpm run build, then probe the live server via mcpc per its workflow; judge implemented behavior against 2-design.md. Do NOT run or replace the unit suite (that is the oracle). First line `VERDICT: PASS|FAIL`, then findings tagged blocker/major/minor/nit with actual-vs-expected."
+    }
+  }
+}
