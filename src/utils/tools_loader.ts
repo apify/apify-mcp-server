@@ -10,6 +10,7 @@ import log from '@apify/log';
 import { defaults, HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { addActor } from '../tools/actors/add_actor.js';
+import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
     CATEGORY_NAME_SET,
@@ -254,6 +255,11 @@ export function getToolsForServerMode(
         for (const cat of toolCategoriesEnabledByDefault) {
             result.push(...categories[cat]);
         }
+        // report-problem is default-served but lives in the `dev` category (not a default category),
+        // so inject it here for the default (no-selectors) case. Server-side servability gating
+        // (telemetry on + client allowed + client known) still applies downstream in
+        // composeToolsForClient; this only puts it in the default candidate set.
+        result.push(reportProblem);
     }
 
     // Actor tools (pre-fetched, mode-agnostic)

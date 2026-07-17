@@ -27,6 +27,17 @@ import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAbo
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
+// report-problem is telemetry-gated and lives in the dev category, so getDefaultTools
+// (actors + docs) never contains it, and this telemetry-off suite would not be served it anyway.
+// Its served/hidden/acknowledge behavior is covered by the unit tests
+// (tests/unit/mcp.server.report_problem_gating.test.ts, tests/unit/tools.report_problem.test.ts).
+function servedDefaultTools(): ToolEntry[] {
+    return getDefaultTools('default');
+}
+function servedDefaultToolNames(): string[] {
+    return getDefaultToolNames();
+}
+
 // Helper to find tool by name, resolving categories for the given mode on each call.
 // This ensures we always validate against the correct mode-specific tool definition
 // (e.g. outputSchema may diverge between modes in the future).
@@ -240,10 +251,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             it('should list all default tools and Actors', async () => {
                 client = await createClientFn();
                 const tools = await client.listTools();
-                expect(tools.tools.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 4);
+                expect(tools.tools.length).toEqual(servedDefaultTools().length + defaults.actors.length + 4);
 
                 const names = getToolNames(tools);
-                expectToolNamesToContain(names, getDefaultToolNames());
+                expectToolNamesToContain(names, servedDefaultToolNames());
                 expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
                 // get-actor-run + storage/abort helpers are auto-injected alongside call-actor.
                 expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
@@ -258,6 +269,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 // Should be equivalent to tools=actors,docs,apify/rag-web-browser
                 // Note: UI tools (search-actors-widget, fetch-actor-details-widget) are only available in apps mode
+                // report-problem is telemetry-gated and telemetry is off in this suite, so it is not listed.
                 const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
                 const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
                 const expectedActors = [actorNameToToolName('apify/rag-web-browser')];
@@ -267,12 +279,26 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 expectToolNamesToContain(names, expectedActorsTools);
                 expectToolNamesToContain(names, expectedDocsTools);
+                expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
                 expectToolNamesToContain(names, expectedActors);
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                 // get-actor-run should be automatically included when call-actor is present
                 expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
 
                 await client.close();
+            });
+
+            describe('report-problem', () => {
+                // report-problem is served only when telemetry is enabled; this suite runs with telemetry
+                // off, so end-to-end it must be absent. That gating is what we can verify here without
+                // emitting telemetry. The served path (listed for non-Anthropic clients, hidden from
+                // Anthropic clients, acknowledges a submission) is covered by the unit tests
+                // tests/unit/mcp.server.report_problem_gating.test.ts and tests/unit/tools.report_problem.test.ts.
+                it('is not served when telemetry is disabled', async () => {
+                    client = await createClientFn();
+                    const names = getToolNames(await client.listTools());
+                    expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                });
             });
 
             it('should auto-inject storage and abort tools when enableAddingActors is true', async () => {
@@ -304,9 +330,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             it('should list all default tools and Actors when enableAddingActors is false', async () => {
                 client = await createClientFn({ enableAddingActors: false });
                 const names = getToolNames(await client.listTools());
-                expect(names.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 4);
+                expect(names.length).toEqual(servedDefaultTools().length + defaults.actors.length + 4);
 
-                expectToolNamesToContain(names, getDefaultToolNames());
+                expectToolNamesToContain(names, servedDefaultToolNames());
                 expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                 // get-actor-run should be automatically included when call-actor is present
@@ -1723,7 +1749,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 validateStructuredOutputForTool(result, HELPER_TOOLS.DOCS_FETCH, 'default');
             });
 
-            it.for(Object.keys(getCategoryTools('default')))(
+            // The `dev` category holds only report-problem, which is telemetry-gated (off in this suite),
+            // so it can't load standalone here; its gating is covered by unit tests. Exclude it from the
+            // category sweep.
+            it.for(Object.keys(getCategoryTools('default')).filter((category) => category !== 'dev'))(
                 'should load correct tools for %s category',
                 async (category) => {
                     client = await createClientFn({
@@ -1897,9 +1926,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     // Test with enableAddingActors = false via env var
                     client = await createClientFn({ enableAddingActors: false, useEnv: true });
                     const names = getToolNames(await client.listTools());
-                    expect(names.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 4);
+                    expect(names.length).toEqual(servedDefaultTools().length + defaults.actors.length + 4);
 
-                    expectToolNamesToContain(names, getDefaultToolNames());
+                    expectToolNamesToContain(names, servedDefaultToolNames());
                     expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
                     expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                     // get-actor-run should be automatically included when call-actor is present

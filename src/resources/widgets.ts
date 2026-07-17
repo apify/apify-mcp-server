@@ -182,3 +182,14 @@ export async function resolveAvailableWidgets(baseDir: string): Promise<Map<stri
 export function getWidgetConfig(uri: string): WidgetConfig | undefined {
     return WIDGET_REGISTRY[uri];
 }
+
+/**
+ * Actor-run widget `_meta`, with a per-run `openai/widgetDescription` merged in.
+ * Shared by `buildStartRunWidgetResponse` and `buildGetActorRunWidgetResponse`.
+ */
+export function buildActorRunWidgetMeta(descriptionName: string): NonNullable<Resource['_meta']> {
+    return {
+        ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
+        'openai/widgetDescription': `Actor run progress for ${descriptionName}`,
+    };
+}

@@ -42,7 +42,7 @@ import {
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
-import { buildGetActorRunSuccessResponse } from '../runs/get_actor_run.js';
+import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 import {
     abortRunOnSignal,
@@ -620,7 +620,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
         if ('error' in fetchResult) return fetchResult.error;
 
         return {
-            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false, linkContext }),
+            ...buildGetActorRunResponse({ ...fetchResult.result, linkContext }),
             toolTelemetry: { actorId: resolvedActorId },
         };
     } catch (error) {

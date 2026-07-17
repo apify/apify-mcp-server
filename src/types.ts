@@ -389,6 +389,27 @@ export type ToolCallTelemetryProperties = {
     validation_error_count?: number;
 };
 
+/**
+ * Segment 'MCP Reported Problem' event payload: the `report-problem` submission plus the same
+ * session/client context carried by {@link ToolCallTelemetryProperties}. A downstream Segment
+ * destination consumes this event for Slack/GitHub fan-out.
+ */
+export type ReportedProblemTelemetryProperties = Pick<
+    ToolCallTelemetryProperties,
+    | 'app'
+    | 'app_version'
+    | 'mcp_client_name'
+    | 'mcp_client_version'
+    | 'mcp_protocol_version'
+    | 'mcp_session_id'
+    | 'transport_type'
+> & {
+    message: string;
+    actor_id?: string;
+    actor_run_id?: string;
+    related_tools?: string[];
+};
+
 export type AjvErrorDetails = Pick<
     ToolCallTelemetryProperties,
     | 'validation_keyword'
