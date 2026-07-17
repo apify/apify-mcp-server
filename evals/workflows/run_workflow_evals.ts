@@ -26,7 +26,12 @@ import { executeConversation } from './conversation_executor.js';
 import { LlmClient } from './llm_client.js';
 import { McpClient } from './mcp_client.js';
 import type { EvaluationResult, TestResultRecord } from './output_formatter.js';
-import { formatDetailedResult, formatResultsTable } from './output_formatter.js';
+import {
+    aggregateRepeatedResults,
+    formatDetailedResult,
+    formatRepeatSummaryTable,
+    formatResultsTable,
+} from './output_formatter.js';
 import { raceWithTimeout, TestTimeoutError } from './race_with_timeout.js';
 import {
     findBaselineRecord,
@@ -55,6 +60,7 @@ type CliArgs = {
     baseline?: string;
     traces?: string;
     testTimeout?: number;
+    repeat?: number;
 };
 
 /**
@@ -77,10 +83,15 @@ async function runSingleTest(
     argv: CliArgs,
     llmClient: LlmClient,
     apifyToken: string,
+    attemptIndex: number,
+    totalAttempts: number,
 ): Promise<EvaluationResult> {
     const testId = testCase.id;
+    // Distinguish repeated attempts of the same test case in log output; unchanged when
+    // --repeat is not used (totalAttempts === 1).
+    const logId = totalAttempts > 1 ? `${testId}#${attemptIndex}/${totalAttempts}` : testId;
 
-    logWithPrefix(testId, `[${index + 1}/${total}] Running...`);
+    logWithPrefix(logId, `[${index + 1}/${total}] Running...`);
 
     // Create FRESH MCP instance per test for isolation
     const mcpClient = new McpClient(argv.toolTimeout, {
@@ -147,10 +158,12 @@ async function runSingleTest(
             conversation,
             judgeResult: finalJudgeResult,
             durationMs,
+            attemptIndex,
+            totalAttempts,
         };
 
         logWithPrefix(
-            testId,
+            logId,
             `  ${finalJudgeResult.verdict === 'PASS' ? '✅' : '❌'} ${finalJudgeResult.verdict} (${durationMs}ms)`,
         );
     } catch (error) {
@@ -173,22 +186,25 @@ async function runSingleTest(
             },
             durationMs,
             error: error instanceof Error ? error.message : String(error),
+            timedOut,
+            attemptIndex,
+            totalAttempts,
         };
 
-        logWithPrefix(testId, `  ${timedOut ? '⏱️  TIMEOUT' : '🔥 ERROR'} (${durationMs}ms)`);
+        logWithPrefix(logId, `  ${timedOut ? '⏱️  TIMEOUT' : '🔥 ERROR'} (${durationMs}ms)`);
     } finally {
         // ALWAYS cleanup MCP client for this test
         try {
             await mcpClient.cleanup();
         } catch (cleanupError) {
-            logWithPrefix(testId, `  ⚠️  Cleanup failed: ${cleanupError}`);
+            logWithPrefix(logId, `  ⚠️  Cleanup failed: ${cleanupError}`);
         }
     }
 
     // Show detailed output if verbose
     if (argv.verbose) {
-        logWithPrefix(testId, '');
-        logWithPrefix(testId, formatDetailedResult(result));
+        logWithPrefix(logId, '');
+        logWithPrefix(logId, formatDetailedResult(result));
     }
 
     return result;
@@ -267,6 +283,13 @@ async function main() {
             type: 'string',
             description:
                 'Write full per-turn traces (LLM output, tool calls, full args/results, untruncated) to this JSON file',
+        })
+        .option('repeat', {
+            type: 'number',
+            description:
+                'Run each test case this many times and print an aggregated pass/completion/error-rate summary ' +
+                '(default: 1). --traces and --results-path record every attempt individually, never averaged.',
+            default: 1,
         })
         .help().argv) as CliArgs;
 
@@ -413,16 +436,33 @@ async function main() {
     const llmClient = new LlmClient();
 
     // Run evaluations
-    console.log(`▶️  Running ${filteredTestCases.length} evaluation(s) with concurrency ${argv.concurrency}...`);
+    const repeat = argv.repeat!;
+    const totalJobs = filteredTestCases.length * repeat;
+    console.log(
+        `▶️  Running ${filteredTestCases.length} evaluation(s)` +
+            (repeat > 1 ? ` × ${repeat} repeat(s) = ${totalJobs} job(s)` : '') +
+            ` with concurrency ${argv.concurrency}...`,
+    );
     console.log();
 
     // Create concurrency limiter
     const limit = pLimit(argv.concurrency!);
 
+    // Each (test case, attempt) pair is its own job through the same limiter -- repeats of one
+    // test case interleave with everything else exactly like distinct test cases do. Run
+    // sequentially yourself via --concurrency 1 for a clean, low-noise comparison; --repeat
+    // doesn't invent a separate scheduling mode for that.
+    const jobs: { testCase: WorkflowTestCase; attemptIndex: number }[] = [];
+    for (const testCase of filteredTestCases) {
+        for (let attemptIndex = 1; attemptIndex <= repeat; attemptIndex++) {
+            jobs.push({ testCase, attemptIndex });
+        }
+    }
+
     // Execute tests in parallel with concurrency control
-    const resultPromises = filteredTestCases.map(async (testCase, index) => {
+    const resultPromises = jobs.map(async ({ testCase, attemptIndex }, index) => {
         return limit(async () => {
-            return runSingleTest(testCase, index, filteredTestCases.length, argv, llmClient, apifyToken);
+            return runSingleTest(testCase, index, totalJobs, argv, llmClient, apifyToken, attemptIndex, repeat);
         });
     });
 
@@ -457,15 +497,25 @@ async function main() {
         }
     }
 
-    // Display results (with byte/token deltas when a baseline matched)
+    // Display results (with byte/token deltas when a baseline matched) -- every individual
+    // attempt, never averaged; that's what --traces and --results-path also record.
     console.log(formatResultsTable(results, baselineByTestId.size > 0 ? baselineByTestId : undefined));
+
+    if (repeat > 1) {
+        console.log(formatRepeatSummaryTable(aggregateRepeatedResults(results)));
+    }
 
     // Exit with appropriate code - ALL tests must pass
     const totalTests = results.length;
     const passedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'PASS').length;
     const errorTests = results.filter((r) => r.error).length;
 
-    // Exit 0 only if ALL tests passed with no errors
+    // --repeat exists to characterize flakiness across N attempts, not to gate on one unlucky
+    // run -- exit 0 regardless of individual outcomes (the summary above is for a human to read).
+    // Default (repeat = 1) keeps the strict all-must-pass gate unchanged.
+    if (repeat > 1) {
+        process.exit(0);
+    }
     const allPassed = totalTests > 0 && passedTests === totalTests && errorTests === 0;
     process.exit(allPassed ? 0 : 1);
 }

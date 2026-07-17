@@ -246,6 +246,7 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 | `--judge-model <model>` | | Override judge model | `deepseek/deepseek-v4-flash` |
 | `--tool-timeout <seconds>` | | Tool call timeout | `60` |
 | `--test-timeout <seconds>` | | Wall-clock timeout for one whole test case (agent + judge) | `300` |
+| `--repeat <n>` | | Run each test case N times, print an aggregated pass/completion/error-rate summary | `1` |
 | `--concurrency <number>` | `-c` | Number of tests to run in parallel | `4` |
 | `--output` | `-o` | Save results to JSON file | `false` |
 | `--results-path <path>` | | Results JSON file | `results.json` |
@@ -357,6 +358,48 @@ cleans up that test's MCP client.
 
 ```bash
 pnpm run evals:workflow -- --test-timeout 600   # for slower models / long chains
+```
+
+### Repeated Runs (`--repeat`)
+
+A single run of a test case can't distinguish "this approach is worse" from
+ordinary run-to-run noise — flaky upstream Actors, model variance, and (at
+higher `--concurrency`) rate-limit contention all inject noise unrelated to
+the thing you're actually trying to measure. `--repeat <n>` runs each
+(filtered) test case N times and prints an aggregated summary in addition to
+the normal per-attempt table.
+
+**Job scheduling:** each `(test case, attempt)` pair is its own job through
+the same `--concurrency` limiter as any other run — repeats of one test case
+interleave with everything else exactly like distinct test cases do. For a
+clean, low-noise comparison, run with `--concurrency 1` yourself; `--repeat`
+doesn't invent a separate sequential mode for that.
+
+**What gets averaged, and what doesn't:**
+- `--traces` and `--results-path` (`--output`) record **every attempt
+  individually**, tagged with `attemptIndex`/`totalAttempts` — never
+  averaged. Use these for the exact numbers behind any one run.
+- The printed **Repeat Summary** aggregates per test case:
+  - `passRate` (strict PASS / N) and `completionRate` ((PASS + judge-FAIL) /
+    N) are reported separately — a wrong-but-complete answer and a timeout
+    are different failure modes needing different fixes, so they're not
+    collapsed into one number.
+  - Duration/token/tool-byte stats (median + mean) are computed **only over
+    completed attempts** (PASS or judge-FAIL). An errored or timed-out
+    attempt is excluded from these — including it would bias the "typical
+    duration" toward whatever the timeout cap happened to be, which isn't a
+    real measurement of anything.
+  - `timedOut` (exceeded `--test-timeout` specifically) is counted
+    separately from other errors.
+
+**Exit code:** `--repeat` exists to characterize flakiness across N
+attempts, not to gate CI on one unlucky run — the process exits `0`
+regardless of individual attempt outcomes when `--repeat > 1`. The default
+(`--repeat 1`, unused) keeps the normal all-attempts-must-pass exit code.
+
+```bash
+pnpm run evals:workflow -- --test-cases-path evals/workflows/code_mode_test_cases.json \
+    --repeat 5 --concurrency 1 --test-timeout 900 --traces /tmp/code_mode_traces.json
 ```
 
 ### Saving Results to File

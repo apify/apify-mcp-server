@@ -137,6 +137,9 @@ export function convertEvaluationResultToRecord(
         finalResponse: getFinalResponse(conversation),
         toolCallTrace: getToolCallTrace(conversation),
         error: result.error ?? null,
+        timedOut: result.timedOut,
+        attemptIndex: result.attemptIndex,
+        totalAttempts: result.totalAttempts,
     };
 }
 

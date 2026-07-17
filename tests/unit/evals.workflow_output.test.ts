@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { EvaluationResult, TestResultRecord } from '../../evals/workflows/output_formatter.js';
 import {
+    aggregateRepeatedResults,
     formatBytes,
+    formatRepeatSummaryTable,
     formatResultsTable,
     formatTokens,
     formatWithDelta,
@@ -252,5 +254,131 @@ describe('formatResultsTable()', () => {
         const baseline = new Map<string, TestResultRecord>([['a', makeRecord('a', 2000, 800)]]);
         const table = formatResultsTable([makeResult('b', 1000, 500)], baseline);
         expect(table).toContain('(no baseline)');
+    });
+});
+
+describe('aggregateRepeatedResults()', () => {
+    function makeAttempt(
+        testId: string,
+        overrides: Partial<EvaluationResult> & { durationMs?: number; tokens?: number; bytes?: number } = {},
+    ): EvaluationResult {
+        const { durationMs = 100, tokens = 500, bytes = 1000, ...rest } = overrides;
+        return {
+            testCase: { id: testId, category: 'basic', query: 'q', reference: 'r' } as EvaluationResult['testCase'],
+            conversation: {
+                ...makeConversation([
+                    {
+                        turnNumber: 1,
+                        toolCalls: [],
+                        toolResults: [{ toolName: 't', success: true, resultBytes: bytes }],
+                    },
+                ]),
+                totalTokens: tokens,
+            },
+            judgeResult: { verdict: 'PASS', reason: 'ok', rawResponse: '' },
+            durationMs,
+            ...rest,
+        };
+    }
+
+    it('counts pass/fail/timeout/error into separate buckets', () => {
+        const results = [
+            makeAttempt('a', { judgeResult: { verdict: 'PASS', reason: 'ok', rawResponse: '' } }),
+            makeAttempt('a', { judgeResult: { verdict: 'PASS', reason: 'ok', rawResponse: '' } }),
+            makeAttempt('a', { judgeResult: { verdict: 'FAIL', reason: 'wrong', rawResponse: '' } }),
+            makeAttempt('a', { error: 'Test exceeded 300s timeout', timedOut: true }),
+            makeAttempt('a', { error: 'MCP error -32000: Connection closed' }),
+        ];
+
+        const [summary] = aggregateRepeatedResults(results);
+        expect(summary.attempts).toBe(5);
+        expect(summary.passed).toBe(2);
+        expect(summary.failed).toBe(1);
+        expect(summary.timedOut).toBe(1);
+        expect(summary.errored).toBe(1);
+        expect(summary.passRate).toBe(0.4);
+        expect(summary.completionRate).toBe(0.6); // passed + failed, not errored/timed-out
+    });
+
+    it('computes duration/token/byte stats only over completed attempts, excluding errored ones', () => {
+        const results = [
+            makeAttempt('a', { durationMs: 100, tokens: 200, bytes: 1000 }),
+            makeAttempt('a', { durationMs: 300, tokens: 600, bytes: 3000 }),
+            // A timed-out attempt capped at 900s shouldn't drag the "typical duration" toward 900s.
+            makeAttempt('a', { durationMs: 900_000, error: 'Test exceeded 900s timeout', timedOut: true }),
+        ];
+
+        const [summary] = aggregateRepeatedResults(results);
+        expect(summary.medianDurationMs).toBe(200);
+        expect(summary.meanDurationMs).toBe(200);
+        expect(summary.medianTokens).toBe(400);
+        expect(summary.medianToolBytes).toBe(2000);
+    });
+
+    it('leaves duration/token/byte stats undefined when every attempt errored', () => {
+        const results = [makeAttempt('a', { error: 'boom' }), makeAttempt('a', { error: 'boom again' })];
+
+        const [summary] = aggregateRepeatedResults(results);
+        expect(summary.medianDurationMs).toBeUndefined();
+        expect(summary.meanTokens).toBeUndefined();
+    });
+
+    it('groups by test case id, keeping each test case a separate summary', () => {
+        const results = [makeAttempt('a'), makeAttempt('a'), makeAttempt('b')];
+
+        const summaries = aggregateRepeatedResults(results);
+        expect(summaries).toHaveLength(2);
+        expect(summaries.find((s) => s.testId === 'a')?.attempts).toBe(2);
+        expect(summaries.find((s) => s.testId === 'b')?.attempts).toBe(1);
+    });
+});
+
+describe('formatRepeatSummaryTable()', () => {
+    it('renders pass/completion rates and per-attempt-type counts', () => {
+        const results = [
+            {
+                testId: 'a',
+                category: 'basic',
+                attempts: 4,
+                passed: 2,
+                failed: 1,
+                timedOut: 1,
+                errored: 0,
+                passRate: 0.5,
+                completionRate: 0.75,
+                medianDurationMs: 1000,
+                meanDurationMs: 1100,
+                medianTokens: 500,
+                meanTokens: 550,
+                medianToolBytes: 2000,
+                meanToolBytes: 2100,
+            },
+        ];
+
+        const table = formatRepeatSummaryTable(results);
+        expect(table).toContain('a (basic)');
+        expect(table).toContain('Pass rate: 2/4 (50%)');
+        expect(table).toContain('Completion rate: 3/4 (75%)');
+        expect(table).toContain('Wrong answer: 1 | Timed out: 1 | Other errors: 0');
+        expect(table).toContain('median 1000ms');
+    });
+
+    it('flags a test case with no completed attempts instead of printing undefined', () => {
+        const results = [
+            {
+                testId: 'a',
+                category: 'basic',
+                attempts: 2,
+                passed: 0,
+                failed: 0,
+                timedOut: 2,
+                errored: 0,
+                passRate: 0,
+                completionRate: 0,
+            },
+        ];
+
+        const table = formatRepeatSummaryTable(results);
+        expect(table).toContain('No completed attempts to measure duration/tokens/bytes from.');
     });
 });
