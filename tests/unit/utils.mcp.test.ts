@@ -7,6 +7,7 @@ import type { HelperTool } from '../../src/types.js';
 import { wrapJsonText } from '../../src/utils/encode_text.js';
 import {
     computeToolResponseBytes,
+    getHttpErrorHint,
     getToolCallErrorUserText,
     injectMcpSessionId,
     respondAborted,
@@ -223,6 +224,24 @@ describe('respondServerError()', () => {
     });
 });
 
+describe('getHttpErrorHint()', () => {
+    it('returns the private-resource hint for 403', () => {
+        expect(getHttpErrorHint(403)).toContain('may be private');
+    });
+
+    it('returns the token hint for 401, with no em dash', () => {
+        const hint = getHttpErrorHint(401);
+        expect(hint).toContain('check APIFY_TOKEN');
+        expect(hint).not.toContain('—');
+    });
+
+    it('returns undefined for statuses without a specific remedy', () => {
+        expect(getHttpErrorHint(404)).toBeUndefined();
+        expect(getHttpErrorHint(500)).toBeUndefined();
+        expect(getHttpErrorHint(undefined)).toBeUndefined();
+    });
+});
+
 describe('getToolCallErrorUserText()', () => {
     it('returns the concurrent-run-limit hint when a direct Actor tool hits the limit', () => {
         const error = Object.assign(new Error('Cannot start new Actor runs.'), { type: 'cannot-start-actor-runs' });
@@ -230,6 +249,13 @@ describe('getToolCallErrorUserText()', () => {
         expect(text).toContain('account limit for concurrent Actor runs');
         expect(text).toContain('console.apify.com/billing/subscription');
         expect(text).not.toContain('Verify the tool name');
+    });
+
+    it('sources the 401 hint from getHttpErrorHint', () => {
+        const error = Object.assign(new Error('Unauthorized'), { statusCode: 401 });
+        const text = getToolCallErrorUserText('apify/instagram-scraper', error);
+        expect(text).toContain('check APIFY_TOKEN');
+        expect(text).not.toContain('—');
     });
 });
 

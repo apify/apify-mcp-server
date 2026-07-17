@@ -729,6 +729,26 @@ export class ActorsMcpServer {
         });
     }
 
+    /**
+     * Token sources in order: per-request `_meta.apifyToken` (stdio inline) > server-instance
+     * option (set by the transport from `Authorization` header or stdio env). No env fallback:
+     * dev_server / production must extract the token from request headers so payment
+     * mode (no token) behaves identically to production.
+     */
+    private resolveApifyToken(meta?: ApifyRequestParams['_meta']): string | undefined {
+        return meta?.apifyToken || this.options.token;
+    }
+
+    /**
+     * Token-scoped client for resources/read (the API proxy needs auth). Deliberately token-only:
+     * unlike the CallTool path it does NOT forward provider/payment headers, so a payment-only
+     * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
+     */
+    private resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
+        const token = this.resolveApifyToken(params._meta);
+        return token ? new ApifyClient({ token }) : undefined;
+    }
+
     private setupResourceHandlers(): void {
         const resourceService = createResourceService({
             paymentProvider: this.options.paymentProvider,
@@ -741,7 +761,10 @@ export class ActorsMcpServer {
         });
 
         this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-            return await resourceService.readResource(request.params.uri);
+            return await resourceService.readResource(
+                request.params.uri,
+                this.resolveApifyClient(request.params as ApifyRequestParams),
+            );
         });
 
         this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
@@ -913,12 +936,7 @@ export class ActorsMcpServer {
             // eslint-disable-next-line prefer-const
             let { name, arguments: args, _meta: meta } = params;
             const progressToken = meta?.progressToken;
-            const metaApifyToken = meta?.apifyToken;
-            // Token sources in order: per-request `_meta.apifyToken` (stdio inline) > server-instance
-            // option (set by the transport from `Authorization` header or stdio env). No env fallback:
-            // dev_server / production must extract the token from request headers so payment
-            // mode (no token) behaves identically to production.
-            const apifyToken = (metaApifyToken || this.options.token) as string;
+            const apifyToken = this.resolveApifyToken(meta) as string;
             // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = meta?.mcpSessionId;
             if (!mcpSessionId) {

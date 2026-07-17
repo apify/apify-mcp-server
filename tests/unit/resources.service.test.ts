@@ -1,3 +1,4 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SKYFIRE_README_CONTENT } from '../../src/payments/const.js';
@@ -19,6 +20,11 @@ const buildAvailableWidget = (uri: string, exists: boolean): AvailableWidget => 
     jsPath: `/tmp/${WIDGET_REGISTRY[uri].jsFilename}`,
     exists,
 });
+
+// `contents[0]` is a text|blob union; narrow it in tests that read the text/widget shape.
+function firstContent(result: { contents: unknown[] }): { mimeType?: string; text?: string; html?: string } {
+    return result.contents[0] as { mimeType?: string; text?: string; html?: string };
+}
 
 describe('createResourceService()', () => {
     describe('listResources()', () => {
@@ -80,20 +86,37 @@ describe('createResourceService()', () => {
 
             const result = await service.readResource('file://readme.md');
 
-            expect(result.contents[0].text).toBe(SKYFIRE_README_CONTENT);
-            expect(result.contents[0].mimeType).toBe('text/markdown');
+            expect(firstContent(result).text).toBe(SKYFIRE_README_CONTENT);
+            expect(firstContent(result).mimeType).toBe('text/markdown');
         });
 
-        it('returns a plain-text fallback for an unknown URI', async () => {
+        it('throws InvalidParams for an unknown URI', async () => {
             const service = createResourceService({
                 getMode: () => 'default',
                 getAvailableWidgets: () => new Map(),
             });
 
-            const result = await service.readResource('file://missing.md');
+            const error = await service.readResource('file://missing.md').catch((e: unknown) => e);
 
-            expect(result.contents[0].text).toBe('Resource file://missing.md not found');
-            expect(result.contents[0].mimeType).toBe('text/plain');
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+            expect((error as McpError).message).toContain('file://missing.md');
+            expect((error as McpError).data).toEqual({ uri: 'file://missing.md' });
+        });
+
+        it('throws the origin refusal for a non-Apify https URL', async () => {
+            // http(s) URIs route to readApiResource, whose origin gate owns the refusal — the user
+            // sees why the read was rejected, not the generic not-a-readable-resource fallback.
+            const service = createResourceService({
+                getMode: () => 'default',
+                getAvailableWidgets: () => new Map(),
+            });
+
+            const error = await service.readResource('https://example.com/steal-my-token').catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+            expect((error as McpError).message).toContain('only Apify API URLs');
         });
 
         it('returns widget HTML when the widget exists', async () => {
@@ -111,9 +134,9 @@ describe('createResourceService()', () => {
 
             const result = await service.readResource(WIDGET_URIS.SEARCH_ACTORS);
 
-            expect(result.contents[0].mimeType).toBe('text/html;profile=mcp-app');
-            expect(result.contents[0].text).toContain('console.log("widget");');
-            expect(result.contents[0].html).toContain('<script type="module">console.log("widget");</script>');
+            expect(firstContent(result).mimeType).toBe('text/html;profile=mcp-app');
+            expect(firstContent(result).text).toContain('console.log("widget");');
+            expect(firstContent(result).html).toContain('<script type="module">console.log("widget");</script>');
         });
 
         it('returns a plain-text fallback for a widget URI not in the registry', async () => {
@@ -124,8 +147,8 @@ describe('createResourceService()', () => {
 
             const result = await service.readResource('ui://widget/unknown.html');
 
-            expect(result.contents[0].text).toContain('Not found in registry.');
-            expect(result.contents[0].mimeType).toBe('text/plain');
+            expect(firstContent(result).text).toContain('Not found in registry.');
+            expect(firstContent(result).mimeType).toBe('text/plain');
         });
 
         it('returns a plain-text fallback when the widget file is missing on disk', async () => {
@@ -139,22 +162,51 @@ describe('createResourceService()', () => {
 
             const result = await service.readResource(WIDGET_URIS.SEARCH_ACTORS);
 
-            expect(result.contents[0].text).toContain('File not found at');
-            expect(result.contents[0].text).toContain(WIDGET_REGISTRY[WIDGET_URIS.SEARCH_ACTORS].jsFilename);
-            expect(result.contents[0].mimeType).toBe('text/plain');
+            expect(firstContent(result).text).toContain('File not found at');
+            expect(firstContent(result).text).toContain(WIDGET_REGISTRY[WIDGET_URIS.SEARCH_ACTORS].jsFilename);
+            expect(firstContent(result).mimeType).toBe('text/plain');
         });
     });
 
     describe('listResourceTemplates()', () => {
-        it('returns an empty list', async () => {
+        it('advertises the common API URL shapes with descriptions', async () => {
             const service = createResourceService({
                 getMode: () => 'default',
                 getAvailableWidgets: () => new Map(),
             });
 
-            const result = await service.listResourceTemplates();
+            const { resourceTemplates } = await service.listResourceTemplates();
 
-            expect(result).toEqual({ resourceTemplates: [] });
+            expect(resourceTemplates.map((t) => t.name)).toEqual([
+                'dataset-items',
+                'key-value-store-record',
+                'key-value-store-keys',
+                'actor-run',
+                'actor-run-log',
+            ]);
+            for (const template of resourceTemplates) {
+                expect(template.uriTemplate).toMatch(/^https:\/\/api\.apify\.com\/v2\//);
+                expect(template.description).toBeTruthy();
+            }
+            // dataset-items advertises `format` (7 response types), so it must not pin a mimeType —
+            // the spec allows a template mimeType only when all matching resources share one type.
+            expect(resourceTemplates.find((t) => t.name === 'dataset-items')).not.toHaveProperty('mimeType');
+        });
+
+        it('exposes paging parameters as RFC 6570 query expansions', async () => {
+            const service = createResourceService({
+                getMode: () => 'default',
+                getAvailableWidgets: () => new Map(),
+            });
+
+            const { resourceTemplates } = await service.listResourceTemplates();
+            const byName = new Map(resourceTemplates.map((t) => [t.name, t.uriTemplate]));
+
+            expect(byName.get('dataset-items')).toContain('{?limit,offset,');
+            // KV key listings page with exclusiveStartKey, not offset.
+            expect(byName.get('key-value-store-keys')).toContain('{?limit,exclusiveStartKey}');
+            // A single record has no paging parameters at all.
+            expect(byName.get('key-value-store-record')).not.toContain('{?');
         });
     });
 });

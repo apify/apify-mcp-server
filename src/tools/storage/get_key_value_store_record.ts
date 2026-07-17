@@ -2,7 +2,7 @@ import type { AudioContent, EmbeddedResource, ImageContent, ResourceLink } from 
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, KV_RECORD_MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -10,7 +10,12 @@ import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils
 import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
 import { respondRaw, respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
-import { buildConsoleLinkContent, buildStorageResponse, normalizeRecordKey } from './storage_helpers.js';
+import {
+    buildBinaryRecordDisposition,
+    buildConsoleLinkContent,
+    buildStorageResponse,
+    normalizeRecordKey,
+} from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -80,8 +85,10 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         // structuredContent — so emit a minimal schema-conforming descriptor alongside the block.
         // The Console link (Console UI token sessions) rides as a trailing text block.
         if (Buffer.isBuffer(value)) {
-            // Content-Type is case-insensitive; lowercase so the image/audio checks below don't miss `Image/PNG`.
-            const mimeType = contentType?.split(';')[0].trim().toLowerCase();
+            // Normalizes the MIME type (so the image/audio checks below don't miss `Image/PNG`) and
+            // decides inline-vs-link-out at the same MAX_INLINE_BYTES threshold the API-resource proxy uses.
+            const disposition = buildBinaryRecordDisposition(contentType, value);
+            const { mimeType } = disposition;
             const structuredContent = {
                 keyValueStoreId,
                 key: record.key,
@@ -90,7 +97,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 summary,
             };
             const consoleLinkContent = buildConsoleLinkContent(apifyConsoleUrl);
-            if (value.length > KV_RECORD_MAX_INLINE_BYTES) {
+            if (disposition.kind === 'linkOut') {
                 // base64-inlining a large binary would blow up the context window; return a link instead.
                 const uri = await store.getRecordPublicUrl(recordKey);
                 return respondRaw({
@@ -100,14 +107,14 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                             type: 'resource_link',
                             uri,
                             name: recordKey,
-                            size: value.length,
+                            size: disposition.bytes,
                             ...(mimeType && { mimeType }),
                         } satisfies ResourceLink,
                         ...consoleLinkContent,
                     ],
                 });
             }
-            const data = value.toString('base64');
+            const data = disposition.base64;
             if (mimeType?.startsWith('image/')) {
                 return respondRaw({
                     structuredContent,
