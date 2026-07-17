@@ -22,6 +22,7 @@
  *     description?: string,
  *     priceUsd?: number,
  *     tieredPricing?: [{ tier: string, priceUsd: number }],
+ *     isPrimaryEvent?: boolean,
  *   }],
  *   pricingNote?: string,
  *   eventDescriptionsOmitted?: boolean,

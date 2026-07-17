@@ -64,15 +64,13 @@ function formatPayPerEventPricing(
     const prefix = showFromPrefix ? 'from ' : '';
 
     if (event.tieredPricing && event.tieredPricing.length > 0) {
-        // Match public Store: prefer GOLD, else cheapest paid tier.
-        const goldPrice = event.tieredPricing.find((tier) => tier.tier === 'GOLD' && tier.priceUsd > 0)?.priceUsd;
         const tieredPrices = event.tieredPricing
             .filter((tier) => tier.tier !== 'FREE' && tier.priceUsd > 0)
             .map((tier) => tier.priceUsd);
-        const displayPrice = goldPrice ?? (tieredPrices.length > 0 ? Math.min(...tieredPrices) : undefined);
 
-        if (typeof displayPrice === 'number') {
-            const pricePerThousand = displayPrice * PRICE_DISPLAY_UNIT_SIZE;
+        if (tieredPrices.length > 0) {
+            const minPrice = Math.min(...tieredPrices);
+            const pricePerThousand = minPrice * PRICE_DISPLAY_UNIT_SIZE;
             return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
         }
     }
