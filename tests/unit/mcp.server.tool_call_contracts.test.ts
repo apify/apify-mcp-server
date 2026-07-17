@@ -22,10 +22,12 @@ import {
 } from './helpers/mcp_server.js';
 
 /**
- * Pins the handler-level behavior contracts that umbrella #658 will merge (the sync
- * `CallToolRequestSchema` catch and the `executeToolAndUpdateTask` catch). Failure classes are
- * fabricated by throwing from a fake tool's `call`; both the sync path (result shapes) and the task
- * path (terminal status mapping) assert the same source-of-truth per class.
+ * Pins the handler-level behavior contracts for the two catch paths (the sync
+ * `CallToolRequestSchema` catch and the `executeToolAndUpdateTask` catch). Both catches now share
+ * error classification via `buildToolCallErrorResult`; #658 will still unify the two sinks
+ * themselves. Failure classes are fabricated by throwing from a fake tool's `call`; both the sync
+ * path (result shapes) and the task path (terminal status mapping) assert the same source-of-truth
+ * per class.
  */
 
 /** x402 payload as the axios interceptor decodes it from the `payment-required` header. */
@@ -336,10 +338,11 @@ describe('executeToolAndUpdateTask()', () => {
     });
 
     describe('task-call telemetry properties per failure class', () => {
-        // Same seam and per-class expectations as the sync block: the task catch builds its
-        // callDiagnostics via its own duplicated inline logic (the duplication #658 merges), so pin
-        // it separately. Telemetry fires once via finishTaskTracking; the emitted properties carry
-        // no task-specific key (taskId appears only in the log line, not in the Segment properties).
+        // Same seam and per-class expectations as the sync block: the task catch assigns
+        // callDiagnostics from the shared mapper's result via a flat overwrite, unlike the sync
+        // path's spread-merge onto a pre-existing object, so pin it separately. Telemetry fires once
+        // via finishTaskTracking; the emitted properties carry no task-specific key (taskId appears
+        // only in the log line, not in the Segment properties).
         for (const fc of FAILURE_CLASSES) {
             it(`emits telemetry properties for a ${fc.label} failure in task mode`, async () => {
                 const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
@@ -435,9 +438,6 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
 
     /** Flush the setImmediate-deferred status notification (emitted after the response). */
     async function flushDeferredNotification(): Promise<void> {
-        await new Promise((resolve) => {
-            setImmediate(resolve);
-        });
         await new Promise((resolve) => {
             setImmediate(resolve);
         });
