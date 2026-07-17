@@ -1,6 +1,7 @@
 import type { Build } from 'apify-client';
 
 import type { ApifyClient } from '../apify_client.js';
+import { CODE_RUNTIME_ACTOR_ID } from '../const.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
@@ -41,16 +42,16 @@ function typeValueToString(value: unknown): string {
  * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
  * Returns the content string and appropriate heading for text output.
  *
- * An Actor can opt out of the summary entirely via `fullReadmeOnly: true` in its
- * `.actor/actor.json` (see fetchActorDetails() for where that's read) — for an Actor whose
- * README documents an API contract (exact method names/shapes), the auto-generated summary
- * can omit the one section that matters and there's no per-call way to request the raw text.
+ * apify/code-runtime is hardcoded to always get its full README (see CODE_RUNTIME_ACTOR_ID) —
+ * its README documents an exact API contract (method names/shapes) that the auto-generated
+ * summary can omit, and there's no per-call way to request the raw text otherwise.
  */
-export function resolveReadmeContent(details: { readmeSummary?: string; readme: string; fullReadmeOnly?: boolean }): {
+export function resolveReadmeContent(details: { actorInfo: { id: string }; readmeSummary?: string; readme: string }): {
     content: string;
     heading: string;
 } {
-    if (!details.fullReadmeOnly && details.readmeSummary?.trim()) {
+    const forceFullReadme = details.actorInfo.id === CODE_RUNTIME_ACTOR_ID;
+    if (!forceFullReadme && details.readmeSummary?.trim()) {
         return { content: details.readmeSummary, heading: '# README summary' };
     }
     return { content: details.readme, heading: '# README' };
@@ -65,7 +66,6 @@ export type ActorDetailsResult = {
     inputSchema: ActorInputSchema;
     readme: string;
     readmeSummary?: string;
-    fullReadmeOnly?: boolean;
 };
 
 export async function fetchActorDetails(
@@ -104,11 +104,6 @@ export async function fetchActorDetails(
         inputSchema.properties = shortenProperties(inputSchema.properties);
         const actorCard = formatActorToActorCard(actorInfoWithPicture, cardOptions);
         const actorCardStructured = formatActorToStructuredCard(actorInfoWithPicture, cardOptions);
-        // Not part of apify-client's ActorDefinition type (it only models the platform's
-        // recognized actor.json fields) — read defensively in case an unrecognized top-level
-        // key doesn't survive the platform's own build validation into this response.
-        const fullReadmeOnly =
-            (buildInfo.actorDefinition as unknown as Record<string, unknown>).fullReadmeOnly === true;
         return {
             actorInfo: actorInfoWithPicture,
             buildInfo,
@@ -117,7 +112,6 @@ export async function fetchActorDetails(
             inputSchema,
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
             readmeSummary: actorInfo.readmeSummary,
-            fullReadmeOnly,
         };
     } catch (error) {
         logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
