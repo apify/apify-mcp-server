@@ -74,10 +74,11 @@ export const getDatasetItems: ToolEntry = Object.freeze({
 
         USAGE:
         - Use when you need to read data from a dataset (all items or only selected fields).
+        - Call this tool alone for output/results — do not also call ${HELPER_TOOLS.DATASET_GET}.
         - Call ${HELPER_TOOLS.DATASET_GET} first only when you need field names for projection and the user has not asked for row data yet.
 
         USAGE EXAMPLES:
-        - user_input: Retrieve results from dataset abc123
+        - user_input: Get output from my latest actor with datasetId des32s
         - user_input: Get only metadata.url and title from dataset username~my-dataset`,
     inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,
