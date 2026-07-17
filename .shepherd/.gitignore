@@ -1,0 +1,5 @@
+# shepherd run data — commit only the config, ignore per-run artifacts
+*
+!.gitignore
+!config.json
+!registry.json
