@@ -95,6 +95,7 @@ You must judge whether this agent made the correct selection.
 
 **search-actors**: Searches the Apify Store to find scraping tools/Actors (NOT celebrity actors). This finds pre-built scraping solutions.
 - Use when query mentions: "Actor", "tool", "scraper", or asks about finding/discovering scraping capabilities
+- Do NOT use for immediate data retrieval (today/latest/recent/current/now, or get/fetch data right now) — use apify--rag-web-browser
 - Example: "Find an Actor for Instagram" or "What tools scrape Twitter?"
 
 **apify--rag-web-browser**: Browses the web to get data immediately (one-time data retrieval).
@@ -120,6 +121,7 @@ You must judge whether this agent made the correct selection.
 
 **get-dataset**: Gets dataset metadata (itemCount, fields, stats) — NOT the row data. Call alone; do not also call get-dataset-schema.
 - Use when query asks about a dataset's details, size, item count, or fields
+- Do not use when the user asks to retrieve/show results, data, or rows — use get-dataset-items
 - Example: "How many items are in dataset abc123?" or "Show metadata and stats for dataset des32s"
 
 **get-dataset-schema**: Generates a JSON schema inferred from a sample of dataset items — field names and types. NOT metadata, stats, or row data.
