@@ -16,6 +16,12 @@ export type EvaluationResult = {
     judgeResult: JudgeResult;
     durationMs: number;
     error?: string;
+    /** True when `error` specifically means the test exceeded --test-timeout, not some other failure. */
+    timedOut?: boolean;
+    /** 1-indexed attempt number for this test case (see --repeat); absent/1 when repeat is not used. */
+    attemptIndex?: number;
+    /** Total attempts requested for this test case (see --repeat); absent/1 when repeat is not used. */
+    totalAttempts?: number;
 };
 
 /**
@@ -102,6 +108,90 @@ export function getToolCallTrace(conversation: ConversationHistory): ToolCallTra
             };
         }),
     );
+}
+
+function median(values: number[]): number | undefined {
+    if (values.length === 0) return undefined;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function mean(values: number[]): number | undefined {
+    if (values.length === 0) return undefined;
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+/**
+ * Aggregated outcome across repeated attempts of the same test case (see --repeat).
+ *
+ * passRate/completionRate are distinct on purpose: `completionRate` counts any attempt the
+ * agent finished (right or wrong answer), `passRate` only the correct ones. Averaging duration/
+ * tokens/bytes over ALL attempts would bias toward errored/timed-out ones (e.g. a --test-timeout
+ * cap inflates the "typical" duration for a run that never actually finished) -- those stats are
+ * computed over completed attempts only.
+ */
+export type RepeatSummary = {
+    testId: string;
+    category: string;
+    attempts: number;
+    passed: number;
+    /** Judge FAIL -- agent finished but gave a wrong/incomplete answer. */
+    failed: number;
+    /** Exceeded --test-timeout specifically. */
+    timedOut: number;
+    /** Threw for any other reason. */
+    errored: number;
+    passRate: number;
+    completionRate: number;
+    medianDurationMs?: number;
+    meanDurationMs?: number;
+    medianTokens?: number;
+    meanTokens?: number;
+    medianToolBytes?: number;
+    meanToolBytes?: number;
+};
+
+export function aggregateRepeatedResults(results: EvaluationResult[]): RepeatSummary[] {
+    const byTestId = new Map<string, EvaluationResult[]>();
+    for (const result of results) {
+        const group = byTestId.get(result.testCase.id) ?? [];
+        group.push(result);
+        byTestId.set(result.testCase.id, group);
+    }
+
+    const summaries: RepeatSummary[] = [];
+    for (const [testId, group] of byTestId) {
+        const attempts = group.length;
+        const passed = group.filter((r) => !r.error && r.judgeResult.verdict === 'PASS').length;
+        const failed = group.filter((r) => !r.error && r.judgeResult.verdict === 'FAIL').length;
+        const timedOut = group.filter((r) => r.timedOut).length;
+        const errored = group.filter((r) => r.error && !r.timedOut).length;
+
+        const completed = group.filter((r) => !r.error);
+        const durations = completed.map((r) => r.durationMs);
+        const tokens = completed.map((r) => r.conversation.totalTokens ?? 0);
+        const toolBytes = completed.map((r) => sumResultBytes(r.conversation));
+
+        summaries.push({
+            testId,
+            category: group[0].testCase.category,
+            attempts,
+            passed,
+            failed,
+            timedOut,
+            errored,
+            passRate: passed / attempts,
+            completionRate: (passed + failed) / attempts,
+            medianDurationMs: median(durations),
+            meanDurationMs: mean(durations),
+            medianTokens: median(tokens),
+            meanTokens: mean(tokens),
+            medianToolBytes: median(toolBytes),
+            meanToolBytes: mean(toolBytes),
+        });
+    }
+    return summaries;
 }
 
 /**
@@ -268,6 +358,50 @@ export function formatResultsTable(results: EvaluationResult[], baseline?: Map<s
 }
 
 /**
+ * Format the aggregated per-test-case outcome across repeated attempts (see --repeat).
+ * Complements formatResultsTable(), which already lists every individual attempt.
+ */
+export function formatRepeatSummaryTable(summaries: RepeatSummary[]): string {
+    const lines: string[] = [];
+
+    lines.push('='.repeat(100));
+    lines.push('Repeat Summary (aggregated across attempts per test case)');
+    lines.push('='.repeat(100));
+    lines.push('');
+
+    for (const summary of summaries) {
+        lines.push(`${summary.testId} (${summary.category})`);
+        lines.push(
+            `  Pass rate: ${summary.passed}/${summary.attempts} (${(summary.passRate * 100).toFixed(0)}%) | ` +
+                `Completion rate: ${summary.passed + summary.failed}/${summary.attempts} (${(summary.completionRate * 100).toFixed(0)}%)`,
+        );
+        lines.push(
+            `  Wrong answer: ${summary.failed} | Timed out: ${summary.timedOut} | Other errors: ${summary.errored}`,
+        );
+        if (summary.medianDurationMs !== undefined) {
+            lines.push(
+                `  Duration (completed attempts): median ${Math.round(summary.medianDurationMs)}ms, ` +
+                    `mean ${Math.round(summary.meanDurationMs!)}ms`,
+            );
+            lines.push(
+                `  Tokens (completed attempts): median ${formatTokens(Math.round(summary.medianTokens!))}, ` +
+                    `mean ${formatTokens(Math.round(summary.meanTokens!))}`,
+            );
+            lines.push(
+                `  Tool bytes (completed attempts): median ${formatBytes(Math.round(summary.medianToolBytes!))}, ` +
+                    `mean ${formatBytes(Math.round(summary.meanToolBytes!))}`,
+            );
+        } else {
+            lines.push(`  No completed attempts to measure duration/tokens/bytes from.`);
+        }
+        lines.push('');
+    }
+
+    lines.push('='.repeat(100));
+    return lines.join('\n');
+}
+
+/**
  * Format a single result for verbose output
  */
 export function formatDetailedResult(result: EvaluationResult): string {
@@ -389,6 +523,12 @@ export type TestResultRecord = {
     toolCallTrace?: ToolCallTraceEntry[];
     /** Error message if execution failed, null otherwise */
     error: string | null;
+    /** True when `error` specifically means the test exceeded --test-timeout */
+    timedOut?: boolean;
+    /** 1-indexed attempt number for this test case (see --repeat); 1 when repeat is not used */
+    attemptIndex?: number;
+    /** Total attempts requested for this test case (see --repeat); 1 when repeat is not used */
+    totalAttempts?: number;
 };
 
 /**

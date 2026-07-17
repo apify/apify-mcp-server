@@ -21,13 +21,18 @@ export type TestTrace = {
     query: string;
     durationMs: number;
     error?: string;
+    timedOut?: boolean;
     verdict: string;
     judgeReason: string;
+    /** 1-indexed attempt number for this test case (see --repeat); 1 when repeat is not used. */
+    attemptIndex: number;
+    /** Total attempts requested for this test case (see --repeat); 1 when repeat is not used. */
+    totalAttempts: number;
     conversation: ConversationHistory;
 };
 
 function toTrace(result: EvaluationResult): TestTrace {
-    const { testCase, conversation, judgeResult, durationMs, error } = result;
+    const { testCase, conversation, judgeResult, durationMs, error, timedOut, attemptIndex, totalAttempts } = result;
     return {
         testId: testCase.id,
         category: testCase.category,
@@ -36,8 +41,11 @@ function toTrace(result: EvaluationResult): TestTrace {
         query: testCase.query,
         durationMs,
         error,
+        timedOut,
         verdict: judgeResult.verdict,
         judgeReason: judgeResult.reason,
+        attemptIndex: attemptIndex ?? 1,
+        totalAttempts: totalAttempts ?? 1,
         conversation,
     };
 }
