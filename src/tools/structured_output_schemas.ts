@@ -45,6 +45,10 @@ const pricingEventsSchema = {
             description: { type: 'string', description: 'Event description' },
             priceUsd: { type: 'number', description: 'Price in USD' },
             tieredPricing: eventTieredPricingSchema,
+            isPrimaryEvent: {
+                type: 'boolean',
+                description: 'Whether this is the primary event shown on the public Store pricing badge',
+            },
         },
     },
     description: 'Event-based pricing information',
