@@ -14,9 +14,12 @@ import { SERVER_MODE } from '../../types.js';
  * Build server instructions for the given mode.
  *
  * Apps-only sections are omitted in default mode to prevent models from
- * attempting to call widget tools that are not registered.
+ * attempting to call widget tools that are not registered. The report-problem line is
+ * emitted only when `reportProblemAvailable` is true — i.e. `report-problem` is actually
+ * served — so clients that never receive the tool (Anthropic surfaces, telemetry off, or a
+ * `tools=` selection that omits report-problem) are not told to call it.
  */
-export function getServerInstructions(mode: SERVER_MODE = SERVER_MODE.DEFAULT): string {
+export function getServerInstructions(mode: SERVER_MODE = SERVER_MODE.DEFAULT, reportProblemAvailable = false): string {
     const isApps = mode === SERVER_MODE.APPS;
 
     return `
@@ -83,5 +86,11 @@ ${
   \`${HELPER_TOOLS.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs \`${HELPER_TOOLS.ACTOR_CALL}\`:**
   Prefer dedicated tools when available; use \`${HELPER_TOOLS.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.
-`;
+${
+    reportProblemAvailable
+        ? `
+If a tool or Actor fails and you cannot resolve it, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.
+`
+        : ''
+}`;
 }

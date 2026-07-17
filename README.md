@@ -243,6 +243,7 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 Legend for the **Enabled by default** column:
 - ✅ — in the default tool set.
 - ⚡ — auto-injected when `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present (which is true in the default configuration).
+- ✅¹ — served by default, but only when telemetry is enabled and the client is not withheld: Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code) or `local-agent-mode-apify`. To disable, pass an explicit `tools=` list that omits it.
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
@@ -256,6 +257,7 @@ Legend for the **Enabled by default** column:
 | `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
+| `report-problem` | dev | Report a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
 | `get-actor-run-list` | runs | Get a list of an Actor's runs, filterable by status. |  |
 | `get-actor-log` | runs | Retrieve the logs for a specific Actor run. |  |
 | `get-dataset` | storage | Get metadata about a specific dataset. |  |
@@ -291,6 +293,8 @@ When no query parameters are provided, the MCP server loads the following `tools
 - `apify/rag-web-browser`
 
 If the tools parameter is specified, only the listed tools or categories will be enabled – no default tools will be included.
+
+`report-problem` is served by default (subject to the gating in the footnote above) but lives in the `dev` category, so an explicit `tools=dev` selects it too. To disable it, pass an explicit `tools=` list that omits it (e.g. `tools=actors,docs`).
 
 > **Easy configuration:**
 >

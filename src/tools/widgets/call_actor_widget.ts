@@ -10,7 +10,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondServerError } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
-import { buildStartRunResponse } from '../actors/actor_run_response.js';
+import { buildStartRunWidgetResponse } from '../actors/actor_run_response.js';
 import {
     buildCallActorErrorResponse,
     callActorPreExecute,
@@ -120,7 +120,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
                 runId: actorRun.id,
                 mcpSessionId: toolArgs.mcpSessionId,
             });
-            const response = buildStartRunResponse({ actorName: baseActorName, actorRun, widget: true });
+            const response = buildStartRunWidgetResponse({ actorName: baseActorName, actorRun });
             return {
                 ...response,
                 toolTelemetry: { actorId: resolvedActorId },
