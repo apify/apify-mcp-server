@@ -32,8 +32,10 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         Not the full field list, item counts, or stats — use ${HELPER_TOOLS.DATASET_GET} for those.
         The schema can be used for validation, documentation, or processing.
 
+        Do not use for metadata, stats, or fetching rows — use ${HELPER_TOOLS.DATASET_GET} or ${HELPER_TOOLS.DATASET_GET_ITEMS}.
+
         USAGE:
-        - Use when you need to infer the structure of dataset items for downstream processing or validation.
+        - Use when the user asks for a JSON schema or to infer structure/shape from a sample.
 
         USAGE EXAMPLES:
         - user_input: Generate schema for dataset 34das2 using 10 items

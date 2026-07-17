@@ -31,7 +31,8 @@ export const getDataset: ToolEntry = Object.freeze({
         Note: itemCount updates may be delayed by up to ~5 seconds.
 
         USAGE:
-        - Use when you need dataset metadata to understand its structure before fetching items.
+        - Use when you need dataset metadata: item count, stats, or the field list.
+        - Call this tool alone — do not also call ${HELPER_TOOLS.DATASET_SCHEMA_GET}.
 
         USAGE EXAMPLES:
         - user_input: Show info for dataset xyz123

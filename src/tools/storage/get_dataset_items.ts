@@ -68,14 +68,16 @@ export const getDatasetItems: ToolEntry = Object.freeze({
     title: 'Get dataset items',
     description: dedent`
         Get items (rows) from a dataset — the output/results produced by an Actor run.
-        Not dataset metadata — use ${HELPER_TOOLS.DATASET_GET} first if you don't know the field names.
+        Not metadata or schema — use ${HELPER_TOOLS.DATASET_GET} for counts and the field list, ${HELPER_TOOLS.DATASET_SCHEMA_GET} for a JSON schema from a sample.
+        When the user provides a datasetId and asks to retrieve results, output, or row data, call this tool directly.
         Default limit is ${DEFAULT_DATASET_ITEMS_LIMIT}. Use clean=true to skip empty items and hidden fields.
 
         USAGE:
         - Use when you need to read data from a dataset (all items or only selected fields).
+        - Call ${HELPER_TOOLS.DATASET_GET} first only when you need field names for projection and the user has not asked for row data yet.
 
         USAGE EXAMPLES:
-        - user_input: Get the output from my last Actor run, dataset abd123
+        - user_input: Retrieve results from dataset abc123
         - user_input: Get only metadata.url and title from dataset username~my-dataset`,
     inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,

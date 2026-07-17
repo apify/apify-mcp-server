@@ -41,7 +41,7 @@ export const MODELS_TO_EVALUATE = [
     // 'anthropic/claude-sonnet-4.5',
     'google/gemini-2.5-flash',
     // 'google/gemini-2.5-pro',
-    'openai/gpt-5.4',
+    'openai/gpt-5.4-mini',
     // 'openai/gpt-5-mini',
     // 'openai/gpt-4o-mini', // deprecated model
 ];
@@ -114,17 +114,16 @@ You must judge whether this agent made the correct selection.
 - Searches across all documentation to find relevant pages
 - Example: "How to create an Apify Actor?" or "What is Apify Proxy?"
 
-**get-dataset-items**: Gets items (rows) from a dataset — the output/results produced by an Actor run. NOT dataset metadata (use get-dataset first if the field names are unknown).
-- Use when query asks to get/fetch/retrieve data from a previous Actor execution
-- Returns the actual scraped data, not Actor documentation
-- Example: "Get the data from my last Actor run" or "Show me the results from dataset abc123"
+**get-dataset-items**: Gets items (rows) from a dataset — the output/results produced by an Actor run. NOT metadata or schema.
+- Use when query asks to get/fetch/retrieve results, output, or row data and provides a datasetId — call directly, do not prefetch with get-dataset or get-dataset-schema
+- Example: "Retrieve results from dataset abc123" or "Get the output from my last Actor run"
 
-**get-dataset**: Gets dataset metadata (itemCount, fields, stats) — NOT the row data. Use get-dataset-items for the data, get-dataset-schema for inferred field types.
+**get-dataset**: Gets dataset metadata (itemCount, fields, stats) — NOT the row data. Call alone; do not also call get-dataset-schema.
 - Use when query asks about a dataset's details, size, item count, or fields
-- Example: "How many items are in dataset abc123?" or "Show info for dataset des32s"
+- Example: "How many items are in dataset abc123?" or "Show metadata and stats for dataset des32s"
 
-**get-dataset-schema**: Generates a JSON schema inferred from a sample of dataset items — field names and types, not authoritative stats (use get-dataset for the full field list and stats).
-- Use when query asks for the schema, structure, or shape of a dataset
+**get-dataset-schema**: Generates a JSON schema inferred from a sample of dataset items — field names and types. NOT metadata, stats, or row data.
+- Use when query explicitly asks for a JSON schema or to infer structure/shape from a sample
 - Example: "What is the schema of dataset abc123?" or "Generate a schema for dataset des32s"
 
 **get-dataset-list**: Lists the datasets owned by the authenticated user — summaries only, not contents (use get-dataset to inspect one).
