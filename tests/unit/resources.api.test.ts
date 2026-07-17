@@ -296,6 +296,9 @@ describe('readApiResource()', () => {
         expect(contents.text).toContain(signedUrl('kv-1', 'BIG'));
         // The partial body is never returned.
         expect(contents.text).not.toContain('partial');
+        // A record is not pageable, so the dataset/list paging clause must not appear.
+        expect(contents.text).not.toContain('offset');
+        expect(contents.text).not.toContain('dataset/list');
     });
 
     it('still mints a signed link for a record key with malformed percent-encoding', async () => {

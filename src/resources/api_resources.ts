@@ -113,13 +113,24 @@ function buildTextResult(uri: string, text: string, mimeType: string = TEXT_MIME
     return { contents: [{ uri, mimeType, text } satisfies TextResourceContents] };
 }
 
+/** True when the URI is a key-value-store record path (a single record, not a pageable list). */
+function isKvRecordUri(uri: string): boolean {
+    try {
+        return KV_RECORD_PATH_RE.test(new URL(uri).pathname);
+    } catch {
+        return false;
+    }
+}
+
 /** Body too large to inline: a download-pointer text result. NOT a failure — the resource is readable, just not inline. */
 async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promise<ReadResourceResult> {
     const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient);
+    // A KVS record is a single object with no paging; only a dataset/list can shrink via limit/offset.
+    const pagingHint = isKvRecordUri(uri) ? '' : ' For a dataset/list, re-read with a smaller limit/offset range.';
     return buildTextResult(
         uri,
         `Response body exceeds the ${MAX_INLINE_BYTES}-byte inline limit. Download it from ${downloadUrl} ` +
-            `(may require your Apify API token). For a dataset/list, re-read with a smaller limit/offset range.`,
+            `(may require your Apify API token).${pagingHint}`,
     );
 }
 
