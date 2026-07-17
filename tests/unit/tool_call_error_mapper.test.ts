@@ -140,11 +140,9 @@ describe('buildToolCallErrorResult()', () => {
     });
 
     it('classifies an McpError carrying code 402 as payment', () => {
-        // Documents the containment invariant the sync catch relies on: getHttpStatusCode falls
-        // through to `.code`, so a protocol error with code 402 satisfies the x402 predicate.
-        // Such an error must never reach the sync catch (all remote-McpError routes are sealed by
-        // inner catches); if this pin surprises you, re-check that containment before touching the
-        // McpError re-throw order in server.ts.
+        // Pins that an McpError with code 402 classifies as payment — the containment invariant the
+        // sync-catch hoist relies on (see the re-throw comment in server.ts). If this pin surprises
+        // you, re-check that containment before reordering that re-throw.
         const result = buildToolCallErrorResult(new McpError(402 as ErrorCode, 'remote 402'), {
             toolName: TOOL_NAME,
             isAborted: false,

@@ -9,7 +9,7 @@ import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../uti
 import { classifyFailureCategory, getToolStatusFromError } from '../utils/tool_status.js';
 import { buildActorFields } from '../utils/tools.js';
 
-/** Inputs the mapper needs but can't derive itself (abort source and tool name differ per caller). */
+/** Inputs the mapper can't derive itself — they differ per caller. */
 export type ToolCallErrorParams = {
     toolName: string;
     actorName?: string;
@@ -48,8 +48,7 @@ export type ToolCallErrorResult =
 
 /**
  * Classifies a tool-call error into a 402 payment / permission-approval / generic execution result.
- * Pure: never throws, logs, or touches the task store. Callers pass `isAborted` (each reads its own
- * signal) and `toolName` (sync uses the raw requested name, task the resolved `tool.name`).
+ * Pure: never throws, logs, or touches the task store.
  */
 export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorParams): ToolCallErrorResult {
     const { toolName, actorName, actorId, isAborted } = params;
