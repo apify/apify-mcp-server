@@ -111,7 +111,7 @@ You must judge whether this agent made the correct selection.
 
 **search-apify-docs**: Searches Apify documentation for general info about Apify platform/features.
 - Use when query asks about Apify concepts, features, or how to use the platform
-- Searches across all documentation to find relevant pages
+- Do not also call search-actors unless the user asks to find scraping tools or Actors
 - Example: "How to create an Apify Actor?" or "What is Apify Proxy?"
 
 **get-dataset-items**: Gets items (rows) from a dataset — the output/results produced by an Actor run. NOT metadata or schema.
