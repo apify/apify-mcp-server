@@ -5,6 +5,7 @@ import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
 import type {
     ActorStoreList,
     ConsoleLinkContext,
+    HelperTool,
     InternalToolArgs,
     StructuredActorCard,
     ToolEntry,
@@ -213,4 +214,4 @@ export const searchActors: ToolEntry = Object.freeze({
         const footer = buildSearchActorsFooter(verbatimLinksNudge);
         return respondOk(`${header}\n\n${actorCardText}\n\n${footer}`, { structuredContent });
     },
-} as const);
+} as const satisfies HelperTool);

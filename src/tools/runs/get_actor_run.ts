@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
 import { buildActorRunWidgetMeta } from '../../resources/widgets.js';
-import type { ConsoleLinkContext, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
@@ -153,4 +153,4 @@ export const getActorRun: ToolEntry = Object.freeze({
             return buildGetActorRunError(parsed.runId, error);
         }
     },
-} as const);
+} as const satisfies HelperTool);

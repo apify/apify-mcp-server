@@ -2,7 +2,7 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { ConsoleLinkContext, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import {
     type ActorDetailsResult,
@@ -278,4 +278,4 @@ export const fetchActorDetails: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs) => buildFetchActorDetailsResult(toolArgs),
-} as const);
+} as const satisfies HelperTool);
