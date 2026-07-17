@@ -12,8 +12,8 @@ implementations, not by importing from here.
 
 - `server.ts` — `ActorsMcpServer`: tool/prompt/resource/task registration, the
   `initialize` handshake, MCP Apps capability detection, `CallToolRequest` handling.
-  `dispatchToolCall` is the single exhaustive `switch (tool.type)` (INTERNAL / ACTOR_MCP /
-  ACTOR) that both the sync handler and the task path (`executeToolAndUpdateTask`) run.
+  Both the sync handler and the task path (`executeToolAndUpdateTask`) run the shared
+  `dispatchToolCall` switch, now in `tool_dispatch.ts`.
   Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
   a task store (the internal repo injects a Redis one) or the constructor throws.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
@@ -24,6 +24,9 @@ implementations, not by importing from here.
   `server.ts` tool-call catches share. Maps an error to a `kind: 'payment' | 'approval'
   | 'execution'` result (status, diagnostics, response/userText). Never throws, logs,
   or writes the store — the catch blocks own logging, store writes, and wire wrapping.
+- `tool_dispatch.ts` — `dispatchToolCall()`: the single exhaustive `switch (tool.type)`
+  (INTERNAL / ACTOR_MCP / ACTOR) both the sync handler and the task path run. Plain
+  function taking the `ActorsMcpServer` instance; touches no class state beyond `.server`.
 - `const.ts` — the invariant constants below (the single source for these values).
 
 ## Gotchas & invariants
