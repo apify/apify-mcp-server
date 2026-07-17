@@ -21,7 +21,9 @@ implementations, not by importing from here.
 - `tool_call_error_mapper.ts` — `buildToolCallErrorResult()`: pure classifier both
   `server.ts` tool-call catches share. Maps an error to a `kind: 'payment' | 'approval'
   | 'execution'` result (status, diagnostics, response/userText). Never throws, logs,
-  or writes the store — the catch blocks own logging, store writes, and wire wrapping.
+  or writes the store — the catch blocks own logging and store writes. For payment/approval
+  the mapper returns the ready-to-send `response`; the catch builds the wire result only for
+  the execution `userText`.
 - `const.ts` — the invariant constants below (the single source for these values).
 
 ## Gotchas & invariants

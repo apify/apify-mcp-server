@@ -5,21 +5,21 @@ import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from '../../src/mcp/tool_call_error_mapper.js';
 import type { CallDiagnostics } from '../../src/types.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
-import { makePaymentRequiredError, makePermissionApprovalError, PERMISSION_HTTP_STATUS } from './helpers/mcp_server.js';
+import {
+    makePaymentRequiredError,
+    makePermissionApprovalError,
+    PERMISSION_HTTP_STATUS,
+    X402_PAYMENT_DATA,
+} from './helpers/mcp_server.js';
 
 const TOOL_NAME = 'test-tool';
 const ACTOR_NAME = 'apify/web-scraper';
 const ACTOR_ID = 'abc123';
 
-const X402_PAYMENT_DATA = {
-    x402Version: 1,
-    accepts: [{ scheme: 'exact', network: 'base-sepolia', maxAmountRequired: '10000' }],
-};
-
 type Case = {
     label: string;
     makeError: () => unknown;
-    kind: (typeof TOOL_CALL_ERROR_KIND)[keyof typeof TOOL_CALL_ERROR_KIND];
+    kind: TOOL_CALL_ERROR_KIND;
     toolStatus: string;
     callDiagnostics: CallDiagnostics;
     /** Exact `response` payload for payment/approval; execution carries `userText` instead. */
@@ -149,5 +149,20 @@ describe('buildToolCallErrorResult()', () => {
         });
 
         expect(result.kind).toBe(TOOL_CALL_ERROR_KIND.PAYMENT);
+    });
+
+    it('includes failure_http_status for an execution error carrying an HTTP status', () => {
+        // A non-payment/approval error that still carries an HTTP status (e.g. a 500) classifies as
+        // execution but must keep failure_http_status for telemetry — the conditional arm.
+        const result = buildToolCallErrorResult(Object.assign(new Error('server exploded'), { statusCode: 500 }), {
+            toolName: TOOL_NAME,
+            actorName: ACTOR_NAME,
+            actorId: ACTOR_ID,
+            isAborted: false,
+        });
+
+        expect(result.kind).toBe(TOOL_CALL_ERROR_KIND.EXECUTION);
+        expect(result.callDiagnostics.failure_http_status).toBe(500);
+        expect(result.callDiagnostics.failure_detail).toBe('server exploded');
     });
 });

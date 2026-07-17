@@ -1,11 +1,14 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import { buildPermissionApprovalResponse } from '../tools/actors/call_actor.js';
 import type { CallDiagnostics, ToolStatus } from '../types.js';
 import { isPermissionApprovalError } from '../utils/apify_errors.js';
 import { getHttpStatusCode } from '../utils/logging.js';
 import type { ToolResponse } from '../utils/mcp.js';
 import { getToolCallErrorUserText } from '../utils/mcp.js';
-import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../utils/payment_errors.js';
+import {
+    buildPaymentRequiredResponse,
+    buildPermissionApprovalResponse,
+    isX402PaymentRequiredError,
+} from '../utils/payment_errors.js';
 import { classifyFailureCategory, getToolStatusFromError } from '../utils/tool_status.js';
 import { buildActorFields } from '../utils/tools.js';
 
@@ -23,6 +26,7 @@ export const TOOL_CALL_ERROR_KIND = {
     APPROVAL: 'approval',
     EXECUTION: 'execution',
 } as const;
+export type TOOL_CALL_ERROR_KIND = (typeof TOOL_CALL_ERROR_KIND)[keyof typeof TOOL_CALL_ERROR_KIND];
 
 /** Shared shape for the two branches that carry a ready-to-return `response` (402 and approval). */
 type ResponseErrorResult = {
@@ -48,7 +52,8 @@ export type ToolCallErrorResult =
 
 /**
  * Classifies a tool-call error into a 402 payment / permission-approval / generic execution result.
- * Pure: never throws, logs, or touches the task store.
+ * Pure: never throws, logs, or touches the task store. An HTTP-range-coded error — including an
+ * `McpError` with code 402 — classifies as PAYMENT, since `getHttpStatusCode` falls through to `.code`.
  */
 export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorParams): ToolCallErrorResult {
     const { toolName, actorName, actorId, isAborted } = params;

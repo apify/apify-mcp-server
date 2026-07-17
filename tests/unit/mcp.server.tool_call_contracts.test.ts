@@ -19,6 +19,7 @@ import {
     makeThrowingTool,
     PERMISSION_HTTP_STATUS,
     withServer,
+    X402_PAYMENT_DATA,
 } from './helpers/mcp_server.js';
 
 /**
@@ -29,12 +30,6 @@ import {
  * path (result shapes) and the task path (terminal status mapping) assert the same source-of-truth
  * per class.
  */
-
-/** x402 payload as the axios interceptor decodes it from the `payment-required` header. */
-const X402_PAYMENT_DATA = {
-    x402Version: 1,
-    accepts: [{ scheme: 'exact', network: 'base-sepolia', maxAmountRequired: '10000' }],
-};
 
 /** The wire `content` `buildPaymentRequiredResponse` produces for X402_PAYMENT_DATA. */
 const X402_RESPONSE_CONTENT = [

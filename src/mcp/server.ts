@@ -1425,8 +1425,8 @@ export class ActorsMcpServer {
                 // Re-throwing first is order-equivalent only because no McpError with an HTTP-range
                 // code reaches this catch: an McpError(402) WOULD satisfy the x402 predicate
                 // (getHttpStatusCode falls through to `.code`), but every remote-McpError route is
-                // sealed by an inner catch (ACTOR_MCP branch, call-actor MCP passthrough) and all
-                // in-repo McpErrors use negative ErrorCode.* values.
+                // sealed by its own inner catch before reaching here, and all in-repo McpErrors use
+                // negative ErrorCode.* values.
                 if (error instanceof McpError) {
                     throw error;
                 }
