@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.11.7 - **not yet released**
 
+### 🚀 Features
+
+- Storage as resources ([#1003](https://github.com/apify/apify-mcp-server/pull/1003)) ([b46668b](https://github.com/apify/apify-mcp-server/commit/b46668bd98a14e776e6e86ecb2e6f0d43d86dbd5)) by [@RobertCrupa](https://github.com/RobertCrupa)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.11.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.6) (2026-07-16)
