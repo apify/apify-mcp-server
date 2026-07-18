@@ -60,11 +60,11 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getServerInfo } from '../server_card.js';
-import { buildReportedProblemProperties, getTelemetryEnv, trackReportedProblem, trackToolCall } from '../telemetry.js';
+import { getTelemetryEnv } from '../telemetry.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
-import { appendReportProblemNudge } from '../tools/dev/report_problem.js';
+import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorsAsToolsResult } from '../tools/index.js';
 import type {
@@ -75,19 +75,18 @@ import type {
     Input,
     ServerModeOption,
     TelemetryEnv,
-    ToolCallTelemetryProperties,
     ToolEntry,
     ToolStatus,
 } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
-import { computeToolResponseBytes, respondOk } from '../utils/mcp.js';
+import { respondOk } from '../utils/mcp.js';
 import { isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
-import { deriveResourceIds, extractAjvErrorDetails } from '../utils/tool_status.js';
+import { extractAjvErrorDetails } from '../utils/tool_status.js';
 import {
     buildActorFields,
     extractActorId,
@@ -96,10 +95,9 @@ import {
     getToolPublicFieldOnly,
 } from '../utils/tools.js';
 import { getActors, getToolsForServerMode, toolNamesToInput } from '../utils/tools_loader.js';
-import { getUserInfoCached } from '../utils/userid_cache.js';
-import { getPackageVersion } from '../utils/version.js';
 import { LOG_LEVEL_MAP } from './const.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
+import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telemetry.js';
 import { dispatchToolCall } from './tool_dispatch.js';
 import {
     createTaskCancellationWatcher,
@@ -221,9 +219,9 @@ export class ActorsMcpServer {
      */
     private pendingToolsUntilClientKnown: { input: Input; actorTools: ToolEntry[] }[] = [];
 
-    // Telemetry configuration (resolved from options and env vars in setupTelemetry)
-    private telemetryEnabled: boolean | null = null;
-    private telemetryEnv: TelemetryEnv = DEFAULT_TELEMETRY_ENV;
+    // Telemetry configuration (resolved from options and env vars, see setupTelemetry)
+    public readonly telemetryEnabled: boolean;
+    public readonly telemetryEnv: TelemetryEnv;
 
     // List of widgets that are ready to be served
     private availableWidgets: Map<string, AvailableWidget> = new Map();
@@ -283,7 +281,9 @@ export class ActorsMcpServer {
             },
             instructions: getServerInstructions(),
         });
-        this.setupTelemetry();
+        const { telemetryEnabled, telemetryEnv } = this.setupTelemetry();
+        this.telemetryEnabled = telemetryEnabled;
+        this.telemetryEnv = telemetryEnv;
         this.setupInitializeHandler();
         this.setupLoggingProxy();
         this.tools = new Map();
@@ -301,19 +301,23 @@ export class ActorsMcpServer {
     /**
      * Telemetry configuration with precedence: explicit options > env vars > defaults
      */
-    private setupTelemetry() {
+    private setupTelemetry(): { telemetryEnabled: boolean; telemetryEnv: TelemetryEnv } {
+        let telemetryEnabled: boolean;
         const explicitEnabled = parseBooleanOrNull(this.options.telemetry?.enabled);
         if (explicitEnabled !== null) {
-            this.telemetryEnabled = explicitEnabled;
+            telemetryEnabled = explicitEnabled;
         } else {
             const envEnabled = parseBooleanOrNull(process.env.TELEMETRY_ENABLED);
-            this.telemetryEnabled = envEnabled ?? DEFAULT_TELEMETRY_ENABLED;
+            telemetryEnabled = envEnabled ?? DEFAULT_TELEMETRY_ENABLED;
         }
 
         // Configure telemetryEnv: explicit option > env var > default ('PROD')
-        if (this.telemetryEnabled) {
-            this.telemetryEnv = getTelemetryEnv(this.options.telemetry?.env ?? process.env.TELEMETRY_ENV);
+        let telemetryEnv: TelemetryEnv = DEFAULT_TELEMETRY_ENV;
+        if (telemetryEnabled) {
+            telemetryEnv = getTelemetryEnv(this.options.telemetry?.env ?? process.env.TELEMETRY_ENV);
         }
+
+        return { telemetryEnabled, telemetryEnv };
     }
 
     /**
@@ -409,29 +413,10 @@ export class ActorsMcpServer {
      */
     private isReportProblemServable(): boolean {
         return (
-            !!this.telemetryEnabled &&
+            this.telemetryEnabled &&
             this.clientKnown &&
             !isReportProblemBlockedForClient(this.options.initializeRequestData)
         );
-    }
-
-    /**
-     * Append the report-problem nudge to a failed tool result. Thin wrapper over
-     * {@link appendReportProblemNudge} that fills in whether report-problem is served on this
-     * connection; suppression by category/402 is handled inside the helper.
-     */
-    private withReportProblemNudge<T>(
-        result: T,
-        failingToolName: string | undefined,
-        failureCategory?: string,
-        failureHttpStatus?: number,
-    ): T {
-        return appendReportProblemNudge(result, {
-            failingToolName,
-            available: this.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
-            failureCategory,
-            failureHttpStatus,
-        });
     }
 
     private composePendingToolsForClient(): void {
@@ -943,12 +928,13 @@ export class ActorsMcpServer {
                 // On a failed result, nudge the agent to report the blocker via report-problem at the
                 // moment it decides what to do next. Gated on the tool actually being served (see
                 // isReportProblemServable), so clients where it is blocklisted or telemetry is off never see it.
-                const augmented = this.withReportProblemNudge(
-                    r,
-                    resolvedToolName,
-                    callDiagnostics.failure_category,
-                    callDiagnostics.failure_http_status,
-                );
+                const augmented = withReportProblemNudge({
+                    result: r,
+                    tools: this.tools,
+                    failingToolName: resolvedToolName,
+                    failureCategory: callDiagnostics.failure_category,
+                    failureHttpStatus: callDiagnostics.failure_http_status,
+                });
                 toolResult = augmented;
                 return augmented;
             };
@@ -975,7 +961,12 @@ export class ActorsMcpServer {
 
             // Initialize telemetry with raw tool name — updated below once the tool is resolved.
             // This ensures telemetry is available even for early failures (missing token, tool not found).
-            const { telemetryData, userId } = await this.prepareTelemetryData(name, mcpSessionId, apifyToken);
+            const { telemetryData, userId } = await prepareTelemetryData({
+                toolName: name,
+                mcpSessionId,
+                apifyToken,
+                apifyMcpServer: this,
+            });
 
             // actorName/actorId are declared here so they're available in the catch block for telemetry.
             // Set after tool resolution (inside the try block).
@@ -1348,7 +1339,7 @@ export class ActorsMcpServer {
                 });
             } finally {
                 if (shouldTrackTelemetry) {
-                    this.logToolCallAndTelemetry({
+                    logToolCallAndTelemetry({
                         toolName: resolvedToolName,
                         mcpSessionId,
                         toolStatus,
@@ -1359,80 +1350,11 @@ export class ActorsMcpServer {
                         args,
                         result: toolResult,
                         taskId: preflightTaskId,
+                        apifyMcpServer: this,
                     });
                 }
             }
         });
-    }
-
-    /**
-     * Logs tool call completion at INFO level and tracks telemetry.
-     * Computes duration once so both the log line and telemetry event use the same value.
-     * Response bytes and resource ids are derived here from the raw `result` (+ `args`) so every
-     * call site stays a plain hand-off — no path can forget to compute or strip them.
-     */
-    private logToolCallAndTelemetry(params: {
-        toolName: string;
-        mcpSessionId: string | undefined;
-        toolStatus: ToolStatus;
-        startTime: number;
-        taskId?: string;
-        telemetryData: ToolCallTelemetryProperties | null;
-        userId: string | null;
-        callDiagnostics?: CallDiagnostics;
-        args?: Record<string, unknown>;
-        result?: unknown;
-    }): void {
-        const durationMs = Date.now() - params.startTime;
-        // `result` is undefined only on short-circuit paths that never produced a payload (e.g. a
-        // cancelled task); skip byte accounting there. `null`/`{}` still measure as zero bytes.
-        const responseBytes = params.result === undefined ? undefined : computeToolResponseBytes(params.result);
-
-        log.info('Tool call completed', {
-            toolName: params.toolName,
-            mcpSessionId: params.mcpSessionId,
-            toolStatus: params.toolStatus,
-            durationMs,
-            ...(responseBytes !== undefined && {
-                responseContentBytes: responseBytes.contentBytes,
-                responseStructuredContentBytes: responseBytes.structuredContentBytes,
-                responseFileBytes: responseBytes.fileBytes,
-            }),
-            ...(params.taskId !== undefined && { taskId: params.taskId }),
-        });
-
-        if (params.telemetryData) {
-            const finalizedTelemetryData: ToolCallTelemetryProperties = {
-                ...params.telemetryData,
-                tool_status: params.toolStatus,
-                tool_exec_time_ms: durationMs,
-                ...(responseBytes && {
-                    tool_response_content_bytes: responseBytes.contentBytes,
-                    tool_response_structured_content_bytes: responseBytes.structuredContentBytes,
-                    tool_response_file_bytes: responseBytes.fileBytes,
-                }),
-                // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
-                ...params.callDiagnostics,
-                // Resource ids are read once here from the args + the tool's public output; no tool
-                // threads them back. Applied uniformly, last. See deriveResourceIds.
-                ...deriveResourceIds(params.args, params.result),
-            };
-            trackToolCall(params.userId, this.telemetryEnv, finalizedTelemetryData);
-
-            // A successful report-problem call also emits a dedicated feedback event carrying the
-            // submission. A downstream Segment destination fans it out to Slack/GitHub.
-            if (
-                params.toolName === HELPER_TOOLS.PROBLEM_REPORT &&
-                params.toolStatus === TOOL_STATUS.SUCCEEDED &&
-                params.args
-            ) {
-                trackReportedProblem(
-                    params.userId,
-                    this.telemetryEnv,
-                    buildReportedProblemProperties(finalizedTelemetryData, params.args),
-                );
-            }
-        }
     }
 
     // TODO: outer orchestration here (pre-flight, telemetry bookkeeping, task-store handling) still duplicates the CallToolRequestSchema handler's logic; the dispatch ladder is now shared. Refactor.
@@ -1488,14 +1410,15 @@ export class ActorsMcpServer {
 
         // Prepare telemetry before try-catch so it's accessible to both paths.
         // This avoids re-fetching user data in the error handler.
-        const { telemetryData, userId } = await this.prepareTelemetryData(
-            getToolFullName(tool),
+        const { telemetryData, userId } = await prepareTelemetryData({
+            toolName: getToolFullName(tool),
             mcpSessionId,
             apifyToken,
-        );
+            apifyMcpServer: this,
+        });
 
         const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, result?: unknown) => {
-            this.logToolCallAndTelemetry({
+            logToolCallAndTelemetry({
                 toolName: tool.name,
                 mcpSessionId,
                 toolStatus: status,
@@ -1506,6 +1429,7 @@ export class ActorsMcpServer {
                 callDiagnostics: diagnostics,
                 args: toolArgs,
                 result,
+                apifyMcpServer: this,
             });
         };
 
@@ -1623,12 +1547,13 @@ export class ActorsMcpServer {
 
             // On a failed result, nudge the agent to report the blocker via report-problem (mirrors the
             // synchronous CallTool path, which task-mode calls like call-actor bypass).
-            result = this.withReportProblemNudge(
+            result = withReportProblemNudge({
                 result,
-                tool.name,
-                callDiagnostics.failure_category,
-                callDiagnostics.failure_http_status,
-            );
+                tools: this.tools,
+                failingToolName: tool.name,
+                failureCategory: callDiagnostics.failure_category,
+                failureHttpStatus: callDiagnostics.failure_http_status,
+            });
 
             // Store the result in the task store
             log.debug('[executeToolAndUpdateTask] Storing completed result', {
@@ -1747,8 +1672,8 @@ export class ActorsMcpServer {
             // INVALID_INPUT gets the softer nudge; payment (402) is suppressed via the HTTP status and
             // AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES. The 402 branch above
             // returns before reaching here, so this only sees non-payment failures.
-            const failedResult = this.withReportProblemNudge(
-                {
+            const failedResult = withReportProblemNudge({
+                result: {
                     content: [
                         {
                             type: 'text' as const,
@@ -1758,52 +1683,15 @@ export class ActorsMcpServer {
                     isError: true,
                     internalToolStatus: toolStatus,
                 },
-                tool.name,
-                callDiagnostics.failure_category,
-                callDiagnostics.failure_http_status,
-            );
+                tools: this.tools,
+                failingToolName: tool.name,
+                failureCategory: callDiagnostics.failure_category,
+                failureHttpStatus: callDiagnostics.failure_http_status,
+            });
             await completeTask('failed', failedResult, toolStatus, callDiagnostics);
         } finally {
             cancelWatcher.dispose();
         }
-    }
-
-    /*
-     * Creates telemetry data for a tool call.
-     */
-    private async prepareTelemetryData(
-        toolName: string,
-        mcpSessionId: string | undefined,
-        apifyToken: string,
-    ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
-        if (!this.telemetryEnabled) {
-            return { telemetryData: null, userId: null };
-        }
-
-        // Get userId from cache or fetch from API
-        let userId: string | null = null;
-        if (apifyToken) {
-            const apifyClient = new ApifyClient({ token: apifyToken });
-            ({ userId } = await getUserInfoCached(apifyToken, apifyClient));
-            log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
-        }
-        const capabilities = this.options.initializeRequestData?.params?.capabilities;
-        const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
-        const telemetryData: ToolCallTelemetryProperties = {
-            app: 'mcp',
-            app_version: getPackageVersion() || '',
-            mcp_client_name: params?.clientInfo?.name || '',
-            mcp_client_version: params?.clientInfo?.version || '',
-            mcp_protocol_version: params?.protocolVersion || '',
-            mcp_client_capabilities: capabilities || null,
-            mcp_session_id: mcpSessionId || '',
-            transport_type: this.options.transportType || '',
-            tool_name: toolName,
-            tool_status: TOOL_STATUS.SUCCEEDED, // Will be updated in finally
-            tool_exec_time_ms: 0, // Will be calculated in finally
-        };
-
-        return { telemetryData, userId };
     }
 
     /**

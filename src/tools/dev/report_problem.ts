@@ -77,6 +77,27 @@ export function appendReportProblemNudge<T>(
     return { ...r, content: [...r.content, { type: 'text', text: nudge }] } as T;
 }
 
+/**
+ * Append the report-problem nudge to a failed tool result. Thin wrapper over
+ * {@link appendReportProblemNudge} that fills in whether report-problem is served on this
+ * connection, based on the caller's `tools` map; suppression by category/402 is handled inside
+ * the helper.
+ */
+export function withReportProblemNudge<T>(params: {
+    result: T;
+    tools: Map<string, ToolEntry>;
+    failingToolName: string | undefined;
+    failureCategory?: string;
+    failureHttpStatus?: number;
+}): T {
+    return appendReportProblemNudge(params.result, {
+        failingToolName: params.failingToolName,
+        available: params.tools.has(HELPER_TOOLS.PROBLEM_REPORT),
+        failureCategory: params.failureCategory,
+        failureHttpStatus: params.failureHttpStatus,
+    });
+}
+
 export const reportProblemArgsSchema = z.object({
     message: z
         .string()
