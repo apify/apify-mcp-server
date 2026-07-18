@@ -12,8 +12,8 @@ implementations, not by importing from here.
 
 - `server.ts` — `ActorsMcpServer`: tool/prompt/resource/task registration, the
   `initialize` handshake, MCP Apps capability detection, `CallToolRequest` handling.
-  Both the sync handler and the task path (`executeToolAndUpdateTask`) run the shared
-  `dispatchToolCall` switch, now in `tool_dispatch.ts`.
+  Both the sync handler and the task path (`executeToolAndUpdateTask`, now in
+  `task_execution.ts`) run the shared `dispatchToolCall` switch, in `tool_dispatch.ts`.
   Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
   a task store (the internal repo injects a Redis one) or the constructor throws.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
@@ -33,6 +33,11 @@ implementations, not by importing from here.
   the sync `CallToolRequestSchema` handler and the task path. Plain functions taking the
   `ActorsMcpServer` instance (as `apifyMcpServer`), reading `telemetryEnabled`/`telemetryEnv`
   and `options.*` off it — both are `public readonly` on `ActorsMcpServer`.
+- `task_execution.ts` — `executeToolAndUpdateTask()` / `emitTaskStatusNotification()`: the
+  long-running-task path. `executeToolAndUpdateTask()` takes the `ActorsMcpServer` instance
+  (as `apifyMcpServer`); `emitTaskStatusNotification()` takes `taskStore`/`server` directly
+  and also keeps two call sites in `server.ts` (the `tasks/cancel` handler and the pre-flight
+  `setImmediate` failure path).
 - `const.ts` — the invariant constants below (the single source for these values).
 
 ## Gotchas & invariants

@@ -2,7 +2,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { emitTaskStatusNotification } from '../../src/mcp/server.js';
+import { emitTaskStatusNotification } from '../../src/mcp/task_execution.js';
 import { getRequestHandler, withServer } from './helpers/mcp_server.js';
 
 // Helper to create a minimal TaskStore mock
