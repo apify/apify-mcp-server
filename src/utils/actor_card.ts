@@ -330,8 +330,7 @@ export type WidgetActor = {
  * Formats Actor for widget UI components.
  * Used only in OpenAI (widget) mode — search results and Actor details widgets.
  *
- * Uses complete pricing so the widget badge can pick the primary event and GOLD tier
- * the same way the public Store page does.
+ * Uses complete pricing so the widget badge can pick the primary event and match the public Store pricing badge logic.
  */
 export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: PricingTier): WidgetActor {
     const fullName = `${actor.username}/${actor.name}`;
