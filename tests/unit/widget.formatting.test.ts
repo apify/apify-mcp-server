@@ -75,7 +75,7 @@ describe('formatPricing()', () => {
                 model: 'PAY_PER_EVENT',
                 events: [{ title: 'Each tweet', priceUsd: 0.00025 }],
             }),
-        ).toBe('$0.25 / 1,000 each tweets');
+        ).toBe('$0.25 / 1,000 each tweet');
     });
 
     it('uses the event flagged isPrimaryEvent when an actor has multiple charge events', () => {
@@ -87,7 +87,7 @@ describe('formatPricing()', () => {
                     { title: 'Each tweet', priceUsd: 0.00025, isPrimaryEvent: true },
                 ],
             }),
-        ).toBe('from $0.25 / 1,000 each tweets');
+        ).toBe('from $0.25 / 1,000 each tweet');
     });
 
     it('falls back to Pay per event when multi-event PPE has no primary event', () => {
