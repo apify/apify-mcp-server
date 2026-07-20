@@ -18,7 +18,7 @@ import {
 } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
+    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name.'),
     recordKey: z.string().min(1).describe('Key of the record to retrieve.'),
 });
 
@@ -30,7 +30,8 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
     title: 'Get key-value store record',
     description: dedent`
-        Get a value stored in a key-value store under a specific key.
+        Get the value stored under a specific key in a key-value store — a single record, not a listing of all keys.
+        Use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} first if you don't know the key name.
         The response preserves the original Content-Encoding; most clients handle decompression automatically.
 
         USAGE:
