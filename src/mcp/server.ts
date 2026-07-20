@@ -73,7 +73,7 @@ import type {
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
-import { isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
+import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -1014,6 +1014,7 @@ export class ActorsMcpServer {
                     apifyToken,
                     meta,
                     requestHeaders: extra.requestInfo?.headers,
+                    requestOrigin: getRequestOriginForClient(this.options.initializeRequestData),
                 });
 
                 log.debug('Validate arguments for tool', { toolName: tool.name, mcpSessionId, input: logSafeArgs });
