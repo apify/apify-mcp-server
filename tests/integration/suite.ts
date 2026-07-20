@@ -2190,6 +2190,57 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(items![0]['math.factorial.first']).toBe(1);
                     await client.close();
                 });
+
+                it('reads dataset items via resources/read', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.readResource({
+                        uri: `https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`,
+                    });
+                    const contents = result.contents[0] as { mimeType?: string; text?: string };
+                    // The proxy passes through the API's declared Content-Type, which carries a charset
+                    // (e.g. `application/json; charset=utf-8`), so match the base type rather than the exact string.
+                    expect(contents.mimeType).toContain('application/json');
+                    // The generic proxy returns the raw API body — a bare JSON array of items.
+                    const items = JSON.parse(contents.text as string) as unknown[];
+                    expect(Array.isArray(items)).toBe(true);
+                    await client.close();
+                });
+
+                it('reads a KV record via resources/read', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.readResource({
+                        uri: `https://api.apify.com/v2/key-value-stores/${defaultKvId}/records/INPUT`,
+                    });
+                    const contents = result.contents[0] as { text?: string };
+                    expect(contents.text).toContain('firstNumber');
+                    await client.close();
+                });
+
+                it('rejects resources/read of a nonexistent dataset with a JSON-RPC error', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    await expect(
+                        client.readResource({
+                            uri: 'https://api.apify.com/v2/datasets/this-dataset-does-not-exist-xyz/items',
+                        }),
+                    ).rejects.toThrow(/Failed to read/i);
+                    await client.close();
+                });
+
+                it('rejects resources/read of a non-Apify URL with a JSON-RPC error', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    await expect(client.readResource({ uri: 'https://example.com/steal-my-token' })).rejects.toThrow(
+                        /Failed to read/i,
+                    );
+                    await client.close();
+                });
+
+                it('advertises API URL templates via resources/templates/list', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const { resourceTemplates } = await client.listResourceTemplates();
+                    const datasetItems = resourceTemplates.find((t) => t.name === 'dataset-items');
+                    expect(datasetItems?.uriTemplate).toContain('/v2/datasets/{datasetId}/items{?limit,offset,');
+                    await client.close();
+                });
             });
 
             it('rejects get-key-value-store-record when required keyValueStoreId is missing', async () => {

@@ -1,4 +1,4 @@
-import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND, MAX_INLINE_BYTES } from '../../const.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
@@ -164,4 +164,36 @@ export function buildKvsKeysSummaryNextStep(params: {
 const NORMALIZE_RECORD_KEY_REGEX = new RegExp(`^[${QUOTE_WRAPPER_CHARS}]+|[${QUOTE_WRAPPER_CHARS}]+$`, 'g');
 export function normalizeRecordKey(key: string): string {
     return key.trim().replace(NORMALIZE_RECORD_KEY_REGEX, '').trim();
+}
+
+/**
+ * How to surface a binary key-value-store record value: inline as base64 below
+ * `MAX_INLINE_BYTES`, otherwise link out (inlining a multi-MB blob would blow up the
+ * client's context). `mimeType` is the Content-Type with parameters stripped and lowercased
+ * (`Image/PNG; charset=…` → `image/png`), or `undefined` when no Content-Type was declared.
+ */
+export type BinaryRecordDisposition =
+    | { kind: 'inline'; mimeType?: string; base64: string }
+    | { kind: 'linkOut'; mimeType?: string; bytes: number };
+
+/**
+ * Base MIME type of a Content-Type header: parameters stripped, lowercased
+ * (`Image/PNG; charset=…` → `image/png`), `undefined` when no header was declared.
+ * Shared by the get-key-value-store-record tool and the API-resource proxy.
+ */
+export function parseBaseMimeType(contentType: string | undefined): string | undefined {
+    return contentType?.split(';')[0].trim().toLowerCase();
+}
+
+/**
+ * Build the transport disposition for a binary record value: normalize the MIME type, decide
+ * inline-vs-link-out at the byte threshold, base64-encode when inlining. It does NOT mint the
+ * link-out URL — the caller handles `linkOut` by minting its own URL via async calls.
+ */
+export function buildBinaryRecordDisposition(contentType: string | undefined, value: Buffer): BinaryRecordDisposition {
+    const mimeType = parseBaseMimeType(contentType);
+    if (value.length > MAX_INLINE_BYTES) {
+        return { kind: 'linkOut', ...(mimeType !== undefined && { mimeType }), bytes: value.length };
+    }
+    return { kind: 'inline', ...(mimeType !== undefined && { mimeType }), base64: value.toString('base64') };
 }

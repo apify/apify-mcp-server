@@ -12,7 +12,6 @@ import {
     buildCallActorAppsDescription,
     buildCallActorDescription,
     buildCallActorErrorResponse,
-    buildPermissionApprovalResponse,
     callActorArgs,
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
@@ -244,45 +243,6 @@ describe('call_actor_common', () => {
                 callOptions: { maxItems: -1 },
             });
             expect(result.success).toBe(false);
-        });
-    });
-
-    describe('buildPermissionApprovalResponse', () => {
-        const makeError = (approvalUrl?: string) =>
-            new ApifyApiError(
-                {
-                    data: {
-                        error: {
-                            type: 'full-permission-actor-not-approved',
-                            message:
-                                'This Actor requires full access to your account. You must approve its permissions before running it.',
-                            ...(approvalUrl ? { data: { approvalUrl } } : {}),
-                        },
-                    },
-                    status: 403,
-                } as AxiosResponse,
-                1,
-            );
-
-        it('includes the approval URL when present', () => {
-            const approvalUrl = 'https://console.apify.com/actors/abc123?approvePermissions=true';
-            const response = buildPermissionApprovalResponse(makeError(approvalUrl));
-
-            expect(response.isError).toBe(true);
-            const allText = (response.content ?? []).map(textOf).join('\n');
-            expect(allText).toContain('This Actor requires full access to your account');
-            expect(allText).toContain(approvalUrl);
-        });
-
-        it('omits the URL line when approvalUrl is missing from error.data', () => {
-            const response = buildPermissionApprovalResponse(makeError());
-
-            expect(response.isError).toBe(true);
-            expect(response.content).toHaveLength(1);
-            const firstBlock = (response.content ?? [])[0];
-            expect(firstBlock && 'text' in firstBlock ? firstBlock.text : undefined).toContain(
-                'This Actor requires full access to your account',
-            );
         });
     });
 

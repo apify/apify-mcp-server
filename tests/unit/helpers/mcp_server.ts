@@ -60,10 +60,17 @@ export async function withServer<T>(
 /** HTTP status of a full-permission-not-approved error, shared by the fabricator and its pins. */
 export const PERMISSION_HTTP_STATUS = 403;
 
+/** x402 payload as the axios interceptor decodes it from the `payment-required` header. */
+export const X402_PAYMENT_DATA = {
+    x402Version: 1,
+    accepts: [{ scheme: 'exact', network: 'base-sepolia', maxAmountRequired: '10000' }],
+};
+
 /**
  * A 402 x402 payment-required condition. Any object with `statusCode: 402` satisfies the predicate;
  * pass `paymentData` to attach the payload the production axios interceptor stores under
- * `Symbol.for('paymentRequiredData')`, so the full x402 response build is exercised.
+ * `Symbol.for('paymentRequiredData')`, so the full x402 response build is exercised. Called with no
+ * argument it yields the bare 402 (no payload).
  */
 export function makePaymentRequiredError(paymentData?: Record<string, unknown>): Error {
     return Object.assign(new Error('Payment required'), {

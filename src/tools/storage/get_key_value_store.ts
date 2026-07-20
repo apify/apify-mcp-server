@@ -12,7 +12,7 @@ import { keyValueStoreOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageResponse } from './storage_helpers.js';
 
 const getKeyValueStoreArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
+    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name.'),
 });
 
 /**
@@ -23,8 +23,8 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.KEY_VALUE_STORE_GET,
     title: 'Get key-value store',
     description: dedent`
-        Get details about a key-value store by ID or username~store-name.
-        The results will include store metadata (ID, name, owner, access settings) and usage statistics.
+        Get metadata for a key-value store — a flexible store for unstructured data or files.
+        Returns store details and usage stats, not its records — use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} to list what it holds.
 
         USAGE:
         - Use when you need to inspect a store to locate records or understand its properties.

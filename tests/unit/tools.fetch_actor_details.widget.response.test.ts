@@ -133,4 +133,18 @@ describe('fetch-actor-details-widget response', () => {
         const ok = tool.ajvValidate({ actor: 'apify/web-scraper' });
         expect(ok).toBe(true);
     });
+
+    // Regression: same fix as tools.fetch_actor_details.response.test.ts — the widget variant
+    // shares fetchActorDetails() and must not turn a 401 into the not-found response either.
+    it('propagates a 401 from fetchActorDetails instead of returning the not-found response', async () => {
+        vi.mocked(fetchActorDetails).mockRejectedValue(
+            Object.assign(new Error('Authentication token is not valid'), {
+                statusCode: 401,
+            }),
+        );
+
+        await expect(
+            (fetchActorDetailsWidget as HelperTool).call(stubInternalToolArgs({ actor: 'apify/web-scraper' })),
+        ).rejects.toMatchObject({ statusCode: 401 });
+    });
 });

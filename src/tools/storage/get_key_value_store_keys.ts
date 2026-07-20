@@ -12,12 +12,12 @@ import { keyValueStoreKeysOutputSchema } from '../structured_output_schemas.js';
 import { buildKvsKeysSummaryNextStep, buildStorageResponse, catchNotFound } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
+    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name.'),
     exclusiveStartKey: z
         .string()
         .optional()
         .describe('All keys up to this one (including) are skipped from the result.'),
-    limit: z.number().max(10).optional().describe('Number of keys to be returned. Maximum value is 10.'),
+    limit: z.number().max(10).optional().describe('Number of keys to be returned. Maximum is 10.'),
 });
 
 /**
@@ -28,8 +28,8 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
     title: 'Get key-value store keys',
     description: dedent`
-        List keys in a key-value store with optional pagination.
-        The results will include keys and basic info about stored values (e.g., size).
+        List the keys in a key-value store — key names and basic info (e.g., size), not their values.
+        Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} to read one.
         Use exclusiveStartKey and limit to paginate.
 
         USAGE:
