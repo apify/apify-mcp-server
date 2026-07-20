@@ -372,11 +372,12 @@ describe('executeToolAndUpdateTask()', () => {
 
     it('dispatches an ACTOR_MCP tool run as a task and surfaces a connect failure as a completed error result', async () => {
         // #1063 CLOSED: executeToolAndUpdateTask now dispatches ACTOR_MCP through the shared switch.
-        // makeActorMcpTool points at an unreachable serverUrl, so connectMCPClient returns null and the
+        // Stub connectMCPClient to return null — deterministic, no real network attempt — so the
         // ACTOR_MCP branch stores its connect-failure soft-fail result — a `completed` task carrying an
         // `isError` body (matching the sync path), not the old empty {} masquerading as a success.
         await withServer(async (server) => {
             silenceLogs();
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
             // The connect-failure branch logs via the transport; the harness has none, so stub it.
             vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
             const { task, result } = await runTaskAndReadBack(server, makeActorMcpTool());
