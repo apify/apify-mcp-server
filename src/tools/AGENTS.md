@@ -34,8 +34,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool
 returns, then a disambiguation line naming the sibling tool(s) it's confused with via
-`${HELPER_TOOLS.X}` (never a hardcoded name), proportional caveats, then `USAGE:` (one bullet) and
-`USAGE EXAMPLES:` (exactly two `user_input:` bullets). Match this shape when touching these files.
+`${HELPER_TOOLS.X}` (never a hardcoded name), proportional caveats, then `USAGE:` (one or more
+bullets) and `USAGE EXAMPLES:` (exactly two `user_input:` bullets). Match this shape when touching
+these files.
 
 ## Related, owned elsewhere (don't restate)
 
