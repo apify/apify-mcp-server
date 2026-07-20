@@ -39,7 +39,7 @@ const getDatasetItemsArgs = z.object({
         .int()
         .min(1)
         .optional()
-        .describe(`Maximum number of items to return. Defaults to ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
+        .describe(`Maximum number of items to return. Default is ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
     fields: z
         .string()
         .optional()
@@ -67,18 +67,16 @@ export const getDatasetItems: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.DATASET_GET_ITEMS,
     title: 'Get dataset items',
     description: dedent`
-        Retrieve dataset items with pagination, sorting, and field selection.
-        Items can be large; when you only need specific columns, pass fields to reduce response size (use ${HELPER_TOOLS.DATASET_GET} first if you don't know the field names).
-        For nested fields use dot notation (e.g., fields="metadata.url") — the server auto-flattens parent prefixes.
-        Defaults limit to ${DEFAULT_DATASET_ITEMS_LIMIT}. Use clean=true to skip empty items and hidden fields.
-
-        The results will include items along with pagination info (limit, offset) and total count.
+        Get items (rows) from a dataset — the output/results produced by an Actor run.
+        Not metadata or schema — use ${HELPER_TOOLS.DATASET_GET} for counts and the field list, ${HELPER_TOOLS.DATASET_SCHEMA_GET} for a JSON schema from a sample.
+        When the user provides a datasetId and asks to retrieve results, output, data, or rows, call this tool directly — do not call ${HELPER_TOOLS.DATASET_GET} first.
+        Default limit is ${DEFAULT_DATASET_ITEMS_LIMIT}. Use clean=true to skip empty items and hidden fields.
 
         USAGE:
         - Use when you need to read data from a dataset (all items or only selected fields).
 
         USAGE EXAMPLES:
-        - user_input: Get first 20 items from dataset abd123
+        - user_input: Retrieve results from dataset abc123
         - user_input: Get only metadata.url and title from dataset username~my-dataset`,
     inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,

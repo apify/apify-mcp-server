@@ -725,6 +725,26 @@ export class ActorsMcpServer {
         });
     }
 
+    /**
+     * Token sources in order: per-request `_meta.apifyToken` (stdio inline) > server-instance
+     * option (set by the transport from `Authorization` header or stdio env). No env fallback:
+     * dev_server / production must extract the token from request headers so payment
+     * mode (no token) behaves identically to production.
+     */
+    private resolveApifyToken(meta?: ApifyRequestParams['_meta']): string | undefined {
+        return meta?.apifyToken || this.options.token;
+    }
+
+    /**
+     * Token-scoped client for resources/read (the API proxy needs auth). Deliberately token-only:
+     * unlike the CallTool path it does NOT forward provider/payment headers, so a payment-only
+     * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
+     */
+    private resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
+        const token = this.resolveApifyToken(params._meta);
+        return token ? new ApifyClient({ token }) : undefined;
+    }
+
     private setupResourceHandlers(): void {
         const resourceService = createResourceService({
             paymentProvider: this.options.paymentProvider,
@@ -737,7 +757,10 @@ export class ActorsMcpServer {
         });
 
         this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-            return await resourceService.readResource(request.params.uri);
+            return await resourceService.readResource(
+                request.params.uri,
+                this.resolveApifyClient(request.params as ApifyRequestParams),
+            );
         });
 
         this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
@@ -909,12 +932,7 @@ export class ActorsMcpServer {
             // eslint-disable-next-line prefer-const
             let { name, arguments: args, _meta: meta } = params;
             const progressToken = meta?.progressToken;
-            const metaApifyToken = meta?.apifyToken;
-            // Token sources in order: per-request `_meta.apifyToken` (stdio inline) > server-instance
-            // option (set by the transport from `Authorization` header or stdio env). No env fallback:
-            // dev_server / production must extract the token from request headers so payment
-            // mode (no token) behaves identically to production.
-            const apifyToken = (metaApifyToken || this.options.token) as string;
+            const apifyToken = this.resolveApifyToken(meta) as string;
             // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = meta?.mcpSessionId;
             if (!mcpSessionId) {
@@ -1436,8 +1454,9 @@ export class ActorsMcpServer {
      * INTERNAL and ACTOR execution errors propagate to the caller's catch; the ACTOR_MCP case keeps its
      * own inner catch and returns a soft-fail result instead of throwing.
      *
-     * `extractToolTelemetry` runs once here (INTERNAL case) and strips `toolTelemetry` in place, so
-     * callers must not re-strip. The caller constructs `progressTracker`; dispatch consumes it and stops
+     * `extractToolTelemetry` (via `applyToolTelemetry`) runs once here, in the INTERNAL and ACTOR
+     * cases, and strips `toolTelemetry` in place, so callers must not re-strip. ACTOR_MCP sets
+     * telemetry manually instead. The caller constructs `progressTracker`; dispatch consumes it and stops
      * it in the branch `finally`. The abort source is `extra.signal`: the request signal for sync; the
      * task caller passes a `taskExtra` whose `signal` is the cancel watcher's, so a client disconnect
      * never cancels a task. `shouldForwardNotifications` gates only the ACTOR_MCP raw-notification
@@ -1515,6 +1534,11 @@ export class ActorsMcpServer {
             }
 
             case TOOL_TYPE.ACTOR_MCP: {
+                // This case never throws: connect/exec failures resolve to a soft-fail `result`
+                // (isError body) below instead. As a task, that means the outer completeTask
+                // stores it via the 'completed' path (isError body) — deliberately matching sync's
+                // own soft-fail semantics, unlike ACTOR/INTERNAL, whose thrown errors land in the
+                // task caller's 'failed' path.
                 let client: Client | null = null;
                 try {
                     client = await connectMCPClient(tool.serverUrl, apifyToken, mcpSessionId);
@@ -1658,8 +1682,9 @@ export class ActorsMcpServer {
             default:
                 // Exhaustiveness guard mirroring getToolFullName: a new TOOL_TYPE member makes `tool`
                 // non-`never` here and fails `satisfies never` at compile time. Unreachable at runtime —
-                // ToolEntry is a closed 3-way union — but if forced via untyped injection, reject like
-                // the pre-extraction ladder did instead of returning the tool definition to the client.
+                // ToolEntry is a closed 3-way union. Unlike the pre-extraction fall-through (which also
+                // listed available tools, called log.softFail, and sent a logging message before
+                // throwing), this just throws InvalidParams with no side effects.
                 throw new McpError(
                     ErrorCode.InvalidParams,
                     `Unknown tool type "${(tool satisfies never as ToolEntry).type}"`,
@@ -1824,14 +1849,13 @@ export class ActorsMcpServer {
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
             };
 
-            // Task mode always constructs a progress tracker (taskId + onStatusMessage), unlike the
-            // sync opt-in path. Dispatch consumes and stops it; the ACTOR_MCP case ignores it.
-            const progressTracker = createProgressTracker(
-                progressToken,
-                extra.sendNotification,
-                taskId,
-                onStatusMessage,
-            );
+            // ACTOR_MCP never reads the tracker (matching the sync path, which passes null for it);
+            // INTERNAL/ACTOR get one built from taskId + onStatusMessage, which dispatch consumes
+            // and stops.
+            const progressTracker =
+                tool.type === TOOL_TYPE.ACTOR_MCP
+                    ? null
+                    : createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
             const dispatchResult = await this.dispatchToolCall({
                 tool,
                 toolArgs,
