@@ -108,12 +108,14 @@ export async function fetchActorDetails(
             readmeSummary: actorInfo.readmeSummary,
         };
     } catch (error) {
-        logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
         // 404/400 is a genuine "Actor doesn't exist" — same treatment as the not-found check
         // above. Anything else (401/403/5xx) must propagate: it's a different failure class
         // (e.g. invalid token) the caller should surface as such, not as "not found".
         const statusCode = getHttpStatusCode(error);
-        if (statusCode === 404 || statusCode === 400) return null;
+        if (statusCode === 404 || statusCode === 400) {
+            logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
+            return null;
+        }
         throw error;
     }
 }
