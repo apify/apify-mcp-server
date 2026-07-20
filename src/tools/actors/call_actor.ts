@@ -1,6 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { ContentBlock } from '@modelcontextprotocol/sdk/types.js';
-import type { ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -33,12 +32,12 @@ import { wrapJsonText } from '../../utils/encode_text.js';
 import { logHttpError } from '../../utils/logging.js';
 import {
     respondAborted,
-    respondErrorNoTelemetry,
     respondRaw,
     respondServerError,
     respondUserError,
     type ToolResponse,
 } from '../../utils/mcp.js';
+import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
@@ -127,17 +126,6 @@ export function buildCallActorDescription(): string {
 
 export function buildCallActorAppsDescription(): string {
     return buildCallActorDescriptionSections(true);
-}
-
-/** Text lines for a permission-approval response: the error message plus an optional approval URL. */
-function buildPermissionApprovalTexts(error: ApifyApiError): string[] {
-    const approvalUrl = typeof error.data?.approvalUrl === 'string' ? error.data.approvalUrl : undefined;
-    return [error.message, ...(approvalUrl ? [`Approve here: ${approvalUrl}`] : [])];
-}
-
-/** Exported for native actor tool error handling in server.ts — no logging, no telemetry. */
-export function buildPermissionApprovalResponse(error: ApifyApiError): ToolResponse {
-    return respondErrorNoTelemetry(buildPermissionApprovalTexts(error));
 }
 
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ToolResponse {

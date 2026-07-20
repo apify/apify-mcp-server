@@ -1,6 +1,9 @@
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
+import { ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
 
 import type { ALLOWED_TASK_TOOL_EXECUTION_MODES } from '../../../src/const.js';
+import { APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED } from '../../../src/const.js';
 import { ActorsMcpServer } from '../../../src/mcp/server.js';
 import type { ActorsMcpServerOptions, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../../src/types.js';
 import { TOOL_TYPE } from '../../../src/types.js';
@@ -52,6 +55,39 @@ export async function withServer<T>(
     } finally {
         await server.close();
     }
+}
+
+/** HTTP status of a full-permission-not-approved error, shared by the fabricator and its pins. */
+export const PERMISSION_HTTP_STATUS = 403;
+
+/** x402 payload as the axios interceptor decodes it from the `payment-required` header. */
+export const X402_PAYMENT_DATA = {
+    x402Version: 1,
+    accepts: [{ scheme: 'exact', network: 'base-sepolia', maxAmountRequired: '10000' }],
+};
+
+/**
+ * A 402 x402 payment-required condition. Any object with `statusCode: 402` satisfies the predicate;
+ * pass `paymentData` to attach the payload the production axios interceptor stores under
+ * `Symbol.for('paymentRequiredData')`, so the full x402 response build is exercised. Called with no
+ * argument it yields the bare 402 (no payload).
+ */
+export function makePaymentRequiredError(paymentData?: Record<string, unknown>): Error {
+    return Object.assign(new Error('Payment required'), {
+        statusCode: 402,
+        ...(paymentData ? { [Symbol.for('paymentRequiredData')]: paymentData } : {}),
+    });
+}
+
+/** A real full-permission-not-approved `ApifyApiError`, built against the src/const.ts type constant. */
+export function makePermissionApprovalError(): ApifyApiError {
+    return new ApifyApiError(
+        {
+            data: { error: { type: APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED, message: 'needs approval' } },
+            status: PERMISSION_HTTP_STATUS,
+        } as AxiosResponse,
+        1,
+    );
 }
 
 /**

@@ -1,12 +1,18 @@
 /**
- * Tests for `buildPaymentRequiredResponse` — covers the x402 MCP transport spec
- * requirement that PaymentRequired payloads land in both `structuredContent`
- * (preferred) and `content[0].text` as JSON (fallback). See coinbase/x402
- * `specs/transports-v2/mcp.md`.
+ * Tests for the payment/approval error-response builders. `buildPaymentRequiredResponse` covers the
+ * x402 MCP transport spec requirement that PaymentRequired payloads land in both `structuredContent`
+ * (preferred) and `content[0].text` as JSON (fallback). See coinbase/x402 `specs/transports-v2/mcp.md`.
  */
+import { ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
-import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../../src/utils/payment_errors.js';
+import {
+    buildPaymentRequiredResponse,
+    buildPermissionApprovalResponse,
+    isX402PaymentRequiredError,
+} from '../../src/utils/payment_errors.js';
+import { textOf } from './helpers/tool_context.js';
 
 const SAMPLE_PAYMENT_REQUIRED = {
     x402Version: 2,
@@ -57,5 +63,44 @@ describe('buildPaymentRequiredResponse()', () => {
         expect(result.isError).toBe(true);
         expect(result.structuredContent).toBeUndefined();
         expect(result.content).toEqual([{ type: 'text', text: 'plain string error' }]);
+    });
+});
+
+describe('buildPermissionApprovalResponse()', () => {
+    const makeError = (approvalUrl?: string) =>
+        new ApifyApiError(
+            {
+                data: {
+                    error: {
+                        type: 'full-permission-actor-not-approved',
+                        message:
+                            'This Actor requires full access to your account. You must approve its permissions before running it.',
+                        ...(approvalUrl ? { data: { approvalUrl } } : {}),
+                    },
+                },
+                status: 403,
+            } as AxiosResponse,
+            1,
+        );
+
+    it('includes the approval URL when present', () => {
+        const approvalUrl = 'https://console.apify.com/actors/abc123?approvePermissions=true';
+        const response = buildPermissionApprovalResponse(makeError(approvalUrl));
+
+        expect(response.isError).toBe(true);
+        const allText = (response.content ?? []).map(textOf).join('\n');
+        expect(allText).toContain('This Actor requires full access to your account');
+        expect(allText).toContain(approvalUrl);
+    });
+
+    it('omits the URL line when approvalUrl is missing from error.data', () => {
+        const response = buildPermissionApprovalResponse(makeError());
+
+        expect(response.isError).toBe(true);
+        expect(response.content).toHaveLength(1);
+        const firstBlock = (response.content ?? [])[0];
+        expect(firstBlock && 'text' in firstBlock ? firstBlock.text : undefined).toContain(
+            'This Actor requires full access to your account',
+        );
     });
 });

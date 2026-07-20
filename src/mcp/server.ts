@@ -67,7 +67,7 @@ import { buildReportedProblemProperties, getTelemetryEnv, trackReportedProblem, 
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
-import { buildPermissionApprovalResponse, checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
+import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { appendReportProblemNudge } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorsAsToolsResult } from '../tools/index.js';
@@ -84,16 +84,11 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
-import { isPermissionApprovalError, remoteMcpFailureDetail } from '../utils/apify_errors.js';
-import { getHttpStatusCode, isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
-import {
-    computeToolResponseBytes,
-    getToolCallErrorUserText,
-    respondErrorNoTelemetry,
-    respondOk,
-} from '../utils/mcp.js';
+import { remoteMcpFailureDetail } from '../utils/apify_errors.js';
+import { isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
+import { computeToolResponseBytes, respondErrorNoTelemetry, respondOk } from '../utils/mcp.js';
 import { isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
-import { buildPaymentRequiredResponse, isX402PaymentRequiredError } from '../utils/payment_errors.js';
+import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
@@ -116,6 +111,7 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
+import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import {
     createTaskCancellationWatcher,
     isTaskCancelled,
@@ -1441,53 +1437,49 @@ export class ActorsMcpServer {
                 // If we reached here without returning, it means the tool type was not recognized (user error)
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
             } catch (error) {
-                const httpStatus = getHttpStatusCode(error);
-
-                // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
-                // content[0].text (JSON) + isError: true. The concurrent-run limit falls through
-                // to the run-limit message below.
-                if (isX402PaymentRequiredError(error)) {
-                    toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    callDiagnostics = {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        failure_http_status: 402,
-                        ...buildActorFields(actorName, actorId),
-                    };
-                    return captureResult(buildPaymentRequiredResponse(error));
-                }
-
-                if (isPermissionApprovalError(error)) {
-                    toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    callDiagnostics = {
-                        failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
-                        failure_http_status: error.statusCode,
-                        ...buildActorFields(actorName, actorId),
-                    };
-                    logHttpError(error, 'Permission approval required while calling tool', {
-                        toolName: name,
-                        mcpSessionId,
-                    });
-                    return captureResult(buildPermissionApprovalResponse(error));
-                }
-
                 // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
                 // returns them as JSON-RPC errors. failInvalidParams already set callDiagnostics
                 // with the correct semantic category (e.g. AUTH), so we must not overwrite it.
+                // Re-throwing first is order-equivalent only because no McpError with an HTTP-range
+                // code reaches this catch: an McpError(402) WOULD satisfy the x402 predicate
+                // (getHttpStatusCode falls through to `.code`), but every remote-McpError route is
+                // sealed by its own inner catch before reaching here, and all in-repo McpErrors use
+                // negative ErrorCode.* values.
                 if (error instanceof McpError) {
                     throw error;
                 }
 
-                toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
-                const failureDetail =
-                    error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+                const errorResult = buildToolCallErrorResult(error, {
+                    toolName: name,
+                    actorName,
+                    actorId,
+                    isAborted: Boolean(extra.signal?.aborted),
+                });
+                toolStatus = errorResult.toolStatus;
+
+                // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
+                // content[0].text (JSON) + isError: true. No log here (unlike the task path). The
+                // concurrent-run limit also surfaces as 402 but is excluded by the predicate and
+                // falls through to the generic run-limit handling below.
+                if (errorResult.kind === TOOL_CALL_ERROR_KIND.PAYMENT) {
+                    callDiagnostics = errorResult.callDiagnostics;
+                    return captureResult(errorResult.response);
+                }
+
+                if (errorResult.kind === TOOL_CALL_ERROR_KIND.APPROVAL) {
+                    callDiagnostics = errorResult.callDiagnostics;
+                    logHttpError(error, 'Permission approval required while calling tool', {
+                        toolName: name,
+                        mcpSessionId,
+                    });
+                    return captureResult(errorResult.response);
+                }
+
                 callDiagnostics = {
                     // Spread existing diagnostics first (e.g. validation_keyword from failInvalidParams),
-                    // then overwrite with freshly computed fields so they take precedence.
+                    // then overwrite with the mapper's freshly computed fields so they take precedence.
                     ...callDiagnostics,
-                    failure_category: classifyFailureCategory(error),
-                    ...(httpStatus !== undefined ? { failure_http_status: httpStatus } : {}),
-                    failure_detail: failureDetail,
-                    ...buildActorFields(actorName, actorId),
+                    ...errorResult.callDiagnostics,
                 };
 
                 logHttpError(error, 'Error occurred while calling tool', {
@@ -1507,7 +1499,7 @@ export class ActorsMcpServer {
                 // reuse the local ABORTED-aware toolStatus, do NOT re-derive from the error (which
                 // would drop ABORTED and leak failureCategory/failureHttpStatus onto the wire).
                 return captureResult({
-                    ...respondOk(getToolCallErrorUserText(name, error)),
+                    ...respondOk(errorResult.userText),
                     isError: true,
                     toolTelemetry: { toolStatus },
                 });
@@ -1877,9 +1869,15 @@ export class ActorsMcpServer {
                 return;
             }
 
+            const errorResult = buildToolCallErrorResult(error, {
+                toolName: tool.name,
+                actorName,
+                actorId,
+                isAborted: Boolean(cancelWatcher.signal.aborted),
+            });
+
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
-            const httpStatus = getHttpStatusCode(error);
-            if (isX402PaymentRequiredError(error)) {
+            if (errorResult.kind === TOOL_CALL_ERROR_KIND.PAYMENT) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this 402.
@@ -1889,29 +1887,20 @@ export class ActorsMcpServer {
                     })
                 )
                     return;
-                const paymentResponse = buildPaymentRequiredResponse(error);
                 await storeTaskResultOrSkipIfExpired(
                     this.taskStore,
                     tool.name,
                     taskId,
                     'completed',
-                    paymentResponse,
+                    errorResult.response,
                     mcpSessionId,
                 );
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-                finishTaskTracking(
-                    TOOL_STATUS.SOFT_FAIL,
-                    {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        failure_http_status: 402,
-                        ...buildActorFields(actorName, actorId),
-                    },
-                    paymentResponse,
-                );
+                finishTaskTracking(errorResult.toolStatus, errorResult.callDiagnostics, errorResult.response);
                 return;
             }
 
-            if (isPermissionApprovalError(error)) {
+            if (errorResult.kind === TOOL_CALL_ERROR_KIND.APPROVAL) {
                 logHttpError(error, 'Permission approval required while calling tool (task mode)', {
                     toolName: tool.name,
                 });
@@ -1923,36 +1912,21 @@ export class ActorsMcpServer {
                     })
                 )
                     return;
-                const approvalResponse = buildPermissionApprovalResponse(error);
                 await storeTaskResultOrSkipIfExpired(
                     this.taskStore,
                     tool.name,
                     taskId,
                     'completed',
-                    approvalResponse,
+                    errorResult.response,
                     mcpSessionId,
                 );
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-                finishTaskTracking(
-                    TOOL_STATUS.SOFT_FAIL,
-                    {
-                        failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
-                        failure_http_status: error.statusCode,
-                        ...buildActorFields(actorName, actorId),
-                    },
-                    approvalResponse,
-                );
+                finishTaskTracking(errorResult.toolStatus, errorResult.callDiagnostics, errorResult.response);
                 return;
             }
 
-            toolStatus = getToolStatusFromError(error, Boolean(cancelWatcher.signal.aborted));
-            const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
-            callDiagnostics = {
-                failure_category: classifyFailureCategory(error),
-                ...(httpStatus !== undefined ? { failure_http_status: httpStatus } : {}),
-                failure_detail: failureDetail,
-                ...buildActorFields(actorName, actorId),
-            };
+            toolStatus = errorResult.toolStatus;
+            callDiagnostics = errorResult.callDiagnostics;
             // Log level follows the already-classified toolStatus:
             //   SOFT_FAIL (e.g. 402/403 user quota, client-side issues) → softFail
             //   FAILED/ABORTED/other                                    → error
@@ -1981,7 +1955,7 @@ export class ActorsMcpServer {
                     error,
                 });
             }
-            const userText = getToolCallErrorUserText(tool.name, error);
+            const { userText } = errorResult;
 
             // Check if task was cancelled before storing result
             if (await skipIfTaskCancelled(', skipping result storage', toolStatus, callDiagnostics)) return;

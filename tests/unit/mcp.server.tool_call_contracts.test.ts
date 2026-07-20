@@ -1,16 +1,9 @@
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
-import {
-    APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
-    FAILURE_CATEGORY,
-    HELPER_TOOLS,
-    TOOL_STATUS,
-} from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
 import * as telemetry from '../../src/telemetry.js';
@@ -18,56 +11,31 @@ import * as callActor from '../../src/tools/actors/call_actor.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
-import { getRequestHandler, makeRecorderTool, makeThrowingTool, withServer } from './helpers/mcp_server.js';
+import {
+    getRequestHandler,
+    makePaymentRequiredError,
+    makePermissionApprovalError,
+    makeRecorderTool,
+    makeThrowingTool,
+    PERMISSION_HTTP_STATUS,
+    withServer,
+    X402_PAYMENT_DATA,
+} from './helpers/mcp_server.js';
 
 /**
- * Pins the handler-level behavior contracts the sync `CallToolRequestSchema` catch and the
- * `executeToolAndUpdateTask` catch must share. Failure classes are fabricated by throwing from a
- * fake tool's `call`; both the sync path (result shapes) and the task path (terminal status
- * mapping) assert the same source-of-truth per class.
+ * Pins the handler-level behavior contracts for the two catch paths (the sync
+ * `CallToolRequestSchema` catch and the `executeToolAndUpdateTask` catch). Both catches now share
+ * error classification via `buildToolCallErrorResult`; #658 will still unify the two sinks
+ * themselves. Failure classes are fabricated by throwing from a fake tool's `call`; both the sync
+ * path (result shapes) and the task path (terminal status mapping) assert the same source-of-truth
+ * per class.
  */
-
-const PERMISSION_HTTP_STATUS = 403;
-
-/** x402 payload as the axios interceptor decodes it from the `payment-required` header. */
-const X402_PAYMENT_DATA = {
-    x402Version: 1,
-    accepts: [{ scheme: 'exact', network: 'base-sepolia', maxAmountRequired: '10000' }],
-};
 
 /** The wire `content` `buildPaymentRequiredResponse` produces for X402_PAYMENT_DATA. */
 const X402_RESPONSE_CONTENT = [
     { type: 'text', text: JSON.stringify(X402_PAYMENT_DATA) },
     { type: 'text', text: 'Payment required to run this Actor or access this resource.' },
 ];
-
-/**
- * A 402 x402 payment-required condition. Any object with `statusCode: 402` satisfies the predicate;
- * the payment payload rides the same `Symbol.for('paymentRequiredData')` property the production
- * axios interceptor attaches, so the handler exercises the full x402 response build.
- */
-function makePaymentRequiredError(): Error {
-    return Object.assign(new Error('Payment required'), {
-        statusCode: 402,
-        [Symbol.for('paymentRequiredData')]: X402_PAYMENT_DATA,
-    });
-}
-
-/** A 402 with no captured payment payload — exercises the message-only fallback branch. */
-function makeBarePaymentRequiredError(): Error {
-    return Object.assign(new Error('Payment required'), { statusCode: 402 });
-}
-
-/** A real full-permission-not-approved `ApifyApiError`, built against the src/const.ts type constant. */
-function makePermissionApprovalError(): ApifyApiError {
-    return new ApifyApiError(
-        {
-            data: { error: { type: APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED, message: 'needs approval' } },
-            status: PERMISSION_HTTP_STATUS,
-        } as AxiosResponse,
-        1,
-    );
-}
 
 type FailureClass = {
     label: string;
@@ -83,7 +51,7 @@ type FailureClass = {
 const FAILURE_CLASSES: FailureClass[] = [
     {
         label: '402 payment-required',
-        makeError: makePaymentRequiredError,
+        makeError: () => makePaymentRequiredError(X402_PAYMENT_DATA),
         taskStatus: 'completed',
         storedResult: { content: X402_RESPONSE_CONTENT, isError: true, structuredContent: X402_PAYMENT_DATA },
         telemetry: {
@@ -231,7 +199,10 @@ describe('CallToolRequestSchema handler', () => {
         it('returns the x402 payment-required response shape for a 402 failure', async () => {
             await withServer(async (server) => {
                 silenceLogs();
-                const result = await runSync(server, makeThrowingTool({ error: makePaymentRequiredError() }));
+                const result = await runSync(
+                    server,
+                    makeThrowingTool({ error: makePaymentRequiredError(X402_PAYMENT_DATA) }),
+                );
                 expect(result.isError).toBe(true);
                 // Per the x402 MCP transport spec the payload rides both structuredContent and
                 // content[0].text as JSON — payment clients parse these; pin both exactly.
@@ -246,7 +217,7 @@ describe('CallToolRequestSchema handler', () => {
         it('returns the message-only payment-required response for a 402 without payment data', async () => {
             await withServer(async (server) => {
                 silenceLogs();
-                const result = await runSync(server, makeThrowingTool({ error: makeBarePaymentRequiredError() }));
+                const result = await runSync(server, makeThrowingTool({ error: makePaymentRequiredError() }));
                 expect(result.isError).toBe(true);
                 expect(result.content).toEqual([{ type: 'text', text: 'Payment required' }]);
                 expect(result.structuredContent).toBeUndefined();
@@ -362,10 +333,11 @@ describe('executeToolAndUpdateTask()', () => {
     });
 
     describe('task-call telemetry properties per failure class', () => {
-        // Same seam and per-class expectations as the sync block: the task catch builds its
-        // callDiagnostics via its own duplicated inline logic, so pin it separately. Telemetry fires
-        // once via finishTaskTracking; the emitted properties carry no task-specific key (taskId
-        // appears only in the log line, not in the Segment properties).
+        // Same seam and per-class expectations as the sync block: the task catch assigns
+        // callDiagnostics from the shared mapper's result via a flat overwrite, unlike the sync
+        // path's spread-merge onto a pre-existing object, so pin it separately. Telemetry fires once
+        // via finishTaskTracking; the emitted properties carry no task-specific key (taskId appears
+        // only in the log line, not in the Segment properties).
         for (const fc of FAILURE_CLASSES) {
             it(`emits telemetry properties for a ${fc.label} failure in task mode`, async () => {
                 const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
@@ -397,9 +369,10 @@ describe('executeToolAndUpdateTask()', () => {
     });
 
     it('stores an empty {} completed result for an ACTOR_MCP tool in task mode', async () => {
-        // KNOWN GAP: executeToolAndUpdateTask has no ACTOR_MCP dispatch branch, so `result` stays the
-        // initial {} and is stored as `completed`. This pins today's buggy behavior — if that branch
-        // is added, update this test to assert the real result instead of {}.
+        // KNOWN GAP (#1063): executeToolAndUpdateTask has no ACTOR_MCP dispatch branch, so `result`
+        // stays the initial {} and is stored as `completed`. This pins today's buggy behavior. FLIP
+        // WHEN #1063 LANDS: the task path will then dispatch the ACTOR_MCP tool and store a real
+        // result, so update this test to assert that result instead of {}.
         await withServer(async (server) => {
             silenceLogs();
             const { task, result } = await runTaskAndReadBack(server, makeActorMcpTool());
@@ -460,7 +433,9 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
 
     /** Flush the setImmediate-deferred status notification (emitted after the response). */
     async function flushDeferredNotification(): Promise<void> {
-        await new Promise((resolve) => setImmediate(resolve));
+        await new Promise((resolve) => {
+            setImmediate(resolve);
+        });
     }
 
     it('resolves a payment pre-flight failure as a terminal completed task, one completed notification', async () => {
