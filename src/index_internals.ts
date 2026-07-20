@@ -30,9 +30,9 @@ export {
     actorNameToToolName,
     defaults,
     getDefaultTools,
-    /**
-     * @deprecated Use `addActor` instead. Kept for the apify-mcp-server-internal migration; remove once it no longer imports `addTool`.
-     */
+/**
+ * @deprecated Backward-compat alias for the `addActor` tool entry. Kept for the apify-mcp-server-internal migration; remove once it no longer imports `addTool`.
+ */
     addActor as addTool,
     getCategoryTools,
     type ActorStore,
