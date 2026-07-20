@@ -470,9 +470,6 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
         await new Promise((resolve) => {
             setImmediate(resolve);
         });
-        await new Promise((resolve) => {
-            setImmediate(resolve);
-        });
     }
 
     it('resolves a payment pre-flight failure as a terminal completed task, one completed notification', async () => {
