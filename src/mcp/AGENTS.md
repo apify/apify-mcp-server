@@ -23,7 +23,9 @@ implementations, not by importing from here.
 - `tool_call_error_mapper.ts` — `buildToolCallErrorResult()`: pure classifier both
   `server.ts` tool-call catches share. Maps an error to a `kind: 'payment' | 'approval'
   | 'execution'` result (status, diagnostics, response/userText). Never throws, logs,
-  or writes the store — the catch blocks own logging, store writes, and wire wrapping.
+  or writes the store — the catch blocks own logging and store writes. For payment/approval
+  the mapper returns the ready-to-send `response`; the catch builds the wire result only for
+  the execution `userText`.
 - `tool_dispatch.ts` — `dispatchToolCall()`: the single exhaustive `switch (tool.type)`
   (INTERNAL / ACTOR_MCP / ACTOR) both the sync handler and the task path run. Plain
   function taking the `ActorsMcpServer` instance; touches no class state beyond `.server`.

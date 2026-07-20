@@ -270,18 +270,23 @@ export function computeToolResponseBytes(result: unknown): {
     return { contentBytes, structuredContentBytes, fileBytes };
 }
 
+/**
+ * Actionable hint for an HTTP failure status, or `undefined` when the status carries no specific
+ * remedy. Shared by the tool-call and resources/read error paths so both differentiate auth failures
+ * the same way (the model's only lever is the text it gets back).
+ */
+export function getHttpErrorHint(status: number | undefined): string | undefined {
+    if (status === 403) return 'The resource may be private or your token may lack access.';
+    if (status === 401) return 'Authentication failed, check APIFY_TOKEN is set and valid.';
+    return undefined;
+}
+
 /** User-facing error text for tool execution failures with HTTP-aware hints. */
 export function getToolCallErrorUserText(toolName: string, error: unknown): string {
     const msg = error instanceof Error ? error.message : String(error);
-    const status = getHttpStatusCode(error);
     if (isActorRunLimitError(error)) {
         return `Error calling tool "${toolName}": ${msg}. ${ACTOR_RUN_LIMIT_MESSAGE}`;
     }
-    if (status === 403) {
-        return `Error calling tool "${toolName}": ${msg}. The resource may be private or your token may lack access.`;
-    }
-    if (status === 401) {
-        return `Error calling tool "${toolName}": ${msg}. Authentication failed — check APIFY_TOKEN is set and valid.`;
-    }
-    return `Error calling tool "${toolName}": ${msg}. Verify the tool name and input parameters.`;
+    const hint = getHttpErrorHint(getHttpStatusCode(error)) ?? 'Verify the tool name and input parameters.';
+    return `Error calling tool "${toolName}": ${msg}. ${hint}`;
 }

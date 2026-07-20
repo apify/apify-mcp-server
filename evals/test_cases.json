@@ -1,5 +1,5 @@
 {
-  "version": "1.7",
+  "version": "1.9",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
@@ -167,7 +167,7 @@
     {
       "id": "rag-web-browser-1",
       "category": "apify--rag-web-browser",
-      "query": "Find recent articles about AI from tech blogs",
+      "query": "Get recent articles about AI from tech blogs",
       "expectedTools": ["apify--rag-web-browser"]
     },
     {
@@ -211,7 +211,7 @@
     {
       "id": "search-vs-rag-3",
       "category": "apify--rag-web-browser",
-      "query": "Find recent AI articles on tech blogs",
+      "query": "Get recent AI articles on tech blogs",
       "expectedTools": ["apify--rag-web-browser"]
     },
     {
@@ -254,7 +254,7 @@
     {
       "id": "search-vs-rag-9",
       "category": "apify--rag-web-browser",
-      "query": "Look for news articles on AI",
+      "query": "Fetch current news articles on AI",
       "expectedTools": ["apify--rag-web-browser"]
     },
     {
@@ -284,7 +284,7 @@
     {
       "id": "search-apify-docs-4",
       "category": "search-apify-docs",
-      "query": "Is there is a documentation for MCP server",
+      "query": "Is there documentation for the Apify MCP server?",
       "expectedTools": ["search-apify-docs"]
     },
     {
@@ -296,7 +296,7 @@
     {
       "id": "search-apify-docs-6",
       "category": "search-apify-docs",
-      "query": "Web scraping with Crawlee",
+      "query": "How to do web scraping with Crawlee in the Apify docs",
       "expectedTools": ["search-apify-docs"]
     },
     {
@@ -362,7 +362,7 @@
     {
       "id": "get-dataset-items-3",
       "category": "get-dataset-items",
-      "query": "Show me the data from my Instagram scraper run with datasetId d23d2, ",
+      "query": "Show me the data from my Instagram scraper run with datasetId d23d2",
       "expectedTools": ["get-dataset-items"]
     },
     {
@@ -411,7 +411,7 @@
     {
       "id": "misleading-query-3",
       "category": "search-apify-docs",
-      "query": "I need to build my own Apify Actor from scratch",
+      "query": "How do I build my own Apify Actor from scratch?",
       "expectedTools": ["search-apify-docs"]
     },
     {
@@ -436,7 +436,7 @@
     {
       "id": "tool-selection-confusion-2",
       "category": "tool-selection",
-      "query": "Find recent AI articles on tech blogs",
+      "query": "Get recent AI articles on tech blogs",
       "expectedTools": ["apify--rag-web-browser"]
     },
     {
@@ -484,8 +484,8 @@
       "id": "get-dataset-3",
       "category": "get-dataset",
       "query": "What fields does dataset UvsU contain?",
-      "expectedTools": ["get-dataset", "get-dataset-schema"],
-      "reference": "Listing the fields of a dataset is metadata. Use get-dataset or get-dataset-schema to infer the JSON schema."
+      "expectedTools": ["get-dataset"],
+      "reference": "Listing the fields of a dataset is metadata. Use get-dataset."
     },
     {
       "id": "get-dataset-schema-1",

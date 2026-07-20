@@ -11,24 +11,22 @@ import { buildStorageListSummaryNextStep, buildStorageResponse } from './storage
 const getUserKeyValueStoresListArgs = z.object({
     offset: z
         .number()
-        .describe('Number of array elements that should be skipped at the start. The default is 0.')
+        .describe('Number of array elements that should be skipped at the start. Default is 0.')
         .default(0),
     limit: z
         .number()
         .max(10)
-        .describe('Maximum number of array elements to return. The default value (and maximum) is 10.')
+        .describe('Maximum number of array elements to return. Default is 10. Maximum is 10.')
         .default(10),
     desc: z
         .boolean()
         .describe(
-            'If true or 1 then the stores are sorted by the createdAt field in descending order. Default: sorted in ascending order.',
+            'If true or 1 then the stores are sorted by the createdAt field in descending order. Default is false (ascending order).',
         )
         .default(false),
     unnamed: z
         .boolean()
-        .describe(
-            'If true or 1 then all the stores are returned. By default, only named key-value stores are returned.',
-        )
+        .describe('If true or 1 then all the stores are returned. Default is false (named key-value stores only).')
         .default(false),
 });
 
@@ -40,11 +38,10 @@ export const getKeyValueStoreList: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
     title: 'Get user key-value stores list',
     description: dedent`
-        List key-value stores owned by the authenticated user.
-        Actor runs automatically produce unnamed stores (set unnamed=true to include them). Users can also create named stores.
-
-        The results will include basic info for each store, sorted by createdAt (ascending by default).
-        Use limit, offset, and desc to paginate and sort.
+        List the key-value stores owned by the authenticated user — flexible storage for unstructured data or files.
+        Returns summaries only, not their contents — use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} to inspect one from the list.
+        Actor runs automatically produce unnamed stores (set unnamed=true to include them); users can also create named stores.
+        Sorted by createdAt (ascending by default); use limit, offset, and desc to paginate and sort.
 
         USAGE:
         - Use when you need to browse available key-value stores (named or unnamed).

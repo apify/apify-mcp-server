@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.11.7 - **not yet released**
+
+### 🚀 Features
+
+- Storage as resources ([#1003](https://github.com/apify/apify-mcp-server/pull/1003)) ([b46668b](https://github.com/apify/apify-mcp-server/commit/b46668bd98a14e776e6e86ecb2e6f0d43d86dbd5)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Unify storage tool descriptions (#885) ([#1089](https://github.com/apify/apify-mcp-server/pull/1089)) ([1d34dbf](https://github.com/apify/apify-mcp-server/commit/1d34dbfc0d01fefccc1900bd2aa62daad3532bb4)) by [@jirispilka](https://github.com/jirispilka), closes [#885](https://github.com/apify/apify-mcp-server/issues/885)
+
+### 🐛 Bug Fixes
+
+- Propagate auth errors instead of reporting Actor not found ([#1102](https://github.com/apify/apify-mcp-server/pull/1102)) ([fa5c3db](https://github.com/apify/apify-mcp-server/commit/fa5c3db718c4fbe22572012bacc1104d61303ed7)) by [@MQ37](https://github.com/MQ37)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.11.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.6) (2026-07-16)
 
 ### 🚀 Features

@@ -5,7 +5,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS, KV_RECORD_MAX_INLINE_BYTES } from '../../src/const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { getKeyValueStoreRecord } from '../../src/tools/storage/get_key_value_store_record.js';
 import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -187,7 +187,7 @@ describe('get-key-value-store-record', () => {
     });
 
     it('returns a resource_link instead of inlining a binary record over the size limit', async () => {
-        const bytes = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
+        const bytes = Buffer.alloc(MAX_INLINE_BYTES + 1);
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'kv-1', recordKey: 'big.png' },
@@ -201,13 +201,13 @@ describe('get-key-value-store-record', () => {
             type: 'resource_link',
             uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/big.png?signature=signed',
             name: 'big.png',
-            size: KV_RECORD_MAX_INLINE_BYTES + 1,
+            size: MAX_INLINE_BYTES + 1,
             mimeType: 'image/png',
         });
     });
 
     it('returns a resource_link without mimeType when the record has no Content-Type', async () => {
-        const bytes = Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1);
+        const bytes = Buffer.alloc(MAX_INLINE_BYTES + 1);
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'kv-1', recordKey: 'blob' },
@@ -221,7 +221,7 @@ describe('get-key-value-store-record', () => {
             type: 'resource_link',
             uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/blob?signature=signed',
             name: 'blob',
-            size: KV_RECORD_MAX_INLINE_BYTES + 1,
+            size: MAX_INLINE_BYTES + 1,
         });
     });
 
@@ -272,7 +272,7 @@ describe('get-key-value-store-record', () => {
             { recordKey: 'report.pdf', value: Buffer.from([0x25, 0x50, 0x44, 0x46]), contentType: 'application/pdf' },
             {
                 recordKey: 'big.png',
-                value: Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1),
+                value: Buffer.alloc(MAX_INLINE_BYTES + 1),
                 contentType: 'image/png',
             },
         ];
@@ -344,7 +344,7 @@ describe('get-key-value-store-record', () => {
         it('accepts an over-limit binary fetch returned as a resource_link', async () => {
             const client = await connectClientForRecord({
                 key: 'big.png',
-                value: Buffer.alloc(KV_RECORD_MAX_INLINE_BYTES + 1),
+                value: Buffer.alloc(MAX_INLINE_BYTES + 1),
                 contentType: 'image/png',
             });
             const result = await client.callTool({

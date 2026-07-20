@@ -46,7 +46,7 @@ export const searchActorsBaseArgsSchema = z.object({
             - The goal is to find Actors that specifically handle the platform and data type the user mentioned
 
             Examples:
-            ✅ "Instagram posts", "Twitter", "Amazon products", "weather", "news articles"
+            ✅ "Instagram posts", "Twitter", "Amazon products", "TikTok comments"
             ✅ "" (empty) — returns the most popular Actors store-wide
             ❌ "Instagram posts profiles comments hashtags reels stories followers..." (too long)
             ❌ "top popular actors", "best scrapers", "trending" — ranking words aren't Actor keywords; pass "" instead
@@ -76,8 +76,8 @@ Use this tool when user wants to:
 - Browse existing solutions (e.g., "Show me scrapers for news sites")
 - Learn about MCP servers or AI agents available in the Store
 
-Do NOT use this tool when user wants immediate data retrieval - use apify/rag-web-browser instead for getting actual data right now.
-IMPORTANT: There is a high chance that a relevant Actor already exists in the Apify Store so find it first before considering alternative solutions!
+Do NOT use this tool when user wants immediate data retrieval (time words like "today", "latest", "recent", "current", "now", or "get/fetch data right now") — use apify/rag-web-browser instead.
+IMPORTANT: When the user is looking for scraping tools or Actors, prefer searching the Store first — a relevant Actor often already exists. Do not use Store search as a substitute for immediate data retrieval.
 
 Usage:
 - Prefer broad, generic keywords - use just the platform name (e.g. "Instagram" instead of "Instagram scraper").
