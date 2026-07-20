@@ -88,7 +88,7 @@ import { remoteMcpFailureDetail } from '../utils/apify_errors.js';
 import { isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import { computeToolResponseBytes, respondErrorNoTelemetry, respondOk } from '../utils/mcp.js';
 import { isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
-import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
+import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
