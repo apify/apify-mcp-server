@@ -9,7 +9,7 @@ const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 // Request origin headers
 const REQUEST_ORIGIN_HEADER = 'X-Apify-Request-Origin';
 
-/** Values for the X-Apify-Request-Origin header. Must match `META_ORIGINS` in `@apify/consts`. */
+/** Values sent in the X-Apify-Request-Origin header; expected to correspond to `META_ORIGINS` in `@apify/consts` on the backend. */
 export const REQUEST_ORIGIN = {
     MCP: 'MCP',
     APIFY_AI: 'APIFY_AI',

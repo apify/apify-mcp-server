@@ -50,6 +50,22 @@ function makeNoopProvider(): PaymentProvider {
     };
 }
 
+function makeSkyfireLikeProvider(): PaymentProvider {
+    return {
+        id: 'skyfire',
+        allowsUnauthenticated: true,
+        decorateToolSchema: (tool) => tool,
+        validatePayment: () => null,
+        getPaymentHeaders: (args): Record<string, string> =>
+            args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {},
+        removePaymentFields: (args) => {
+            const { 'skyfire-pay-id': _removed, ...rest } = args;
+            return rest;
+        },
+        redactForLogging: (args) => args,
+    };
+}
+
 function getStaticHeaders(): Record<string, string> {
     const passed = capturedOptions.at(-1) as CapturedClientOptions;
     return passed.requestInterceptors[0]({ headers: {} }).headers;
@@ -86,5 +102,18 @@ describe('prepareToolCallContext()', () => {
             requestOrigin: 'APIFY_AI',
         });
         expect(getStaticHeaders()['X-Apify-Request-Origin']).toBe('APIFY_AI');
+    });
+
+    it('threads the request origin alongside payment headers', () => {
+        prepareToolCallContext({
+            provider: makeSkyfireLikeProvider(),
+            tool: makeTool(),
+            args: { 'skyfire-pay-id': 'jwt-token-123' },
+            apifyToken: 'apify_api_test_token',
+            requestOrigin: 'APIFY_AI',
+        });
+        const headers = getStaticHeaders();
+        expect(headers['X-Apify-Request-Origin']).toBe('APIFY_AI');
+        expect(headers['skyfire-pay-id']).toBe('jwt-token-123');
     });
 });
