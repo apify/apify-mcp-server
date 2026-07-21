@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Propagate auth errors instead of reporting Actor not found ([#1102](https://github.com/apify/apify-mcp-server/pull/1102)) ([fa5c3db](https://github.com/apify/apify-mcp-server/commit/fa5c3db718c4fbe22572012bacc1104d61303ed7)) by [@MQ37](https://github.com/MQ37)
+- SoftFail observed Mezmo client and upstream noise ([#1118](https://github.com/apify/apify-mcp-server/pull/1118)) ([9684988](https://github.com/apify/apify-mcp-server/commit/9684988453e588d72b05798ca97505715cc89b08)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
