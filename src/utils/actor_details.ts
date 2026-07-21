@@ -1,6 +1,7 @@
 import type { Build } from 'apify-client';
 
 import type { ApifyClient } from '../apify_client.js';
+import { CODE_RUNTIME_ACTOR_ID } from '../const.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
@@ -40,12 +41,17 @@ function typeValueToString(value: unknown): string {
 /**
  * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
  * Returns the content string and appropriate heading for text output.
+ *
+ * apify/code-runtime is hardcoded to always get its full README (see CODE_RUNTIME_ACTOR_ID) —
+ * its README documents an exact API contract (method names/shapes) that the auto-generated
+ * summary can omit, and there's no per-call way to request the raw text otherwise.
  */
-export function resolveReadmeContent(details: { readmeSummary?: string; readme: string }): {
+export function resolveReadmeContent(details: { actorInfo: { id: string }; readmeSummary?: string; readme: string }): {
     content: string;
     heading: string;
 } {
-    if (details.readmeSummary?.trim()) {
+    const forceFullReadme = details.actorInfo.id === CODE_RUNTIME_ACTOR_ID;
+    if (!forceFullReadme && details.readmeSummary?.trim()) {
         return { content: details.readmeSummary, heading: '# README summary' };
     }
     return { content: details.readme, heading: '# README' };
