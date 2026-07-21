@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.11.7 - **not yet released**
+## [0.11.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.7) (2026-07-21)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - SoftFail observed Mezmo client and upstream noise ([#1118](https://github.com/apify/apify-mcp-server/pull/1118)) ([9684988](https://github.com/apify/apify-mcp-server/commit/9684988453e588d72b05798ca97505715cc89b08)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.11.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.6) (2026-07-16)
 
 ### 🚀 Features
