@@ -29,6 +29,10 @@ implementations, not by importing from here.
 - `tool_dispatch.ts` — `dispatchToolCall()`: the single exhaustive `switch (tool.type)`
   (INTERNAL / ACTOR_MCP / ACTOR) both the sync handler and the task path run. Plain
   function taking the `ActorsMcpServer` instance; touches no class state beyond `.server`.
+- `tool_call_telemetry.ts` — `prepareTelemetryData()` / `logToolCallAndTelemetry()`: shared by
+  the sync `CallToolRequestSchema` handler and the task path. Plain functions taking the
+  `ActorsMcpServer` instance (as `apifyMcpServer`), reading `telemetryEnabled`/`telemetryEnv`
+  and `options.*` off it — both are `public readonly` on `ActorsMcpServer`.
 - `const.ts` — the invariant constants below (the single source for these values).
 
 ## Gotchas & invariants
