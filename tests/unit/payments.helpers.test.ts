@@ -8,8 +8,9 @@
  *    (so AJV's in-place removeAdditional mutation doesn't corrupt toolArgsRedacted)
  * 3. Missing payment fails with paymentRequiredResult, not a validation error
  * 4. No-provider path also returns separate references
+ * 5. requestOrigin is forwarded to ApifyClient (header wiring is covered in apify_client.test.ts)
  */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
@@ -17,11 +18,25 @@ import type { HelperTool } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { respondRaw } from '../../src/utils/mcp.js';
 
+const { capturedClientOptions } = vi.hoisted(() => ({ capturedClientOptions: [] as unknown[] }));
+
+vi.mock('../../src/apify_client.js', () => ({
+    ApifyClient: class {
+        constructor(options: unknown) {
+            capturedClientOptions.push(options);
+        }
+    },
+}));
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
 const MOCK_APIFY_TOKEN = 'apify_api_test_token' as const;
+
+beforeEach(() => {
+    capturedClientOptions.length = 0;
+});
 
 function makeTool(paymentRequired = true): HelperTool {
     return {
@@ -185,5 +200,32 @@ describe('prepareToolCallContext — Skyfire-like provider', () => {
         });
 
         expect(result.paymentRequiredResult).toBeUndefined();
+    });
+});
+
+describe('prepareToolCallContext — requestOrigin forwarding', () => {
+    it('forwards requestOrigin on the no-provider path', () => {
+        prepareToolCallContext({
+            provider: undefined,
+            tool: makeTool(false),
+            args: {},
+            apifyToken: MOCK_APIFY_TOKEN,
+            requestOrigin: 'APIFY_AI',
+        });
+        expect(capturedClientOptions.at(-1)).toMatchObject({ requestOrigin: 'APIFY_AI' });
+    });
+
+    it('forwards requestOrigin alongside payment headers', () => {
+        prepareToolCallContext({
+            provider: makeSkyfireLikeProvider(),
+            tool: makeTool(true),
+            args: { 'skyfire-pay-id': 'jwt-token-123' },
+            apifyToken: MOCK_APIFY_TOKEN,
+            requestOrigin: 'APIFY_AI',
+        });
+        expect(capturedClientOptions.at(-1)).toMatchObject({
+            requestOrigin: 'APIFY_AI',
+            paymentHeaders: { 'skyfire-pay-id': 'jwt-token-123' },
+        });
     });
 });
