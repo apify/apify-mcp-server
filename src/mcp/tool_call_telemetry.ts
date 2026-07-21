@@ -12,15 +12,19 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import type { ActorsMcpServer } from './server.js';
 
-/**
- * Creates telemetry data for a tool call.
- */
-export async function prepareTelemetryData(params: {
+type PrepareTelemetryDataParams = {
     toolName: string;
     mcpSessionId: string | undefined;
     apifyToken: string;
     apifyMcpServer: ActorsMcpServer;
-}): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
+};
+
+/**
+ * Creates telemetry data for a tool call.
+ */
+export async function prepareTelemetryData(
+    params: PrepareTelemetryDataParams,
+): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
     const { toolName, mcpSessionId, apifyToken, apifyMcpServer } = params;
     if (!apifyMcpServer.telemetryEnabled) {
         return { telemetryData: null, userId: null };
@@ -58,7 +62,7 @@ export async function prepareTelemetryData(params: {
  * Response bytes and resource ids are derived here from the raw `result` (+ `args`) so every
  * call site stays a plain hand-off — no path can forget to compute or strip them.
  */
-export function logToolCallAndTelemetry(params: {
+type LogToolCallAndTelemetryParams = {
     toolName: string;
     mcpSessionId: string | undefined;
     toolStatus: ToolStatus;
@@ -70,7 +74,9 @@ export function logToolCallAndTelemetry(params: {
     args?: Record<string, unknown>;
     result?: unknown;
     apifyMcpServer: ActorsMcpServer;
-}): void {
+};
+
+export function logToolCallAndTelemetry(params: LogToolCallAndTelemetryParams): void {
     const durationMs = Date.now() - params.startTime;
     // `result` is undefined only on short-circuit paths that never produced a payload (e.g. a
     // cancelled task); skip byte accounting there. `null`/`{}` still measure as zero bytes.
