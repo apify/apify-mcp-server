@@ -3,6 +3,7 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import log from '@apify/log';
 
 import { SchemaTooLargeError } from '../errors.js';
+import { SKYFIRE_PAY_ID_KEY } from '../payments/const.js';
 import { isActorRunLimitError } from './apify_errors.js';
 
 /**
@@ -152,7 +153,6 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
     log.error(message, { error, ...data });
 }
 
-const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';
 const REDACTED_VALUE = '[REDACTED]';
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => {

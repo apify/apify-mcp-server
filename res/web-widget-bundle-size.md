@@ -33,8 +33,7 @@ paths when a small local equivalent is enough.
 After these changes, the production widget bundles dropped roughly from:
 
 - `actor-run-widget`: `~1.86 MB` to `~1.16 MB`
-- `actor-detail-widget`: `~1.86 MB` to `~1.52 MB`
 - `search-actors-widget`: `~1.87 MB` to `~1.53 MB`
 
-The remaining larger payload in detail/search is mostly the markdown parsing
+The remaining larger payload in search is mostly the markdown parsing
 stack.

@@ -3,13 +3,12 @@ import { redactSkyfirePayId } from '../utils/logging.js';
 import { cloneToolEntry } from '../utils/tools.js';
 import {
     PAYMENT_PROTOCOL_HEADER,
+    SKYFIRE_PAY_ID_KEY,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from './const.js';
 import type { PaymentHeaders, PaymentProvider } from './types.js';
-
-const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';
 
 /**
  * Skyfire payment provider.
@@ -77,10 +76,10 @@ export class SkyfirePaymentProvider implements PaymentProvider {
     }
 
     redactForLogging(args: unknown): unknown {
-        // TODO: redactSkyfirePayId is still exported and used directly by the internal MCP server repo.
-        // Once the internal repo migrates to using `paymentProvider.redactForLogging()`, we should
-        // remove the standalone function and centralize the redaction logic entirely inside this provider
-        // to make it more maintainable.
+        // TODO: redactSkyfirePayId is still used directly by other in-repo callers
+        // (e.g. tools/actors/actor_executor.ts). Once those callers migrate to
+        // `paymentProvider.redactForLogging()`, remove the standalone function and
+        // centralize the redaction logic entirely inside this provider.
         return redactSkyfirePayId(args);
     }
 }

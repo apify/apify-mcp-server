@@ -5,6 +5,8 @@ export const PAYMENT_PROTOCOL_HEADER = 'x-apify-payment-protocol';
 const SKYFIRE_MIN_CHARGE_USD = 5.0;
 const SKYFIRE_SELLER_ID = process.env.SKYFIRE_SELLER_SERVICE_ID;
 
+export const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';
+
 export const SKYFIRE_TOOL_INSTRUCTIONS = `To run the Actor, you need to provide a Skyfire PAY JWT token in the \`skyfire-pay-id\` input property. You first need to create the Skyfire PAY token by calling the \`create-pay-token\` tool from the Skyfire MCP server and then provide the created JWT token in the \`skyfire-pay-id\` input property when calling Actor tool. IMPORTANT: The value you pass to \`skyfire-pay-id\` must be the JWT token string itself (it starts with "ey"), NOT an ID or UUID. The Skyfire PAY token is used for billing purposes and needs to be charged with at least ${SKYFIRE_MIN_CHARGE_USD} USD.${SKYFIRE_SELLER_ID ? ` The Skyfire seller ID for Apify MCP server is "${SKYFIRE_SELLER_ID}".` : ''} When retrieving Actor output using the \`get-dataset-items\` tool, you also need to provide the same Skyfire PAY JWT token (starting with "ey") in the \`skyfire-pay-id\` input property.`;
 
 export const SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION = `Skyfire PAY JWT token used for billing purposes. This must be the JWT token string returned by the create-pay-token tool (starts with "ey"), NOT a token ID or UUID.`;

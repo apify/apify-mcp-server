@@ -304,20 +304,6 @@ export type Actor = ActorOutdated & {
     };
 };
 
-export type ActorDefinitionStorage = {
-    views: Record<
-        string,
-        {
-            transformation: {
-                fields?: string[];
-            };
-            display: {
-                properties: Record<string, object>;
-            };
-        }
-    >;
-};
-
 export type ApifyDocsSearchResult = {
     /** URL of the documentation page, may include anchor (e.g., https://docs.apify.com/actors#build-actors) */
     url: string;
@@ -336,7 +322,6 @@ export type PromptBase = Prompt & {
     render: (args: Record<string, string>) => string;
 };
 
-export type DatasetItem = Record<number | string, unknown>;
 /**
  * Apify token type.
  *
