@@ -1,5 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -10,6 +10,11 @@ import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
 import * as telemetry from '../../src/telemetry.js';
 import * as callActor from '../../src/tools/actors/call_actor.js';
+import {
+    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
+    REPORT_PROBLEM_NUDGE,
+    reportProblem,
+} from '../../src/tools/dev/report_problem.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -412,6 +417,88 @@ describe('executeToolAndUpdateTask()', () => {
         );
         expect(trackSpy.mock.calls).toHaveLength(1);
         expect(trackSpy.mock.calls[0][2].tool_status).toBe(TOOL_STATUS.SUCCEEDED);
+    });
+
+    it('suppresses the report-problem nudge for a 402-carrying ACTOR_MCP task failure', async () => {
+        // Pins the accepted task-mode delta. The ACTOR_MCP dispatch catch now carries
+        // failure_http_status, so a contained remote 402 reaches withReportProblemNudge with
+        // failureHttpStatus === 402 and the nudge is suppressed (402 is a billing state, not a defect).
+        // If the ACTOR_MCP path stopped carrying failure_http_status, this INVALID_INPUT failure would
+        // instead append REPORT_PROBLEM_INVALID_INPUT_NUDGE and this test would fail.
+        await withServer(async (server) => {
+            silenceLogs();
+            const rejectingClient = {
+                callTool: vi.fn().mockRejectedValue(new McpError(402 as ErrorCode, 'remote 402')),
+                close: vi.fn().mockResolvedValue(undefined),
+                setNotificationHandler: vi.fn(),
+            } as unknown as Client;
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(rejectingClient);
+            // report-problem must be served for the nudge to be a candidate at all (spread the frozen
+            // tool so server.close() can null its ajvValidate on teardown).
+            server.upsertTools([{ ...reportProblem }]);
+            const { task, result } = await runTaskAndReadBack(server, makeActorMcpTool());
+            expect(task.status).toBe('completed');
+            expect(result.isError).toBe(true);
+            const texts = (result.content as { text: string }[]).map((c) => c.text);
+            expect(texts.some((t) => t.includes('Failed to call MCP tool'))).toBe(true);
+            expect(texts).not.toContain(REPORT_PROBLEM_NUDGE);
+            expect(texts).not.toContain(REPORT_PROBLEM_INVALID_INPUT_NUDGE);
+        });
+    });
+});
+
+describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    /** A stub MCP client whose `callTool` rejects with `error`; connect/close/notify are no-ops. */
+    function stubRejectingClient(error: unknown): Client {
+        return {
+            callTool: vi.fn().mockRejectedValue(error),
+            close: vi.fn().mockResolvedValue(undefined),
+            setNotificationHandler: vi.fn(),
+        } as unknown as Client;
+    }
+
+    it('contains a remote McpError as a soft-fail result instead of re-throwing on the wire', async () => {
+        // The ACTOR_MCP inner catch seals the route: without it the McpError would reach the sync
+        // outer catch, which re-throws every McpError as a JSON-RPC error — so this test fails if the
+        // inner catch is removed (the handler would reject instead of resolving with a soft-fail body).
+        await withServer(async (server) => {
+            silenceLogs();
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(
+                stubRejectingClient(new McpError(ErrorCode.InternalError, 'remote boom')),
+            );
+            const result = await runSync(server, makeActorMcpTool());
+            expect(result.isError).toBe(true);
+            expect((result.content as { text: string }[])[0].text).toContain('Failed to call MCP tool');
+        });
+    });
+
+    it('contains a remote 402-coded McpError as a soft-fail result, never a thrown payment error', async () => {
+        // A remote McpError with code 402 would classify as PAYMENT if it reached buildToolCallErrorResult
+        // (getHttpStatusCode falls through to `.code`). The inner catch keeps it a soft-fail execution
+        // result and it never surfaces as a thrown payment error — and the telemetry carries
+        // failure_http_status, which ACTOR_MCP execution failures now report like every other path.
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(
+                    stubRejectingClient(new McpError(402 as ErrorCode, 'remote 402')),
+                );
+                const result = await runSync(server, makeActorMcpTool());
+                expect(result.isError).toBe(true);
+                expect((result.content as { text: string }[])[0].text).toContain('Failed to call MCP tool');
+                // Not the x402 payment response shape (no structuredContent payload).
+                expect(result.structuredContent).toBeUndefined();
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+        expect(trackSpy.mock.calls).toHaveLength(1);
+        const properties = trackSpy.mock.calls[0][2];
+        expect(properties.tool_status).toBe(TOOL_STATUS.SOFT_FAIL);
+        expect(properties.failure_http_status).toBe(402);
+        expect(properties.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
     });
 });
 

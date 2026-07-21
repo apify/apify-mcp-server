@@ -20,7 +20,7 @@ import { remoteMcpFailureDetail } from '../utils/apify_errors.js';
 import { logHttpError } from '../utils/logging.js';
 import { respondErrorNoTelemetry } from '../utils/mcp.js';
 import type { createProgressTracker } from '../utils/progress.js';
-import { applyToolTelemetry, classifyFailureCategory, getToolStatusFromError } from '../utils/tool_status.js';
+import { applyToolTelemetry, buildExecutionDiagnostics } from '../utils/tool_status.js';
 import { buildActorFields } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
@@ -193,14 +193,12 @@ export async function dispatchToolCall(params: {
 
                 result = { ...res };
             } catch (error) {
-                toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
-                const failureDetail =
-                    error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
-                callDiagnostics = {
-                    failure_category: classifyFailureCategory(error),
-                    failure_detail: failureDetail,
-                    ...buildActorFields(actorName, actorId),
-                };
+                ({ toolStatus, callDiagnostics } = buildExecutionDiagnostics(
+                    error,
+                    Boolean(extra.signal?.aborted),
+                    actorName,
+                    actorId,
+                ));
                 logHttpError(error, `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`, {
                     actorId: tool.actorId,
                     toolName: tool.originToolName,

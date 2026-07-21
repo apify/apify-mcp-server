@@ -90,6 +90,7 @@ import { getActors, getToolsForServerMode, toolNamesToInput } from '../utils/too
 import { LOG_LEVEL_MAP } from './const.js';
 import { emitTaskStatusNotification, executeToolAndUpdateTask } from './task_execution.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
+import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telemetry.js';
 import { dispatchToolCall } from './tool_dispatch.js';
 import { parseInputParamsFromUrl, storeTaskResultOrSkipIfExpired } from './utils.js';
@@ -1248,52 +1249,63 @@ export class ActorsMcpServer {
                 });
                 toolStatus = errorResult.toolStatus;
 
-                // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
-                // content[0].text (JSON) + isError: true. No log here (unlike the task path). The
-                // concurrent-run limit also surfaces as 402 but is excluded by the predicate and
-                // falls through to the generic run-limit handling below.
-                if (errorResult.kind === TOOL_CALL_ERROR_KIND.PAYMENT) {
-                    callDiagnostics = errorResult.callDiagnostics;
-                    return captureResult(errorResult.response);
+                switch (errorResult.kind) {
+                    case TOOL_CALL_ERROR_KIND.PAYMENT: {
+                        // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
+                        // content[0].text (JSON) + isError: true. No log here (unlike the task path). The
+                        // concurrent-run limit also surfaces as 402 but is excluded by the predicate and
+                        // falls through to the generic run-limit handling below.
+                        callDiagnostics = errorResult.callDiagnostics;
+                        return captureResult(errorResult.response);
+                    }
+                    case TOOL_CALL_ERROR_KIND.APPROVAL: {
+                        callDiagnostics = errorResult.callDiagnostics;
+                        logHttpError(error, 'Permission approval required while calling tool', {
+                            toolName: name,
+                            mcpSessionId,
+                        });
+                        return captureResult(errorResult.response);
+                    }
+                    case TOOL_CALL_ERROR_KIND.EXECUTION: {
+                        callDiagnostics = {
+                            // Spread existing diagnostics first (e.g. validation_keyword from
+                            // failInvalidParams), then overwrite with the mapper's freshly computed fields
+                            // so they take precedence.
+                            ...callDiagnostics,
+                            ...errorResult.callDiagnostics,
+                        };
+
+                        logHttpError(error, 'Error occurred while calling tool', {
+                            toolName: name,
+                            toolStatus,
+                            mcpSessionId,
+                            failureCategory: callDiagnostics.failure_category,
+                            failureHttpStatus: callDiagnostics.failure_http_status,
+                            actorName: callDiagnostics.actor_name,
+                            validationKeyword: callDiagnostics.validation_keyword,
+                            validationPath: callDiagnostics.validation_path,
+                            validationMissingProperty: callDiagnostics.validation_missing_property,
+                            validationAdditionalProperty: callDiagnostics.validation_additional_property,
+                        });
+                        // This framework outer-catch path bypasses extractToolTelemetry (returned via
+                        // captureResult), so preserve the pre-existing wire shape { toolStatus } exactly:
+                        // reuse the local ABORTED-aware toolStatus, do NOT re-derive from the error (which
+                        // would drop ABORTED and leak failureCategory/failureHttpStatus onto the wire).
+                        return captureResult({
+                            ...respondOk(errorResult.userText),
+                            isError: true,
+                            toolTelemetry: { toolStatus },
+                        });
+                    }
+                    default:
+                        // Compile-time exhaustiveness guard (same `satisfies never` idiom as
+                        // dispatchToolCall's default arm): a new TOOL_CALL_ERROR_KIND makes `errorResult`
+                        // non-`never` here and fails to compile. Unreachable at runtime.
+                        throw new McpError(
+                            ErrorCode.InvalidParams,
+                            `Unknown tool-call error kind "${(errorResult satisfies never as ToolCallErrorResult).kind}"`,
+                        );
                 }
-
-                if (errorResult.kind === TOOL_CALL_ERROR_KIND.APPROVAL) {
-                    callDiagnostics = errorResult.callDiagnostics;
-                    logHttpError(error, 'Permission approval required while calling tool', {
-                        toolName: name,
-                        mcpSessionId,
-                    });
-                    return captureResult(errorResult.response);
-                }
-
-                callDiagnostics = {
-                    // Spread existing diagnostics first (e.g. validation_keyword from failInvalidParams),
-                    // then overwrite with the mapper's freshly computed fields so they take precedence.
-                    ...callDiagnostics,
-                    ...errorResult.callDiagnostics,
-                };
-
-                logHttpError(error, 'Error occurred while calling tool', {
-                    toolName: name,
-                    toolStatus,
-                    mcpSessionId,
-                    failureCategory: callDiagnostics.failure_category,
-                    failureHttpStatus: callDiagnostics.failure_http_status,
-                    actorName: callDiagnostics.actor_name,
-                    validationKeyword: callDiagnostics.validation_keyword,
-                    validationPath: callDiagnostics.validation_path,
-                    validationMissingProperty: callDiagnostics.validation_missing_property,
-                    validationAdditionalProperty: callDiagnostics.validation_additional_property,
-                });
-                // This framework outer-catch path bypasses extractToolTelemetry (returned via
-                // captureResult), so preserve the pre-existing wire shape { toolStatus } exactly:
-                // reuse the local ABORTED-aware toolStatus, do NOT re-derive from the error (which
-                // would drop ABORTED and leak failureCategory/failureHttpStatus onto the wire).
-                return captureResult({
-                    ...respondOk(errorResult.userText),
-                    isError: true,
-                    toolTelemetry: { toolStatus },
-                });
             } finally {
                 if (shouldTrackTelemetry) {
                     logToolCallAndTelemetry({

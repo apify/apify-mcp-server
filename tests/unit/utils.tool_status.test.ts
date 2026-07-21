@@ -3,9 +3,11 @@ import type { ActorRun } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
+import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from '../../src/mcp/tool_call_error_mapper.js';
 import { buildStartRunResponse } from '../../src/tools/actors/actor_run_response.js';
 import {
     applyToolTelemetry,
+    buildExecutionDiagnostics,
     classifyFailureCategory,
     deriveResourceIds,
     extractAjvErrorDetails,
@@ -87,6 +89,47 @@ describe('classifyFailureCategory', () => {
     it('classifies the concurrent-run limit as INVALID_INPUT even when wrapped as a 5xx', () => {
         const error = Object.assign(new Error('Streamable HTTP error: cannot-start-actor-runs'), { statusCode: 500 });
         expect(classifyFailureCategory(error)).toBe(FAILURE_CATEGORY.INVALID_INPUT);
+    });
+});
+
+describe('buildExecutionDiagnostics', () => {
+    const ACTOR_NAME = 'apify/web-scraper';
+    const ACTOR_ID = 'abc123';
+
+    it('includes failure_http_status for an HTTP-range-status error', () => {
+        const error = Object.assign(new Error('server exploded'), { statusCode: 500 });
+        const { toolStatus, callDiagnostics } = buildExecutionDiagnostics(error, false, ACTOR_NAME, ACTOR_ID);
+
+        expect(toolStatus).toBe(TOOL_STATUS.FAILED);
+        expect(callDiagnostics.failure_http_status).toBe(500);
+        expect(callDiagnostics.failure_detail).toBe('server exploded');
+    });
+
+    it('omits failure_http_status when the error carries no HTTP status', () => {
+        const { callDiagnostics } = buildExecutionDiagnostics(new Error('no status'), false, ACTOR_NAME, ACTOR_ID);
+        expect(callDiagnostics).not.toHaveProperty('failure_http_status');
+        expect(callDiagnostics.failure_detail).toBe('no status');
+    });
+
+    it('truncates failure_detail to 200 chars', () => {
+        const { callDiagnostics } = buildExecutionDiagnostics(new Error('x'.repeat(300)), false, undefined, undefined);
+        expect(callDiagnostics.failure_detail).toHaveLength(200);
+    });
+
+    it('yields callDiagnostics identical to the mapper execution arm for the same error', () => {
+        // Both the ACTOR_MCP catch and the generic mapper now share this builder, so their execution
+        // diagnostics must be identical for the same input (the whole point of the extraction).
+        const error = Object.assign(new Error('server exploded'), { statusCode: 500 });
+        const fromBuilder = buildExecutionDiagnostics(error, false, ACTOR_NAME, ACTOR_ID).callDiagnostics;
+        const fromMapper = buildToolCallErrorResult(error, {
+            toolName: 'test-tool',
+            actorName: ACTOR_NAME,
+            actorId: ACTOR_ID,
+            isAborted: false,
+        });
+
+        expect(fromMapper.kind).toBe(TOOL_CALL_ERROR_KIND.EXECUTION);
+        expect(fromBuilder).toEqual(fromMapper.callDiagnostics);
     });
 });
 
