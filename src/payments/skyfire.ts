@@ -1,8 +1,9 @@
 import type { ToolEntry } from '../types.js';
-import { redactSkyfirePayId, SKYFIRE_PAY_ID_KEY } from '../utils/logging.js';
+import { redactSkyfirePayId } from '../utils/logging.js';
 import { cloneToolEntry } from '../utils/tools.js';
 import {
     PAYMENT_PROTOCOL_HEADER,
+    SKYFIRE_PAY_ID_KEY,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
