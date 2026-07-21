@@ -12,6 +12,8 @@ implementations, not by importing from here.
 
 - `server.ts` — `ActorsMcpServer`: tool/prompt/resource/task registration, the
   `initialize` handshake, MCP Apps capability detection, `CallToolRequest` handling.
+  `dispatchToolCall` is the single exhaustive `switch (tool.type)` (INTERNAL / ACTOR_MCP /
+  ACTOR) that both the sync handler and the task path (`executeToolAndUpdateTask`) run.
   Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
   a task store (the internal repo injects a Redis one) or the constructor throws.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.

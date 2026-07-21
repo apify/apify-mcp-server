@@ -1260,182 +1260,35 @@ export class ActorsMcpServer {
                     return captureResult(outcome.result);
                 }
 
-                // Handle internal tool
-                if (tool.type === TOOL_TYPE.INTERNAL) {
-                    // Tools that may emit notifications/progress during a sync wait must be opted in here.
-                    // call-actor: emits during start+waitForFinish. get-actor-run: emits when waitSecs > 0.
-                    const progressTrackerOptIn =
-                        tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_RUNS_GET;
-                    const progressTracker = progressTrackerOptIn
-                        ? createProgressTracker(progressToken, extra.sendNotification)
-                        : null;
+                // Progress tracker: opt in for the two INTERNAL tools that emit during a sync wait
+                // (call-actor start+waitForFinish, get-actor-run when waitSecs > 0), and unconditionally
+                // for ACTOR tools. ACTOR_MCP forwards notifications directly, not via a tracker.
+                const progressTrackerOptIn =
+                    tool.type === TOOL_TYPE.ACTOR ||
+                    (tool.type === TOOL_TYPE.INTERNAL &&
+                        (tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_RUNS_GET));
+                const progressTracker = progressTrackerOptIn
+                    ? createProgressTracker(progressToken, extra.sendNotification)
+                    : null;
 
-                    try {
-                        log.info('Calling internal tool', { toolName: tool.name, mcpSessionId, input: logSafeArgs });
-                        const res = (await tool.call({
-                            args: toolArgs!,
-                            extra,
-                            apifyMcpServer: this,
-                            mcpServer: this.server,
-                            apifyToken,
-                            apifyClient: apifyClient!,
-                            progressTracker,
-                            mcpSessionId,
-                        })) as Record<string, unknown>;
-
-                        // Extract diagnostics and strip internal fields from res before returning to client.
-                        ({ toolStatus, callDiagnostics } = applyToolTelemetry(
-                            res,
-                            actorName,
-                            actorId,
-                            callDiagnostics,
-                        ));
-                        return captureResult(res);
-                    } finally {
-                        progressTracker?.stop();
-                    }
-                }
-
-                if (tool.type === TOOL_TYPE.ACTOR_MCP) {
-                    let client: Client | null = null;
-                    try {
-                        client = await connectMCPClient(tool.serverUrl, apifyToken, mcpSessionId);
-                        if (!client) {
-                            const msg = dedent`
-                                Failed to connect to MCP server at "${tool.serverUrl}".
-                                Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.
-                            `;
-                            log.softFail(msg, { mcpSessionId, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR });
-                            await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                            toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            callDiagnostics = { ...callDiagnostics, failure_category: FAILURE_CATEGORY.INTERNAL_ERROR };
-                            return captureResult(respondErrorNoTelemetry(msg));
-                        }
-
-                        // Only set up notification handlers if progressToken is provided by the client
-                        if (progressToken !== undefined && progressToken !== null) {
-                            // Set up notification handlers for the client
-                            for (const schema of ServerNotificationSchema.options) {
-                                const method = schema.shape.method.value;
-                                // Forward notifications from the proxy client to the server
-                                client.setNotificationHandler(schema, async (notification) => {
-                                    log.debug('Sending MCP notification', {
-                                        method,
-                                        mcpSessionId,
-                                        notification,
-                                    });
-                                    await extra.sendNotification(notification);
-                                });
-                            }
-                        }
-
-                        log.info('Calling Actor-MCP', {
-                            toolName: tool.name,
-                            actorMcpToolName: tool.originToolName,
-                            actorId: tool.actorId,
-                            mcpSessionId,
-                            input: logSafeArgs,
-                        });
-                        const res = await client.callTool(
-                            {
-                                name: tool.originToolName,
-                                arguments: toolArgs!,
-                                _meta: { progressToken },
-                            },
-                            CallToolResultSchema,
-                            {
-                                timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
-                            },
-                        );
-
-                        // TODO: actor-mcp responses are opaque — isError could be a user input problem
-                        // (e.g. invalid query) or a genuine server failure. We can't distinguish without
-                        // parsing the error text. Defaulting to INTERNAL_ERROR for now; revisit when
-                        // actor-mcp gets deeper telemetry treatment.
-                        if ('isError' in res && res.isError) {
-                            toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            callDiagnostics = {
-                                failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
-                                ...buildActorFields(actorName, actorId),
-                            };
-                        }
-
-                        return captureResult({ ...res });
-                    } catch (error) {
-                        toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
-                        const failureDetail =
-                            error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
-                        callDiagnostics = {
-                            failure_category: classifyFailureCategory(error),
-                            failure_detail: failureDetail,
-                            ...buildActorFields(actorName, actorId),
-                        };
-                        logHttpError(
-                            error,
-                            `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`,
-                            {
-                                actorId: tool.actorId,
-                                toolName: tool.originToolName,
-                                failureCategory: callDiagnostics.failure_category,
-                            },
-                        );
-                        return captureResult(
-                            respondErrorNoTelemetry(
-                                `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${remoteMcpFailureDetail(error)}`,
-                            ),
-                        );
-                    } finally {
-                        if (client) await client.close();
-                    }
-                }
-
-                // Handle actor tool
-                if (tool.type === TOOL_TYPE.ACTOR) {
-                    const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
-
-                    try {
-                        log.info('Calling Actor', {
-                            toolName: tool.name,
-                            actorName: tool.actorFullName,
-                            mcpSessionId,
-                            input: logSafeArgs,
-                        });
-                        const executorResult = await actorExecutor.executeActorTool({
-                            actorFullName: tool.actorFullName,
-                            input: toolArgs!,
-                            apifyClient: apifyClient!,
-                            callOptions: { memory: tool.memoryMbytes },
-                            progressTracker,
-                            abortSignal: extra.signal,
-                            mcpSessionId,
-                            datasetItemsSchema: tool.datasetItemsSchema,
-                        });
-
-                        if (!executorResult) {
-                            toolStatus = TOOL_STATUS.ABORTED;
-                            // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
-                            // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
-                            return captureResult({});
-                        }
-
-                        // Mirror the INTERNAL branch: read the telemetry the executor embedded on error
-                        // results (e.g. respondUserError → SOFT_FAIL/INVALID_INPUT), strip it from the wire,
-                        // and set failure_category so the report-problem nudge picks the softer variant.
-                        ({ toolStatus, callDiagnostics } = applyToolTelemetry(
-                            executorResult as Record<string, unknown>,
-                            actorName,
-                            actorId,
-                            callDiagnostics,
-                        ));
-                        return captureResult(executorResult);
-                    } finally {
-                        if (progressTracker) {
-                            progressTracker.stop();
-                        }
-                    }
-                }
-                // If we reached here without returning, it means the tool type was not recognized (user error)
-                toolStatus = TOOL_STATUS.SOFT_FAIL;
+                const dispatchResult = await this.dispatchToolCall({
+                    tool,
+                    toolArgs: toolArgs!,
+                    logSafeArgs,
+                    apifyToken,
+                    apifyClient: apifyClient!,
+                    mcpSessionId,
+                    progressToken,
+                    progressTracker,
+                    shouldForwardNotifications: true,
+                    extra,
+                    actorName,
+                    actorId,
+                    taskMode: false,
+                });
+                toolStatus = dispatchResult.toolStatus;
+                callDiagnostics = dispatchResult.callDiagnostics;
+                return captureResult(dispatchResult.result);
             } catch (error) {
                 // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
                 // returns them as JSON-RPC errors. failInvalidParams already set callDiagnostics
@@ -1443,8 +1296,8 @@ export class ActorsMcpServer {
                 // Re-throwing first is order-equivalent only because no McpError with an HTTP-range
                 // code reaches this catch: an McpError(402) WOULD satisfy the x402 predicate
                 // (getHttpStatusCode falls through to `.code`), but every remote-McpError route is
-                // sealed by its own inner catch before reaching here, and all in-repo McpErrors use
-                // negative ErrorCode.* values.
+                // sealed by an inner catch (ACTOR_MCP branch, call-actor MCP passthrough) and all
+                // in-repo McpErrors use negative ErrorCode.* values.
                 if (error instanceof McpError) {
                     throw error;
                 }
@@ -1519,19 +1372,6 @@ export class ActorsMcpServer {
                     });
                 }
             }
-
-            const availableTools = this.listToolNames();
-            const msg = dedent`
-                Unknown tool type for "${name}".
-                Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
-                Please verify the tool name and ensure the tool is properly registered.
-            `;
-            log.softFail(msg, { mcpSessionId, statusCode: 404 });
-            await this.server.sendLoggingMessage({
-                level: 'error',
-                data: msg,
-            });
-            throw new McpError(ErrorCode.InvalidParams, msg);
         });
     }
 
@@ -1605,7 +1445,256 @@ export class ActorsMcpServer {
         }
     }
 
-    // TODO: this function quite duplicates the main tool call login the CallToolRequestSchema handler, we should refactor
+    /**
+     * Runs a validated tool call through the single tool-type dispatch switch and returns the raw
+     * result plus derived telemetry. The exhaustive switch turns a future 4th TOOL_TYPE into a compile
+     * error (same `satisfies never` idiom as getToolFullName) instead of a silent runtime fall-through.
+     * Both the sync `CallToolRequestSchema` handler and `executeToolAndUpdateTask` call this after their
+     * own pre-dispatch validation and keep their own try/catch + buildToolCallErrorResult around it.
+     * INTERNAL and ACTOR execution errors propagate to the caller's catch; the ACTOR_MCP case keeps its
+     * own inner catch and returns a soft-fail result instead of throwing.
+     *
+     * `extractToolTelemetry` (via `applyToolTelemetry`) runs once here, in the INTERNAL and ACTOR
+     * cases, and strips `toolTelemetry` in place, so callers must not re-strip. ACTOR_MCP sets
+     * telemetry manually instead. The caller constructs `progressTracker`; dispatch consumes it and stops
+     * it in the branch `finally`. The abort source is `extra.signal`: the request signal for sync; the
+     * task caller passes a `taskExtra` whose `signal` is the cancel watcher's, so a client disconnect
+     * never cancels a task. `shouldForwardNotifications` gates only the ACTOR_MCP raw-notification
+     * forwarder (true for sync, false for task, whose originating request is already answered).
+     * `taskMode` is a passthrough to `tool.call` / `executeActorTool`, never a dispatch selector.
+     */
+    private async dispatchToolCall(params: {
+        tool: ToolEntry;
+        toolArgs: Record<string, unknown>;
+        logSafeArgs: unknown;
+        apifyToken: string;
+        apifyClient: ApifyClient;
+        mcpSessionId: string | undefined;
+        progressToken: string | number | undefined;
+        progressTracker: ReturnType<typeof createProgressTracker>;
+        shouldForwardNotifications: boolean;
+        extra: RequestHandlerExtra<Request, Notification>;
+        actorName?: string;
+        actorId?: string;
+        taskMode: boolean;
+        // Caller-supplied log decoration (task mode: ' for task' suffix + taskId field), applied
+        // mechanically to the per-branch "Calling …" lines — no effect on dispatch behavior.
+        logContext?: { messageSuffix: string; fields: Record<string, unknown> };
+    }): Promise<{ result: Record<string, unknown>; toolStatus: ToolStatus; callDiagnostics: CallDiagnostics }> {
+        const {
+            tool,
+            toolArgs,
+            logSafeArgs,
+            apifyToken,
+            apifyClient,
+            mcpSessionId,
+            progressToken,
+            progressTracker,
+            shouldForwardNotifications,
+            extra,
+            actorName,
+            actorId,
+            taskMode,
+            logContext,
+        } = params;
+
+        let result: Record<string, unknown> = {};
+        let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
+        // Always populate actor fields so they're tracked on both success and failure paths.
+        let callDiagnostics: CallDiagnostics = { ...buildActorFields(actorName, actorId) };
+
+        switch (tool.type) {
+            case TOOL_TYPE.INTERNAL: {
+                try {
+                    log.info(`Calling internal tool${logContext?.messageSuffix ?? ''}`, {
+                        ...logContext?.fields,
+                        toolName: tool.name,
+                        mcpSessionId,
+                        input: logSafeArgs,
+                    });
+                    const res = (await tool.call({
+                        args: toolArgs,
+                        extra,
+                        apifyMcpServer: this,
+                        mcpServer: this.server,
+                        apifyToken,
+                        apifyClient,
+                        progressTracker,
+                        mcpSessionId,
+                        taskMode,
+                    })) as Record<string, unknown>;
+
+                    // Extract diagnostics and strip internal fields from res before returning to client.
+                    ({ toolStatus, callDiagnostics } = applyToolTelemetry(res, actorName, actorId, callDiagnostics));
+                    result = res;
+                } finally {
+                    progressTracker?.stop();
+                }
+                break;
+            }
+
+            case TOOL_TYPE.ACTOR_MCP: {
+                // This case never throws: connect/exec failures resolve to a soft-fail `result`
+                // (isError body) below instead. As a task, that means the outer completeTask
+                // stores it via the 'completed' path (isError body) — deliberately matching sync's
+                // own soft-fail semantics, unlike ACTOR/INTERNAL, whose thrown errors land in the
+                // task caller's 'failed' path.
+                let client: Client | null = null;
+                try {
+                    client = await connectMCPClient(tool.serverUrl, apifyToken, mcpSessionId);
+                    if (!client) {
+                        const msg = dedent`
+                            Failed to connect to MCP server at "${tool.serverUrl}".
+                            Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.
+                        `;
+                        log.softFail(msg, { mcpSessionId, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR });
+                        await this.server.sendLoggingMessage({ level: 'error', data: msg });
+                        toolStatus = TOOL_STATUS.SOFT_FAIL;
+                        callDiagnostics = { ...callDiagnostics, failure_category: FAILURE_CATEGORY.INTERNAL_ERROR };
+                        result = respondErrorNoTelemetry(msg);
+                        break;
+                    }
+
+                    // Only set up notification handlers if progressToken is provided by the client.
+                    // Gated off for tasks (shouldForwardNotifications=false): the originating request is
+                    // already answered, so forwarding against its progressToken would misroute.
+                    if (shouldForwardNotifications && progressToken !== undefined && progressToken !== null) {
+                        // Set up notification handlers for the client
+                        for (const schema of ServerNotificationSchema.options) {
+                            const method = schema.shape.method.value;
+                            // Forward notifications from the proxy client to the server
+                            client.setNotificationHandler(schema, async (notification) => {
+                                log.debug('Sending MCP notification', {
+                                    method,
+                                    mcpSessionId,
+                                    notification,
+                                });
+                                await extra.sendNotification(notification);
+                            });
+                        }
+                    }
+
+                    log.info(`Calling Actor-MCP${logContext?.messageSuffix ?? ''}`, {
+                        ...logContext?.fields,
+                        toolName: tool.name,
+                        actorMcpToolName: tool.originToolName,
+                        actorId: tool.actorId,
+                        mcpSessionId,
+                        input: logSafeArgs,
+                    });
+                    const res = await client.callTool(
+                        {
+                            name: tool.originToolName,
+                            arguments: toolArgs,
+                            // Without forwarding there is no route back for remote progress — don't
+                            // hand the remote a token nobody listens to.
+                            ...(shouldForwardNotifications ? { _meta: { progressToken } } : {}),
+                        },
+                        CallToolResultSchema,
+                        {
+                            timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
+                        },
+                    );
+
+                    // TODO: actor-mcp responses are opaque — isError could be a user input problem
+                    // (e.g. invalid query) or a genuine server failure. We can't distinguish without
+                    // parsing the error text. Defaulting to INTERNAL_ERROR for now; revisit when
+                    // actor-mcp gets deeper telemetry treatment.
+                    if ('isError' in res && res.isError) {
+                        toolStatus = TOOL_STATUS.SOFT_FAIL;
+                        callDiagnostics = {
+                            failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
+                            ...buildActorFields(actorName, actorId),
+                        };
+                    }
+
+                    result = { ...res };
+                } catch (error) {
+                    toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
+                    const failureDetail =
+                        error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+                    callDiagnostics = {
+                        failure_category: classifyFailureCategory(error),
+                        failure_detail: failureDetail,
+                        ...buildActorFields(actorName, actorId),
+                    };
+                    logHttpError(error, `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`, {
+                        actorId: tool.actorId,
+                        toolName: tool.originToolName,
+                        failureCategory: callDiagnostics.failure_category,
+                    });
+                    result = respondErrorNoTelemetry(
+                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${remoteMcpFailureDetail(error)}`,
+                    );
+                } finally {
+                    if (client) await client.close();
+                }
+                break;
+            }
+
+            case TOOL_TYPE.ACTOR: {
+                try {
+                    log.info(`Calling Actor${logContext?.messageSuffix ?? ''}`, {
+                        ...logContext?.fields,
+                        toolName: tool.name,
+                        actorName: tool.actorFullName,
+                        mcpSessionId,
+                        input: logSafeArgs,
+                    });
+                    const executorResult = await actorExecutor.executeActorTool({
+                        actorFullName: tool.actorFullName,
+                        input: toolArgs,
+                        apifyClient,
+                        callOptions: { memory: tool.memoryMbytes },
+                        progressTracker,
+                        abortSignal: extra.signal,
+                        mcpSessionId,
+                        datasetItemsSchema: tool.datasetItemsSchema,
+                        taskMode,
+                    });
+
+                    if (!executorResult) {
+                        toolStatus = TOOL_STATUS.ABORTED;
+                        // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
+                        // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
+                        result = {};
+                        break;
+                    }
+
+                    // Mirror the INTERNAL branch: read the telemetry the executor embedded on error
+                    // results (e.g. respondUserError → SOFT_FAIL/INVALID_INPUT), strip it from the wire,
+                    // and set failure_category so the report-problem nudge picks the softer variant.
+                    ({ toolStatus, callDiagnostics } = applyToolTelemetry(
+                        executorResult as Record<string, unknown>,
+                        actorName,
+                        actorId,
+                        callDiagnostics,
+                    ));
+                    result = executorResult;
+                } finally {
+                    if (progressTracker) {
+                        progressTracker.stop();
+                    }
+                }
+                break;
+            }
+
+            default:
+                // Exhaustiveness guard mirroring getToolFullName: a new TOOL_TYPE member makes `tool`
+                // non-`never` here and fails `satisfies never` at compile time. Unreachable at runtime —
+                // ToolEntry is a closed 3-way union. Unlike the pre-extraction fall-through (which also
+                // listed available tools, called log.softFail, and sent a logging message before
+                // throwing), this just throws InvalidParams with no side effects.
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Unknown tool type "${(tool satisfies never as ToolEntry).type}"`,
+                );
+        }
+
+        return { result, toolStatus, callDiagnostics };
+    }
+
+    // TODO: outer orchestration here (pre-flight, telemetry bookkeeping, task-store handling) still duplicates the CallToolRequestSchema handler's logic; the dispatch ladder is now shared. Refactor.
     /**
      * Executes a tool asynchronously for a long-running task and updates task status.
      *
@@ -1679,6 +1768,26 @@ export class ActorsMcpServer {
             });
         };
 
+        // Terminal step shared by every task outcome: store the result (expiry-tolerant),
+        // emit the status notification, record telemetry.
+        const completeTask = async (
+            storeStatus: 'completed' | 'failed',
+            taskResult: Record<string, unknown>,
+            status: ToolStatus,
+            diagnostics: CallDiagnostics | undefined,
+        ): Promise<void> => {
+            await storeTaskResultOrSkipIfExpired(
+                this.taskStore,
+                tool.name,
+                taskId,
+                storeStatus,
+                taskResult,
+                mcpSessionId,
+            );
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
+            finishTaskTracking(status, diagnostics, taskResult);
+        };
+
         // Once a task is cancelled the spec forbids writing a result; every storage path
         // must short-circuit here. `logSuffix` is concatenated after "Task was cancelled"
         // so we keep the existing log format and the existing telemetry status per path.
@@ -1740,94 +1849,32 @@ export class ActorsMcpServer {
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
             };
 
-            // Handle internal tool execution in task mode
-            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === TOOL_TYPE.INTERNAL) {
-                const progressTracker = createProgressTracker(
-                    progressToken,
-                    extra.sendNotification,
-                    taskId,
-                    onStatusMessage,
-                );
-
-                try {
-                    log.info('Calling internal tool for task', {
-                        taskId,
-                        toolName: tool.name,
-                        mcpSessionId,
-                        input: logSafeArgs,
-                    });
-                    const res = (await tool.call({
-                        args: toolArgs,
-                        extra: taskExtra,
-                        apifyMcpServer: this,
-                        mcpServer: this.server,
-                        apifyToken,
-                        apifyClient,
-                        progressTracker,
-                        mcpSessionId,
-                        taskMode: true,
-                    })) as Record<string, unknown>;
-
-                    ({ toolStatus, callDiagnostics } = applyToolTelemetry(res, actorName, actorId, callDiagnostics));
-                    result = res;
-                } finally {
-                    if (progressTracker) {
-                        progressTracker.stop();
-                    }
-                }
-            }
-
-            // Handle actor tool execution in task mode
-            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === TOOL_TYPE.ACTOR) {
-                const progressTracker = createProgressTracker(
-                    progressToken,
-                    extra.sendNotification,
-                    taskId,
-                    onStatusMessage,
-                );
-
-                try {
-                    log.info('Calling Actor for task', {
-                        taskId,
-                        toolName: tool.name,
-                        actorName: tool.actorFullName,
-                        mcpSessionId,
-                        input: logSafeArgs,
-                    });
-                    const executorResult = await actorExecutor.executeActorTool({
-                        actorFullName: tool.actorFullName,
-                        input: toolArgs,
-                        apifyClient,
-                        callOptions: { memory: tool.memoryMbytes },
-                        progressTracker,
-                        abortSignal: cancelWatcher.signal,
-                        mcpSessionId,
-                        datasetItemsSchema: tool.datasetItemsSchema,
-                        taskMode: true,
-                    });
-
-                    if (!executorResult) {
-                        toolStatus = TOOL_STATUS.ABORTED;
-                        // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
-                        // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
-                        result = {};
-                    } else {
-                        // Mirror the INTERNAL task branch: extract embedded telemetry so failure_category
-                        // drives the success-path nudge below and toolTelemetry is stripped from the wire.
-                        ({ toolStatus, callDiagnostics } = applyToolTelemetry(
-                            executorResult as Record<string, unknown>,
-                            actorName,
-                            actorId,
-                            callDiagnostics,
-                        ));
-                        result = executorResult;
-                    }
-                } finally {
-                    if (progressTracker) {
-                        progressTracker.stop();
-                    }
-                }
-            }
+            // ACTOR_MCP never reads the tracker (matching the sync path, which passes null for it);
+            // INTERNAL/ACTOR get one built from taskId + onStatusMessage, which dispatch consumes
+            // and stops.
+            const progressTracker =
+                tool.type === TOOL_TYPE.ACTOR_MCP
+                    ? null
+                    : createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
+            const dispatchResult = await this.dispatchToolCall({
+                tool,
+                toolArgs,
+                logSafeArgs,
+                apifyToken,
+                apifyClient,
+                mcpSessionId,
+                progressToken,
+                progressTracker,
+                shouldForwardNotifications: false,
+                extra: taskExtra,
+                actorName,
+                actorId,
+                taskMode: true,
+                logContext: { messageSuffix: ' for task', fields: { taskId } },
+            });
+            result = dispatchResult.result;
+            toolStatus = dispatchResult.toolStatus;
+            callDiagnostics = dispatchResult.callDiagnostics;
 
             // Check if task was cancelled before storing result
             if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
@@ -1846,11 +1893,8 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            await storeTaskResultOrSkipIfExpired(this.taskStore, tool.name, taskId, 'completed', result, mcpSessionId);
+            await completeTask('completed', result, toolStatus, callDiagnostics);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
-            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-
-            finishTaskTracking(toolStatus, callDiagnostics, result);
         } catch (error) {
             // Reached only when the task expired before the `working` transition (updateTaskStatus
             // above rethrows the store's unknown-taskId error). The tool never ran and the task is
@@ -1887,16 +1931,12 @@ export class ActorsMcpServer {
                     })
                 )
                     return;
-                await storeTaskResultOrSkipIfExpired(
-                    this.taskStore,
-                    tool.name,
-                    taskId,
+                await completeTask(
                     'completed',
                     errorResult.response,
-                    mcpSessionId,
+                    errorResult.toolStatus,
+                    errorResult.callDiagnostics,
                 );
-                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-                finishTaskTracking(errorResult.toolStatus, errorResult.callDiagnostics, errorResult.response);
                 return;
             }
 
@@ -1912,16 +1952,12 @@ export class ActorsMcpServer {
                     })
                 )
                     return;
-                await storeTaskResultOrSkipIfExpired(
-                    this.taskStore,
-                    tool.name,
-                    taskId,
+                await completeTask(
                     'completed',
                     errorResult.response,
-                    mcpSessionId,
+                    errorResult.toolStatus,
+                    errorResult.callDiagnostics,
                 );
-                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-                finishTaskTracking(errorResult.toolStatus, errorResult.callDiagnostics, errorResult.response);
                 return;
             }
 
@@ -1964,10 +2000,11 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            // Nudge on a genuinely-failed task result. INTERNAL_ERROR and an unknown category get the
-            // full nudge; a genuine INVALID_INPUT gets the softer nudge; payment (402) is suppressed via
-            // the HTTP status and AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES.
-            // The 402 branch above returns before reaching here, so this only sees non-payment failures.
+            // Nudge on a genuinely-failed task result (mirrors the completed path and the sync
+            // captureResult). INTERNAL_ERROR and an unknown category get the full nudge; a genuine
+            // INVALID_INPUT gets the softer nudge; payment (402) is suppressed via the HTTP status and
+            // AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES. The 402 branch above
+            // returns before reaching here, so this only sees non-payment failures.
             const failedResult = this.withReportProblemNudge(
                 {
                     content: [
@@ -1983,17 +2020,7 @@ export class ActorsMcpServer {
                 callDiagnostics.failure_category,
                 callDiagnostics.failure_http_status,
             );
-            await storeTaskResultOrSkipIfExpired(
-                this.taskStore,
-                tool.name,
-                taskId,
-                'failed',
-                failedResult,
-                mcpSessionId,
-            );
-            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-
-            finishTaskTracking(toolStatus, callDiagnostics, failedResult);
+            await completeTask('failed', failedResult, toolStatus, callDiagnostics);
         } finally {
             cancelWatcher.dispose();
         }
