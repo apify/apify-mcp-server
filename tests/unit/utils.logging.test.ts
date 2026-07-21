@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 
 import log from '@apify/log';
 
@@ -16,6 +17,7 @@ describe('isMcpClientFaultMessage', () => {
         for (const message of [
             'Bad Request: Server not initialized',
             'Invalid Request: Only one initialization request is allowed',
+            'Invalid Request: Server already initialized',
             'Not Acceptable: Client must accept text/event-stream',
             'Not Acceptable: Client must accept both application/json and text/event-stream',
             'Parse error: Invalid JSON',
@@ -34,6 +36,11 @@ describe('isMcpClientFaultMessage', () => {
         ).toBe(true);
         expect(isMcpClientFaultMessage('Failed to send response: Error: Not connected')).toBe(true);
         expect(isMcpClientFaultMessage('Invalid state: Controller is already closed')).toBe(true);
+        expect(
+            isMcpClientFaultMessage(
+                'Bad Request: Unsupported protocol version: 2025-11-25, 2025-11-25 (supported versions: 2025-11-25)',
+            ),
+        ).toBe(true);
     });
 
     it('does not match substrings or near-misses (avoids catching other libraries)', () => {
@@ -42,6 +49,7 @@ describe('isMcpClientFaultMessage', () => {
         expect(isMcpClientFaultMessage('Database connection: Not connected to replica')).toBe(false);
         expect(isMcpClientFaultMessage('Parse error: Invalid YAML')).toBe(false);
         expect(isMcpClientFaultMessage('Server not initialized yet, retrying')).toBe(false);
+        expect(isMcpClientFaultMessage('Unsupported protocol version in docs')).toBe(false);
     });
 });
 
@@ -90,6 +98,65 @@ describe('logHttpError', () => {
         expect(softFail).toHaveBeenCalledTimes(1);
         expect(exception).not.toHaveBeenCalled();
         expect(error).not.toHaveBeenCalled();
+    });
+
+    it('soft-fails Zod validation failures from untrusted MCP tools/list payloads', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
+        const error = vi.spyOn(log, 'error').mockImplementation(() => log);
+
+        logHttpError(new ZodError([]), `Failed to list MCP tools for Actor 'red.cars/example'`);
+
+        expect(softFail).toHaveBeenCalledTimes(1);
+        expect(exception).not.toHaveBeenCalled();
+        expect(error).not.toHaveBeenCalled();
+    });
+
+    it('soft-fails Zod-shaped errors even when name is $ZodError (SDK / Zod 4)', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const errorLog = vi.spyOn(log, 'error').mockImplementation(() => log);
+        const zodShaped = Object.assign(new Error('Invalid input'), { name: '$ZodError', issues: [] });
+
+        logHttpError(zodShaped, `Failed to list MCP tools for Actor 'red.cars/example'`);
+
+        expect(softFail).toHaveBeenCalledTimes(1);
+        expect(errorLog).not.toHaveBeenCalled();
+    });
+
+    it('soft-fails remote transport failures (socket hang up) even when wrapped as HTTP 500', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
+        const error = Object.assign(
+            new Error('Streamable HTTP error: Error POSTing to endpoint: Error: socket hang up'),
+            { statusCode: 500 },
+        );
+
+        logHttpError(error, 'Failed to load tools from MCP server');
+
+        expect(exception).not.toHaveBeenCalled();
+        expect(softFail).toHaveBeenCalledTimes(1);
+    });
+
+    it('soft-fails gateway timeouts from upstream docs or Actor MCP', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
+        const error = Object.assign(new Error('HTTP 504 Gateway Time-out'), { statusCode: 504 });
+
+        logHttpError(error, 'Failed to fetch the documentation page');
+
+        expect(exception).not.toHaveBeenCalled();
+        expect(softFail).toHaveBeenCalledTimes(1);
+    });
+
+    it('still exceptions genuine upstream 500s that are not transport noise', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
+        const error = Object.assign(new Error('Internal server failure in Apify API'), { statusCode: 500 });
+
+        logHttpError(error, 'Failed to get Actor run');
+
+        expect(softFail).not.toHaveBeenCalled();
+        expect(exception).toHaveBeenCalledTimes(1);
     });
 });
 
