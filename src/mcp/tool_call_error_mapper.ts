@@ -83,7 +83,7 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
         };
     }
 
-    const { toolStatus, callDiagnostics } = buildExecutionDiagnostics(error, isAborted, actorName, actorId);
+    const { toolStatus, callDiagnostics } = buildExecutionDiagnostics({ error, isAborted, actorName, actorId });
     return {
         kind: TOOL_CALL_ERROR_KIND.EXECUTION,
         toolStatus,

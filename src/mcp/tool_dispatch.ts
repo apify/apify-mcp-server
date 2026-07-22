@@ -193,12 +193,12 @@ export async function dispatchToolCall(params: {
 
                 result = { ...res };
             } catch (error) {
-                ({ toolStatus, callDiagnostics } = buildExecutionDiagnostics(
+                ({ toolStatus, callDiagnostics } = buildExecutionDiagnostics({
                     error,
-                    Boolean(extra.signal?.aborted),
+                    isAborted: Boolean(extra.signal?.aborted),
                     actorName,
                     actorId,
-                ));
+                }));
                 logHttpError(error, `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`, {
                     actorId: tool.actorId,
                     toolName: tool.originToolName,

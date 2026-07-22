@@ -102,6 +102,14 @@ export function classifyFailureCategory(error: unknown): FailureCategory {
     return FAILURE_CATEGORY.INTERNAL_ERROR;
 }
 
+/** Inputs for {@link buildExecutionDiagnostics}. */
+export type ExecutionDiagnosticsParams = {
+    error: unknown;
+    isAborted: boolean;
+    actorName: string | undefined;
+    actorId: string | undefined;
+};
+
 /**
  * Builds the execution-arm telemetry shared by the generic mapper's EXECUTION branch and the
  * ACTOR_MCP inner catch: the abort-aware `toolStatus`, plus `callDiagnostics` carrying
@@ -109,12 +117,11 @@ export function classifyFailureCategory(error: unknown): FailureCategory {
  * and the actor fields. Field set and order match the mapper's EXECUTION arm exactly. Callers add
  * their own `userText`/`response` and do their own logging.
  */
-export function buildExecutionDiagnostics(
-    error: unknown,
-    isAborted: boolean,
-    actorName: string | undefined,
-    actorId: string | undefined,
-): { toolStatus: ToolStatus; callDiagnostics: CallDiagnostics } {
+export function buildExecutionDiagnostics(params: ExecutionDiagnosticsParams): {
+    toolStatus: ToolStatus;
+    callDiagnostics: CallDiagnostics;
+} {
+    const { error, isAborted, actorName, actorId } = params;
     const httpStatus = getHttpStatusCode(error);
     const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
     return {

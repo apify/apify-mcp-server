@@ -98,7 +98,12 @@ describe('buildExecutionDiagnostics', () => {
 
     it('includes failure_http_status for an HTTP-range-status error', () => {
         const error = Object.assign(new Error('server exploded'), { statusCode: 500 });
-        const { toolStatus, callDiagnostics } = buildExecutionDiagnostics(error, false, ACTOR_NAME, ACTOR_ID);
+        const { toolStatus, callDiagnostics } = buildExecutionDiagnostics({
+            error,
+            isAborted: false,
+            actorName: ACTOR_NAME,
+            actorId: ACTOR_ID,
+        });
 
         expect(toolStatus).toBe(TOOL_STATUS.FAILED);
         expect(callDiagnostics.failure_http_status).toBe(500);
@@ -106,13 +111,23 @@ describe('buildExecutionDiagnostics', () => {
     });
 
     it('omits failure_http_status when the error carries no HTTP status', () => {
-        const { callDiagnostics } = buildExecutionDiagnostics(new Error('no status'), false, ACTOR_NAME, ACTOR_ID);
+        const { callDiagnostics } = buildExecutionDiagnostics({
+            error: new Error('no status'),
+            isAborted: false,
+            actorName: ACTOR_NAME,
+            actorId: ACTOR_ID,
+        });
         expect(callDiagnostics).not.toHaveProperty('failure_http_status');
         expect(callDiagnostics.failure_detail).toBe('no status');
     });
 
     it('truncates failure_detail to 200 chars', () => {
-        const { callDiagnostics } = buildExecutionDiagnostics(new Error('x'.repeat(300)), false, undefined, undefined);
+        const { callDiagnostics } = buildExecutionDiagnostics({
+            error: new Error('x'.repeat(300)),
+            isAborted: false,
+            actorName: undefined,
+            actorId: undefined,
+        });
         expect(callDiagnostics.failure_detail).toHaveLength(200);
     });
 
@@ -120,7 +135,12 @@ describe('buildExecutionDiagnostics', () => {
         // Both the ACTOR_MCP catch and the generic mapper now share this builder, so their execution
         // diagnostics must be identical for the same input (the whole point of the extraction).
         const error = Object.assign(new Error('server exploded'), { statusCode: 500 });
-        const fromBuilder = buildExecutionDiagnostics(error, false, ACTOR_NAME, ACTOR_ID).callDiagnostics;
+        const fromBuilder = buildExecutionDiagnostics({
+            error,
+            isAborted: false,
+            actorName: ACTOR_NAME,
+            actorId: ACTOR_ID,
+        }).callDiagnostics;
         const fromMapper = buildToolCallErrorResult(error, {
             toolName: 'test-tool',
             actorName: ACTOR_NAME,
