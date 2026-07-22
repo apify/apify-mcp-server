@@ -780,10 +780,25 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(outputText).not.toContain('This Actor is rental');
             });
 
-            // Four add-actor-specific cases (list-changed notification, its own error strings, x402
-            // rejection, MCP-server proxy registration) removed — unreachable now add-actor is
-            // substituted (PR 0). Unit coverage stays in tests/unit/tools.add_actor.test.ts until PR 2;
-            // x402/actor:tool coverage lives in the tests below, via call-actor.
+            it('should return an Actor-not-found error when calling a non-existent actor via call-actor', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                const nonExistentActor = 'apify/this-actor-does-not-exist';
+                const result = await client.callTool({
+                    name: HELPER_TOOLS.ACTOR_CALL,
+                    arguments: { actor: nonExistentActor, input: {} },
+                });
+                expect(result).toBeDefined();
+                expect(result.isError).toBe(true);
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toContain(nonExistentActor);
+                expect(content[0].text).toContain('was not found');
+            });
+
+            // Three add-actor-specific cases (list-changed notification, x402 rejection, MCP-server
+            // proxy registration) removed — unreachable now add-actor is substituted (PR 0). Unit
+            // coverage stays in tests/unit/tools.add_actor.test.ts until PR 2; x402/actor:tool
+            // coverage lives in the tests below, via call-actor.
 
             // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
             // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4
