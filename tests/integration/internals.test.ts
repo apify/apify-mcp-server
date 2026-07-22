@@ -11,7 +11,7 @@ import { addActor } from '../../src/tools/actors/add_actor.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
 import type { Input } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
-import { loadToolsFromInput } from '../../src/utils/tools_loader.js';
+import { AUTO_INJECTED_TOOLS, loadToolsFromInput } from '../../src/utils/tools_loader.js';
 import { ACTOR_NORMAL_MODE } from '../const.js';
 import { expectArrayWeakEquals } from '../helpers.js';
 
@@ -88,7 +88,10 @@ describe('MCP server internals integration tests', () => {
         await actorsMcpServer.loadToolsByName(names, apifyClient);
 
         // Must resolve to itself — restore is not a live selector, so the substitution must not fire.
-        expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), [addActor.name]);
+        // add-actor's presence auto-injects the run/storage helpers (pre-existing tools_loader
+        // behavior, unrelated to this PR) — the restored set is add-actor plus those, not add-actor alone.
+        const expectedToolNames = [addActor.name, ...AUTO_INJECTED_TOOLS.map((t) => t.name)];
+        expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), expectedToolNames);
     });
 
     it('should notify tools changed handler on tool modifications', async () => {

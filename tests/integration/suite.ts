@@ -1675,25 +1675,29 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             });
 
             // The `dev` category holds only report-problem, which is telemetry-gated (off in this suite),
-            // so it can't load standalone here; its gating is covered by unit tests. Exclude it from the
+            // so it can't load standalone here; its gating is covered by unit tests. `experimental`'s
+            // sole member (add-actor) is substituted for call-actor at selection time for any new
+            // connection (PR 0), so its raw registry members no longer match what a live selector
+            // loads — covered instead by the dedicated substitution tests above. Exclude both from the
             // category sweep.
-            it.for(Object.keys(getCategoryTools('default')).filter((category) => category !== 'dev'))(
-                'should load correct tools for %s category',
-                async (category) => {
-                    client = await createClientFn({
-                        tools: [category as ToolCategory],
-                    });
+            it.for(
+                Object.keys(getCategoryTools('default')).filter(
+                    (category) => category !== 'dev' && category !== 'experimental',
+                ),
+            )('should load correct tools for %s category', async (category) => {
+                client = await createClientFn({
+                    tools: [category as ToolCategory],
+                });
 
-                    const loadedTools = await client.listTools();
-                    const toolNames = getToolNames(loadedTools);
+                const loadedTools = await client.listTools();
+                const toolNames = getToolNames(loadedTools);
 
-                    const expectedToolNames = getExpectedToolNamesByCategories([category as ToolCategory]);
-                    // Only assert that all tools from the selected category are present.
-                    for (const expectedToolName of expectedToolNames) {
-                        expect(toolNames).toContain(expectedToolName);
-                    }
-                },
-            );
+                const expectedToolNames = getExpectedToolNamesByCategories([category as ToolCategory]);
+                // Only assert that all tools from the selected category are present.
+                for (const expectedToolName of expectedToolNames) {
+                    expect(toolNames).toContain(expectedToolName);
+                }
+            });
 
             it('should include call-actor (add-actor substituted) when experimental category is selected even if enableAddingActors is false', async () => {
                 client = await createClientFn({
