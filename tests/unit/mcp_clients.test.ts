@@ -1,7 +1,7 @@
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
-import { isReportProblemBlockedForClient } from '../../src/utils/mcp_clients.js';
+import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../../src/utils/mcp_clients.js';
 
 function initRequest(clientName?: string): InitializeRequest | undefined {
     if (clientName === undefined) return undefined;
@@ -32,5 +32,26 @@ describe('isReportProblemBlockedForClient', () => {
 
     it('does not block when there is no initialize request data', () => {
         expect(isReportProblemBlockedForClient(undefined)).toBe(false);
+    });
+});
+
+describe('getRequestOriginForClient()', () => {
+    it('maps the Apify Console AI chat client to APIFY_AI', () => {
+        expect(getRequestOriginForClient(initRequest('apify-console-ai-chat'))).toBe('APIFY_AI');
+    });
+
+    it.each(['cursor', 'claude-ai', 'vscode', ''])('maps the unrelated client "%s" to MCP', (clientName) => {
+        expect(getRequestOriginForClient(initRequest(clientName))).toBe('MCP');
+    });
+
+    it.each(['apify-console-ai-chat-v2', 'Apify-Console-AI-Chat'])(
+        'maps the near-miss client "%s" to MCP (exact match only)',
+        (clientName) => {
+            expect(getRequestOriginForClient(initRequest(clientName))).toBe('MCP');
+        },
+    );
+
+    it('maps a missing initialize request to MCP', () => {
+        expect(getRequestOriginForClient(undefined)).toBe('MCP');
     });
 });

@@ -7,6 +7,7 @@ import { HELPER_TOOLS, TOOL_STATUS } from '../const.js';
 import { buildReportedProblemProperties, trackReportedProblem, trackToolCall } from '../telemetry.js';
 import type { CallDiagnostics, ToolCallTelemetryProperties, ToolStatus } from '../types.js';
 import { computeToolResponseBytes } from '../utils/mcp.js';
+import { getRequestOriginForClient } from '../utils/mcp_clients.js';
 import { deriveResourceIds } from '../utils/tool_status.js';
 import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
@@ -33,7 +34,8 @@ export async function prepareTelemetryData(
     // Get userId from cache or fetch from API
     let userId: string | null = null;
     if (apifyToken) {
-        const apifyClient = new ApifyClient({ token: apifyToken });
+        const requestOrigin = getRequestOriginForClient(apifyMcpServer.options.initializeRequestData);
+        const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
         ({ userId } = await getUserInfoCached(apifyToken, apifyClient));
         log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
     }

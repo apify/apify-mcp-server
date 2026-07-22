@@ -8,12 +8,20 @@ const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 
 // Request origin headers
 const REQUEST_ORIGIN_HEADER = 'X-Apify-Request-Origin';
-const REQUEST_ORIGIN_VALUE = 'MCP';
+
+/** Values sent in the X-Apify-Request-Origin header; expected to correspond to `META_ORIGINS` in `@apify/consts` on the backend. */
+export const REQUEST_ORIGIN = {
+    MCP: 'MCP',
+    APIFY_AI: 'APIFY_AI',
+} as const;
+export type REQUEST_ORIGIN = (typeof REQUEST_ORIGIN)[keyof typeof REQUEST_ORIGIN];
 
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
     /** Payment headers to forward on outbound API requests (from PaymentProvider.getPaymentHeaders) */
     paymentHeaders?: PaymentHeaders;
+    /** Value for the X-Apify-Request-Origin header. Defaults to MCP. */
+    requestOrigin?: REQUEST_ORIGIN;
 };
 
 export function getApifyAPIBaseUrl(): string {
@@ -35,9 +43,12 @@ export class ApifyClient extends _ApifyClient {
             delete options.token;
         }
 
-        const { paymentHeaders, ...clientOptions } = options;
-        // Static headers: MCP origin plus any payment headers from a PaymentProvider.
-        const staticHeaders = { [REQUEST_ORIGIN_HEADER]: REQUEST_ORIGIN_VALUE, ...paymentHeaders };
+        const { paymentHeaders, requestOrigin, ...clientOptions } = options;
+        // Static headers: request origin plus any payment headers from a PaymentProvider.
+        const staticHeaders = {
+            [REQUEST_ORIGIN_HEADER]: requestOrigin ?? REQUEST_ORIGIN.MCP,
+            ...paymentHeaders,
+        };
 
         super({
             // token null case is handled, we can assert type here

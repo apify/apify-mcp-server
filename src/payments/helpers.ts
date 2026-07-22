@@ -1,3 +1,4 @@
+import type { REQUEST_ORIGIN } from '../apify_client.js';
 import { ApifyClient } from '../apify_client.js';
 import type { ApifyToken, ToolEntry } from '../types.js';
 import { buildPaymentRequiredResponse, registerPaymentRequiredInterceptor } from '../utils/payment_errors.js';
@@ -42,11 +43,13 @@ export function prepareToolCallContext(input: {
     apifyToken: ApifyToken;
     meta?: PaymentMeta;
     requestHeaders?: RequestHeaders;
+    /** Request origin to attribute started runs to (from getRequestOriginForClient). Defaults to MCP. */
+    requestOrigin?: REQUEST_ORIGIN;
 }): PrepareToolCallContextResult {
-    const { provider, tool, args, apifyToken, meta, requestHeaders } = input;
+    const { provider, tool, args, apifyToken, meta, requestHeaders, requestOrigin } = input;
 
     if (!provider) {
-        const apifyClient = new ApifyClient({ token: apifyToken });
+        const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
         registerPaymentRequiredInterceptor(apifyClient);
         return {
             toolArgsWithoutPayment: { ...args },
@@ -63,8 +66,8 @@ export function prepareToolCallContext(input: {
     const paymentHeaders = provider.getPaymentHeaders(args, meta, requestHeaders);
     const apifyClient =
         Object.keys(paymentHeaders).length > 0
-            ? new ApifyClient({ paymentHeaders })
-            : new ApifyClient({ token: apifyToken });
+            ? new ApifyClient({ paymentHeaders, requestOrigin })
+            : new ApifyClient({ token: apifyToken, requestOrigin });
     registerPaymentRequiredInterceptor(apifyClient);
 
     return {

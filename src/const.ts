@@ -70,6 +70,12 @@ export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
  */
 export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
 
+/**
+ * `clientInfo.name` sent by the Apify Console AI chat backend during the MCP initialize handshake.
+ * Runs started by this client are attributed to the APIFY_AI request origin.
+ */
+export const APIFY_AI_CLIENT_NAME = 'apify-console-ai-chat';
+
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
 export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool when user wants to GET or RETRIEVE actual data immediately (one-time data retrieval).

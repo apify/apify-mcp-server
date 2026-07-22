@@ -7,13 +7,14 @@
  * MCP-side rental over-fetch / filter is needed.
  */
 
-import { ApifyClient } from '../apify_client.js';
+import type { ApifyClient } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import type { ActorStoreList } from '../types.js';
 
 export type SearchActorsByKeywordsOptions = {
     search: string;
-    apifyToken: string;
+    /** Caller's already-configured client — reused so the request-origin header stays correct. */
+    apifyClient: ApifyClient;
     limit: number;
     offset?: number;
     allowsAgenticUsers?: boolean;
@@ -23,16 +24,15 @@ export type SearchActorsByKeywordsOptions = {
 
 export type SearchAgentSafeActorsOptions = {
     keywords: string;
-    apifyToken: string;
+    apifyClient: ApifyClient;
     limit: number;
     offset: number;
     paymentProvider?: PaymentProvider;
 };
 
 export async function searchActorsByKeywords(options: SearchActorsByKeywordsOptions): Promise<ActorStoreList[]> {
-    const { search, apifyToken, limit, offset, allowsAgenticUsers, includeInputSchema } = options;
-    const client = new ApifyClient({ token: apifyToken });
-    const storeClient = client.store();
+    const { search, apifyClient, limit, offset, allowsAgenticUsers, includeInputSchema } = options;
+    const storeClient = apifyClient.store();
     if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
     if (includeInputSchema !== undefined) storeClient.params = { ...storeClient.params, includeInputSchema };
 
@@ -47,11 +47,11 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
  * at apify-core's hard cap (`MAX_LIMIT_WITH_INPUT_SCHEMA`).
  */
 export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<ActorStoreList[]> {
-    const { keywords, apifyToken, limit, offset, paymentProvider } = options;
+    const { keywords, apifyClient, limit, offset, paymentProvider } = options;
 
     return searchActorsByKeywords({
         search: keywords,
-        apifyToken,
+        apifyClient,
         limit,
         offset,
         allowsAgenticUsers: paymentProvider ? true : undefined,

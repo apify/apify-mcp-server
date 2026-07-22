@@ -78,7 +78,7 @@ export async function fetchActorDetails(
                 actor.defaultBuild().then(async (build) => build.get()),
                 searchActorsByKeywords({
                     search: actorSlug,
-                    apifyToken: apifyClient.token || '',
+                    apifyClient,
                     limit: ACTOR_DETAILS_PICTURE_SEARCH_LIMIT,
                 }).catch(() => []),
             ]);

@@ -73,7 +73,7 @@ import type {
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
-import { isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
+import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -654,10 +654,13 @@ export class ActorsMcpServer {
      * Token-scoped client for resources/read (the API proxy needs auth). Deliberately token-only:
      * unlike the CallTool path it does NOT forward provider/payment headers, so a payment-only
      * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
+     * Still carries the request-origin tag — `initializeRequestData` is already set by this point.
      */
     private resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
         const token = this.resolveApifyToken(params._meta);
-        return token ? new ApifyClient({ token }) : undefined;
+        return token
+            ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(this.options.initializeRequestData) })
+            : undefined;
     }
 
     private setupResourceHandlers(): void {
@@ -992,6 +995,7 @@ export class ActorsMcpServer {
                     apifyToken,
                     meta,
                     requestHeaders: extra.requestInfo?.headers,
+                    requestOrigin: getRequestOriginForClient(this.options.initializeRequestData),
                 });
 
                 log.debug('Validate arguments for tool', { toolName: tool.name, mcpSessionId, input: logSafeArgs });

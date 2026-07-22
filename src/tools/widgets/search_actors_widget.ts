@@ -66,7 +66,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         const [actors, { userPlanTier }] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,
-                apifyToken,
+                apifyClient,
                 limit: parsed.limit,
                 offset: parsed.offset,
                 paymentProvider: apifyMcpServer.options.paymentProvider,
