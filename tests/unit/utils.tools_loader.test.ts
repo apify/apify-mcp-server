@@ -184,7 +184,7 @@ describe('getToolsForServerMode add-actor selector cutoff (PR 0)', () => {
         expect(toolNames.filter((n) => n === HELPER_TOOLS.ACTOR_CALL)).toHaveLength(1);
     });
 
-    it("resolves a restored session's stored add-actor name to itself (isRestore bypass)", () => {
+    it("resolves a restored session's stored add-actor name to itself (isSessionRestore bypass)", () => {
         const toolNames = getToolsForServerMode({ tools: [HELPER_TOOLS.ACTOR_ADD] }, [], 'default', true).map(
             (t) => t.name,
         );

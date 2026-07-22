@@ -82,7 +82,6 @@ function getTokenFromAuthFile(): string | undefined {
     }
 }
 
-// Configure logging, set to ERROR
 log.setLevel(log.LEVELS.ERROR);
 const packageVersion = getPackageVersion() ?? '0.0.0';
 
@@ -100,8 +99,7 @@ const argv = yargs(hideBin(process.argv))
     .option('enable-adding-actors', {
         type: 'boolean',
         default: false,
-        describe: `Enable dynamically adding Actors as tools based on user requests. Can also be set via ENABLE_ADDING_ACTORS environment variable.
-Deprecated: use tools call-actor instead.`,
+        describe: `Deprecated: no longer adds Actors dynamically — substitutes call-actor. Use tools call-actor instead. Can also be set via ENABLE_ADDING_ACTORS environment variable.`,
     })
     .option('enableActorAutoLoading', {
         type: 'boolean',

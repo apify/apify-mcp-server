@@ -285,7 +285,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
             });
 
-            it('should substitute call-actor for add-actor and auto-inject storage/abort tools when enableAddingActors is true', async () => {
+            it('substitutes call-actor for add-actor and auto-injects the run/storage/abort helpers when enableAddingActors is true', async () => {
                 client = await createClientFn({ enableAddingActors: true });
                 const names = getToolNames(await client.listTools());
                 // call-actor (substituted for add-actor, PR 0) triggers auto-injected helpers (get-actor-run, storage, abort).
@@ -794,11 +794,6 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(content[0].text).toContain(nonExistentActor);
                 expect(content[0].text).toContain('was not found');
             });
-
-            // Three add-actor-specific cases (list-changed notification, x402 rejection, MCP-server
-            // proxy registration) removed — unreachable now add-actor is substituted (PR 0). Unit
-            // coverage stays in tests/unit/tools.add_actor.test.ts until PR 2; x402/actor:tool
-            // coverage lives in the tests below, via call-actor.
 
             // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
             // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4

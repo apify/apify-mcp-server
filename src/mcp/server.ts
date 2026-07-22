@@ -174,7 +174,7 @@ export class ActorsMcpServer {
      * We capture the exact actor-tool slice fetched for each request so the flush composes every
      * entry against *its own* actor list rather than the accumulated union across unrelated requests.
      */
-    private pendingToolsUntilClientKnown: { input: Input; actorTools: ToolEntry[]; isRestore: boolean }[] = [];
+    private pendingToolsUntilClientKnown: { input: Input; actorTools: ToolEntry[]; isSessionRestore: boolean }[] = [];
 
     // Telemetry configuration (resolved from options and env vars, see setupTelemetry)
     public readonly telemetryEnabled: boolean;
@@ -347,9 +347,12 @@ export class ActorsMcpServer {
      * and re-added by the initialize flush. Used by every input-driven load path and the flush.
      * (loadActorsAsTools upserts actor tools directly; actor tools are never gated, so they need no
      * filtering.)
+     *
+     * @param isSessionRestore - forwarded to `getToolsForServerMode`; keeps a restored session's stored
+     * `add-actor` name resolving to itself instead of being substituted with `call-actor`.
      */
-    private composeToolsForClient(input: Input, actorTools: ToolEntry[], isRestore = false): ToolEntry[] {
-        const tools = getToolsForServerMode(input, actorTools, this.serverMode, isRestore);
+    private composeToolsForClient(input: Input, actorTools: ToolEntry[], isSessionRestore = false): ToolEntry[] {
+        const tools = getToolsForServerMode(input, actorTools, this.serverMode, isSessionRestore);
         if (this.isReportProblemServable()) return tools;
         return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
     }
@@ -374,8 +377,8 @@ export class ActorsMcpServer {
     private composePendingToolsForClient(): void {
         if (this.pendingToolsUntilClientKnown.length === 0) return;
 
-        const tools = this.pendingToolsUntilClientKnown.flatMap(({ input, actorTools, isRestore }) =>
-            this.composeToolsForClient(input, actorTools, isRestore),
+        const tools = this.pendingToolsUntilClientKnown.flatMap(({ input, actorTools, isSessionRestore }) =>
+            this.composeToolsForClient(input, actorTools, isSessionRestore),
         );
 
         this.pendingToolsUntilClientKnown = [];
@@ -467,21 +470,24 @@ export class ActorsMcpServer {
      * Callers pass different `shouldNotify` values: `loadToolsByName` forwards `actorTools.length > 0`
      * (notify only when actor tools were fetched), while `loadToolsFromUrl` and `loadToolsFromInput`
      * pass `false` and defer to the post-initialize reconcile. See `composePendingToolsForClient`.
+     *
+     * @param isSessionRestore - forwarded through to `getToolsForServerMode` (only `loadToolsByName`
+     * passes `true`) so a restored session's stored `add-actor` name resolves to itself.
      */
     private registerFetchedActorTools(
         input: Input,
         actorTools: ToolEntry[],
         shouldNotify: boolean,
-        isRestore = false,
+        isSessionRestore = false,
     ): void {
         if (!this.serverModeResolved) {
-            this.pendingToolsUntilClientKnown.push({ input, actorTools, isRestore });
+            this.pendingToolsUntilClientKnown.push({ input, actorTools, isSessionRestore });
             if (actorTools.length > 0) this.upsertTools(actorTools, shouldNotify);
             return;
         }
-        const tools = this.composeToolsForClient(input, actorTools, isRestore);
+        const tools = this.composeToolsForClient(input, actorTools, isSessionRestore);
         if (tools.length > 0) this.upsertTools(tools, shouldNotify);
-        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools, isRestore });
+        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools, isSessionRestore });
     }
 
     /**
@@ -500,7 +506,7 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        // isRestore: true — a stored 'add-actor' name must resolve to itself, not the PR 0 substitute.
+        // isSessionRestore: true — a stored 'add-actor' name must resolve to itself, not the PR 0 substitute.
         this.registerFetchedActorTools(restoreInput, actorTools, actorTools.length > 0, true);
     }
 
