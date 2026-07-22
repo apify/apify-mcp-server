@@ -84,14 +84,9 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
 }
 
 /**
- * This function is used to fetch normal non-MCP server Actors as a tool.
- *
- * Fetches Actor input schemas by Actor IDs or Actor full names and creates MCP tools.
- *
- * This function retrieves the input schemas for the specified Actors and compiles them into MCP tools.
- * It uses the AJV library to validate the input schemas.
- *
- * Tool name can't contain /, so it is replaced with _
+ * Fetches input schemas for normal (non-MCP-server) Actors by ID or full name and compiles them
+ * into MCP tools, using AJV to validate the input schemas. Tool name can't contain /, so it is
+ * replaced with _.
  *
  * The input schema processing workflow:
  * 1. Properties are marked as required using markInputPropertiesAsRequired() to add "REQUIRED" prefix to descriptions
@@ -192,10 +187,8 @@ export async function getMCPServersAsTools(
     apifyToken: ApifyToken,
     mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
-    /**
-     * This is case for the payment provider request without any Apify token, we do not support
-     * standby Actors in this case, so we can skip MCP servers since they would fail anyway (they are standby Actors).
-     */
+    // Payment-provider request with no Apify token: standby Actors aren't supported here, so
+    // MCP servers — which are always standby Actors — are skipped since they'd fail anyway.
     if (apifyToken === null || apifyToken === undefined) {
         return [];
     }

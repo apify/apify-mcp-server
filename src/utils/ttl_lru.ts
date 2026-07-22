@@ -1,10 +1,8 @@
 import { LruCache } from '@apify/datastructures';
 
 /**
- * LRU cache with TTL (time-to-live) for storing entries.
- *
- * This class wraps an LRU cache and adds a time-to-live (TTL) expiration to each entry.
- * When an entry is accessed, it is checked for expiration and removed if expired.
+ * LRU cache with TTL: entries expire after a set time and are checked (and evicted if expired)
+ * whenever accessed.
  *
  * Usage:
  *   ```typescript

@@ -526,14 +526,11 @@ export type ActorExecutor = {
  */
 export type ActorStore = {
     /**
-     * Returns the inferred JSON Schema properties for an Actor's dataset items,
-     * based on historical successful runs.
-     *
-     * The returned object should be a JSON Schema `properties` object, e.g.:
+     * Returns the inferred JSON Schema `properties` object for an Actor's dataset items, e.g.:
      * `{ url: { type: 'string' }, price: { type: 'number' } }`
      *
-     * Returns null if no schema is available (e.g., new Actor with no runs).
-     * Internally calls `getActorOutputSchemaAsTypeObject` and converts the result.
+     * Converts the result of {@link ActorStore.getActorOutputSchemaAsTypeObject} — same source
+     * (historical successful runs) and same null contract.
      *
      * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
      */

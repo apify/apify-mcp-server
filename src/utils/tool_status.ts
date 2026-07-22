@@ -166,7 +166,6 @@ export function extractToolTelemetry(
     const telemetry = res.toolTelemetry as ToolTelemetryContext | undefined;
     delete res.toolTelemetry;
 
-    // Tool-reported actorId (e.g. from call-actor) takes precedence over server-side actorId
     const actorFields = buildActorFields(actorName, telemetry?.actorId ?? actorId);
 
     if (!telemetry) {
