@@ -180,12 +180,9 @@ export function toolNamesToInput(toolNames: string[]): Input {
 /**
  * Compose the final tool list from pre-fetched actor tools and the original input for the given mode.
  *
- * @param isRestore - `true` when `input` was reconstructed from a session's already-stored tool
- * names (`toolNamesToInput()`, via `loadToolsByName()`), as opposed to a live tool selector on a
- * new connection. A stored name legitimately contains the literal string `'add-actor'` for
- * sessions that predate the PR 0 cutoff below — restore must resolve it to itself, not
- * re-run it through the same substitution a fresh selector gets. Defaults to `false` (a live
- * selector) for every other caller.
+ * @param isRestore - `true` for a session restore (`toolNamesToInput()` via `loadToolsByName()`),
+ * as opposed to a live selector. A restored session's stored name can be `'add-actor'` from before
+ * the PR 0 cutoff below — it must resolve to itself, not get substituted like a fresh selector.
  */
 export function getToolsForServerMode(
     input: Input,
@@ -227,11 +224,8 @@ export function getToolsForServerMode(
                 continue;
             }
 
-            // `add-actor` cutoff (PR 0): a fresh `tools=add-actor` selector or the `experimental`
-            // category (whose sole member is `add-actor`) resolves to `call-actor` instead, on
-            // every new connection. A restored session's own stored `'add-actor'` name is not a
-            // live selector — it falls through to the unchanged lookups below and resolves to
-            // itself, exactly as before this cutoff.
+            // add-actor cutoff (PR 0): substitute call-actor for a live 'add-actor'/'experimental'
+            // selector. Skipped on restore, where `sel` may be a pre-cutoff session's own stored name.
             if (!isRestore && (sel === HELPER_TOOLS.ACTOR_ADD || sel === 'experimental')) {
                 if (callActorTool) internalSelections.push(callActorTool);
                 continue;
@@ -262,10 +256,8 @@ export function getToolsForServerMode(
     // Internal tools
     if (selectors !== undefined) {
         result.push(...internalSelections);
-        // `enableAddingActors` cutoff (PR 0): a live selector never sets this on a restored
-        // session's input (`toolNamesToInput()` never populates it), so this branch only ever
-        // runs for a new connection — ensure `call-actor` (add-actor's substitute) is available
-        // alongside selected tools.
+        // enableAddingActors cutoff (PR 0): substitute call-actor for add-actor. Restore inputs never
+        // set this flag (toolNamesToInput() doesn't), so this only fires for a live connection.
         if (addActorEnabled && !selectorsExplicitEmpty && !actorsExplicitlyEmpty) {
             const hasCallActor = result.some((e) => e.name === callActorTool?.name);
             if (callActorTool && !hasCallActor) result.push(callActorTool);

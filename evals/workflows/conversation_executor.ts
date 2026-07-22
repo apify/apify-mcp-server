@@ -165,9 +165,8 @@ export async function executeConversation(options: ConversationExecutorOptions):
         turns.push(turn);
 
         // Refresh tools after executing tool calls
-        // Tools can change dynamically for a restored pre-cutover session (e.g. one that
-        // still has add-actor loaded); add-actor is no longer selectable for new sessions.
-        // Fetch fresh tools from MCP server for next turn
+        // Tools can still change dynamically for a restored pre-cutover session with add-actor
+        // loaded (no longer selectable for new sessions). Fetch fresh tools for next turn
         tools = mcpToolsToOpenAiTools(mcpClient.getTools());
     }
 

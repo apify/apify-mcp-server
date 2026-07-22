@@ -380,7 +380,7 @@ The v2 configuration preserves backward compatibility with v1 usage. Notes:
   - Examples: `?actors=apify/rag-web-browser` ≡ `?tools=apify/rag-web-browser`; `--actors apify/rag-web-browser` ≡ `--tools apify/rag-web-browser`.
 - `enable-adding-actors` (CLI) and `enableAddingActors` (URL) are supported but deprecated.
   - Prefer including the specific tool `tools=call-actor` (default via the `actors` category).
-  - `add-actor` is no longer selectable, on any surface, for new connections — `call-actor` is substituted in its place: when enabled with no `tools` specified, the server exposes only `call-actor`; when categories/tools are selected, `call-actor` is also included.
+  - `add-actor` is no longer selectable for new connections on any surface — `call-actor` is substituted in its place, same enabled/alongside-other-tools behavior as before.
 - `enableActorAutoLoading` remains as a legacy alias for `enableAddingActors` and is mapped automatically.
 - Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, and `apify/rag-web-browser`.
   - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).

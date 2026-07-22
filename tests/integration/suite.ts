@@ -330,8 +330,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ enableAddingActors: false, tools: ['experimental'] });
 
                 const names = getToolNames(await client.listTools());
-                // experimental category's sole member (add-actor) resolves to call-actor for a new connection (PR 0) +
-                // auto-injected helpers (get-actor-run, storage, abort).
+                // experimental's sole member (add-actor) resolves to call-actor (PR 0) + auto-injected helpers.
                 expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
                 expect(names).toContain('call-actor');
                 expect(names).not.toContain('add-actor');
@@ -538,9 +537,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
                 client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
                 const names = getToolNames(await client.listTools());
-                // actors category (already includes call-actor) + auto-injected helpers (get-actor-run, dataset, kv, abort).
-                // enableAddingActors's add-actor substitute (call-actor, PR 0) is already present via the actors
-                // category, so it adds no further tool.
+                // actors category (already has call-actor) + auto-injected helpers. enableAddingActors's
+                // substitute (call-actor, PR 0) is already there, so it adds nothing further.
                 const numberOfTools = getCategoryTools('default').actors.length + AUTO_INJECTED_TOOL_NAMES.length;
                 expect(names).toHaveLength(numberOfTools);
                 // get-actor-run should be automatically included when call-actor is present
@@ -782,13 +780,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(outputText).not.toContain('This Actor is rental');
             });
 
-            // add-actor's own dynamic-registration behavior (tools-changed notification, its specific
-            // error strings, x402 standby rejection, Actorized-MCP-server proxy-tool registration) is no
-            // longer reachable via any new connection (add-actor is substituted by call-actor at
-            // selection time, PR 0) — those four cases were removed here. add-actor's own `call()` logic
-            // stays covered at the unit level (tests/unit/tools.add_actor.test.ts) until PR 2 deletes it;
-            // the x402/standby-rejection and MCP-server actor:tool call paths are covered here via
-            // call-actor directly (see the `actor:tool` pass-through test below).
+            // Four add-actor-specific cases (list-changed notification, its own error strings, x402
+            // rejection, MCP-server proxy registration) removed — unreachable now add-actor is
+            // substituted (PR 0). Unit coverage stays in tests/unit/tools.add_actor.test.ts until PR 2;
+            // x402/actor:tool coverage lives in the tests below, via call-actor.
 
             // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
             // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4
@@ -1675,11 +1670,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             });
 
             // The `dev` category holds only report-problem, which is telemetry-gated (off in this suite),
-            // so it can't load standalone here; its gating is covered by unit tests. `experimental`'s
-            // sole member (add-actor) is substituted for call-actor at selection time for any new
-            // connection (PR 0), so its raw registry members no longer match what a live selector
-            // loads — covered instead by the dedicated substitution tests above. Exclude both from the
-            // category sweep.
+            // so it can't load standalone here; its gating is covered by unit tests. `experimental` is
+            // excluded too — its sole member (add-actor) is substituted for call-actor (PR 0), covered
+            // by the dedicated substitution tests above instead.
             it.for(
                 Object.keys(getCategoryTools('default')).filter(
                     (category) => category !== 'dev' && category !== 'experimental',
@@ -1768,8 +1761,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 { retry: 2 },
                 async () => {
                     const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
-                    // Load the Actor directly at connection time (add-actor's dynamic registration
-                    // is no longer selectable for new connections, PR 0).
+                    // Load the Actor at connection time — add-actor's dynamic add is gone (PR 0).
                     client = await createClientFn({ actors: [ACTOR_NORMAL_MODE] });
 
                     const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });

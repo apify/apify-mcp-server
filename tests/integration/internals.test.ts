@@ -40,9 +40,8 @@ describe('MCP server internals integration tests', () => {
         actorsMcpServer.upsertTools(newTool);
 
         const names = actorsMcpServer.listAllToolNames();
-        // enableAddingActors=true seeds call-actor (add-actor is substituted at selection time for new
-        // connections, PR 0) + 4 auto-injected helpers (get-actor-run, dataset, kv, abort); then
-        // ACTOR_NORMAL_MODE is added on top.
+        // enableAddingActors=true now seeds call-actor (add-actor substituted, PR 0) + 4
+        // auto-injected helpers; then ACTOR_NORMAL_MODE is added on top.
         const expectedToolNames = [
             HELPER_TOOLS.ACTOR_CALL,
             'get-actor-run',
@@ -61,11 +60,8 @@ describe('MCP server internals integration tests', () => {
         expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), expectedToolNames);
     });
 
-    // PR 0 restore-path race (see tools_loader.ts's `getToolsForServerMode` isRestore param): a
-    // pre-cutoff session's stored tool names can legitimately contain the literal string 'add-actor'.
-    // Restoring that session must resolve it to itself, not run it through the same
-    // add-actor→call-actor substitution a live selector gets on this exact code path
-    // (`toolNamesToInput()`/`loadToolsByName()` → `getToolsForServerMode()`).
+    // PR 0 restore-path race: a pre-cutoff session's stored names can contain 'add-actor'. Restore
+    // must resolve it to itself, not the add-actor→call-actor substitution a live selector gets.
     it("restores a pre-cutoff session's stored add-actor name to itself, not call-actor", async () => {
         const actorsMcpServer = new ActorsMcpServer({
             setupSigintHandler: false,
@@ -74,30 +70,27 @@ describe('MCP server internals integration tests', () => {
         });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
-        // Simulate a session that loaded add-actor before the PR 0 cutoff — seed it directly via
-        // upsertTools, bypassing the loader (which would now substitute call-actor for any live selector).
+        // Simulate a pre-cutoff session: seed add-actor directly, bypassing the loader (which would
+        // now substitute call-actor for a live selector).
         actorsMcpServer.upsertTools([addActor]);
         const names = actorsMcpServer.listAllToolNames();
         expectArrayWeakEquals([addActor.name], names);
 
-        // Simulate the session being dropped from local memory (e.g. a different node in a multi-node
-        // deployment) and restored from the stored tool name list.
+        // Simulate the session being restored from its stored tool name list (e.g. on another node).
         actorsMcpServer.tools.clear();
         expect(actorsMcpServer.listAllToolNames()).toEqual([]);
 
         await actorsMcpServer.loadToolsByName(names, apifyClient);
 
-        // Must resolve to itself — restore is not a live selector, so the substitution must not fire.
-        // add-actor's presence auto-injects the run/storage helpers (pre-existing tools_loader
-        // behavior, unrelated to this PR) — the restored set is add-actor plus those, not add-actor alone.
+        // Resolves to itself, plus add-actor's usual auto-injected run/storage helpers (pre-existing,
+        // unrelated to this PR) — not the call-actor substitution.
         const expectedToolNames = [addActor.name, ...AUTO_INJECTED_TOOLS.map((t) => t.name)];
         expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), expectedToolNames);
     });
 
     it('should notify tools changed handler on tool modifications', async () => {
         let latestTools: string[] = [];
-        // enableAddingActors=true seeds call-actor (add-actor substituted, PR 0) + 4 auto-injected helpers
-        // (get-actor-run, dataset, kv, abort)
+        // enableAddingActors=true seeds call-actor (add-actor substituted, PR 0) + 4 auto-injected helpers.
         const numberOfTools = 5;
 
         let toolNotificationCount = 0;
@@ -142,8 +135,7 @@ describe('MCP server internals integration tests', () => {
     it('should stop notifying after unregistering tools changed handler', async () => {
         let latestTools: string[] = [];
         let notificationCount = 0;
-        // enableAddingActors=true seeds call-actor (add-actor substituted, PR 0) + 4 auto-injected helpers
-        // (get-actor-run, dataset, kv, abort)
+        // enableAddingActors=true seeds call-actor (add-actor substituted, PR 0) + 4 auto-injected helpers.
         const numberOfTools = 5;
         const onToolsChanged = (tools: string[]) => {
             latestTools = tools;

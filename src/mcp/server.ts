@@ -500,8 +500,7 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        // `isRestore: true` — bypasses the add-actor→call-actor selector cutoff (PR 0) so a
-        // pre-cutoff session's stored `'add-actor'` name resolves to itself, not the substitute.
+        // isRestore: true — a stored 'add-actor' name must resolve to itself, not the PR 0 substitute.
         this.registerFetchedActorTools(restoreInput, actorTools, actorTools.length > 0, true);
     }
 
