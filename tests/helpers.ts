@@ -4,7 +4,6 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
-import { HELPER_TOOLS } from '../src/const.js';
 import type { TelemetryEnv, ToolCategory } from '../src/types.js';
 
 export type McpClientOptions = {
@@ -155,20 +154,6 @@ export async function createMcpStdioClient(options?: McpClientOptions): Promise<
     await client.connect(transport);
 
     return client;
-}
-
-/**
- * Adds an Actor as a tool using the ADD_ACTOR helper tool.
- * @param client - MCP client instance
- * @param actor - Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".
- */
-export async function addActor(client: Client, actor: string): Promise<void> {
-    await client.callTool({
-        name: HELPER_TOOLS.ACTOR_ADD,
-        arguments: {
-            actor,
-        },
-    });
 }
 
 /**

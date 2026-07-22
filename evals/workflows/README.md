@@ -101,7 +101,7 @@ for (const test of tests) {
 
 **Why:**
 - MCP server supports dynamic tool registration at runtime
-- `add-actor` tool can register new Actor tools mid-conversation
+- a restored pre-cutover session may still have `add-actor` loaded and register new Actor tools mid-conversation (`add-actor` itself is no longer selectable for new sessions)
 - LLM must see updated tool list to use new tools
 
 **Implementation:**
@@ -490,7 +490,7 @@ Unlike typical function calling:
 
 ### Dynamic Tool Registration
 
-- `add-actor` dynamically registers new Actor tools
+- a restored pre-cutover session's `add-actor` could dynamically register new Actor tools (no longer selectable for new sessions)
 - Tool list NOT static
 - Must refresh after tool execution
 
@@ -526,7 +526,7 @@ Format must be exact for LLM context understanding.
 **Solution:** ✅ Isolated MCP instances per test.
 
 ### LLM can't use newly added tool
-**Symptom:** Agent uses `add-actor` but can't call new tool.<br>
+**Symptom:** Agent uses a dynamically-registered tool (e.g. a restored session's `add-actor`) but can't call new tool.<br>
 **Solution:** ✅ Dynamic tool fetching per turn.
 
 ### Judge too strict/lenient

@@ -101,13 +101,13 @@ const argv = yargs(hideBin(process.argv))
         type: 'boolean',
         default: false,
         describe: `Enable dynamically adding Actors as tools based on user requests. Can also be set via ENABLE_ADDING_ACTORS environment variable.
-Deprecated: use tools add-actor instead.`,
+Deprecated: use tools call-actor instead.`,
     })
     .option('enableActorAutoLoading', {
         type: 'boolean',
         default: false,
         hidden: true,
-        describe: 'Deprecated: Use tools add-actor instead.',
+        describe: 'Deprecated: Use tools call-actor instead.',
     })
     .options('tools', {
         type: 'string',

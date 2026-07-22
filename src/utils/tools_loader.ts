@@ -9,7 +9,6 @@ import log from '@apify/log';
 
 import { defaults, HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
-import { addActor } from '../tools/actors/add_actor.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
@@ -178,11 +177,21 @@ export function toolNamesToInput(toolNames: string[]): Input {
     return input;
 }
 
-/** Compose the final tool list from pre-fetched actor tools and the original input for the given mode. */
+/**
+ * Compose the final tool list from pre-fetched actor tools and the original input for the given mode.
+ *
+ * @param isRestore - `true` when `input` was reconstructed from a session's already-stored tool
+ * names (`toolNamesToInput()`, via `loadToolsByName()`), as opposed to a live tool selector on a
+ * new connection. A stored name legitimately contains the literal string `'add-actor'` for
+ * sessions that predate the PR 0 cutoff below — restore must resolve it to itself, not
+ * re-run it through the same substitution a fresh selector gets. Defaults to `false` (a live
+ * selector) for every other caller.
+ */
 export function getToolsForServerMode(
     input: Input,
     actorTools: ToolEntry[],
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
+    isRestore = false,
 ): ToolEntry[] {
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
@@ -204,6 +213,8 @@ export function getToolsForServerMode(
         }
     }
 
+    const callActorTool = toolsByName.get(HELPER_TOOLS.ACTOR_CALL);
+
     // Walk selectors for internal picks (mode-specific). Actor-name classification
     // happened in `resolveActorsToLoad`; we don't need to partition again here.
     const internalSelections: ToolEntry[] = [];
@@ -212,7 +223,16 @@ export function getToolsForServerMode(
             if (sel === 'preview') {
                 // 'preview' category is deprecated. It contained `call-actor` which is now default.
                 log.warning('Tool category "preview" is deprecated');
-                const callActorTool = toolsByName.get(HELPER_TOOLS.ACTOR_CALL);
+                if (callActorTool) internalSelections.push(callActorTool);
+                continue;
+            }
+
+            // `add-actor` cutoff (PR 0): a fresh `tools=add-actor` selector or the `experimental`
+            // category (whose sole member is `add-actor`) resolves to `call-actor` instead, on
+            // every new connection. A restored session's own stored `'add-actor'` name is not a
+            // live selector — it falls through to the unchanged lookups below and resolves to
+            // itself, exactly as before this cutoff.
+            if (!isRestore && (sel === HELPER_TOOLS.ACTOR_ADD || sel === 'experimental')) {
                 if (callActorTool) internalSelections.push(callActorTool);
                 continue;
             }
@@ -242,14 +262,17 @@ export function getToolsForServerMode(
     // Internal tools
     if (selectors !== undefined) {
         result.push(...internalSelections);
-        // If add-actor mode is enabled, ensure add-actor tool is available alongside selected tools.
+        // `enableAddingActors` cutoff (PR 0): a live selector never sets this on a restored
+        // session's input (`toolNamesToInput()` never populates it), so this branch only ever
+        // runs for a new connection — ensure `call-actor` (add-actor's substitute) is available
+        // alongside selected tools.
         if (addActorEnabled && !selectorsExplicitEmpty && !actorsExplicitlyEmpty) {
-            const hasAddActor = result.some((e) => e.name === addActor.name);
-            if (!hasAddActor) result.push(addActor);
+            const hasCallActor = result.some((e) => e.name === callActorTool?.name);
+            if (callActorTool && !hasCallActor) result.push(callActorTool);
         }
     } else if (addActorEnabled && !actorsExplicitlyEmpty) {
-        // No selectors: either expose only add-actor (when enabled), or default categories
-        result.push(addActor);
+        // No selectors: either expose only call-actor (add-actor substitution, when enabled) or default categories
+        if (callActorTool) result.push(callActorTool);
     } else if (!actorsExplicitlyEmpty) {
         // Use mode-resolved default categories
         for (const cat of toolCategoriesEnabledByDefault) {

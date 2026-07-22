@@ -9,10 +9,10 @@
     },
     {
       "id": "search-add-call-python-actor",
-      "tools": ["add-actor", "actors"],
+      "tools": ["actors"],
       "category": "call",
-      "query": "Find example Python Actor and add it to the MCP server and then call it with random sample input and present the results",
-      "reference": "The agent must find apify/python-example Actor or any similar and add it to the MCP server using the add-actor tool. Then, it must call the added Actor with sample input and return the output."
+      "query": "Find example Python Actor and call it with random sample input and present the results",
+      "reference": "The agent must find apify/python-example Actor or any similar and call it using the call-actor tool with sample input, and return the output."
     },
     {
       "id": "instagram-posts",
