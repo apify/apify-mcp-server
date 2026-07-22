@@ -44,9 +44,6 @@ import { getPackageVersion } from './utils/version.js';
 
 // Keeping this type here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
-/**
- * Type for command line arguments
- */
 type CliArgs = {
     actors?: string;
     enableAddingActors: boolean;
@@ -155,9 +152,7 @@ Only used when --telemetry-enabled is true`,
 
 // Respect either the new flag or the deprecated one
 const enableAddingActors = Boolean(argv.enableAddingActors || argv.enableActorAutoLoading);
-// Split actors argument, trim whitespace, and filter out empty strings
 const actorList = argv.actors !== undefined ? parseCommaSeparatedList(argv.actors) : undefined;
-// Split tools argument, trim whitespace, and filter out empty strings
 const toolCategoryKeys = argv.tools !== undefined ? parseCommaSeparatedList(argv.tools) : undefined;
 
 // Propagate log.error to console.error for easier debugging

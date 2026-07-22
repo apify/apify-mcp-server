@@ -347,9 +347,6 @@ export class ActorsMcpServer {
      * and re-added by the initialize flush. Used by every input-driven load path and the flush.
      * (loadActorsAsTools upserts actor tools directly; actor tools are never gated, so they need no
      * filtering.)
-     *
-     * @param isSessionRestore - forwarded to `getToolsForServerMode`; keeps a restored session's stored
-     * `add-actor` name resolving to itself instead of being substituted with `call-actor`.
      */
     private composeToolsForClient(input: Input, actorTools: ToolEntry[], isSessionRestore = false): ToolEntry[] {
         const tools = getToolsForServerMode(input, actorTools, this.serverMode, isSessionRestore);
@@ -470,9 +467,6 @@ export class ActorsMcpServer {
      * Callers pass different `shouldNotify` values: `loadToolsByName` forwards `actorTools.length > 0`
      * (notify only when actor tools were fetched), while `loadToolsFromUrl` and `loadToolsFromInput`
      * pass `false` and defer to the post-initialize reconcile. See `composePendingToolsForClient`.
-     *
-     * @param isSessionRestore - forwarded through to `getToolsForServerMode` (only `loadToolsByName`
-     * passes `true`) so a restored session's stored `add-actor` name resolves to itself.
      */
     private registerFetchedActorTools(
         input: Input,
