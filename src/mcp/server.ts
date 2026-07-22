@@ -669,10 +669,13 @@ export class ActorsMcpServer {
      * Token-scoped client for resources/read (the API proxy needs auth). Deliberately token-only:
      * unlike the CallTool path it does NOT forward provider/payment headers, so a payment-only
      * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
+     * Still carries the request-origin tag — `initializeRequestData` is already set by this point.
      */
     private resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
         const token = this.resolveApifyToken(params._meta);
-        return token ? new ApifyClient({ token }) : undefined;
+        return token
+            ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(this.options.initializeRequestData) })
+            : undefined;
     }
 
     private setupResourceHandlers(): void {

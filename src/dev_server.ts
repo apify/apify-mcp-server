@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -17,6 +18,7 @@ import { ApifyClient } from './apify_client.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import { injectMcpSessionId } from './utils/mcp.js';
+import { getRequestOriginForClient } from './utils/mcp_clients.js';
 import { parseServerMode } from './utils/server_mode.js';
 
 // DEV ONLY. This is a local dev/standby-emulation server, not the hosted HTTP server.
@@ -160,7 +162,11 @@ export function createExpressApp(): express.Express {
                     token: apifyToken,
                 });
 
-                const apifyClient = new ApifyClient({ token: apifyToken });
+                // req.body is this same `initialize` request (isInitializeRequest matched above),
+                // so clientInfo is already readable here — unlike stdio.ts, which loads tools
+                // before any client info exists.
+                const requestOrigin = getRequestOriginForClient(req.body as InitializeRequest);
+                const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
                 // Fetch actor metadata and queue mode-agnostic sources. Composed with
                 // the final mode inside the initialize request handler.
                 await mcpServer.loadToolsFromUrl(req.url, apifyClient);
