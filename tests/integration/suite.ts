@@ -90,7 +90,6 @@ async function callNormalModeTestActor(client: Client, selectedToolName: string)
 }
 
 function validateStructuredOutput(result: unknown, toolOutputSchema: unknown, toolName: string): void {
-    // Ensure result has structured content
     const resultWithStructured = result as Record<string, unknown>;
     if (!resultWithStructured.structuredContent) {
         return;
@@ -98,15 +97,12 @@ function validateStructuredOutput(result: unknown, toolOutputSchema: unknown, to
 
     const { structuredContent } = resultWithStructured;
 
-    // Verify tool has an outputSchema
     expect(toolOutputSchema).toBeDefined();
 
     if (toolOutputSchema) {
-        // Create AJV validator instance
         const ajv = new Ajv();
         const validate = ajv.compile(toolOutputSchema as Record<string, unknown>);
 
-        // Validate structured content against the schema
         const isValid = validate(structuredContent);
 
         if (!isValid) {
@@ -2518,35 +2514,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(tools.tools.length).toBeGreaterThan(0);
             });
 
-            //  TEMP: this logic is currently disabled, see src/utils/tools-loader.ts
-            // it.runIf(options.transport === 'streamable-http')('should swap call-actor for add-actor when client supports dynamic tools', async () => {
-            //     client = await createClientFn({ clientName: 'Visual Studio Code', tools: ['actors'] });
-            //     const names = getToolNames(await client.listTools());
-
-            //     // should not contain call-actor but should contain add-actor
-            //     expect(names).not.toContain('call-actor');
-            //     expect(names).toContain('add-actor');
-
-            //     await client.close();
-            // });
-            // it.runIf(options.transport === 'streamable-http')(
-            // `should swap call-actor for add-actor when client supports dynamic tools for default tools`, async () => {
-            //     client = await createClientFn({ clientName: 'Visual Studio Code' });
-            //     const names = getToolNames(await client.listTools());
-
-            //     // should not contain call-actor but should contain add-actor
-            //     expect(names).not.toContain('call-actor');
-            //     expect(names).toContain('add-actor');
-
-            //     await client.close();
-            // });
             it.runIf(options.transport === 'streamable-http')(
                 'should NOT swap call-actor for add-actor even when client supports dynamic tools',
                 async () => {
                     client = await createClientFn({ clientName: 'Visual Studio Code', tools: ['actors'] });
                     const names = getToolNames(await client.listTools());
 
-                    // should not contain call-actor but should contain add-actor
+                    // call-actor stays; add-actor is not injected
                     expect(names).toContain('call-actor');
                     expect(names).not.toContain('add-actor');
 
@@ -2559,7 +2533,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     client = await createClientFn({ clientName: 'Visual Studio Code' });
                     const names = getToolNames(await client.listTools());
 
-                    // should not contain call-actor but should contain add-actor
+                    // call-actor stays; add-actor is not injected
                     expect(names).toContain('call-actor');
                     expect(names).not.toContain('add-actor');
 
@@ -2572,7 +2546,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     client = await createClientFn({ clientName: 'Visual Studio Code', tools: ['call-actor'] });
                     const names = getToolNames(await client.listTools());
 
-                    // should not contain call-actor but should contain add-actor
+                    // call-actor stays; add-actor is not injected
                     expect(names).toContain('call-actor');
                     expect(names).not.toContain('add-actor');
 

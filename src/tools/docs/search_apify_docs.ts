@@ -107,9 +107,7 @@ You can also try using more specific or alternative keywords related to your sea
             return respondOk(instructions, { structuredContent });
         }
 
-        // Instructions for LLM to use the docs fetch tool when retrieving full document content
         const instructions = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. ${PLATFORM_DOCS_PREFERENCE}`;
-        // Actual unstructured text result
         const textResult = `Search results for "${query}" in ${parsed.docSource}:
 
 ${results

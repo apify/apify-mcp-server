@@ -74,7 +74,6 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
             return buildStorageResponse({ structuredContent: { datasetId, schema: {} }, summary, nextStep });
         }
 
-        // Generate schema using the shared utility
         const schema = generateSchemaFromItems(datasetItems, {
             limit: parsed.limit,
             clean: parsed.clean,

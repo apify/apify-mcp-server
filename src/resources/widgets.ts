@@ -95,8 +95,9 @@ function createWidgetMeta(params: { resourceUri: string; invoking: string; invok
     return {
         'openai/toolInvocation/invoking': invoking,
         'openai/toolInvocation/invoked': invoked,
-        // ChatGPT compatibility keys — required for public apps in ChatGPT.
-        // These were removed during MCP Apps migration but ChatGPT still reads them.
+        // ChatGPT compatibility keys. `widgetAccessible` and `widgetPrefersBorder` were
+        // dropped in the MCP Apps migration and are left here (commented) as a reference for
+        // what ChatGPT public apps read — re-add them if ChatGPT public-app support regresses.
         // 'openai/widgetAccessible': true,
         'openai/widgetCSP': OPENAI_WIDGET_CSP,
         // 'openai/widgetPrefersBorder': WIDGET_BASE_UI.prefersBorder,

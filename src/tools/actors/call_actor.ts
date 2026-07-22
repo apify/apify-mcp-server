@@ -644,7 +644,6 @@ function createCallActorTool(description: string): ToolEntry {
             openWorldHint: true,
         },
         execution: {
-            // Support long-running tasks
             taskSupport: 'optional',
         },
         call: async (toolArgs: InternalToolArgs) => executeCallActor(toolArgs),

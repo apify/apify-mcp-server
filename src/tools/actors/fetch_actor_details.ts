@@ -63,9 +63,8 @@ export const actorDetailsOutputDefaults = {
 export type ResolvedOutputOptions = typeof actorDetailsOutputDefaults;
 
 /**
- * Resolve output options with smart defaults.
- * If output is undefined/empty, returns defaults.
- * If any property is explicitly set, undefined properties are treated as false.
+ * Resolves `output` per {@link actorDetailsOutputOptionsSchema}'s documented defaulting behavior:
+ * undefined/empty → defaults; otherwise undefined properties are treated as false.
  */
 export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputOptionsSchema>): ResolvedOutputOptions {
     const hasExplicitOptions = output && Object.values(output).some((v) => v !== undefined);

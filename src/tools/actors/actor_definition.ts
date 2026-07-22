@@ -90,11 +90,9 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
         pictureUrl: 'pictureUrl' in response ? (response.pictureUrl as string | undefined) : undefined,
     };
 }
-/** Prune Actor README if it is too long
- * If the README is too long
- * - We keep the README as it is up to the limit.
- * - After the limit, we keep heading only
- * - We add a note that the README was truncated because it was too long.
+/**
+ * Prune Actor README if it exceeds `limit`: keep it as-is up to the limit, keep only headings
+ * after that, and append a note that the README was truncated.
  */
 function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LENGTH): string {
     if (readme.length <= limit) {

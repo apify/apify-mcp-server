@@ -11,8 +11,7 @@ import { SERVER_MODE } from '../types.js';
 import { loadToolsFromInput } from '../utils/tools_loader.js';
 
 /**
- * Process input parameters from URL and get tools
- * If URL contains query parameter `actors`, return tools from Actors otherwise return null.
+ * If the URL contains an `actors` query parameter, returns tools for those Actors; otherwise null.
  * @param url The URL to process
  * @param apifyClient The Apify client instance
  * @param mode Server mode for tool variant resolution

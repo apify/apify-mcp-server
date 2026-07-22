@@ -151,6 +151,17 @@ Use comments to guide reviewers:
 *   **Comments:**
     * Use proper English (spelling, grammar, punctuation, capitalization).
     * Use JSDoc `/**` for documentation, `//` for generic comments, and avoid `/*` (single asterisk multiline comments).
+    * **Comment the *why*, not the *what*.** Good comments explain intent, trade-offs, and non-obvious constraints — never restate what the code already says. Follow these rules:
+        1. **Don't duplicate the code.** Delete comments that narrate the next line (e.g. `// Apply filter if configured` above the `if`, `// Helper to format X` above `formatX`). If the code says it, the comment shouldn't.
+        2. **Don't use comments to excuse unclear code.** Fix the name or the structure instead of explaining a bad one.
+        3. **If you can't write a clear comment, the code is probably the problem.** A comment you struggle to phrase is a signal to simplify the code.
+        4. **Dispel confusion, don't cause it.** A comment that contradicts the code (wrong `@param`, stale example, inverted assertion) is worse than none — keep comments in sync with the code they describe.
+        5. **Explain unidiomatic code.** When code is deliberately unusual (a cast the compiler forces, a workaround for an upstream quirk), say why. This is the comment that earns its place.
+        6. **Link the source of copied/adapted code.** Paste a URL to the original.
+        7. **Link external references where they help.** API endpoints, spec sections, algorithms — link the exact page (e.g. the matching `docs.apify.com/api/v2/...` slug), not a generic one.
+        8. **Comment bug fixes.** When a line exists to fix a bug or work around a defect, note it and link the issue (`// see apify/apify-mcp-server#637`).
+        9. **Mark incomplete work.** Use `TODO`/`FIXME` with concrete context and an issue link where one exists (e.g. `TODO(#675): ...`) — not a vague `// TODO: fix this`.
+    * **No commented-out code.** Delete it; git history is the archive. Don't repeat the same comment across many lines — state it once (file- or block-level) or make the code self-explanatory.
 
 *   **Parameters**
     * **Minimal Parameters:** Pass only the parameters that the function actually uses.

@@ -227,10 +227,7 @@ export class ActorsMcpServer {
                         },
                     },
                 },
-                /**
-                 * Declaring resources even though we are not using them
-                 * to prevent clients like Claude desktop from failing.
-                 */
+                // Declared but unused — some clients (e.g. Claude Desktop) fail without it.
                 resources: {},
                 prompts: {},
                 logging: {},
@@ -247,9 +244,7 @@ export class ActorsMcpServer {
         this.setupLoggingHandlers();
         this.setupToolHandlers();
         this.setupPromptHandlers();
-        /**
-         * We need to handle resource requests to prevent clients like Claude desktop from failing.
-         */
+        // Handle resource requests so clients like Claude Desktop don't fail.
         this.setupResourceHandlers();
         this.setupTaskHandlers();
     }
@@ -393,7 +388,6 @@ export class ActorsMcpServer {
 
     /**
      * Returns an array of tool names.
-     * @returns {string[]} - An array of tool names.
      */
     public listToolNames(): string[] {
         return Array.from(this.tools.keys());
@@ -426,8 +420,7 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Returns the list of all internal tool names
-     * @returns {string[]} - Array of loaded tool IDs (e.g., 'apify/rag-web-browser')
+     * Returns the list of all internal tool names (e.g., 'call-actor', 'search-actors').
      */
     private listInternalToolNames(): string[] {
         return Array.from(this.tools.values())
@@ -436,8 +429,7 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Returns the list of all currently loaded Actor tool IDs.
-     * @returns {string[]} - Array of loaded Actor tool IDs (e.g., 'apify/rag-web-browser')
+     * Returns the currently loaded Actor tool full names (e.g., 'apify/rag-web-browser').
      */
     public listActorToolNames(): string[] {
         return Array.from(this.tools.values())
@@ -446,20 +438,18 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Returns a list of Actor IDs that are registered as MCP servers.
-     * @returns {string[]} - An array of Actor MCP server Actor IDs (e.g., 'apify/actors-mcp-server').
+     * Returns the unique Actor IDs registered as MCP servers (e.g., 'apify/actors-mcp-server').
      */
     private listActorMcpServerToolIds(): string[] {
         const ids = Array.from(this.tools.values())
             .filter((tool: ToolEntry) => tool.type === TOOL_TYPE.ACTOR_MCP)
             .map((tool) => tool.actorId);
-        // Ensure uniqueness
         return Array.from(new Set(ids));
     }
 
     /**
-     * Returns a list of Actor name and MCP server tool IDs.
-     * @returns {string[]} - An array of Actor MCP server Actor IDs (e.g., 'apify/actors-mcp-server').
+     * Returns the combined internal tool names, Actor full names, and Actor-MCP server Actor IDs
+     * currently loaded.
      */
     public listAllToolNames(): string[] {
         return [...this.listInternalToolNames(), ...this.listActorToolNames(), ...this.listActorMcpServerToolIds()];
@@ -492,7 +482,6 @@ export class ActorsMcpServer {
      * Loads missing toolNames from a provided list of tool names.
      * Skips toolNames that are already loaded and loads only the missing ones.
      * @param toolNames - Array of tool names to ensure are loaded
-     * @param apifyClient
      */
     public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
         const loadedTools = new Set(this.listAllToolNames());
@@ -589,10 +578,7 @@ export class ActorsMcpServer {
     }
 
     private notifyToolsChangedHandler() {
-        // If no handler is registered, do nothing
         if (!this.toolsChangedHandler) return;
-
-        // Get the list of tool names
         this.toolsChangedHandler(this.listAllToolNames());
     }
 
@@ -626,15 +612,14 @@ export class ActorsMcpServer {
                 process.exit(0);
             };
             process.once('SIGINT', handler);
-            this.sigintHandler = handler; // Store the actual handler
+            this.sigintHandler = handler;
         }
     }
 
     private setupLoggingProxy(): void {
-        // Store original sendLoggingMessage
         const originalSendLoggingMessage = this.server.sendLoggingMessage.bind(this.server);
 
-        // Proxy sendLoggingMessage to filter logs
+        // Filter outgoing log messages below the client's requested level.
         this.server.sendLoggingMessage = async (params: { level: string; data?: unknown; [key: string]: unknown }) => {
             const messageLevelValue = LOG_LEVEL_MAP[params.level] ?? -1; // Unknown levels get -1, discard
             const currentLevelValue = LOG_LEVEL_MAP[this.currentLogLevel] ?? LOG_LEVEL_MAP.info; // Default to info if invalid
@@ -757,11 +742,12 @@ export class ActorsMcpServer {
 
     /**
      * Sets up MCP request handlers for long-running tasks.
+     * Each handler reads `_meta.mcpSessionId` (injected at the transport layer) to isolate
+     * per-session task stores.
      */
     private setupTaskHandlers(): void {
         // List tasks
         this.server.setRequestHandler(ListTasksRequestSchema, async (request) => {
-            // mcpSessionId is injected at transport layer for session isolation in task stores
             const params = (request.params || {}) as ApifyRequestParams & { cursor?: string };
             const { cursor } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
@@ -772,7 +758,6 @@ export class ActorsMcpServer {
 
         // Get task status
         this.server.setRequestHandler(GetTaskRequestSchema, async (request) => {
-            // mcpSessionId is injected at transport layer for session isolation in task stores
             const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
             const { taskId } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
@@ -782,7 +767,6 @@ export class ActorsMcpServer {
 
         // Get task result payload
         this.server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
-            // mcpSessionId is injected at transport layer for session isolation in task stores
             const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
             const { taskId } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
@@ -807,7 +791,6 @@ export class ActorsMcpServer {
 
         // Cancel task
         this.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
-            // mcpSessionId is injected at transport layer for session isolation in task stores
             const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
             const { taskId } = params;
             const mcpSessionId = params._meta?.mcpSessionId;
@@ -836,11 +819,7 @@ export class ActorsMcpServer {
     }
 
     private setupToolHandlers(): void {
-        /**
-         * Handles the request to list tools.
-         * @param {object} request - The request object.
-         * @returns {object} - The response object containing the tools.
-         */
+        // Handles the request to list tools.
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             const tools = Array.from(this.tools.values()).map((tool) =>
                 getToolPublicFieldOnly(tool, {
@@ -852,10 +831,8 @@ export class ActorsMcpServer {
         });
 
         /**
-         * Handles the request to call a tool.
-         * @param {object} request - The request object containing tool name and arguments.
-         * @param {object} extra - Extra data given to the request handler, such as sendNotification function.
-         * @throws {McpError} - based on the McpServer class code from the typescript MCP SDK
+         * Handles the request to call a tool. `extra` carries request-scoped helpers such as
+         * `sendNotification`. Throws {@link McpError} to mirror the MCP SDK's McpServer error codes.
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
             const params = request.params as ApifyRequestParams & { name: string; arguments?: Record<string, unknown> };
@@ -863,7 +840,8 @@ export class ActorsMcpServer {
             let { name, arguments: args, _meta: meta } = params;
             const progressToken = meta?.progressToken;
             const apifyToken = this.resolveApifyToken(meta) as string;
-            // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
+            // Injected upstream; required for long-running tasks — the task store keys on it and
+            // there is no other channel to pass it.
             const mcpSessionId = meta?.mcpSessionId;
             if (!mcpSessionId) {
                 log.error('MCP Session ID is missing in tool call request. This should never happen.');
@@ -1367,23 +1345,21 @@ export class ActorsMcpServer {
     }
 
     async close(): Promise<void> {
-        // Remove SIGINT handler
         if (this.sigintHandler) {
             process.removeListener('SIGINT', this.sigintHandler);
             this.sigintHandler = undefined;
         }
-        // Clear all tools and their compiled schemas
+        // Clear all tools and null their compiled schemas.
         for (const tool of this.tools.values()) {
             if (tool.ajvValidate && typeof tool.ajvValidate === 'function') {
                 (tool as { ajvValidate: ValidateFunction<unknown> | null }).ajvValidate = null;
             }
         }
         this.tools.clear();
-        // Unregister tools changed handler
         if (this.toolsChangedHandler) {
             this.unregisterToolsChangedHandler();
         }
-        // Close server (which should also remove its event handlers)
+        // Closing the server also removes its event handlers.
         await this.server.close();
     }
 }

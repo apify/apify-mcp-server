@@ -63,7 +63,6 @@ function prepareAlgoliaRequest(
         query: query.trim(),
     };
 
-    // Apply filters if configured
     if ('filters' in indexConfig && indexConfig.filters) {
         searchRequest.filters = indexConfig.filters;
     }
@@ -79,7 +78,6 @@ function prepareAlgoliaRequest(
         }
     }
 
-    // Apply facet filters if configured
     if ('facetFilters' in indexConfig && indexConfig.facetFilters) {
         searchRequest.facetFilters = indexConfig.facetFilters;
     }
@@ -117,7 +115,6 @@ function processAlgoliaResponse(results: AlgoliaResult[]): ApifyDocsSearchResult
                 continue;
             }
 
-            // Build URL with anchor if present
             let url = hit.url_without_anchor;
             if (hit.anchor && hit.anchor.trim()) {
                 url += `#${hit.anchor}`;

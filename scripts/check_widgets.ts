@@ -1,7 +1,6 @@
 /* eslint-disable no-console */
 /**
- * Build-time check to ensure widget files exist
- * This script validates that all registered widgets have corresponding files
+ * Build-time check: fails if a registered widget has no corresponding file.
  */
 
 import { existsSync } from 'node:fs';
