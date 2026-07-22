@@ -2,6 +2,7 @@ import { ApifyClient } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import { getCategoryTools } from '../../src/tools/registry.js';
 import type { ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import {
@@ -149,30 +150,26 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
 });
 
 describe('getToolsForServerMode add-actor selector cutoff (PR 0)', () => {
-    it('substitutes call-actor for a literal tools=add-actor selector on a new connection', () => {
-        const toolNames = getToolsForServerMode({ tools: [HELPER_TOOLS.ACTOR_ADD] }, [], 'default').map((t) => t.name);
+    const substitutionCases: { case: string; input: Parameters<typeof getToolsForServerMode>[0] }[] = [
+        { case: 'a literal tools=add-actor selector', input: { tools: [HELPER_TOOLS.ACTOR_ADD] } },
+        { case: 'the tools=experimental category', input: { tools: ['experimental'] } },
+        { case: 'enableAddingActors=true with no other selectors', input: { enableAddingActors: true } },
+        {
+            case: 'enableAddingActors=true alongside other selectors',
+            input: { tools: ['docs'], enableAddingActors: true },
+        },
+    ];
+    it.for(substitutionCases)('substitutes call-actor for $case on a new connection', ({ input }) => {
+        const toolNames = getToolsForServerMode(input, [], 'default').map((t) => t.name);
         expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
         expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
     });
 
-    it('substitutes call-actor for the tools=experimental category on a new connection', () => {
-        const toolNames = getToolsForServerMode({ tools: ['experimental'] }, [], 'default').map((t) => t.name);
-        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
-    });
-
-    it('substitutes call-actor for enableAddingActors=true with no other selectors on a new connection', () => {
-        const toolNames = getToolsForServerMode({ enableAddingActors: true }, [], 'default').map((t) => t.name);
-        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
-    });
-
-    it('substitutes call-actor for enableAddingActors=true alongside other selectors on a new connection', () => {
-        const toolNames = getToolsForServerMode({ tools: ['docs'], enableAddingActors: true }, [], 'default').map(
-            (t) => t.name,
-        );
-        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
+    it('keeps the experimental category single-member (guard for the whole-category substitution)', () => {
+        // getToolsForServerMode substitutes call-actor for the entire `experimental` selector and then
+        // stops, so a second member would be silently dropped. Revisit that branch before growing the
+        // category.
+        expect(getCategoryTools('default').experimental).toHaveLength(1);
     });
 
     it('does not duplicate call-actor when both an explicit selector and enableAddingActors resolve to it', () => {
