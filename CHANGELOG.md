@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.11.8 - **not yet released**
 
+### 🚀 Features
+
+- Attribute Apify AI runs with the APIFY_AI origin ([#1117](https://github.com/apify/apify-mcp-server/pull/1117)) ([780fd40](https://github.com/apify/apify-mcp-server/commit/780fd40a7707633b1dcfc8060cc906fb4f8bd5b3)) by [@jirispilka](https://github.com/jirispilka)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.11.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.7) (2026-07-21)
