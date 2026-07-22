@@ -393,7 +393,6 @@ export class ActorsMcpServer {
 
     /**
      * Returns an array of tool names.
-     * @returns {string[]} - An array of tool names.
      */
     public listToolNames(): string[] {
         return Array.from(this.tools.keys());
@@ -426,8 +425,7 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Returns the list of all internal tool names
-     * @returns {string[]} - Array of loaded tool IDs (e.g., 'apify/rag-web-browser')
+     * Returns the list of all internal tool names (e.g., 'call-actor', 'search-actors').
      */
     private listInternalToolNames(): string[] {
         return Array.from(this.tools.values())
@@ -458,8 +456,8 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Returns a list of Actor name and MCP server tool IDs.
-     * @returns {string[]} - An array of Actor MCP server Actor IDs (e.g., 'apify/actors-mcp-server').
+     * Returns the combined internal tool names, Actor full names, and Actor-MCP server Actor IDs
+     * currently loaded.
      */
     public listAllToolNames(): string[] {
         return [...this.listInternalToolNames(), ...this.listActorToolNames(), ...this.listActorMcpServerToolIds()];
@@ -492,7 +490,6 @@ export class ActorsMcpServer {
      * Loads missing toolNames from a provided list of tool names.
      * Skips toolNames that are already loaded and loads only the missing ones.
      * @param toolNames - Array of tool names to ensure are loaded
-     * @param apifyClient
      */
     public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
         const loadedTools = new Set(this.listAllToolNames());
@@ -836,11 +833,7 @@ export class ActorsMcpServer {
     }
 
     private setupToolHandlers(): void {
-        /**
-         * Handles the request to list tools.
-         * @param {object} request - The request object.
-         * @returns {object} - The response object containing the tools.
-         */
+        // Handles the request to list tools.
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             const tools = Array.from(this.tools.values()).map((tool) =>
                 getToolPublicFieldOnly(tool, {

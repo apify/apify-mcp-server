@@ -49,7 +49,6 @@ function inputFieldsToString(inputSchema: ActorStoreInputSchema): string | null 
     return `- **Input fields:** ${fields}${suffix}`;
 }
 
-// Helper function to format categories from uppercase with underscores to a proper case
 function formatCategories(categories?: string[]): string[] {
     if (!categories) return [];
 

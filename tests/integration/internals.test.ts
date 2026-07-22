@@ -35,11 +35,9 @@ describe('MCP server internals integration tests', () => {
         );
         actorsMcpServer.upsertTools(initialTools);
 
-        // Load new tool
         const { tools: newTool } = await getActorsAsTools([ACTOR_NORMAL_MODE], apifyClient);
         actorsMcpServer.upsertTools(newTool);
 
-        // Store the tool name list
         const names = actorsMcpServer.listAllToolNames();
         // enableAddingActors=true seeds add-actor + 4 auto-injected helpers (get-actor-run, dataset, kv, abort);
         // then ACTOR_NORMAL_MODE is added on top.
@@ -53,14 +51,11 @@ describe('MCP server internals integration tests', () => {
         ];
         expectArrayWeakEquals(expectedToolNames, names);
 
-        // Remove all tools
         actorsMcpServer.tools.clear();
         expect(actorsMcpServer.listAllToolNames()).toEqual([]);
 
-        // Load the tool state from the tool name list
+        // Restore purely from the persisted name list — the round-trip under test.
         await actorsMcpServer.loadToolsByName(names, apifyClient);
-
-        // Check if the tool name list is restored
         expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), expectedToolNames);
     });
 

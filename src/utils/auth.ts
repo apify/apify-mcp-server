@@ -1,4 +1,4 @@
-import { CATEGORY_NAME_SET, getUnauthEnabledToolCategories, unauthEnabledTools } from '../tools/index.js';
+import { getUnauthEnabledToolCategories, unauthEnabledTools } from '../tools/index.js';
 import type { ToolCategory } from '../types.js';
 
 /**
@@ -23,18 +23,9 @@ export function isApiTokenRequired(params: {
     // Convert ToolCategory[] to Set<string> for comparison with string keys
     const unauthCategorySet = new Set<string>(getUnauthEnabledToolCategories() as ToolCategory[]);
 
-    const areAllToolsSafe = toolCategoryKeys.every((key) => {
-        // If it is a safe category
-        if (unauthCategorySet.has(key)) return true;
-        // If it is a safe tool
-        if (unauthTokenSet.has(key)) return true;
-
-        // If it is a known category but not safe -> unsafe
-        if (CATEGORY_NAME_SET.has(key)) return false;
-
-        // Otherwise it is likely an Actor name -> unsafe
-        return false;
-    });
+    // Safe only if the key is an unauth-enabled category or tool. Anything else — a
+    // token-gated category, or an Actor name (which isn't in either set) — is unsafe.
+    const areAllToolsSafe = toolCategoryKeys.every((key) => unauthCategorySet.has(key) || unauthTokenSet.has(key));
 
     const isActorsEmpty = !actorList || actorList.length === 0;
 

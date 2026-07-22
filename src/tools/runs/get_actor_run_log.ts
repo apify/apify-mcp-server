@@ -12,7 +12,7 @@ const GetRunLogArgs = z.object({
 });
 
 /**
- * https://docs.apify.com/api/v2/actor-run-get
+ * https://docs.apify.com/api/v2/actor-run-log-get
  *  /v2/actor-runs/{runId}/log{?token}
  */
 export const getActorRunLog: ToolEntry = Object.freeze({

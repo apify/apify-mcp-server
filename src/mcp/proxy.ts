@@ -9,12 +9,9 @@ import { ajv } from '../utils/ajv.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
 /**
- * Generates a unique server ID based on the provided URL.
+ * Generates a unique server ID by hashing the URL.
  *
  * URL is used instead of Actor ID because one Actor may expose multiple servers - legacy SSE / streamable HTTP.
- *
- * @param url The URL to generate the server ID from.
- * @returns A unique server ID.
  */
 export function getMCPServerID(url: string): string {
     const serverHashDigest = createHash('sha256').update(url).digest('hex');
@@ -23,10 +20,8 @@ export function getMCPServerID(url: string): string {
 }
 
 /**
- * Generates a unique tool name based on the provided URL and tool name.
- * @param url The URL to generate the tool name from.
- * @param toolName The tool name to generate the tool name from.
- * @returns A unique tool name.
+ * Prefixes the tool name with the server ID hash and truncates to MAX_TOOL_NAME_LENGTH.
+ * Truncation can in theory collide two different origin tool names.
  */
 function getProxyMCPServerToolName(url: string, toolName: string): string {
     const prefix = getMCPServerID(url);

@@ -5,7 +5,9 @@ export const ACTOR_ENUM_MAX_LENGTH = 2000;
 export const ACTOR_MAX_DESCRIPTION_LENGTH = 500;
 
 // Actor run const
-export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of memory, free users can't run actors-mcp-server and requested Actor
+// Actors needing more memory than this are rejected: a free-tier user's quota can't fit both
+// the MCP server and the requested Actor running at once (e.g. an 8 GB Actor leaves no room).
+export const ACTOR_MAX_MEMORY_MBYTES = 4_096;
 
 // Tool output
 /**

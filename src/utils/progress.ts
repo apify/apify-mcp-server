@@ -3,9 +3,10 @@ import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 
 import type { ApifyClient } from '../apify_client.js';
 
-// The console uses const MIN_OBSERVER_INTERVAL_MILLIS = 3000 so it should be fine.
+// Kept at/above Apify Console's own run-polling interval (MIN_OBSERVER_INTERVAL_MILLIS = 3000)
+// so we don't poll the API more aggressively than the Console does.
 // Exported for tests to keep fake-timer advances in sync with the production interval.
-export const PROGRESS_NOTIFICATION_INTERVAL_MS = 3000; // 3 seconds
+export const PROGRESS_NOTIFICATION_INTERVAL_MS = 3000;
 
 export const TERMINAL_RUN_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']);
 
