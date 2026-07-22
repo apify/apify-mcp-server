@@ -1,7 +1,6 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
 import type { CallDiagnostics, ToolStatus } from '../types.js';
 import { isPermissionApprovalError } from '../utils/apify_errors.js';
-import { getHttpStatusCode } from '../utils/logging.js';
 import type { ToolResponse } from '../utils/mcp.js';
 import { getToolCallErrorUserText } from '../utils/mcp.js';
 import {
@@ -9,7 +8,7 @@ import {
     buildPermissionApprovalResponse,
     isX402PaymentRequiredError,
 } from '../utils/payment_errors.js';
-import { classifyFailureCategory, getToolStatusFromError } from '../utils/tool_status.js';
+import { buildExecutionDiagnostics } from '../utils/tool_status.js';
 import { buildActorFields } from '../utils/tools.js';
 
 /** Inputs the mapper can't derive itself — they differ per caller. */
@@ -57,7 +56,6 @@ export type ToolCallErrorResult =
  */
 export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorParams): ToolCallErrorResult {
     const { toolName, actorName, actorId, isAborted } = params;
-    const httpStatus = getHttpStatusCode(error);
 
     if (isX402PaymentRequiredError(error)) {
         return {
@@ -85,16 +83,11 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
         };
     }
 
-    const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+    const { toolStatus, callDiagnostics } = buildExecutionDiagnostics({ error, isAborted, actorName, actorId });
     return {
         kind: TOOL_CALL_ERROR_KIND.EXECUTION,
-        toolStatus: getToolStatusFromError(error, isAborted),
-        callDiagnostics: {
-            failure_category: classifyFailureCategory(error),
-            ...(httpStatus !== undefined ? { failure_http_status: httpStatus } : {}),
-            failure_detail: failureDetail,
-            ...buildActorFields(actorName, actorId),
-        },
+        toolStatus,
+        callDiagnostics,
         userText: getToolCallErrorUserText(toolName, error),
     };
 }

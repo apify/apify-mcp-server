@@ -2,6 +2,7 @@ import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/int
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Notification, Request, TaskStatusNotification } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
@@ -15,6 +16,7 @@ import { createProgressTracker } from '../utils/progress.js';
 import { buildActorFields, getToolFullName } from '../utils/tools.js';
 import type { ActorsMcpServer } from './server.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
+import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telemetry.js';
 import { dispatchToolCall } from './tool_dispatch.js';
 import {
@@ -292,98 +294,119 @@ export async function executeToolAndUpdateTask(params: {
             isAborted: Boolean(cancelWatcher.signal.aborted),
         });
 
-        // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
-        if (errorResult.kind === TOOL_CALL_ERROR_KIND.PAYMENT) {
-            logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
-            // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
-            // so guard storeTaskResult against a cancel that raced with this 402.
-            if (
-                await skipIfTaskCancelled(', skipping 402 result storage', TOOL_STATUS.ABORTED, {
-                    ...buildActorFields(actorName, actorId),
-                })
-            )
+        switch (errorResult.kind) {
+            case TOOL_CALL_ERROR_KIND.PAYMENT: {
+                // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
+                logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
+                // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
+                // so guard storeTaskResult against a cancel that raced with this 402.
+                if (
+                    await skipIfTaskCancelled(', skipping 402 result storage', TOOL_STATUS.ABORTED, {
+                        ...buildActorFields(actorName, actorId),
+                    })
+                )
+                    return;
+                await completeTask(
+                    'completed',
+                    errorResult.response,
+                    errorResult.toolStatus,
+                    errorResult.callDiagnostics,
+                );
                 return;
-            await completeTask('completed', errorResult.response, errorResult.toolStatus, errorResult.callDiagnostics);
-            return;
-        }
-
-        if (errorResult.kind === TOOL_CALL_ERROR_KIND.APPROVAL) {
-            logHttpError(error, 'Permission approval required while calling tool (task mode)', {
-                toolName: tool.name,
-            });
-            // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
-            // so guard storeTaskResult against a cancel that raced with this approval error.
-            if (
-                await skipIfTaskCancelled(', skipping permission-approval result storage', TOOL_STATUS.ABORTED, {
-                    ...buildActorFields(actorName, actorId),
-                })
-            )
+            }
+            case TOOL_CALL_ERROR_KIND.APPROVAL: {
+                logHttpError(error, 'Permission approval required while calling tool (task mode)', {
+                    toolName: tool.name,
+                });
+                // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
+                // so guard storeTaskResult against a cancel that raced with this approval error.
+                if (
+                    await skipIfTaskCancelled(', skipping permission-approval result storage', TOOL_STATUS.ABORTED, {
+                        ...buildActorFields(actorName, actorId),
+                    })
+                )
+                    return;
+                await completeTask(
+                    'completed',
+                    errorResult.response,
+                    errorResult.toolStatus,
+                    errorResult.callDiagnostics,
+                );
                 return;
-            await completeTask('completed', errorResult.response, errorResult.toolStatus, errorResult.callDiagnostics);
-            return;
-        }
+            }
+            case TOOL_CALL_ERROR_KIND.EXECUTION: {
+                toolStatus = errorResult.toolStatus;
+                callDiagnostics = errorResult.callDiagnostics;
+                // Log level follows the already-classified toolStatus:
+                //   SOFT_FAIL (e.g. 402/403 user quota, client-side issues) → softFail
+                //   FAILED/ABORTED/other                                    → error
+                if (toolStatus === TOOL_STATUS.SOFT_FAIL) {
+                    // Mezmo promotes on "error" in message/keys — use errMessage key, sanitized.
+                    const errMessage = sanitizeMezmoMessage(error instanceof Error ? error.message : String(error));
+                    log.softFail('Tool execution soft-failed for task', {
+                        taskId,
+                        toolName: tool.name,
+                        toolStatus,
+                        mcpSessionId,
+                        failureCategory: callDiagnostics.failure_category,
+                        failureHttpStatus: callDiagnostics.failure_http_status,
+                        actorName: callDiagnostics.actor_name,
+                        errMessage,
+                    });
+                } else {
+                    log.error('Error executing tool for task', {
+                        taskId,
+                        toolName: tool.name,
+                        toolStatus,
+                        mcpSessionId,
+                        failureCategory: callDiagnostics.failure_category,
+                        failureHttpStatus: callDiagnostics.failure_http_status,
+                        actorName: callDiagnostics.actor_name,
+                        error,
+                    });
+                }
+                const { userText } = errorResult;
 
-        toolStatus = errorResult.toolStatus;
-        callDiagnostics = errorResult.callDiagnostics;
-        // Log level follows the already-classified toolStatus:
-        //   SOFT_FAIL (e.g. 402/403 user quota, client-side issues) → softFail
-        //   FAILED/ABORTED/other                                    → error
-        if (toolStatus === TOOL_STATUS.SOFT_FAIL) {
-            // Mezmo promotes on "error" in message/keys — use errMessage key, sanitized.
-            const errMessage = sanitizeMezmoMessage(error instanceof Error ? error.message : String(error));
-            log.softFail('Tool execution soft-failed for task', {
-                taskId,
-                toolName: tool.name,
-                toolStatus,
-                mcpSessionId,
-                failureCategory: callDiagnostics.failure_category,
-                failureHttpStatus: callDiagnostics.failure_http_status,
-                actorName: callDiagnostics.actor_name,
-                errMessage,
-            });
-        } else {
-            log.error('Error executing tool for task', {
-                taskId,
-                toolName: tool.name,
-                toolStatus,
-                mcpSessionId,
-                failureCategory: callDiagnostics.failure_category,
-                failureHttpStatus: callDiagnostics.failure_http_status,
-                actorName: callDiagnostics.actor_name,
-                error,
-            });
-        }
-        const { userText } = errorResult;
+                // Check if task was cancelled before storing result
+                if (await skipIfTaskCancelled(', skipping result storage', toolStatus, callDiagnostics)) return;
 
-        // Check if task was cancelled before storing result
-        if (await skipIfTaskCancelled(', skipping result storage', toolStatus, callDiagnostics)) return;
-
-        log.debug('[executeToolAndUpdateTask] Storing failed result', {
-            taskId,
-            mcpSessionId,
-        });
-        // Nudge on a genuinely-failed task result (mirrors the completed path and the sync
-        // captureResult). INTERNAL_ERROR and an unknown category get the full nudge; a genuine
-        // INVALID_INPUT gets the softer nudge; payment (402) is suppressed via the HTTP status and
-        // AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES. The 402 branch above
-        // returns before reaching here, so this only sees non-payment failures.
-        const failedResult = withReportProblemNudge({
-            result: {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: userText,
+                log.debug('[executeToolAndUpdateTask] Storing failed result', {
+                    taskId,
+                    mcpSessionId,
+                });
+                // Nudge on a genuinely-failed task result (mirrors the completed path and the sync
+                // captureResult). INTERNAL_ERROR and an unknown category get the full nudge; a genuine
+                // INVALID_INPUT gets the softer nudge; payment (402) is suppressed via the HTTP status and
+                // AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES. The 402 branch above
+                // returns before reaching here, so this only sees non-payment failures.
+                const failedResult = withReportProblemNudge({
+                    result: {
+                        content: [
+                            {
+                                type: 'text' as const,
+                                text: userText,
+                            },
+                        ],
+                        isError: true,
+                        internalToolStatus: toolStatus,
                     },
-                ],
-                isError: true,
-                internalToolStatus: toolStatus,
-            },
-            tools: apifyMcpServer.tools,
-            failingToolName: tool.name,
-            failureCategory: callDiagnostics.failure_category,
-            failureHttpStatus: callDiagnostics.failure_http_status,
-        });
-        await completeTask('failed', failedResult, toolStatus, callDiagnostics);
+                    tools: apifyMcpServer.tools,
+                    failingToolName: tool.name,
+                    failureCategory: callDiagnostics.failure_category,
+                    failureHttpStatus: callDiagnostics.failure_http_status,
+                });
+                await completeTask('failed', failedResult, toolStatus, callDiagnostics);
+                break;
+            }
+            default:
+                // Compile-time exhaustiveness guard (same `satisfies never` idiom as dispatchToolCall's
+                // default arm): a new TOOL_CALL_ERROR_KIND makes `errorResult` non-`never` here and fails
+                // to compile. Unreachable at runtime.
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Unknown tool-call error kind "${(errorResult satisfies never as ToolCallErrorResult).kind}"`,
+                );
+        }
     } finally {
         cancelWatcher.dispose();
     }
