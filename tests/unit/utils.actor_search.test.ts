@@ -1,29 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ApifyClient } from '../../src/apify_client.js';
 import type { ActorStoreList } from '../../src/types.js';
 import { searchActorsByKeywords, searchAgentSafeActors } from '../../src/utils/actor_search.js';
 
 const listMock = vi.fn();
 const paramsHolder: { params: Record<string, unknown> } = { params: {} };
 
-vi.mock('../../src/apify_client.js', () => ({
-    // Vitest 4 constructs mocked classes via `Reflect.construct`, which requires a
-    // constructable implementation. An arrow function has no [[Construct]], so it must
-    // be a regular function that returns the mock instance.
-    ApifyClient: vi.fn().mockImplementation(function () {
-        return {
-            store: () => ({
-                get params(): Record<string, unknown> {
-                    return paramsHolder.params;
-                },
-                set params(value: Record<string, unknown>) {
-                    paramsHolder.params = value;
-                },
-                list: listMock,
-            }),
-        };
+const stubApifyClient = {
+    store: () => ({
+        get params(): Record<string, unknown> {
+            return paramsHolder.params;
+        },
+        set params(value: Record<string, unknown>) {
+            paramsHolder.params = value;
+        },
+        list: listMock,
     }),
-}));
+} as unknown as ApifyClient;
 
 const baseStoreActor: ActorStoreList = {
     id: 'id-default',
@@ -62,7 +56,7 @@ describe('searchActorsByKeywords', () => {
         listMock.mockResolvedValueOnce({ items: [] });
         await searchActorsByKeywords({
             search: 'foo',
-            apifyToken: 'tok',
+            apifyClient: stubApifyClient,
             limit: 5,
             offset: 0,
             includeInputSchema: true,
@@ -74,7 +68,7 @@ describe('searchActorsByKeywords', () => {
 
     it('omits both flags when not provided', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
-        await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok', limit: 5 });
+        await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5 });
         expect(paramsHolder.params).not.toHaveProperty('includeInputSchema');
         expect(paramsHolder.params).not.toHaveProperty('allowsAgenticUsers');
     });
@@ -90,7 +84,7 @@ describe('searchAgentSafeActors', () => {
         listMock.mockResolvedValueOnce({ items: [makeActor(), makeActor(), makeActor()] });
         const result = await searchAgentSafeActors({
             keywords: 'foo',
-            apifyToken: 'tok',
+            apifyClient: stubApifyClient,
             limit: 3,
             offset: 0,
         });
@@ -103,7 +97,7 @@ describe('searchAgentSafeActors', () => {
         listMock.mockResolvedValueOnce({ items: [makeActor()] });
         await searchAgentSafeActors({
             keywords: 'foo',
-            apifyToken: 'tok',
+            apifyClient: stubApifyClient,
             limit: 1,
             offset: 0,
             // The actual provider is not consumed here; only its presence flips the flag.
