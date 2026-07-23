@@ -223,7 +223,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
         // eslint-disable-next-line vitest/valid-title -- parametric suite factory; title is the suiteName argument
         suiteName,
         {
-            concurrent: true, // Every test owns its client (declared+registered locally) — safe to parallelize.
+            concurrent: true, // Every test declares and closes its own client — safe to parallelize.
         },
         () => {
             it('should list all default tools and Actors', async () => {
