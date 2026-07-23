@@ -77,6 +77,14 @@ You can use the Apify MCP Server in two ways:
 
 You can find detailed instructions for setting up the MCP server in the [Apify documentation](https://docs.apify.com/platform/integrations/mcp).
 
+[Autohand Code](https://github.com/autohandai/code-cli/) users can register the hosted Streamable HTTP endpoint directly:
+
+```bash
+autohand mcp add --transport http apify https://mcp.apify.com
+```
+
+Add `--scope project` to keep the registration in the current workspace.
+
 # 🤖 MCP clients
 
 Apify MCP Server is compatible with any MCP client that adheres to the [Model Context Protocol](https://modelcontextprotocol.org/), but the level of support for dynamic tool discovery and other features may vary between clients.
