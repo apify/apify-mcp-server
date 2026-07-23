@@ -104,16 +104,17 @@ export async function prepareToolCall(params: {
     isTaskRequest: boolean;
     mcpSessionId: string | undefined;
     telemetryData: ToolCallTelemetryProperties | null;
-    // Used to preserve abort status for a post-resolution classified failure.
     extra?: RequestHandlerExtra<Request, Notification>;
-    // Per-request client identity for the modern (2026-07-28) path, where it arrives on every
-    // request. Defaults to the initialize-scoped `options.initializeRequestData` on legacy
-    // connections, so v1 callers passing nothing stay byte-identical.
     initializeRequestData?: InitializeRequest;
+    tools?: Map<string, ToolEntry>;
 }): Promise<PreparedCall | InvalidToolCall | PreparedCallError> {
     const { apifyMcpServer, apifyToken, name, meta, requestHeaders, isTaskRequest, telemetryData } = params;
     let { args } = params;
-    const { options, tools } = apifyMcpServer;
+    const { options } = apifyMcpServer;
+    const tools = params.tools ?? apifyMcpServer.tools;
+    const initializeRequestData = Object.hasOwn(params, 'initializeRequestData')
+        ? params.initializeRequestData
+        : options.initializeRequestData;
 
     if (!apifyToken && !options.paymentProvider?.allowsUnauthenticated && !options.allowUnauthMode) {
         return {
@@ -131,7 +132,7 @@ export async function prepareToolCall(params: {
     const toolEntry = Array.from(tools.values()).find((t) => t.name === newName || getToolFullName(t) === newName);
 
     if (!toolEntry) {
-        const availableTools = apifyMcpServer.listToolNames();
+        const availableTools = Array.from(tools.keys());
         return {
             message: dedent`
                 Tool "${name}" was not found.
@@ -188,7 +189,7 @@ export async function prepareToolCall(params: {
             apifyToken,
             meta,
             requestHeaders,
-            requestOrigin: getRequestOriginForClient(params.initializeRequestData ?? options.initializeRequestData),
+            requestOrigin: getRequestOriginForClient(initializeRequestData),
         });
 
         log.debug('Validate arguments for tool', {
@@ -276,6 +277,7 @@ export async function prepareToolCall(params: {
             actorId,
             isAborted: Boolean(params.extra?.signal?.aborted),
             mcpSessionId: params.mcpSessionId,
+            tools,
         });
         return { ...outcome, resolvedToolName, decodedArgs };
     }
@@ -291,6 +293,7 @@ export async function executeSyncToolCall(
         mcpSessionId: string | undefined;
         progressToken: string | number | undefined;
         extra: RequestHandlerExtra<Request, Notification>;
+        tools?: Map<string, ToolEntry>;
     },
 ): Promise<ToolCallOutcome> {
     const { apifyMcpServer, apifyToken, toolName, mcpSessionId, progressToken, extra } = params;
@@ -301,7 +304,7 @@ export async function executeSyncToolCall(
     const nudge = (result: unknown, callDiagnostics: CallDiagnostics): Record<string, unknown> =>
         withReportProblemNudge({
             result,
-            tools: apifyMcpServer.tools,
+            tools: params.tools ?? apifyMcpServer.tools,
             failingToolName: resolvedToolName,
             failureCategory: callDiagnostics.failure_category,
             failureHttpStatus: callDiagnostics.failure_http_status,
@@ -358,6 +361,7 @@ export async function executeSyncToolCall(
             actorId,
             isAborted: Boolean(extra.signal?.aborted),
             mcpSessionId,
+            tools: params.tools,
         });
     }
 }
@@ -373,6 +377,7 @@ export function classifyToolCallError(
         actorId: string | undefined;
         isAborted: boolean;
         mcpSessionId: string | undefined;
+        tools?: Map<string, ToolEntry>;
     },
 ): ToolCallOutcome {
     const { apifyMcpServer, toolName, failingToolName, actorName, actorId, isAborted, mcpSessionId } = params;
@@ -380,7 +385,7 @@ export function classifyToolCallError(
     const nudge = (result: unknown, callDiagnostics: CallDiagnostics): Record<string, unknown> =>
         withReportProblemNudge({
             result,
-            tools: apifyMcpServer.tools,
+            tools: params.tools ?? apifyMcpServer.tools,
             failingToolName,
             failureCategory: callDiagnostics.failure_category,
             failureHttpStatus: callDiagnostics.failure_http_status,

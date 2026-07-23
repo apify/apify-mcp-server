@@ -9,7 +9,7 @@ minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
   - "@apify/*"
   - "@apify-packages/*"
-  # v2 MCP SDK is adopted at exact-pinned pre-release versions (stateless-migration PR 1),
+  # The stateless MCP SDK is adopted at exact-pinned pre-release versions (stateless-migration PR 1),
   # so every bump is a deliberate, reviewed change — the age gate adds nothing for these.
   # Drop the exclusions once the SDK is stable and the pins move to ranges.
   - "@modelcontextprotocol/core"
@@ -39,7 +39,7 @@ strictDepBuilds: false
 overrides:
   "@modelcontextprotocol/sdk": "1.29.0"
 
-# Required by pnpm v10+ modern `pnpm deploy`: workspace deps get copied ("injected")
+# Required by pnpm v10+ `pnpm deploy`: workspace deps get copied ("injected")
 # into consumers' node_modules instead of symlinked, so deploy output is portable.
 # No effect on installs in this repo today — the root package has no `workspace:*` deps.
 injectWorkspacePackages: true
