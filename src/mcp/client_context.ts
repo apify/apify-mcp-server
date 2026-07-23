@@ -26,12 +26,18 @@ export function buildMcpClientContext(params: McpInitializeParams | undefined): 
 
     return {
         ...(params.protocolVersion !== undefined && { protocolVersion: params.protocolVersion }),
-        ...(params.clientInfo !== undefined && { clientInfo: { ...params.clientInfo } }),
+        // The SDK's `Implementation`/`clientInfo` shape carries optional nested fields (`icons[]`,
+        // `title`, `websiteUrl`, `description`) beyond {name, version}, so clone it the same way as
+        // capabilities — a shallow spread would share those nested objects/arrays by reference.
+        ...(params.clientInfo !== undefined && { clientInfo: structuredClone(params.clientInfo) }),
         ...(params.capabilities !== undefined && { capabilities: structuredClone(params.capabilities) }),
     };
 }
 
 export function isUiSupportedByClient(context: McpClientContext | undefined): boolean {
+    // `context.capabilities` is our protocol-neutral `Record<string, unknown>`; `getUiCapability` is
+    // an upstream ext-apps helper expecting its own SDK-typed capabilities shape. The runtime value is
+    // the same object either way, so this cast only crosses that type boundary.
     const uiCapability = getUiCapability(context?.capabilities as Parameters<typeof getUiCapability>[0]);
     return uiCapability?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
 }
