@@ -614,9 +614,7 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
     });
 
     it('re-throws an escaped McpError as a JSON-RPC error, not an isError tool result', async () => {
-        // Safety net: if an McpError escapes dispatch (ACTOR_MCP containment is the normal seal),
-        // the sync catch must re-throw it — never classify. Classification would turn InvalidParams
-        // into an EXECUTION isError result, and a 402-coded McpError into a PAYMENT tool result.
+        // Escaped McpErrors must remain JSON-RPC errors, including 402-coded errors.
         await withServer(async (server) => {
             silenceLogs();
             const tool = makeThrowingTool({
@@ -642,9 +640,7 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
     });
 
     it('re-throws a 402-coded McpError as JSON-RPC, never a PAYMENT tool result', async () => {
-        // Companion to the InvalidParams fence: a 402-coded McpError hits isX402PaymentRequiredError
-        // if classified (getHttpStatusCode → `.code`). Must reject with code 402, not resolve with
-        // structuredContent payment payload.
+        // A 402-coded McpError must reject as JSON-RPC, not become a payment result.
         await withServer(async (server) => {
             silenceLogs();
             const tool = makeThrowingTool({
@@ -993,12 +989,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
     });
 
     it('classifies a non-McpError prep-spine throw as an EXECUTION isError result, not a raw reject', async () => {
-        // The blocker regression fence. A 5xx re-thrown from the standby pre-flight
-        // (checkPaymentProviderStandbyConflict → getActorDefinition) originates inside the prep spine,
-        // before dispatch. It must land in the shell's outer catch and be classified exactly like v1:
-        // an isError tool result with toolStatus FAILED and a logHttpError side-effect — never
-        // propagated raw to the SDK as a JSON-RPC error (which would flip the wire and log telemetry as
-        // SUCCEEDED). Without the outer catch the handler would reject instead of resolving.
+        // Prep-spine 5xx errors must become FAILED tool results, not raw JSON-RPC errors.
         const logSpy = vi.spyOn(logging, 'logHttpError').mockImplementation(() => {});
         await withServer(
             async (server) => {
@@ -1022,16 +1013,14 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 );
                 expect(result.isError).toBe(true);
                 expect(result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.FAILED });
-                // The throw happened in the prep spine — the tool body never ran.
+                // Preparation failed before dispatch.
                 expect(received.called).toBe(false);
                 expect(logSpy).toHaveBeenCalledWith(
                     expect.anything(),
                     'Error occurred while calling tool',
                     expect.objectContaining({ toolStatus: TOOL_STATUS.FAILED }),
                 );
-                // The classified result must carry the actor context v1 had. The prep-spine throw
-                // happens after tool resolution, so actor_name flows into callDiagnostics and reaches
-                // logHttpError's `actorName` field. Before the fix actorName was undefined on this path.
+                // Actor context must survive post-resolution failures.
                 expect(logSpy).toHaveBeenCalledWith(
                     expect.anything(),
                     'Error occurred while calling tool',
@@ -1043,12 +1032,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
     });
 
     it('classifies a createTask throw so telemetry is FAILED, not SUCCEEDED', async () => {
-        // Residual outer-catch fence: after prep-spine throws moved into PreparedCallError, the shell
-        // catch's remaining job is a task-branch createTask failure. Classification must run so the
-        // finally logs FAILED — without it a raw throw leaves toolStatus at SUCCEEDED. The classified
-        // isError body cannot satisfy CreateTaskResult (no `task` field), so the SDK wrapper then
-        // rejects with InvalidParams; the store-outage path avoids that by throwing InternalError.
-        // This test pins the telemetry half of the catch; the wire-shape trap is a separate follow-up.
+        // createTask failures must mark telemetry FAILED before the protocol error is re-thrown.
         const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
         await withServer(
             async (server) => {
@@ -1083,10 +1067,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
     });
 
     it('carries actor_name into the telemetry event on a post-resolution prep-spine throw', async () => {
-        // Companion to the classification fence above: the same standby-5xx prep-spine throw must emit a
-        // telemetry event whose callDiagnostics carry actor_name (spread into the tracked properties),
-        // byte-identical to base — which set actorName right after resolution so the outer-catch telemetry
-        // kept it. Telemetry-enabled + unauth so trackToolCall fires with no userId network fetch.
+        // Post-resolution failures must retain actor_name in telemetry.
         const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
         await withServer(
             async (server) => {

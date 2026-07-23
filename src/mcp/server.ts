@@ -814,8 +814,7 @@ export class ActorsMcpServer {
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
             const params = request.params as ApifyRequestParams & { name: string; arguments?: Record<string, unknown> };
-            // `args` is reassigned to the dot-decoded copy so the telemetry `finally` sees decoded keys
-            // (v1 reassigned this same closure var); name/meta are never reassigned.
+            // Keep telemetry on the decoded arguments.
             // eslint-disable-next-line prefer-const
             let { name, arguments: args, _meta: meta } = params;
             const progressToken = meta?.progressToken;
@@ -836,19 +835,13 @@ export class ActorsMcpServer {
             // this handler's `finally` — so its `Tool call completed` log line keeps the taskId the
             // async path logs via finishTaskTracking.
             let preflightTaskId: string | undefined;
-            // Set from the outcome's (already-nudged) result so the `finally` can measure response
-            // size for telemetry. Stays null on the InvalidToolCall throw path, matching v1.
+            // The nudge must be included in the measured result.
             let toolResult: unknown = null;
-            // Hoisted so the outer catch can classify a task-branch `createTask` throw with the same
-            // actor telemetry fields v1 had. Assigned from `prepared` after a successful `prepareToolCall`
-            // (before the task branch runs). Prep-spine post-resolution throws are classified inside
-            // `prepareToolCall` with its own in-scope actor context, so they never rely on these.
+            // Keep actor context available to the outer catch.
             let actorName: string | undefined;
             let actorId: string | undefined;
 
-            // Initialize telemetry with raw tool name — `prepareToolCall` updates it once the tool is
-            // resolved. This ensures telemetry is available even for early failures (missing token,
-            // tool not found).
+            // Start with the raw name so early failures still have telemetry.
             const { telemetryData, userId } = await prepareTelemetryData({
                 toolName: name,
                 mcpSessionId,
@@ -871,11 +864,7 @@ export class ActorsMcpServer {
                 });
 
                 if ('result' in prepared) {
-                    // A non-McpError throw from the prep spine AFTER tool resolution — the engine
-                    // classified it with the actor context it had in scope. Interpret it exactly like the
-                    // sync outcome below (v1 projection is identity). resolvedToolName/args are carried so
-                    // the telemetry `finally` logs the resolved name + decoded args, matching base — which
-                    // had both set before such a throw could reach its outer catch.
+                    // The engine already classified this post-resolution failure.
                     resolvedToolName = prepared.resolvedToolName;
                     args = prepared.decodedArgs;
                     toolStatus = prepared.toolStatus;
@@ -885,11 +874,7 @@ export class ActorsMcpServer {
                 }
 
                 if ('message' in prepared) {
-                    // Invalid call — reproduce v1's failInvalidParams tail: assign toolStatus/
-                    // callDiagnostics (so the `finally` telemetry sees them), softFail-log, emit the
-                    // side-channel, then throw the protocol error. v1 set resolvedToolName (and decoded
-                    // the args) right after resolution, unconditionally — so use the values prep carries
-                    // back for the post-resolution rejects, independent of whether telemetry is enabled.
+                    // Reproduce v1's invalid-params tail and preserve telemetry fields.
                     resolvedToolName = prepared.resolvedToolName ?? resolvedToolName;
                     if (prepared.decodedArgs) args = prepared.decodedArgs;
                     toolStatus = prepared.toolStatus;
@@ -912,7 +897,7 @@ export class ActorsMcpServer {
                 actorName = prepared.actorName;
                 actorId = prepared.actorId;
                 resolvedToolName = getToolFullName(tool);
-                // Feed telemetry the decoded args, matching v1's closure reassign before the `finally`.
+                // Telemetry uses the decoded arguments.
                 args = prepared.decodedArgs;
 
                 // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
@@ -984,8 +969,7 @@ export class ActorsMcpServer {
                         setImmediate(() => {
                             void emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
                         });
-                        // Nudge only for byte-measurement (the stored/wire result stays un-nudged, per
-                        // the async path); mirrors v1's captureResult on this branch.
+                        // Measure the nudged result without changing the stored result.
                         toolResult = withReportProblemNudge({
                             result: outcome.result,
                             tools: this.tools,
@@ -1041,14 +1025,7 @@ export class ActorsMcpServer {
                 toolResult = outcome.result;
                 return outcome.result;
             } catch (error) {
-                // Restore v1's outer-catch classification. A non-McpError throw from the task branch's
-                // createTask must become a classified isError tool result, not propagate raw to the SDK
-                // (which would flip the wire to a JSON-RPC error and log telemetry as SUCCEEDED). (Prep-spine
-                // post-resolution throws are classified inside prepareToolCall and returned as an outcome,
-                // so they no longer reach here.) Re-throw McpError (InvalidToolCall rejections, the task
-                // store-outage InternalError) unchanged so the SDK returns them as JSON-RPC errors —
-                // order-equivalent to v1 since no HTTP-range-coded McpError reaches here. Reuses the
-                // shared classifier so the wire, telemetry (FAILED), and logHttpError match base.
+                // Match v1: classify task-creation failures, but re-throw protocol errors as JSON-RPC.
                 if (error instanceof McpError) {
                     throw error;
                 }

@@ -10,7 +10,7 @@ import { executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_en
 import type { ToolCallTelemetryProperties } from '../../src/types.js';
 import { makePaymentRequiredError, makeRecorderTool, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
-/** Minimal RequestHandlerExtra for driving the engine directly (no transport). */
+/** Builds request context for direct engine tests. */
 function fakeExtra(aborted = false): RequestHandlerExtra<Request, Notification> {
     return {
         signal: { aborted },
@@ -19,7 +19,7 @@ function fakeExtra(aborted = false): RequestHandlerExtra<Request, Notification> 
     } as unknown as RequestHandlerExtra<Request, Notification>;
 }
 
-/** Silence the error-path logging the failure branches emit, keeping test output clean. */
+/** Suppresses expected failure logs. */
 function silenceLogs(): void {
     vi.spyOn(log, 'error').mockImplementation(() => log);
     vi.spyOn(log, 'exception').mockImplementation(() => log);

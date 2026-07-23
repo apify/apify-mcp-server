@@ -62,9 +62,7 @@ export async function dispatchToolCall(params: {
     // Caller-supplied log decoration (task mode: ' for task' suffix + taskId field), applied
     // mechanically to the per-branch "Calling …" lines — no effect on dispatch behavior.
     logContext?: { messageSuffix: string; fields: Record<string, unknown> };
-    // Client-facing side-channel for the ACTOR_MCP connect-failure soft-fail. Defaults to the
-    // server's `sendLoggingMessage`, keeping the hard `.server` coupling off the shared leaf so a
-    // future shell (with no session transport) can pass a no-op.
+    // Side-channel for ACTOR_MCP connect failures; shells without a transport may pass a no-op.
     emitLog?: (msg: { level: string; data?: unknown }) => Promise<void>;
 }): Promise<{ result: Record<string, unknown>; toolStatus: ToolStatus; callDiagnostics: CallDiagnostics }> {
     const {

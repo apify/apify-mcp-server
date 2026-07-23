@@ -12,31 +12,18 @@ implementations, not by importing from here.
 
 - `server.ts` — `ActorsMcpServer`: tool/prompt/resource/task registration, the
   `initialize` handshake, MCP Apps capability detection, `CallToolRequest` handling.
-  The `CallToolRequest` handler is a thin shell over `tool_call_engine.ts`: it builds
-  inputs, calls `prepareToolCall` (mapping an `InvalidToolCall` back to the v1
-  softFail-log → side-channel → `McpError` throw, and interpreting a `PreparedCallError` —
-  a prep-spine post-resolution throw the engine already classified — like any other outcome)
-  and `executeSyncToolCall`, then runs its telemetry `finally`. Its outer `catch` re-throws
-  `McpError` unchanged and routes a task-branch `createTask` throw through the shared
-  `classifyToolCallError` so it becomes a classified `isError` result, not a raw reject —
-  byte-identical to v1's old inline catch. The task path (`executeToolAndUpdateTask`, in
-  `task_execution.ts`) reuses the same `PreparedCall`. Both run the shared
-  `dispatchToolCall` switch in `tool_dispatch.ts`.
+  The `CallToolRequest` handler prepares calls with `tool_call_engine.ts`, runs the
+  sync tail, and records telemetry. `InvalidToolCall` is mapped to the v1
+  softFail → logging notification → `McpError` sequence; `McpError` is re-thrown,
+  while task-creation failures are classified as tool results. The task path reuses
+  the same `PreparedCall`; both use the shared `dispatchToolCall` switch.
   Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
   a task store (the internal repo injects a Redis one) or the constructor throws.
-- `tool_call_engine.ts` — the shared `tools/call` orchestration spine both eras call.
-  `prepareToolCall()` runs the prep spine (token gate → resolution → payment context → AJV
-  validation → task-support check → standby/402 pre-flight) and returns a neutral
-  `PreparedCall`, `InvalidToolCall`, or `PreparedCallError` (a post-resolution non-`McpError`
-  throw it classifies itself, keeping the actor context v1 had) — never throws a protocol
-  error. `executeSyncToolCall()`
-  runs the dispatch tail (pre-flight short-circuit → dispatch → error classification →
-  report-problem nudge) and returns a `ToolCallOutcome`. `classifyToolCallError()` is the
-  shared error→`ToolCallOutcome` classifier (reuses `buildToolCallErrorResult`, applies the
-  nudge, owns the APPROVAL/EXECUTION `logHttpError` side-effects); both `executeSyncToolCall`'s
-  catch and the shell's outer catch route through it. `buildPreflightFailureOutcome()`
-  lives here (single-source precedence: standby wins over 402). Does not construct SDK protocol
-  errors — shells do; escaped `McpError`s are re-thrown so they stay JSON-RPC errors.
+- `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
+  token gate, tool resolution, payment context, AJV validation, task support, and standby/402
+  pre-flight. `executeSyncToolCall()` runs the dispatch tail; `classifyToolCallError()` maps
+  non-protocol errors to tool results. Protocol errors are not constructed here, and escaped
+  `McpError`s remain JSON-RPC errors.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
@@ -50,9 +37,7 @@ implementations, not by importing from here.
 - `tool_dispatch.ts` — `dispatchToolCall()`: the single exhaustive `switch (tool.type)`
   (INTERNAL / ACTOR_MCP / ACTOR) both the sync handler and the task path run. Plain
   function taking the `ActorsMcpServer` instance; touches no class state beyond `.server`.
-  The optional `emitLog` param (default: `apifyMcpServer.server.sendLoggingMessage`) is the
-  client-facing side-channel for the ACTOR_MCP connect-failure soft-fail; a shell with no
-  session transport can pass a no-op, keeping the hard `.server` coupling off the leaf.
+  The optional `emitLog` parameter sends ACTOR_MCP connect-failure notifications.
 - `tool_call_telemetry.ts` — `prepareTelemetryData()` / `logToolCallAndTelemetry()`: shared by
   the sync `CallToolRequestSchema` handler and the task path. Plain functions taking the
   `ActorsMcpServer` instance (as `apifyMcpServer`), reading `telemetryEnabled`/`telemetryEnv`
