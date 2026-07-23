@@ -9,7 +9,6 @@ import log from '@apify/log';
 
 import { defaults, HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
-import { addActor } from '../tools/actors/add_actor.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
@@ -178,11 +177,18 @@ export function toolNamesToInput(toolNames: string[]): Input {
     return input;
 }
 
-/** Compose the final tool list from pre-fetched actor tools and the original input for the given mode. */
+/**
+ * Compose the final tool list from pre-fetched actor tools and the original input for the given mode.
+ *
+ * @param isRestore - `true` for a session restore (`toolNamesToInput()` via `loadToolsByName()`),
+ * as opposed to a live selector. A restored session's stored name can be `'add-actor'` from before
+ * the PR 0 cutoff below — it must resolve to itself, not get substituted like a fresh selector.
+ */
 export function getToolsForServerMode(
     input: Input,
     actorTools: ToolEntry[],
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
+    isRestore = false,
 ): ToolEntry[] {
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
@@ -204,6 +210,8 @@ export function getToolsForServerMode(
         }
     }
 
+    const callActorTool = toolsByName.get(HELPER_TOOLS.ACTOR_CALL);
+
     // Walk selectors for internal picks (mode-specific). Actor-name classification
     // happened in `resolveActorsToLoad`; we don't need to partition again here.
     const internalSelections: ToolEntry[] = [];
@@ -212,7 +220,13 @@ export function getToolsForServerMode(
             if (sel === 'preview') {
                 // 'preview' category is deprecated. It contained `call-actor` which is now default.
                 log.warning('Tool category "preview" is deprecated');
-                const callActorTool = toolsByName.get(HELPER_TOOLS.ACTOR_CALL);
+                if (callActorTool) internalSelections.push(callActorTool);
+                continue;
+            }
+
+            // add-actor cutoff (PR 0): substitute call-actor for a live 'add-actor'/'experimental'
+            // selector. Skipped on restore, where `sel` may be a pre-cutoff session's own stored name.
+            if (!isRestore && (sel === HELPER_TOOLS.ACTOR_ADD || sel === 'experimental')) {
                 if (callActorTool) internalSelections.push(callActorTool);
                 continue;
             }
@@ -242,14 +256,15 @@ export function getToolsForServerMode(
     // Internal tools
     if (selectors !== undefined) {
         result.push(...internalSelections);
-        // If add-actor mode is enabled, ensure add-actor tool is available alongside selected tools.
+        // enableAddingActors cutoff (PR 0): substitute call-actor for add-actor. Restore inputs never
+        // set this flag (toolNamesToInput() doesn't), so this only fires for a live connection.
         if (addActorEnabled && !selectorsExplicitEmpty && !actorsExplicitlyEmpty) {
-            const hasAddActor = result.some((e) => e.name === addActor.name);
-            if (!hasAddActor) result.push(addActor);
+            const hasCallActor = result.some((e) => e.name === callActorTool?.name);
+            if (callActorTool && !hasCallActor) result.push(callActorTool);
         }
     } else if (addActorEnabled && !actorsExplicitlyEmpty) {
-        // No selectors: either expose only add-actor (when enabled), or default categories
-        result.push(addActor);
+        // No selectors: either expose only call-actor (add-actor substitution, when enabled) or default categories
+        if (callActorTool) result.push(callActorTool);
     } else if (!actorsExplicitlyEmpty) {
         // Use mode-resolved default categories
         for (const cat of toolCategoriesEnabledByDefault) {

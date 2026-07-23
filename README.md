@@ -242,7 +242,7 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 
 Legend for the **Enabled by default** column:
 - ✅ — in the default tool set.
-- ⚡ — auto-injected when `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present (which is true in the default configuration).
+- ⚡ — auto-injected when `call-actor`, an Actor tool, or `get-actor-run` is present (which is true in the default configuration).
 - ✅¹ — served by default, but only when telemetry is enabled and the client is not withheld: Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code) or `local-agent-mode-apify`. To disable, pass an explicit `tools=` list that omits it.
 
 | Tool name | Category | Description | Enabled by default |
@@ -266,11 +266,10 @@ Legend for the **Enabled by default** column:
 | `get-key-value-store-keys`| storage | List the keys within a specific key-value store. |  |
 | `get-dataset-list` | storage | List all available datasets for the user. |  |
 | `get-key-value-store-list`| storage | List all available key-value stores for the user. |  |
-| `add-actor` | experimental | Add an Actor as a new tool for the user to call. |  |
 
 > **Note:**
 >
-> When `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present, the server auto-injects `get-actor-run`, `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run`.
+> When `call-actor`, an Actor tool, or `get-actor-run` is present, the server auto-injects `get-actor-run`, `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run`.
 >
 > When you call an Actor — through `call-actor` or directly via an Actor tool (e.g., `apify--rag-web-browser`) — the response contains run metadata, storage IDs, and a `summary` + `nextStep`, but no dataset items. To fetch items, follow `nextStep` and call `get-dataset-items` (auto-injected), passing the `datasetId` returned from the call.
 
@@ -284,7 +283,7 @@ All tools include metadata annotations to help MCP clients and LLMs understand t
 
 ### Tools configuration
 
-The `tools` configuration parameter is used to specify loaded tools – either categories or specific tools directly, and Apify Actors. For example, `tools=storage,runs` loads two categories; `tools=add-actor` loads just one tool.
+The `tools` configuration parameter is used to specify loaded tools – either categories or specific tools directly, and Apify Actors. For example, `tools=storage,runs` loads two categories; `tools=call-actor` loads just one tool.
 
 When no query parameters are provided, the MCP server loads the following `tools` by default:
 
@@ -380,13 +379,14 @@ The v2 configuration preserves backward compatibility with v1 usage. Notes:
   - Internally they are merged into `tools` selectors.
   - Examples: `?actors=apify/rag-web-browser` ≡ `?tools=apify/rag-web-browser`; `--actors apify/rag-web-browser` ≡ `--tools apify/rag-web-browser`.
 - `enable-adding-actors` (CLI) and `enableAddingActors` (URL) are supported but deprecated.
-  - Prefer `tools=experimental` or including the specific tool `tools=add-actor`.
-  - Behavior remains: when enabled with no `tools` specified, the server exposes only `add-actor`; when categories/tools are selected, `add-actor` is also included.
+  - Prefer including the specific tool `tools=call-actor` (default via the `actors` category).
+  - `add-actor` is no longer selectable for new connections on any surface — `call-actor` is substituted in its place, same enabled/alongside-other-tools behavior as before.
 - `enableActorAutoLoading` remains as a legacy alias for `enableAddingActors` and is mapped automatically.
 - Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, and `apify/rag-web-browser`.
   - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).
 - `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
 - `preview` category is deprecated and removed. Use specific tool names instead.
+- `tools=add-actor` and `tools=experimental` are no longer selectable for new connections — `call-actor` is substituted at selection time. Use `tools=call-actor` (or the default `actors` category) instead.
 
 Existing URLs and commands using `?actors=...` or `--actors` continue to work unchanged.
 

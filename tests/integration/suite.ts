@@ -1,6 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -22,7 +22,7 @@ import type { SERVER_MODE, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
 import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
-import { addActor, type McpClientOptions } from '../helpers.js';
+import type { McpClientOptions } from '../helpers.js';
 import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAborted } from './utils/task_waits.js';
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
@@ -75,18 +75,6 @@ function buildExampleMcpServerAddToolContent(firstNumber: number, secondNumber: 
             text: `The sum of ${firstNumber} and ${secondNumber} is ${firstNumber + secondNumber}`,
         },
     ];
-}
-
-async function callNormalModeTestActor(client: Client, selectedToolName: string) {
-    const result = await client.callTool({
-        name: selectedToolName,
-        arguments: {
-            firstNumber: 1,
-            secondNumber: 2,
-        },
-    });
-
-    expectNormalModeTestStructuredContent(result);
 }
 
 function validateStructuredOutput(result: unknown, toolOutputSchema: unknown, toolName: string): void {
@@ -297,12 +285,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 });
             });
 
-            it('should auto-inject storage and abort tools when enableAddingActors is true', async () => {
+            it('should substitute call-actor for add-actor and auto-inject storage/abort tools when enableAddingActors is true', async () => {
                 client = await createClientFn({ enableAddingActors: true });
                 const names = getToolNames(await client.listTools());
-                // add-actor triggers auto-injected helpers (get-actor-run, storage, abort).
+                // call-actor (substituted for add-actor, PR 0) triggers auto-injected helpers (get-actor-run, storage, abort).
                 expect(names.length).toEqual(1 + AUTO_INJECTED_TOOL_NAMES.length);
-                expect(names).toContain('add-actor');
+                expect(names).toContain('call-actor');
+                expect(names).not.toContain('add-actor');
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                 await client.close();
             });
@@ -337,13 +326,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 await client.close();
             });
 
-            it('should override enableAddingActors false with experimental tool category', async () => {
+            it('should override enableAddingActors false with experimental tool category (substituted to call-actor)', async () => {
                 client = await createClientFn({ enableAddingActors: false, tools: ['experimental'] });
 
                 const names = getToolNames(await client.listTools());
-                // experimental category provides add-actor + auto-injected helpers (get-actor-run, storage, abort).
+                // experimental's sole member (add-actor) resolves to call-actor (PR 0) + auto-injected helpers.
                 expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
-                expect(names).toContain('add-actor');
+                expect(names).toContain('call-actor');
+                expect(names).not.toContain('add-actor');
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
                 await client.close();
@@ -466,24 +456,24 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 await client.close();
             });
 
-            it('should handle mixed categories and specific tools in tools param', async () => {
+            it('should handle mixed categories and specific tools in tools param (add-actor substituted to call-actor)', async () => {
                 client = await createClientFn({
                     tools: ['docs', 'fetch-actor-details', 'add-actor'],
                 });
                 const names = getToolNames(await client.listTools());
 
-                // docs (2) + fetch-actor-details + add-actor + auto-injected helpers
+                // docs (2) + fetch-actor-details + call-actor (add-actor substituted, PR 0) + auto-injected helpers
                 expect(names).toHaveLength(4 + AUTO_INJECTED_TOOL_NAMES.length);
 
                 // Should include: docs category + specific tools
                 expect(names).toContain('search-apify-docs'); // from docs category
                 expect(names).toContain('fetch-apify-docs'); // from docs category
                 expect(names).toContain('fetch-actor-details'); // specific tool
-                expect(names).toContain('add-actor'); // specific tool
+                expect(names).toContain('call-actor'); // add-actor substituted (PR 0)
 
-                // Should NOT include other actors category tools
+                // Should NOT include other actors category tools, nor add-actor itself
                 expect(names).not.toContain('search-actors');
-                expect(names).not.toContain('call-actor');
+                expect(names).not.toContain('add-actor');
             });
 
             it('should load only docs tools', async () => {
@@ -519,31 +509,37 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 await client.close();
             });
 
-            it('should add Actor dynamically and call it directly', async () => {
+            it('should substitute call-actor for add-actor when enableAddingActors is true, and call the Actor directly (no add step)', async () => {
                 const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
                 client = await createClientFn({ enableAddingActors: true });
                 const names = getToolNames(await client.listTools());
                 expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
-                expect(names).toContain('add-actor');
+                expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+                expect(names).not.toContain('add-actor');
                 expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                 expect(names).not.toContain(selectedToolName);
-                // Add Actor dynamically
-                await addActor(client, ACTOR_NORMAL_MODE);
 
-                // add-actor + auto-injected + newly added actor
-                const namesAfterAdd = getToolNames(await client.listTools());
-                expect(namesAfterAdd.length).toEqual(2 + AUTO_INJECTED_TOOL_NAMES.length);
-                expect(namesAfterAdd).toContain(selectedToolName);
-                expectToolNamesToContain(namesAfterAdd, AUTO_INJECTED_TOOL_NAMES);
-                await callNormalModeTestActor(client, selectedToolName);
+                // No dynamic "add" step exists anymore (PR 0) — call-actor calls any Actor by name directly.
+                const result = await client.callTool({
+                    name: HELPER_TOOLS.ACTOR_CALL,
+                    arguments: {
+                        actor: ACTOR_NORMAL_MODE,
+                        input: {
+                            firstNumber: 1,
+                            secondNumber: 2,
+                        },
+                    },
+                });
+                expectNormalModeTestStructuredContent(result);
             });
 
             it('should call Actor dynamically via generic call-actor tool without need to add it first', async () => {
                 const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
                 client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
                 const names = getToolNames(await client.listTools());
-                // actors category + add-actor + auto-injected helpers (get-actor-run, dataset, kv, abort)
-                const numberOfTools = getCategoryTools('default').actors.length + 1 + AUTO_INJECTED_TOOL_NAMES.length;
+                // actors category (already has call-actor) + auto-injected helpers. enableAddingActors's
+                // substitute (call-actor, PR 0) is already there, so it adds nothing further.
+                const numberOfTools = getCategoryTools('default').actors.length + AUTO_INJECTED_TOOL_NAMES.length;
                 expect(names).toHaveLength(numberOfTools);
                 // get-actor-run should be automatically included when call-actor is present
                 expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
@@ -784,82 +780,25 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(outputText).not.toContain('This Actor is rental');
             });
 
-            it('should notify client about tool list changed', async () => {
-                client = await createClientFn({ enableAddingActors: true });
-
-                // This flag is set to true when a 'notifications/tools/list_changed' notification is received,
-                // indicating that the tool list has been updated dynamically.
-                let hasReceivedNotification = false;
-                client.setNotificationHandler(ToolListChangedNotificationSchema, async (notification) => {
-                    if (notification.method === 'notifications/tools/list_changed') {
-                        hasReceivedNotification = true;
-                    }
-                });
-                // Add Actor dynamically
-                await client.callTool({ name: HELPER_TOOLS.ACTOR_ADD, arguments: { actor: ACTOR_NORMAL_MODE } });
-
-                expect(hasReceivedNotification).toBe(true);
-            });
-
-            it('should return error when adding a non-existent actor', async () => {
-                client = await createClientFn({ enableAddingActors: true });
+            it('should return an Actor-not-found error when calling a non-existent actor via call-actor', async () => {
+                client = await createClientFn({ tools: ['actors'] });
                 const nonExistentActor = 'apify/this-actor-does-not-exist';
                 const result = await client.callTool({
-                    name: HELPER_TOOLS.ACTOR_ADD,
-                    arguments: { actor: nonExistentActor },
+                    name: HELPER_TOOLS.ACTOR_CALL,
+                    arguments: { actor: nonExistentActor, input: {} },
                 });
                 expect(result).toBeDefined();
                 expect(result.isError).toBe(true);
                 const content = result.content as { text: string }[];
                 expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toContain(nonExistentActor);
                 expect(content[0].text).toContain('was not found');
             });
 
-            it.runIf(options.transport === 'streamable-http')(
-                'should return error when adding a standby Actor in x402 payment mode',
-                async () => {
-                    client = await createClientFn({ enableAddingActors: true, payment: 'x402' });
-                    const result = await client.callTool({
-                        name: HELPER_TOOLS.ACTOR_ADD,
-                        arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER },
-                    });
-                    expect(result).toBeDefined();
-                    expect(result.isError).toBe(true);
-                    const content = result.content as { text: string }[];
-                    expect(content.length).toBeGreaterThan(0);
-                    expect(content[0].text).toContain('standby Actor, which is not supported in agentic payment mode');
-                    await client.close();
-                },
-            );
-
-            it('should be able to add and call Actorized MCP server', async () => {
-                client = await createClientFn({ enableAddingActors: true });
-
-                // example-mcp-server exposes a single `add` tool. The proxy registers it under a
-                // hashed prefix (see `getProxyMCPServerToolName`) — match the `-add` suffix while
-                // excluding the unrelated `add-actor` helper present in the seed tools.
-                const isProxiedAddTool = (name: string) => name.endsWith('-add');
-
-                const toolNamesBefore = getToolNames(await client.listTools());
-                expect(toolNamesBefore.filter(isProxiedAddTool)).toHaveLength(0);
-
-                // Add Actorized MCP server
-                await addActor(client, ACTOR_EXAMPLE_MCP_SERVER);
-
-                const toolNamesAfter = getToolNames(await client.listTools());
-                const proxiedAddTools = toolNamesAfter.filter(isProxiedAddTool);
-                expect(proxiedAddTools).toHaveLength(1);
-
-                const result = await client.callTool({
-                    name: proxiedAddTools[0],
-                    arguments: {
-                        firstNumber: 2,
-                        secondNumber: 3,
-                    },
-                });
-                expect(result.content).toEqual(buildExampleMcpServerAddToolContent(2, 3));
-                expect(result.isError ?? false).toBe(false);
-            });
+            // Three add-actor-specific cases (list-changed notification, x402 rejection, MCP-server
+            // proxy registration) removed — unreachable now add-actor is substituted (PR 0). Unit
+            // coverage stays in tests/unit/tools.add_actor.test.ts until PR 2; x402/actor:tool
+            // coverage lives in the tests below, via call-actor.
 
             // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
             // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4
@@ -1746,27 +1685,29 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             });
 
             // The `dev` category holds only report-problem, which is telemetry-gated (off in this suite),
-            // so it can't load standalone here; its gating is covered by unit tests. Exclude it from the
-            // category sweep.
-            it.for(Object.keys(getCategoryTools('default')).filter((category) => category !== 'dev'))(
-                'should load correct tools for %s category',
-                async (category) => {
-                    client = await createClientFn({
-                        tools: [category as ToolCategory],
-                    });
+            // so it can't load standalone here; its gating is covered by unit tests. `experimental` is
+            // excluded too — its sole member (add-actor) is substituted for call-actor (PR 0), covered
+            // by the dedicated substitution tests above instead.
+            it.for(
+                Object.keys(getCategoryTools('default')).filter(
+                    (category) => category !== 'dev' && category !== 'experimental',
+                ),
+            )('should load correct tools for %s category', async (category) => {
+                client = await createClientFn({
+                    tools: [category as ToolCategory],
+                });
 
-                    const loadedTools = await client.listTools();
-                    const toolNames = getToolNames(loadedTools);
+                const loadedTools = await client.listTools();
+                const toolNames = getToolNames(loadedTools);
 
-                    const expectedToolNames = getExpectedToolNamesByCategories([category as ToolCategory]);
-                    // Only assert that all tools from the selected category are present.
-                    for (const expectedToolName of expectedToolNames) {
-                        expect(toolNames).toContain(expectedToolName);
-                    }
-                },
-            );
+                const expectedToolNames = getExpectedToolNamesByCategories([category as ToolCategory]);
+                // Only assert that all tools from the selected category are present.
+                for (const expectedToolName of expectedToolNames) {
+                    expect(toolNames).toContain(expectedToolName);
+                }
+            });
 
-            it('should include add-actor when experimental category is selected even if enableAddingActors is false', async () => {
+            it('should include call-actor (add-actor substituted) when experimental category is selected even if enableAddingActors is false', async () => {
                 client = await createClientFn({
                     enableAddingActors: false,
                     tools: ['experimental'],
@@ -1775,10 +1716,11 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const loadedTools = await client.listTools();
                 const toolNames = getToolNames(loadedTools);
 
-                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_ADD);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
+                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
             });
 
-            it('should include add-actor when enableAddingActors is false and add-actor is selected directly', async () => {
+            it('should include call-actor (add-actor substituted) when enableAddingActors is false and add-actor is selected directly', async () => {
                 client = await createClientFn({
                     enableAddingActors: false,
                     tools: [HELPER_TOOLS.ACTOR_ADD],
@@ -1787,8 +1729,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const loadedTools = await client.listTools();
                 const toolNames = getToolNames(loadedTools);
 
-                // Must include add-actor since it was selected directly
-                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_ADD);
+                // Must include call-actor since add-actor was selected directly and is substituted (PR 0)
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
+                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
             });
 
             it('should handle multiple tool category keys input correctly', async () => {
@@ -1833,8 +1776,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 { retry: 2 },
                 async () => {
                     const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
-                    client = await createClientFn({ enableAddingActors: true });
-                    await addActor(client, ACTOR_NORMAL_MODE);
+                    // Load the Actor at connection time — add-actor's dynamic add is gone (PR 0).
+                    client = await createClientFn({ actors: [ACTOR_NORMAL_MODE] });
 
                     const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
                     const actor = await api.actor(ACTOR_NORMAL_MODE).get();
@@ -1935,11 +1878,12 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             );
 
             it.runIf(options.transport === 'stdio')(
-                'should respect ENABLE_ADDING_ACTORS env var and auto-inject storage tools alongside add-actor',
+                'should respect ENABLE_ADDING_ACTORS env var and auto-inject storage tools alongside call-actor (add-actor substituted)',
                 async () => {
                     client = await createClientFn({ enableAddingActors: true, useEnv: true });
                     const names = getToolNames(await client.listTools());
-                    expectToolNamesToContain(names, ['add-actor', ...AUTO_INJECTED_TOOL_NAMES]);
+                    expectToolNamesToContain(names, ['call-actor', ...AUTO_INJECTED_TOOL_NAMES]);
+                    expect(names).not.toContain('add-actor');
 
                     await client.close();
                 },

@@ -148,6 +148,51 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
     );
 });
 
+describe('getToolsForServerMode add-actor selector cutoff (PR 0)', () => {
+    it('substitutes call-actor for a literal tools=add-actor selector on a new connection', () => {
+        const toolNames = getToolsForServerMode({ tools: [HELPER_TOOLS.ACTOR_ADD] }, [], 'default').map((t) => t.name);
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
+    });
+
+    it('substitutes call-actor for the tools=experimental category on a new connection', () => {
+        const toolNames = getToolsForServerMode({ tools: ['experimental'] }, [], 'default').map((t) => t.name);
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
+    });
+
+    it('substitutes call-actor for enableAddingActors=true with no other selectors on a new connection', () => {
+        const toolNames = getToolsForServerMode({ enableAddingActors: true }, [], 'default').map((t) => t.name);
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
+    });
+
+    it('substitutes call-actor for enableAddingActors=true alongside other selectors on a new connection', () => {
+        const toolNames = getToolsForServerMode({ tools: ['docs'], enableAddingActors: true }, [], 'default').map(
+            (t) => t.name,
+        );
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
+    });
+
+    it('does not duplicate call-actor when both an explicit selector and enableAddingActors resolve to it', () => {
+        const toolNames = getToolsForServerMode(
+            { tools: [HELPER_TOOLS.ACTOR_CALL], enableAddingActors: true },
+            [],
+            'default',
+        ).map((t) => t.name);
+        expect(toolNames.filter((n) => n === HELPER_TOOLS.ACTOR_CALL)).toHaveLength(1);
+    });
+
+    it("resolves a restored session's stored add-actor name to itself (isRestore bypass)", () => {
+        const toolNames = getToolsForServerMode({ tools: [HELPER_TOOLS.ACTOR_ADD] }, [], 'default', true).map(
+            (t) => t.name,
+        );
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_ADD);
+        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+    });
+});
+
 describe('getToolsForServerMode report-problem default injection', () => {
     // report-problem lives in the `dev` category but is injected into the default (no-selectors)
     // candidate set. Server-side servability gating is applied later in composeToolsForClient; here
