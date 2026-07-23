@@ -657,9 +657,7 @@ async function waitForRunWithProgress(opts: {
 
     if ((waitSecs === undefined || waitSecs > 0) && !TERMINAL_RUN_STATUSES.has(run.status)) {
         if (progressTracker) {
-            // Set before the first updateProgress() call so it's carried on every notification,
-            // including this initial one — lets clients correlate the run without waiting for it
-            // to finish (needed for abort/cancel tests; see progress.ts).
+            // Before the first updateProgress() call, so it's on every notification.
             progressTracker.setRunId(runId);
             const trackerLabel = (await actorNamePromise) ?? 'actor';
             await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, run));

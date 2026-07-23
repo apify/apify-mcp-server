@@ -55,21 +55,9 @@ export async function assertStatusMessagePropagated(taskClient: Client, stream: 
 }
 
 /**
- * Captures the runId off the *first* `notifications/progress` message for a plain (non-task)
- * request — the server attaches it (see `ProgressTracker.setRunId` in `src/utils/progress.ts`)
- * as soon as the run starts, well before `waitSecs` elapses. Pass `onprogress` to
- * `client.request(...)` to receive it; the request must carry a progress token for the server to
- * emit anything, which is exactly what supplying `onprogress` causes the SDK to set.
- *
- * Deterministic: the caller `await`s `runIdPromise` before triggering an abort, so the abort can
- * never fire before the run is known to have started — no run-list polling, no races with other
- * concurrent runs of the same Actor.
- *
- * Also works for task-augmented (`experimental.tasks.callToolStream`) calls: `onprogress` and
- * `task` are independent request options, so the SDK still attaches `_meta.progressToken`. The
- * server must route that notification through the session transport, not the request-scoped
- * stream (which closes once the initial `{ task }` response is flushed) — see
- * `sendTaskProgressNotification` in `src/mcp/task_execution.ts`.
+ * Resolves runIdPromise from the first notifications/progress message (works for plain requests
+ * and task-augmented calls — pass `onprogress` alongside `task` too). The caller awaits it before
+ * aborting/cancelling, so there's no race with the run starting and no run-list polling.
  */
 export function captureRunIdFromProgress(): {
     onprogress: (progress: Progress) => void;
@@ -80,8 +68,7 @@ export function captureRunIdFromProgress(): {
         resolveRunId = resolve;
     });
     const onprogress = (progress: Progress) => {
-        // The MCP SDK's `Progress` type omits `_meta`, but `_onprogress` spreads the full
-        // notification params (minus progressToken) into the callback at runtime, so it's there.
+        // Progress type omits _meta, but it's there at runtime (SDK spreads full params).
         const meta = (progress as Progress & { _meta?: Record<string, unknown> })._meta;
         const runId = (meta?.[APIFY_ACTOR_RUN_META_KEY] as { runId?: string } | undefined)?.runId;
         if (runId) resolveRunId(runId);

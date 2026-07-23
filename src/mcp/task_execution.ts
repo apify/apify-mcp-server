@@ -31,15 +31,8 @@ import {
     storeTaskResultOrSkipIfExpired,
 } from './utils.js';
 
-/**
- * Sends a `notifications/progress` message through the session transport, not the request-scoped
- * stream `extra.sendNotification` ties to. Required for task mode: the creating request's stream
- * closes once the initial `{ task }` response is flushed (execution continues after, via
- * `setImmediate`), so a relatedRequestId-scoped send silently fails once that response is sent
- * (`streamableHttp`'s server throws "No connection established for request ID", which
- * `ProgressTracker` swallows). Same routing `emitTaskStatusNotification` uses for
- * `notifications/tasks/status`, applied to progress notifications.
- */
+/** Sends notifications/progress via the session transport (like emitTaskStatusNotification below) —
+ *  the creating request's stream is already closed by the time task execution runs. */
 function sendTaskProgressNotification(server: Server): (notification: ProgressNotification) => Promise<void> {
     return async (notification) => server.notification(notification);
 }

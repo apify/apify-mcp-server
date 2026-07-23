@@ -49,8 +49,7 @@ export class ProgressTracker {
         this.onStatusMessage = options.onStatusMessage;
     }
 
-    /** Lets callers that know the runId at construction time (e.g. `call-actor`) attach it once,
-     *  so every subsequent `notifications/progress` carries it for clients to correlate. */
+    /** Attaches a runId so every subsequent notifications/progress carries it. */
     setRunId(runId: string): void {
         this.runId = runId;
     }
@@ -73,13 +72,8 @@ export class ProgressTracker {
                         progressToken: this.progressToken,
                         progress: this.currentProgress,
                         ...(message && { message }),
-                        // Per MCP spec, a Notification's `_meta` lives inside `params`, not at the
-                        // notification's top level — `JSONRPCNotificationSchema` is `.strict()`, so a
-                        // top-level `_meta` fails classification and the whole message is dropped as
-                        // "Unknown message type" by any spec-compliant client (verified against the
-                        // official SDK Client). runId reuses APIFY_ACTOR_RUN_META_KEY, the same `_meta`
-                        // key used for usage-cost meta on the final result, so clients/tests can
-                        // correlate a run without waiting for it to finish or racing the run-list API.
+                        // _meta must live in params — JSONRPCNotificationSchema is .strict(), a
+                        // top-level _meta drops the whole message as "Unknown message type".
                         ...((this.taskId || this.runId) && {
                             _meta: {
                                 ...(this.taskId && { [RELATED_TASK_META_KEY]: { taskId: this.taskId } }),

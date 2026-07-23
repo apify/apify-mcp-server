@@ -1869,10 +1869,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
-            // Cancel an in-flight `tools/call` via `notifications/cancelled` and verify the
-            // underlying Apify run is aborted. The runId comes from the first `notifications/progress`
-            // message (see captureRunIdFromProgress) — the abort only fires once that arrives, so
-            // there's no race with the run actually starting, and no run-list polling.
+            // Cancels an in-flight tools/call via notifications/cancelled, verifies the run aborted.
             it.runIf(options.transport === 'streamable-http')(
                 'should abort actor run on notifications/cancelled',
                 { retry: 2 },
@@ -2789,9 +2786,6 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
 
                 const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-                // `onprogress` and `task` are independent request options — the SDK still attaches
-                // `_meta.progressToken`, so the run's `notifications/progress` fires alongside
-                // `notifications/tasks/status`, carrying the runId (see captureRunIdFromProgress).
                 const { onprogress, runIdPromise } = captureRunIdFromProgress();
 
                 const stream = client.experimental.tasks.callToolStream(
