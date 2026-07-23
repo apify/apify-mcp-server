@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Attribute Apify AI runs with the APIFY_AI origin ([#1117](https://github.com/apify/apify-mcp-server/pull/1117)) ([780fd40](https://github.com/apify/apify-mcp-server/commit/780fd40a7707633b1dcfc8060cc906fb4f8bd5b3)) by [@jirispilka](https://github.com/jirispilka)
+- [**breaking**] Cut off add-actor tool selection, substitute call-actor ([#1127](https://github.com/apify/apify-mcp-server/pull/1127)) ([432289e](https://github.com/apify/apify-mcp-server/commit/432289ebdf6ab08a88f76e3e29df4ea14b4544e2)) by [@MQ37](https://github.com/MQ37), closes [#1129](https://github.com/apify/apify-mcp-server/issues/1129)
 
 
 <!-- git-cliff-unreleased-end -->
