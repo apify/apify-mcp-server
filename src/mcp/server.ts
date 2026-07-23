@@ -117,7 +117,7 @@ type ToolsChangedHandler = (toolNames: string[]) => void;
  * Pure: callers own their own post-handling (return the result directly, or store + notify + synthesize
  * a terminal task) — call this only once `standbyRejection ?? paymentRequiredResult` is already truthy.
  */
-function buildPreflightFailureOutcome(
+export function buildPreflightFailureOutcome(
     standbyRejection: Record<string, unknown> | null,
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
     actorName: string | undefined,
@@ -364,11 +364,37 @@ export class ActorsMcpServer {
      * survive a load that never sees an initialize.
      */
     private isReportProblemServable(): boolean {
+        return this.isReportProblemServableForClient(this.options.initializeRequestData);
+    }
+
+    /**
+     * Per-client variant of {@link isReportProblemServable} for callers that resolve client
+     * identity per request (the modern 2026-07-28 path) instead of from the initialize-scoped
+     * `options.initializeRequestData`. An absent client (`undefined`) is treated as unknown, so
+     * client-gated tools are withheld — same default the legacy path has before initialize.
+     */
+    public isReportProblemServableForClient(initializeRequestData: InitializeRequest | undefined): boolean {
         return (
             this.telemetryEnabled &&
-            this.clientKnown &&
-            !isReportProblemBlockedForClient(this.options.initializeRequestData)
+            initializeRequestData != null &&
+            !isReportProblemBlockedForClient(initializeRequestData)
         );
+    }
+
+    /**
+     * Resolve the effective server mode for a client described by an initialize-shaped request.
+     * An explicit `default`/`apps` option wins unconditionally; `'auto'` detects MCP Apps UI
+     * support from the given client capabilities. The modern (2026-07-28) path calls this per
+     * request — client capabilities arrive on every request, not once at initialize.
+     */
+    public resolveServerModeForClient(initializeRequestData: InitializeRequest | undefined): SERVER_MODE {
+        if (this.serverModeOption !== 'auto') return this.serverMode;
+        return resolveServerMode('auto', isUiSupportedByClient(initializeRequestData));
+    }
+
+    /** Widgets resolved by {@link prepare}; consumed by the resource service (both eras). */
+    public getAvailableWidgets(): Map<string, AvailableWidget> {
+        return this.availableWidgets;
     }
 
     private composePendingToolsForClient(): void {
@@ -1365,8 +1391,17 @@ export class ActorsMcpServer {
         }
     }
 
-    async connect(transport: Transport): Promise<void> {
+    /**
+     * Pre-connect setup (widget resolution). Callers that serve this instance without calling
+     * {@link connect} themselves (e.g. the modern 2026-07-28 registration shell in
+     * `modern_server.ts`) run it before handling requests. Idempotent.
+     */
+    async prepare(): Promise<void> {
         await this.resolveWidgets();
+    }
+
+    async connect(transport: Transport): Promise<void> {
+        await this.prepare();
         await this.server.connect(transport);
     }
 

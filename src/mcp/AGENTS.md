@@ -16,6 +16,12 @@ implementations, not by importing from here.
   `task_execution.ts`) run the shared `dispatchToolCall` switch, in `tool_dispatch.ts`.
   Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
   a task store (the internal repo injects a Redis one) or the constructor throws.
+- `modern_server.ts` — `createModernServer(apifyMcpServer)`: the modern-era (MCP 2026-07-28,
+  stateless) registration shell on the v2 SDK (`@modelcontextprotocol/server`). Additive second
+  surface for `tools/list`, `tools/call`, `resources/*`, `prompts/*` — same `ToolEntry.call()`
+  logic, per-request client identity/mode/token (envelope + `authInfo`, not `_meta`). No
+  `tasks/*` (the v2 SDK rejects them `-32601`), no logging side-channel. Legacy `server.ts`
+  stays on the v1 SDK, untouched.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
