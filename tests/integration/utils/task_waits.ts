@@ -1,19 +1,16 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import type { ApifyClient } from 'apify-client';
 import { expect, vi } from 'vitest';
 
+import { APIFY_ACTOR_RUN_META_KEY } from '../../../src/utils/mcp.js';
 import { TERMINAL_RUN_STATUSES } from '../../../src/utils/progress.js';
 
-// Generous timeouts: container-scheduling lag on the Apify Platform can push
-// "first time the run shows up in the API" or "ABORTED status propagates" past
-// the tight bounds the original values assumed, surfacing as `Timed out in
+// Generous timeout: container-scheduling lag on the Apify Platform can push "ABORTED status
+// propagates" past the tight bound the original value assumed, surfacing as `Timed out in
 // waitUntil` flakes on otherwise-correct test logic.
-const RUN_DISCOVERY_TIMEOUT_MS = 20_000;
-const RUN_DISCOVERY_INTERVAL_MS = 250;
 const RUN_ABORT_WAIT_TIMEOUT_MS = 60_000;
 const RUN_ABORT_WAIT_INTERVAL_MS = 500;
-// `startedAt` is server-stamped; `capturingSince` is client-stamped — buffer absorbs skew.
-const CLOCK_SKEW_BUFFER_MS = 2_000;
 
 type TaskStreamMessage = {
     type: string;
@@ -58,38 +55,30 @@ export async function assertStatusMessagePropagated(taskClient: Client, stream: 
 }
 
 /**
- * Race the Apify API to find the just-started run for this Actor under the test's token.
- *
- * Cancellation tests need the runId to verify the abort side-effect, but the runId
- * isn't reachable through the MCP client — the response isn't delivered after cancel,
- * and `notifications/progress` doesn't carry it. The run does appear in the Actor-scoped
- * run list within a few hundred ms of server-side `start()`.
- *
- * Scoped to THIS Actor (not global `runs()`) so concurrent runs of other Actors don't
- * pollute the page. Non-terminal status filter excludes prior completed runs in the window.
+ * Resolves runIdPromise from the first notifications/progress message (works for plain requests
+ * and task-augmented calls — pass `onprogress` alongside `task` too). The caller awaits it before
+ * aborting/cancelling, so there's no race with the run starting and no run-list polling.
  */
-export async function captureInflightActorRunId(
-    apiClient: ApifyClient,
-    actorId: string,
-    capturingSince: Date,
-): Promise<string> {
-    const startedAfter = new Date(capturingSince.getTime() - CLOCK_SKEW_BUFFER_MS);
-    const runId = await vi.waitUntil(
-        async () => {
-            const runs = await apiClient.actor(actorId).runs().list({ limit: 3, desc: true });
-            return runs.items.find(
-                (r) =>
-                    r.startedAt instanceof Date && r.startedAt >= startedAfter && !TERMINAL_RUN_STATUSES.has(r.status),
-            )?.id;
-        },
-        { timeout: RUN_DISCOVERY_TIMEOUT_MS, interval: RUN_DISCOVERY_INTERVAL_MS },
-    );
-    return runId as string;
+export function captureRunIdFromProgress(): {
+    onprogress: (progress: Progress) => void;
+    runIdPromise: Promise<string>;
+} {
+    let resolveRunId: (runId: string) => void;
+    const runIdPromise = new Promise<string>((resolve) => {
+        resolveRunId = resolve;
+    });
+    const onprogress = (progress: Progress) => {
+        // Progress type omits _meta, but it's there at runtime (SDK spreads full params).
+        const meta = (progress as Progress & { _meta?: Record<string, unknown> })._meta;
+        const runId = (meta?.[APIFY_ACTOR_RUN_META_KEY] as { runId?: string } | undefined)?.runId;
+        if (runId) resolveRunId(runId);
+    };
+    return { onprogress, runIdPromise };
 }
 
 /**
  * Poll a specific run by ID until it reaches ABORTED or ABORTING.
- * Pair with `captureInflightActorRunId` for deterministic abort verification.
+ * Pair with `captureRunIdFromProgress` for deterministic abort verification.
  */
 export async function waitForRunAborted(apiClient: ApifyClient, runId: string): Promise<void> {
     await vi.waitUntil(
