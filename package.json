@@ -53,6 +53,7 @@
     "@apify/utilities": "^2.25.1",
     "@modelcontextprotocol/core": "2.0.0-beta.5",
     "@modelcontextprotocol/ext-apps": "^1.1.2",
+    "@modelcontextprotocol/node": "2.0.0-beta.5",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@modelcontextprotocol/server": "2.0.0-beta.5",
     "@segment/analytics-node": "^2.3.0",

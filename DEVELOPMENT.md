@@ -117,7 +117,7 @@ Editing `src/web/src/widgets/*.tsx` triggers a hot-reload — the next widget re
 - Get your Apify API token from [Apify Console](https://console.apify.com/settings/integrations)
 - Preview widgets via the local esbuild dev server at `http://localhost:3226/index.html`
 
-The MCP server listens on port `3001`. The HTTP server implementation is in `src/dev_server.ts`. The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
+The MCP server listens on port `3001`. The HTTP server implementation is in `src/dev_server.ts`; it serves both the legacy sessionful protocol and the stateless `2026-07-28` protocol for local verification. The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
 
 ### Configuring APIFY_TOKEN for Claude Code
 

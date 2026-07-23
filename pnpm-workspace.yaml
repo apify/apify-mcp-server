@@ -13,6 +13,7 @@ minimumReleaseAgeExclude:
   # so every bump is a deliberate, reviewed change — the age gate adds nothing for these.
   # Drop the exclusions once the SDK is stable and the pins move to ranges.
   - "@modelcontextprotocol/core"
+  - "@modelcontextprotocol/node"
   - "@modelcontextprotocol/server"
 
 # Postinstall protection — pnpm only runs build scripts for packages with `: true` here.

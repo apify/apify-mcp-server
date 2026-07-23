@@ -226,6 +226,9 @@ importers:
       '@modelcontextprotocol/ext-apps':
         specifier: ^1.1.2
         version: 1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.4.3)
+      '@modelcontextprotocol/node':
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5(@modelcontextprotocol/server@2.0.0-beta.5)(hono@4.12.19)
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@4.4.3)
@@ -1071,6 +1074,16 @@ packages:
       react:
         optional: true
       react-dom:
+        optional: true
+
+  '@modelcontextprotocol/node@2.0.0-beta.5':
+    resolution: {integrity: sha512-flrOzx5qFLBM9I8IYRGfYUY02erFmxOvYQ9sEE6iSj/ZZpRYKorXWscM/qrfW9rwlcGLyymHhnP2AaDbMB1lIA==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@modelcontextprotocol/server': ^2.0.0-beta.5
+      hono: ^4.11.4
+    peerDependenciesMeta:
+      hono:
         optional: true
 
   '@modelcontextprotocol/sdk@1.29.0':
@@ -5135,6 +5148,13 @@ snapshots:
     optionalDependencies:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
+
+  '@modelcontextprotocol/node@2.0.0-beta.5(@modelcontextprotocol/server@2.0.0-beta.5)(hono@4.12.19)':
+    dependencies:
+      '@hono/node-server': 1.19.14(hono@4.12.19)
+      '@modelcontextprotocol/server': 2.0.0-beta.5
+    optionalDependencies:
+      hono: 4.12.19
 
   '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
     dependencies:
