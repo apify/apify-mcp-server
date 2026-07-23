@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.11.8 - **not yet released**
+## [0.12.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.12.0) (2026-07-23)
 
 ### 🚀 Features
 
@@ -11,7 +10,6 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Cut off add-actor tool selection, substitute call-actor ([#1127](https://github.com/apify/apify-mcp-server/pull/1127)) ([432289e](https://github.com/apify/apify-mcp-server/commit/432289ebdf6ab08a88f76e3e29df4ea14b4544e2)) by [@MQ37](https://github.com/MQ37), closes [#1129](https://github.com/apify/apify-mcp-server/issues/1129)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.11.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.11.7) (2026-07-21)
 
 ### 🚀 Features
