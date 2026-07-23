@@ -180,7 +180,7 @@ export function toolNamesToInput(toolNames: string[]): Input {
 /**
  * Compose the final tool list from pre-fetched actor tools and the original input for the given mode.
  *
- * @param isRestore - `true` for a session restore (`toolNamesToInput()` via `loadToolsByName()`),
+ * @param isSessionRestore - `true` for a session restore (`toolNamesToInput()` via `loadToolsByName()`),
  * as opposed to a live selector. A restored session's stored name can be `'add-actor'` from before
  * the PR 0 cutoff below — it must resolve to itself, not get substituted like a fresh selector.
  */
@@ -188,7 +188,7 @@ export function getToolsForServerMode(
     input: Input,
     actorTools: ToolEntry[],
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
-    isRestore = false,
+    isSessionRestore = false,
 ): ToolEntry[] {
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
@@ -226,7 +226,7 @@ export function getToolsForServerMode(
 
             // add-actor cutoff (PR 0): substitute call-actor for a live 'add-actor'/'experimental'
             // selector. Skipped on restore, where `sel` may be a pre-cutoff session's own stored name.
-            if (!isRestore && (sel === HELPER_TOOLS.ACTOR_ADD || sel === 'experimental')) {
+            if (!isSessionRestore && (sel === HELPER_TOOLS.ACTOR_ADD || sel === 'experimental')) {
                 if (callActorTool) internalSelections.push(callActorTool);
                 continue;
             }

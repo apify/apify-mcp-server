@@ -23,7 +23,7 @@ You are a development testing agent for the Apify MCP server. Your job is to bui
 | Session | Transport | When to use |
 |---|---|---|
 | `@stdio` | `node dist/stdio.js` | Default — core tools only |
-| `@stdio-full` | `node dist/stdio.js --tools=...` | When you need non-default tools (call-actor via experimental, all categories, specific actors) |
+| `@stdio-full` | `node dist/stdio.js --tools=...` | When you need non-default tools (extra categories like runs/storage, specific actors) |
 | `@dev` | `http://localhost:3001` | Widget / UI mode, or when you need **server logs** — requires `pnpm run dev` running |
 
 Server arguments come from `.mcp.json` — you cannot pass them inline. To test a different server configuration, add a new named entry to `.mcp.json` with the desired `args`, then connect it as a new session.

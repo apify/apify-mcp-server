@@ -235,6 +235,9 @@ export type Input = {
      * @deprecated Use `enableAddingActors` instead.
      */
     enableActorAutoLoading?: boolean | string;
+    /**
+     * @deprecated No longer adds Actors dynamically; substitutes `call-actor`. Use `tools: ['call-actor']` instead.
+     */
     enableAddingActors?: boolean | string;
     maxActorMemoryBytes?: number;
     /**
