@@ -74,15 +74,21 @@ function toRequestHandlerExtra(ctx: ServerContext): RequestHandlerExtra<Request,
 
 /** Create a stateless server backed by an {@link ActorsMcpServer}. */
 export function createStatelessServer(apifyMcpServer: ActorsMcpServer): StatelessServer {
-    const initialTools = apifyMcpServer.composeStatelessClientGatedTools(apifyMcpServer.serverMode);
-
     const server = new StatelessServer(getServerInfo(), {
         capabilities: {
             tools: {},
             resources: {},
             prompts: {},
         },
-        instructions: getServerInstructions(apifyMcpServer.serverMode, initialTools.has(HELPER_TOOLS.PROBLEM_REPORT)),
+        // The SDK fixes instructions once at construction, so gate report-problem on the full
+        // per-client servable check (telemetry AND client-known AND not blocklisted) using the
+        // construction-time identity — not tool presence, which is telemetry-only and would advertise
+        // report-problem to blocklisted clients (Anthropic/Claude) that tools/list correctly withholds.
+        // No construction identity (reused instance) → unservable → instructions omit it (safe default).
+        instructions: getServerInstructions(
+            apifyMcpServer.serverMode,
+            apifyMcpServer.isReportProblemServableForClient(apifyMcpServer.options.initializeRequestData),
+        ),
     });
 
     const resourceServiceFor = (ctx: ServerContext) => {
