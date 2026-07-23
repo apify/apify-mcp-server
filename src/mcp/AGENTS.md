@@ -12,10 +12,18 @@ implementations, not by importing from here.
 
 - `server.ts` — `ActorsMcpServer`: tool/prompt/resource/task registration, the
   `initialize` handshake, MCP Apps capability detection, `CallToolRequest` handling.
-  Both the sync handler and the task path (`executeToolAndUpdateTask`, now in
-  `task_execution.ts`) run the shared `dispatchToolCall` switch, in `tool_dispatch.ts`.
+  The `CallToolRequest` handler prepares calls with `tool_call_engine.ts`, runs the
+  sync tail, and records telemetry. `InvalidToolCall` is mapped to the v1
+  softFail → logging notification → `McpError` sequence; `McpError` is re-thrown,
+  while task-creation failures are classified as tool results. The task path reuses
+  the same `PreparedCall`; both use the shared `dispatchToolCall` switch.
   Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
   a task store (the internal repo injects a Redis one) or the constructor throws.
+- `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
+  token gate, tool resolution, payment context, AJV validation, task support, and standby/402
+  pre-flight. `executeSyncToolCall()` runs the dispatch tail; `classifyToolCallError()` maps
+  non-protocol errors to tool results. Protocol errors are not constructed here, and escaped
+  `McpError`s remain JSON-RPC errors.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
@@ -29,6 +37,7 @@ implementations, not by importing from here.
 - `tool_dispatch.ts` — `dispatchToolCall()`: the single exhaustive `switch (tool.type)`
   (INTERNAL / ACTOR_MCP / ACTOR) both the sync handler and the task path run. Plain
   function taking the `ActorsMcpServer` instance; touches no class state beyond `.server`.
+  The optional `emitLog` parameter sends ACTOR_MCP connect-failure notifications.
 - `tool_call_telemetry.ts` — `prepareTelemetryData()` / `logToolCallAndTelemetry()`: shared by
   the sync `CallToolRequestSchema` handler and the task path. Plain functions taking the
   `ActorsMcpServer` instance (as `apifyMcpServer`), reading `telemetryEnabled`/`telemetryEnv`
