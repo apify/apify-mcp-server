@@ -4,7 +4,7 @@
  */
 
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Notification, Request } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 
@@ -106,6 +106,10 @@ export async function prepareToolCall(params: {
     telemetryData: ToolCallTelemetryProperties | null;
     // Used to preserve abort status for a post-resolution classified failure.
     extra?: RequestHandlerExtra<Request, Notification>;
+    // Per-request client identity for the modern (2026-07-28) path, where it arrives on every
+    // request. Defaults to the initialize-scoped `options.initializeRequestData` on legacy
+    // connections, so v1 callers passing nothing stay byte-identical.
+    initializeRequestData?: InitializeRequest;
 }): Promise<PreparedCall | InvalidToolCall | PreparedCallError> {
     const { apifyMcpServer, apifyToken, name, meta, requestHeaders, isTaskRequest, telemetryData } = params;
     let { args } = params;
@@ -184,7 +188,7 @@ export async function prepareToolCall(params: {
             apifyToken,
             meta,
             requestHeaders,
-            requestOrigin: getRequestOriginForClient(options.initializeRequestData),
+            requestOrigin: getRequestOriginForClient(params.initializeRequestData ?? options.initializeRequestData),
         });
 
         log.debug('Validate arguments for tool', {

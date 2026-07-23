@@ -135,6 +135,9 @@ export class ActorsMcpServer {
      */
     private pendingToolsUntilClientKnown: { input: Input; actorTools: ToolEntry[]; isSessionRestore: boolean }[] = [];
 
+    /** Set once the modern (2026-07-28) surface has eagerly composed its client-gated tools. */
+    private modernClientGatedToolsComposed = false;
+
     // Telemetry configuration (resolved from options and env vars, see setupTelemetry)
     public readonly telemetryEnabled: boolean;
     public readonly telemetryEnv: TelemetryEnv;
@@ -323,11 +326,37 @@ export class ActorsMcpServer {
      * survive a load that never sees an initialize.
      */
     private isReportProblemServable(): boolean {
+        return this.isReportProblemServableForClient(this.options.initializeRequestData);
+    }
+
+    /**
+     * Per-client variant of {@link isReportProblemServable} for callers that resolve client
+     * identity per request (the modern 2026-07-28 path) instead of from the initialize-scoped
+     * `options.initializeRequestData`. An absent client (`undefined`) is treated as unknown, so
+     * client-gated tools are withheld — same default the legacy path has before initialize.
+     */
+    public isReportProblemServableForClient(initializeRequestData: InitializeRequest | undefined): boolean {
         return (
             this.telemetryEnabled &&
-            this.clientKnown &&
-            !isReportProblemBlockedForClient(this.options.initializeRequestData)
+            initializeRequestData != null &&
+            !isReportProblemBlockedForClient(initializeRequestData)
         );
+    }
+
+    /**
+     * Resolve the effective server mode for a client described by an initialize-shaped request.
+     * An explicit `default`/`apps` option wins unconditionally; `'auto'` detects MCP Apps UI
+     * support from the given client capabilities. The modern (2026-07-28) path calls this per
+     * request — client capabilities arrive on every request, not once at initialize.
+     */
+    public resolveServerModeForClient(initializeRequestData: InitializeRequest | undefined): SERVER_MODE {
+        if (this.serverModeOption !== 'auto') return this.serverMode;
+        return resolveServerMode('auto', isUiSupportedByClient(initializeRequestData));
+    }
+
+    /** Widgets resolved by {@link prepare}; consumed by the resource service (both eras). */
+    public getAvailableWidgets(): Map<string, AvailableWidget> {
+        return this.availableWidgets;
     }
 
     private composePendingToolsForClient(): void {
@@ -344,6 +373,37 @@ export class ActorsMcpServer {
         // idempotent, and this pass adds the client-gated tools (e.g. report-problem) now that the
         // client is known, reconciling shared state to the complete set.
         if (tools.length > 0) this.upsertTools(tools, true);
+    }
+
+    /**
+     * Modern (2026-07-28) surface only: eagerly compose the tools the v1 path defers to the
+     * initialize flush. The stateless modern instance never receives a v1 `initialize` handshake,
+     * so `clientKnown` stays false forever and {@link composeToolsForClient}'s servability strip
+     * would keep report-problem (and, in `'auto'` mode, every queued helper tool) out of
+     * {@link tools} permanently — leaving `server2.ts`'s per-request `tools/list` filter nothing to
+     * admit. Re-composes the queued sources at the instance mode bypassing only the `clientKnown`
+     * half of that strip (the telemetry gate stays, since it is client-independent) and upserts, so
+     * report-problem is present whenever the configured set includes it and telemetry is enabled;
+     * `server2.ts` then gates its visibility per request via {@link isReportProblemServableForClient}.
+     * Runs once (load-then-serve, mirroring v1's single initialize flush). v1's compose/flush/gating
+     * machinery is untouched — this never runs on the v1 path, so a v1 client's `tools/list` is unchanged.
+     */
+    public composeModernClientGatedTools(): void {
+        if (this.modernClientGatedToolsComposed) return;
+        this.modernClientGatedToolsComposed = true;
+        if (this.pendingToolsUntilClientKnown.length === 0) return;
+        const tools = this.pendingToolsUntilClientKnown.flatMap(({ input, actorTools, isSessionRestore }) =>
+            getToolsForServerMode(input, actorTools, this.serverMode, isSessionRestore),
+        );
+        // Bypass only the `clientKnown` deferral (the stateless path never handshakes). The telemetry
+        // gate is client-independent and must stay: report-problem forwards submissions solely via
+        // telemetry, so with telemetry off it must not enter `this.tools`, or `createServer2`'s
+        // instructions would advertise a tool `tools/list` never serves. Per-client blocklist gating
+        // stays a per-request `tools/list` concern.
+        const composed = this.telemetryEnabled
+            ? tools
+            : tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
+        if (composed.length > 0) this.upsertTools(composed);
     }
 
     /**
@@ -537,8 +597,9 @@ export class ActorsMcpServer {
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
         // Client gating (e.g. hiding report-problem from Anthropic surfaces) is applied earlier, in
-        // composeToolsForClient — the single compose choke point where the client is known. Do not
-        // filter here: this is a low-level commit point reached before the client is known too.
+        // the compose choke points where the client is known — composeToolsForClient (v1) and
+        // composeModernClientGatedTools (modern surface). Do not filter here: this is a low-level
+        // commit point reached before the client is known too.
         for (const tool of tools) {
             const stored = this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
             this.tools.set(stored.name, stored);
@@ -1109,8 +1170,17 @@ export class ActorsMcpServer {
         }
     }
 
-    async connect(transport: Transport): Promise<void> {
+    /**
+     * Pre-connect setup (widget resolution). Callers that serve this instance without calling
+     * {@link connect} themselves (e.g. the modern 2026-07-28 registration shell in `server2.ts`)
+     * run it before handling requests. Idempotent.
+     */
+    async prepare(): Promise<void> {
         await this.resolveWidgets();
+    }
+
+    async connect(transport: Transport): Promise<void> {
+        await this.prepare();
         await this.server.connect(transport);
     }
 

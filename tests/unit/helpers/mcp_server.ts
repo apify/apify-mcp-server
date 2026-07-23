@@ -113,6 +113,26 @@ export function makeThrowingTool(
 }
 
 /**
+ * An ACTOR_MCP tool; `connectMCPClient` is mocked to null so the connect-failure soft-fail branch
+ * runs without a network attempt. Pass `name` to give it a distinct tool name (e.g. for parity
+ * tests running the same fixture through two handlers); defaults to the historical fixture name.
+ */
+export function makeActorMcpTool(name = 'test-actor-mcp-tool'): ToolEntry {
+    return {
+        type: TOOL_TYPE.ACTOR_MCP,
+        name,
+        description: 'actor-mcp',
+        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
+        ajvValidate: compileSchema({ type: 'object', properties: {} }),
+        originToolName: 'origin-tool',
+        actorId: 'test/actor',
+        serverId: 'server-id',
+        serverUrl: 'https://example.invalid/mcp',
+        execution: { taskSupport: 'optional' },
+    } as ToolEntry;
+}
+
+/**
  * A synthetic internal tool that records what the server passed into `call` (whether it ran, and the
  * `progressTracker` it received). Generalizes to any "did the server pass X to the tool?" assertion.
  * `paymentRequired`/`taskSupport` let a caller drive the pre-flight payment/task paths.

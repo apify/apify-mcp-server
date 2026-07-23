@@ -9,6 +9,11 @@ minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
   - "@apify/*"
   - "@apify-packages/*"
+  # v2 MCP SDK is adopted at exact-pinned pre-release versions (stateless-migration PR 1),
+  # so every bump is a deliberate, reviewed change — the age gate adds nothing for these.
+  # Drop the exclusions once the SDK is stable and the pins move to ranges.
+  - "@modelcontextprotocol/core"
+  - "@modelcontextprotocol/server"
 
 # Postinstall protection — pnpm only runs build scripts for packages with `: true` here.
 # `: false` is an explicit-deny marker; without it, pnpm re-injects a `"set this to true or false"`

@@ -34,10 +34,23 @@ implementations, not by importing from here.
   or writes the store — the catch blocks own logging and store writes. For payment/approval
   the mapper returns the ready-to-send `response`; the catch builds the wire result only for
   the execution `userText`.
+- `server2.ts` — `createServer2(apifyMcpServer)`: the modern-era (MCP 2026-07-28, stateless)
+  registration shell on the v2 SDK (`@modelcontextprotocol/server`). Additive second surface for
+  `tools/list`, `tools/call`, `resources/*`, `prompts/*`. A thin shell over `tool_call_engine.ts`
+  (`prepareToolCall` → `executeSyncToolCall`), not a re-implementation of the spine. Per-request
+  client identity/mode/token (envelope `_meta` + `authInfo`, never `_meta.apifyToken`); server mode
+  and `report-problem` visibility re-resolved per request. Four differences from the v1 shell:
+  `InvalidToolCall` throws `ProtocolError(InvalidParams)` with no logging notification (SEP-2577);
+  results are projected via `server.projectCallToolResult`; `tasks/*` is unregistered (v2 SDK
+  rejects it `-32601`), so `isTaskRequest` is always false; identity/mode/token are per-request.
+  Widget / MCP-Apps serving is a non-goal for the modern surface. Legacy `server.ts` stays on the
+  v1 SDK, untouched.
 - `tool_dispatch.ts` — `dispatchToolCall()`: the single exhaustive `switch (tool.type)`
   (INTERNAL / ACTOR_MCP / ACTOR) both the sync handler and the task path run. Plain
   function taking the `ActorsMcpServer` instance; touches no class state beyond `.server`.
-  The optional `emitLog` parameter sends ACTOR_MCP connect-failure notifications.
+  An ACTOR_MCP connect failure is logged server-side (`log.softFail`) and returned as a soft-fail
+  `isError` result — it no longer emits a client-facing logging notification (removed in the
+  2026-07-28 migration; SEP-2577).
 - `tool_call_telemetry.ts` — `prepareTelemetryData()` / `logToolCallAndTelemetry()`: shared by
   the sync `CallToolRequestSchema` handler and the task path. Plain functions taking the
   `ActorsMcpServer` instance (as `apifyMcpServer`), reading `telemetryEnabled`/`telemetryEnv`
@@ -68,6 +81,16 @@ implementations, not by importing from here.
   `getToolsForServerMode()`) is documented once in
   [`../../DEVELOPMENT.md`](../../DEVELOPMENT.md) — read it before changing
   registration in `server.ts`; not restated here.
+- **Modern-path eager compose (`composeModernClientGatedTools`).** v1 withholds report-problem
+  from the composed set until the `initialize` handshake flips the client to known, then its
+  initialize flush adds it. The stateless modern instance never gets that handshake, so
+  `createServer2` calls `composeModernClientGatedTools()` to compose report-problem — only when
+  telemetry is enabled, since that gate is client-independent; it bypasses only the `clientKnown`
+  deferral — and, in `'auto'` mode, the queued helper tools into `this.tools` up front; `server2.ts`'s
+  `tools/list` then gates report-problem per request via `isReportProblemServableForClient`. It is
+  modern-only and idempotent — v1's compose/flush/gating machinery and a v1 client's `tools/list` are
+  unchanged. Not a leak: report-problem in `this.tools` is expected on a telemetry-enabled modern
+  instance (and absent when telemetry is off, so instructions never advertise it there).
 
 ## Local commands
 

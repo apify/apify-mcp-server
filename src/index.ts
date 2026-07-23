@@ -1,8 +1,10 @@
 /*
  This file provides essential functions and tools for MCP servers, serving as a library.
- The ActorsMcpServer should be the only class exported from the package
+ Intentional public surface: the `ActorsMcpServer` class (legacy v1 serving) and the
+ `createServer2` factory (modern 2026-07-28 serving shell). Keep this the whole export list.
 */
 
 import { ActorsMcpServer } from './mcp/server.js';
+import { createServer2 } from './mcp/server2.js';
 
-export { ActorsMcpServer };
+export { ActorsMcpServer, createServer2 };
