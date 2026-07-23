@@ -51,8 +51,6 @@ import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getServerInfo } from '../server_card.js';
 import { getTelemetryEnv } from '../telemetry.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
-import { getActorsAsTools } from '../tools/index.js';
-import type { ActorsAsToolsResult } from '../tools/index.js';
 import type {
     ActorsMcpServerOptions,
     ActorStore,
@@ -95,15 +93,12 @@ function isUiSupportedByClient(request: InitializeRequest | undefined): boolean 
     return uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
 }
 
-type ToolsChangedHandler = (toolNames: string[]) => void;
-
 /**
  * Create Apify MCP server
  */
 export class ActorsMcpServer {
     public readonly server: Server;
     public readonly tools: Map<string, ToolEntry>;
-    private toolsChangedHandler: ToolsChangedHandler | undefined;
     private sigintHandler: (() => Promise<void>) | undefined;
     private currentLogLevel = 'info';
     public readonly options: ActorsMcpServerOptions;
@@ -304,8 +299,7 @@ export class ActorsMcpServer {
      * gated here by servability. Every other tool composes eagerly, so a recovery/rehydration load
      * without an initialize still restores them. report-problem is withheld until the client is known
      * and re-added by the initialize flush. Used by every input-driven load path and the flush.
-     * (loadActorsAsTools upserts actor tools directly; actor tools are never gated, so they need no
-     * filtering.)
+     * (Actor tools are never gated, so they need no filtering.)
      */
     private composeToolsForClient(input: Input, actorTools: ToolEntry[], isSessionRestore = false): ToolEntry[] {
         const tools = getToolsForServerMode(input, actorTools, this.serverMode, isSessionRestore);
@@ -339,11 +333,10 @@ export class ActorsMcpServer {
 
         this.pendingToolsUntilClientKnown = [];
 
-        // Notify after the flush so shared-state handlers (e.g. Redis recovery) see the final tool
-        // set. Load paths already upserted the client-agnostic tools pre-init; re-upserting is
+        // Load paths already upserted the client-agnostic tools pre-init; re-upserting is
         // idempotent, and this pass adds the client-gated tools (e.g. report-problem) now that the
-        // client is known, reconciling shared state to the complete set.
-        if (tools.length > 0) this.upsertTools(tools, true);
+        // client is known.
+        if (tools.length > 0) this.upsertTools(tools);
     }
 
     /**
@@ -351,32 +344,6 @@ export class ActorsMcpServer {
      */
     public listToolNames(): string[] {
         return Array.from(this.tools.keys());
-    }
-
-    /**
-     * Register handler to get notified when tools change.
-     * The handler receives an array of tool names that the server has after the change.
-     * This is primarily used to store the tools in shared state (e.g., Redis) for recovery
-     * when the server loses local state.
-     * @throws {Error} - If a handler is already registered.
-     * @param handler - The handler function to be called when tools change.
-     */
-    public registerToolsChangedHandler(handler: (toolNames: string[]) => void) {
-        if (this.toolsChangedHandler) {
-            throw new Error('Tools changed handler is already registered.');
-        }
-        this.toolsChangedHandler = handler;
-    }
-
-    /**
-     * Unregister the handler for tools changed event.
-     * @throws {Error} - If no handler is currently registered.
-     */
-    public unregisterToolsChangedHandler() {
-        if (!this.toolsChangedHandler) {
-            throw new Error('Tools changed handler is not registered.');
-        }
-        this.toolsChangedHandler = undefined;
     }
 
     /**
@@ -418,28 +385,19 @@ export class ActorsMcpServer {
     /**
      * Buffer-or-compose gate shared by the actor-tools loaders. If the server mode isn't resolved
      * yet ('auto' before initialize), queue the whole source for `composePendingToolsForClient` and
-     * (if non-empty) upsert the mode-agnostic actor tools immediately with the given `shouldNotify`.
+     * (if non-empty) upsert the mode-agnostic actor tools immediately.
      * Once the mode is resolved, compose the client-specific set via `composeToolsForClient` (which
      * withholds report-problem until the client is known) and upsert it; if the client still isn't
      * known, queue the source so the initialize flush re-composes and adds the client-gated tools.
-     *
-     * Callers pass different `shouldNotify` values: `loadToolsByName` forwards `actorTools.length > 0`
-     * (notify only when actor tools were fetched), while `loadToolsFromUrl` and `loadToolsFromInput`
-     * pass `false` and defer to the post-initialize reconcile. See `composePendingToolsForClient`.
      */
-    private registerFetchedActorTools(
-        input: Input,
-        actorTools: ToolEntry[],
-        shouldNotify: boolean,
-        isSessionRestore = false,
-    ): void {
+    private registerFetchedActorTools(input: Input, actorTools: ToolEntry[], isSessionRestore = false): void {
         if (!this.serverModeResolved) {
             this.pendingToolsUntilClientKnown.push({ input, actorTools, isSessionRestore });
-            if (actorTools.length > 0) this.upsertTools(actorTools, shouldNotify);
+            if (actorTools.length > 0) this.upsertTools(actorTools);
             return;
         }
         const tools = this.composeToolsForClient(input, actorTools, isSessionRestore);
-        if (tools.length > 0) this.upsertTools(tools, shouldNotify);
+        if (tools.length > 0) this.upsertTools(tools);
         if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools, isSessionRestore });
     }
 
@@ -459,29 +417,7 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        // isSessionRestore: true. This replays the tool names a session already had (stored via
-        // listAllToolNames), so the add-actor cutoff must NOT rewrite them — a stored 'add-actor'
-        // resolves to itself. The live paths (loadToolsFromInput/loadToolsFromUrl, flag omitted)
-        // instead substitute call-actor for a fresh selection. Both the flag and this exception go
-        // away in PR 2, when add-actor is deleted and there is nothing left to preserve.
-        this.registerFetchedActorTools(restoreInput, actorTools, actorTools.length > 0, true);
-    }
-
-    /**
-     * Load Actors as tools, upsert successes into the server, and return both the tool
-     * entries and any per-name {@link ActorLoadError}s. Bulk callers read `tools`; the
-     * `add-actor` tool reads `errors[0]` to forward a precise reason to the agent
-     * (not-found / load-failed / standby-payment-not-supported).
-     */
-    public async loadActorsAsTools(actorIdsOrNames: string[], apifyClient: ApifyClient): Promise<ActorsAsToolsResult> {
-        const result = await getActorsAsTools(actorIdsOrNames, apifyClient, {
-            actorStore: this.actorStore,
-            paymentProvider: this.options.paymentProvider,
-        });
-        if (result.tools.length > 0) {
-            this.upsertTools(result.tools, true);
-        }
-        return result;
+        this.registerFetchedActorTools(restoreInput, actorTools, true);
     }
 
     /** Load tools from URL params. Used by SSE and HTTP entry points. */
@@ -493,7 +429,7 @@ export class ActorsMcpServer {
         });
 
         log.debug('Loading tools from query parameters');
-        this.registerFetchedActorTools(input, actorTools, false);
+        this.registerFetchedActorTools(input, actorTools);
     }
 
     /**
@@ -511,20 +447,16 @@ export class ActorsMcpServer {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });
-        this.registerFetchedActorTools(input, actorTools, false);
+        this.registerFetchedActorTools(input, actorTools);
     }
 
-    /** Delete tools from the server and notify the handler.
-     */
-    public removeToolsByName(toolNames: string[], shouldNotifyToolsChangedHandler = false): string[] {
+    /** Delete tools from the server. */
+    public removeToolsByName(toolNames: string[]): string[] {
         const removedTools: string[] = [];
         for (const toolName of toolNames) {
             if (this.removeToolByName(toolName)) {
                 removedTools.push(toolName);
             }
-        }
-        if (removedTools.length > 0) {
-            if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         }
         return removedTools;
     }
@@ -532,10 +464,9 @@ export class ActorsMcpServer {
     /**
      * Upsert new tools.
      * @param tools - Array of tool wrappers to add or update
-     * @param shouldNotifyToolsChangedHandler - Whether to notify the tools changed handler
      * @returns Array of added/updated tool wrappers
      */
-    public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
+    public upsertTools(tools: ToolEntry[]) {
         // Client gating (e.g. hiding report-problem from Anthropic surfaces) is applied earlier, in
         // composeToolsForClient — the single compose choke point where the client is known. Do not
         // filter here: this is a low-level commit point reached before the client is known too.
@@ -543,13 +474,7 @@ export class ActorsMcpServer {
             const stored = this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
             this.tools.set(stored.name, stored);
         }
-        if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         return tools;
-    }
-
-    private notifyToolsChangedHandler() {
-        if (!this.toolsChangedHandler) return;
-        this.toolsChangedHandler(this.listAllToolNames());
     }
 
     private removeToolByName(toolName: string): boolean {
@@ -1126,9 +1051,6 @@ export class ActorsMcpServer {
             }
         }
         this.tools.clear();
-        if (this.toolsChangedHandler) {
-            this.unregisterToolsChangedHandler();
-        }
         // Closing the server also removes its event handlers.
         await this.server.close();
     }

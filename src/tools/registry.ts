@@ -22,7 +22,6 @@
 import { HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { SERVER_MODE } from '../types.js';
-import { addActor } from './actors/add_actor.js';
 import { callActorApps, callActorDefault } from './actors/call_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
 import { searchActors } from './actors/search_actors.js';
@@ -65,7 +64,7 @@ function isModeMap(entry: CategoryToolEntry): entry is ModeMap {
  * Use {@link getCategoryTools} to resolve entries into concrete ToolEntry arrays for a given mode.
  */
 export const toolCategories = {
-    experimental: [addActor],
+    experimental: [],
     actors: [
         searchActors,
         fetchActorDetails,

@@ -31,8 +31,8 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
     describe('per-mode tool lists', () => {
         it('should have correct tools in experimental category (both modes)', () => {
-            expect(toolNames(defaultCategories.experimental)).toEqual([HELPER_TOOLS.ACTOR_ADD]);
-            expect(toolNames(appsCategories.experimental)).toEqual([HELPER_TOOLS.ACTOR_ADD]);
+            expect(toolNames(defaultCategories.experimental)).toEqual([]);
+            expect(toolNames(appsCategories.experimental)).toEqual([]);
         });
 
         it('should have correct tools in actors category (both modes)', () => {
