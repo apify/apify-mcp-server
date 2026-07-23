@@ -32,30 +32,24 @@ import {
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
-import dedent from 'dedent';
 
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from '../apify_client.js';
 import {
-    ALLOWED_TASK_TOOL_EXECUTION_MODES,
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
     TOOL_STATUS,
 } from '../const.js';
-import { prepareToolCallContext } from '../payments/helpers.js';
 import { prompts } from '../prompts/index.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getServerInfo } from '../server_card.js';
 import { getTelemetryEnv } from '../telemetry.js';
-import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
-import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
-import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorsAsToolsResult } from '../tools/index.js';
@@ -71,28 +65,21 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
-import { isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
-import { respondOk } from '../utils/mcp.js';
+import { isMcpClientFaultMessage, sanitizeMezmoMessage } from '../utils/logging.js';
 import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
-import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
-import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
-import { extractAjvErrorDetails } from '../utils/tool_status.js';
-import {
-    buildActorFields,
-    extractActorId,
-    extractActorName,
-    getToolFullName,
-    getToolPublicFieldOnly,
-} from '../utils/tools.js';
+import { buildActorFields, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getActors, getToolsForServerMode, toolNamesToInput } from '../utils/tools_loader.js';
 import { LOG_LEVEL_MAP } from './const.js';
 import { emitTaskStatusNotification, executeToolAndUpdateTask } from './task_execution.js';
-import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
-import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
+import {
+    buildPreflightFailureOutcome,
+    classifyToolCallError,
+    executeSyncToolCall,
+    prepareToolCall,
+} from './tool_call_engine.js';
 import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telemetry.js';
-import { dispatchToolCall } from './tool_dispatch.js';
 import { parseInputParamsFromUrl, storeTaskResultOrSkipIfExpired } from './utils.js';
 
 /**
@@ -109,34 +96,6 @@ function isUiSupportedByClient(request: InitializeRequest | undefined): boolean 
 }
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
-
-/**
- * Shared diagnostics for a pre-flight failure (standby-provider conflict or missing/invalid payment
- * signature) — a call outcome already known before any Actor runs. Standby rejection wins over the
- * generic payment-required failure so the agent gets the precise reason instead of a generic 402.
- * Pure: callers own their own post-handling (return the result directly, or store + notify + synthesize
- * a terminal task) — call this only once `standbyRejection ?? paymentRequiredResult` is already truthy.
- */
-function buildPreflightFailureOutcome(
-    standbyRejection: Record<string, unknown> | null,
-    paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
-    actorName: string | undefined,
-    actorId: string | undefined,
-): {
-    toolStatus: ToolStatus;
-    callDiagnostics: CallDiagnostics;
-    result: Record<string, unknown> | ReturnType<typeof buildPaymentRequiredResponse>;
-} {
-    return {
-        toolStatus: TOOL_STATUS.SOFT_FAIL,
-        callDiagnostics: {
-            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-            ...(standbyRejection ? {} : { failure_http_status: 402 }),
-            ...buildActorFields(actorName, actorId),
-        },
-        result: (standbyRejection ?? paymentRequiredResult)!,
-    };
-}
 
 /**
  * Create Apify MCP server
@@ -698,47 +657,52 @@ export class ActorsMcpServer {
     }
 
     /**
+     * Returns the prompts/list result.
+     */
+    private listPrompts(): { prompts: typeof prompts } {
+        return { prompts };
+    }
+
+    /**
+     * Builds the prompts/get result: find → not-found → validate → render.
+     * Throws {@link McpError} for an unknown prompt name or invalid arguments (v1 behavior).
+     */
+    private getPrompt(name: string, args: Record<string, string> | undefined) {
+        const prompt = prompts.find((p) => p.name === name);
+        if (!prompt) {
+            throw new McpError(
+                ErrorCode.InvalidParams,
+                `Prompt ${name} not found. Available prompts: ${prompts.map((p) => p.name).join(', ')}`,
+            );
+        }
+        if (!prompt.ajvValidate(args)) {
+            throw new McpError(
+                ErrorCode.InvalidParams,
+                `Invalid arguments for prompt ${name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(prompt.ajvValidate.errors)}`,
+            );
+        }
+        return {
+            description: prompt.description,
+            messages: [
+                {
+                    role: 'user',
+                    content: {
+                        type: 'text',
+                        text: prompt.render(args || {}),
+                    },
+                },
+            ],
+        };
+    }
+
+    /**
      * Sets up MCP request handlers for prompts.
      */
     private setupPromptHandlers(): void {
-        /**
-         * Handles the prompts/list request.
-         */
-        this.server.setRequestHandler(ListPromptsRequestSchema, () => {
-            return { prompts };
-        });
-
-        /**
-         * Handles the prompts/get request.
-         */
-        this.server.setRequestHandler(GetPromptRequestSchema, (request) => {
-            const { name, arguments: args } = request.params;
-            const prompt = prompts.find((p) => p.name === name);
-            if (!prompt) {
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Prompt ${name} not found. Available prompts: ${prompts.map((p) => p.name).join(', ')}`,
-                );
-            }
-            if (!prompt.ajvValidate(args)) {
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Invalid arguments for prompt ${name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(prompt.ajvValidate.errors)}`,
-                );
-            }
-            return {
-                description: prompt.description,
-                messages: [
-                    {
-                        role: 'user',
-                        content: {
-                            type: 'text',
-                            text: prompt.render(args || {}),
-                        },
-                    },
-                ],
-            };
-        });
+        this.server.setRequestHandler(ListPromptsRequestSchema, () => this.listPrompts());
+        this.server.setRequestHandler(GetPromptRequestSchema, (request) =>
+            this.getPrompt(request.params.name, request.params.arguments),
+        );
     }
 
     /**
@@ -850,6 +814,8 @@ export class ActorsMcpServer {
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
             const params = request.params as ApifyRequestParams & { name: string; arguments?: Record<string, unknown> };
+            // `args` is reassigned to the dot-decoded copy so the telemetry `finally` sees decoded keys
+            // (v1 reassigned this same closure var); name/meta are never reassigned.
             // eslint-disable-next-line prefer-const
             let { name, arguments: args, _meta: meta } = params;
             const progressToken = meta?.progressToken;
@@ -870,45 +836,19 @@ export class ActorsMcpServer {
             // this handler's `finally` — so its `Tool call completed` log line keeps the taskId the
             // async path logs via finishTaskTracking.
             let preflightTaskId: string | undefined;
-            // Captured by `captureResult` so the `finally` block can measure response size for telemetry.
+            // Set from the outcome's (already-nudged) result so the `finally` can measure response
+            // size for telemetry. Stays null on the InvalidToolCall throw path, matching v1.
             let toolResult: unknown = null;
-            const captureResult = <T>(r: T): T => {
-                // On a failed result, nudge the agent to report the blocker via report-problem at the
-                // moment it decides what to do next. Gated on the tool actually being served (see
-                // isReportProblemServable), so clients where it is blocklisted or telemetry is off never see it.
-                const augmented = withReportProblemNudge({
-                    result: r,
-                    tools: this.tools,
-                    failingToolName: resolvedToolName,
-                    failureCategory: callDiagnostics.failure_category,
-                    failureHttpStatus: callDiagnostics.failure_http_status,
-                });
-                toolResult = augmented;
-                return augmented;
-            };
-            const failInvalidParams = async (
-                message: string,
-                details: CallDiagnostics,
-                logFields?: Record<string, unknown>,
-            ): Promise<never> => {
-                toolStatus = TOOL_STATUS.SOFT_FAIL;
-                callDiagnostics = details;
-                log.softFail(message, {
-                    mcpSessionId,
-                    failureCategory: details.failure_category,
-                    actorName: details.actor_name,
-                    validationKeyword: details.validation_keyword,
-                    validationPath: details.validation_path,
-                    validationMissingProperty: details.validation_missing_property,
-                    validationAdditionalProperty: details.validation_additional_property,
-                    ...logFields,
-                });
-                await this.server.sendLoggingMessage({ level: 'error', data: message });
-                throw new McpError(ErrorCode.InvalidParams, message);
-            };
+            // Hoisted so the outer catch can classify a task-branch `createTask` throw with the same
+            // actor telemetry fields v1 had. Assigned from `prepared` after a successful `prepareToolCall`
+            // (before the task branch runs). Prep-spine post-resolution throws are classified inside
+            // `prepareToolCall` with its own in-scope actor context, so they never rely on these.
+            let actorName: string | undefined;
+            let actorId: string | undefined;
 
-            // Initialize telemetry with raw tool name — updated below once the tool is resolved.
-            // This ensures telemetry is available even for early failures (missing token, tool not found).
+            // Initialize telemetry with raw tool name — `prepareToolCall` updates it once the tool is
+            // resolved. This ensures telemetry is available even for early failures (missing token,
+            // tool not found).
             const { telemetryData, userId } = await prepareTelemetryData({
                 toolName: name,
                 mcpSessionId,
@@ -916,159 +856,64 @@ export class ActorsMcpServer {
                 apifyMcpServer: this,
             });
 
-            // actorName/actorId are declared here so they're available in the catch block for telemetry.
-            // Set after tool resolution (inside the try block).
-            let actorName: string | undefined;
-            let actorId: string | undefined;
-
             try {
-                // Validate token
-                if (
-                    !apifyToken &&
-                    !this.options.paymentProvider?.allowsUnauthenticated &&
-                    !this.options.allowUnauthMode
-                ) {
-                    await failInvalidParams(
-                        dedent`
-                    Apify API token is required but was not provided.
-                    Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request header as Authorization Bearer <token>.
-                    You can get your Apify token from https://console.apify.com/account/integrations.
-                `,
-                        {
-                            failure_category: FAILURE_CATEGORY.AUTH,
-                        },
-                    );
-                }
-
-                // TODO - if connection is /mcp client will not receive notification on tool change
-                // Find tool by name, actor full name, or legacy tool name (e.g. apify-slash-rag-web-browser → apify--rag-web-browser)
-                const newName = legacyToolNameToNew(name) ?? name;
-                const toolEntry = Array.from(this.tools.values()).find(
-                    (t) => t.name === newName || getToolFullName(t) === newName,
-                );
-
-                if (!toolEntry) {
-                    const availableTools = this.listToolNames();
-                    await failInvalidParams(
-                        dedent`
-                    Tool "${name}" was not found.
-                    Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
-                    Please verify the tool name is correct. You can list all available tools using the tools/list request.
-                `,
-                        {
-                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        },
-                    );
-                }
-
-                const tool = toolEntry!;
-                resolvedToolName = getToolFullName(tool);
-                // Update telemetry tool name now that we resolved the tool (uses actorFullName for actor tools).
-                if (telemetryData) {
-                    telemetryData.tool_name = resolvedToolName;
-                }
-
-                // Extract actor name/id for telemetry — available even when validation fails later.
-                actorName = extractActorName(tool, args as Record<string, unknown>);
-                actorId = extractActorId(tool);
-
-                // Always populate actor fields so they're tracked on both success and failure paths.
-                callDiagnostics = { ...callDiagnostics, ...buildActorFields(actorName, actorId) };
-
-                if (!args) {
-                    await failInvalidParams(
-                        dedent`
-                    Missing arguments for tool "${name}".
-                    Please provide the required arguments for this tool. Check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool to see what parameters are required.
-                `,
-                        {
-                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                            ...buildActorFields(actorName, actorId),
-                        },
-                    );
-                }
-
-                // Decode dot property names in arguments before validation,
-                // since validation expects the original, non-encoded property names.
-                args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
-
-                // Centralize all payment processing: validate, strip payment fields, create client.
-                // Must run before AJV validation so toolArgsWithoutPayment doesn't contain provider-specific fields.
-                const {
-                    toolArgsWithoutPayment: toolArgs,
-                    toolArgsRedacted: logSafeArgs,
-                    apifyClient,
-                    paymentRequiredResult,
-                } = prepareToolCallContext({
-                    provider: this.options.paymentProvider,
-                    tool,
-                    args: args as Record<string, unknown>,
+                const prepared = await prepareToolCall({
+                    apifyMcpServer: this,
                     apifyToken,
+                    name,
+                    args,
                     meta,
                     requestHeaders: extra.requestInfo?.headers,
-                    requestOrigin: getRequestOriginForClient(this.options.initializeRequestData),
+                    isTaskRequest: Boolean(request.params.task),
+                    mcpSessionId,
+                    telemetryData,
+                    extra,
                 });
 
-                log.debug('Validate arguments for tool', { toolName: tool.name, mcpSessionId, input: logSafeArgs });
-                if (!tool.ajvValidate(toolArgs)) {
-                    const errors = tool.ajvValidate.errors || [];
-                    const ajvErrorDetails = extractAjvErrorDetails(errors);
-                    const errorMessages = errors
-                        .map(
-                            (e: { message?: string; instancePath?: string }) =>
-                                `${e.instancePath || 'root'}: ${e.message || 'validation error'}`,
-                        )
-                        .join('; ');
-                    await failInvalidParams(
-                        dedent`
-                    Invalid arguments for tool "${tool.name}".
-                    Validation errors: ${errorMessages}.
-                    Please check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.
-                `,
-                        {
-                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                            ...ajvErrorDetails,
-                            ...buildActorFields(actorName, actorId),
-                        },
-                    );
+                if ('result' in prepared) {
+                    // A non-McpError throw from the prep spine AFTER tool resolution — the engine
+                    // classified it with the actor context it had in scope. Interpret it exactly like the
+                    // sync outcome below (v1 projection is identity). resolvedToolName/args are carried so
+                    // the telemetry `finally` logs the resolved name + decoded args, matching base — which
+                    // had both set before such a throw could reach its outer catch.
+                    resolvedToolName = prepared.resolvedToolName;
+                    args = prepared.decodedArgs;
+                    toolStatus = prepared.toolStatus;
+                    callDiagnostics = prepared.callDiagnostics;
+                    toolResult = prepared.result;
+                    return prepared.result;
                 }
 
-                // Check if tool call is a long-running task and the tool supports that
-                // Cast to allowed task mode types ('optional' | 'required') for type-safe includes() check
-                const taskSupport = tool.execution?.taskSupport as (typeof ALLOWED_TASK_TOOL_EXECUTION_MODES)[number];
-                if (request.params.task && !ALLOWED_TASK_TOOL_EXECUTION_MODES.includes(taskSupport)) {
-                    await failInvalidParams(
-                        dedent`
-                    Tool "${tool.name}" does not support long running task calls.
-                    Please remove the "task" parameter from the tool call request or use a different tool that supports long running tasks.
-                `,
-                        {
-                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                            ...buildActorFields(actorName, actorId),
-                        },
-                    );
+                if ('message' in prepared) {
+                    // Invalid call — reproduce v1's failInvalidParams tail: assign toolStatus/
+                    // callDiagnostics (so the `finally` telemetry sees them), softFail-log, emit the
+                    // side-channel, then throw the protocol error. v1 set resolvedToolName (and decoded
+                    // the args) right after resolution, unconditionally — so use the values prep carries
+                    // back for the post-resolution rejects, independent of whether telemetry is enabled.
+                    resolvedToolName = prepared.resolvedToolName ?? resolvedToolName;
+                    if (prepared.decodedArgs) args = prepared.decodedArgs;
+                    toolStatus = prepared.toolStatus;
+                    callDiagnostics = prepared.callDiagnostics;
+                    log.softFail(prepared.message, {
+                        mcpSessionId,
+                        failureCategory: prepared.callDiagnostics.failure_category,
+                        actorName: prepared.callDiagnostics.actor_name,
+                        validationKeyword: prepared.callDiagnostics.validation_keyword,
+                        validationPath: prepared.callDiagnostics.validation_path,
+                        validationMissingProperty: prepared.callDiagnostics.validation_missing_property,
+                        validationAdditionalProperty: prepared.callDiagnostics.validation_additional_property,
+                        ...prepared.logFields,
+                    });
+                    await this.server.sendLoggingMessage({ level: 'error', data: prepared.message });
+                    throw new McpError(ErrorCode.InvalidParams, prepared.message);
                 }
 
-                // Standby / MCP-server Actors are never payable via a third-party provider —
-                // compute the rejection here so both the sync short-circuit and the task path
-                // can use it. In task-mode we still create the task and store this rejection
-                // as its result (instead of a generic 402), so the agent gets the precise reason
-                // when fetching the task result. Task-mode `call-actor` declares
-                // `taskSupport: 'optional'`, so without this both paths would 402 by default.
-                const { paymentProvider } = this.options;
-                const isCallActorTool =
-                    tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_CALL_WIDGET;
-                const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
-
-                const standbyRejection =
-                    paymentProvider && isCallActorTool && typeof actorArg === 'string' && actorArg.length > 0
-                        ? await checkPaymentProviderStandbyConflict({
-                              actorName: actorArg,
-                              paymentProvider,
-                              apifyToken,
-                              mcpSessionId,
-                          })
-                        : null;
+                const { tool, toolArgs, logSafeArgs, apifyClient, standbyRejection, paymentRequiredResult } = prepared;
+                actorName = prepared.actorName;
+                actorId = prepared.actorId;
+                resolvedToolName = getToolFullName(tool);
+                // Feed telemetry the decoded args, matching v1's closure reassign before the `finally`.
+                args = prepared.decodedArgs;
 
                 // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
                 // Handle long-running task request
@@ -1120,8 +965,7 @@ export class ActorsMcpServer {
                             // CreateTaskResult parse error; surface it as a protocol error instead.
                             // The pre-flight outcome left toolStatus=SOFT_FAIL, but a genuine store
                             // outage is a hard failure — correct it before throwing so the handler
-                            // `finally` logs FAILED/INTERNAL_ERROR (the outer McpError re-throw preserves
-                            // these), not the stale pre-flight SOFT_FAIL.
+                            // `finally` logs FAILED/INTERNAL_ERROR, not the stale pre-flight SOFT_FAIL.
                             toolStatus = TOOL_STATUS.FAILED;
                             callDiagnostics = {
                                 failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
@@ -1140,7 +984,15 @@ export class ActorsMcpServer {
                         setImmediate(() => {
                             void emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
                         });
-                        captureResult(outcome.result);
+                        // Nudge only for byte-measurement (the stored/wire result stays un-nudged, per
+                        // the async path); mirrors v1's captureResult on this branch.
+                        toolResult = withReportProblemNudge({
+                            result: outcome.result,
+                            tools: this.tools,
+                            failingToolName: resolvedToolName,
+                            failureCategory: callDiagnostics.failure_category,
+                            failureHttpStatus: callDiagnostics.failure_http_status,
+                        });
                         // createTask returned status `working`; synthesize the terminal status instead of
                         // re-fetching — if the task expired before the result store (the one case
                         // storeTaskResultOrSkipIfExpired tolerates), a re-fetch would come back empty and a
@@ -1153,9 +1005,9 @@ export class ActorsMcpServer {
                         executeToolAndUpdateTask({
                             taskId: task.taskId,
                             tool,
-                            toolArgs: toolArgs!,
+                            toolArgs,
                             logSafeArgs,
-                            apifyClient: apifyClient!,
+                            apifyClient,
                             apifyToken,
                             progressToken,
                             extra,
@@ -1175,129 +1027,44 @@ export class ActorsMcpServer {
                     return { task };
                 }
 
-                // Sync path: short-circuit on either pre-flight failure. buildPreflightFailureOutcome
-                // encodes the precedence — standby rejection wins over the generic payment-required
-                // 402, so the agent gets the precise reason.
-                if (standbyRejection || paymentRequiredResult) {
-                    const outcome = buildPreflightFailureOutcome(
-                        standbyRejection,
-                        paymentRequiredResult,
-                        actorName,
-                        actorId,
-                    );
-                    toolStatus = outcome.toolStatus;
-                    callDiagnostics = outcome.callDiagnostics;
-                    return captureResult(outcome.result);
-                }
-
-                // Progress tracker: opt in for the two INTERNAL tools that emit during a sync wait
-                // (call-actor start+waitForFinish, get-actor-run when waitSecs > 0), and unconditionally
-                // for ACTOR tools. ACTOR_MCP forwards notifications directly, not via a tracker.
-                const progressTrackerOptIn =
-                    tool.type === TOOL_TYPE.ACTOR ||
-                    (tool.type === TOOL_TYPE.INTERNAL &&
-                        (tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_RUNS_GET));
-                const progressTracker = progressTrackerOptIn
-                    ? createProgressTracker(progressToken, extra.sendNotification)
-                    : null;
-
-                const dispatchResult = await dispatchToolCall({
-                    tool,
-                    toolArgs: toolArgs!,
-                    logSafeArgs,
-                    apifyToken,
-                    apifyClient: apifyClient!,
+                // Sync path: run the shared dispatch tail and project its neutral outcome by identity.
+                const outcome = await executeSyncToolCall(prepared, {
                     apifyMcpServer: this,
+                    apifyToken,
+                    toolName: name,
                     mcpSessionId,
                     progressToken,
-                    progressTracker,
-                    shouldForwardNotifications: true,
                     extra,
-                    actorName,
-                    actorId,
-                    taskMode: false,
                 });
-                toolStatus = dispatchResult.toolStatus;
-                callDiagnostics = dispatchResult.callDiagnostics;
-                return captureResult(dispatchResult.result);
+                toolStatus = outcome.toolStatus;
+                callDiagnostics = outcome.callDiagnostics;
+                toolResult = outcome.result;
+                return outcome.result;
             } catch (error) {
-                // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
-                // returns them as JSON-RPC errors. failInvalidParams already set callDiagnostics
-                // with the correct semantic category (e.g. AUTH), so we must not overwrite it.
-                // Re-throwing first is order-equivalent only because no McpError with an HTTP-range
-                // code reaches this catch: an McpError(402) WOULD satisfy the x402 predicate
-                // (getHttpStatusCode falls through to `.code`), but every remote-McpError route is
-                // sealed by an inner catch (ACTOR_MCP branch, call-actor MCP passthrough) and all
-                // in-repo McpErrors use negative ErrorCode.* values.
+                // Restore v1's outer-catch classification. A non-McpError throw from the task branch's
+                // createTask must become a classified isError tool result, not propagate raw to the SDK
+                // (which would flip the wire to a JSON-RPC error and log telemetry as SUCCEEDED). (Prep-spine
+                // post-resolution throws are classified inside prepareToolCall and returned as an outcome,
+                // so they no longer reach here.) Re-throw McpError (InvalidToolCall rejections, the task
+                // store-outage InternalError) unchanged so the SDK returns them as JSON-RPC errors —
+                // order-equivalent to v1 since no HTTP-range-coded McpError reaches here. Reuses the
+                // shared classifier so the wire, telemetry (FAILED), and logHttpError match base.
                 if (error instanceof McpError) {
                     throw error;
                 }
-
-                const errorResult = buildToolCallErrorResult(error, {
+                const outcome = classifyToolCallError(error, {
+                    apifyMcpServer: this,
                     toolName: name,
+                    failingToolName: resolvedToolName,
                     actorName,
                     actorId,
                     isAborted: Boolean(extra.signal?.aborted),
+                    mcpSessionId,
                 });
-                toolStatus = errorResult.toolStatus;
-
-                switch (errorResult.kind) {
-                    case TOOL_CALL_ERROR_KIND.PAYMENT: {
-                        // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
-                        // content[0].text (JSON) + isError: true. No log here (unlike the task path). The
-                        // concurrent-run limit also surfaces as 402 but is excluded by the predicate and
-                        // falls through to the generic run-limit handling below.
-                        callDiagnostics = errorResult.callDiagnostics;
-                        return captureResult(errorResult.response);
-                    }
-                    case TOOL_CALL_ERROR_KIND.APPROVAL: {
-                        callDiagnostics = errorResult.callDiagnostics;
-                        logHttpError(error, 'Permission approval required while calling tool', {
-                            toolName: name,
-                            mcpSessionId,
-                        });
-                        return captureResult(errorResult.response);
-                    }
-                    case TOOL_CALL_ERROR_KIND.EXECUTION: {
-                        callDiagnostics = {
-                            // Spread existing diagnostics first (e.g. validation_keyword from
-                            // failInvalidParams), then overwrite with the mapper's freshly computed fields
-                            // so they take precedence.
-                            ...callDiagnostics,
-                            ...errorResult.callDiagnostics,
-                        };
-
-                        logHttpError(error, 'Error occurred while calling tool', {
-                            toolName: name,
-                            toolStatus,
-                            mcpSessionId,
-                            failureCategory: callDiagnostics.failure_category,
-                            failureHttpStatus: callDiagnostics.failure_http_status,
-                            actorName: callDiagnostics.actor_name,
-                            validationKeyword: callDiagnostics.validation_keyword,
-                            validationPath: callDiagnostics.validation_path,
-                            validationMissingProperty: callDiagnostics.validation_missing_property,
-                            validationAdditionalProperty: callDiagnostics.validation_additional_property,
-                        });
-                        // This framework outer-catch path bypasses extractToolTelemetry (returned via
-                        // captureResult), so preserve the pre-existing wire shape { toolStatus } exactly:
-                        // reuse the local ABORTED-aware toolStatus, do NOT re-derive from the error (which
-                        // would drop ABORTED and leak failureCategory/failureHttpStatus onto the wire).
-                        return captureResult({
-                            ...respondOk(errorResult.userText),
-                            isError: true,
-                            toolTelemetry: { toolStatus },
-                        });
-                    }
-                    default:
-                        // Compile-time exhaustiveness guard (same `satisfies never` idiom as
-                        // dispatchToolCall's default arm): a new TOOL_CALL_ERROR_KIND makes `errorResult`
-                        // non-`never` here and fails to compile. Unreachable at runtime.
-                        throw new McpError(
-                            ErrorCode.InvalidParams,
-                            `Unknown tool-call error kind "${(errorResult satisfies never as ToolCallErrorResult).kind}"`,
-                        );
-                }
+                toolStatus = outcome.toolStatus;
+                callDiagnostics = outcome.callDiagnostics;
+                toolResult = outcome.result;
+                return outcome.result;
             } finally {
                 if (shouldTrackTelemetry) {
                     logToolCallAndTelemetry({

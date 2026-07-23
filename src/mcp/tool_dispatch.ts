@@ -62,6 +62,10 @@ export async function dispatchToolCall(params: {
     // Caller-supplied log decoration (task mode: ' for task' suffix + taskId field), applied
     // mechanically to the per-branch "Calling …" lines — no effect on dispatch behavior.
     logContext?: { messageSuffix: string; fields: Record<string, unknown> };
+    // Client-facing side-channel for the ACTOR_MCP connect-failure soft-fail. Defaults to the
+    // server's `sendLoggingMessage`, keeping the hard `.server` coupling off the shared leaf so a
+    // future shell (with no session transport) can pass a no-op.
+    emitLog?: (msg: { level: string; data?: unknown }) => Promise<void>;
 }): Promise<{ result: Record<string, unknown>; toolStatus: ToolStatus; callDiagnostics: CallDiagnostics }> {
     const {
         tool,
@@ -79,6 +83,10 @@ export async function dispatchToolCall(params: {
         actorId,
         taskMode,
         logContext,
+        emitLog = async (msg) =>
+            apifyMcpServer.server.sendLoggingMessage(
+                msg as Parameters<typeof apifyMcpServer.server.sendLoggingMessage>[0],
+            ),
     } = params;
 
     let result: Record<string, unknown> = {};
@@ -131,7 +139,7 @@ export async function dispatchToolCall(params: {
                         Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.
                     `;
                     log.softFail(msg, { mcpSessionId, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR });
-                    await apifyMcpServer.server.sendLoggingMessage({ level: 'error', data: msg });
+                    await emitLog({ level: 'error', data: msg });
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
                     callDiagnostics = { ...callDiagnostics, failure_category: FAILURE_CATEGORY.INTERNAL_ERROR };
                     result = respondErrorNoTelemetry(msg);

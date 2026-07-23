@@ -18,6 +18,7 @@ import {
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
+import * as logging from '../../src/utils/logging.js';
 import {
     getRequestHandler,
     makePaymentRequiredError,
@@ -315,6 +316,117 @@ describe('CallToolRequestSchema handler', () => {
                 expectFailureClassTelemetry(trackSpy, fc);
             });
         }
+    });
+});
+
+describe('CallToolRequestSchema handler — invalid-call rejections (characterization)', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('emits an error-level logging notification before rejecting an invalid tool call', async () => {
+        // The side-channel v1 uses to notify the client of a rejection before throwing McpError.
+        // Existing invalid-params tests only stub sendLoggingMessage; none asserts it fired.
+        await withServer(async (server) => {
+            silenceLogs();
+            const sendLogSpy = vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            const handler = getRequestHandler(server, 'tools/call');
+            await expect(
+                handler(
+                    {
+                        method: 'tools/call',
+                        params: { name: 'does-not-exist', arguments: {}, _meta: { mcpSessionId: 's1' } },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                ),
+            ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+            expect(sendLogSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ level: 'error', data: expect.stringContaining('was not found') }),
+            );
+        });
+    });
+
+    it('rejects a call with no Apify token as an InvalidParams protocol error', async () => {
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                const { tool, received } = makeRecorderTool('auth-required-tool');
+                server.upsertTools([tool]);
+                vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+                const handler = getRequestHandler(server, 'tools/call');
+                await expect(
+                    handler(
+                        {
+                            method: 'tools/call',
+                            params: { name: 'auth-required-tool', arguments: {}, _meta: { mcpSessionId: 's1' } },
+                        },
+                        { signal: { aborted: false }, sendNotification: vi.fn() },
+                    ),
+                ).rejects.toMatchObject({
+                    code: ErrorCode.InvalidParams,
+                    message: expect.stringContaining('Apify API token is required'),
+                });
+                expect(received.called).toBe(false);
+            },
+            { token: undefined },
+        );
+    });
+
+    it('rejects a call to an unknown tool name as an InvalidParams protocol error', async () => {
+        await withServer(async (server) => {
+            silenceLogs();
+            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            const handler = getRequestHandler(server, 'tools/call');
+            await expect(
+                handler(
+                    {
+                        method: 'tools/call',
+                        params: { name: 'does-not-exist', arguments: {}, _meta: { mcpSessionId: 's1' } },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                ),
+            ).rejects.toMatchObject({
+                code: ErrorCode.InvalidParams,
+                message: expect.stringContaining('was not found'),
+            });
+        });
+    });
+
+    it('rejects a call with missing arguments as an InvalidParams protocol error', async () => {
+        await withServer(async (server) => {
+            silenceLogs();
+            const { tool, received } = makeRecorderTool('missing-args-tool');
+            server.upsertTools([tool]);
+            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            const handler = getRequestHandler(server, 'tools/call');
+            await expect(
+                handler(
+                    { method: 'tools/call', params: { name: 'missing-args-tool', _meta: { mcpSessionId: 's1' } } },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                ),
+            ).rejects.toMatchObject({
+                code: ErrorCode.InvalidParams,
+                message: expect.stringContaining('Missing arguments'),
+            });
+            expect(received.called).toBe(false);
+        });
+    });
+
+    it('reports ABORTED tool status when the request signal is aborted', async () => {
+        // A throwing tool + aborted signal exercises the EXECUTION arm's abort-preserving branch:
+        // toolStatus is ABORTED (not re-derived from the error) and rides the wire as toolTelemetry.
+        await withServer(async (server) => {
+            silenceLogs();
+            server.upsertTools([makeThrowingTool({ error: new Error('boom') })]);
+            const handler = getRequestHandler(server, 'tools/call');
+            const result = await handler(
+                {
+                    method: 'tools/call',
+                    params: { name: 'test-throwing-tool', arguments: {}, _meta: { mcpSessionId: 's1' } },
+                },
+                { signal: { aborted: true }, sendNotification: vi.fn() },
+            );
+            expect(result.isError).toBe(true);
+            expect(result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.ABORTED });
+        });
     });
 });
 
@@ -821,6 +933,97 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 expect(statusNotificationStatuses(notifySpy)).toEqual([]);
             },
             { paymentProvider: makePaymentProvider() },
+        );
+    });
+
+    it('classifies a non-McpError prep-spine throw as an EXECUTION isError result, not a raw reject', async () => {
+        // The blocker regression fence. A 5xx re-thrown from the standby pre-flight
+        // (checkPaymentProviderStandbyConflict → getActorDefinition) originates inside the prep spine,
+        // before dispatch. It must land in the shell's outer catch and be classified exactly like v1:
+        // an isError tool result with toolStatus FAILED and a logHttpError side-effect — never
+        // propagated raw to the SDK as a JSON-RPC error (which would flip the wire and log telemetry as
+        // SUCCEEDED). Without the outer catch the handler would reject instead of resolving.
+        const logSpy = vi.spyOn(logging, 'logHttpError').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
+                    Object.assign(new Error('server error'), { statusCode: 500 }),
+                );
+                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
+                server.upsertTools([tool]);
+                const handler = getRequestHandler(server, 'tools/call');
+                const result = await handler(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: HELPER_TOOLS.ACTOR_CALL,
+                            arguments: { actor: 'apify/some-actor' },
+                            _meta: { mcpSessionId: 's1' },
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+                expect(result.isError).toBe(true);
+                expect(result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.FAILED });
+                // The throw happened in the prep spine — the tool body never ran.
+                expect(received.called).toBe(false);
+                expect(logSpy).toHaveBeenCalledWith(
+                    expect.anything(),
+                    'Error occurred while calling tool',
+                    expect.objectContaining({ toolStatus: TOOL_STATUS.FAILED }),
+                );
+                // The classified result must carry the actor context v1 had. The prep-spine throw
+                // happens after tool resolution, so actor_name flows into callDiagnostics and reaches
+                // logHttpError's `actorName` field. Before the fix actorName was undefined on this path.
+                expect(logSpy).toHaveBeenCalledWith(
+                    expect.anything(),
+                    'Error occurred while calling tool',
+                    expect.objectContaining({ actorName: 'apify/some-actor', toolStatus: TOOL_STATUS.FAILED }),
+                );
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
+    });
+
+    it('carries actor_name into the telemetry event on a post-resolution prep-spine throw', async () => {
+        // Companion to the classification fence above: the same standby-5xx prep-spine throw must emit a
+        // telemetry event whose callDiagnostics carry actor_name (spread into the tracked properties),
+        // byte-identical to base — which set actorName right after resolution so the outer-catch telemetry
+        // kept it. Telemetry-enabled + unauth so trackToolCall fires with no userId network fetch.
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                vi.spyOn(logging, 'logHttpError').mockImplementation(() => {});
+                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
+                    Object.assign(new Error('server error'), { statusCode: 500 }),
+                );
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
+                server.upsertTools([tool]);
+                const handler = getRequestHandler(server, 'tools/call');
+                await handler(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: HELPER_TOOLS.ACTOR_CALL,
+                            arguments: { actor: 'apify/some-actor' },
+                            _meta: { mcpSessionId: 's1' },
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+                expect(trackSpy.mock.calls).toHaveLength(1);
+                const properties = trackSpy.mock.calls[0][2] as Record<string, unknown>;
+                expect(properties.actor_name).toBe('apify/some-actor');
+                expect(properties.tool_status).toBe(TOOL_STATUS.FAILED);
+            },
+            {
+                token: undefined,
+                telemetry: { enabled: true },
+                allowUnauthMode: true,
+                paymentProvider: makePaymentProvider(),
+            },
         );
     });
 });
