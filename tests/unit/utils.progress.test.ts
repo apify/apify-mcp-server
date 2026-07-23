@@ -129,10 +129,10 @@ describe('ProgressTracker', () => {
                 progressToken: 'tok',
                 progress: 1,
                 message: 'running',
-            },
-            _meta: {
-                [RELATED_TASK_META_KEY]: {
-                    taskId: 'task-abc',
+                _meta: {
+                    [RELATED_TASK_META_KEY]: {
+                        taskId: 'task-abc',
+                    },
                 },
             },
         });
@@ -148,7 +148,27 @@ describe('ProgressTracker', () => {
         await tracker.updateProgress('running');
 
         const notification = mockSendNotification.mock.calls[0][0];
-        expect(notification).not.toHaveProperty('_meta');
+        expect(notification.params).not.toHaveProperty('_meta');
+    });
+
+    it('includes runId under APIFY_ACTOR_RUN_META_KEY once set via setRunId()', async () => {
+        const mockSendNotification = vi.fn();
+        const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+        tracker.setRunId('run-xyz');
+
+        await tracker.updateProgress('running');
+
+        expect(mockSendNotification).toHaveBeenCalledWith({
+            method: 'notifications/progress',
+            params: {
+                progressToken: 'tok',
+                progress: 1,
+                message: 'running',
+                _meta: {
+                    'com.apify/ActorRun': { runId: 'run-xyz' },
+                },
+            },
+        });
     });
 
     it('does not re-emit on first poll tick when run state matches the seeded initial', async () => {

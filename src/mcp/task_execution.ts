@@ -1,7 +1,12 @@
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Notification, Request, TaskStatusNotification } from '@modelcontextprotocol/sdk/types.js';
+import type {
+    Notification,
+    ProgressNotification,
+    Request,
+    TaskStatusNotification,
+} from '@modelcontextprotocol/sdk/types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
@@ -25,6 +30,19 @@ import {
     isTaskNotFoundError,
     storeTaskResultOrSkipIfExpired,
 } from './utils.js';
+
+/**
+ * Sends a `notifications/progress` message through the session transport, not the request-scoped
+ * stream `extra.sendNotification` ties to. Required for task mode: the creating request's stream
+ * closes once the initial `{ task }` response is flushed (execution continues after, via
+ * `setImmediate`), so a relatedRequestId-scoped send silently fails once that response is sent
+ * (`streamableHttp`'s server throws "No connection established for request ID", which
+ * `ProgressTracker` swallows). Same routing `emitTaskStatusNotification` uses for
+ * `notifications/tasks/status`, applied to progress notifications.
+ */
+function sendTaskProgressNotification(server: Server): (notification: ProgressNotification) => Promise<void> {
+    return async (notification) => server.notification(notification);
+}
 
 /** Send notifications/tasks/status for taskId. Routes via session transport (no relatedRequestId).
  *  Swallows errors — notifications are advisory. */
@@ -227,7 +245,12 @@ export async function executeToolAndUpdateTask(params: {
         const progressTracker =
             tool.type === TOOL_TYPE.ACTOR_MCP
                 ? null
-                : createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
+                : createProgressTracker(
+                      progressToken,
+                      sendTaskProgressNotification(apifyMcpServer.server),
+                      taskId,
+                      onStatusMessage,
+                  );
         const dispatchResult = await dispatchToolCall({
             tool,
             toolArgs,

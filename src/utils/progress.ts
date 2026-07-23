@@ -2,6 +2,7 @@ import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 
 import type { ApifyClient } from '../apify_client.js';
+import { APIFY_ACTOR_RUN_META_KEY } from './mcp.js';
 
 // Kept at/above Apify Console's own run-polling interval (MIN_OBSERVER_INTERVAL_MILLIS = 3000)
 // so we don't poll the API more aggressively than the Console does.
@@ -34,6 +35,7 @@ export class ProgressTracker {
     private lastEmittedMessage?: string;
     private taskId?: string;
     private onStatusMessage?: (message: string) => Promise<void>;
+    private runId?: string;
 
     constructor(options: {
         progressToken?: string | number;
@@ -45,6 +47,12 @@ export class ProgressTracker {
         this.sendNotification = options.sendNotification;
         this.taskId = options.taskId;
         this.onStatusMessage = options.onStatusMessage;
+    }
+
+    /** Lets callers that know the runId at construction time (e.g. `call-actor`) attach it once,
+     *  so every subsequent `notifications/progress` carries it for clients to correlate. */
+    setRunId(runId: string): void {
+        this.runId = runId;
     }
 
     async updateProgress(message?: string): Promise<void> {
@@ -65,15 +73,20 @@ export class ProgressTracker {
                         progressToken: this.progressToken,
                         progress: this.currentProgress,
                         ...(message && { message }),
-                    },
-                    // Per MCP spec: progress notifications during task execution should include related-task metadata
-                    ...(this.taskId && {
-                        _meta: {
-                            [RELATED_TASK_META_KEY]: {
-                                taskId: this.taskId,
+                        // Per MCP spec, a Notification's `_meta` lives inside `params`, not at the
+                        // notification's top level — `JSONRPCNotificationSchema` is `.strict()`, so a
+                        // top-level `_meta` fails classification and the whole message is dropped as
+                        // "Unknown message type" by any spec-compliant client (verified against the
+                        // official SDK Client). runId reuses APIFY_ACTOR_RUN_META_KEY, the same `_meta`
+                        // key used for usage-cost meta on the final result, so clients/tests can
+                        // correlate a run without waiting for it to finish or racing the run-list API.
+                        ...((this.taskId || this.runId) && {
+                            _meta: {
+                                ...(this.taskId && { [RELATED_TASK_META_KEY]: { taskId: this.taskId } }),
+                                ...(this.runId && { [APIFY_ACTOR_RUN_META_KEY]: { runId: this.runId } }),
                             },
-                        },
-                    }),
+                        }),
+                    },
                 };
 
                 await this.sendNotification(notification);
