@@ -25,8 +25,8 @@ implementations, not by importing from here.
   Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
   a task store (the internal repo injects a Redis one) or the constructor throws.
 - `tool_call_engine.ts` — the shared `tools/call` orchestration spine both eras call.
-  `prepareToolCall()` runs the prep spine (token gate → resolution → args/AJV validation
-  → payment context → task-support check → standby/402 pre-flight) and returns a neutral
+  `prepareToolCall()` runs the prep spine (token gate → resolution → payment context → AJV
+  validation → task-support check → standby/402 pre-flight) and returns a neutral
   `PreparedCall`, `InvalidToolCall`, or `PreparedCallError` (a post-resolution non-`McpError`
   throw it classifies itself, keeping the actor context v1 had) — never throws a protocol
   error. `executeSyncToolCall()`
@@ -35,8 +35,8 @@ implementations, not by importing from here.
   shared error→`ToolCallOutcome` classifier (reuses `buildToolCallErrorResult`, applies the
   nudge, owns the APPROVAL/EXECUTION `logHttpError` side-effects); both `executeSyncToolCall`'s
   catch and the shell's outer catch route through it. `buildPreflightFailureOutcome()`
-  lives here (single-source precedence: standby wins over 402). Imports no SDK error type —
-  each shell constructs its own protocol error + side-channel emission.
+  lives here (single-source precedence: standby wins over 402). Does not construct SDK protocol
+  errors — shells do; escaped `McpError`s are re-thrown so they stay JSON-RPC errors.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.

@@ -612,6 +612,62 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
         expect(properties.failure_http_status).toBe(402);
         expect(properties.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
     });
+
+    it('re-throws an escaped McpError as a JSON-RPC error, not an isError tool result', async () => {
+        // Safety net: if an McpError escapes dispatch (ACTOR_MCP containment is the normal seal),
+        // the sync catch must re-throw it — never classify. Classification would turn InvalidParams
+        // into an EXECUTION isError result, and a 402-coded McpError into a PAYMENT tool result.
+        await withServer(async (server) => {
+            silenceLogs();
+            const tool = makeThrowingTool({
+                name: 'mcp-error-tool',
+                error: new McpError(ErrorCode.InvalidParams, 'protocol boom'),
+            });
+            server.upsertTools([tool]);
+            const handler = getRequestHandler(server, 'tools/call');
+            await expect(
+                handler(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: 'mcp-error-tool',
+                            arguments: {},
+                            _meta: { mcpSessionId: 's1' },
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                ),
+            ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+        });
+    });
+
+    it('re-throws a 402-coded McpError as JSON-RPC, never a PAYMENT tool result', async () => {
+        // Companion to the InvalidParams fence: a 402-coded McpError hits isX402PaymentRequiredError
+        // if classified (getHttpStatusCode → `.code`). Must reject with code 402, not resolve with
+        // structuredContent payment payload.
+        await withServer(async (server) => {
+            silenceLogs();
+            const tool = makeThrowingTool({
+                name: 'mcp-402-tool',
+                error: new McpError(402 as ErrorCode, 'remote 402'),
+            });
+            server.upsertTools([tool]);
+            const handler = getRequestHandler(server, 'tools/call');
+            await expect(
+                handler(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: 'mcp-402-tool',
+                            arguments: {},
+                            _meta: { mcpSessionId: 's1' },
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                ),
+            ).rejects.toMatchObject({ code: 402 });
+        });
+    });
 });
 
 describe('CallToolRequestSchema handler — task-augmented pre-flight failures', () => {
@@ -984,6 +1040,46 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
             },
             { paymentProvider: makePaymentProvider() },
         );
+    });
+
+    it('classifies a createTask throw so telemetry is FAILED, not SUCCEEDED', async () => {
+        // Residual outer-catch fence: after prep-spine throws moved into PreparedCallError, the shell
+        // catch's remaining job is a task-branch createTask failure. Classification must run so the
+        // finally logs FAILED — without it a raw throw leaves toolStatus at SUCCEEDED. The classified
+        // isError body cannot satisfy CreateTaskResult (no `task` field), so the SDK wrapper then
+        // rejects with InvalidParams; the store-outage path avoids that by throwing InternalError.
+        // This test pins the telemetry half of the catch; the wire-shape trap is a separate follow-up.
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                vi.spyOn(logging, 'logHttpError').mockImplementation(() => {});
+                vi.spyOn(server.taskStore, 'createTask').mockRejectedValue(new Error('store down'));
+                const { tool, received } = makeRecorderTool('create-task-fail-tool', {
+                    taskSupport: 'optional',
+                });
+                server.upsertTools([tool]);
+                const handler = getRequestHandler(server, 'tools/call');
+                await expect(
+                    handler(
+                        {
+                            method: 'tools/call',
+                            params: {
+                                name: 'create-task-fail-tool',
+                                arguments: {},
+                                _meta: { mcpSessionId: 's1' },
+                                task: { ttl: 60_000 },
+                            },
+                        },
+                        { signal: { aborted: false }, sendNotification: vi.fn() },
+                    ),
+                ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+                expect(received.called).toBe(false);
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+        expect(trackSpy.mock.calls).toHaveLength(1);
+        expect(trackSpy.mock.calls[0][2].tool_status).toBe(TOOL_STATUS.FAILED);
     });
 
     it('carries actor_name into the telemetry event on a post-resolution prep-spine throw', async () => {

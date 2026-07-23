@@ -2,16 +2,18 @@
  * Shared tool-call orchestration engine. Plain functions taking the `ActorsMcpServer` instance
  * (as `apifyMcpServer`), mirroring `tool_dispatch.ts` conventions; owns no class state. Both eras of
  * the MCP surface call this to run the same `tools/call` spine: token gate → tool resolution →
- * args/AJV validation → payment context → task-support check → standby/402 pre-flight → dispatch →
+ * payment context → AJV validation → task-support check → standby/402 pre-flight → dispatch →
  * error classification → report-problem nudge.
  *
- * The engine imports no SDK error type (`McpError` / `ProtocolError`): failures are returned as
- * neutral `InvalidToolCall` / `ToolCallOutcome` values and each shell constructs its own protocol
- * error and side-channel emission. See `src/mcp/AGENTS.md`.
+ * The engine does not construct SDK protocol errors: failures are returned as neutral
+ * `InvalidToolCall` / `ToolCallOutcome` / `PreparedCallError` values and each shell builds its own
+ * protocol error and side-channel emission. Escaped `McpError`s are re-thrown so shells keep them
+ * as JSON-RPC errors (never classified into PAYMENT/EXECUTION tool results). See `src/mcp/AGENTS.md`.
  */
 
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Notification, Request } from '@modelcontextprotocol/sdk/types.js';
+import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 
 import log from '@apify/log';
@@ -326,9 +328,9 @@ export async function prepareToolCall(params: {
             decodedArgs,
         };
     } catch (error) {
-        // A non-McpError throw after tool resolution. Classify it with the actor context already in
-        // scope, reusing the shared classifier, so the shell interprets it like any other outcome and
-        // telemetry + logHttpError carry actor_name/actor_id — byte-identical to base's outer catch.
+        // Protocol errors stay protocol errors (shell re-throws as JSON-RPC). Classify only
+        // non-McpError throws so actor context reaches telemetry + logHttpError like base's outer catch.
+        if (error instanceof McpError) throw error;
         const outcome = classifyToolCallError(error, {
             apifyMcpServer,
             toolName: name,
@@ -346,7 +348,7 @@ export async function prepareToolCall(params: {
  * The synchronous dispatch tail: pre-flight short-circuit → progress-tracker opt-in → dispatch →
  * error classification → report-problem nudge. Returns a `ToolCallOutcome` whose `result` is the exact
  * wire payload (nudge already applied). Owns the APPROVAL/EXECUTION `logHttpError` side-effects, so the
- * v1 shell stays purely interpretive. Imports no SDK error type.
+ * v1 shell stays purely interpretive. Re-throws `McpError` (does not construct one).
  */
 export async function executeSyncToolCall(
     prepared: PreparedCall,
@@ -420,6 +422,10 @@ export async function executeSyncToolCall(
             callDiagnostics: dispatchResult.callDiagnostics,
         };
     } catch (error) {
+        // Match v1: McpError must stay a JSON-RPC error. Classifying would turn InvalidParams/
+        // InternalError into isError EXECUTION results, and a 402-coded McpError into PAYMENT
+        // (getHttpStatusCode falls through to `.code`).
+        if (error instanceof McpError) throw error;
         return classifyToolCallError(error, {
             apifyMcpServer,
             toolName,
@@ -438,7 +444,8 @@ export async function executeSyncToolCall(
  * applies the report-problem nudge, so the returned `result` is the exact wire payload. Both the sync
  * dispatch tail (`executeSyncToolCall`'s catch) and the v1 shell's outer catch (prep-spine and
  * task-branch `createTask` throws) route through this, so any non-`McpError` throw is classified
- * identically wherever it originates. Imports no SDK error type.
+ * identically wherever it originates. Does not construct SDK protocol errors; callers re-throw
+ * `McpError` before invoking this.
  */
 export function classifyToolCallError(
     error: unknown,
