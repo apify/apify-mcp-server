@@ -64,7 +64,6 @@ function isModeMap(entry: CategoryToolEntry): entry is ModeMap {
  * Use {@link getCategoryTools} to resolve entries into concrete ToolEntry arrays for a given mode.
  */
 export const toolCategories = {
-    experimental: [],
     actors: [
         searchActors,
         fetchActorDetails,

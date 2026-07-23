@@ -54,6 +54,16 @@ const ALL_INTERNAL_TOOL_NAMES: Set<string> = (() => {
     return names;
 })();
 
+/**
+ * Retired selector strings that name neither a registry category nor a real internal tool
+ * anymore, but must still resolve as a no-op instead of being misread as an Actor ID:
+ * `'preview'` (deprecated pseudo-category) and `'add-actor'`/`'experimental'` (add-actor,
+ * deleted — PR 2 of the stateless migration). `getToolsForServerMode` substitutes `call-actor`
+ * for each (see its own docstring); this set only keeps `resolveActorsToLoad` from treating them
+ * as Actor names and trying to fetch a nonexistent Actor.
+ */
+const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set(['preview', 'experimental', HELPER_TOOLS.ACTOR_ADD]);
+
 type NormalizedInput = {
     /**
      * Cleaned tool selectors (trimmed, non-empty). `undefined` when `input.tools`
@@ -95,7 +105,7 @@ function normalizeInput(input: Input): NormalizedInput {
  * the *internal* tool variants around it differ by mode.
  *
  * Selectors classified as "actor names":
- *   - NOT the deprecated `'preview'` pseudo-category
+ *   - NOT a retired selector (`RETIRED_SELECTOR_NAMES`: `'preview'`, `'experimental'`, `'add-actor'`)
  *   - NOT a category name (from `CATEGORY_NAME_SET`)
  *   - NOT the name of an internal tool in any mode (from `ALL_INTERNAL_TOOL_NAMES`)
  *
@@ -105,11 +115,11 @@ function normalizeInput(input: Input): NormalizedInput {
 function resolveActorsToLoad(input: Input): string[] {
     const { selectors, addActorEnabled, actorsExplicitlyEmpty } = normalizeInput(input);
 
-    // Selectors that aren't categories or internal tools in any mode → Actor names.
+    // Selectors that aren't retired, categories, or internal tools in any mode → Actor names.
     const actorSelectorsFromTools: string[] = [];
     if (selectors !== undefined) {
         for (const sel of selectors) {
-            if (sel === 'preview') continue;
+            if (RETIRED_SELECTOR_NAMES.has(sel)) continue;
             if (CATEGORY_NAME_SET.has(sel)) continue;
             if (ALL_INTERNAL_TOOL_NAMES.has(sel)) continue;
             actorSelectorsFromTools.push(sel);
