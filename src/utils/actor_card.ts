@@ -329,9 +329,7 @@ export type WidgetActor = {
  * Formats Actor for widget UI components.
  * Used only in OpenAI (widget) mode — search results and Actor details widgets.
  *
- * Always uses simplified tier-aware pricing so the widget's top-level
- * `pricePerUnit` / `events[0].priceUsd` (which is what the widget UI renders)
- * matches the tier-filtered prices shown in the LLM text and structured output.
+ * Uses complete pricing so the widget badge can pick the primary event and match the public Store pricing badge logic.
  */
 export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: PricingTier): WidgetActor {
     const fullName = `${actor.username}/${actor.name}`;
@@ -351,6 +349,6 @@ export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: Pr
             totalUsers: actor.stats?.totalUsers || 0,
         },
         url: `${APIFY_STORE_URL}/${fullName}`,
-        currentPricingInfo: pricingInfoToSimplifiedStructured(getActorPricingInfo(actor), userTier),
+        currentPricingInfo: pricingInfoToStructured(getActorPricingInfo(actor), userTier),
     };
 }

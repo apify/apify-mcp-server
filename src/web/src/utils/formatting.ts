@@ -56,8 +56,12 @@ function formatFlatPricePerMonth(pricePerUnit: number | undefined): string {
     return `${formatPriceUsd(monthlyPrice)}/month + usage`;
 }
 
-function formatPayPerEventPricing(event: NonNullable<StructuredPricingInfo['events']>[0]): string {
+function formatPayPerEventPricing(
+    event: NonNullable<StructuredPricingInfo['events']>[0],
+    { showFromPrefix = false }: { showFromPrefix?: boolean } = {},
+): string {
     const title = event.title.toLowerCase() || 'result';
+    const prefix = showFromPrefix ? 'from ' : '';
 
     if (event.tieredPricing && event.tieredPricing.length > 0) {
         const tieredPrices = event.tieredPricing
@@ -76,9 +80,9 @@ function formatPayPerEventPricing(event: NonNullable<StructuredPricingInfo['even
 
         if (isPricedPerThousandResults) {
             const pricePerThousand = event.priceUsd * PRICE_DISPLAY_UNIT_SIZE;
-            return `${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
+            return `${prefix}${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
         }
-        return `${formatPriceUsd(event.priceUsd)} / ${title}`;
+        return `${prefix}${formatPriceUsd(event.priceUsd)} / ${title}`;
     }
 
     return 'Pay per event';
@@ -120,11 +124,12 @@ export const formatPricing = (pricing: StructuredPricingInfo): string => {
             return 'Pay per event';
         }
 
-        if (pricing.events.length === 1) {
-            return formatPayPerEventPricing(pricing.events[0]);
-        }
+        const primaryEvent =
+            pricing.events.length === 1 ? pricing.events[0] : pricing.events.find((event) => event.isPrimaryEvent);
 
-        return 'Pay per event';
+        return primaryEvent
+            ? formatPayPerEventPricing(primaryEvent, { showFromPrefix: pricing.events.length > 1 })
+            : 'Pay per event';
     }
 
     if (pricing.model === 'PRICE_PER_DATASET_ITEM') {

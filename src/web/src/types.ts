@@ -26,6 +26,7 @@ export type StructuredPricingInfo = {
             tier: string;
             priceUsd: number;
         }[];
+        isPrimaryEvent?: boolean;
     }[];
     pricingNote?: string;
     eventDescriptionsOmitted?: boolean;
