@@ -323,11 +323,31 @@ export class ActorsMcpServer {
      * survive a load that never sees an initialize.
      */
     private isReportProblemServable(): boolean {
+        return this.isReportProblemServableForClient(this.options.initializeRequestData);
+    }
+
+    /**
+     * Per-client variant of {@link isReportProblemServable} for stateless requests.
+     */
+    public isReportProblemServableForClient(initializeRequestData: InitializeRequest | undefined): boolean {
         return (
             this.telemetryEnabled &&
-            this.clientKnown &&
-            !isReportProblemBlockedForClient(this.options.initializeRequestData)
+            initializeRequestData != null &&
+            !isReportProblemBlockedForClient(initializeRequestData)
         );
+    }
+
+    /**
+     * Resolve the effective server mode for a client described by an initialize-shaped request.
+     */
+    public resolveServerModeForClient(initializeRequestData: InitializeRequest | undefined): SERVER_MODE {
+        if (this.serverModeOption !== 'auto') return this.serverMode;
+        return resolveServerMode('auto', isUiSupportedByClient(initializeRequestData));
+    }
+
+    /** Widgets resolved by {@link prepare}; consumed by the resource service (both eras). */
+    public getAvailableWidgets(): Map<string, AvailableWidget> {
+        return this.availableWidgets;
     }
 
     private composePendingToolsForClient(): void {
@@ -344,6 +364,18 @@ export class ActorsMcpServer {
         // idempotent, and this pass adds the client-gated tools (e.g. report-problem) now that the
         // client is known, reconciling shared state to the complete set.
         if (tools.length > 0) this.upsertTools(tools, true);
+    }
+
+    /** Compose stateless tools for the request's resolved mode. */
+    public composeStatelessClientGatedTools(mode: SERVER_MODE): Map<string, ToolEntry> {
+        const tools = new Map(this.tools);
+        for (const { input, actorTools, isSessionRestore } of this.pendingToolsUntilClientKnown) {
+            for (const tool of getToolsForServerMode(input, actorTools, mode, isSessionRestore)) {
+                tools.set(tool.name, tool);
+            }
+        }
+        if (!this.telemetryEnabled) tools.delete(HELPER_TOOLS.PROBLEM_REPORT);
+        return tools;
     }
 
     /**
@@ -536,9 +568,6 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
-        // Client gating (e.g. hiding report-problem from Anthropic surfaces) is applied earlier, in
-        // composeToolsForClient — the single compose choke point where the client is known. Do not
-        // filter here: this is a low-level commit point reached before the client is known too.
         for (const tool of tools) {
             const stored = this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
             this.tools.set(stored.name, stored);
@@ -1109,8 +1138,15 @@ export class ActorsMcpServer {
         }
     }
 
-    async connect(transport: Transport): Promise<void> {
+    /**
+     * Pre-connect setup for callers that do not use {@link connect}.
+     */
+    async prepare(): Promise<void> {
         await this.resolveWidgets();
+    }
+
+    async connect(transport: Transport): Promise<void> {
+        await this.prepare();
         await this.server.connect(transport);
     }
 

@@ -18,6 +18,7 @@ type PrepareTelemetryDataParams = {
     mcpSessionId: string | undefined;
     apifyToken: string;
     apifyMcpServer: ActorsMcpServer;
+    initializeRequestData?: InitializeRequest;
 };
 
 /**
@@ -30,17 +31,20 @@ export async function prepareTelemetryData(
     if (!apifyMcpServer.telemetryEnabled) {
         return { telemetryData: null, userId: null };
     }
+    const initializeRequestData = Object.hasOwn(params, 'initializeRequestData')
+        ? params.initializeRequestData
+        : apifyMcpServer.options.initializeRequestData;
 
     // Get userId from cache or fetch from API
     let userId: string | null = null;
     if (apifyToken) {
-        const requestOrigin = getRequestOriginForClient(apifyMcpServer.options.initializeRequestData);
+        const requestOrigin = getRequestOriginForClient(initializeRequestData);
         const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
         ({ userId } = await getUserInfoCached(apifyToken, apifyClient));
         log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
     }
-    const capabilities = apifyMcpServer.options.initializeRequestData?.params?.capabilities;
-    const initializeParams = apifyMcpServer.options.initializeRequestData?.params as InitializeRequest['params'];
+    const capabilities = initializeRequestData?.params?.capabilities;
+    const initializeParams = initializeRequestData?.params as InitializeRequest['params'];
     const telemetryData: ToolCallTelemetryProperties = {
         app: 'mcp',
         app_version: getPackageVersion() || '',

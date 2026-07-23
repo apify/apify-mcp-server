@@ -16,11 +16,11 @@ import {
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
-import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import * as logging from '../../src/utils/logging.js';
 import {
     getRequestHandler,
+    makeActorMcpTool,
     makePaymentRequiredError,
     makePermissionApprovalError,
     makeRecorderTool,
@@ -132,22 +132,6 @@ function silenceLogs(): void {
     vi.spyOn(log, 'exception').mockImplementation(() => log);
     vi.spyOn(log, 'softFail').mockImplementation(() => log);
     vi.spyOn(log, 'warning').mockImplementation(() => log);
-}
-
-/** An ACTOR_MCP tool with `taskSupport` forced so it clears the pre-dispatch gate (see the gap test). */
-function makeActorMcpTool(): ToolEntry {
-    return {
-        type: TOOL_TYPE.ACTOR_MCP,
-        name: 'test-actor-mcp-tool',
-        description: 'actor-mcp',
-        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
-        ajvValidate: compileSchema({ type: 'object', properties: {} }),
-        originToolName: 'origin-tool',
-        actorId: 'test/actor',
-        serverId: 'server-id',
-        serverUrl: 'https://example.invalid/mcp',
-        execution: { taskSupport: 'optional' },
-    } as ToolEntry;
 }
 
 async function runSync(server: ActorsMcpServer, tool: ToolEntry): Promise<Record<string, unknown>> {
@@ -495,8 +479,8 @@ describe('executeToolAndUpdateTask()', () => {
         await withServer(async (server) => {
             silenceLogs();
             vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
-            // The connect-failure branch logs via the transport; the harness has none, so stub it.
-            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            // The client-facing logging notification for a connect failure was removed (SEP-2577,
+            // 1b): the failure is still logged server-side and returned as a soft-fail isError result.
             const { task, result } = await runTaskAndReadBack(server, makeActorMcpTool());
             expect(task.status).toBe('completed');
             expect(result.isError).toBe(true);

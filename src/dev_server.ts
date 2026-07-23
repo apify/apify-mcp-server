@@ -5,9 +5,11 @@
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
+import { toNodeHandler, toWebRequest } from '@modelcontextprotocol/node';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { createMcpHandler, isLegacyRequest, type McpRequestContext } from '@modelcontextprotocol/server';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -16,16 +18,16 @@ import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from './apify_client.js';
 import { ActorsMcpServer } from './mcp/server.js';
+import { createStatelessServer } from './mcp/stateless_server.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { getRequestOriginForClient } from './utils/mcp_clients.js';
 import { parseServerMode } from './utils/server_mode.js';
 
 // DEV ONLY. This is a local dev/standby-emulation server, not the hosted HTTP server.
-// The production Streamable HTTP transport (auth, rate limiting, Redis-backed session
-// lifecycle, multi-node) lives in apify-mcp-server-internal. Do not treat this file as
-// the source of HTTP-transport semantics or send PRs here to mirror production behavior;
-// fix production-facing HTTP behavior in the internal repo.
+// It serves both the legacy and stateless HTTP protocol paths for local verification.
+// Production auth, rate limiting, Redis-backed sessions, and multi-node behavior live in
+// apify-mcp-server-internal.
 //
 // Default telemetry to the DEV Segment source so local tool calls never land in PROD
 // analytics. Still overridable by an explicit TELEMETRY_ENV (e.g. PROD) in the env.
@@ -87,11 +89,58 @@ function resolveRequestAuth(
     return null;
 }
 
+async function resolveRequestOptions(requestUrl: string) {
+    const urlParams = new URL(requestUrl, 'http://localhost/').searchParams;
+    const telemetryEnabled =
+        parseBooleanOrNull(urlParams.get('telemetry-enabled')) ??
+        parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ??
+        true;
+    const uiParam = urlParams.get('ui');
+    return {
+        telemetryEnabled,
+        serverMode: uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE),
+        paymentProvider: await resolvePaymentProvider(urlParams.get('payment')),
+    };
+}
+
+async function createStatelessServerForRequest(context: McpRequestContext, taskStore: InMemoryTaskStore) {
+    const requestUrl = context.requestInfo?.url ?? 'http://localhost/';
+    const { telemetryEnabled, serverMode, paymentProvider } = await resolveRequestOptions(requestUrl);
+    const apifyToken = context.authInfo?.token || undefined;
+    const apifyMcpServer = new ActorsMcpServer({
+        taskStore,
+        setupSigintHandler: false,
+        transportType: 'http',
+        telemetry: { enabled: telemetryEnabled },
+        serverMode,
+        paymentProvider,
+        token: apifyToken,
+    });
+    const apifyClient = new ApifyClient({ token: apifyToken });
+    await apifyMcpServer.loadToolsFromUrl(requestUrl, apifyClient);
+    await apifyMcpServer.prepare();
+    return createStatelessServer(apifyMcpServer);
+}
+
+function createStatelessRequestHandler(taskStore: InMemoryTaskStore) {
+    return toNodeHandler(
+        createMcpHandler(
+            async (context) => {
+                return createStatelessServerForRequest(context, taskStore);
+            },
+            {
+                legacy: 'reject',
+            },
+        ),
+    );
+}
+
 export function createExpressApp(): express.Express {
     const app = express();
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
     const taskStore = new InMemoryTaskStore();
+    const statelessServer = createStatelessRequestHandler(taskStore);
 
     function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
         if (statusCode >= 500) {
@@ -122,6 +171,20 @@ export function createExpressApp(): express.Express {
     app.post('/', async (req: Request, res: Response) => {
         log.info('Received MCP request:', req.body);
         try {
+            const request = await toWebRequest(req, req.body);
+            if (!(await isLegacyRequest(request, req.body))) {
+                const { paymentProvider } = await resolveRequestOptions(req.url);
+                const auth = resolveRequestAuth(req, res, paymentProvider);
+                if (!auth) return;
+                (req as Request & { auth?: { token: string; clientId: string; scopes: string[] } }).auth = {
+                    token: auth.apifyToken ?? '',
+                    clientId: '',
+                    scopes: [],
+                };
+                await statelessServer(req, res, req.body);
+                return;
+            }
+
             // Check for existing session ID
             const sessionId = req.headers['mcp-session-id'] as string | undefined;
             let transport: StreamableHTTPServerTransport;
@@ -130,20 +193,7 @@ export function createExpressApp(): express.Express {
                 // Reuse existing transport
                 transport = transports[sessionId];
             } else if (!sessionId && isInitializeRequest(req.body)) {
-                // Extract telemetry query parameters
-                const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
-                const telemetryEnabledParam = urlParams.get('telemetry-enabled');
-                // URL param > env var > default (true)
-                const telemetryEnabled =
-                    parseBooleanOrNull(telemetryEnabledParam) ??
-                    parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ??
-                    true;
-
-                const uiParam = urlParams.get('ui');
-                const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
-
-                // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
-                const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
+                const { telemetryEnabled, serverMode, paymentProvider } = await resolveRequestOptions(req.url);
 
                 // Mirror production: no token required in payment mode, else require Bearer header
                 const auth = resolveRequestAuth(req, res, paymentProvider);

@@ -34,10 +34,22 @@ implementations, not by importing from here.
   or writes the store — the catch blocks own logging and store writes. For payment/approval
   the mapper returns the ready-to-send `response`; the catch builds the wire result only for
   the execution `userText`.
+- `stateless_server.ts` — `createStatelessServer(apifyMcpServer)`: the MCP 2026-07-28
+  registration shell on `@modelcontextprotocol/server`. Additive stateless surface for
+  `tools/list`, `tools/call`, `resources/*`, `prompts/*`. A thin shell over `tool_call_engine.ts`
+  (`prepareToolCall` → `executeSyncToolCall`), not a re-implementation of the spine. Per-request
+  client identity/mode/token (envelope `_meta` + `authInfo`, never `_meta.apifyToken`); server mode
+  and `report-problem` visibility re-resolved per request. Four differences from the v1 shell:
+  `InvalidToolCall` throws `ProtocolError(InvalidParams)` with no logging notification (SEP-2577);
+  results are projected via `server.projectCallToolResult`; `tasks/*` is unregistered (the SDK
+  rejects it `-32601`), so `isTaskRequest` is always false; identity/mode/token are per-request.
+  Apps tools are composed for each request's resolved mode. Legacy `server.ts` stays on the v1 SDK.
 - `tool_dispatch.ts` — `dispatchToolCall()`: the single exhaustive `switch (tool.type)`
   (INTERNAL / ACTOR_MCP / ACTOR) both the sync handler and the task path run. Plain
   function taking the `ActorsMcpServer` instance; touches no class state beyond `.server`.
-  The optional `emitLog` parameter sends ACTOR_MCP connect-failure notifications.
+  An ACTOR_MCP connect failure is logged server-side (`log.softFail`) and returned as a soft-fail
+  `isError` result — it no longer emits a client-facing logging notification (removed in the
+  2026-07-28 migration; SEP-2577).
 - `tool_call_telemetry.ts` — `prepareTelemetryData()` / `logToolCallAndTelemetry()`: shared by
   the sync `CallToolRequestSchema` handler and the task path. Plain functions taking the
   `ActorsMcpServer` instance (as `apifyMcpServer`), reading `telemetryEnabled`/`telemetryEnv`
@@ -68,6 +80,10 @@ implementations, not by importing from here.
   `getToolsForServerMode()`) is documented once in
   [`../../DEVELOPMENT.md`](../../DEVELOPMENT.md) — read it before changing
   registration in `server.ts`; not restated here.
+- **Stateless per-request compose.** `composeStatelessClientGatedTools()` resolves queued sources
+  for the request's mode without mutating the legacy tool map. `stateless_server.ts` uses that map
+  for both listing and calling tools, and removes `report-problem` when the request client cannot
+  use it.
 
 ## Local commands
 
