@@ -227,8 +227,11 @@ describe('createStatelessServer()', () => {
 
                     const statelessServer = createStatelessServer(server);
                     expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(false);
+                    // Construction sees no client identity here, so instructions conservatively omit
+                    // report-problem even with telemetry on — the gate is per-client servability, not
+                    // telemetry-only tool presence. Per-request tools/list still admits it below.
                     // eslint-disable-next-line no-underscore-dangle
-                    expect((statelessServer as unknown as { _instructions?: string })._instructions).toContain(
+                    expect((statelessServer as unknown as { _instructions?: string })._instructions).not.toContain(
                         HELPER_TOOLS.PROBLEM_REPORT,
                     );
                     const handler = getStatelessRequestHandler(statelessServer, 'tools/list');
@@ -271,6 +274,62 @@ describe('createStatelessServer()', () => {
                     HELPER_TOOLS.PROBLEM_REPORT,
                 );
             });
+        });
+
+        it('does not advertise report-problem in instructions for a blocklisted construction client even with telemetry on', async () => {
+            await withServer(
+                async (server) => {
+                    await server.loadToolsByName([HELPER_TOOLS.PROBLEM_REPORT], {} as never);
+                    const statelessServer = createStatelessServer(server);
+                    // eslint-disable-next-line no-underscore-dangle
+                    expect((statelessServer as unknown as { _instructions?: string })._instructions).not.toContain(
+                        HELPER_TOOLS.PROBLEM_REPORT,
+                    );
+                    // Per-request tools/list withholds it for the same blocklisted client too.
+                    const listed = await getStatelessRequestHandler(statelessServer, 'tools/list')(
+                        { method: 'tools/list', params: {} },
+                        makeStatelessContext({ clientInfo: { name: 'Claude Desktop', version: '1.0.0' } }),
+                    );
+                    expect((listed.tools as { name: string }[]).map((t) => t.name)).not.toContain(
+                        HELPER_TOOLS.PROBLEM_REPORT,
+                    );
+                },
+                {
+                    telemetry: { enabled: true },
+                    initializeRequestData: {
+                        method: 'initialize',
+                        params: {
+                            protocolVersion: STATELESS_PROTOCOL_VERSION,
+                            capabilities: {},
+                            clientInfo: { name: 'Claude Desktop', version: '1.0.0' },
+                        },
+                    },
+                },
+            );
+        });
+
+        it('advertises report-problem in instructions for a servable (non-blocklisted) construction client', async () => {
+            await withServer(
+                async (server) => {
+                    await server.loadToolsByName([HELPER_TOOLS.PROBLEM_REPORT], {} as never);
+                    const statelessServer = createStatelessServer(server);
+                    // eslint-disable-next-line no-underscore-dangle
+                    expect((statelessServer as unknown as { _instructions?: string })._instructions).toContain(
+                        HELPER_TOOLS.PROBLEM_REPORT,
+                    );
+                },
+                {
+                    telemetry: { enabled: true },
+                    initializeRequestData: {
+                        method: 'initialize',
+                        params: {
+                            protocolVersion: STATELESS_PROTOCOL_VERSION,
+                            capabilities: {},
+                            clientInfo: { name: 'known-client', version: '1.0.0' },
+                        },
+                    },
+                },
+            );
         });
 
         it('composes Apps tools for an Apps-capable request when the option is auto', async () => {
