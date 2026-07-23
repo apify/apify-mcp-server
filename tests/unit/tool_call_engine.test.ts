@@ -42,6 +42,7 @@ describe('prepareToolCall()', () => {
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData: null,
+                clientContext: undefined,
             });
             expect('message' in result).toBe(true);
             const invalid = result as InvalidToolCall;
@@ -63,6 +64,7 @@ describe('prepareToolCall()', () => {
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData: null,
+                clientContext: undefined,
             });
             expect('message' in result).toBe(true);
             const invalid = result as InvalidToolCall;
@@ -85,6 +87,7 @@ describe('prepareToolCall()', () => {
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData: null,
+                clientContext: undefined,
             });
             expect('message' in result).toBe(true);
             const invalid = result as InvalidToolCall;
@@ -107,6 +110,7 @@ describe('prepareToolCall()', () => {
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData,
+                clientContext: undefined,
             });
             expect('message' in result).toBe(false);
             const prepared = result as PreparedCall;
@@ -133,6 +137,7 @@ describe('executeSyncToolCall()', () => {
             isTaskRequest: false,
             mcpSessionId: 's1',
             telemetryData: null,
+            clientContext: undefined,
         })) as PreparedCall;
         return prepared;
     }

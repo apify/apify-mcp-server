@@ -19,6 +19,10 @@ implementations, not by importing from here.
   the same `PreparedCall`; both use the shared `dispatchToolCall` switch.
   Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
   a task store (the internal repo injects a Redis one) or the constructor throws.
+- `client_context.ts` — protocol-neutral client identity and capabilities. The server
+  snapshots it from constructor recovery data and refreshes it during `initialize`.
+  Internal helpers receive this context instead of an SDK initialize type; the raw
+  `options.initializeRequestData` remains the hosted session-recovery boundary.
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
   token gate, tool resolution, payment context, AJV validation, task support, and standby/402
   pre-flight. `executeSyncToolCall()` runs the dispatch tail; `classifyToolCallError()` maps
@@ -68,6 +72,10 @@ implementations, not by importing from here.
   `getToolsForServerMode()`) is documented once in
   [`../../DEVELOPMENT.md`](../../DEVELOPMENT.md) — read it before changing
   registration in `server.ts`; not restated here.
+- **Client data has two forms.** Keep `options.initializeRequestData` unchanged for hosted
+  session recovery. Use the `McpClientContext` snapshot for client gating, request origin,
+  telemetry, resources, and scheduled tasks. Do not export the context from the package root
+  or `./internals`.
 
 ## Local commands
 

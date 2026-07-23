@@ -4,10 +4,6 @@
 
 import { randomUUID } from 'node:crypto';
 
-// The ext-apps package exposes `./server` via conditional exports only (no `./server/index.js`
-// wildcard), so we can't satisfy the `import/extensions` rule on this subpath.
-// eslint-disable-next-line import/extensions
-import { getUiCapability, RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -71,6 +67,8 @@ import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import { buildActorFields, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getActors, getToolsForServerMode, toolNamesToInput } from '../utils/tools_loader.js';
+import { buildMcpClientContext, isUiSupportedByClient } from './client_context.js';
+import type { McpClientContext } from './client_context.js';
 import { LOG_LEVEL_MAP } from './const.js';
 import { emitTaskStatusNotification, executeToolAndUpdateTask } from './task_execution.js';
 import {
@@ -81,19 +79,6 @@ import {
 } from './tool_call_engine.js';
 import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telemetry.js';
 import { parseInputParamsFromUrl, storeTaskResultOrSkipIfExpired } from './utils.js';
-
-/**
- * Returns true when the initialize request advertises the MCP Apps UI extension
- * with the widget MIME type. Used to resolve `'auto'` server mode.
- *
- * Uses {@link getUiCapability} from `@modelcontextprotocol/ext-apps/server` to
- * read the `io.modelcontextprotocol/ui` extension from client capabilities — the
- * canonical way per the MCP Apps spec.
- */
-function isUiSupportedByClient(request: InitializeRequest | undefined): boolean {
-    const uiCap = getUiCapability(request?.params?.capabilities);
-    return uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
-}
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
@@ -109,6 +94,7 @@ export class ActorsMcpServer {
     public readonly options: ActorsMcpServerOptions;
     public readonly taskStore: TaskStore;
     public readonly actorStore?: ActorStore;
+    private clientContext: McpClientContext | undefined;
     /**
      * Resolved server mode. Preliminary value at construction (`'auto'` → `DEFAULT`).
      * Finalized inside the `initialize` request handler (see constructor) once the
@@ -147,6 +133,7 @@ export class ActorsMcpServer {
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
+        this.clientContext = buildMcpClientContext(options.initializeRequestData?.params);
 
         // for stdio use in memory task store if not provided, otherwise use provided task store
         if (this.options.transportType === 'stdio' && !this.options.taskStore) {
@@ -256,7 +243,9 @@ export class ActorsMcpServer {
         )._oninitialize.bind(this.server);
 
         this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
-            this.clientSupportsUi = isUiSupportedByClient(request);
+            this.clientContext = buildMcpClientContext(request.params);
+            (this.options as Record<string, unknown>).initializeRequestData = request;
+            this.clientSupportsUi = isUiSupportedByClient(this.clientContext);
 
             if (this.serverModeOption === 'auto') {
                 const resolved = resolveServerMode('auto', this.clientSupportsUi);
@@ -265,10 +254,6 @@ export class ActorsMcpServer {
                 }
                 this.serverModeResolved = true;
             }
-
-            // Setting this makes `clientKnown` true, so the queued compose below (and any later
-            // load) resolves the tool set for this client and applies the per-client blocklist.
-            (this.options as Record<string, unknown>).initializeRequestData = request;
 
             log.info('Resolved server mode for client capabilities', {
                 serverMode: this.serverMode,
@@ -294,7 +279,7 @@ export class ActorsMcpServer {
      *  recovery path). Only client-gated tools wait for this so the per-client blocklist can be
      *  applied; client-agnostic tools compose regardless. */
     private get clientKnown(): boolean {
-        return this.options.initializeRequestData != null;
+        return this.clientContext != null;
     }
 
     /**
@@ -323,11 +308,7 @@ export class ActorsMcpServer {
      * survive a load that never sees an initialize.
      */
     private isReportProblemServable(): boolean {
-        return (
-            this.telemetryEnabled &&
-            this.clientKnown &&
-            !isReportProblemBlockedForClient(this.options.initializeRequestData)
-        );
+        return this.telemetryEnabled && this.clientKnown && !isReportProblemBlockedForClient(this.clientContext);
     }
 
     private composePendingToolsForClient(): void {
@@ -624,13 +605,14 @@ export class ActorsMcpServer {
      * Token-scoped client for resources/read (the API proxy needs auth). Deliberately token-only:
      * unlike the CallTool path it does NOT forward provider/payment headers, so a payment-only
      * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
-     * Still carries the request-origin tag — `initializeRequestData` is already set by this point.
+     * Still carries the request-origin tag from the client context captured by this point.
      */
-    private resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
+    private resolveApifyClient(
+        params: ApifyRequestParams,
+        clientContext: McpClientContext | undefined,
+    ): ApifyClient | undefined {
         const token = this.resolveApifyToken(params._meta);
-        return token
-            ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(this.options.initializeRequestData) })
-            : undefined;
+        return token ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(clientContext) }) : undefined;
     }
 
     private setupResourceHandlers(): void {
@@ -647,7 +629,7 @@ export class ActorsMcpServer {
         this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
             return await resourceService.readResource(
                 request.params.uri,
-                this.resolveApifyClient(request.params as ApifyRequestParams),
+                this.resolveApifyClient(request.params as ApifyRequestParams, this.clientContext),
             );
         });
 
@@ -840,6 +822,7 @@ export class ActorsMcpServer {
             // Keep actor context available to the outer catch.
             let actorName: string | undefined;
             let actorId: string | undefined;
+            const { clientContext } = this;
 
             // Start with the raw name so early failures still have telemetry.
             const { telemetryData, userId } = await prepareTelemetryData({
@@ -847,6 +830,7 @@ export class ActorsMcpServer {
                 mcpSessionId,
                 apifyToken,
                 apifyMcpServer: this,
+                clientContext,
             });
 
             try {
@@ -860,6 +844,7 @@ export class ActorsMcpServer {
                     isTaskRequest: Boolean(request.params.task),
                     mcpSessionId,
                     telemetryData,
+                    clientContext,
                     extra,
                 });
 
@@ -999,6 +984,7 @@ export class ActorsMcpServer {
                             actorName,
                             actorId,
                             apifyMcpServer: this,
+                            clientContext,
                         }).catch((error) =>
                             // Benign task-expiry is handled in-method (see the catch block and
                             // storeTaskResultOrSkipIfExpired); anything reaching here is genuinely unexpected.

@@ -27,6 +27,7 @@ import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { extractAjvErrorDetails } from '../utils/tool_status.js';
 import { buildActorFields, extractActorId, extractActorName, getToolFullName } from '../utils/tools.js';
+import type { McpClientContext } from './client_context.js';
 import type { ActorsMcpServer } from './server.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
@@ -104,10 +105,12 @@ export async function prepareToolCall(params: {
     isTaskRequest: boolean;
     mcpSessionId: string | undefined;
     telemetryData: ToolCallTelemetryProperties | null;
+    clientContext: McpClientContext | undefined;
     // Used to preserve abort status for a post-resolution classified failure.
     extra?: RequestHandlerExtra<Request, Notification>;
 }): Promise<PreparedCall | InvalidToolCall | PreparedCallError> {
-    const { apifyMcpServer, apifyToken, name, meta, requestHeaders, isTaskRequest, telemetryData } = params;
+    const { apifyMcpServer, apifyToken, name, meta, requestHeaders, isTaskRequest, telemetryData, clientContext } =
+        params;
     let { args } = params;
     const { options, tools } = apifyMcpServer;
 
@@ -184,7 +187,7 @@ export async function prepareToolCall(params: {
             apifyToken,
             meta,
             requestHeaders,
-            requestOrigin: getRequestOriginForClient(options.initializeRequestData),
+            requestOrigin: getRequestOriginForClient(clientContext),
         });
 
         log.debug('Validate arguments for tool', {

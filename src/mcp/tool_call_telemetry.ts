@@ -1,5 +1,3 @@
-import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify_client.js';
@@ -11,6 +9,7 @@ import { getRequestOriginForClient } from '../utils/mcp_clients.js';
 import { deriveResourceIds } from '../utils/tool_status.js';
 import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
+import type { McpClientContext } from './client_context.js';
 import type { ActorsMcpServer } from './server.js';
 
 type PrepareTelemetryDataParams = {
@@ -18,6 +17,7 @@ type PrepareTelemetryDataParams = {
     mcpSessionId: string | undefined;
     apifyToken: string;
     apifyMcpServer: ActorsMcpServer;
+    clientContext: McpClientContext | undefined;
 };
 
 /**
@@ -26,7 +26,7 @@ type PrepareTelemetryDataParams = {
 export async function prepareTelemetryData(
     params: PrepareTelemetryDataParams,
 ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
-    const { toolName, mcpSessionId, apifyToken, apifyMcpServer } = params;
+    const { toolName, mcpSessionId, apifyToken, apifyMcpServer, clientContext } = params;
     if (!apifyMcpServer.telemetryEnabled) {
         return { telemetryData: null, userId: null };
     }
@@ -34,20 +34,18 @@ export async function prepareTelemetryData(
     // Get userId from cache or fetch from API
     let userId: string | null = null;
     if (apifyToken) {
-        const requestOrigin = getRequestOriginForClient(apifyMcpServer.options.initializeRequestData);
+        const requestOrigin = getRequestOriginForClient(clientContext);
         const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
         ({ userId } = await getUserInfoCached(apifyToken, apifyClient));
         log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
     }
-    const capabilities = apifyMcpServer.options.initializeRequestData?.params?.capabilities;
-    const initializeParams = apifyMcpServer.options.initializeRequestData?.params as InitializeRequest['params'];
     const telemetryData: ToolCallTelemetryProperties = {
         app: 'mcp',
         app_version: getPackageVersion() || '',
-        mcp_client_name: initializeParams?.clientInfo?.name || '',
-        mcp_client_version: initializeParams?.clientInfo?.version || '',
-        mcp_protocol_version: initializeParams?.protocolVersion || '',
-        mcp_client_capabilities: capabilities || null,
+        mcp_client_name: clientContext?.clientInfo?.name || '',
+        mcp_client_version: clientContext?.clientInfo?.version || '',
+        mcp_protocol_version: clientContext?.protocolVersion || '',
+        mcp_client_capabilities: clientContext?.capabilities || null,
         mcp_session_id: mcpSessionId || '',
         transport_type: apifyMcpServer.options.transportType || '',
         tool_name: toolName,

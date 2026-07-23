@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { InitializeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -15,6 +16,7 @@ import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from './apify_client.js';
+import { buildMcpClientContext } from './mcp/client_context.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import { injectMcpSessionId } from './utils/mcp.js';
@@ -124,12 +126,13 @@ export function createExpressApp(): express.Express {
         try {
             // Check for existing session ID
             const sessionId = req.headers['mcp-session-id'] as string | undefined;
+            const initializeRequest = getInitializeRequest(req.body);
             let transport: StreamableHTTPServerTransport;
 
             if (sessionId && transports[sessionId]) {
                 // Reuse existing transport
                 transport = transports[sessionId];
-            } else if (!sessionId && isInitializeRequest(req.body)) {
+            } else if (!sessionId && initializeRequest) {
                 // Extract telemetry query parameters
                 const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
                 const telemetryEnabledParam = urlParams.get('telemetry-enabled');
@@ -162,10 +165,9 @@ export function createExpressApp(): express.Express {
                     token: apifyToken,
                 });
 
-                // req.body is this same `initialize` request (isInitializeRequest matched above),
-                // so clientInfo is already readable here — unlike stdio.ts, which loads tools
-                // before any client info exists.
-                const requestOrigin = getRequestOriginForClient(req.body as InitializeRequest);
+                // Client info is already available here — unlike stdio.ts, which loads tools
+                // before initialization.
+                const requestOrigin = getRequestOriginForClient(buildMcpClientContext(initializeRequest.params));
                 const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
                 // Fetch actor metadata and queue mode-agnostic sources. Composed with
                 // the final mode inside the initialize request handler.
@@ -282,14 +284,13 @@ export function createExpressApp(): express.Express {
     return app;
 }
 
-// Helper function to detect initialize requests
-function isInitializeRequest(body: unknown): boolean {
-    if (Array.isArray(body)) {
-        return body.some(
-            (msg) => typeof msg === 'object' && msg !== null && 'method' in msg && msg.method === 'initialize',
-        );
+function getInitializeRequest(body: unknown): InitializeRequest | undefined {
+    const messages = Array.isArray(body) ? body : [body];
+    for (const message of messages) {
+        const result = InitializeRequestSchema.safeParse(message);
+        if (result.success) return result.data as InitializeRequest;
     }
-    return typeof body === 'object' && body !== null && 'method' in body && body.method === 'initialize';
+    return undefined;
 }
 
 // --- Entry point: start the server when run directly ---
