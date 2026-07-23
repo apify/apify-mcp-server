@@ -500,7 +500,11 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        // isSessionRestore: true — a stored 'add-actor' name must resolve to itself, not the PR 0 substitute.
+        // isSessionRestore: true. This replays the tool names a session already had (stored via
+        // listAllToolNames), so the add-actor cutoff must NOT rewrite them — a stored 'add-actor'
+        // resolves to itself. The live paths (loadToolsFromInput/loadToolsFromUrl, flag omitted)
+        // instead substitute call-actor for a fresh selection. Both the flag and this exception go
+        // away in PR 2, when add-actor is deleted and there is nothing left to preserve.
         this.registerFetchedActorTools(restoreInput, actorTools, actorTools.length > 0, true);
     }
 

@@ -217,16 +217,14 @@ export function getToolsForServerMode(
     const internalSelections: ToolEntry[] = [];
     if (selectors !== undefined && selectors.length > 0) {
         for (const sel of selectors) {
-            if (sel === 'preview') {
-                // 'preview' category is deprecated. It contained `call-actor` which is now default.
-                log.warning('Tool category "preview" is deprecated');
-                if (callActorTool) internalSelections.push(callActorTool);
-                continue;
-            }
-
-            // add-actor cutoff (PR 0): substitute call-actor for a live 'add-actor'/'experimental'
-            // selector. Skipped on restore, where `sel` may be a pre-cutoff session's own stored name.
-            if (!isSessionRestore && (sel === HELPER_TOOLS.ACTOR_ADD || sel === 'experimental')) {
+            // Selectors that resolve to call-actor: the deprecated `preview` category (always), and
+            // the add-actor cutoff (PR 0) for a live `add-actor`/`experimental` selector — skipped on
+            // restore, where `sel` may be a pre-cutoff session's own stored name.
+            if (
+                sel === 'preview' ||
+                (!isSessionRestore && (sel === HELPER_TOOLS.ACTOR_ADD || sel === 'experimental'))
+            ) {
+                if (sel === 'preview') log.warning('Tool category "preview" is deprecated');
                 if (callActorTool) internalSelections.push(callActorTool);
                 continue;
             }
