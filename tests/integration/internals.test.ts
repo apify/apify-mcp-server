@@ -8,7 +8,7 @@ import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
 import { SERVER_MODE } from '../../src/types.js';
-import { loadToolsFromInput } from '../../src/utils/tools_loader.js';
+import { AUTO_INJECTED_TOOLS, loadToolsFromInput } from '../../src/utils/tools_loader.js';
 import { ACTOR_NORMAL_MODE } from '../const.js';
 import { expectArrayWeakEquals } from '../helpers.js';
 
@@ -77,6 +77,11 @@ describe('MCP server internals integration tests', () => {
         expect(actorsMcpServer.listAllToolNames()).toEqual([]);
 
         await actorsMcpServer.loadToolsByName(names, apifyClient);
-        expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), [ACTOR_NORMAL_MODE]);
+        // Restore auto-injects the run/storage/abort helpers alongside any actor tool (pre-existing,
+        // unrelated to add-actor's removal) — not just the actor tool itself.
+        expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), [
+            ACTOR_NORMAL_MODE,
+            ...AUTO_INJECTED_TOOLS.map((t) => t.name),
+        ]);
     });
 });
