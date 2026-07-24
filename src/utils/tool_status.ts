@@ -51,6 +51,14 @@ export function deriveResourceIds(args: Record<string, unknown> | undefined, res
 }
 
 /**
+ * Neutral predicate: true if `error` is an SDK `McpError`. Lets the shared orchestration modules
+ * keep the exact `instanceof McpError` behavior without importing the SDK error type themselves.
+ */
+export function isMcpError(error: unknown): boolean {
+    return error instanceof McpError;
+}
+
+/**
  * Central helper to classify an error into a ToolStatus value.
  *
  * - TOOL_STATUS.ABORTED   → the client explicitly aborted Request.

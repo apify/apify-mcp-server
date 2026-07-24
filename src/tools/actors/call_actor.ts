@@ -567,7 +567,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
 
         resolvedActorId = extractActorId(resolution.actor);
         const { apifyClient } = toolArgs;
-        const abortSignal = toolArgs.extra.signal;
+        const abortSignal = toolArgs.signal;
 
         if (abortSignal?.aborted) return respondAborted();
 

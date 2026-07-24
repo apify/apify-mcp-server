@@ -12,6 +12,7 @@ import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import { respondUserError } from '../../src/utils/mcp.js';
+import { getRequestHandler } from './helpers/mcp_server.js';
 
 // The ACTOR branch of the tools/call handler runs actorExecutor.executeActorTool (a module
 // singleton), not the tool's own call(). Mock it so we can return an isError result without a network.
@@ -37,12 +38,7 @@ function makeActorTool(): ToolEntry {
 }
 
 function getToolCallHandler(server: ActorsMcpServer): HandlerFn {
-    const handler = (
-        server as unknown as { server: { _requestHandlers: Map<string, HandlerFn> } }
-    ).server._requestHandlers // eslint-disable-next-line no-underscore-dangle
-        .get('tools/call');
-    if (!handler) throw new Error('tools/call handler not registered');
-    return handler;
+    return getRequestHandler(server, 'tools/call');
 }
 
 // Dispatch a sync tools/call for the direct actor tool, with report-problem served and the

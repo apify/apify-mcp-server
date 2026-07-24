@@ -126,7 +126,7 @@ export const getActorRun: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, progressTracker, mcpSessionId, extra } = toolArgs;
+        const { args, apifyClient: client, apifyToken, progressTracker, mcpSessionId, signal } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
         try {
@@ -135,7 +135,7 @@ export const getActorRun: ToolEntry = Object.freeze({
                 waitSecs: parsed.waitSecs,
                 client,
                 progressTracker,
-                abortSignal: extra?.signal,
+                abortSignal: signal,
                 mcpSessionId,
             });
 

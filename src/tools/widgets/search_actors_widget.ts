@@ -59,7 +59,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, apifyMcpServer } = toolArgs;
+        const { args, apifyToken, apifyClient, paymentProvider } = toolArgs;
         const parsed = searchActorsWidgetArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
@@ -69,7 +69,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
                 apifyClient,
                 limit: parsed.limit,
                 offset: parsed.offset,
-                paymentProvider: apifyMcpServer.options.paymentProvider,
+                paymentProvider,
             }),
             getUserInfoCached(apifyToken, apifyClient),
         ]);
