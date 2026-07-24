@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.12.1 - **not yet released**
 
+### 🚀 Features
+
+- [**breaking**] Delete add-actor implementation (stateless migration PR 2) ([#1144](https://github.com/apify/apify-mcp-server/pull/1144)) ([4562136](https://github.com/apify/apify-mcp-server/commit/4562136999ddb2377949992e73226266c8ae08a1)) by [@MQ37](https://github.com/MQ37), closes [#1131](https://github.com/apify/apify-mcp-server/issues/1131)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.12.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.12.0) (2026-07-23)
