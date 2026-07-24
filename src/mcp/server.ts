@@ -257,7 +257,7 @@ export class ActorsMcpServer {
 
         this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
             this.clientContext = buildMcpClientContext(request.params);
-            (this.options as Record<string, unknown>).initializeRequestData = request;
+            this.options.initializeRequestData = request;
             this.clientSupportsUi = isUiSupportedByClient(this.clientContext);
 
             if (this.serverModeOption === 'auto') {
@@ -440,7 +440,6 @@ export class ActorsMcpServer {
     /**
      * Loads missing toolNames from a provided list of tool names.
      * Skips toolNames that are already loaded and loads only the missing ones.
-     * @param toolNames - Array of tool names to ensure are loaded
      */
     public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
         const loadedTools = new Set(this.listAllToolNames());
@@ -620,12 +619,11 @@ export class ActorsMcpServer {
      * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
      * Still carries the request-origin tag from the client context captured by this point.
      */
-    private resolveApifyClient(
-        params: ApifyRequestParams,
-        clientContext: McpClientContext | undefined,
-    ): ApifyClient | undefined {
+    private resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
         const token = this.resolveApifyToken(params._meta);
-        return token ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(clientContext) }) : undefined;
+        return token
+            ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(this.clientContext) })
+            : undefined;
     }
 
     private setupResourceHandlers(): void {
@@ -643,7 +641,7 @@ export class ActorsMcpServer {
             try {
                 return await resourceService.readResource(
                     request.params.uri,
-                    this.resolveApifyClient(request.params as ApifyRequestParams, this.clientContext),
+                    this.resolveApifyClient(request.params as ApifyRequestParams),
                 );
             } catch (error) {
                 throw toLegacyMcpError(error);
