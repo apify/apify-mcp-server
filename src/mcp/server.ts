@@ -89,7 +89,7 @@ type ToolsChangedHandler = (toolNames: string[]) => void;
  * and `data` unchanged so the wire output (code, message, presence of `data`) is byte-identical.
  * Non-domain errors pass through untouched.
  */
-function toMcpError(error: unknown): unknown {
+function toLegacyMcpError(error: unknown): unknown {
     if (error instanceof InvalidParamsError) return new McpError(ErrorCode.InvalidParams, error.message, error.data);
     if (error instanceof InternalError) return new McpError(ErrorCode.InternalError, error.message, error.data);
     return error;
@@ -646,7 +646,7 @@ export class ActorsMcpServer {
                     this.resolveApifyClient(request.params as ApifyRequestParams, this.clientContext),
                 );
             } catch (error) {
-                throw toMcpError(error);
+                throw toLegacyMcpError(error);
             }
         });
 
@@ -666,7 +666,7 @@ export class ActorsMcpServer {
             try {
                 return promptService.getPrompt(request.params.name, request.params.arguments);
             } catch (error) {
-                throw toMcpError(error);
+                throw toLegacyMcpError(error);
             }
         });
     }

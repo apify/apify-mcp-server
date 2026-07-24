@@ -25,7 +25,7 @@ implementations, not by importing from here.
   `options.initializeRequestData` remains the hosted session-recovery boundary.
 - `errors.ts` — protocol-neutral domain errors `InvalidParamsError`/`InternalError`
   (plain `Error` subclasses with `data?: unknown`, zero SDK imports). The prompt and
-  resource services throw these; `server.ts`'s `toMcpError` maps each 1:1 to
+  resource services throw these; `server.ts`'s `toLegacyMcpError` maps each 1:1 to
   `McpError(ErrorCode.InvalidParams | InternalError, message, data)` in the
   `resources/read` and `prompts/get` handler bodies — the single v1 seam, so wire
   output stays byte-identical. A future v2 adapter supplies its own projection.
