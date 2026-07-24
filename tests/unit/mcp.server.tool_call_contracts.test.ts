@@ -1,4 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +7,7 @@ import log from '@apify/log';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import * as mcpClient from '../../src/mcp/client.js';
+import type { McpClientContext } from '../../src/mcp/client_context.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
 import * as telemetry from '../../src/telemetry.js';
@@ -125,6 +127,29 @@ const BASE_TELEMETRY_KEYS = [
     'tool_status',
     'transport_type',
 ];
+
+const CLIENT_CAPABILITIES = {
+    roots: { listChanged: true },
+    experimental: { feature: { enabled: true } },
+};
+
+const INITIALIZE_REQUEST = {
+    method: 'initialize',
+    params: {
+        protocolVersion: '2025-06-18',
+        clientInfo: { name: 'context-client', version: '1.2.3' },
+        capabilities: CLIENT_CAPABILITIES,
+    },
+} as InitializeRequest;
+
+function expectClientContextTelemetry(properties: Record<string, unknown>): void {
+    expect(properties).toMatchObject({
+        mcp_client_name: 'context-client',
+        mcp_client_version: '1.2.3',
+        mcp_protocol_version: '2025-06-18',
+        mcp_client_capabilities: CLIENT_CAPABILITIES,
+    });
+}
 
 /** Silence the error-path logging the failure branches emit, keeping test output clean. */
 function silenceLogs(): void {
@@ -317,6 +342,24 @@ describe('CallToolRequestSchema handler', () => {
             });
         }
     });
+
+    it('uses the complete client context for sync-call telemetry', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                await runSync(server, makeRecorderTool('sync-context-tool').tool);
+            },
+            {
+                token: undefined,
+                telemetry: { enabled: true },
+                allowUnauthMode: true,
+                initializeRequestData: INITIALIZE_REQUEST,
+            },
+        );
+
+        expect(trackSpy.mock.calls).toHaveLength(1);
+        expectClientContextTelemetry(trackSpy.mock.calls[0][2]);
+    });
 });
 
 describe('CallToolRequestSchema handler — invalid-call rejections (characterization)', () => {
@@ -485,6 +528,50 @@ describe('executeToolAndUpdateTask()', () => {
                 expect(trackSpy.mock.calls[0][2]).not.toHaveProperty('task_id');
             });
         }
+    });
+
+    it('uses the client context captured when the task is scheduled', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                const { tool } = makeRecorderTool('task-context-tool', { taskSupport: 'optional' });
+                server.upsertTools([tool]);
+                const handler = getRequestHandler(server, 'tools/call');
+                const response = await handler(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: tool.name,
+                            arguments: {},
+                            _meta: { mcpSessionId: 's1' },
+                            task: { ttl: 60_000 },
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+
+                (server as unknown as { clientContext: McpClientContext }).clientContext = {
+                    protocolVersion: 'changed',
+                    clientInfo: { name: 'changed', version: 'changed' },
+                    capabilities: { changed: true },
+                };
+
+                await vi.waitFor(async () => {
+                    const task = await server.taskStore.getTask((response.task as { taskId: string }).taskId);
+                    if (task?.status !== 'completed') throw new Error('task did not complete');
+                    if (trackSpy.mock.calls.length === 0) throw new Error('trackToolCall spy was not called');
+                });
+            },
+            {
+                token: undefined,
+                telemetry: { enabled: true },
+                allowUnauthMode: true,
+                initializeRequestData: INITIALIZE_REQUEST,
+            },
+        );
+
+        expect(trackSpy.mock.calls).toHaveLength(1);
+        expectClientContextTelemetry(trackSpy.mock.calls[0][2]);
     });
 
     it('dispatches an ACTOR_MCP tool run as a task and surfaces a connect failure as a completed error result', async () => {
