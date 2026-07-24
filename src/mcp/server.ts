@@ -606,12 +606,11 @@ export class ActorsMcpServer {
      * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
      * Still carries the request-origin tag from the client context captured by this point.
      */
-    private resolveApifyClient(
-        params: ApifyRequestParams,
-        clientContext: McpClientContext | undefined,
-    ): ApifyClient | undefined {
+    private resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
         const token = this.resolveApifyToken(params._meta);
-        return token ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(clientContext) }) : undefined;
+        return token
+            ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(this.clientContext) })
+            : undefined;
     }
 
     private setupResourceHandlers(): void {
@@ -628,7 +627,7 @@ export class ActorsMcpServer {
         this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
             return await resourceService.readResource(
                 request.params.uri,
-                this.resolveApifyClient(request.params as ApifyRequestParams, this.clientContext),
+                this.resolveApifyClient(request.params as ApifyRequestParams),
             );
         });
 
