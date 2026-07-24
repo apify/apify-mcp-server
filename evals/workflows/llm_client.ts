@@ -42,15 +42,21 @@ export type LlmResponse = {
 export class LlmClient {
     private openai: OpenAI;
 
-    constructor() {
+    /**
+     * @param wrapClient - Optional wrapper applied to the underlying OpenAI client
+     *   (e.g. `observeOpenAI` from `@langfuse/openai` to trace every LLM call). The
+     *   wrapper must return a client with the same interface.
+     */
+    constructor(wrapClient?: (client: OpenAI) => OpenAI) {
         if (!OPENROUTER_CONFIG.apiKey) {
             throw new Error('OPENROUTER_API_KEY environment variable is required');
         }
 
-        this.openai = new OpenAI({
+        const client = new OpenAI({
             baseURL: OPENROUTER_CONFIG.baseURL,
             apiKey: OPENROUTER_CONFIG.apiKey,
         });
+        this.openai = wrapClient ? wrapClient(client) : client;
     }
 
     /**

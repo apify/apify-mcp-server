@@ -3,6 +3,7 @@
  * Handles the loop: LLM → Tool calls → Execute tools → Add to messages → Repeat
  */
 
+import { startActiveObservation } from '@langfuse/tracing';
 // eslint-disable-next-line import/extensions
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
 
@@ -141,11 +142,25 @@ export async function executeConversation(options: ConversationExecutorOptions):
                 continue;
             }
 
-            // Execute tool via MCP
-            const result = await mcpClient.callTool({
-                name: toolCall.name,
-                arguments: args,
-            });
+            // Execute tool via MCP, wrapped in a Langfuse tool observation so each
+            // call appears in the trace with its arguments and result. No-ops when
+            // tracing is not initialized (OTel returns a no-op tracer).
+            const result = await startActiveObservation(
+                toolCall.name,
+                async (span) => {
+                    const toolResult = await mcpClient.callTool({
+                        name: toolCall.name,
+                        arguments: args,
+                    });
+                    span.update({
+                        input: args,
+                        output: toolResult.success ? toolResult.result : { error: toolResult.error },
+                        ...(toolResult.success ? {} : { level: 'ERROR' as const }),
+                    });
+                    return toolResult;
+                },
+                { asType: 'tool' },
+            );
 
             // Serialize the tool result exactly as the agent (LLM) receives it,
             // and record its byte size to measure the data volume tools return.

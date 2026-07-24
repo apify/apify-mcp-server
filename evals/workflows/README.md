@@ -1,6 +1,6 @@
 # Workflow Evaluation System
 
-Tests AI agents performing multi-turn conversations with Apify MCP tools, evaluated by an LLM judge.
+Tests AI agents performing multi-turn conversations with Apify MCP tools, evaluated by an LLM judge. Results (traces, scores, dataset, experiment runs) are recorded in **Langfuse Cloud**.
 
 ---
 
@@ -10,12 +10,16 @@ Tests AI agents performing multi-turn conversations with Apify MCP tools, evalua
 - Node.js installed
 - Apify account with API token
 - OpenRouter API key
+- Langfuse Cloud project (public + secret key)
 
 **Run evaluations:**
 ```bash
 # 1. Set environment variables
 export APIFY_TOKEN="your_apify_token"
 export OPENROUTER_API_KEY="your_openrouter_key"
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+export LANGFUSE_BASE_URL="https://us.cloud.langfuse.com"  # US, or https://cloud.langfuse.com for EU
 
 # 2. Build the MCP server
 pnpm run build
@@ -32,25 +36,18 @@ pnpm run evals:workflow -- --category search
 # Run specific test
 pnpm run evals:workflow -- --id search-google-maps
 
-# Filter by line range in test_cases.json
-pnpm run evals:workflow -- --lines 277-283
-
-# Show detailed conversation logs
-pnpm run evals:workflow -- --verbose
-
 # Increase timeout for long-running Actors (default: 60s)
 pnpm run evals:workflow -- --tool-timeout 300
 
 # Run tests in parallel (default: 4)
 pnpm run evals:workflow -- --concurrency 8
-
-# Save results to JSON file
-pnpm run evals:workflow -- --output
 ```
 
 **Exit codes:**
 - `0` = All tests passed ✅
 - `1` = Any test failed or error occurred ❌
+
+Every run upserts all test cases from `test_cases.json` into the Langfuse dataset `workflow-evals` (by `id`, so it stays complete regardless of filters), then runs the filtered subset as an experiment named `workflow-evals`. The run name is `<git-branch>-<agent-model>-<timestamp>`.
 
 ---
 
@@ -216,14 +213,16 @@ const conversation = await executeConversation({
 
 - `types.ts` - Type definitions
 - `config.ts` - Models, prompts, constants
-- `mcp-client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions)
-- `llm-client.ts` - OpenRouter wrapper
-- `convert-mcp-tools.ts` - MCP → OpenAI tool format
-- `conversation-executor.ts` - Multi-turn loop with dynamic tools and server instructions
-- `workflow-judge.ts` - Judge evaluation
-- `test-cases-loader.ts` - Load/filter test cases
-- `output-formatter.ts` - Results formatting
-- `run-workflow-evals.ts` - Main CLI entry
+- `mcp_client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions)
+- `llm_client.ts` - OpenRouter wrapper (optionally wrapped with `observeOpenAI` for tracing)
+- `conversation_executor.ts` - Multi-turn loop with dynamic tools and server instructions
+- `workflow_judge.ts` - Judge evaluation
+- `test_cases_loader.ts` - Load/filter test cases
+- `output_formatter.ts` - `sumResultBytes` helper (tool-result byte total)
+- `langfuse_tracing.ts` - OpenTelemetry + Langfuse span processor init/shutdown, env validation
+- `langfuse_dataset.ts` - Get-or-create dataset and upsert test cases
+- `langfuse_experiment.ts` - Experiment task, evaluators, run-name/item helpers
+- `run_workflow_evals.ts` - Main CLI entry
 
 ## Configuration
 
@@ -232,7 +231,12 @@ const conversation = await executeConversation({
 ```bash
 export APIFY_TOKEN="your_apify_token"           # Get from https://console.apify.com/account/integrations
 export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai/keys
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."          # Langfuse Cloud project settings
+export LANGFUSE_SECRET_KEY="sk-lf-..."          # Langfuse Cloud project settings
+export LANGFUSE_BASE_URL="https://us.cloud.langfuse.com"  # US, or https://cloud.langfuse.com (EU)
 ```
+
+All three Langfuse vars are required; the runner fails fast (before any test runs) if any is missing and prints the two valid `LANGFUSE_BASE_URL` values.
 
 ### CLI Options
 
@@ -240,66 +244,12 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 |--------|-------|-------------|---------|
 | `--category <name>` | | Filter tests by category | All categories |
 | `--id <id>` | | Run specific test by ID | All tests |
-| `--lines <range>` | `-l` | Filter by line range in test-cases.json | All tests |
-| `--verbose` | | Show detailed conversation logs | `false` |
 | `--test-cases-path <path>` | | Custom test cases file path | `test_cases.json` |
 | `--agent-model <model>` | | Override agent model | `anthropic/claude-haiku-4.5` |
 | `--judge-model <model>` | | Override judge model | `deepseek/deepseek-v4-flash` |
 | `--tool-timeout <seconds>` | | Tool call timeout | `60` |
-| `--concurrency <number>` | `-c` | Number of tests to run in parallel | `4` |
-| `--output` | `-o` | Save results to JSON file | `false` |
-| `--baseline <path>` | | Results JSON to compare against (prints byte/token deltas) | `results.json` |
+| `--concurrency <number>` | `-c` | Number of items to run in parallel (`maxConcurrency`) | `4` |
 | `--help` | | Show help message | - |
-
-### Line Range Filtering
-
-The `--lines` (or `-l`) option filters test cases by their line numbers in the `test_cases.json` file.
-
-**Format options:**
-- **Single line:** `--lines 100` (includes tests that contain line 100)
-- **Range:** `--lines 10-20` (includes tests that overlap with lines 10-20)
-- **Multiple ranges:** `--lines 10-20,50-60,100` (comma-separated, includes tests that overlap with any range)
-
-**Overlap logic (inclusive):**
-- A test case is included if it overlaps with ANY specified range
-- Example: `--lines 277-283` includes tests that start before line 283 AND end after line 277
-
-**Combine with other filters (AND logic):**
-```bash
-# Line range + category
-pnpm run evals:workflow -- --lines 100-200 --category call
-
-# Line range + ID pattern
-pnpm run evals:workflow -- --lines 50-100 --id "search.*"
-
-# All three filters
-pnpm run evals:workflow -- --lines 277-283 --category mcp --verbose
-```
-
-**Error handling:**
-- Invalid format (e.g., `abc-def`) → Error with usage examples
-- Invalid range (e.g., `300-200`) → Error: start must be ≤ end
-- Out of bounds (e.g., `500-600` when file has 319 lines) → Error with line count
-
-**Use cases:**
-- Debug specific test cases by examining their location in the JSON file
-- Run tests added in a specific PR by targeting the affected line ranges
-- Quickly iterate on a subset of tests during development
-
-**Examples:**
-```bash
-# Single test at specific line
-pnpm run evals:workflow -- --lines 283
-
-# Range of tests
-pnpm run evals:workflow -- --lines 277-283
-
-# Multiple ranges
-pnpm run evals:workflow -- --lines 10-20,50-60,100-110
-
-# With verbose output for debugging
-pnpm run evals:workflow -- --lines 277-283 --verbose
-```
 
 ### Concurrency
 
@@ -340,100 +290,21 @@ The `--tool-timeout` option sets the maximum time (in seconds) to wait for a sin
 pnpm run evals:workflow -- --tool-timeout 300
 ```
 
-### Saving Results to File
+### Results in Langfuse
 
-The `--output` (or `-o`) option saves test results to `evals/workflows/results.json` for tracking over time.
+Results are recorded in Langfuse Cloud, not to a local file. Each run:
 
-**How it works:**
-- Results are stored per combination of: `agentModel:judgeModel:testId`
-- Running the same test with the same models **overwrites** the previous result
-- Running with different model combinations **adds** new entries
-- Results are **versioned in git** for historical tracking
+- **Syncs the dataset** `workflow-evals` — every test case in `test_cases.json` is upserted by `id`, so the dataset stays complete regardless of `--id`/`--category` filters.
+- **Runs an experiment** named `workflow-evals`, run name `<git-branch>-<agent-model>-<timestamp>`, with run metadata `{ agentModel, judgeModel, toolTimeout }`.
+- **Traces** every item's agent/judge LLM calls (via `observeOpenAI`) and each MCP tool call (as a `tool` observation with its arguments and result) nested under the item's trace.
+- **Scores** each item with three evaluators:
+  - `workflow_judge` — `1` if the judge verdict is PASS, else `0` (comment = judge reason). This is the strict gate; an errored item scores `0`.
+  - `total_tokens` — agent LLM tokens billed across the conversation.
+  - `result_bytes` — UTF-8 bytes of tool results returned to the agent.
 
-**Data structure:**
-```json
-{
-  "version": "1.0",
-  "results": {
-    "anthropic/claude-haiku-4.5:x-ai/grok-4.1-fast:search-google-maps": {
-      "timestamp": "2026-01-07T10:45:23.123Z",
-      "agentModel": "anthropic/claude-haiku-4.5",
-      "judgeModel": "x-ai/grok-4.1-fast",
-      "testId": "search-google-maps",
-      "verdict": "PASS",
-      "reason": "Agent successfully searched for Google Maps actors",
-      "durationMs": 5234,
-      "turns": 3,
-      "resultBytes": 18452,
-      "promptTokens": 6231,
-      "completionTokens": 412,
-      "totalTokens": 6643,
-      "error": null
-    }
-  }
-}
-```
+The console prints a compact pass/fail line per item plus a `passed/total` summary and the run link. Exit code is `0` only if every item scored `workflow_judge === 1`; otherwise `1`.
 
-**Each result contains:**
-- `timestamp` - ISO timestamp when test was run
-- `agentModel` - LLM model used for the agent
-- `judgeModel` - LLM model used for judging
-- `testId` - Test case identifier
-- `verdict` - `PASS` or `FAIL`
-- `reason` - Judge reasoning or error message
-- `durationMs` - Test duration in milliseconds
-- `turns` - Number of conversation turns
-- `resultBytes` - Total UTF-8 bytes of tool results returned to the agent across the conversation (measured at the point each result is fed to the LLM, so it reflects what the agent actually receives). Compare across branches to quantify byte savings.
-- `promptTokens` / `completionTokens` / `totalTokens` - Tokens billed across all agent LLM calls (summed over turns; judge calls excluded). Tokens — not bytes — are what fill the context window, so this is the primary cost signal. Bytes are a deterministic, tokenizer-free proxy.
-- `error` - Error message if execution failed, `null` otherwise
-
-**Examples:**
-```bash
-# Basic usage - save all test results
-pnpm run evals:workflow -- --output
-pnpm run evals:workflow -- -o
-
-# Save results for specific category
-pnpm run evals:workflow -- --category search --output
-
-# Compare different agent models
-pnpm run evals:workflow -- --agent-model anthropic/claude-haiku-4.5 --output
-pnpm run evals:workflow -- --agent-model openai/gpt-4o --output
-# Results file now contains entries for both models
-
-# Compare different judge models
-pnpm run evals:workflow -- --judge-model x-ai/grok-4.1-fast --output
-pnpm run evals:workflow -- --judge-model openai/gpt-4o --output
-```
-
-**Partial runs:**
-When using filters (`--category`, `--id`), only the filtered tests are updated in the results file. Other entries remain unchanged.
-
-**Version control:**
-The `results.json` file is tracked in git, allowing you to:
-- See result changes over time in commits
-- Compare results across branches
-- Track performance regressions in PRs
-
-### Comparing against a baseline (byte/token deltas)
-
-Every run automatically compares against a baseline and prints per-test and aggregate **deltas** for tool bytes and tokens — no manual file diffing. This is how you answer "did this change grow the response size?".
-
-- **Default baseline** is the committed `evals/workflows/results.json`. Each test is matched by its `agentModel:judgeModel:testId` key.
-- **Custom baseline:** `--baseline <path>` compares against any saved results file.
-- Deltas read as `▼ -2.1 KB / -10.2%` (reduction) or `▲ +900 / +3.4%` (increase). Lower is better for both metrics.
-- This is **reporting only** — a regression never fails the run. Task success (all tests PASS) is the hard gate.
-
-```bash
-# Compare the current code against the committed baseline (default)
-pnpm run evals:workflow
-
-# Compare against a saved baseline file
-cp evals/workflows/results.json /tmp/baseline.json
-pnpm run evals:workflow -- --baseline /tmp/baseline.json   # prints byte/token deltas vs the baseline
-```
-
-> **Bootstrap note:** records written before these metrics existed have no `resultBytes`/`*Tokens` fields, so the first run after this change shows `(no baseline)` for them and writes fresh values with `--output`. Subsequent runs show real deltas.
+Compare tokens/bytes across runs (branches, models) directly in the Langfuse experiment view.
 
 ### Test Case Format
 
