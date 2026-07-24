@@ -41,6 +41,7 @@ import {
     TOOL_STATUS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
+import { createPromptService } from '../prompts/prompt_service.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
@@ -70,6 +71,7 @@ import { getActors, getToolsForServerMode, toolNamesToInput } from '../utils/too
 import { buildMcpClientContext, isUiSupportedByClient } from './client_context.js';
 import type { McpClientContext } from './client_context.js';
 import { LOG_LEVEL_MAP } from './const.js';
+import { InternalError, InvalidParamsError } from './errors.js';
 import { emitTaskStatusNotification, executeToolAndUpdateTask } from './task_execution.js';
 import {
     buildPreflightFailureOutcome,
@@ -81,6 +83,17 @@ import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telem
 import { parseInputParamsFromUrl, storeTaskResultOrSkipIfExpired } from './utils.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
+
+/**
+ * Legacy protocol boundary: project a service's domain error to its v1 `McpError`, copying `message`
+ * and `data` unchanged so the wire output (code, message, presence of `data`) is byte-identical.
+ * Non-domain errors pass through untouched.
+ */
+function toLegacyMcpError(error: unknown): unknown {
+    if (error instanceof InvalidParamsError) return new McpError(ErrorCode.InvalidParams, error.message, error.data);
+    if (error instanceof InternalError) return new McpError(ErrorCode.InternalError, error.message, error.data);
+    return error;
+}
 
 /**
  * Create Apify MCP server
@@ -625,10 +638,14 @@ export class ActorsMcpServer {
         });
 
         this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-            return await resourceService.readResource(
-                request.params.uri,
-                this.resolveApifyClient(request.params as ApifyRequestParams),
-            );
+            try {
+                return await resourceService.readResource(
+                    request.params.uri,
+                    this.resolveApifyClient(request.params as ApifyRequestParams),
+                );
+            } catch (error) {
+                throw toLegacyMcpError(error);
+            }
         });
 
         this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
@@ -637,52 +654,19 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Returns the prompts/list result.
-     */
-    private listPrompts(): { prompts: typeof prompts } {
-        return { prompts };
-    }
-
-    /**
-     * Builds the prompts/get result: find → not-found → validate → render.
-     * Throws {@link McpError} for an unknown prompt name or invalid arguments (v1 behavior).
-     */
-    private getPrompt(name: string, args: Record<string, string> | undefined) {
-        const prompt = prompts.find((p) => p.name === name);
-        if (!prompt) {
-            throw new McpError(
-                ErrorCode.InvalidParams,
-                `Prompt ${name} not found. Available prompts: ${prompts.map((p) => p.name).join(', ')}`,
-            );
-        }
-        if (!prompt.ajvValidate(args)) {
-            throw new McpError(
-                ErrorCode.InvalidParams,
-                `Invalid arguments for prompt ${name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(prompt.ajvValidate.errors)}`,
-            );
-        }
-        return {
-            description: prompt.description,
-            messages: [
-                {
-                    role: 'user',
-                    content: {
-                        type: 'text',
-                        text: prompt.render(args || {}),
-                    },
-                },
-            ],
-        };
-    }
-
-    /**
-     * Sets up MCP request handlers for prompts.
+     * Sets up MCP request handlers for prompts. The prompt service throws domain errors; the
+     * boundary maps them to `McpError` so wire output is unchanged.
      */
     private setupPromptHandlers(): void {
-        this.server.setRequestHandler(ListPromptsRequestSchema, () => this.listPrompts());
-        this.server.setRequestHandler(GetPromptRequestSchema, (request) =>
-            this.getPrompt(request.params.name, request.params.arguments),
-        );
+        const promptService = createPromptService(prompts);
+        this.server.setRequestHandler(ListPromptsRequestSchema, () => promptService.listPrompts());
+        this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+            try {
+                return promptService.getPrompt(request.params.name, request.params.arguments);
+            } catch (error) {
+                throw toLegacyMcpError(error);
+            }
+        });
     }
 
     /**

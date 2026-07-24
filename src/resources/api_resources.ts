@@ -3,12 +3,12 @@ import type {
     ReadResourceResult,
     TextResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { isAxiosError } from 'axios';
 
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
 import { MAX_INLINE_BYTES } from '../const.js';
+import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import { parseBaseMimeType } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { getHttpErrorHint } from '../utils/mcp.js';
@@ -28,22 +28,25 @@ function isTextualMimeType(baseMimeType: string | undefined): boolean {
     );
 }
 
+/** Domain error class the boundary maps to the matching v1 JSON-RPC error code. */
+type DomainErrorClass = new (message: string, data?: unknown) => Error;
+
 /**
- * Maps a failed read's HTTP status to a JSON-RPC error code:
- * - 3xx/4xx except 429 → `InvalidParams` (the request/resource is the problem — bad URI, missing/invalid
+ * Maps a failed read's HTTP status to the domain error class:
+ * - 3xx/4xx except 429 → `InvalidParamsError` (the request/resource is the problem — bad URI, missing/invalid
  *   token, private resource, or a resource that does not exist; SEP-2164 remaps "nonexistent" here too).
  * - 429, 5xx, or no status (network failure) → `InternalError` (transient or upstream).
  */
-function getErrorCodeForStatus(status: number | undefined): ErrorCode {
-    if (status !== undefined && status < 500 && status !== 429) return ErrorCode.InvalidParams;
-    return ErrorCode.InternalError;
+function getErrorClassForStatus(status: number | undefined): DomainErrorClass {
+    if (status !== undefined && status < 500 && status !== 429) return InvalidParamsError;
+    return InternalError;
 }
 
-/** Throw the standard resources/read failure McpError. Callers log the error first — the log source differs by site. */
+/** Throw the standard resources/read failure. Callers log the error first — the log source differs by site. */
 function throwReadFailure(uri: string, status: number | undefined, message: string): never {
     const hint = getHttpErrorHint(status);
-    throw new McpError(
-        getErrorCodeForStatus(status),
+    const ErrorClass = getErrorClassForStatus(status);
+    throw new ErrorClass(
         `Failed to read ${uri}: ${status ? `HTTP ${status}: ` : ''}${message}${hint ? `. ${hint}` : ''}`,
         { uri },
     );
@@ -174,8 +177,9 @@ function parseApiErrorMessage(body: Buffer | undefined): string | undefined {
  * JSON primitives, formatting, and bytes round-trip exactly.
  *
  * Genuine failures (no token, bad origin, a missing resource, a bad token, a 5xx, a network error)
- * throw an `McpError` so the SDK returns a JSON-RPC error rather than success-shaped content for an
- * unreadable resource (see SEP-2164). A body over `MAX_INLINE_BYTES` is NOT a failure — it is a
+ * throw a domain error (`InvalidParamsError`/`InternalError`) that the `server.ts` boundary maps to a
+ * JSON-RPC error, so the SDK returns an error rather than success-shaped content for an unreadable
+ * resource (see SEP-2164). A body over `MAX_INLINE_BYTES` is NOT a failure — it is a
  * successful read returning a download pointer.
  *
  * The request goes straight through `apifyClient.httpClient.axios` (the same axios instance
@@ -189,14 +193,13 @@ function parseApiErrorMessage(body: Buffer | undefined): string | undefined {
  */
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
     if (!isApifyApiUri(uri)) {
-        throw new McpError(
-            ErrorCode.InvalidParams,
+        throw new InvalidParamsError(
             `Failed to read ${uri}: only Apify API URLs (${getApifyAPIBaseUrl()}) are readable as resources.`,
             { uri },
         );
     }
     if (!apifyClient) {
-        throw new McpError(ErrorCode.InvalidParams, `Failed to read ${uri}: no Apify token in this session.`, {
+        throw new InvalidParamsError(`Failed to read ${uri}: no Apify token in this session.`, {
             uri,
         });
     }
@@ -228,7 +231,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
             // A drop mid-body (reset, truncation, bad gzip). Never return partial content.
             logHttpError(err, `resources/read response interrupted`, { uri });
             const message = err instanceof Error ? err.message : String(err);
-            throw new McpError(ErrorCode.InternalError, `Failed to read ${uri}: response interrupted: ${message}`, {
+            throw new InternalError(`Failed to read ${uri}: response interrupted: ${message}`, {
                 uri,
             });
         }
