@@ -1,12 +1,12 @@
 import { Readable } from 'node:stream';
 
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
 import { describe, expect, it } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
+import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
 import { isApifyApiUri, readApiResource } from '../../src/resources/api_resources.js';
 
 const API = 'https://api.apify.com';
@@ -16,11 +16,11 @@ function firstContent(result: ReadResourceResult): { mimeType?: string; text?: s
     return result.contents[0] as { mimeType?: string; text?: string; blob?: string };
 }
 
-/** Await a read that must reject, asserting it threw an McpError and returning it for further checks. */
-async function expectReadError(promise: Promise<unknown>): Promise<McpError> {
+/** Await a read that must reject, returning the caught domain error for class/message/data checks. */
+async function expectReadError(promise: Promise<unknown>): Promise<InvalidParamsError | InternalError> {
     const error = await promise.catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(McpError);
-    return error as McpError;
+    expect(error).toBeInstanceOf(Error);
+    return error as InvalidParamsError | InternalError;
 }
 
 /** Body stream the stubbed request returns; chunked to prove multi-chunk reassembly. */
@@ -118,14 +118,14 @@ describe('readApiResource()', () => {
     it('throws InvalidParams when there is no token', async () => {
         const error = await expectReadError(readApiResource(`${API}/v2/datasets/ds-1/items`, undefined));
 
-        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error).toBeInstanceOf(InvalidParamsError);
         expect(error.message).toContain('no Apify token');
     });
 
     it('throws InvalidParams for a non-Apify URL (no token leak to other hosts)', async () => {
         const error = await expectReadError(readApiResource('https://example.com/steal-my-token', stubApifyClient()));
 
-        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error).toBeInstanceOf(InvalidParamsError);
         expect(error.message).toContain('only Apify API URLs');
         // Spec error shape: the failing URI rides in error.data, not only in the message text.
         expect(error.data).toEqual({ uri: 'https://example.com/steal-my-token' });
@@ -346,7 +346,7 @@ describe('readApiResource()', () => {
 
         const error = await expectReadError(readApiResource(`${API}/v2/datasets/missing/items`, client));
 
-        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error).toBeInstanceOf(InvalidParamsError);
         expect(error.message).toContain('Failed to read');
         expect(error.message).toContain('404');
     });
@@ -364,7 +364,7 @@ describe('readApiResource()', () => {
             readApiResource(`${API}/v2/datasets/ds-1/items`, stubApifyClient({ request })),
         );
 
-        expect(error.code).toBe(ErrorCode.InternalError);
+        expect(error).toBeInstanceOf(InternalError);
         expect(error.message).toContain('response interrupted');
         expect(error.message).toContain('socket hang up');
     });
@@ -379,7 +379,7 @@ describe('readApiResource()', () => {
 
         const error = await expectReadError(readApiResource(uri, client));
 
-        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error).toBeInstanceOf(InvalidParamsError);
         expect(error.message).toContain(`Failed to read ${uri}: HTTP 404: Dataset was not found`);
         expect(error.data).toEqual({ uri });
     });
@@ -390,7 +390,7 @@ describe('readApiResource()', () => {
 
         const error = await expectReadError(readApiResource(uri, client));
 
-        expect(error.code).toBe(ErrorCode.InternalError);
+        expect(error).toBeInstanceOf(InternalError);
         expect(error.message).toContain(`Failed to read ${uri}: HTTP 500: Internal Server Error`);
     });
 
@@ -407,7 +407,7 @@ describe('readApiResource()', () => {
 
         const error = await expectReadError(readApiResource(uri, client));
 
-        expect(error.code).toBe(ErrorCode.InternalError);
+        expect(error).toBeInstanceOf(InternalError);
         expect(error.message).toContain('HTTP 502: Bad Gateway');
     });
 
@@ -419,7 +419,7 @@ describe('readApiResource()', () => {
 
         const error = await expectReadError(readApiResource(uri, client));
 
-        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error).toBeInstanceOf(InvalidParamsError);
         expect(error.message).toContain('HTTP 401: Token invalid');
         expect(error.message).toContain('check APIFY_TOKEN');
     });
@@ -432,7 +432,7 @@ describe('readApiResource()', () => {
 
         const error = await expectReadError(readApiResource(uri, client));
 
-        expect(error.code).toBe(ErrorCode.InvalidParams);
+        expect(error).toBeInstanceOf(InvalidParamsError);
         expect(error.message).toContain('HTTP 403: Forbidden');
         expect(error.message).toContain('may be private');
     });

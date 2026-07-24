@@ -27,7 +27,8 @@ directory you're editing.
 - [`resources/AGENTS.md`](resources/AGENTS.md) — MCP resources + widget registry.
 - [`web/AGENTS.md`](web/AGENTS.md) — widget UI (separate build) + design system.
 - `utils/` — broad helper grab-bag, no single concept (no child doc; grep it).
-- `prompts/` — one tiny registry file (no child doc).
+- `prompts/` — the prompt registry (`index.ts`) plus `prompt_service.ts`
+  (`createPromptService`, throws protocol-neutral domain errors); no child doc.
 
 **Two-phase tool loading** (mode-agnostic `getActors()` vs mode-dependent
 `getToolsForServerMode()`) is documented once in

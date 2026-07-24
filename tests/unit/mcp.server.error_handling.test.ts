@@ -1,3 +1,6 @@
+import { Readable } from 'node:stream';
+
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -70,5 +73,78 @@ describe('CallToolRequestSchema handler outer catch', () => {
 
         expect(result.isError).toBe(true);
         expect(result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.FAILED });
+    });
+});
+
+/**
+ * Wire oracle for the domain-error → McpError boundary in `setupResourceHandlers`/`setupPromptHandlers`:
+ * the services throw protocol-neutral domain errors, and the handler must surface them as `McpError`
+ * carrying the original code, message, and `data` unchanged.
+ */
+describe('resources/read and prompts/get error boundary', () => {
+    it('surfaces a resources/read failure as McpError(InvalidParams) with the uri in data', async () => {
+        await withServer(async (server) => {
+            const handler = getRequestHandler(server, 'resources/read');
+
+            const error = await handler(
+                { method: 'resources/read', params: { uri: 'file://missing.md' } },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            ).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+            expect((error as McpError).message).toContain('file://missing.md');
+            expect((error as McpError).data).toEqual({ uri: 'file://missing.md' });
+        });
+    });
+
+    it('surfaces a resources/read 5xx as McpError(InternalError) — not downgraded to InvalidParams', async () => {
+        await withServer(async (server) => {
+            const uri = 'https://api.apify.com/v2/datasets/ds-1/items';
+            const stubClient = {
+                httpClient: {
+                    axios: {
+                        request: async () => ({
+                            data: Readable.from([]),
+                            headers: { 'content-type': 'application/json' },
+                            status: 500,
+                            statusText: 'Internal Server Error',
+                        }),
+                    },
+                },
+            };
+            // The handler builds its own token-scoped client; stub it so the read resolves a 5xx,
+            // driving readApiResource down the InternalError arm through the real resources/read seam.
+            vi.spyOn(server as unknown as { resolveApifyClient: () => unknown }, 'resolveApifyClient').mockReturnValue(
+                stubClient,
+            );
+            const handler = getRequestHandler(server, 'resources/read');
+
+            const error = await handler(
+                { method: 'resources/read', params: { uri } },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            ).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InternalError);
+            expect((error as McpError).message).toContain('HTTP 500');
+            expect((error as McpError).data).toEqual({ uri });
+        });
+    });
+
+    it('surfaces a prompts/get failure for an unknown name as McpError(InvalidParams)', async () => {
+        await withServer(async (server) => {
+            const handler = getRequestHandler(server, 'prompts/get');
+
+            const error = await handler(
+                { method: 'prompts/get', params: { name: 'nonexistent' } },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            ).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+            expect((error as McpError).message).toContain('nonexistent');
+            expect((error as McpError).message).toContain('Available prompts:');
+        });
     });
 });
