@@ -10,15 +10,15 @@ import type { ToolCategory } from '../types.js';
 export function isApiTokenRequired(params: { toolCategoryKeys?: string[]; actorList?: string[] }): boolean {
     const { toolCategoryKeys, actorList } = params;
 
-    // If no tools or categories specified, default to requiring token
-    // (This matches current requirement for full server start)
-    if (!toolCategoryKeys || toolCategoryKeys.length === 0) {
+    // Retired selectors (add-actor, experimental, preview) are inert no-ops — strip them before
+    // judging emptiness so an all-retired request is judged the same as an explicitly empty one.
+    const activeToolKeys = toolCategoryKeys?.filter((key) => !RETIRED_SELECTOR_NAMES.has(key));
+
+    // If no tools/categories specified, or only retired/no-op ones, default to requiring a token
+    // (this matches the current requirement for a full server start).
+    if (!activeToolKeys || activeToolKeys.length === 0) {
         return true;
     }
-
-    // Retired selectors are inert — they never load a token-gated tool, so ignore them when
-    // judging safety. A request for only retired selectors therefore needs no token.
-    const activeToolKeys = toolCategoryKeys.filter((key) => !RETIRED_SELECTOR_NAMES.has(key));
 
     const unauthTokenSet = new Set(unauthEnabledTools);
     // Convert ToolCategory[] to Set<string> for comparison with string keys

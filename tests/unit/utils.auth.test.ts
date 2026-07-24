@@ -61,9 +61,12 @@ describe('isApiTokenRequired', () => {
         ).toBe(true);
     });
 
-    it.for(RETIRED_SELECTORS)('does not require a token for retired selector "%s"', (selector) => {
-        expect(isApiTokenRequired({ toolCategoryKeys: [selector] })).toBe(false);
-    });
+    it.for(RETIRED_SELECTORS)(
+        'requires a token for a retired-only selector "%s" (same as an empty list)',
+        (selector) => {
+            expect(isApiTokenRequired({ toolCategoryKeys: [selector] })).toBe(true);
+        },
+    );
 
     it('does not require a token for retired selectors alongside a public tool', () => {
         expect(isApiTokenRequired({ toolCategoryKeys: [...RETIRED_SELECTORS, 'search-actors'] })).toBe(false);
