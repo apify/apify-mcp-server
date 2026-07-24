@@ -244,7 +244,7 @@ export class ActorsMcpServer {
 
         this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
             this.clientContext = buildMcpClientContext(request.params);
-            (this.options as Record<string, unknown>).initializeRequestData = request;
+            this.options.initializeRequestData = request;
             this.clientSupportsUi = isUiSupportedByClient(this.clientContext);
 
             if (this.serverModeOption === 'auto') {
@@ -427,7 +427,6 @@ export class ActorsMcpServer {
     /**
      * Loads missing toolNames from a provided list of tool names.
      * Skips toolNames that are already loaded and loads only the missing ones.
-     * @param toolNames - Array of tool names to ensure are loaded
      */
     public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
         const loadedTools = new Set(this.listAllToolNames());
