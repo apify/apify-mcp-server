@@ -552,7 +552,7 @@ describe('executeToolAndUpdateTask()', () => {
                     { signal: { aborted: false }, sendNotification: vi.fn() },
                 );
 
-                (server as unknown as { clientContext: McpClientContext }).clientContext = {
+                (server as unknown as { _clientContext: McpClientContext })._clientContext = {
                     protocolVersion: 'changed',
                     clientInfo: { name: 'changed', version: 'changed' },
                     capabilities: { changed: true },

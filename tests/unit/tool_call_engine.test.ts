@@ -22,7 +22,6 @@ function prepareFields(server: ActorsMcpServer) {
         tools: server.tools,
         paymentProvider: server.options.paymentProvider,
         allowUnauthMode: server.options.allowUnauthMode,
-        loadedToolNames: server.listToolNames(),
     };
 }
 
@@ -159,7 +158,6 @@ describe('executeSyncToolCall()', () => {
             tools: server.tools,
             actorStore: server.actorStore,
             paymentProvider: server.options.paymentProvider,
-            loadedToolNames: server.listToolNames(),
             signal: makeSignal(aborted),
             sendNotification: vi.fn(),
             emitLog: vi.fn(),

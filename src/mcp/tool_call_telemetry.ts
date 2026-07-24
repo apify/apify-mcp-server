@@ -3,7 +3,13 @@ import log from '@apify/log';
 import { ApifyClient } from '../apify_client.js';
 import { HELPER_TOOLS, TOOL_STATUS } from '../const.js';
 import { buildReportedProblemProperties, trackReportedProblem, trackToolCall } from '../telemetry.js';
-import type { CallDiagnostics, TelemetryEnv, ToolCallTelemetryProperties, ToolStatus } from '../types.js';
+import type {
+    CallDiagnostics,
+    TelemetryEnv,
+    ToolCallTelemetryProperties,
+    ToolStatus,
+    TransportType,
+} from '../types.js';
 import { computeToolResponseBytes } from '../utils/mcp.js';
 import { getRequestOriginForClient } from '../utils/mcp_clients.js';
 import { deriveResourceIds } from '../utils/tool_status.js';
@@ -16,7 +22,7 @@ type PrepareTelemetryDataParams = {
     mcpSessionId: string | undefined;
     apifyToken: string;
     telemetryEnabled: boolean;
-    transportType?: 'stdio' | 'http';
+    transportType?: TransportType;
     clientContext: McpClientContext | undefined;
 };
 
