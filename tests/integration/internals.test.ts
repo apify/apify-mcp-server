@@ -7,7 +7,6 @@ import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
-import type { Input } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
 import { loadToolsFromInput } from '../../src/utils/tools_loader.js';
 import { ACTOR_NORMAL_MODE } from '../const.js';
@@ -27,8 +26,8 @@ describe('MCP server internals integration tests', () => {
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const initialTools = await loadToolsFromInput(
             {
-                enableAddingActors: true,
-            } as Input,
+                tools: ['call-actor'],
+            },
             apifyClient,
             'default',
         );
@@ -38,8 +37,7 @@ describe('MCP server internals integration tests', () => {
         actorsMcpServer.upsertTools(newTool);
 
         const names = actorsMcpServer.listAllToolNames();
-        // enableAddingActors=true now seeds call-actor (add-actor substituted, PR 0) + 4
-        // auto-injected helpers; then ACTOR_NORMAL_MODE is added on top.
+        // call-actor seeds the 4 auto-injected helpers; then ACTOR_NORMAL_MODE is added on top.
         const expectedToolNames = [
             HELPER_TOOLS.ACTOR_CALL,
             'get-actor-run',

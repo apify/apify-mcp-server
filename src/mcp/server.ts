@@ -128,7 +128,7 @@ export class ActorsMcpServer {
      * We capture the exact actor-tool slice fetched for each request so the flush composes every
      * entry against *its own* actor list rather than the accumulated union across unrelated requests.
      */
-    private pendingToolsUntilClientKnown: { input: Input; actorTools: ToolEntry[]; isSessionRestore: boolean }[] = [];
+    private pendingToolsUntilClientKnown: { input: Input; actorTools: ToolEntry[] }[] = [];
 
     // Telemetry configuration (resolved from options and env vars, see setupTelemetry)
     public readonly telemetryEnabled: boolean;
@@ -301,8 +301,8 @@ export class ActorsMcpServer {
      * and re-added by the initialize flush. Used by every input-driven load path and the flush.
      * (Actor tools are never gated, so they need no filtering.)
      */
-    private composeToolsForClient(input: Input, actorTools: ToolEntry[], isSessionRestore = false): ToolEntry[] {
-        const tools = getToolsForServerMode(input, actorTools, this.serverMode, isSessionRestore);
+    private composeToolsForClient(input: Input, actorTools: ToolEntry[]): ToolEntry[] {
+        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
         if (this.isReportProblemServable()) return tools;
         return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
     }
@@ -327,8 +327,8 @@ export class ActorsMcpServer {
     private composePendingToolsForClient(): void {
         if (this.pendingToolsUntilClientKnown.length === 0) return;
 
-        const tools = this.pendingToolsUntilClientKnown.flatMap(({ input, actorTools, isSessionRestore }) =>
-            this.composeToolsForClient(input, actorTools, isSessionRestore),
+        const tools = this.pendingToolsUntilClientKnown.flatMap(({ input, actorTools }) =>
+            this.composeToolsForClient(input, actorTools),
         );
 
         this.pendingToolsUntilClientKnown = [];
@@ -390,15 +390,15 @@ export class ActorsMcpServer {
      * withholds report-problem until the client is known) and upsert it; if the client still isn't
      * known, queue the source so the initialize flush re-composes and adds the client-gated tools.
      */
-    private registerFetchedActorTools(input: Input, actorTools: ToolEntry[], isSessionRestore = false): void {
+    private registerFetchedActorTools(input: Input, actorTools: ToolEntry[]): void {
         if (!this.serverModeResolved) {
-            this.pendingToolsUntilClientKnown.push({ input, actorTools, isSessionRestore });
+            this.pendingToolsUntilClientKnown.push({ input, actorTools });
             if (actorTools.length > 0) this.upsertTools(actorTools);
             return;
         }
-        const tools = this.composeToolsForClient(input, actorTools, isSessionRestore);
+        const tools = this.composeToolsForClient(input, actorTools);
         if (tools.length > 0) this.upsertTools(tools);
-        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools, isSessionRestore });
+        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools });
     }
 
     /**
@@ -417,7 +417,7 @@ export class ActorsMcpServer {
             paymentProvider: this.options.paymentProvider,
         });
 
-        this.registerFetchedActorTools(restoreInput, actorTools, true);
+        this.registerFetchedActorTools(restoreInput, actorTools);
     }
 
     /** Load tools from URL params. Used by SSE and HTTP entry points. */

@@ -5,9 +5,6 @@
  * No tool-loading is done here; we only canonicalize values and preserve
  * intent via `undefined` (use defaults later) vs empty (explicitly none).
  */
-import log from '@apify/log';
-import { parseBooleanOrNull } from '@apify/utilities';
-
 import type { Input, ToolSelector } from './types.js';
 
 // Normalize lists from comma-separated strings or arrays.
@@ -27,7 +24,6 @@ export function normalizeList(value: string | unknown[] | undefined): string[] |
  *
  * Responsibilities:
  * - Coerce `actors`, `tools` from string/array into trimmed arrays ('' → []).
- * - Normalize booleans (including legacy `enableActorAutoLoading`).
  * - Merge `actors` into `tools` so selection lives in one place.
  *
  * Semantics passed to the loader:
@@ -36,15 +32,6 @@ export function normalizeList(value: string | unknown[] | undefined): string[] |
 export function processInput(originalInput: Partial<Input>): Input {
     // Normalize actors (strings and arrays) to a clean array or undefined
     const actors = normalizeList(originalInput.actors) as unknown as string[] | undefined;
-
-    // Map deprecated flag to the new one and normalize both to boolean.
-    let enableAddingActors: boolean;
-    if (originalInput.enableAddingActors === undefined && originalInput.enableActorAutoLoading !== undefined) {
-        log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
-        enableAddingActors = parseBooleanOrNull(originalInput.enableActorAutoLoading) ?? false;
-    } else {
-        enableAddingActors = parseBooleanOrNull(originalInput.enableAddingActors) ?? false;
-    }
 
     // Normalize tools (strings/arrays) to a clean array or undefined
     let tools = normalizeList(originalInput.tools as string | string[] | undefined) as unknown as
@@ -67,7 +54,6 @@ export function processInput(originalInput: Partial<Input>): Input {
     return {
         ...originalInput,
         actors: Array.isArray(actors) && actors.length > 0 && tools !== undefined ? undefined : actors,
-        enableAddingActors,
         tools,
     };
 }

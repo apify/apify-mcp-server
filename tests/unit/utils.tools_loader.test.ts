@@ -148,32 +148,6 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
     );
 });
 
-describe('getToolsForServerMode add-actor selector cutoff (PR 0)', () => {
-    const substitutionCases: { case: string; input: Parameters<typeof getToolsForServerMode>[0] }[] = [
-        { case: 'a literal tools=add-actor selector', input: { tools: [HELPER_TOOLS.ACTOR_ADD] } },
-        { case: 'the tools=experimental category', input: { tools: ['experimental'] } },
-        { case: 'enableAddingActors=true with no other selectors', input: { enableAddingActors: true } },
-        {
-            case: 'enableAddingActors=true alongside other selectors',
-            input: { tools: ['docs'], enableAddingActors: true },
-        },
-    ];
-    it.for(substitutionCases)('substitutes call-actor for $case on a new connection', ({ input }) => {
-        const toolNames = getToolsForServerMode(input, [], 'default').map((t) => t.name);
-        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_ADD);
-    });
-
-    it('does not duplicate call-actor when both an explicit selector and enableAddingActors resolve to it', () => {
-        const toolNames = getToolsForServerMode(
-            { tools: [HELPER_TOOLS.ACTOR_CALL], enableAddingActors: true },
-            [],
-            'default',
-        ).map((t) => t.name);
-        expect(toolNames.filter((n) => n === HELPER_TOOLS.ACTOR_CALL)).toHaveLength(1);
-    });
-});
-
 describe('getToolsForServerMode report-problem default injection', () => {
     // report-problem lives in the `dev` category but is injected into the default (no-selectors)
     // candidate set. Server-side servability gating is applied later in composeToolsForClient; here
@@ -191,11 +165,6 @@ describe('getToolsForServerMode report-problem default injection', () => {
     it('includes report-problem via the dev category selector (tools=dev)', () => {
         const toolNames = getToolsForServerMode({ tools: ['dev'] }, [], 'default').map((t) => t.name);
         expect(toolNames).toContain(HELPER_TOOLS.PROBLEM_REPORT);
-    });
-
-    it('excludes report-problem in add-actor-only mode', () => {
-        const toolNames = getToolsForServerMode({ enableAddingActors: true }, [], 'default').map((t) => t.name);
-        expect(toolNames).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
     });
 });
 

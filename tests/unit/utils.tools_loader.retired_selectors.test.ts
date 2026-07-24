@@ -1,14 +1,15 @@
+import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { ApifyClient } from 'apify-client';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import { ActorsMcpServer } from '../../src/index.js';
 import type * as ToolsIndexModule from '../../src/tools/index.js';
-import { getActors } from '../../src/utils/tools_loader.js';
+import { SERVER_MODE } from '../../src/types.js';
+import { getActors, getToolsForServerMode, toolNamesToInput } from '../../src/utils/tools_loader.js';
 
-// 'preview', 'experimental', and 'add-actor' name neither a registry category nor a real
-// internal tool anymore (all three were retired). Stub getActorsAsTools so a regression that
-// misclassifies one of them as an Actor name shows up as an unexpected call here, instead of a
-// live "Actor not found" fetch against the real Apify API.
+const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview'] as const;
+
 vi.mock('../../src/tools/index.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsIndexModule>();
     return { ...actual, getActorsAsTools: vi.fn().mockResolvedValue({ tools: [], errors: [] }) };
@@ -16,17 +17,58 @@ vi.mock('../../src/tools/index.js', async (importOriginal) => {
 
 const { getActorsAsTools } = await import('../../src/tools/index.js');
 const getActorsAsToolsMock = vi.mocked(getActorsAsTools);
+const apifyClient = new ApifyClient({ token: 'test-token' });
 
-describe('getActors() retired selectors', () => {
-    const apifyClient = new ApifyClient({ token: 'test-token' });
+beforeEach(() => {
+    getActorsAsToolsMock.mockClear();
+});
 
-    it.for(['preview', 'experimental', HELPER_TOOLS.ACTOR_ADD])(
-        'resolves selector "%s" to no Actor tools without attempting an Actor fetch',
-        async (selector) => {
-            const tools = await getActors({ tools: [selector] }, apifyClient);
+describe('getActors()', () => {
+    it.for(RETIRED_SELECTORS)('does not fetch retired selector "%s"', async (selector) => {
+        const tools = await getActors({ tools: [selector] }, apifyClient);
 
-            expect(tools).toEqual([]);
-            expect(getActorsAsToolsMock).not.toHaveBeenCalled();
-        },
-    );
+        expect(tools).toEqual([]);
+        expect(getActorsAsToolsMock).not.toHaveBeenCalled();
+    });
+});
+
+describe('toolNamesToInput()', () => {
+    it.for(RETIRED_SELECTORS)('drops retired selector "%s" during restore conversion', (selector) => {
+        expect(toolNamesToInput([selector, HELPER_TOOLS.STORE_SEARCH])).toEqual({
+            tools: [HELPER_TOOLS.STORE_SEARCH],
+        });
+    });
+});
+
+describe('getToolsForServerMode()', () => {
+    it.for(RETIRED_SELECTORS)('loads nothing for retired selector "%s"', (selector) => {
+        const toolNames = getToolsForServerMode({ tools: [selector] }, [], SERVER_MODE.DEFAULT).map(
+            (tool) => tool.name,
+        );
+
+        expect(toolNames).toEqual([]);
+    });
+
+    it.for(RETIRED_SELECTORS)('ignores retired selector "%s" alongside docs', (selector) => {
+        const toolNames = getToolsForServerMode({ tools: [selector, 'docs'] }, [], SERVER_MODE.DEFAULT).map(
+            (tool) => tool.name,
+        );
+
+        expect(toolNames).toEqual([HELPER_TOOLS.DOCS_SEARCH, HELPER_TOOLS.DOCS_FETCH]);
+    });
+});
+
+describe('ActorsMcpServer.loadToolsByName()', () => {
+    it.for(RETIRED_SELECTORS)('drops restored retired selector "%s" without fetching', async (selector) => {
+        const server = new ActorsMcpServer({
+            setupSigintHandler: false,
+            taskStore: new InMemoryTaskStore(),
+            serverMode: SERVER_MODE.DEFAULT,
+        });
+
+        await server.loadToolsByName([selector], apifyClient);
+
+        expect(getActorsAsToolsMock).not.toHaveBeenCalled();
+        expect(server.listAllToolNames()).toEqual([]);
+    });
 });
