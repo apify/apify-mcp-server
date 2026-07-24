@@ -22,7 +22,9 @@ import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import * as logging from '../../src/utils/logging.js';
 import {
+    getLegacyServer,
     getRequestHandler,
+    getTaskStore,
     makePaymentRequiredError,
     makePermissionApprovalError,
     makeRecorderTool,
@@ -215,13 +217,13 @@ async function runTaskAndReadBack(server: ActorsMcpServer, tool: ToolEntry) {
         { signal: { aborted: false }, sendNotification: vi.fn() },
     )) as { task: { taskId: string } };
     const task = await vi.waitFor(async () => {
-        const current = await server.taskStore.getTask(res.task.taskId);
+        const current = await getTaskStore(server).getTask(res.task.taskId);
         if (!current || !TERMINAL_STATUSES.has(current.status)) {
             throw new Error(`Task ${res.task.taskId} did not reach a terminal status`);
         }
         return current;
     });
-    const result = await server.taskStore.getTaskResult(res.task.taskId);
+    const result = await getTaskStore(server).getTaskResult(res.task.taskId);
     return { task, result: result as Record<string, unknown> };
 }
 
@@ -279,7 +281,7 @@ describe('CallToolRequestSchema handler', () => {
             // failInvalidParams awaits sendLoggingMessage before throwing McpError; the harness has
             // no transport (notification would throw "Not connected"), so stub it to observe the
             // real InvalidParams rejection.
-            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
             const handler = getRequestHandler(server, 'tools/call');
             await expect(
                 handler(
@@ -310,7 +312,7 @@ describe('CallToolRequestSchema handler', () => {
             tool.inputSchema = schema as ToolInputSchema;
             tool.ajvValidate = compileSchema(schema);
             server.upsertTools([tool]);
-            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
             const handler = getRequestHandler(server, 'tools/call');
             await expect(
                 handler(
@@ -370,7 +372,7 @@ describe('CallToolRequestSchema handler — invalid-call rejections (characteriz
         // Existing invalid-params tests only stub sendLoggingMessage; none asserts it fired.
         await withServer(async (server) => {
             silenceLogs();
-            const sendLogSpy = vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            const sendLogSpy = vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
             const handler = getRequestHandler(server, 'tools/call');
             await expect(
                 handler(
@@ -393,7 +395,7 @@ describe('CallToolRequestSchema handler — invalid-call rejections (characteriz
                 silenceLogs();
                 const { tool, received } = makeRecorderTool('auth-required-tool');
                 server.upsertTools([tool]);
-                vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+                vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
                 const handler = getRequestHandler(server, 'tools/call');
                 await expect(
                     handler(
@@ -416,7 +418,7 @@ describe('CallToolRequestSchema handler — invalid-call rejections (characteriz
     it('rejects a call to an unknown tool name as an InvalidParams protocol error', async () => {
         await withServer(async (server) => {
             silenceLogs();
-            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
             const handler = getRequestHandler(server, 'tools/call');
             await expect(
                 handler(
@@ -438,7 +440,7 @@ describe('CallToolRequestSchema handler — invalid-call rejections (characteriz
             silenceLogs();
             const { tool, received } = makeRecorderTool('missing-args-tool');
             server.upsertTools([tool]);
-            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
             const handler = getRequestHandler(server, 'tools/call');
             await expect(
                 handler(
@@ -557,7 +559,7 @@ describe('executeToolAndUpdateTask()', () => {
                 };
 
                 await vi.waitFor(async () => {
-                    const task = await server.taskStore.getTask((response.task as { taskId: string }).taskId);
+                    const task = await getTaskStore(server).getTask((response.task as { taskId: string }).taskId);
                     if (task?.status !== 'completed') throw new Error('task did not complete');
                     if (trackSpy.mock.calls.length === 0) throw new Error('trackToolCall spy was not called');
                 });
@@ -583,7 +585,7 @@ describe('executeToolAndUpdateTask()', () => {
             silenceLogs();
             vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
             // The connect-failure branch logs via the transport; the harness has none, so stub it.
-            vi.spyOn(server.server, 'sendLoggingMessage').mockResolvedValue(undefined);
+            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
             const { task, result } = await runTaskAndReadBack(server, makeActorMcpTool());
             expect(task.status).toBe('completed');
             expect(result.isError).toBe(true);
@@ -813,7 +815,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
         await withServer(
             async (server) => {
                 silenceLogs();
-                const notifySpy = vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
                 const { tool, received } = makeRecorderTool('payment-tool', {
                     paymentRequired: true,
                     taskSupport: 'optional',
@@ -825,7 +827,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 // The tool implementation never ran.
                 expect(received.called).toBe(false);
                 // Stored result carries the x402 payload intact.
-                const stored = (await server.taskStore.getTaskResult(res.task.taskId)) as Record<string, unknown>;
+                const stored = (await getTaskStore(server).getTaskResult(res.task.taskId)) as Record<string, unknown>;
                 expect(stored.isError).toBe(true);
                 expect(stored.structuredContent).toEqual(X402_PAYLOAD);
                 // Exactly one status notification, `completed`, emitted after the response.
@@ -841,7 +843,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
         await withServer(
             async (server) => {
                 silenceLogs();
-                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
                 const handler = getRequestHandler(server, 'tools/call');
 
                 // Non-task sync path returns the paymentRequiredResult directly.
@@ -861,7 +863,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                     taskSupport: 'optional',
                 }).tool;
                 const res = await callTask(server, taskTool, {});
-                const stored = await server.taskStore.getTaskResult(res.task.taskId);
+                const stored = await getTaskStore(server).getTaskResult(res.task.taskId);
 
                 expect(stored).toEqual(syncResult);
             },
@@ -877,13 +879,13 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 const standbySpy = vi
                     .spyOn(callActor, 'checkPaymentProviderStandbyConflict')
                     .mockResolvedValue(standbyResult);
-                const notifySpy = vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
                 const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
 
                 expect(res.task.status).toBe('completed');
                 expect(received.called).toBe(false);
-                const stored = await server.taskStore.getTaskResult(res.task.taskId);
+                const stored = await getTaskStore(server).getTaskResult(res.task.taskId);
                 expect(stored).toEqual(standbyResult);
                 await flushDeferredNotification();
                 expect(statusNotificationStatuses(notifySpy)).toEqual(['completed']);
@@ -900,7 +902,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 silenceLogs();
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
-                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
                 // paymentRequired + missing skyfire-pay-id would also yield paymentRequiredResult.
                 const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
                     paymentRequired: true,
@@ -908,7 +910,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 });
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
 
-                const stored = (await server.taskStore.getTaskResult(res.task.taskId)) as Record<string, unknown>;
+                const stored = (await getTaskStore(server).getTaskResult(res.task.taskId)) as Record<string, unknown>;
                 // Standby result wins — not the x402 payment payload.
                 expect(stored).toEqual(standbyResult);
                 expect(stored.structuredContent).toBeUndefined();
@@ -922,7 +924,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
         await withServer(
             async (server) => {
                 silenceLogs();
-                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
                 const { tool } = makeRecorderTool('payment-tool', { paymentRequired: true, taskSupport: 'optional' });
                 await callTask(server, tool, {});
             },
@@ -945,7 +947,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 silenceLogs();
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
-                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
                 const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
                 await callTask(server, tool, { actor: 'apify/some-actor' });
             },
@@ -971,7 +973,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 silenceLogs();
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
-                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
                 const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
@@ -991,7 +993,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
 
                 // Task path stores the same failure as a completed result.
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
-                const stored = await server.taskStore.getTaskResult(res.task.taskId);
+                const stored = await getTaskStore(server).getTaskResult(res.task.taskId);
 
                 expect(stored).toEqual(syncResult);
             },
@@ -1005,8 +1007,8 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
         await withServer(
             async (server) => {
                 silenceLogs();
-                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
-                vi.spyOn(server.taskStore, 'storeTaskResult').mockRejectedValue(new Error('store unavailable'));
+                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
+                vi.spyOn(getTaskStore(server), 'storeTaskResult').mockRejectedValue(new Error('store unavailable'));
                 const { tool } = makeRecorderTool('payment-tool', { paymentRequired: true, taskSupport: 'optional' });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
@@ -1037,7 +1039,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
             async (server) => {
                 const infoSpy = vi.spyOn(log, 'info').mockImplementation(() => log);
                 silenceLogs();
-                vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
+                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
                 const { tool } = makeRecorderTool('payment-tool', { paymentRequired: true, taskSupport: 'optional' });
                 const res = await callTask(server, tool, {});
                 const completedCall = infoSpy.mock.calls.find(([message]) => message === 'Tool call completed');
@@ -1054,11 +1056,11 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
         await withServer(
             async (server) => {
                 silenceLogs();
-                const notifySpy = vi.spyOn(server.server, 'notification').mockResolvedValue(undefined);
-                vi.spyOn(server.taskStore, 'storeTaskResult').mockRejectedValue(
+                const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
+                vi.spyOn(getTaskStore(server), 'storeTaskResult').mockRejectedValue(
                     new Error('Task with ID some-task not found'),
                 );
-                vi.spyOn(server.taskStore, 'getTask').mockResolvedValue(null);
+                vi.spyOn(getTaskStore(server), 'getTask').mockResolvedValue(null);
                 const { tool, received } = makeRecorderTool('payment-tool', {
                     paymentRequired: true,
                     taskSupport: 'optional',
@@ -1125,7 +1127,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
             async (server) => {
                 silenceLogs();
                 vi.spyOn(logging, 'logHttpError').mockImplementation(() => {});
-                vi.spyOn(server.taskStore, 'createTask').mockRejectedValue(new Error('store down'));
+                vi.spyOn(getTaskStore(server), 'createTask').mockRejectedValue(new Error('store down'));
                 const { tool, received } = makeRecorderTool('create-task-fail-tool', {
                     taskSupport: 'optional',
                 });
