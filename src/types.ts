@@ -1,7 +1,5 @@
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { InitializeRequest, Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, Prompt, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type {
     Actor as ActorOutdated,
@@ -15,7 +13,6 @@ import type z from 'zod';
 
 import type { ApifyClient } from './apify_client.js';
 import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
-import type { ActorsMcpServer } from './mcp/server.js';
 import type { PaymentProvider } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/registry.js';
 import type { ToolResponse } from './utils/mcp.js';
@@ -142,29 +139,24 @@ export type ActorTool = ToolBase & {
 };
 
 /**
- * Arguments passed to internal tool calls.
- * Contains both the tool arguments and server references.
+ * Arguments passed to internal tool calls. Protocol-neutral: plain values the tool bodies read,
+ * no v1 SDK request context or facade reference.
  */
 export type InternalToolArgs = {
     /** Arguments passed to the tool (payment fields already stripped by the server) */
     args: Record<string, unknown>;
-    /** MCP request `_meta` field — used by payment providers that read from metadata (e.g., x402) */
-    meta?: Record<string, unknown>;
-    /** Extra data given to request handlers.
-     *
-     * Can be used to send notifications from the server to the client.
-     *
-     * For more details see: https://github.com/modelcontextprotocol/typescript-sdk/blob/f822c1255edcf98c4e73b9bf17a9dd1b03f86716/src/shared/protocol.ts#L102
-     */
-    extra: RequestHandlerExtra<Request, Notification>;
-    /** Reference to the Apify MCP server instance */
-    apifyMcpServer: ActorsMcpServer;
-    /** Reference to the MCP server instance */
-    mcpServer: Server;
+    /** Abort signal for the call: the request signal for sync calls, the cancel-watcher signal for tasks. */
+    signal: AbortSignal;
     /** Apify API token */
     apifyToken: string;
     /** ApifyClient pre-configured with payment headers (if applicable) or standard token. */
     apifyClient: ApifyClient;
+    /** External store for Actor metadata (output schemas); only set in hosted deployments. */
+    actorStore?: ActorStore;
+    /** Payment provider for agentic payment modes (Skyfire, x402), when configured. */
+    paymentProvider?: PaymentProvider;
+    /** Names of all currently loaded tools. */
+    loadedToolNames: readonly string[];
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
     /** MCP session ID for logging context */
@@ -549,6 +541,11 @@ export type ActorStore = {
 };
 
 /**
+ * How the server is connected: 'stdio' (direct/local) or 'http' (remote HTTP streamable).
+ */
+export type TransportType = 'stdio' | 'http';
+
+/**
  * Options for configuring the ActorsMcpServer instance.
  */
 export type ActorsMcpServerOptions = {
@@ -600,7 +597,7 @@ export type ActorsMcpServerOptions = {
      * - 'stdio': Direct/local stdio connection
      * - 'http': Remote HTTP streamable connection
      */
-    transportType?: 'stdio' | 'http';
+    transportType?: TransportType;
     /**
      * Apify API token for authentication
      * Primarily used by stdio transport when token is read from ~/.apify/auth.json file

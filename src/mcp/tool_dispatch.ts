@@ -1,20 +1,15 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Notification, Request } from '@modelcontextprotocol/sdk/types.js';
-import {
-    CallToolResultSchema,
-    ErrorCode,
-    McpError,
-    ServerNotificationSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { ServerNotification } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, ServerNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
+import type { PaymentProvider } from '../payments/types.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
-import type { CallDiagnostics, ToolEntry, ToolStatus } from '../types.js';
+import type { ActorStore, CallDiagnostics, ToolEntry, ToolStatus } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { remoteMcpFailureDetail } from '../utils/apify_errors.js';
 import { logHttpError } from '../utils/logging.js';
@@ -24,7 +19,6 @@ import { applyToolTelemetry, buildExecutionDiagnostics } from '../utils/tool_sta
 import { buildActorFields } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
-import type { ActorsMcpServer } from './server.js';
 
 /**
  * Runs a validated tool call through the single tool-type dispatch switch and returns the raw
@@ -38,11 +32,12 @@ import type { ActorsMcpServer } from './server.js';
  * `extractToolTelemetry` (via `applyToolTelemetry`) runs once here, in the INTERNAL and ACTOR
  * cases, and strips `toolTelemetry` in place, so callers must not re-strip. ACTOR_MCP sets
  * telemetry manually instead. The caller constructs `progressTracker`; dispatch consumes it and stops
- * it in the branch `finally`. The abort source is `extra.signal`: the request signal for sync; the
- * task caller passes a `taskExtra` whose `signal` is the cancel watcher's, so a client disconnect
- * never cancels a task. `shouldForwardNotifications` gates only the ACTOR_MCP raw-notification
- * forwarder (true for sync, false for task, whose originating request is already answered).
- * `taskMode` is a passthrough to `tool.call` / `executeActorTool`, never a dispatch selector.
+ * it in the branch `finally`. The abort source is the `signal` param: the request signal for sync; the
+ * task caller passes the cancel watcher's signal, so a client disconnect never cancels a task.
+ * `shouldForwardNotifications` gates only the ACTOR_MCP raw-notification forwarder (true for sync,
+ * false for task, whose originating request is already answered). `taskMode` is a passthrough to
+ * `tool.call` / `executeActorTool`, never a dispatch selector. `emitLog` (required) is the
+ * side-channel for ACTOR_MCP connect failures; shells without a transport may pass a no-op.
  */
 export async function dispatchToolCall(params: {
     tool: ToolEntry;
@@ -50,20 +45,23 @@ export async function dispatchToolCall(params: {
     logSafeArgs: unknown;
     apifyToken: string;
     apifyClient: ApifyClient;
-    apifyMcpServer: ActorsMcpServer;
     mcpSessionId: string | undefined;
     progressToken: string | number | undefined;
     progressTracker: ReturnType<typeof createProgressTracker>;
     shouldForwardNotifications: boolean;
-    extra: RequestHandlerExtra<Request, Notification>;
+    signal: AbortSignal;
+    sendNotification: (notification: ServerNotification) => Promise<void>;
+    emitLog: (msg: { level: string; data?: unknown }) => Promise<void>;
+    actorStore?: ActorStore;
+    paymentProvider?: PaymentProvider;
+    /** The live tool registry; tool args derive `loadedToolNames` from it at call time. */
+    tools: Map<string, ToolEntry>;
     actorName?: string;
     actorId?: string;
     taskMode: boolean;
     // Caller-supplied log decoration (task mode: ' for task' suffix + taskId field), applied
     // mechanically to the per-branch "Calling …" lines — no effect on dispatch behavior.
     logContext?: { messageSuffix: string; fields: Record<string, unknown> };
-    // Side-channel for ACTOR_MCP connect failures; shells without a transport may pass a no-op.
-    emitLog?: (msg: { level: string; data?: unknown }) => Promise<void>;
 }): Promise<{ result: Record<string, unknown>; toolStatus: ToolStatus; callDiagnostics: CallDiagnostics }> {
     const {
         tool,
@@ -71,20 +69,20 @@ export async function dispatchToolCall(params: {
         logSafeArgs,
         apifyToken,
         apifyClient,
-        apifyMcpServer,
         mcpSessionId,
         progressToken,
         progressTracker,
         shouldForwardNotifications,
-        extra,
+        signal,
+        sendNotification,
+        emitLog,
+        actorStore,
+        paymentProvider,
+        tools,
         actorName,
         actorId,
         taskMode,
         logContext,
-        emitLog = async (msg) =>
-            apifyMcpServer.server.sendLoggingMessage(
-                msg as Parameters<typeof apifyMcpServer.server.sendLoggingMessage>[0],
-            ),
     } = params;
 
     let result: Record<string, unknown> = {};
@@ -103,11 +101,12 @@ export async function dispatchToolCall(params: {
                 });
                 const res = (await tool.call({
                     args: toolArgs,
-                    extra,
-                    apifyMcpServer,
-                    mcpServer: apifyMcpServer.server,
+                    signal,
                     apifyToken,
                     apifyClient,
+                    actorStore,
+                    paymentProvider,
+                    loadedToolNames: Array.from(tools.keys()),
                     progressTracker,
                     mcpSessionId,
                     taskMode,
@@ -158,7 +157,7 @@ export async function dispatchToolCall(params: {
                                 mcpSessionId,
                                 notification,
                             });
-                            await extra.sendNotification(notification);
+                            await sendNotification(notification);
                         });
                     }
                 }
@@ -201,7 +200,7 @@ export async function dispatchToolCall(params: {
             } catch (error) {
                 ({ toolStatus, callDiagnostics } = buildExecutionDiagnostics({
                     error,
-                    isAborted: Boolean(extra.signal?.aborted),
+                    isAborted: Boolean(signal.aborted),
                     actorName,
                     actorId,
                 }));
@@ -234,7 +233,7 @@ export async function dispatchToolCall(params: {
                     apifyClient,
                     callOptions: { memory: tool.memoryMbytes },
                     progressTracker,
-                    abortSignal: extra.signal,
+                    abortSignal: signal,
                     mcpSessionId,
                     datasetItemsSchema: tool.datasetItemsSchema,
                     taskMode,
@@ -271,11 +270,8 @@ export async function dispatchToolCall(params: {
             // non-`never` here and fails `satisfies never` at compile time. Unreachable at runtime —
             // ToolEntry is a closed 3-way union. Unlike the pre-extraction fall-through (which also
             // listed available tools, called log.softFail, and sent a logging message before
-            // throwing), this just throws InvalidParams with no side effects.
-            throw new McpError(
-                ErrorCode.InvalidParams,
-                `Unknown tool type "${(tool satisfies never as ToolEntry).type}"`,
-            );
+            // throwing), this just throws with no side effects.
+            throw new Error(`Unknown tool type "${(tool satisfies never as ToolEntry).type}"`);
     }
 
     return { result, toolStatus, callDiagnostics };

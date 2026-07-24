@@ -1,21 +1,19 @@
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Notification, Request, TaskStatusNotification } from '@modelcontextprotocol/sdk/types.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { ServerNotification, TaskStatusNotification } from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
+import type { PaymentProvider } from '../payments/types.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
-import type { CallDiagnostics, ToolEntry, ToolStatus } from '../types.js';
+import type { ActorStore, CallDiagnostics, TelemetryEnv, ToolEntry, ToolStatus, TransportType } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { buildActorFields, getToolFullName } from '../utils/tools.js';
 import type { McpClientContext } from './client_context.js';
-import type { ActorsMcpServer } from './server.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telemetry.js';
@@ -70,13 +68,16 @@ export async function emitTaskStatusNotification(
  * @param params.apifyClient - ApifyClient configured with payment headers or the standard token
  * @param params.apifyToken - Apify API token
  * @param params.progressToken - Progress token for notifications
- * @param params.extra - Extra request handler context
  * @param params.mcpSessionId - MCP session ID for telemetry
  * @param params.actorName - Actor name, used for telemetry and error diagnostics
  * @param params.actorId - Actor ID, used for telemetry and error diagnostics
- * @param params.apifyMcpServer - The ActorsMcpServer instance (task store, server, tools, telemetry config)
+ * @param params.taskStore - Task store (legacy) for status/result persistence
+ * @param params.server - v1 SDK server (legacy) for task-status notifications and logging
+ * @param params.sendNotification - Progress-notification sink for the running tool
  */
 
+// TODO(#1156): collapse this flat param list (and its siblings in tool_call_engine.ts and
+// tool_dispatch.ts) into lifetime-scoped session/request context objects.
 export async function executeToolAndUpdateTask(params: {
     taskId: string;
     tool: ToolEntry;
@@ -85,12 +86,19 @@ export async function executeToolAndUpdateTask(params: {
     apifyClient: ApifyClient;
     apifyToken: string;
     progressToken: string | number | undefined;
-    extra: RequestHandlerExtra<Request, Notification>;
     mcpSessionId: string | undefined;
     actorName?: string;
     actorId?: string;
-    apifyMcpServer: ActorsMcpServer;
     clientContext: McpClientContext | undefined;
+    taskStore: TaskStore;
+    server: Server;
+    tools: Map<string, ToolEntry>;
+    actorStore?: ActorStore;
+    paymentProvider?: PaymentProvider;
+    telemetryEnabled: boolean;
+    telemetryEnv: TelemetryEnv;
+    transportType?: TransportType;
+    sendNotification: (notification: ServerNotification) => Promise<void>;
 }): Promise<void> {
     const {
         taskId,
@@ -100,13 +108,22 @@ export async function executeToolAndUpdateTask(params: {
         apifyClient,
         apifyToken,
         progressToken,
-        extra,
         mcpSessionId,
         actorName,
         actorId,
-        apifyMcpServer,
         clientContext,
+        taskStore,
+        server,
+        tools,
+        actorStore,
+        paymentProvider,
+        telemetryEnabled,
+        telemetryEnv,
+        transportType,
+        sendNotification,
     } = params;
+    const emitLog = async (msg: { level: string; data?: unknown }) =>
+        server.sendLoggingMessage(msg as Parameters<typeof server.sendLoggingMessage>[0]);
     let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
     // Always populate actor fields so they're tracked on both success and failure paths.
     let callDiagnostics: CallDiagnostics = { ...buildActorFields(actorName, actorId) };
@@ -124,7 +141,8 @@ export async function executeToolAndUpdateTask(params: {
         toolName: getToolFullName(tool),
         mcpSessionId,
         apifyToken,
-        apifyMcpServer,
+        telemetryEnabled,
+        transportType,
         clientContext,
     });
 
@@ -140,7 +158,7 @@ export async function executeToolAndUpdateTask(params: {
             callDiagnostics: diagnostics,
             args: toolArgs,
             result,
-            apifyMcpServer,
+            telemetryEnv,
         });
     };
 
@@ -152,15 +170,8 @@ export async function executeToolAndUpdateTask(params: {
         status: ToolStatus,
         diagnostics: CallDiagnostics | undefined,
     ): Promise<void> => {
-        await storeTaskResultOrSkipIfExpired(
-            apifyMcpServer.taskStore,
-            tool.name,
-            taskId,
-            storeStatus,
-            taskResult,
-            mcpSessionId,
-        );
-        await emitTaskStatusNotification(taskId, mcpSessionId, apifyMcpServer.taskStore, apifyMcpServer.server);
+        await storeTaskResultOrSkipIfExpired(taskStore, tool.name, taskId, storeStatus, taskResult, mcpSessionId);
+        await emitTaskStatusNotification(taskId, mcpSessionId, taskStore, server);
         finishTaskTracking(status, diagnostics, taskResult);
     };
 
@@ -172,7 +183,7 @@ export async function executeToolAndUpdateTask(params: {
         status: ToolStatus,
         diagnostics?: CallDiagnostics,
     ): Promise<boolean> => {
-        if (!(await isTaskCancelled(taskId, mcpSessionId, apifyMcpServer.taskStore))) return false;
+        if (!(await isTaskCancelled(taskId, mcpSessionId, taskStore))) return false;
         log.debug(`[executeToolAndUpdateTask] Task was cancelled${logSuffix}`, { taskId, mcpSessionId });
         finishTaskTracking(status, diagnostics);
         return true;
@@ -183,13 +194,12 @@ export async function executeToolAndUpdateTask(params: {
     // Actor run stops instead of consuming compute until natural completion.
     // Per MCP tasks spec, request-level aborts (client disconnect,
     // notifications/cancelled for the original request ID) MUST NOT cancel
-    // the task — `extra.signal` is intentionally not chained here.
+    // the task — the request signal is intentionally not chained here.
     const cancelWatcher = createTaskCancellationWatcher({
         taskId,
         mcpSessionId,
-        taskStore: apifyMcpServer.taskStore,
+        taskStore,
     });
-    const taskExtra = { ...extra, signal: cancelWatcher.signal };
 
     try {
         log.debug('[executeToolAndUpdateTask] Updating task status to working', {
@@ -202,7 +212,7 @@ export async function executeToolAndUpdateTask(params: {
         // apart from a genuine store error.
         // noinspection ExceptionCaughtLocallyJS
         try {
-            await apifyMcpServer.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
+            await taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
         } catch (err) {
             if (
                 await skipIfTaskCancelled(' before execution started, skipping', TOOL_STATUS.ABORTED, {
@@ -212,7 +222,7 @@ export async function executeToolAndUpdateTask(params: {
                 return;
             throw err;
         }
-        await emitTaskStatusNotification(taskId, mcpSessionId, apifyMcpServer.taskStore, apifyMcpServer.server);
+        await emitTaskStatusNotification(taskId, mcpSessionId, taskStore, server);
 
         // Execute the tool and get the result
         let result: Record<string, unknown> = {};
@@ -221,8 +231,8 @@ export async function executeToolAndUpdateTask(params: {
         // TODO(TC-3): cancel arriving while this is scheduled throws cancelled → working;
         // currently swallowed by progress.ts's tick catch — guard or catch explicitly.
         const onStatusMessage = async (message: string) => {
-            await apifyMcpServer.taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
-            await emitTaskStatusNotification(taskId, mcpSessionId, apifyMcpServer.taskStore, apifyMcpServer.server);
+            await taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
+            await emitTaskStatusNotification(taskId, mcpSessionId, taskStore, server);
         };
 
         // ACTOR_MCP never reads the tracker (matching the sync path, which passes null for it);
@@ -231,19 +241,23 @@ export async function executeToolAndUpdateTask(params: {
         const progressTracker =
             tool.type === TOOL_TYPE.ACTOR_MCP
                 ? null
-                : createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
+                : createProgressTracker(progressToken, sendNotification, taskId, onStatusMessage);
         const dispatchResult = await dispatchToolCall({
             tool,
             toolArgs,
             logSafeArgs,
             apifyToken,
             apifyClient,
-            apifyMcpServer,
             mcpSessionId,
             progressToken,
             progressTracker,
             shouldForwardNotifications: false,
-            extra: taskExtra,
+            signal: cancelWatcher.signal,
+            sendNotification,
+            emitLog,
+            actorStore,
+            paymentProvider,
+            tools,
             actorName,
             actorId,
             taskMode: true,
@@ -260,7 +274,7 @@ export async function executeToolAndUpdateTask(params: {
         // synchronous CallTool path, which task-mode calls like call-actor bypass).
         result = withReportProblemNudge({
             result,
-            tools: apifyMcpServer.tools,
+            tools,
             failingToolName: tool.name,
             failureCategory: callDiagnostics.failure_category,
             failureHttpStatus: callDiagnostics.failure_http_status,
@@ -394,7 +408,7 @@ export async function executeToolAndUpdateTask(params: {
                         isError: true,
                         internalToolStatus: toolStatus,
                     },
-                    tools: apifyMcpServer.tools,
+                    tools,
                     failingToolName: tool.name,
                     failureCategory: callDiagnostics.failure_category,
                     failureHttpStatus: callDiagnostics.failure_http_status,
@@ -406,8 +420,7 @@ export async function executeToolAndUpdateTask(params: {
                 // Compile-time exhaustiveness guard (same `satisfies never` idiom as dispatchToolCall's
                 // default arm): a new TOOL_CALL_ERROR_KIND makes `errorResult` non-`never` here and fails
                 // to compile. Unreachable at runtime.
-                throw new McpError(
-                    ErrorCode.InvalidParams,
+                throw new Error(
                     `Unknown tool-call error kind "${(errorResult satisfies never as ToolCallErrorResult).kind}"`,
                 );
         }

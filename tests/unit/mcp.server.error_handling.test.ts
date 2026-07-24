@@ -7,7 +7,7 @@ import log from '@apify/log';
 
 import { TOOL_STATUS } from '../../src/const.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
-import { getRequestHandler, makeThrowingTool, withServer } from './helpers/mcp_server.js';
+import { getLegacyServer, getRequestHandler, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
 /**
  * Covers the `server.onerror` wiring in `setupErrorHandling()`: client faults softFail with a
@@ -22,13 +22,13 @@ describe('ActorsMcpServer onerror', () => {
             const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
             const errorLog = vi.spyOn(log, 'error').mockImplementation(() => log);
 
-            server.server.onerror?.(new Error('Parse error: Invalid JSON-RPC message'));
+            getLegacyServer(server).onerror?.(new Error('Parse error: Invalid JSON-RPC message'));
             expect(errorLog).not.toHaveBeenCalled();
             expect(softFail).toHaveBeenCalledWith('MCP client fault, request could not be handled', {
                 errMessage: 'Parse failure: Invalid JSON-RPC message',
             });
 
-            server.server.onerror?.(new Error('Unexpected internal failure'));
+            getLegacyServer(server).onerror?.(new Error('Unexpected internal failure'));
             expect(errorLog).toHaveBeenCalledTimes(1);
         });
     });
