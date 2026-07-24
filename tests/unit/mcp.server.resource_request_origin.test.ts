@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ApifyClientModule from '../../src/apify_client.js';
 import { APIFY_AI_CLIENT_NAME } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
-import { getRequestHandler, makeRecorderTool } from './helpers/mcp_server.js';
+import { getRequestHandler, getTaskStore, makeRecorderTool } from './helpers/mcp_server.js';
 
 const { capturedClientOptions } = vi.hoisted(() => ({ capturedClientOptions: [] as unknown[] }));
 
@@ -127,7 +127,7 @@ describe('ActorsMcpServer tools/call — request-origin tagging', () => {
             expect(capturedClientOptions.at(-1)).toMatchObject({ requestOrigin: 'APIFY_AI' });
             if (isTaskRequest) {
                 await vi.waitFor(async () => {
-                    const task = await server.taskStore.getTask((result.task as { taskId: string }).taskId);
+                    const task = await getTaskStore(server).getTask((result.task as { taskId: string }).taskId);
                     if (task?.status !== 'completed') throw new Error('task did not complete');
                 });
             }

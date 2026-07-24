@@ -39,9 +39,10 @@ export function stubToolCallContext(
         args,
         apifyToken: 'test-token',
         apifyClient: client,
-        extra: {},
-        mcpServer: {},
-        apifyMcpServer: { options: { paymentProvider: undefined }, listToolNames: () => Object.values(HELPER_TOOLS) },
+        signal: new AbortController().signal,
+        paymentProvider: undefined,
+        actorStore: undefined,
+        loadedToolNames: Object.values(HELPER_TOOLS),
     } as unknown as InternalToolArgs;
 }
 

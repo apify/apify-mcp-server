@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { SERVER_MODE } from '../../src/types.js';
+import { getLegacyServer } from './helpers/mcp_server.js';
 
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
 
@@ -31,7 +32,7 @@ function makeInitializeRequest(clientName: string): InitializeRequest {
 
 async function dispatchInitialize(server: ActorsMcpServer, clientName: string): Promise<void> {
     const handler = (
-        server.server as unknown as {
+        getLegacyServer(server) as unknown as {
             // eslint-disable-next-line no-underscore-dangle
             _requestHandlers: Map<string, InitHandler>;
         }
