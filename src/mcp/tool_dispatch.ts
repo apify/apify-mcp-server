@@ -54,7 +54,8 @@ export async function dispatchToolCall(params: {
     emitLog: (msg: { level: string; data?: unknown }) => Promise<void>;
     actorStore?: ActorStore;
     paymentProvider?: PaymentProvider;
-    loadedToolNames: readonly string[];
+    /** The live tool registry; tool args derive `loadedToolNames` from it at call time. */
+    tools: Map<string, ToolEntry>;
     actorName?: string;
     actorId?: string;
     taskMode: boolean;
@@ -77,7 +78,7 @@ export async function dispatchToolCall(params: {
         emitLog,
         actorStore,
         paymentProvider,
-        loadedToolNames,
+        tools,
         actorName,
         actorId,
         taskMode,
@@ -105,7 +106,7 @@ export async function dispatchToolCall(params: {
                     apifyClient,
                     actorStore,
                     paymentProvider,
-                    loadedToolNames,
+                    loadedToolNames: Array.from(tools.keys()),
                     progressTracker,
                     mcpSessionId,
                     taskMode,

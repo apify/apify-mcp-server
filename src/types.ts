@@ -541,6 +541,11 @@ export type ActorStore = {
 };
 
 /**
+ * How the server is connected: 'stdio' (direct/local) or 'http' (remote HTTP streamable).
+ */
+export type TransportType = 'stdio' | 'http';
+
+/**
  * Options for configuring the ActorsMcpServer instance.
  */
 export type ActorsMcpServerOptions = {
@@ -592,7 +597,7 @@ export type ActorsMcpServerOptions = {
      * - 'stdio': Direct/local stdio connection
      * - 'http': Remote HTTP streamable connection
      */
-    transportType?: 'stdio' | 'http';
+    transportType?: TransportType;
     /**
      * Apify API token for authentication
      * Primarily used by stdio transport when token is read from ~/.apify/auth.json file

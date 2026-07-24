@@ -8,7 +8,7 @@ import type { ApifyClient } from '../apify_client.js';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
-import type { ActorStore, CallDiagnostics, TelemetryEnv, ToolEntry, ToolStatus } from '../types.js';
+import type { ActorStore, CallDiagnostics, TelemetryEnv, ToolEntry, ToolStatus, TransportType } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import { createProgressTracker } from '../utils/progress.js';
@@ -76,6 +76,8 @@ export async function emitTaskStatusNotification(
  * @param params.sendNotification - Progress-notification sink for the running tool
  */
 
+// TODO(#1156): collapse this flat param list (and its siblings in tool_call_engine.ts and
+// tool_dispatch.ts) into lifetime-scoped session/request context objects.
 export async function executeToolAndUpdateTask(params: {
     taskId: string;
     tool: ToolEntry;
@@ -93,10 +95,9 @@ export async function executeToolAndUpdateTask(params: {
     tools: Map<string, ToolEntry>;
     actorStore?: ActorStore;
     paymentProvider?: PaymentProvider;
-    loadedToolNames: readonly string[];
     telemetryEnabled: boolean;
     telemetryEnv: TelemetryEnv;
-    transportType?: 'stdio' | 'http';
+    transportType?: TransportType;
     sendNotification: (notification: ServerNotification) => Promise<void>;
 }): Promise<void> {
     const {
@@ -116,7 +117,6 @@ export async function executeToolAndUpdateTask(params: {
         tools,
         actorStore,
         paymentProvider,
-        loadedToolNames,
         telemetryEnabled,
         telemetryEnv,
         transportType,
@@ -257,7 +257,7 @@ export async function executeToolAndUpdateTask(params: {
             emitLog,
             actorStore,
             paymentProvider,
-            loadedToolNames,
+            tools,
             actorName,
             actorId,
             taskMode: true,

@@ -50,13 +50,13 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
     public readonly tools: Map<string, ToolEntry>;
     public readonly options: ActorsMcpServerOptions;
     public readonly actorStore?: ActorStore;
-    public clientContext: McpClientContext | undefined;
+    private _clientContext: McpClientContext | undefined;
     /**
      * Resolved server mode. Preliminary value at construction (`'auto'` → `DEFAULT`).
      * Finalized inside the `initialize` request handler (see {@link applyInitialize}) once the
      * client's capabilities are known. Effectively set-once per connection.
      */
-    public serverMode: SERVER_MODE;
+    private _serverMode: SERVER_MODE;
     /**
      * Raw option captured from `options.serverMode` (or the legacy `uiMode`). Re-resolved
      * inside the initialize handler when set to `'auto'`; explicit `'default'`/`'apps'`
@@ -94,9 +94,17 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
     // The v1 SDK adapter. Package-private: constructed here and never exposed on the public surface.
     private readonly legacyServer: LegacyMcpServer;
 
+    public get clientContext(): McpClientContext | undefined {
+        return this._clientContext;
+    }
+
+    public get serverMode(): SERVER_MODE {
+        return this._serverMode;
+    }
+
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
-        this.clientContext = buildMcpClientContext(options.initializeRequestData?.params);
+        this._clientContext = buildMcpClientContext(options.initializeRequestData?.params);
         this.actorStore = options.actorStore;
         // Constructor is an ingestion boundary for programmatic callers. Normalize via
         // parseServerMode so that runtime-invalid values ('openai' alias, stray strings)
@@ -109,7 +117,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
             rawServerMode !== undefined ? parseServerMode(rawServerMode) : parseServerMode(legacyUiMode);
         // Preliminary resolution — re-resolved inside the initialize handler once
         // client capabilities are known (only for 'auto').
-        this.serverMode = resolveServerMode(this.serverModeOption, false);
+        this._serverMode = resolveServerMode(this.serverModeOption, false);
         this.serverModeResolved = this.serverModeOption !== 'auto';
 
         const { telemetryEnabled, telemetryEnv } = this.setupTelemetry();
@@ -124,12 +132,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
             getAvailableWidgets: () => this.availableWidgets,
         });
 
-        const { setupSigintHandler = true } = options;
-        this.legacyServer = new LegacyMcpServer(this, {
-            setupSigintHandler,
-            taskStore: options.taskStore,
-            transportType: options.transportType,
-        });
+        this.legacyServer = new LegacyMcpServer(this);
     }
 
     /**
@@ -166,14 +169,14 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
      * the final composed set.
      */
     public async applyInitialize(request: InitializeRequest): Promise<void> {
-        this.clientContext = buildMcpClientContext(request.params);
+        this._clientContext = buildMcpClientContext(request.params);
         this.options.initializeRequestData = request;
         this.clientSupportsUi = isUiSupportedByClient(this.clientContext);
 
         if (this.serverModeOption === 'auto') {
             const resolved = resolveServerMode('auto', this.clientSupportsUi);
-            if (resolved !== this.serverMode) {
-                this.serverMode = resolved;
+            if (resolved !== this._serverMode) {
+                this._serverMode = resolved;
             }
             this.serverModeResolved = true;
         }
@@ -472,8 +475,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
     async close(): Promise<void> {
         // Reverse-of-connect (LIFO) teardown: take the transport/server down first (SIGINT removal +
         // server close are the adapter's transport-lifecycle responsibility), then clear the shared
-        // tool map. This intentionally reverses the pre-refactor tools-then-server order; it is
-        // unobservable because `close()` only runs on a quiesced serving unit.
+        // tool map. The order is unobservable because `close()` only runs on a quiesced serving unit.
         await this.legacyServer.close();
         this.clearTools();
     }

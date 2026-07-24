@@ -1,11 +1,6 @@
 /**
- * Legacy (v1 SDK) MCP wiring extracted from `ActorsMcpServer`.
- *
- * `LegacyMcpServer` owns the v1 SDK `Server`, every request handler (initialize, logging, tools,
- * prompts, resources, tasks), notifications, error mapping, SIGINT + transport lifecycle. It reads
- * shared Apify state through the narrow {@link LegacyMcpServerHost} interface (implemented by
- * `ActorsMcpServer`), never importing the concrete facade class. This adapter is package-private —
- * not exported from `index.ts` / `index_internals.ts`.
+ * Package-private v1 SDK adapter: owns the SDK `Server`, request handlers, notifications, and
+ * transport lifecycle, reading shared Apify state through {@link LegacyMcpServerHost}.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -94,19 +89,11 @@ export interface LegacyMcpServerHost {
     readonly options: ActorsMcpServerOptions;
     readonly promptService: ReturnType<typeof createPromptService>;
     readonly resourceService: ReturnType<typeof createResourceService>;
-    listToolNames(): string[];
-    listAllToolNames(): string[];
     resolveApifyToken(meta?: ApifyRequestParams['_meta']): string | undefined;
     resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined;
     getServerInstructions(): string;
     applyInitialize(request: InitializeRequest): Promise<void>;
 }
-
-type LegacyMcpServerOptions = {
-    setupSigintHandler: boolean;
-    taskStore?: TaskStore;
-    transportType?: 'stdio' | 'http';
-};
 
 /**
  * v1 SDK adapter. One per serving unit, constructed only by `ActorsMcpServer`.
@@ -118,14 +105,15 @@ export class LegacyMcpServer {
     private sigintHandler: (() => Promise<void>) | undefined;
     private currentLogLevel = 'info';
 
-    constructor(host: LegacyMcpServerHost, options: LegacyMcpServerOptions) {
+    constructor(host: LegacyMcpServerHost) {
         this.host = host;
+        const { taskStore, transportType, setupSigintHandler = true } = host.options;
 
         // for stdio use in memory task store if not provided, otherwise use provided task store
-        if (options.transportType === 'stdio' && !options.taskStore) {
+        if (transportType === 'stdio' && !taskStore) {
             this.taskStore = new InMemoryTaskStore();
-        } else if (options.taskStore) {
-            this.taskStore = options.taskStore;
+        } else if (taskStore) {
+            this.taskStore = taskStore;
         } else {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
@@ -154,7 +142,7 @@ export class LegacyMcpServer {
         });
         this.setupInitializeHandler();
         this.setupLoggingProxy();
-        this.setupErrorHandling(options.setupSigintHandler);
+        this.setupErrorHandling(setupSigintHandler);
         this.setupLoggingHandlers();
         this.setupToolHandlers();
         this.setupPromptHandlers();
@@ -425,9 +413,6 @@ export class LegacyMcpServer {
             const { clientContext, actorStore } = this.host;
             const { paymentProvider, allowUnauthMode } = this.host.options;
             // Plain values pulled from the host/request, threaded into the shared engine.
-            // Snapshotting the tool names here equals the pre-refactor per-call read: the tool
-            // registry is only mutated during connection setup, never mid-session.
-            const loadedToolNames = this.host.listToolNames();
             const { signal, sendNotification } = extra;
             const emitLog = async (msg: { level: string; data?: unknown }) =>
                 this.server.sendLoggingMessage(msg as Parameters<typeof this.server.sendLoggingMessage>[0]);
@@ -456,7 +441,6 @@ export class LegacyMcpServer {
                     tools: this.host.tools,
                     paymentProvider,
                     allowUnauthMode,
-                    loadedToolNames,
                     signal,
                 });
 
@@ -600,7 +584,6 @@ export class LegacyMcpServer {
                             tools: this.host.tools,
                             actorStore,
                             paymentProvider,
-                            loadedToolNames,
                             telemetryEnabled: this.host.telemetryEnabled,
                             telemetryEnv: this.host.telemetryEnv,
                             transportType: this.host.options.transportType,
@@ -626,7 +609,6 @@ export class LegacyMcpServer {
                     tools: this.host.tools,
                     actorStore,
                     paymentProvider,
-                    loadedToolNames,
                     signal,
                     sendNotification,
                     emitLog,

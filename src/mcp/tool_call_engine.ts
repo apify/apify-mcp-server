@@ -105,7 +105,6 @@ export async function prepareToolCall(params: {
     tools: Map<string, ToolEntry>;
     paymentProvider?: PaymentProvider;
     allowUnauthMode?: boolean;
-    loadedToolNames: readonly string[];
     // Used to preserve abort status for a post-resolution classified failure.
     signal?: AbortSignal;
 }): Promise<PreparedCall | InvalidToolCall | PreparedCallError> {
@@ -120,7 +119,6 @@ export async function prepareToolCall(params: {
         tools,
         paymentProvider,
         allowUnauthMode,
-        loadedToolNames,
     } = params;
     let { args } = params;
 
@@ -140,7 +138,7 @@ export async function prepareToolCall(params: {
     const toolEntry = Array.from(tools.values()).find((t) => t.name === newName || getToolFullName(t) === newName);
 
     if (!toolEntry) {
-        const availableTools = loadedToolNames;
+        const availableTools = Array.from(tools.keys());
         return {
             message: dedent`
                 Tool "${name}" was not found.
@@ -300,7 +298,6 @@ export async function executeSyncToolCall(
         tools: Map<string, ToolEntry>;
         actorStore?: ActorStore;
         paymentProvider?: PaymentProvider;
-        loadedToolNames: readonly string[];
         signal: AbortSignal;
         sendNotification: (notification: ServerNotification) => Promise<void>;
         emitLog: (msg: { level: string; data?: unknown }) => Promise<void>;
@@ -314,7 +311,6 @@ export async function executeSyncToolCall(
         tools,
         actorStore,
         paymentProvider,
-        loadedToolNames,
         signal,
         sendNotification,
         emitLog,
@@ -366,7 +362,7 @@ export async function executeSyncToolCall(
             emitLog,
             actorStore,
             paymentProvider,
-            loadedToolNames,
+            tools,
             actorName,
             actorId,
             taskMode: false,
