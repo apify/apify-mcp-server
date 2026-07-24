@@ -378,15 +378,11 @@ The v2 configuration preserves backward compatibility with v1 usage. Notes:
 - `actors` param (URL) and `--actors` flag (CLI) are still supported.
   - Internally they are merged into `tools` selectors.
   - Examples: `?actors=apify/rag-web-browser` ≡ `?tools=apify/rag-web-browser`; `--actors apify/rag-web-browser` ≡ `--tools apify/rag-web-browser`.
-- `enable-adding-actors` (CLI) and `enableAddingActors` (URL) are supported but deprecated.
-  - Prefer including the specific tool `tools=call-actor` (default via the `actors` category).
-  - `add-actor` is no longer selectable for new connections on any surface — `call-actor` is substituted in its place, same enabled/alongside-other-tools behavior as before.
-- `enableActorAutoLoading` remains as a legacy alias for `enableAddingActors` and is mapped automatically.
+- `enableAddingActors` (URL), `enable-adding-actors` (CLI), and the legacy `enableActorAutoLoading` alias have been removed. To call Actors dynamically, use `tools=call-actor` (included by default via the `actors` category). Any lingering raw value is ignored.
 - Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, and `apify/rag-web-browser`.
   - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).
 - `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
-- `preview` category is deprecated and removed. Use specific tool names instead.
-- `tools=add-actor` and `tools=experimental` are no longer selectable for new connections — `call-actor` is substituted at selection time. Use `tools=call-actor` (or the default `actors` category) instead.
+- `tools=add-actor`, `tools=experimental`, and `tools=preview` are retired: they are ignored and load no tools. Use `tools=call-actor` (or the default `actors` category) instead.
 
 Existing URLs and commands using `?actors=...` or `--actors` continue to work unchanged.
 

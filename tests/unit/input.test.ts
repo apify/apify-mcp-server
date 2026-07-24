@@ -1,6 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-
-import log from '@apify/log';
+import { describe, expect, it } from 'vitest';
 
 import { normalizeList, processInput } from '../../src/input.js';
 import type { Input } from '../../src/types.js';
@@ -85,37 +83,9 @@ describe('processInput', () => {
         expect(processInput({ tools: [] }).tools).toEqual([]);
     });
 
-    it('maps enableActorAutoLoading to enableAddingActors when the new flag is absent and warns about deprecation', () => {
-        const warn = vi.spyOn(log, 'warning').mockImplementation(() => undefined);
-        try {
-            expect(processInput({ actors: ['actor1'], enableActorAutoLoading: true }).enableAddingActors).toBe(true);
-            expect(processInput({ actors: ['actor1'], enableActorAutoLoading: false }).enableAddingActors).toBe(false);
-            expect(warn).toHaveBeenCalledWith(expect.stringContaining('enableActorAutoLoading is deprecated'));
-        } finally {
-            warn.mockRestore();
-        }
-    });
-
-    it('coerces string boolean values via parseBooleanOrNull', () => {
-        expect(processInput({ enableAddingActors: 'true' }).enableAddingActors).toBe(true);
-        expect(processInput({ enableAddingActors: 'false' }).enableAddingActors).toBe(false);
-        expect(processInput({ enableAddingActors: '1' }).enableAddingActors).toBe(true);
-        expect(processInput({ enableAddingActors: '0' }).enableAddingActors).toBe(false);
-    });
-
-    it('prefers enableAddingActors over enableActorAutoLoading', () => {
-        const processed = processInput({ actors: ['actor1'], enableActorAutoLoading: true, enableAddingActors: false });
-        expect(processed.enableAddingActors).toBe(false);
-    });
-
-    it('defaults enableAddingActors to false and leaves tools and actors undefined for empty input', () => {
+    it('leaves tools and actors undefined for empty input', () => {
         const processed = processInput({});
-        expect(processed.enableAddingActors).toBe(false);
         expect(processed.tools).toBeUndefined();
         expect(processed.actors).toBeUndefined();
-    });
-
-    it('defaults invalid enableAddingActors to false', () => {
-        expect(processInput({ enableAddingActors: 'invalid' }).enableAddingActors).toBe(false);
     });
 });

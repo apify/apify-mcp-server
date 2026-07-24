@@ -9,7 +9,6 @@ import { resolvePaymentProvider } from './payments/index.js';
 import type { PaymentProvider } from './payments/types.js';
 import { getServerCard } from './server_card.js';
 import { actorNameToToolName } from './tools/actor_tool_naming.js';
-import { addActor } from './tools/actors/add_actor.js';
 import {
     getCategoryTools,
     getDefaultTools,
@@ -30,10 +29,6 @@ export {
     actorNameToToolName,
     defaults,
     getDefaultTools,
-    /**
-     * @deprecated Backward-compat alias for the `addActor` tool entry. Kept for the apify-mcp-server-internal migration; remove once it no longer imports `addTool`.
-     */
-    addActor as addTool,
     getCategoryTools,
     type ActorStore,
     type ToolCategory,

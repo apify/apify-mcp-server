@@ -8,7 +8,6 @@ import type { TelemetryEnv, ToolCategory } from '../src/types.js';
 
 export type McpClientOptions = {
     actors?: string[];
-    enableAddingActors?: boolean;
     tools?: (ToolCategory | string)[]; // Tool categories, specific tool or Actor names to include
     useEnv?: boolean; // Use environment variables instead of command line arguments (stdio only)
     clientName?: string; // Client name for identification
@@ -44,12 +43,9 @@ function buildClientAuthHeaders(options?: McpClientOptions): Record<string, stri
 }
 
 function appendSearchParams(url: URL, options?: McpClientOptions): void {
-    const { actors, enableAddingActors, tools, telemetry, serverMode, payment } = options || {};
+    const { actors, tools, telemetry, serverMode, payment } = options || {};
     if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
-    }
-    if (enableAddingActors !== undefined) {
-        url.searchParams.append('enableAddingActors', enableAddingActors.toString());
     }
     if (tools !== undefined) {
         url.searchParams.append('tools', tools.join(','));
@@ -88,7 +84,7 @@ export async function createMcpStreamableClient(serverUrl: string, options?: Mcp
 
 export async function createMcpStdioClient(options?: McpClientOptions): Promise<Client> {
     checkApifyToken(options);
-    const { actors, enableAddingActors, tools, useEnv, telemetry, serverMode, payment } = options || {};
+    const { actors, tools, useEnv, telemetry, serverMode, payment } = options || {};
     const args = ['dist/stdio.js'];
     const env: Record<string, string> = {
         APIFY_TOKEN: process.env.APIFY_TOKEN as string,
@@ -101,9 +97,6 @@ export async function createMcpStdioClient(options?: McpClientOptions): Promise<
     if (useEnv) {
         if (actors !== undefined) {
             env.ACTORS = actors.join(',');
-        }
-        if (enableAddingActors !== undefined) {
-            env.ENABLE_ADDING_ACTORS = enableAddingActors.toString();
         }
         if (tools !== undefined) {
             env.TOOLS = tools.join(',');
@@ -122,9 +115,6 @@ export async function createMcpStdioClient(options?: McpClientOptions): Promise<
         // Use command line arguments as before
         if (actors !== undefined) {
             args.push('--actors', actors.join(','));
-        }
-        if (enableAddingActors !== undefined) {
-            args.push('--enable-adding-actors', enableAddingActors.toString());
         }
         if (tools !== undefined) {
             args.push('--tools', tools.join(','));

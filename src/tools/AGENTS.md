@@ -15,7 +15,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
-  - `actors/` — search, details, call, add, the actor-tools factory, the direct
+  - `actors/` — search, details, call, the actor-tools factory, the direct
     actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
     prunes an Actor's definition, `getActorDefinition`), and `actor_run_response.ts`.
   - `runs/` — get/abort runs, run logs, run list.
