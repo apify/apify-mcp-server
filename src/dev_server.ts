@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequestParams } from '@modelcontextprotocol/sdk/types.js';
+import { InitializeRequestParamsSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -15,6 +16,7 @@ import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from './apify_client.js';
+import { buildMcpClientContext } from './mcp/client_context.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import { injectMcpSessionId } from './utils/mcp.js';
@@ -124,12 +126,13 @@ export function createExpressApp(): express.Express {
         try {
             // Check for existing session ID
             const sessionId = req.headers['mcp-session-id'] as string | undefined;
+            const initializeMessage = extractInitializeMessage(req.body);
             let transport: StreamableHTTPServerTransport;
 
             if (sessionId && transports[sessionId]) {
                 // Reuse existing transport
                 transport = transports[sessionId];
-            } else if (!sessionId && isInitializeRequest(req.body)) {
+            } else if (!sessionId && initializeMessage) {
                 // Extract telemetry query parameters
                 const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
                 const telemetryEnabledParam = urlParams.get('telemetry-enabled');
@@ -162,10 +165,11 @@ export function createExpressApp(): express.Express {
                     token: apifyToken,
                 });
 
-                // req.body is this same `initialize` request (isInitializeRequest matched above),
-                // so clientInfo is already readable here — unlike stdio.ts, which loads tools
-                // before any client info exists.
-                const requestOrigin = getRequestOriginForClient(req.body as InitializeRequest);
+                // Client info is already available here — unlike stdio.ts, which loads tools
+                // before initialization.
+                const requestOrigin = getRequestOriginForClient(
+                    buildMcpClientContext(parseInitializeParams(initializeMessage.params)),
+                );
                 const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
                 // Fetch actor metadata and queue mode-agnostic sources. Composed with
                 // the final mode inside the initialize request handler.
@@ -282,14 +286,30 @@ export function createExpressApp(): express.Express {
     return app;
 }
 
-// Helper function to detect initialize requests
-function isInitializeRequest(body: unknown): boolean {
-    if (Array.isArray(body)) {
-        return body.some(
-            (msg) => typeof msg === 'object' && msg !== null && 'method' in msg && msg.method === 'initialize',
-        );
-    }
-    return typeof body === 'object' && body !== null && 'method' in body && body.method === 'initialize';
+/**
+ * Finds the `initialize` message in a (possibly batched) request body, matching on `method`
+ * alone like the pre-refactor `isInitializeRequest` did. This must stay a loose tag check: a
+ * body with `method: 'initialize'` but malformed/incomplete `params` still needs to enter the
+ * initialize branch below so the SDK's own initialize-schema validation produces the accurate
+ * protocol error, instead of falling through to the generic "Mcp-Session-Id header is required"
+ * 400 from the no-session branch.
+ */
+export function extractInitializeMessage(body: unknown): { method: string; params?: unknown } | undefined {
+    const messages = Array.isArray(body) ? body : [body];
+    return messages.find(
+        (msg): msg is { method: string; params?: unknown } =>
+            typeof msg === 'object' && msg !== null && (msg as { method?: unknown }).method === 'initialize',
+    );
+}
+
+/**
+ * Type-safe extraction of `initialize` params for `buildMcpClientContext`/request-origin.
+ * Malformed params parse to `undefined` (client context stays unset) rather than being cast
+ * unchecked — the SDK validates the full request separately once it takes over below.
+ */
+export function parseInitializeParams(params: unknown): InitializeRequestParams | undefined {
+    const result = InitializeRequestParamsSchema.safeParse(params);
+    return result.success ? result.data : undefined;
 }
 
 // --- Entry point: start the server when run directly ---

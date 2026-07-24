@@ -14,6 +14,7 @@ import { TOOL_TYPE } from '../types.js';
 import { logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { buildActorFields, getToolFullName } from '../utils/tools.js';
+import type { McpClientContext } from './client_context.js';
 import type { ActorsMcpServer } from './server.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
@@ -89,6 +90,7 @@ export async function executeToolAndUpdateTask(params: {
     actorName?: string;
     actorId?: string;
     apifyMcpServer: ActorsMcpServer;
+    clientContext: McpClientContext | undefined;
 }): Promise<void> {
     const {
         taskId,
@@ -103,6 +105,7 @@ export async function executeToolAndUpdateTask(params: {
         actorName,
         actorId,
         apifyMcpServer,
+        clientContext,
     } = params;
     let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
     // Always populate actor fields so they're tracked on both success and failure paths.
@@ -122,6 +125,7 @@ export async function executeToolAndUpdateTask(params: {
         mcpSessionId,
         apifyToken,
         apifyMcpServer,
+        clientContext,
     });
 
     const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, result?: unknown) => {

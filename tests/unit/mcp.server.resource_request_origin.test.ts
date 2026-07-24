@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ApifyClientModule from '../../src/apify_client.js';
 import { APIFY_AI_CLIENT_NAME } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
-import { getRequestHandler } from './helpers/mcp_server.js';
+import { getRequestHandler, makeRecorderTool } from './helpers/mcp_server.js';
 
 const { capturedClientOptions } = vi.hoisted(() => ({ capturedClientOptions: [] as unknown[] }));
 
@@ -87,6 +87,50 @@ describe('ActorsMcpServer resources/read — request-origin tagging', () => {
             ).catch(() => undefined);
 
             expect(capturedClientOptions.at(-1)).toMatchObject({ requestOrigin: 'MCP' });
+        } finally {
+            await server.close();
+        }
+    });
+});
+
+describe('ActorsMcpServer tools/call — request-origin tagging', () => {
+    it.each([
+        { isTaskRequest: false, toolName: 'sync-origin-tool' },
+        { isTaskRequest: true, toolName: 'task-origin-tool' },
+    ])('tags a $toolName client APIFY_AI', async ({ isTaskRequest, toolName }) => {
+        const server = new ActorsMcpServer({
+            taskStore: new InMemoryTaskStore(),
+            setupSigintHandler: false,
+            telemetry: { enabled: false },
+            token: 'test-token',
+            initializeRequestData: makeInitializeRequest(APIFY_AI_CLIENT_NAME),
+        });
+        try {
+            const { tool } = makeRecorderTool(toolName, {
+                taskSupport: isTaskRequest ? 'optional' : undefined,
+            });
+            server.upsertTools([tool]);
+
+            const result = await getRequestHandler(server, 'tools/call')(
+                {
+                    method: 'tools/call',
+                    params: {
+                        name: toolName,
+                        arguments: {},
+                        _meta: { mcpSessionId: 'session-id' },
+                        ...(isTaskRequest && { task: { ttl: 60_000 } }),
+                    },
+                },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            );
+
+            expect(capturedClientOptions.at(-1)).toMatchObject({ requestOrigin: 'APIFY_AI' });
+            if (isTaskRequest) {
+                await vi.waitFor(async () => {
+                    const task = await server.taskStore.getTask((result.task as { taskId: string }).taskId);
+                    if (task?.status !== 'completed') throw new Error('task did not complete');
+                });
+            }
         } finally {
             await server.close();
         }
