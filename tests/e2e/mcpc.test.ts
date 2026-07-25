@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -9,11 +9,14 @@ type McpcCase = {
     id: string;
     configs: string[];
     args: string[];
-    assert: string;
+    /** Optional: cases without an assertion are snapshot-only, and just have to reach the server. */
+    assert?: string;
     /** Expect a non-zero mcpc exit. Protocol errors exit 2 and write the payload to stderr. */
     expectError?: boolean;
     /** jq filters whose results are stored for `{{name}}` interpolation in later cases of the same config. */
     capture?: Record<string, string>;
+    /** Run the snapshot through redact.jq. Needed for anything whose output embeds IDs or timings. */
+    redact?: boolean;
 };
 
 type McpcServerConfig = {
@@ -37,6 +40,13 @@ const MCPC_BIN = resolve('node_modules/.bin/mcpc');
 
 /** Point at another build (e.g. a pre-migration worktree) to compare behavior across commits. */
 const SERVER_ENTRY = resolve(process.env.E2E_SERVER_ENTRY ?? 'dist/stdio.js');
+
+/**
+ * When set, every case writes its normalized output to `<dir>/<config>/<case>.json`. Capture two
+ * builds via E2E_SERVER_ENTRY into two directories and `diff -r` them to find behavioral drift.
+ */
+const SNAPSHOT_DIR = process.env.E2E_SNAPSHOT_DIR;
+const REDACT_FILTER = resolve('tests/e2e/redact.jq');
 
 const DEFAULT_SERVER_ENV: Record<string, string | null> = {
     APIFY_TOKEN: '${APIFY_TOKEN}',
@@ -78,6 +88,30 @@ function buildServerEntry(config: McpcServerConfig) {
     return { command: 'node', args: [SERVER_ENTRY, ...(config.args ?? [])], env };
 }
 
+function toSlug(id: string) {
+    return id
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+}
+
+/** Normalizes a probe result with jq (sorted keys, optional redaction) and writes it for diffing. */
+function writeSnapshot(directory: string, testCase: McpcCase, payload: string) {
+    const file = join(directory, `${toSlug(testCase.id)}.json`);
+    if (existsSync(file)) throw new Error(`Duplicate snapshot name for case "${testCase.id}"`);
+
+    const normalized = spawnSync('jq', testCase.redact ? ['-S', '-f', REDACT_FILTER] : ['-S', '.'], {
+        input: payload,
+        encoding: 'utf8',
+    });
+    if (normalized.error) throw normalized.error;
+    if (normalized.status !== 0) {
+        throw new Error(`jq failed to normalize the snapshot for "${testCase.id}":\n${normalized.stderr}`);
+    }
+
+    writeFileSync(file, normalized.stdout);
+}
+
 function interpolate(value: string, captured: Record<string, string>) {
     return value.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => {
         if (!(name in captured)) {
@@ -101,9 +135,16 @@ describe('mcpc', () => {
         const session = `@e2e-${configName}`;
         /** Values captured by earlier cases in this config, for `{{name}}` interpolation. */
         const captured: Record<string, string> = {};
+        const snapshotDirectory = SNAPSHOT_DIR ? join(SNAPSHOT_DIR, configName) : undefined;
         let configDirectory: string;
 
         beforeAll(() => {
+            if (snapshotDirectory) {
+                // Start clean so a diff never mixes results from an earlier run.
+                rmSync(snapshotDirectory, { recursive: true, force: true });
+                mkdirSync(snapshotDirectory, { recursive: true });
+            }
+
             configDirectory = mkdtempSync(join(tmpdir(), `actors-mcp-e2e-${configName}-`));
             const configPath = join(configDirectory, 'mcp.json');
             writeFileSync(configPath, JSON.stringify({ mcpServers: { server: buildServerEntry(config) } }));
@@ -128,8 +169,12 @@ describe('mcpc', () => {
             // Protocol errors (exit 2) leave stdout empty and write the JSON payload to stderr.
             const payload = result.stdout.trim() || result.stderr;
 
-            const assertion = runJq(payload, testCase.assert);
-            expect(assertion.status, `Assertion failed: ${testCase.assert}\n${payload}`).toBe(0);
+            if (testCase.assert) {
+                const assertion = runJq(payload, testCase.assert);
+                expect(assertion.status, `Assertion failed: ${testCase.assert}\n${payload}`).toBe(0);
+            }
+
+            if (snapshotDirectory) writeSnapshot(snapshotDirectory, testCase, payload);
 
             for (const [name, filter] of Object.entries(testCase.capture ?? {})) {
                 const value = runJq(payload, filter, { raw: true }).stdout.trim();

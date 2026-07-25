@@ -1,54 +1,107 @@
 {
   "configs": {
     "default": {},
-    "docs-only": { "args": ["--tools=docs"] },
-    "apps": { "args": ["--ui=apps"] },
-    "no-token": { "args": ["--tools=docs"], "env": { "APIFY_TOKEN": null } }
+    "docs-only": {
+      "args": [
+        "--tools=docs"
+      ]
+    },
+    "apps": {
+      "args": [
+        "--ui=apps"
+      ]
+    },
+    "no-token": {
+      "args": [
+        "--tools=docs"
+      ],
+      "env": {
+        "APIFY_TOKEN": null
+      }
+    }
   },
   "cases": [
     {
       "id": "lists default tools",
-      "configs": ["default"],
-      "args": ["tools-list"],
+      "configs": [
+        "default"
+      ],
+      "args": [
+        "tools-list"
+      ],
       "assert": "[.[].name] | contains([\"call-actor\", \"search-actors\"])"
     },
     {
       "id": "lists only documentation tools",
-      "configs": ["docs-only"],
-      "args": ["tools-list"],
+      "configs": [
+        "docs-only"
+      ],
+      "args": [
+        "tools-list"
+      ],
       "assert": "([.[].name] | index(\"search-apify-docs\") != null) and ([.[].name] | index(\"call-actor\") == null)"
     },
     {
       "id": "lists widget tools in apps mode",
-      "configs": ["apps"],
-      "args": ["tools-list"],
+      "configs": [
+        "apps"
+      ],
+      "args": [
+        "tools-list"
+      ],
       "assert": "[.[].name] | index(\"search-actors-widget\") != null"
     },
     {
       "id": "serves public docs tools without a token",
-      "configs": ["no-token"],
-      "args": ["tools-list"],
+      "configs": [
+        "no-token"
+      ],
+      "args": [
+        "tools-list"
+      ],
       "assert": "[.[].name] | index(\"search-apify-docs\") != null"
     },
     {
       "id": "rejects an unknown tool with a protocol error",
-      "configs": ["default"],
-      "args": ["tools-call", "does-not-exist"],
+      "configs": [
+        "default"
+      ],
+      "args": [
+        "tools-call",
+        "does-not-exist"
+      ],
       "expectError": true,
       "assert": ".error | test(\"was not found\")"
     },
     {
       "id": "searches Actors",
-      "configs": ["default"],
-      "args": ["tools-call", "search-actors", "keywords:=\"instagram\"", "limit:=1"],
+      "configs": [
+        "default"
+      ],
+      "args": [
+        "tools-call",
+        "search-actors",
+        "keywords:=\"instagram\"",
+        "limit:=1"
+      ],
       "assert": ".isError != true and (.structuredContent | has(\"actors\") and has(\"query\") and has(\"count\"))",
-      "capture": { "actorFullName": ".structuredContent.actors[0].fullName" }
+      "capture": {
+        "actorFullName": ".structuredContent.actors[0].fullName"
+      },
+      "redact": true
     },
     {
       "id": "fetches details for the Actor found by search",
-      "configs": ["default"],
-      "args": ["tools-call", "fetch-actor-details", "actor:=\"{{actorFullName}}\""],
-      "assert": ".isError != true and (.structuredContent.actorInfo.fullName | type == \"string\")"
+      "configs": [
+        "default"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"{{actorFullName}}\""
+      ],
+      "assert": ".isError != true and (.structuredContent.actorInfo.fullName | type == \"string\")",
+      "redact": true
     }
   ]
 }
