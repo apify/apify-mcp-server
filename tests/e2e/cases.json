@@ -1,8 +1,9 @@
 {
   "configs": {
-    "default": [],
-    "docs-only": ["--tools=docs"],
-    "apps": ["--ui=apps"]
+    "default": {},
+    "docs-only": { "args": ["--tools=docs"] },
+    "apps": { "args": ["--ui=apps"] },
+    "no-token": { "args": ["--tools=docs"], "env": { "APIFY_TOKEN": null } }
   },
   "cases": [
     {
@@ -24,10 +25,30 @@
       "assert": "[.[].name] | index(\"search-actors-widget\") != null"
     },
     {
+      "id": "serves public docs tools without a token",
+      "configs": ["no-token"],
+      "args": ["tools-list"],
+      "assert": "[.[].name] | index(\"search-apify-docs\") != null"
+    },
+    {
+      "id": "rejects an unknown tool with a protocol error",
+      "configs": ["default"],
+      "args": ["tools-call", "does-not-exist"],
+      "expectError": true,
+      "assert": ".error | test(\"was not found\")"
+    },
+    {
       "id": "searches Actors",
       "configs": ["default"],
       "args": ["tools-call", "search-actors", "keywords:=\"instagram\"", "limit:=1"],
-      "assert": ".isError != true and (.structuredContent | has(\"actors\") and has(\"query\") and has(\"count\"))"
+      "assert": ".isError != true and (.structuredContent | has(\"actors\") and has(\"query\") and has(\"count\"))",
+      "capture": { "actorFullName": ".structuredContent.actors[0].fullName" }
+    },
+    {
+      "id": "fetches details for the Actor found by search",
+      "configs": ["default"],
+      "args": ["tools-call", "fetch-actor-details", "actor:=\"{{actorFullName}}\""],
+      "assert": ".isError != true and (.structuredContent.actorInfo.fullName | type == \"string\")"
     }
   ]
 }
