@@ -1,0 +1,33 @@
+{
+  "configs": {
+    "default": [],
+    "docs-only": ["--tools=docs"],
+    "apps": ["--ui=apps"]
+  },
+  "cases": [
+    {
+      "id": "lists default tools",
+      "configs": ["default"],
+      "args": ["tools-list"],
+      "assert": "[.[].name] | contains([\"call-actor\", \"search-actors\"])"
+    },
+    {
+      "id": "lists only documentation tools",
+      "configs": ["docs-only"],
+      "args": ["tools-list"],
+      "assert": "([.[].name] | index(\"search-apify-docs\") != null) and ([.[].name] | index(\"call-actor\") == null)"
+    },
+    {
+      "id": "lists widget tools in apps mode",
+      "configs": ["apps"],
+      "args": ["tools-list"],
+      "assert": "[.[].name] | index(\"search-actors-widget\") != null"
+    },
+    {
+      "id": "searches Actors",
+      "configs": ["default"],
+      "args": ["tools-call", "search-actors", "keywords:=\"instagram\"", "limit:=1"],
+      "assert": ".isError != true and (.structuredContent | has(\"actors\") and has(\"query\") and has(\"count\"))"
+    }
+  ]
+}
