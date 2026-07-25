@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/com.apify%2Fapify-mcp-server.svg)](https://mcptoplist.com/server/com.apify%2Fapify-mcp-server)
+
 <h1 align="center">
     <a href="https://mcp.apify.com">
         <picture>
