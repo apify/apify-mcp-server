@@ -48,15 +48,27 @@ const SERVER_ENTRY = resolve(process.env.E2E_SERVER_ENTRY ?? 'dist/stdio.js');
 const SNAPSHOT_DIR = process.env.E2E_SNAPSHOT_DIR;
 const REDACT_FILTER = resolve('tests/e2e/redact.jq');
 
+/** Base URL for HTTP configs, e.g. http://localhost:3001 with `pnpm run dev` running. */
+const HTTP_BASE = process.env.E2E_HTTP_BASE;
+const HTTP_BASE_TOKEN = '${E2E_HTTP_BASE}';
+
+/** HTTP configs need a running server, so they are skipped unless E2E_HTTP_BASE is set. */
+const activeConfigs = Object.entries(suite.configs).filter(
+    ([, config]) => !config.url?.includes(HTTP_BASE_TOKEN) || Boolean(HTTP_BASE),
+);
+
 const DEFAULT_SERVER_ENV: Record<string, string | null> = {
     APIFY_TOKEN: '${APIFY_TOKEN}',
     NODE_EXTRA_CA_CERTS: '${NODE_EXTRA_CA_CERTS}',
 };
 
+/** Widget resources are ~1.5 MB of inlined HTML, well past spawnSync's 1 MB default. */
+const MAX_BUFFER = 64 * 1024 * 1024;
+
 function runMcpc(args: string[], options: { allowFailure?: boolean } = {}) {
     const result = spawnSync(MCPC_BIN, args, {
         encoding: 'utf8',
-        maxBuffer: 10 * 1024 * 1024,
+        maxBuffer: MAX_BUFFER,
         timeout: 120_000,
     });
 
@@ -69,7 +81,11 @@ function runMcpc(args: string[], options: { allowFailure?: boolean } = {}) {
 }
 
 function runJq(input: string, filter: string, options: { raw?: boolean } = {}) {
-    const result = spawnSync('jq', [options.raw ? '-r' : '-e', filter], { input, encoding: 'utf8' });
+    const result = spawnSync('jq', [options.raw ? '-r' : '-e', filter], {
+        input,
+        encoding: 'utf8',
+        maxBuffer: MAX_BUFFER,
+    });
     if (result.error) throw result.error;
     return result;
 }
@@ -77,7 +93,8 @@ function runJq(input: string, filter: string, options: { raw?: boolean } = {}) {
 /** Builds the mcpc server entry written to the temporary config file. */
 function buildServerEntry(config: McpcServerConfig) {
     if (config.url) {
-        return { type: 'http', url: config.url, headers: { Authorization: 'Bearer ${APIFY_TOKEN}' } };
+        const url = config.url.replace(HTTP_BASE_TOKEN, HTTP_BASE ?? '');
+        return { type: 'http', url, headers: { Authorization: 'Bearer ${APIFY_TOKEN}' } };
     }
 
     const env: Record<string, string> = {};
@@ -95,6 +112,20 @@ function toSlug(id: string) {
         .replace(/^-|-$/g, '');
 }
 
+/**
+ * Removes mcpc's own `_mcpc` envelope. It carries the resolved APIFY_TOKEN in plaintext and the
+ * absolute server path, so it must never reach a snapshot, an assertion or a failure message.
+ */
+function stripMcpcEnvelope(payload: string) {
+    const result = spawnSync('jq', ['if type == "object" then del(._mcpc) else . end'], {
+        input: payload,
+        encoding: 'utf8',
+        maxBuffer: MAX_BUFFER,
+    });
+    // Non-JSON output (an mcpc crash, say) has no envelope to strip — assert against it as-is.
+    return result.status === 0 ? result.stdout : payload;
+}
+
 /** Normalizes a probe result with jq (sorted keys, optional redaction) and writes it for diffing. */
 function writeSnapshot(directory: string, testCase: McpcCase, payload: string) {
     const file = join(directory, `${toSlug(testCase.id)}.json`);
@@ -103,6 +134,7 @@ function writeSnapshot(directory: string, testCase: McpcCase, payload: string) {
     const normalized = spawnSync('jq', testCase.redact ? ['-S', '-f', REDACT_FILTER] : ['-S', '.'], {
         input: payload,
         encoding: 'utf8',
+        maxBuffer: MAX_BUFFER,
     });
     if (normalized.error) throw normalized.error;
     if (normalized.status !== 0) {
@@ -131,7 +163,7 @@ describe('mcpc', () => {
         if (jq.error || jq.status !== 0) throw new Error('`jq` is required by this suite but was not found on PATH.');
     });
 
-    describe.each(Object.entries(suite.configs))('%s', (configName, config) => {
+    describe.each(activeConfigs)('%s', (configName, config) => {
         const session = `@e2e-${configName}`;
         /** Values captured by earlier cases in this config, for `{{name}}` interpolation. */
         const captured: Record<string, string> = {};
@@ -167,7 +199,7 @@ describe('mcpc', () => {
             }
 
             // Protocol errors (exit 2) leave stdout empty and write the JSON payload to stderr.
-            const payload = result.stdout.trim() || result.stderr;
+            const payload = stripMcpcEnvelope(result.stdout.trim() || result.stderr);
 
             if (testCase.assert) {
                 const assertion = runJq(payload, testCase.assert);

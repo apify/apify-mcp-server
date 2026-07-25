@@ -4,6 +4,10 @@ Design for an **ad-hoc, disposable** harness that proves the v1 (legacy sessionf
 surface is unchanged by the stateless migration (#1128). Not a CI suite. Not a permanent test
 suite. Delete it when #1128 closes.
 
+> **Implemented.** The harness lives in `tests/e2e/`; operational detail is in
+> [`tests/e2e/README.md`](../tests/e2e/README.md), which is the doc to trust. Corrections that
+> implementation forced on this design are marked **[measured]** below.
+
 ## Why differential
 
 There are no expected values in this harness. The pre-migration build **is** the oracle: run the
@@ -90,9 +94,15 @@ From `src/stdio.ts:83-127`. Each row is one `.mcp.json` session entry per side.
 | 22 | `ui-auto` | `--ui=auto` | resolves from mcpc's advertised caps |
 | 23 | `full-apps` | `--tools=actors,docs,runs,storage --ui=apps` | widest surface |
 | 24 | `mcp-proxy` | `--tools=apify/example-mcp-server` | Actorized MCP server as tool |
-| 25 | `no-token` | *(none, `APIFY_TOKEN` unset)* | unauth tool set + error text |
+| 25 | `no-token` | `--tools=docs`, `APIFY_TOKEN` unset | public tool set without a token |
 
-25 configs. `no-token` needs the env var stripped for that spawn only.
+**[measured] `no-token` cannot use the default tool set.** `stdio.ts:161` calls `process.exit(1)`
+when auth is required and no token exists, so mcpc `connect` fails and there is no session to probe.
+Only public-tool configs are connectable tokenless.
+
+**[measured] Config 24 (`mcp-proxy`) legitimately loads zero tools** when the Actor is unreachable —
+loading an MCP-server Actor means connecting to it and enumerating its tools. Its live probe was
+moved to `cat-all`, where `call-actor` can route `actor:tool` dynamically.
 
 ---
 
@@ -114,16 +124,18 @@ the exhaustive one and it is free.
 | `resources-read:widget` | `resources-read ui://widget/search-actors.html` | apps mode only |
 | | `resources-read ui://widget/actor-run.html` | `WIDGET_URIS` (`src/resources/widgets.ts:49`) |
 
-`tools-get` fans out over every tool the config actually lists, so the probe count is derived at
-runtime, not hand-written. Verified anchors: `default` = 10 (5 from `actors`+`docs`, 1 from
-`defaults.actors`, 4 auto-injected), `cat-all` = 17, `full-apps` = 21 (17 + the 4 `*-widget`
-siblings from `WIDGET_BY_BASE_TOOL`).
+**[measured] The `tools-get` fan-out was dropped as redundant.** `mcpc tools-get <name>` returns
+output byte-identical to that tool's entry in `tools-list --full`, so one probe per config covers
+the whole per-tool surface (annotations, `outputSchema`, `_meta`) and ~180 planned probes disappear.
+
+Verified tool-count anchors: `default` = 10 (5 from `actors`+`docs`, 1 from `defaults.actors`, 4
+auto-injected — plus `report-problem` in real stdio use, which the telemetry-off integration suite
+never sees), `cat-all` = 17, `full-apps` = 21 (17 + the 4 `*-widget` siblings).
 
 **Tool order is part of the contract** — `tools_loader.ts:274` injects `AUTO_INJECTED_TOOLS`
 directly after `call-actor`. Do not sort before diffing.
 
-Rough total: ~25 configs × ~9 fixed probes + ~180 `tools-get` fan-outs ≈ **400 captures per side**.
-All generated from the table by one loop.
+**[measured] Actual size: 29 configs, 52 cases, 220 captures per side, ~5 min per side.**
 
 ---
 
@@ -137,7 +149,7 @@ cost no Actor run. High value per second.
 | `err-unknown-tool` | `tools-call does-not-exist` | JSON-RPC error, not a 500 |
 | `err-missing-required` | `tools-call get-key-value-store-record` | AJV message text |
 | `err-forbidden-url` | `tools-call fetch-apify-docs url:="https://example.com"` | domain allowlist |
-| `err-crawlee-allowed` | `tools-call fetch-apify-docs url:="https://crawlee.dev"` | allowlist positive case |
+| `err-crawlee-allowed` | `tools-call fetch-apify-docs url:="https://crawlee.dev"` | **[measured]** dropped: passes the allowlist, then depends on outbound reach. Replaced by a `docs.apify.com` fetch. |
 | `err-actor-not-found` | `tools-call call-actor actorId:="does/not-exist-xyz"` | not-found mapping |
 | `err-mcp-no-toolname` | `tools-call call-actor actorId:="apify/example-mcp-server"` | `CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG` |
 | `err-waitsecs-high` | `tools-call get-actor-run runId:="x" waitSecs:=99` | >45 rejection |

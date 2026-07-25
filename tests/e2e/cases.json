@@ -1,14 +1,122 @@
 {
   "configs": {
     "default": {},
-    "docs-only": {
+    "cat-actors": {
+      "args": [
+        "--tools=actors"
+      ]
+    },
+    "cat-docs": {
       "args": [
         "--tools=docs"
       ]
     },
-    "apps": {
+    "cat-runs": {
+      "args": [
+        "--tools=runs"
+      ]
+    },
+    "cat-storage": {
+      "args": [
+        "--tools=storage"
+      ]
+    },
+    "cat-dev": {
+      "args": [
+        "--tools=dev"
+      ]
+    },
+    "cat-all": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ]
+    },
+    "tools-empty": {
+      "args": [
+        "--tools="
+      ]
+    },
+    "actors-empty": {
+      "args": [
+        "--actors="
+      ]
+    },
+    "both-empty": {
+      "args": [
+        "--tools=",
+        "--actors="
+      ]
+    },
+    "actor-single": {
+      "args": [
+        "--actors=apify/rag-web-browser"
+      ]
+    },
+    "actor-multi": {
+      "args": [
+        "--actors=apify/rag-web-browser,apify/normal-mode-test-actor"
+      ]
+    },
+    "actor-via-tools": {
+      "args": [
+        "--tools=apify/rag-web-browser"
+      ]
+    },
+    "tool-by-name": {
+      "args": [
+        "--tools=search-actors"
+      ]
+    },
+    "retired-add-actor": {
+      "args": [
+        "--tools=add-actor"
+      ]
+    },
+    "retired-experimental": {
+      "args": [
+        "--tools=experimental"
+      ]
+    },
+    "retired-preview": {
+      "args": [
+        "--tools=preview"
+      ]
+    },
+    "retired-mixed": {
+      "args": [
+        "--tools=actors,add-actor"
+      ]
+    },
+    "merge-compat": {
+      "args": [
+        "--tools=actors",
+        "--actors=apify/rag-web-browser"
+      ]
+    },
+    "ui-apps": {
       "args": [
         "--ui=apps"
+      ]
+    },
+    "ui-default": {
+      "args": [
+        "--ui=default"
+      ]
+    },
+    "ui-auto": {
+      "args": [
+        "--ui=auto"
+      ]
+    },
+    "full-apps": {
+      "args": [
+        "--tools=actors,docs,runs,storage",
+        "--ui=apps"
+      ]
+    },
+    "mcp-proxy": {
+      "args": [
+        "--tools=apify/example-mcp-server"
       ]
     },
     "no-token": {
@@ -18,53 +126,285 @@
       "env": {
         "APIFY_TOKEN": null
       }
+    },
+    "http-docs": {
+      "url": "${E2E_HTTP_BASE}?tools=docs"
+    },
+    "http-storage": {
+      "url": "${E2E_HTTP_BASE}?tools=storage"
+    },
+    "http-ui-apps": {
+      "url": "${E2E_HTTP_BASE}?ui=apps"
+    },
+    "http-payment-skyfire": {
+      "url": "${E2E_HTTP_BASE}?payment=skyfire"
     }
   },
   "cases": [
     {
-      "id": "lists default tools",
+      "id": "server info",
       "configs": [
-        "default"
+        "default",
+        "cat-actors",
+        "cat-docs",
+        "cat-runs",
+        "cat-storage",
+        "cat-dev",
+        "cat-all",
+        "tools-empty",
+        "actors-empty",
+        "both-empty",
+        "actor-single",
+        "actor-multi",
+        "actor-via-tools",
+        "tool-by-name",
+        "retired-add-actor",
+        "retired-experimental",
+        "retired-preview",
+        "retired-mixed",
+        "merge-compat",
+        "ui-apps",
+        "ui-default",
+        "ui-auto",
+        "full-apps",
+        "mcp-proxy",
+        "no-token",
+        "http-docs",
+        "http-storage",
+        "http-ui-apps",
+        "http-payment-skyfire"
       ],
-      "args": [
-        "tools-list"
-      ],
-      "assert": "[.[].name] | contains([\"call-actor\", \"search-actors\"])"
+      "args": []
     },
     {
-      "id": "lists only documentation tools",
+      "id": "ping",
       "configs": [
-        "docs-only"
+        "default",
+        "cat-actors",
+        "cat-docs",
+        "cat-runs",
+        "cat-storage",
+        "cat-dev",
+        "cat-all",
+        "tools-empty",
+        "actors-empty",
+        "both-empty",
+        "actor-single",
+        "actor-multi",
+        "actor-via-tools",
+        "tool-by-name",
+        "retired-add-actor",
+        "retired-experimental",
+        "retired-preview",
+        "retired-mixed",
+        "merge-compat",
+        "ui-apps",
+        "ui-default",
+        "ui-auto",
+        "full-apps",
+        "mcp-proxy",
+        "no-token",
+        "http-docs",
+        "http-storage",
+        "http-ui-apps",
+        "http-payment-skyfire"
       ],
       "args": [
-        "tools-list"
+        "ping"
       ],
-      "assert": "([.[].name] | index(\"search-apify-docs\") != null) and ([.[].name] | index(\"call-actor\") == null)"
+      "redact": true
     },
     {
-      "id": "lists widget tools in apps mode",
+      "id": "tools list",
       "configs": [
-        "apps"
+        "default",
+        "cat-actors",
+        "cat-docs",
+        "cat-runs",
+        "cat-storage",
+        "cat-dev",
+        "cat-all",
+        "tools-empty",
+        "actors-empty",
+        "both-empty",
+        "actor-single",
+        "actor-multi",
+        "actor-via-tools",
+        "tool-by-name",
+        "retired-add-actor",
+        "retired-experimental",
+        "retired-preview",
+        "retired-mixed",
+        "merge-compat",
+        "ui-apps",
+        "ui-default",
+        "ui-auto",
+        "full-apps",
+        "mcp-proxy",
+        "no-token",
+        "http-docs",
+        "http-storage",
+        "http-ui-apps",
+        "http-payment-skyfire"
       ],
       "args": [
-        "tools-list"
-      ],
-      "assert": "[.[].name] | index(\"search-actors-widget\") != null"
+        "tools-list",
+        "--full"
+      ]
     },
     {
-      "id": "serves public docs tools without a token",
+      "id": "prompts list",
       "configs": [
-        "no-token"
+        "default",
+        "cat-actors",
+        "cat-docs",
+        "cat-runs",
+        "cat-storage",
+        "cat-dev",
+        "cat-all",
+        "tools-empty",
+        "actors-empty",
+        "both-empty",
+        "actor-single",
+        "actor-multi",
+        "actor-via-tools",
+        "tool-by-name",
+        "retired-add-actor",
+        "retired-experimental",
+        "retired-preview",
+        "retired-mixed",
+        "merge-compat",
+        "ui-apps",
+        "ui-default",
+        "ui-auto",
+        "full-apps",
+        "mcp-proxy",
+        "no-token",
+        "http-docs",
+        "http-storage",
+        "http-ui-apps",
+        "http-payment-skyfire"
       ],
       "args": [
-        "tools-list"
-      ],
-      "assert": "[.[].name] | index(\"search-apify-docs\") != null"
+        "prompts-list"
+      ]
     },
     {
-      "id": "rejects an unknown tool with a protocol error",
+      "id": "resources list",
       "configs": [
-        "default"
+        "default",
+        "cat-actors",
+        "cat-docs",
+        "cat-runs",
+        "cat-storage",
+        "cat-dev",
+        "cat-all",
+        "tools-empty",
+        "actors-empty",
+        "both-empty",
+        "actor-single",
+        "actor-multi",
+        "actor-via-tools",
+        "tool-by-name",
+        "retired-add-actor",
+        "retired-experimental",
+        "retired-preview",
+        "retired-mixed",
+        "merge-compat",
+        "ui-apps",
+        "ui-default",
+        "ui-auto",
+        "full-apps",
+        "mcp-proxy",
+        "no-token",
+        "http-docs",
+        "http-storage",
+        "http-ui-apps",
+        "http-payment-skyfire"
+      ],
+      "args": [
+        "resources-list"
+      ]
+    },
+    {
+      "id": "resource templates",
+      "configs": [
+        "default",
+        "cat-actors",
+        "cat-docs",
+        "cat-runs",
+        "cat-storage",
+        "cat-dev",
+        "cat-all",
+        "tools-empty",
+        "actors-empty",
+        "both-empty",
+        "actor-single",
+        "actor-multi",
+        "actor-via-tools",
+        "tool-by-name",
+        "retired-add-actor",
+        "retired-experimental",
+        "retired-preview",
+        "retired-mixed",
+        "merge-compat",
+        "ui-apps",
+        "ui-default",
+        "ui-auto",
+        "full-apps",
+        "mcp-proxy",
+        "no-token",
+        "http-docs",
+        "http-storage",
+        "http-ui-apps",
+        "http-payment-skyfire"
+      ],
+      "args": [
+        "resources-templates-list"
+      ]
+    },
+    {
+      "id": "logging set level",
+      "configs": [
+        "default",
+        "cat-actors",
+        "cat-docs",
+        "cat-runs",
+        "cat-storage",
+        "cat-dev",
+        "cat-all",
+        "tools-empty",
+        "actors-empty",
+        "both-empty",
+        "actor-single",
+        "actor-multi",
+        "actor-via-tools",
+        "tool-by-name",
+        "retired-add-actor",
+        "retired-experimental",
+        "retired-preview",
+        "retired-mixed",
+        "merge-compat",
+        "ui-apps",
+        "ui-default",
+        "ui-auto",
+        "full-apps",
+        "mcp-proxy",
+        "no-token",
+        "http-docs",
+        "http-storage",
+        "http-ui-apps",
+        "http-payment-skyfire"
+      ],
+      "args": [
+        "logging-set-level",
+        "debug"
+      ]
+    },
+    {
+      "id": "rejects unknown tool",
+      "configs": [
+        "cat-all"
       ],
       "args": [
         "tools-call",
@@ -74,34 +414,549 @@
       "assert": ".error | test(\"was not found\")"
     },
     {
+      "id": "rejects missing required argument",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-record"
+      ],
+      "expectError": true,
+      "assert": ".error | test(\"must have required property\")"
+    },
+    {
+      "id": "rejects forbidden docs URL",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-apify-docs",
+        "url:=\"https://example.com\""
+      ],
+      "assert": ".isError == true"
+    },
+    {
+      "id": "rejects waitSecs above the maximum",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run",
+        "runId:=\"x\"",
+        "waitSecs:=99"
+      ],
+      "expectError": true
+    },
+    {
+      "id": "rejects unknown prompt",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "prompts-get",
+        "nonexistent"
+      ],
+      "expectError": true
+    },
+    {
+      "id": "rejects a missing dataset resource",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/datasets/nope/items"
+      ],
+      "expectError": true
+    },
+    {
+      "id": "rejects a non-Apify resource URL",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://example.com"
+      ],
+      "expectError": true
+    },
+    {
+      "id": "rejects resource subscribe",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "resources-subscribe",
+        "ui://widget/actor-run.html"
+      ],
+      "expectError": true
+    },
+    {
+      "id": "rejects an unknown Actor",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"does/not-exist-xyz-123\"",
+        "input:={}"
+      ],
+      "redact": true,
+      "assert": ".isError == true"
+    },
+    {
+      "id": "rejects an MCP Actor without a tool name",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/example-mcp-server\"",
+        "input:={}"
+      ],
+      "redact": true,
+      "assert": ".isError == true"
+    },
+    {
+      "id": "serves no tools without a token",
+      "configs": [
+        "no-token"
+      ],
+      "args": [
+        "tools-list"
+      ]
+    },
+    {
+      "id": "calls an Actor and waits",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}"
+      ],
+      "redact": true,
+      "capture": {
+        "runId": ".structuredContent.runId",
+        "datasetId": ".structuredContent.storages.datasets.default.id",
+        "kvStoreId": ".structuredContent.storages.keyValueStores.default.id"
+      },
+      "assert": ".isError != true and (.structuredContent.status == \"SUCCEEDED\")"
+    },
+    {
+      "id": "calls an Actor without waiting",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}",
+        "waitSecs:=0"
+      ],
+      "redact": true
+    },
+    {
+      "id": "calls an Actor with a maxItems cap",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}",
+        "callOptions:={\"maxItems\":1}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets the run",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run",
+        "runId:=\"{{runId}}\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets the run log",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-log",
+        "runId:=\"{{runId}}\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "lists runs",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run-list",
+        "limit:=3"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets dataset items",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets dataset items flattened",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "flatten:=true"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets dataset metadata",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset",
+        "datasetId:=\"{{datasetId}}\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets dataset schema",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-schema",
+        "datasetId:=\"{{datasetId}}\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "lists datasets",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-list",
+        "limit:=3"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets key-value store metadata",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store",
+        "keyValueStoreId:=\"{{kvStoreId}}\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "lists key-value store keys",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-keys",
+        "keyValueStoreId:=\"{{kvStoreId}}\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets the run INPUT record",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-record",
+        "keyValueStoreId:=\"{{kvStoreId}}\"",
+        "recordKey:=\"INPUT\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "lists key-value stores",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-list",
+        "limit:=3"
+      ],
+      "redact": true
+    },
+    {
+      "id": "reads dataset items as a resource",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/datasets/{{datasetId}}/items"
+      ],
+      "redact": true
+    },
+    {
+      "id": "reads a key-value record as a resource",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/key-value-stores/{{kvStoreId}}/records/INPUT"
+      ],
+      "redact": true
+    },
+    {
       "id": "searches Actors",
       "configs": [
-        "default"
+        "cat-all"
       ],
       "args": [
         "tools-call",
         "search-actors",
         "keywords:=\"instagram\"",
-        "limit:=1"
+        "limit:=3"
       ],
-      "assert": ".isError != true and (.structuredContent | has(\"actors\") and has(\"query\") and has(\"count\"))",
-      "capture": {
-        "actorFullName": ".structuredContent.actors[0].fullName"
-      },
       "redact": true
     },
     {
-      "id": "fetches details for the Actor found by search",
+      "id": "searches the docs",
       "configs": [
-        "default"
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "search-apify-docs",
+        "query:=\"actor input schema\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches a docs page",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-apify-docs",
+        "url:=\"https://docs.apify.com/platform/actors\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches Actor details with defaults",
+      "configs": [
+        "cat-all"
       ],
       "args": [
         "tools-call",
         "fetch-actor-details",
-        "actor:=\"{{actorFullName}}\""
+        "actor:=\"apify/rag-web-browser\""
       ],
-      "assert": ".isError != true and (.structuredContent.actorInfo.fullName | type == \"string\")",
       "redact": true
+    },
+    {
+      "id": "fetches Actor details, input schema only",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"inputSchema\":true}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches Actor details, description only",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"description\":true}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches Actor details, stats only",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"stats\":true}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches Actor details, pricing only",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"pricing\":true}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches Actor details, readme only",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"readme\":true}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches Actor details, mcp tools only",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"mcpTools\":true}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches Actor details, description and readme",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"description\":true,\"readme\":true}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches Actor details, rating and metadata",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"rating\":true,\"metadata\":true}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "fetches MCP tools for a regular Actor",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "output:={\"mcpTools\":true}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "calls a dedicated Actor tool",
+      "configs": [
+        "actor-multi"
+      ],
+      "args": [
+        "tools-call",
+        "apify--normal-mode-test-actor",
+        "firstNumber:=3",
+        "secondNumber:=4"
+      ],
+      "redact": true
+    },
+    {
+      "id": "calls a tool through the MCP proxy",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/example-mcp-server:add\"",
+        "input:={\"firstNumber\":5,\"secondNumber\":6}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "reads the search-actors widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "resources-read",
+        "ui://widget/search-actors.html"
+      ]
+    },
+    {
+      "id": "reads the actor-run widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "resources-read",
+        "ui://widget/actor-run.html"
+      ]
     }
   ]
 }

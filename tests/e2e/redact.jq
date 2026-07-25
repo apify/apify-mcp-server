@@ -24,12 +24,23 @@ def NULLED:
         "computeUnits",
         "memMaxBytes",
         "durationMillis",
+        "durationMs",
         "usageTotalUsd",
         "usageUsd",
         "cpuAvgUsage",
         "cpuMaxUsage",
         "netRxBytes",
-        "netTxBytes"
+        "netTxBytes",
+        # Per-store signing secret. A credential — must never reach a snapshot.
+        "urlSigningSecretKey",
+        # Storage access counters and account-wide totals: they move on every read.
+        "readCount",
+        "writeCount",
+        "listCount",
+        "deleteCount",
+        "inflatedBytes",
+        "storageBytes",
+        "total"
     ];
 
 def scrub:
