@@ -225,7 +225,6 @@ describe('createExpressApp() era routing', () => {
             expect(readJsonRpcPayload(response.body).error?.code).toBe(-32000);
         });
     });
-
     it('keeps a claim-less initialize on the sessionful path at the same endpoint', async () => {
         await withDevServer(async (post) => {
             const response = await post(
