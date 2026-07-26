@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import log from '@apify/log';
 
 import { TOOL_STATUS } from '../../src/const.js';
+import { getDefaultTools } from '../../src/tools/index.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
 import { getLegacyServer, getRequestHandler, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
@@ -145,6 +146,29 @@ describe('resources/read and prompts/get error boundary', () => {
             expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
             expect((error as McpError).message).toContain('nonexistent');
             expect((error as McpError).message).toContain('Available prompts:');
+        });
+    });
+});
+
+/**
+ * Every default tool entry is an `Object.freeze`d module singleton, so `clearTools()`'s
+ * `ajvValidate = null` write threw in ESM strict mode and `close()` never reached `tools.clear()`.
+ */
+describe('ActorsMcpServer close()', () => {
+    it('clears frozen tool entries instead of throwing on their read-only ajvValidate', async () => {
+        await withServer(async (server) => {
+            // `upsertTools` stores both by reference, so these are the entries `clearTools()` walks.
+            const [frozenTool] = getDefaultTools();
+            const writableTool = makeThrowingTool();
+            server.upsertTools([frozenTool, writableTool]);
+
+            await expect(server.close()).resolves.toBeUndefined();
+
+            expect(server.listToolNames()).toEqual([]);
+            // The singleton the rest of the suite shares keeps its compiled schema; an entry this
+            // instance owns (Actor and Actor-MCP tools are built per facade, unfrozen) still loses it.
+            expect(frozenTool.ajvValidate).toBeTypeOf('function');
+            expect(writableTool.ajvValidate).toBeNull();
         });
     });
 });
