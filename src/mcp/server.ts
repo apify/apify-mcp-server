@@ -127,9 +127,12 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
      */
     private pendingToolsUntilClientKnown: ToolSource[] = [];
     /**
-     * Every source ever fetched, retained (never drained) so a caller can re-compose the whole tool
-     * set against a view other than the instance's own. The same objects the pending queue holds;
-     * retaining them keeps the fetched actor-tool arrays alive for the facade's lifetime.
+     * The unresolved inputs `tools` is composed from — not a second tool registry. `tools` holds one
+     * resolved output: the instance's own view, fixed once the connection handshake makes the client
+     * known. Retaining every source (never drained) lets a caller whose mode and client identity
+     * arrive with a single request compose its own resolved set from the same inputs, without
+     * touching `tools`. The same objects the pending queue holds; retention also keeps the fetched
+     * actor-tool arrays alive for the facade's lifetime.
      */
     private readonly toolSources: ToolSource[] = [];
 
@@ -526,7 +529,6 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
      * for another view takes the map `resolveWidgetsForMode` returns and leaves the instance alone.
      */
     private async resolveInstanceWidgets(): Promise<void> {
-        if (this.serverMode !== SERVER_MODE.APPS) return;
         this.availableWidgets = await this.resolveWidgetsForMode(this.serverMode);
     }
 
