@@ -2,6 +2,9 @@
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
@@ -35,6 +38,54 @@ import type { McpClientContext } from './client_context.js';
 import { LegacyMcpServer } from './legacy_server.js';
 import type { LegacyMcpServerHost } from './legacy_server.js';
 import { parseInputParamsFromUrl } from './utils.js';
+
+/** An actor-tool fetch retained with the exact input it was fetched for, so it can be re-composed. */
+type ToolSource = { input: Input; actorTools: ToolEntry[] };
+
+/**
+ * The resolved mode plus client identity a composition or gating decision is made against. Passing it
+ * as a parameter is what lets a caller compose against a view other than the instance's own (see
+ * `servingContext`) — one derived from a single request — without mutating the shared facade.
+ */
+type ServingContext = {
+    readonly serverMode: SERVER_MODE;
+    readonly clientContext: McpClientContext | undefined;
+};
+
+/**
+ * Read the widget registry from disk. Module-level and mode-agnostic: the result depends only on
+ * what is on disk, so a successful read can be resolved once and shared (see
+ * {@link ActorsMcpServer.resolveWidgetsForMode}). Rejects on a failed scan, so the caller can tell
+ * that apart from a successful empty registry.
+ */
+async function resolveServableWidgets(): Promise<Map<string, AvailableWidget>> {
+    const resolved = await resolveAvailableWidgets(dirname(fileURLToPath(import.meta.url)));
+
+    const readyWidgets: string[] = [];
+    const missingWidgets: string[] = [];
+
+    for (const [uri, widget] of resolved.entries()) {
+        if (widget.exists) {
+            readyWidgets.push(widget.name);
+        } else {
+            missingWidgets.push(widget.name);
+            log.softFail(`Widget file not found: ${widget.jsPath} (widget: ${uri})`);
+        }
+    }
+
+    if (readyWidgets.length > 0) {
+        log.debug('Ready widgets', { widgets: readyWidgets });
+    }
+
+    if (missingWidgets.length > 0) {
+        log.softFail('Some widgets are not ready', {
+            widgets: missingWidgets,
+            note: 'These widgets will not be available. Ensure web/dist files are built and included in deployment.',
+        });
+    }
+
+    return resolved;
+}
 
 /**
  * Create Apify MCP server.
@@ -74,7 +125,13 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
      * We capture the exact actor-tool slice fetched for each request so the flush composes every
      * entry against *its own* actor list rather than the accumulated union across unrelated requests.
      */
-    private pendingToolsUntilClientKnown: { input: Input; actorTools: ToolEntry[] }[] = [];
+    private pendingToolsUntilClientKnown: ToolSource[] = [];
+    /**
+     * Every source ever fetched, retained (never drained) so a caller can re-compose the whole tool
+     * set against a view other than the instance's own. The same objects the pending queue holds;
+     * retaining them keeps the fetched actor-tool arrays alive for the facade's lifetime.
+     */
+    private readonly toolSources: ToolSource[] = [];
 
     // Telemetry configuration (resolved from options and env vars, see setupTelemetry)
     public readonly telemetryEnabled: boolean;
@@ -86,6 +143,12 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
 
     // List of widgets that are ready to be served
     private availableWidgets: Map<string, AvailableWidget> = new Map();
+
+    /**
+     * In-flight or successfully settled widget resolution, memoized so the disk scan runs once. A
+     * failed attempt is dropped rather than kept (see {@link resolveWidgetsForMode}).
+     */
+    private widgetsResolution: Promise<Map<string, AvailableWidget>> | undefined;
 
     /** Set in the initialize handler once client capabilities are known. */
     public clientSupportsUi = false;
@@ -99,6 +162,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
 
     public get serverMode(): SERVER_MODE {
         return this._serverMode;
+    }
+
+    /** The instance's own view: what a sessionful connection composes and gates against. */
+    private get servingContext(): ServingContext {
+        return { serverMode: this._serverMode, clientContext: this._clientContext };
     }
 
     constructor(options: ActorsMcpServerOptions = {}) {
@@ -189,7 +257,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
 
         this.composePendingToolsForClient();
 
-        await this.resolveWidgets();
+        await this.resolveInstanceWidgets();
     }
 
     /**
@@ -208,38 +276,41 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
     }
 
     /**
-     * Compose the tool list for the current connection: resolve mode-specific tools, then drop
-     * report-problem unless it is currently servable (see {@link isReportProblemServable}).
-     * report-problem is a default-injected tool (via tools_loader) rather than a category member,
-     * gated here by servability. Every other tool composes eagerly, so a recovery/rehydration load
-     * without an initialize still restores them. report-problem is withheld until the client is known
-     * and re-added by the initialize flush. Used by every input-driven load path and the flush.
-     * (Actor tools are never gated, so they need no filtering.)
+     * Compose one source's tool list against `view`: resolve mode-specific tools, then drop
+     * report-problem unless it is servable for that view (see {@link isReportProblemServable}). It is
+     * a default-injected tool rather than a category member, so servability is gated here; every
+     * other tool composes eagerly, so a recovery load without an initialize still restores it.
+     *
+     * Both callers — the input-driven load paths and the initialize flush — pass the instance's own
+     * {@link servingContext}, so report-problem is withheld until the client is known and re-added by
+     * the flush.
      */
-    private composeToolsForClient(input: Input, actorTools: ToolEntry[]): ToolEntry[] {
-        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
-        if (this.isReportProblemServable()) return tools;
+    private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
+        const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
+        if (this.isReportProblemServable(view)) return tools;
         return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
     }
 
     /**
-     * Whether report-problem may be served on this connection right now:
+     * Whether report-problem may be served against `view`:
      * - Its only function is forwarding submissions via telemetry, so it is never servable when
      *   telemetry is disabled (it would just fake an acknowledgement into the void).
-     * - It cannot be judged until the connecting client is known, so it is withheld until then;
-     *   the initialize flush re-composes and adds it if the client allows.
+     * - It cannot be judged until the client is known, so it is withheld while `view` has none; the
+     *   initialize flush re-composes and adds it if the client allows.
      * Every other tool is unconditionally servable, so recovery loads compose them eagerly and they
      * survive a load that never sees an initialize.
      */
-    private isReportProblemServable(): boolean {
-        return this.telemetryEnabled && this.clientKnown && !isReportProblemBlockedForClient(this.clientContext);
+    private isReportProblemServable(view: ServingContext): boolean {
+        return (
+            this.telemetryEnabled && view.clientContext != null && !isReportProblemBlockedForClient(view.clientContext)
+        );
     }
 
     private composePendingToolsForClient(): void {
         if (this.pendingToolsUntilClientKnown.length === 0) return;
 
-        const tools = this.pendingToolsUntilClientKnown.flatMap(({ input, actorTools }) =>
-            this.composeToolsForClient(input, actorTools),
+        const tools = this.pendingToolsUntilClientKnown.flatMap((source) =>
+            this.composeToolsForClient(source, this.servingContext),
         );
 
         this.pendingToolsUntilClientKnown = [];
@@ -302,14 +373,16 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
      * known, queue the source so the initialize flush re-composes and adds the client-gated tools.
      */
     private registerFetchedActorTools(input: Input, actorTools: ToolEntry[]): void {
+        const source: ToolSource = { input, actorTools };
+        this.toolSources.push(source);
         if (!this.serverModeResolved) {
-            this.pendingToolsUntilClientKnown.push({ input, actorTools });
+            this.pendingToolsUntilClientKnown.push(source);
             if (actorTools.length > 0) this.upsertTools(actorTools);
             return;
         }
-        const tools = this.composeToolsForClient(input, actorTools);
+        const tools = this.composeToolsForClient(source, this.servingContext);
         if (tools.length > 0) this.upsertTools(tools);
-        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push({ input, actorTools });
+        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push(source);
     }
 
     /**
@@ -420,54 +493,45 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
     }
 
     /**
-     * Resolves widgets and determines which ones are ready to be served.
+     * Widgets servable in `mode`: none outside apps mode, otherwise the disk registry. A successful
+     * scan is resolved once per facade and shared; a failed one is dropped so the next caller retries
+     * it (widget files not written yet must stay recoverable) and serves an empty registry. Touches no
+     * per-connection state, so a per-request caller cannot disturb a concurrent one.
+     *
+     * Memoizing a success is a deliberate behavior change, not behavior-preserving restructuring: an
+     * explicitly-`apps` facade used to scan disk — and log "Ready widgets" / "Some widgets are not
+     * ready" — twice, from `connect()` and again from `applyInitialize()`, and now scans once; and a
+     * widget file appearing after a successful scan is no longer picked up.
      */
-    private async resolveWidgets(): Promise<void> {
-        if (this.serverMode !== SERVER_MODE.APPS) {
-            return;
+    private async resolveWidgetsForMode(mode: SERVER_MODE): Promise<Map<string, AvailableWidget>> {
+        if (mode !== SERVER_MODE.APPS) {
+            return new Map();
         }
 
-        try {
-            const { fileURLToPath } = await import('node:url');
-            const path = await import('node:path');
-
-            const filename = fileURLToPath(import.meta.url);
-            const dirName = path.dirname(filename);
-
-            const resolved = await resolveAvailableWidgets(dirName);
-            this.availableWidgets = resolved;
-
-            const readyWidgets: string[] = [];
-            const missingWidgets: string[] = [];
-
-            for (const [uri, widget] of resolved.entries()) {
-                if (widget.exists) {
-                    readyWidgets.push(widget.name);
-                } else {
-                    missingWidgets.push(widget.name);
-                    log.softFail(`Widget file not found: ${widget.jsPath} (widget: ${uri})`);
-                }
-            }
-
-            if (readyWidgets.length > 0) {
-                log.debug('Ready widgets', { widgets: readyWidgets });
-            }
-
-            if (missingWidgets.length > 0) {
-                log.softFail('Some widgets are not ready', {
-                    widgets: missingWidgets,
-                    note: 'These widgets will not be available. Ensure web/dist files are built and included in deployment.',
-                });
-            }
-        } catch (error) {
+        // Catch on the shared attempt, not per awaiter: N callers awaiting one rejected scan would
+        // otherwise report one root cause N times. Dropping the memo lets the next caller re-run it.
+        const resolution = (this.widgetsResolution ??= resolveServableWidgets().catch((error: unknown) => {
+            this.widgetsResolution = undefined;
             const errorMessage = error instanceof Error ? error.message : String(error);
             log.softFail(`Failed to resolve widgets: ${errorMessage}`);
             // Continue without widgets
-        }
+            return new Map<string, AvailableWidget>();
+        }));
+        return await resolution;
+    }
+
+    /**
+     * Resolve the instance's own widget map — what the instance `resourceService` reads through its
+     * getter — for this connection's mode. The only writer of that field: a caller resolving widgets
+     * for another view takes the map `resolveWidgetsForMode` returns and leaves the instance alone.
+     */
+    private async resolveInstanceWidgets(): Promise<void> {
+        if (this.serverMode !== SERVER_MODE.APPS) return;
+        this.availableWidgets = await this.resolveWidgetsForMode(this.serverMode);
     }
 
     async connect(transport: Transport): Promise<void> {
-        await this.resolveWidgets();
+        await this.resolveInstanceWidgets();
         await this.legacyServer.connect(transport);
     }
 
