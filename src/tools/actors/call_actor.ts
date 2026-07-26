@@ -32,6 +32,7 @@ import { wrapJsonText } from '../../utils/encode_text.js';
 import { logHttpError } from '../../utils/logging.js';
 import {
     respondAborted,
+    respondErrorNoTelemetry,
     respondRaw,
     respondServerError,
     respondUserError,
@@ -291,7 +292,8 @@ export async function checkPaymentProviderStandbyConflict(params: {
         failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
     });
 
-    return respondUserError(ActorLoadError.standbyPaymentNotSupported(normalizedActorName).message);
+    // This framework short-circuit bypasses telemetry extraction; see apify/apify-mcp-server#1085.
+    return respondErrorNoTelemetry(ActorLoadError.standbyPaymentNotSupported(normalizedActorName).message);
 }
 
 /**

@@ -10,6 +10,7 @@ import * as mcpClient from '../../src/mcp/client.js';
 import type { McpClientContext } from '../../src/mcp/client_context.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
+import { actorDefinitionCache } from '../../src/state.js';
 import * as telemetry from '../../src/telemetry.js';
 import * as callActor from '../../src/tools/actors/call_actor.js';
 import {
@@ -17,7 +18,7 @@ import {
     REPORT_PROBLEM_NUDGE,
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
-import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
+import type { ActorDefinitionWithInfo, ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import * as logging from '../../src/utils/logging.js';
@@ -971,8 +972,16 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
         await withServer(
             async (server) => {
                 silenceLogs();
-                const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
-                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
+                const actorName = 'apify/standby-telemetry-test';
+                actorDefinitionCache.set(actorName, {
+                    definition: { id: 'standby-actor-id', actorFullName: actorName },
+                    info: {
+                        id: 'standby-actor-id',
+                        isPublic: true,
+                        userId: 'standby-owner-id',
+                        actorStandby: { isEnabled: true },
+                    },
+                } as unknown as ActorDefinitionWithInfo);
                 vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
                 const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
                 server.upsertTools([tool]);
@@ -984,7 +993,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                         method: 'tools/call',
                         params: {
                             name: tool.name,
-                            arguments: { actor: 'apify/some-actor' },
+                            arguments: { actor: actorName },
                             _meta: { mcpSessionId: 's1' },
                         },
                     },
@@ -992,9 +1001,11 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 );
 
                 // Task path stores the same failure as a completed result.
-                const res = await callTask(server, tool, { actor: 'apify/some-actor' });
+                const res = await callTask(server, tool, { actor: actorName });
                 const stored = await getTaskStore(server).getTaskResult(res.task.taskId);
 
+                expect(syncResult).not.toHaveProperty('toolTelemetry');
+                expect(stored).not.toHaveProperty('toolTelemetry');
                 expect(stored).toEqual(syncResult);
             },
             { paymentProvider: makePaymentProvider() },
