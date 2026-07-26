@@ -480,10 +480,12 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
         this.clearTools();
     }
 
-    /** Clear all tools and null their compiled schemas. */
+    /** Clear all tools and null the compiled schemas of the entries this instance may write. */
     private clearTools(): void {
         for (const tool of this.tools.values()) {
-            if (tool.ajvValidate && typeof tool.ajvValidate === 'function') {
+            // A frozen entry is not writable — the write throws in strict mode, whether it's a
+            // shared module singleton or a per-facade payment-decorated clone.
+            if (!Object.isFrozen(tool) && tool.ajvValidate && typeof tool.ajvValidate === 'function') {
                 (tool as { ajvValidate: ValidateFunction<unknown> | null }).ajvValidate = null;
             }
         }
