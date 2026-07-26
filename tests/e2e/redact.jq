@@ -74,8 +74,13 @@ def scrub:
 # what keeps `maxTotalChargeUsd` (17 chars, appears under `properties`) intact.
 def replace_ids:
     ([.. | objects | keys[]] | unique) as $keys
-    | ([.. | strings | select(test("^[A-Za-z0-9]{17}$"))] | unique) as $candidates
-    | (($candidates - $keys)) as $ids
+    # Standalone values: `"runId": "abc…"`.
+    | ([.. | strings | select(test("^[A-Za-z0-9]{17}$"))]) as $whole
+    # URL path segments: `…/key-value-stores/abc…/records/COVER`. Storage reads return IDs only
+    # inside `recordPublicUrl`-style links and the resource `uri`, never as a bare value, so
+    # without this collector those probes diff on every run.
+    | ([.. | strings | [scan("/([A-Za-z0-9]{17})(?=[/?\"]|$)")] | flatten[]]) as $inUrls
+    | (($whole + $inUrls | unique) - $keys) as $ids
     | reduce $ids[] as $id (.; walk(if type == "string" then gsub($id; "<id>") else . end));
 
 def prune:

@@ -91,6 +91,45 @@ Anything else is a finding.
 Probes that read mutable account state cannot be compared across two sequential runs; the counters
 and totals that move on every read are redacted for that reason.
 
+## Known instability — read before trusting a green run
+
+**mcpc can hang indefinitely on a `tools/call` or `prompts/get` protocol error**, producing no
+output on either stream and never exiting. Observed on both 0.2.6 and 0.5.0, reproducibly, on
+freshly created sessions after wiping `~/.mcpc` and killing every bridge. In the same session
+`ping`, `tools-list`, `tasks-get`, `resources-read` and tool calls that return `isError: true` all
+answer in under a second, so the server is fine — the bridge is not forwarding the error.
+
+Ruled out as causes: disk space, load, memory, the server's MCP SDK version, mcpc version, the
+number of tools in the error message, stale sessions, stale state directories, orphaned processes,
+and dependency drift (retested against a pristine lockfile and a fresh build).
+
+The probes affected are the protocol-error ones:
+
+- `rejects an unknown tool`
+- `rejects missing required argument`
+- `rejects an unknown prompt`
+- `rejects waitSecs above the maximum`
+
+Earlier in development the full suite passed 281/281 four times with these probes green, so the
+behaviour is environment- or state-dependent rather than permanent. `E2E_PROBE_TIMEOUT_MS`
+(default 45000) bounds each probe so a hang fails by name instead of stalling the run.
+
+**Consequence:** a clean `diff -r` is trustworthy, but a *failing* protocol-error probe is not by
+itself evidence of server drift — check whether it produced no output at all first. If these probes
+hang, re-run in a fresh container before drawing conclusions.
+
+## Pinned mcpc version
+
+`@apify/mcpc` stays on `^0.2.0`. 0.5.0 was evaluated and **not** adopted:
+
+- Tool-level `isError: true` results changed from exit 0 to exit 2, which silently inverts the
+  meaning of the two error classes below.
+- `resources-subscribe` gained a required `<file>` argument, so that probe stopped exercising the
+  server and started failing on mcpc's own argument parsing.
+- It does not fix the hang above.
+
+Re-evaluate on a fresh container, and expect to make the harness exit-code agnostic first.
+
 ## What this cannot cover
 
 mcpc is a request/response client driven from a shell. These parts of the v1 surface are out of

@@ -75,14 +75,31 @@ const DEFAULT_SERVER_ENV: Record<string, string | null> = {
 /** Widget resources are ~1.5 MB of inlined HTML, well past spawnSync's 1 MB default. */
 const MAX_BUFFER = 64 * 1024 * 1024;
 
+/**
+ * Per-probe wall clock. Kept well under the vitest test timeout so a wedged mcpc bridge reports a
+ * named failure instead of being killed anonymously by the runner. See README, "Known instability":
+ * mcpc can hang indefinitely on a `tools/call` or `prompts/get` protocol error, returning no output
+ * at all, in which case the probe must fail loudly rather than stall the suite.
+ */
+const PROBE_TIMEOUT_MS = Number(process.env.E2E_PROBE_TIMEOUT_MS ?? 45_000);
+
 function runMcpc(args: string[], options: { allowFailure?: boolean } = {}) {
     const result = spawnSync(MCPC_BIN, args, {
         encoding: 'utf8',
         maxBuffer: MAX_BUFFER,
-        timeout: 120_000,
+        timeout: PROBE_TIMEOUT_MS,
     });
 
-    if (result.error) throw result.error;
+    // spawnSync reports a timeout kill as an ETIMEDOUT error with no usable output.
+    if (result.error) {
+        const timedOut = (result.error as NodeJS.ErrnoException).code === 'ETIMEDOUT';
+        throw new Error(
+            timedOut
+                ? `mcpc ${args.join(' ')} produced no output within ${PROBE_TIMEOUT_MS}ms. ` +
+                      'A hung bridge, not a server failure — see tests/e2e/README.md.'
+                : `mcpc ${args.join(' ')} could not be run: ${result.error.message}`,
+        );
+    }
     if (!options.allowFailure && result.status !== 0) {
         throw new Error(`mcpc ${args.join(' ')} failed:\n${result.stderr}`);
     }
