@@ -123,7 +123,8 @@ export async function isStatelessRequest(req: EraRoutableRequest): Promise<boole
  * than a shared extraction, so that branch stays untouched by this change.
  *
  * Dev-only shape: a facade is built per request, so `?actors=` re-fetches Actor metadata every time.
- * The hosted server serves every stateless request from one long-lived facade instead.
+ * A host may instead share one facade across many requests to avoid that — snapshots are composed
+ * per request either way, so the facade's lifecycle is the host's choice, not part of this contract.
  */
 async function serveStatelessRequest(req: Request, res: Response, taskStore: InMemoryTaskStore): Promise<void> {
     const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
