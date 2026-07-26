@@ -1,7 +1,12 @@
 # mcpc e2e suite — v1 behavior pin
 
+> **TEMPORARY.** Scaffolding for the stateless migration (#1128), not a permanent suite. Delete
+> this directory, the `e2e` project in `vitest.config.ts` and the `test:e2e` script when #1128
+> closes. `tests/integration/suite.ts` stays the permanent suite — do not move coverage in here,
+> and do not wire this into CI.
+
 Disposable harness that pins the **v1 (legacy sessionful) protocol surface** across the stateless
-migration (#1128). Not part of CI. Delete it when #1128 closes.
+migration (#1128).
 
 It runs in two modes from one table:
 
@@ -48,6 +53,10 @@ Requires `jq` on PATH. `mcpc` is resolved from `node_modules/.bin`, so bare `vit
 | `capture` | jq filters stored for `{{name}}` interpolation in later cases of the same config. |
 | `redact` | Run the snapshot through `redact.jq`. Required for anything embedding IDs or timings. |
 
+Cases run in array order within a config, and `capture` values flow forward. Two orderings matter:
+`gets the finished task result` sits last because `tasks-result` errors while the task is still
+working, and the abort/cancel probes need their target created first.
+
 Two error classes, both measured:
 
 | Class | Example | Exit | Payload |
@@ -81,6 +90,23 @@ Anything else is a finding.
 
 Probes that read mutable account state cannot be compared across two sequential runs; the counters
 and totals that move on every read are redacted for that reason.
+
+## What this cannot cover
+
+mcpc is a request/response client driven from a shell. These parts of the v1 surface are out of
+reach here and are **not** pinned by this harness — check them another way before releasing:
+
+| Not covered | Why | Where it belongs |
+|---|---|---|
+| `notifications/progress` | mcpc does not surface server notifications | `tests/integration/suite.ts` |
+| `notifications/message` filtering | `logging-set-level` round-trips, but delivered logs are invisible | `tests/integration/suite.ts` |
+| `_meta.apifyToken` on `tools/call` | mcpc sends no custom `_meta` | `tests/integration/suite.ts` |
+| Concurrent session isolation | one session per config, opened and closed in sequence | verified manually; needs two live sessions |
+| HTTP wire level (`GET /` 405, `POST /` without session 404, `DELETE /`) | not MCP traffic | `actor.server_streamable.test.ts` |
+| `notifications/tools/list_changed` | no v1 tool mutates the list post-connect | not applicable |
+
+The HTTP configs pin **per-session query-param resolution** (`?tools=`, `?ui=`, `?payment=`), not
+simultaneous isolation.
 
 ## Environment sensitivity
 

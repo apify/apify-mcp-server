@@ -1,4 +1,5 @@
 {
+  "_note": "TEMPORARY \u2014 delete tests/e2e/ when the stateless migration (#1128) closes. Pins the v1 protocol surface across the migration; not a permanent suite, not in CI. See tests/e2e/README.md.",
   "configs": {
     "default": {},
     "cat-actors": {
@@ -127,6 +128,27 @@
         "APIFY_TOKEN": null
       }
     },
+    "telemetry-off": {
+      "args": [
+        "--tools=actors,docs,dev",
+        "--telemetry-enabled=false"
+      ]
+    },
+    "telemetry-on": {
+      "args": [
+        "--tools=actors,docs,dev"
+      ]
+    },
+    "env-tools": {
+      "env": {
+        "TOOLS": "docs"
+      }
+    },
+    "env-ui-mode": {
+      "env": {
+        "UI_MODE": "apps"
+      }
+    },
     "http-docs": {
       "url": "${E2E_HTTP_BASE}?tools=docs"
     },
@@ -169,6 +191,10 @@
         "full-apps",
         "mcp-proxy",
         "no-token",
+        "telemetry-off",
+        "telemetry-on",
+        "env-tools",
+        "env-ui-mode",
         "http-docs",
         "http-storage",
         "http-ui-apps",
@@ -204,6 +230,10 @@
         "full-apps",
         "mcp-proxy",
         "no-token",
+        "telemetry-off",
+        "telemetry-on",
+        "env-tools",
+        "env-ui-mode",
         "http-docs",
         "http-storage",
         "http-ui-apps",
@@ -242,6 +272,10 @@
         "full-apps",
         "mcp-proxy",
         "no-token",
+        "telemetry-off",
+        "telemetry-on",
+        "env-tools",
+        "env-ui-mode",
         "http-docs",
         "http-storage",
         "http-ui-apps",
@@ -280,6 +314,10 @@
         "full-apps",
         "mcp-proxy",
         "no-token",
+        "telemetry-off",
+        "telemetry-on",
+        "env-tools",
+        "env-ui-mode",
         "http-docs",
         "http-storage",
         "http-ui-apps",
@@ -317,6 +355,10 @@
         "full-apps",
         "mcp-proxy",
         "no-token",
+        "telemetry-off",
+        "telemetry-on",
+        "env-tools",
+        "env-ui-mode",
         "http-docs",
         "http-storage",
         "http-ui-apps",
@@ -354,6 +396,10 @@
         "full-apps",
         "mcp-proxy",
         "no-token",
+        "telemetry-off",
+        "telemetry-on",
+        "env-tools",
+        "env-ui-mode",
         "http-docs",
         "http-storage",
         "http-ui-apps",
@@ -391,6 +437,10 @@
         "full-apps",
         "mcp-proxy",
         "no-token",
+        "telemetry-off",
+        "telemetry-on",
+        "env-tools",
+        "env-ui-mode",
         "http-docs",
         "http-storage",
         "http-ui-apps",
@@ -957,6 +1007,422 @@
         "resources-read",
         "ui://widget/actor-run.html"
       ]
+    },
+    {
+      "id": "starts a detached task",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "--detach",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}"
+      ],
+      "capture": {
+        "taskId": ".taskId"
+      },
+      "redact": true
+    },
+    {
+      "id": "lists tasks",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tasks-list"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets task status",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tasks-get",
+        "{{taskId}}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "starts a task to cancel",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "--detach",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":9,\"secondNumber\":9}"
+      ],
+      "capture": {
+        "cancelTaskId": ".taskId"
+      },
+      "redact": true
+    },
+    {
+      "id": "cancels a task",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tasks-cancel",
+        "{{cancelTaskId}}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "rejects an unknown task",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tasks-get",
+        "0000000000000000000000000000dead"
+      ],
+      "expectError": true
+    },
+    {
+      "id": "starts a run to abort",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}",
+        "waitSecs:=0"
+      ],
+      "capture": {
+        "abortRunId": ".structuredContent.runId"
+      },
+      "redact": true
+    },
+    {
+      "id": "aborts the run",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "abort-actor-run",
+        "runId:=\"{{abortRunId}}\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "calls the search-actors widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "search-actors-widget",
+        "keywords:=\"instagram\"",
+        "limit:=2"
+      ],
+      "redact": true
+    },
+    {
+      "id": "calls the fetch-actor-details widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details-widget",
+        "actor:=\"apify/rag-web-browser\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "calls the call-actor widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor-widget",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}"
+      ],
+      "capture": {
+        "widgetRunId": ".structuredContent.runId"
+      },
+      "redact": true
+    },
+    {
+      "id": "calls the get-actor-run widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run-widget",
+        "runId:=\"{{widgetRunId}}\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "calls report-problem",
+      "configs": [
+        "cat-dev"
+      ],
+      "args": [
+        "tools-call",
+        "report-problem",
+        "message:=\"e2e probe\""
+      ]
+    },
+    {
+      "id": "gets a text/plain record",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-record",
+        "keyValueStoreId:=\"{{kvStoreId}}\"",
+        "recordKey:=\"LOG\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets an image/png record",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-record",
+        "keyValueStoreId:=\"{{kvStoreId}}\"",
+        "recordKey:=\"COVER\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets dataset items with field projection",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "fields:=\"sum,isSumPrime\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets dataset items with omit",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "omit:=\"math\""
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets dataset items paged and descending",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "limit:=1",
+        "offset:=0",
+        "desc:=true"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets dataset items cleaned",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "clean:=true"
+      ],
+      "redact": true
+    },
+    {
+      "id": "searches Actors with an offset",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "search-actors",
+        "keywords:=\"instagram\"",
+        "limit:=2",
+        "offset:=2"
+      ],
+      "redact": true
+    },
+    {
+      "id": "searches the docs with paging",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "search-apify-docs",
+        "query:=\"actor input schema\"",
+        "limit:=2",
+        "offset:=1"
+      ],
+      "redact": true
+    },
+    {
+      "id": "lists runs filtered by status",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run-list",
+        "limit:=2",
+        "status:=\"SUCCEEDED\"",
+        "desc:=true"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets a truncated run log",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-log",
+        "runId:=\"{{runId}}\"",
+        "lines:=5"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets dataset schema with a limit",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-schema",
+        "datasetId:=\"{{datasetId}}\"",
+        "limit:=1"
+      ],
+      "redact": true
+    },
+    {
+      "id": "lists store keys with a limit",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-keys",
+        "keyValueStoreId:=\"{{kvStoreId}}\"",
+        "limit:=2"
+      ],
+      "redact": true
+    },
+    {
+      "id": "lists unnamed datasets descending",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-list",
+        "limit:=2",
+        "unnamed:=true",
+        "desc:=true"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets the run with a wait",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run",
+        "runId:=\"{{runId}}\"",
+        "waitSecs:=5"
+      ],
+      "redact": true
+    },
+    {
+      "id": "calls an Actor with run options",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}",
+        "callOptions:={\"memory\":512,\"timeout\":60}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "reads the run as a resource",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/actor-runs/{{runId}}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "reads the run log as a resource",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/logs/{{runId}}"
+      ],
+      "redact": true
+    },
+    {
+      "id": "reads store keys as a resource",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/key-value-stores/{{kvStoreId}}/keys"
+      ],
+      "redact": true
+    },
+    {
+      "id": "gets the finished task result",
+      "configs": [
+        "cat-all"
+      ],
+      "args": [
+        "tasks-result",
+        "{{taskId}}"
+      ],
+      "redact": true
     }
   ]
 }

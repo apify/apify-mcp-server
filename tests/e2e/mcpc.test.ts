@@ -1,3 +1,13 @@
+/**
+ * TEMPORARY — delete this whole directory when the stateless migration (#1128) closes.
+ *
+ * This is scaffolding, not a permanent suite. It exists to prove the v1 (legacy sessionful)
+ * protocol surface is unchanged by that migration, by probing two builds and diffing the output.
+ * `tests/integration/suite.ts` remains the permanent suite; do not migrate coverage into here,
+ * and do not wire this into CI.
+ *
+ * See tests/e2e/README.md for how to run it and how to read a diff.
+ */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

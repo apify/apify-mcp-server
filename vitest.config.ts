@@ -23,6 +23,8 @@ export default defineConfig({
                 },
             },
             {
+                // TEMPORARY — remove with tests/e2e/ when the stateless migration (#1128) closes.
+                // Opt-in only (`pnpm run test:e2e`); never add this project to CI.
                 extends: true,
                 test: {
                     name: 'e2e',

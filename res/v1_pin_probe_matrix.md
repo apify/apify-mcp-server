@@ -190,7 +190,12 @@ comes back clean.
 | `kv-meta` / `kv-keys` / `kv-record` / `kv-list` | the 4 KV tools against the run's default store | |
 | `res-read-ds` | `resources-read <dataset items URL>` | API-as-resource path |
 | `res-read-kv` | `resources-read <KV record URL>` | |
-| `task-*` | `--task` call, then `tasks-list`, `tasks-get`, `tasks-result`, `tasks-cancel` | task lifecycle + `statusMessage` |
+| `task-*` | `tools-call --detach`, then `tasks-list`, `tasks-get`, `tasks-result`, `tasks-cancel` | task lifecycle |
+
+**[measured] `--task` / `--detach` are subcommand-level flags** (`tools-call --detach <tool>`), not
+global ones. Placed before the session they are rejected as unknown options. Tasks are v1-only —
+an explicit non-goal for 2026-07-28 — so this is the highest-value block in the table.
+`tasks-result` errors while the task is still working, so it must run well after task creation.
 
 Sequencing: `call-sync` runs first; its `runId` / `defaultDatasetId` /
 `defaultKeyValueStoreId` feed the storage and run probes. Those IDs differ per side by

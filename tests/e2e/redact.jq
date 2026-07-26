@@ -1,3 +1,6 @@
+# TEMPORARY — delete with the rest of tests/e2e/ when the stateless migration (#1128) closes.
+# See tests/e2e/README.md.
+#
 # Normalizes values that legitimately differ between two runs of the same probe, so that diffing
 # two capture directories shows behavioral drift only.
 #
@@ -40,12 +43,18 @@ def NULLED:
         "deleteCount",
         "inflatedBytes",
         "storageBytes",
-        "total"
+        "total",
+        # Task progress text reflects the Actor's state at poll time, so it moves with timing.
+        # `status` is deliberately kept: it is the signal these probes exist for.
+        "statusMessage",
+        "lastUpdatedAt"
     ];
 
 def scrub:
     gsub("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z"; "<ts>")
     | gsub("\\b(?=[A-Za-z0-9]{17}\\b)(?=[A-Za-z0-9]*[0-9])[A-Za-z0-9]{17}\\b"; "<id>")
+    # MCP task IDs are 32 lowercase hex characters, so they miss the Apify-ID pattern above.
+    | gsub("\\b[0-9a-f]{32}\\b"; "<taskid>")
     | gsub("\\b\\d+\\.\\d+s\\b"; "<dur>");
 
 def prune:
