@@ -52,10 +52,31 @@ def NULLED:
 
 def scrub:
     gsub("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z"; "<ts>")
-    | gsub("\\b(?=[A-Za-z0-9]{17}\\b)(?=[A-Za-z0-9]*[0-9])[A-Za-z0-9]{17}\\b"; "<id>")
-    # MCP task IDs are 32 lowercase hex characters, so they miss the Apify-ID pattern above.
+    # MCP task IDs are 32 lowercase hex characters.
     | gsub("\\b[0-9a-f]{32}\\b"; "<taskid>")
-    | gsub("\\b\\d+\\.\\d+s\\b"; "<dur>");
+    | gsub("\\b\\d+\\.\\d+s\\b"; "<dur>")
+    # List summaries quote an account-wide total ("Listed 2 of 112 datasets."), which grows as the
+    # suite itself creates storages. The page size before it stays visible.
+    | gsub("of (?<n>\\d+) (?<k>datasets|key-value stores|runs)"; "of <n> \(.k)");
+
+# Apify IDs are 17 base62 characters. Collect them only where they appear as a *whole* string
+# value — there they are unambiguously identifiers — then replace those exact literals everywhere,
+# including inside prose ("Run <id> was created") and inside serialized JSON.
+#
+# The earlier heuristic matched any 17-char run of base62 that contained a digit, to spare
+# `maxTotalChargeUsd`. It failed in both directions:
+#   - it missed the ~5% of real IDs with no digit at all (`TeImCqaYBKkirMfpw`), which then showed
+#     up as permanent false diffs;
+#   - it corrupted scientific notation, rewriting `4.5850133895874023E-7` to `4.<id>-7` because the
+#     mantissa is 17 base62 characters, which left embedded JSON unparseable.
+# Collecting concrete values instead of guessing from shape avoids both.
+# Candidates that also occur as an object key are schema property names, not identifiers — that is
+# what keeps `maxTotalChargeUsd` (17 chars, appears under `properties`) intact.
+def replace_ids:
+    ([.. | objects | keys[]] | unique) as $keys
+    | ([.. | strings | select(test("^[A-Za-z0-9]{17}$"))] | unique) as $candidates
+    | (($candidates - $keys)) as $ids
+    | reduce $ids[] as $id (.; walk(if type == "string" then gsub($id; "<id>") else . end));
 
 def prune:
     walk(
@@ -68,17 +89,22 @@ def prune:
         end
     );
 
+def redact_text_parts:
+    map(
+        if (type == "object") and ((.text? // null) | type == "string") then
+            .text |= (. as $raw | try (fromjson | prune | tojson) catch $raw)
+        else
+            .
+        end
+    );
+
+# `tools/call` returns `content`; `resources/read` returns `contents`. Both carry serialized JSON.
 def redact_embedded_json:
-    if (type == "object") and (has("content")) then
-        .content |= map(
-            if (type == "object") and ((.text? // null) | type == "string") then
-                .text |= (. as $raw | try (fromjson | prune | tojson) catch $raw)
-            else
-                .
-            end
-        )
+    if type == "object" then
+        (if has("content") then .content |= redact_text_parts else . end)
+        | (if has("contents") then .contents |= redact_text_parts else . end)
     else
         .
     end;
 
-redact_embedded_json | prune
+redact_embedded_json | prune | replace_ids

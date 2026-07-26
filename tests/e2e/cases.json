@@ -1156,6 +1156,19 @@
       "redact": true
     },
     {
+      "id": "waits for the widget run to finish",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run",
+        "runId:=\"{{widgetRunId}}\"",
+        "waitSecs:=45"
+      ],
+      "redact": true
+    },
+    {
       "id": "calls the get-actor-run widget",
       "configs": [
         "full-apps"
