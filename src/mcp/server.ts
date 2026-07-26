@@ -109,6 +109,12 @@ async function resolveServableWidgets(): Promise<Map<string, AvailableWidget>> {
  * from a snapshot this facade hands out.
  */
 export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerHost {
+    /**
+     * The resolved tool map the instance's own (sessionful) connection serves, composed from
+     * `toolSources` once the legacy handshake makes mode and client known. A stateless request
+     * never reads it: its identity arrives with the request, after this map is composed, so its
+     * snapshot re-composes from the sources instead ({@link createRequestSnapshot}).
+     */
     public readonly tools: Map<string, ToolEntry>;
     public readonly options: ActorsMcpServerOptions;
     public readonly actorStore?: ActorStore;
@@ -634,7 +640,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         // Reverse-of-connect (LIFO) teardown: take the transport/server down first (SIGINT removal +
         // server close are the adapter's transport-lifecycle responsibility), then clear the shared
         // tool map. The order is unobservable because `close()` only runs on a quiesced serving unit.
-        // `clearTools()` leaves the retained sources in place, so a stateless snapshot taken after
+        // Clearing `tools` leaves the retained sources in place, so a stateless snapshot taken after
         // this still lists every loaded tool, re-composed from those sources — the third face of the
         // `upsertTools` / `removeToolsByName` divergence. Latent: nothing closes a facade mid-traffic.
         await this.legacyServer.close();
