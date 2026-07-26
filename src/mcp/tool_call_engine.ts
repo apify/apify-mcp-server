@@ -91,6 +91,16 @@ export function buildPreflightFailureOutcome(
     };
 }
 
+/**
+ * The tool a `tools/call` names, accepting a legacy alias or an Actor's full name. The single
+ * resolution rule: a shell that needs the tool before {@link prepareToolCall} returns (e.g. for its
+ * `outputSchema`) must resolve it the same way, or the two can disagree about which tool was called.
+ */
+export function resolveToolEntry(name: string, tools: Map<string, ToolEntry>): ToolEntry | undefined {
+    const newName = legacyToolNameToNew(name) ?? name;
+    return Array.from(tools.values()).find((tool) => tool.name === newName || getToolFullName(tool) === newName);
+}
+
 /** Prepares a call; protocol errors are left to the shell. */
 export async function prepareToolCall(params: {
     apifyToken: string;
@@ -134,8 +144,7 @@ export async function prepareToolCall(params: {
         };
     }
 
-    const newName = legacyToolNameToNew(name) ?? name;
-    const toolEntry = Array.from(tools.values()).find((t) => t.name === newName || getToolFullName(t) === newName);
+    const toolEntry = resolveToolEntry(name, tools);
 
     if (!toolEntry) {
         const availableTools = Array.from(tools.keys());
