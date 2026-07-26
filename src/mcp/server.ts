@@ -37,6 +37,7 @@ import { buildMcpClientContext, isUiSupportedByClient } from './client_context.j
 import type { McpClientContext } from './client_context.js';
 import { LegacyMcpServer } from './legacy_server.js';
 import type { LegacyMcpServerHost } from './legacy_server.js';
+import type { StatelessMcpServerHost, StatelessRequestSnapshot } from './stateless_server.js';
 import { parseInputParamsFromUrl } from './utils.js';
 
 /** An actor-tool fetch retained with the exact input it was fetched for, so it can be re-composed. */
@@ -94,9 +95,11 @@ async function resolveServableWidgets(): Promise<Map<string, AvailableWidget>> {
  * `actorStore`, telemetry config, widgets, prompt/resource services, and token/client resolution,
  * and constructs exactly one {@link LegacyMcpServer} (the v1 SDK adapter), delegating all v1
  * protocol work to it. It implements {@link LegacyMcpServerHost} so the adapter reads shared state
- * through a narrow contract.
+ * through a narrow contract, and {@link StatelessMcpServerHost} for the 2026-07-28 adapter — which
+ * it does not construct: a stateless serving unit is built per request by `createStatelessServer`,
+ * from a snapshot this facade hands out.
  */
-export class ActorsMcpServer implements LegacyMcpServerHost {
+export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerHost {
     public readonly tools: Map<string, ToolEntry>;
     public readonly options: ActorsMcpServerOptions;
     public readonly actorStore?: ActorStore;
@@ -271,6 +274,60 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
         return getServerInstructions(this.serverMode, this.tools.has(HELPER_TOOLS.PROBLEM_REPORT));
     }
 
+    /**
+     * Instructions for a stateless serving unit. The SDK answers `server/discover` from them at
+     * construction time, before any request's envelope is seen, so they are configuration-level: the
+     * configured mode (generic guidance while it is `'auto'`, since no client is known yet) and no
+     * report-problem mention, because that tool's presence is decided per request long after this
+     * string is frozen. Gating itself is unaffected — see {@link createRequestSnapshot}.
+     *
+     * From `serverModeOption`, never `_serverMode`: a legacy `initialize` rewrites that field in
+     * place, and one facade serves both eras, so reading it would let one legacy client's resolved
+     * mode decide what every later stateless request is told.
+     */
+    public getStatelessServerInstructions(): string {
+        return getServerInstructions(resolveServerMode(this.serverModeOption, false));
+    }
+
+    /**
+     * Build the read-only view one stateless (2026-07-28) request is served from: mode resolved
+     * against *that request's* declared UI capability, the tool set composed against that same
+     * identity (so report-problem gating is applied per request), and a resource service bound to
+     * both. Nothing request-specific is written back to the facade — the only instance field this
+     * touches is the identity-independent widget-resolution memo — so two concurrent requests
+     * declaring different identities cannot contaminate each other.
+     */
+    public async createRequestSnapshot(clientContext: McpClientContext | undefined): Promise<StatelessRequestSnapshot> {
+        // From the configured option, not `_serverMode` — same reason as
+        // {@link getStatelessServerInstructions}.
+        const serverMode = resolveServerMode(this.serverModeOption, isUiSupportedByClient(clientContext));
+        const view: ServingContext = { serverMode, clientContext };
+
+        // Re-compose from the retained sources, not the live `tools` map: that map was composed for
+        // the instance's own view. Directly upserted tools are deliberately left out — carrying them
+        // over would re-add tools this view's gating just withheld.
+        const tools = new Map<string, ToolEntry>();
+        for (const source of this.toolSources) {
+            for (const tool of this.composeToolsForClient(source, view)) {
+                const stored = this.toStoredTool(tool);
+                tools.set(stored.name, stored);
+            }
+        }
+
+        const availableWidgets = await this.resolveWidgetsForMode(serverMode);
+        return {
+            serverMode,
+            clientContext,
+            tools,
+            resourceService: createResourceService({
+                paymentProvider: this.options.paymentProvider,
+                getMode: () => serverMode,
+                getAvailableWidgets: () => availableWidgets,
+            }),
+            createApifyClient: (token) => this.createApifyClient(token, clientContext),
+        };
+    }
+
     /** True once the connecting client is known (set in the initialize handler, or hydrated by a
      *  recovery path). Only client-gated tools wait for this so the per-client blocklist can be
      *  applied; client-agnostic tools compose regardless. */
@@ -284,9 +341,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
      * a default-injected tool rather than a category member, so servability is gated here; every
      * other tool composes eagerly, so a recovery load without an initialize still restores it.
      *
-     * Both callers — the input-driven load paths and the initialize flush — pass the instance's own
-     * {@link servingContext}, so report-problem is withheld until the client is known and re-added by
-     * the flush.
+     * Three callers. The input-driven load paths and the initialize flush pass the instance's own
+     * {@link servingContext}, where report-problem is withheld until the client is known and re-added
+     * by the flush; {@link createRequestSnapshot} passes a view derived from one stateless request.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
         const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
@@ -298,8 +355,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
      * Whether report-problem may be served against `view`:
      * - Its only function is forwarding submissions via telemetry, so it is never servable when
      *   telemetry is disabled (it would just fake an acknowledgement into the void).
-     * - It cannot be judged until the client is known, so it is withheld while `view` has none; the
-     *   initialize flush re-composes and adds it if the client allows.
+     * - It cannot be judged until the client is known, so it is withheld while `view` has none. On a
+     *   sessionful connection the initialize flush re-composes and adds it if the client allows; a
+     *   stateless request's view always names its client, so the answer is final on the spot.
      * Every other tool is unconditionally servable, so recovery loads compose them eagerly and they
      * survive a load that never sees an initialize.
      */
@@ -436,7 +494,14 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
         this.registerFetchedActorTools(input, actorTools);
     }
 
-    /** Delete tools from the server. */
+    /**
+     * Delete tools from the server.
+     *
+     * Deletes from the shared tool map only, leaving the retained load sources in place, so a tool
+     * removed this way still appears in every stateless snapshot ({@link createRequestSnapshot}) —
+     * the more dangerous direction of the {@link upsertTools} divergence. No callers today; one that
+     * needs a tool gone on both protocol eras has to drop its source too.
+     */
     public removeToolsByName(toolNames: string[]): string[] {
         const removedTools: string[] = [];
         for (const toolName of toolNames) {
@@ -449,6 +514,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
 
     /**
      * Upsert new tools.
+     *
+     * Writes the shared tool map directly, bypassing the retained load sources, so a tool added only
+     * this way reaches no stateless snapshot ({@link createRequestSnapshot}). Load through
+     * `loadToolsFrom*` / `loadToolsByName` instead to serve a tool on both protocol eras.
+     *
      * @param tools - Array of tool wrappers to add or update
      * @returns Array of added/updated tool wrappers
      */
@@ -457,10 +527,14 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
         // composeToolsForClient — the single compose choke point where the client is known. Do not
         // filter here: this is a low-level commit point reached before the client is known too.
         for (const tool of tools) {
-            const stored = this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
+            const stored = this.toStoredTool(tool);
             this.tools.set(stored.name, stored);
         }
         return tools;
+    }
+
+    private toStoredTool(tool: ToolEntry): ToolEntry {
+        return this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
     }
 
     private removeToolByName(toolName: string): boolean {
@@ -489,10 +563,15 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
      * Still carries the request-origin tag from the client context captured by this point.
      */
     public resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
-        const token = this.resolveApifyToken(params._meta);
-        return token
-            ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(this.clientContext) })
-            : undefined;
+        return this.createApifyClient(this.resolveApifyToken(params._meta), this.clientContext);
+    }
+
+    /** The one place a request-scoped Apify client is constructed, on either protocol era. */
+    private createApifyClient(
+        token: string | undefined,
+        clientContext: McpClientContext | undefined,
+    ): ApifyClient | undefined {
+        return token ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(clientContext) }) : undefined;
     }
 
     /**
@@ -541,6 +620,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
         // Reverse-of-connect (LIFO) teardown: take the transport/server down first (SIGINT removal +
         // server close are the adapter's transport-lifecycle responsibility), then clear the shared
         // tool map. The order is unobservable because `close()` only runs on a quiesced serving unit.
+        // `clearTools()` leaves the retained sources in place, so a stateless snapshot taken after
+        // this still lists every loaded tool, re-composed from those sources — the third face of the
+        // `upsertTools` / `removeToolsByName` divergence. Latent: nothing closes a facade mid-traffic.
         await this.legacyServer.close();
         this.tools.clear();
     }

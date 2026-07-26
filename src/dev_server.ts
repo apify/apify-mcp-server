@@ -5,10 +5,14 @@
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
+import type { NodeIncomingMessageLike } from '@modelcontextprotocol/node';
+import { toNodeHandler, toWebRequest } from '@modelcontextprotocol/node';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { InitializeRequestParams } from '@modelcontextprotocol/sdk/types.js';
 import { InitializeRequestParamsSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { AuthInfo } from '@modelcontextprotocol/server';
+import { createMcpHandler, isLegacyRequest } from '@modelcontextprotocol/server';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -18,7 +22,9 @@ import { parseBooleanOrNull } from '@apify/utilities';
 import { ApifyClient } from './apify_client.js';
 import { buildMcpClientContext } from './mcp/client_context.js';
 import { ActorsMcpServer } from './mcp/server.js';
+import { createStatelessServer } from './mcp/stateless_server.js';
 import { resolvePaymentProvider } from './payments/index.js';
+import { sanitizeMezmoMessage } from './utils/logging.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { getRequestOriginForClient } from './utils/mcp_clients.js';
 import { parseServerMode } from './utils/server_mode.js';
@@ -89,6 +95,81 @@ function resolveRequestAuth(
     return null;
 }
 
+/** The request fields era routing reads. Narrow so it can be exercised without an HTTP server. */
+type EraRoutableRequest = {
+    method?: string;
+    url?: string;
+    headers: Record<string, string | string[] | undefined>;
+    body?: unknown;
+};
+
+/**
+ * Whether the 2026-07-28 stateless path must answer this request instead of the sessionful one.
+ *
+ * `isLegacyRequest` is the SDK's own discriminator: it reports `true` for claim-less traffic
+ * (2025-era `initialize` and follow-ups, body-less session GET/DELETE, unparseable bodies) and
+ * `false` for everything the 2026-07-28 entry answers — including that entry's own validation
+ * rejections, which must not be re-routed to a legacy handler.
+ */
+export async function isStatelessRequest(req: EraRoutableRequest): Promise<boolean> {
+    // A parsed body is always supplied (`express.json()` ran), so nothing is read from the stream —
+    // which is what lets the narrow shape above stand in for a full `IncomingMessage`.
+    return !(await isLegacyRequest(await toWebRequest(req as NodeIncomingMessageLike, req.body)));
+}
+
+/**
+ * Serves one 2026-07-28 request: no session id, no handshake, nothing retained afterwards. The
+ * URL-parameter and auth handling is deliberately a second copy of the sessionful branch's rather
+ * than a shared extraction, so that branch stays untouched by this change.
+ *
+ * Dev-only shape: a facade is built per request, so `?actors=` re-fetches Actor metadata every time.
+ * The hosted server serves every stateless request from one long-lived facade instead.
+ */
+async function serveStatelessRequest(req: Request, res: Response, taskStore: InMemoryTaskStore): Promise<void> {
+    const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
+    const telemetryEnabled =
+        parseBooleanOrNull(urlParams.get('telemetry-enabled')) ??
+        parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ??
+        true;
+    const uiParam = urlParams.get('ui');
+    const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
+    const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
+
+    const auth = resolveRequestAuth(req, res, paymentProvider);
+    if (!auth) return;
+    const { apifyToken } = auth;
+
+    const mcpServer = new ActorsMcpServer({
+        taskStore,
+        setupSigintHandler: false,
+        transportType: 'http',
+        telemetry: { enabled: telemetryEnabled },
+        serverMode,
+        paymentProvider,
+        token: apifyToken,
+    });
+    // Client identity arrives per request in the `_meta` envelope, not up front as with an
+    // `initialize` handshake, so this fetch carries no request-origin tag.
+    await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken }));
+
+    const handler = createMcpHandler(() => createStatelessServer(mcpServer), {
+        legacy: 'reject',
+        onerror: (error) =>
+            log.softFail('Stateless MCP request rejected', { errMessage: sanitizeMezmoMessage(error.message) }),
+    });
+    try {
+        // The entry never derives `authInfo` from the `Authorization` header, so the token this
+        // server already extracted is passed through as `authInfo` for handlers to read as
+        // `ctx.http.authInfo`. No OAuth client sits behind a dev bearer token, hence empty `clientId`.
+        if (apifyToken) {
+            (req as Request & { auth?: AuthInfo }).auth = { token: apifyToken, clientId: '', scopes: [] };
+        }
+        await toNodeHandler(handler)(req, res, req.body);
+    } finally {
+        await handler.close();
+    }
+}
+
 export function createExpressApp(): express.Express {
     const app = express();
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
@@ -124,6 +205,13 @@ export function createExpressApp(): express.Express {
     app.post('/', async (req: Request, res: Response) => {
         log.info('Received MCP request:', req.body);
         try {
+            // Both protocol eras are served on this one endpoint; everything the stateless path does
+            // not claim falls through to the sessionful path below, unchanged.
+            if (await isStatelessRequest(req)) {
+                await serveStatelessRequest(req, res, taskStore);
+                return;
+            }
+
             // Check for existing session ID
             const sessionId = req.headers['mcp-session-id'] as string | undefined;
             const initializeMessage = extractInitializeMessage(req.body);
