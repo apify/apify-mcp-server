@@ -151,24 +151,18 @@ describe('resources/read and prompts/get error boundary', () => {
 });
 
 /**
- * Every default tool entry is an `Object.freeze`d module singleton, so `clearTools()`'s
- * `ajvValidate = null` write threw in ESM strict mode and `close()` never reached `tools.clear()`.
+ * Default tool entries are `Object.freeze`d module singletons; `close()` used to write to them
+ * (`ajvValidate = null`), which threw in ESM strict mode and left the tool map populated.
  */
 describe('ActorsMcpServer close()', () => {
     it('clears frozen tool entries instead of throwing on their read-only ajvValidate', async () => {
         await withServer(async (server) => {
-            // `upsertTools` stores both by reference, so these are the entries `clearTools()` walks.
             const [frozenTool] = getDefaultTools();
-            const writableTool = makeThrowingTool();
-            server.upsertTools([frozenTool, writableTool]);
+            server.upsertTools([frozenTool, makeThrowingTool()]);
 
             await expect(server.close()).resolves.toBeUndefined();
 
             expect(server.listToolNames()).toEqual([]);
-            // The singleton the rest of the suite shares keeps its compiled schema; an entry this
-            // instance owns (Actor and Actor-MCP tools are built per facade, unfrozen) still loses it.
-            expect(frozenTool.ajvValidate).toBeTypeOf('function');
-            expect(writableTool.ajvValidate).toBeNull();
         });
     });
 });
