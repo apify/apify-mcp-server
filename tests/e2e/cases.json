@@ -1,33 +1,33 @@
 {
-  "_note": "TEMPORARY \u2014 delete tests/e2e/ when the stateless migration (#1128) closes. Pins the v1 protocol surface across the migration; not a permanent suite, not in CI. See tests/e2e/README.md.",
+  "_note": "TEMPORARY, AI-GENERATED, NOT HUMAN-MAINTAINED. Delete tests/e2e/ when the stateless migration (#1128) closes. Pins the v1 protocol surface across the migration; not a permanent suite, not in CI. `\"configs\": [\"__all__\"]` runs a case against every configuration. See tests/e2e/README.md.",
   "configs": {
     "default": {},
-    "cat-actors": {
+    "category-actors": {
       "args": [
         "--tools=actors"
       ]
     },
-    "cat-docs": {
+    "category-docs": {
       "args": [
         "--tools=docs"
       ]
     },
-    "cat-runs": {
+    "category-runs": {
       "args": [
         "--tools=runs"
       ]
     },
-    "cat-storage": {
+    "category-storage": {
       "args": [
         "--tools=storage"
       ]
     },
-    "cat-dev": {
+    "category-dev": {
       "args": [
         "--tools=dev"
       ]
     },
-    "cat-all": {
+    "category-all": {
       "args": [
         "--tools=actors,docs,runs,storage"
       ]
@@ -166,78 +166,14 @@
     {
       "id": "server info",
       "configs": [
-        "default",
-        "cat-actors",
-        "cat-docs",
-        "cat-runs",
-        "cat-storage",
-        "cat-dev",
-        "cat-all",
-        "tools-empty",
-        "actors-empty",
-        "both-empty",
-        "actor-single",
-        "actor-multi",
-        "actor-via-tools",
-        "tool-by-name",
-        "retired-add-actor",
-        "retired-experimental",
-        "retired-preview",
-        "retired-mixed",
-        "merge-compat",
-        "ui-apps",
-        "ui-default",
-        "ui-auto",
-        "full-apps",
-        "mcp-proxy",
-        "no-token",
-        "telemetry-off",
-        "telemetry-on",
-        "env-tools",
-        "env-ui-mode",
-        "http-docs",
-        "http-storage",
-        "http-ui-apps",
-        "http-payment-skyfire"
+        "__all__"
       ],
       "args": []
     },
     {
       "id": "ping",
       "configs": [
-        "default",
-        "cat-actors",
-        "cat-docs",
-        "cat-runs",
-        "cat-storage",
-        "cat-dev",
-        "cat-all",
-        "tools-empty",
-        "actors-empty",
-        "both-empty",
-        "actor-single",
-        "actor-multi",
-        "actor-via-tools",
-        "tool-by-name",
-        "retired-add-actor",
-        "retired-experimental",
-        "retired-preview",
-        "retired-mixed",
-        "merge-compat",
-        "ui-apps",
-        "ui-default",
-        "ui-auto",
-        "full-apps",
-        "mcp-proxy",
-        "no-token",
-        "telemetry-off",
-        "telemetry-on",
-        "env-tools",
-        "env-ui-mode",
-        "http-docs",
-        "http-storage",
-        "http-ui-apps",
-        "http-payment-skyfire"
+        "__all__"
       ],
       "args": [
         "ping"
@@ -247,39 +183,7 @@
     {
       "id": "tools list",
       "configs": [
-        "default",
-        "cat-actors",
-        "cat-docs",
-        "cat-runs",
-        "cat-storage",
-        "cat-dev",
-        "cat-all",
-        "tools-empty",
-        "actors-empty",
-        "both-empty",
-        "actor-single",
-        "actor-multi",
-        "actor-via-tools",
-        "tool-by-name",
-        "retired-add-actor",
-        "retired-experimental",
-        "retired-preview",
-        "retired-mixed",
-        "merge-compat",
-        "ui-apps",
-        "ui-default",
-        "ui-auto",
-        "full-apps",
-        "mcp-proxy",
-        "no-token",
-        "telemetry-off",
-        "telemetry-on",
-        "env-tools",
-        "env-ui-mode",
-        "http-docs",
-        "http-storage",
-        "http-ui-apps",
-        "http-payment-skyfire"
+        "__all__"
       ],
       "args": [
         "tools-list",
@@ -289,39 +193,7 @@
     {
       "id": "prompts list",
       "configs": [
-        "default",
-        "cat-actors",
-        "cat-docs",
-        "cat-runs",
-        "cat-storage",
-        "cat-dev",
-        "cat-all",
-        "tools-empty",
-        "actors-empty",
-        "both-empty",
-        "actor-single",
-        "actor-multi",
-        "actor-via-tools",
-        "tool-by-name",
-        "retired-add-actor",
-        "retired-experimental",
-        "retired-preview",
-        "retired-mixed",
-        "merge-compat",
-        "ui-apps",
-        "ui-default",
-        "ui-auto",
-        "full-apps",
-        "mcp-proxy",
-        "no-token",
-        "telemetry-off",
-        "telemetry-on",
-        "env-tools",
-        "env-ui-mode",
-        "http-docs",
-        "http-storage",
-        "http-ui-apps",
-        "http-payment-skyfire"
+        "__all__"
       ],
       "args": [
         "prompts-list"
@@ -330,39 +202,7 @@
     {
       "id": "resources list",
       "configs": [
-        "default",
-        "cat-actors",
-        "cat-docs",
-        "cat-runs",
-        "cat-storage",
-        "cat-dev",
-        "cat-all",
-        "tools-empty",
-        "actors-empty",
-        "both-empty",
-        "actor-single",
-        "actor-multi",
-        "actor-via-tools",
-        "tool-by-name",
-        "retired-add-actor",
-        "retired-experimental",
-        "retired-preview",
-        "retired-mixed",
-        "merge-compat",
-        "ui-apps",
-        "ui-default",
-        "ui-auto",
-        "full-apps",
-        "mcp-proxy",
-        "no-token",
-        "telemetry-off",
-        "telemetry-on",
-        "env-tools",
-        "env-ui-mode",
-        "http-docs",
-        "http-storage",
-        "http-ui-apps",
-        "http-payment-skyfire"
+        "__all__"
       ],
       "args": [
         "resources-list"
@@ -371,39 +211,7 @@
     {
       "id": "resource templates",
       "configs": [
-        "default",
-        "cat-actors",
-        "cat-docs",
-        "cat-runs",
-        "cat-storage",
-        "cat-dev",
-        "cat-all",
-        "tools-empty",
-        "actors-empty",
-        "both-empty",
-        "actor-single",
-        "actor-multi",
-        "actor-via-tools",
-        "tool-by-name",
-        "retired-add-actor",
-        "retired-experimental",
-        "retired-preview",
-        "retired-mixed",
-        "merge-compat",
-        "ui-apps",
-        "ui-default",
-        "ui-auto",
-        "full-apps",
-        "mcp-proxy",
-        "no-token",
-        "telemetry-off",
-        "telemetry-on",
-        "env-tools",
-        "env-ui-mode",
-        "http-docs",
-        "http-storage",
-        "http-ui-apps",
-        "http-payment-skyfire"
+        "__all__"
       ],
       "args": [
         "resources-templates-list"
@@ -412,39 +220,7 @@
     {
       "id": "logging set level",
       "configs": [
-        "default",
-        "cat-actors",
-        "cat-docs",
-        "cat-runs",
-        "cat-storage",
-        "cat-dev",
-        "cat-all",
-        "tools-empty",
-        "actors-empty",
-        "both-empty",
-        "actor-single",
-        "actor-multi",
-        "actor-via-tools",
-        "tool-by-name",
-        "retired-add-actor",
-        "retired-experimental",
-        "retired-preview",
-        "retired-mixed",
-        "merge-compat",
-        "ui-apps",
-        "ui-default",
-        "ui-auto",
-        "full-apps",
-        "mcp-proxy",
-        "no-token",
-        "telemetry-off",
-        "telemetry-on",
-        "env-tools",
-        "env-ui-mode",
-        "http-docs",
-        "http-storage",
-        "http-ui-apps",
-        "http-payment-skyfire"
+        "__all__"
       ],
       "args": [
         "logging-set-level",
@@ -454,7 +230,7 @@
     {
       "id": "rejects unknown tool",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -466,7 +242,7 @@
     {
       "id": "rejects missing required argument",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -478,7 +254,7 @@
     {
       "id": "rejects forbidden docs URL",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -490,7 +266,7 @@
     {
       "id": "rejects waitSecs above the maximum",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -503,7 +279,7 @@
     {
       "id": "rejects unknown prompt",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "prompts-get",
@@ -514,7 +290,7 @@
     {
       "id": "rejects a missing dataset resource",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "resources-read",
@@ -525,7 +301,7 @@
     {
       "id": "rejects a non-Apify resource URL",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "resources-read",
@@ -536,7 +312,7 @@
     {
       "id": "rejects resource subscribe",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "resources-subscribe",
@@ -547,7 +323,7 @@
     {
       "id": "rejects an unknown Actor",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -561,7 +337,7 @@
     {
       "id": "rejects an MCP Actor without a tool name",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -584,7 +360,7 @@
     {
       "id": "calls an Actor and waits",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -603,7 +379,7 @@
     {
       "id": "calls an Actor without waiting",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -617,7 +393,7 @@
     {
       "id": "calls an Actor with a maxItems cap",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -631,7 +407,7 @@
     {
       "id": "gets the run",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -643,7 +419,7 @@
     {
       "id": "gets the run log",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -655,7 +431,7 @@
     {
       "id": "lists runs",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -667,7 +443,7 @@
     {
       "id": "gets dataset items",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -679,7 +455,7 @@
     {
       "id": "gets dataset items flattened",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -692,7 +468,7 @@
     {
       "id": "gets dataset metadata",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -704,7 +480,7 @@
     {
       "id": "gets dataset schema",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -716,7 +492,7 @@
     {
       "id": "lists datasets",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -728,7 +504,7 @@
     {
       "id": "gets key-value store metadata",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -740,7 +516,7 @@
     {
       "id": "lists key-value store keys",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -752,7 +528,7 @@
     {
       "id": "gets the run INPUT record",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -765,7 +541,7 @@
     {
       "id": "lists key-value stores",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -777,7 +553,7 @@
     {
       "id": "reads dataset items as a resource",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "resources-read",
@@ -788,7 +564,7 @@
     {
       "id": "reads a key-value record as a resource",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "resources-read",
@@ -799,7 +575,7 @@
     {
       "id": "searches Actors",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -812,7 +588,7 @@
     {
       "id": "searches the docs",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -824,7 +600,7 @@
     {
       "id": "fetches a docs page",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -836,7 +612,7 @@
     {
       "id": "fetches Actor details with defaults",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -848,7 +624,7 @@
     {
       "id": "fetches Actor details, input schema only",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -861,7 +637,7 @@
     {
       "id": "fetches Actor details, description only",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -874,7 +650,7 @@
     {
       "id": "fetches Actor details, stats only",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -887,7 +663,7 @@
     {
       "id": "fetches Actor details, pricing only",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -900,7 +676,7 @@
     {
       "id": "fetches Actor details, readme only",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -913,7 +689,7 @@
     {
       "id": "fetches Actor details, mcp tools only",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -926,7 +702,7 @@
     {
       "id": "fetches Actor details, description and readme",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -939,7 +715,7 @@
     {
       "id": "fetches Actor details, rating and metadata",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -952,7 +728,7 @@
     {
       "id": "fetches MCP tools for a regular Actor",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -978,7 +754,7 @@
     {
       "id": "calls a tool through the MCP proxy",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1011,7 +787,7 @@
     {
       "id": "starts a detached task",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1028,7 +804,7 @@
     {
       "id": "lists tasks",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tasks-list"
@@ -1038,7 +814,7 @@
     {
       "id": "gets task status",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tasks-get",
@@ -1049,7 +825,7 @@
     {
       "id": "starts a task to cancel",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1066,7 +842,7 @@
     {
       "id": "cancels a task",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tasks-cancel",
@@ -1077,7 +853,7 @@
     {
       "id": "rejects an unknown task",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tasks-get",
@@ -1088,7 +864,7 @@
     {
       "id": "starts a run to abort",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1105,7 +881,7 @@
     {
       "id": "aborts the run",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1183,7 +959,7 @@
     {
       "id": "calls report-problem",
       "configs": [
-        "cat-dev"
+        "category-dev"
       ],
       "args": [
         "tools-call",
@@ -1194,7 +970,7 @@
     {
       "id": "gets a text/plain record",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1207,7 +983,7 @@
     {
       "id": "gets an image/png record",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1220,7 +996,7 @@
     {
       "id": "gets dataset items with field projection",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1233,7 +1009,7 @@
     {
       "id": "gets dataset items with omit",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1246,7 +1022,7 @@
     {
       "id": "gets dataset items paged and descending",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1261,7 +1037,7 @@
     {
       "id": "gets dataset items cleaned",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1274,7 +1050,7 @@
     {
       "id": "searches Actors with an offset",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1288,7 +1064,7 @@
     {
       "id": "searches the docs with paging",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1302,7 +1078,7 @@
     {
       "id": "lists runs filtered by status",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1316,7 +1092,7 @@
     {
       "id": "gets a truncated run log",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1329,7 +1105,7 @@
     {
       "id": "gets dataset schema with a limit",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1342,7 +1118,7 @@
     {
       "id": "lists store keys with a limit",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1355,7 +1131,7 @@
     {
       "id": "lists unnamed datasets descending",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1369,7 +1145,7 @@
     {
       "id": "gets the run with a wait",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1382,7 +1158,7 @@
     {
       "id": "calls an Actor with run options",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tools-call",
@@ -1396,7 +1172,7 @@
     {
       "id": "reads the run as a resource",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "resources-read",
@@ -1407,7 +1183,7 @@
     {
       "id": "reads the run log as a resource",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "resources-read",
@@ -1418,7 +1194,7 @@
     {
       "id": "reads store keys as a resource",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "resources-read",
@@ -1429,7 +1205,7 @@
     {
       "id": "gets the finished task result",
       "configs": [
-        "cat-all"
+        "category-all"
       ],
       "args": [
         "tasks-result",

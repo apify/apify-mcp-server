@@ -1,4 +1,5 @@
-# TEMPORARY — delete with the rest of tests/e2e/ when the stateless migration (#1128) closes.
+# TEMPORARY — AI-GENERATED — NOT HUMAN-MAINTAINED.
+# Delete with the rest of tests/e2e/ when the stateless migration (#1128) closes.
 # See tests/e2e/README.md.
 #
 # Normalizes values that legitimately differ between two runs of the same probe, so that diffing
@@ -14,12 +15,13 @@
 #            (statuses, item counts, field lists).
 #   NULLED — replaces values scrub cannot reach because they are bare numbers.
 #
-# Both patterns are deliberately narrow, verified against real values and near-misses:
-#   - IDs require a digit, so `maxTotalChargeUsd` (17 chars, no digit) survives.
-#   - Durations require a decimal point, so `waitSecs (default 30s)` in a description survives.
+# Identifiers are handled separately by `replace_ids`, which collects concrete values rather than
+# matching on shape — see the note above that definition for why shape matching failed.
 #
-# `content[].text` is handled too: when the text parses as JSON (content[0] mirrors
-# structuredContent) it is parsed, redacted and re-serialized so nested numbers are reached.
+# Durations require a decimal point, so `waitSecs (default 30s)` in a tool description survives.
+#
+# Serialized JSON inside `content[].text` (tool calls) and `contents[].text` (resource reads) is
+# parsed, redacted and re-serialized, so nested numbers are reached too.
 
 def NULLED:
     [
