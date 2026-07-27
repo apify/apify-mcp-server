@@ -42,6 +42,11 @@ tracked by umbrella issue #777.
 ### [integration_test_coverage_plan.md](./integration_test_coverage_plan.md)
 PR-by-PR breakdown of the audit above. Live plan (#777); sub-issues #750–#754, #766.
 
+### [v1_pin_probe_matrix.md](./v1_pin_probe_matrix.md)
+Design for the disposable mcpc harness (`tests/e2e/`) that pins the v1 protocol surface across the
+#1128 stateless migration; the original differential/no-assertion approach was abandoned in favor
+of real per-case assertions — see the doc's own callout. Ad-hoc, not CI. Delete when #1128 closes.
+
 ### [chatgpt-app-submission.md](./chatgpt-app-submission.md)
 Checklist and notes for ChatGPT MCP Apps store submission. In progress — verify line
 references against current source before relying on them.
