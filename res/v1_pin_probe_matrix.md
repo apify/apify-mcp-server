@@ -4,9 +4,16 @@ Design for an **ad-hoc, disposable** harness that proves the v1 (legacy sessionf
 surface is unchanged by the stateless migration (#1128). Not a CI suite. Not a permanent test
 suite. Delete it when #1128 closes.
 
-> **Implemented.** The harness lives in `tests/e2e/`; operational detail is in
-> [`tests/e2e/README.md`](../tests/e2e/README.md), which is the doc to trust. Corrections that
-> implementation forced on this design are marked **[measured]** below.
+> **Implemented, then pivoted away from the design below.** The harness lives in `tests/e2e/`;
+> [`tests/e2e/README.md`](../tests/e2e/README.md) is the doc to trust. The differential approach
+> this document describes — no assertions, capture two builds, diff — was abandoned: in practice it
+> moved the cost from "write assertions" to "write and debug a redaction filter" (wrong-shape IDs,
+> corrupted scientific notation, missed `resources/read`'s `contents` vs `tools/call`'s `content`),
+> plus a baseline worktree to keep built and in sync. Every case in `cases.json` now has a real `jq`
+> assertion instead. The rest of this document is historical — read it for the reasoning that led to
+> the probe *matrix* (still accurate: which configs, which tool calls, which quirks matter), not for
+> how results are checked. Corrections that implementation forced on the matrix itself are still
+> marked **[measured]** below.
 
 ## Why differential
 

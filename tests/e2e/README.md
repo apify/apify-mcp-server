@@ -12,41 +12,27 @@
 > here, and do not wire this into CI.
 
 Disposable harness that pins the **v1 (legacy sessionful) protocol surface** across the stateless
-migration (#1128).
+migration (#1128), by driving the built `dist/stdio.js` through `mcpc` and asserting on the
+response with `jq`.
 
-It runs in two modes from one table:
-
-- **Assertive** — cases with an `assert` fail loudly. `pnpm run test:e2e`.
-- **Differential** — every case snapshots its output; capture two builds and diff. No expectations
-  are authored, so coverage can be exhaustive without a maintenance burden.
+Every one of the 85 cases has a real assertion: exact values where the test Actor's behavior is
+deterministic (a fixed input always sums to the same result, always writes the same 5 store keys),
+structural checks where it is not (has these keys, is this shape), and error-message checks on the
+error paths.
 
 ## Running
 
 ```bash
-# Assertive
 pnpm run test:e2e
-
-# Snapshot the current build
-pnpm run build
-E2E_SNAPSHOT_DIR=/tmp/e2e/head pnpm exec vitest run --project e2e
-
-# Snapshot the pre-migration baseline and diff
-git worktree add ../v1-base 0ca21c6
-(cd ../v1-base && pnpm install && pnpm run build)
-E2E_SERVER_ENTRY=$PWD/../v1-base/dist/stdio.js \
-  E2E_SNAPSHOT_DIR=/tmp/e2e/base pnpm exec vitest run --project e2e
-diff -r /tmp/e2e/base /tmp/e2e/head
 ```
 
-`0ca21c6` is the baseline: the last commit before `432289e` (#1127), the first migration PR.
+Requires `jq` on PATH. `mcpc` is resolved from `node_modules/.bin`, so bare `vitest` works too.
 
 | Variable | Effect |
 |---|---|
-| `E2E_SERVER_ENTRY` | Server to probe. Default `dist/stdio.js`. |
-| `E2E_SNAPSHOT_DIR` | Write normalized output to `<dir>/<config>/<case>.json`. |
-| `E2E_HTTP_BASE` | Base URL for HTTP configs, e.g. `http://localhost:3001`. Those configs are skipped when unset. |
-
-Requires `jq` on PATH. `mcpc` is resolved from `node_modules/.bin`, so bare `vitest` works too.
+| `E2E_HTTP_BASE` | Base URL for HTTP configs, e.g. `http://localhost:3001` (needs `pnpm run dev` running). Those configs are skipped when unset. |
+| `E2E_PROBE_TIMEOUT_MS` | Per-probe wall clock before a hung mcpc bridge fails by name. Default 45000 — see "Known instability" below. |
+| `E2E_WORKERS` | Shard worker count. Default 6 — see "Parallelism" below. |
 
 ## Parallelism
 
@@ -66,11 +52,13 @@ finished; case counts vary a lot; some configs carry 8-40+ probes, most carry 7.
 self-contained, with any `capture` it depends on re-established inside itself — purely so that
 chain can be spread across shards instead of anchoring one of them alone. `excludeFromAll: true` on
 those keeps `"configs": ["__all__"]` probes (the static ones) from also running against them, which
-would just be a duplicate snapshot of a config that already exists.
+would just repeat an identical probe against a config that already covers it elsewhere.
 
 `maxWorkers` (default 6, override with `E2E_WORKERS`) is set above the 4-core count on purpose —
 each probe is a short subprocess call that mostly waits on the network, not the CPU, so
 oversubscribing does not thrash.
+
+Verified: 281/281 pass, ~76-130s wall clock (sharded) versus ~8 minutes serial.
 
 ## Structure
 
@@ -80,27 +68,22 @@ A case lists the configs it runs against. Use `"configs": ["__all__"]` for probe
 everywhere — the static-surface ones do — so adding a configuration does not mean editing every
 case. Name configs after what they vary: `category-actors`, `retired-preview`, `telemetry-off`. A
 config can set `"excludeFromAll": true` to opt out of `__all__` cases — used for configs that exist
-only to shard a long probe chain and would otherwise duplicate another config's static snapshots
-(see Parallelism above).
+only to shard a long probe chain (see Parallelism above).
 
 Case fields:
 
 | Field | Meaning |
 |---|---|
-| `assert` | jq filter run with `-e`. Optional — without it the case is snapshot-only. |
-| `expectError` | Expect a non-zero mcpc exit. Protocol errors exit 2 and write JSON to stderr. |
-| `capture` | jq filters stored for `{{name}}` interpolation in later cases of the same config. |
-| `redact` | Run the snapshot through `redact.jq`. Required for anything embedding IDs or timings. |
+| `assert` | jq filter run with `-e`. May reference `{{name}}` captures from earlier cases in the same config. |
+| `expectError` | Expect an error response — protocol-level (non-zero exit) or tool-level (`isError: true`). |
+| `capture` | jq filters stored for `{{name}}` interpolation in later cases (`args` or `assert`) of the same config. |
 | `pollWhileWorking` | Retry while mcpc reports the task still running (`tasks-result` errors until it is terminal). |
 
-Cases run in array order within a config, and `capture` values flow forward — the abort/cancel
-probes need their target created earlier in the same config's list. `gets the finished task result`
-used to rely on running last in a long chain to give the task time to finish in the background;
-after splitting the task probes into their own `tasks` configuration (see Parallelism) that chain
-is only 6 cases, too short to make that reliable, so it polls instead (`pollWhileWorking`, ~40s cap).
+Cases run in array order within a config, and `capture` values flow forward — the abort/cancel and
+task-lifecycle probes need their target created earlier in the same config's list.
 
-Two error classes, both measured — and mcpc's exit code for the first one is **not** stable across
-versions, so the runner classifies by payload shape, not by exit code (`isToolLevelErrorResponse` /
+Two error classes — and mcpc's exit code for the first one is **not** stable across versions, so
+the runner classifies by payload shape, not by exit code (`isToolLevelErrorResponse` /
 `isGenuineFailure` / `respondsWithSomeError` in `runner.ts`):
 
 | Class | Example | Exit (0.2.x) | Exit (0.5.x) | Payload |
@@ -108,37 +91,16 @@ versions, so the runner classifies by payload shape, not by exit code (`isToolLe
 | Tool-level | bad dataset id, forbidden URL | 0 | 2 | `{content, isError: true}` on stdout |
 | Protocol | unknown tool, missing required arg | 2 | 2 | `{"error": …}` on stderr, stdout empty |
 
-A case with no `assert` and no `expectError` ("snapshot-only") tolerates a tool-level error either
-way — it was never asserting success, only that the server produced *some* well-formed response —
-so an unreachable external dependency (see "Environment sensitivity" below) still gets captured as
-a snapshot instead of throwing. Only a genuine protocol/bridge failure fails a snapshot-only case.
+A case with `expectError` is checked against *either* class, not raw exit code, so the same case
+definition holds across mcpc's exit-code change between 0.2.x and 0.5.x. A case whose live
+dependency can legitimately be unreachable (an external Actor, an external search backend — see
+"Environment sensitivity" below) writes its `assert` to accept a tool-level error there too, instead
+of asserting success unconditionally.
 
 ## Secrets
 
-Snapshots are scrubbed of two credentials. **Do not commit snapshot directories** regardless.
-
-- mcpc's `_mcpc` envelope carries the resolved `APIFY_TOKEN` in plaintext. It is stripped from
-  every payload before assertions, snapshots and failure messages.
-- `urlSigningSecretKey` (per-store signing secret) is redacted by `redact.jq`.
-
-## Reading a diff
-
-Two diffs are expected and benign:
-
-1. **`serverInfo.version`** in every `server-info.json` — a release bump, not behavior.
-2. **`add-actor` absent in HEAD** — #1144 deleted it deliberately. Shows up in the `retired-*`
-   configs' `tools-list.json` and in `toolNames`.
-
-One known noise source:
-
-3. **`storages.datasets.books.itemCount`** in `calls-an-actor-and-waits` — the test Actor writes to
-   a *named* dataset that persists across runs, so its count moves. Not redacted, because
-   `itemCount` on the default dataset is real signal.
-
-Anything else is a finding.
-
-Probes that read mutable account state cannot be compared across two sequential runs; the counters
-and totals that move on every read are redacted for that reason.
+mcpc's `_mcpc` envelope carries the resolved `APIFY_TOKEN` in plaintext. It is stripped from every
+payload before any assertion or failure message can see it (`stripMcpcEnvelope` in `runner.ts`).
 
 ## Known instability — read before trusting a green run
 
@@ -154,18 +116,16 @@ and dependency drift (retested against a pristine lockfile and a fresh build).
 
 The probes affected are the protocol-error ones:
 
-- `rejects an unknown tool`
+- `rejects unknown tool`
 - `rejects missing required argument`
-- `rejects an unknown prompt`
+- `rejects unknown prompt`
 - `rejects waitSecs above the maximum`
 
 Earlier in development the full suite passed 281/281 four times with these probes green, so the
-behaviour is environment- or state-dependent rather than permanent. `E2E_PROBE_TIMEOUT_MS`
-(default 45000) bounds each probe so a hang fails by name instead of stalling the run.
-
-**Consequence:** a clean `diff -r` is trustworthy, but a *failing* protocol-error probe is not by
-itself evidence of server drift — check whether it produced no output at all first. If these probes
-hang, re-run in a fresh container before drawing conclusions.
+behaviour is environment- or state-dependent rather than permanent. `E2E_PROBE_TIMEOUT_MS` (default
+45000) bounds each probe so a hang fails by name — "produced no output within Nms... a hung bridge,
+not a server failure" — instead of stalling the run or being misread as the server having regressed.
+If these probes hang, re-run in a fresh container before concluding anything about the server.
 
 ## mcpc version
 
@@ -180,16 +140,12 @@ What actually changed between 0.2.x and 0.5.x, and what was done about each:
   `isError: true` in some environment. That whack-a-mole approach was tried first and missed two
   cases (`searches the docs`, `searches the docs with paging` — both fail in network-restricted
   sandboxes where `search-apify-docs`'s Algolia backend is unreachable) before the structural fix
-  replaced it.
-- **`resources-subscribe` gained a required `<file>` argument.** Not fixed. `rejects resource
-  subscribe` still passes, but now because mcpc's own CLI parser rejects the call for a missing
-  argument (`error: missing required argument 'file'` on stderr, exit 1) — not because the server
-  rejected an unsupported subscription. The case no longer exercises the server. Worth a real fix
-  (pass a scratch file and check what the server does with it) or replacing the probe; flagging
-  rather than guessing at the intended behavior.
+  replaced it. Their `assert` now explicitly accepts either outcome (see Environment sensitivity).
+- **`resources-subscribe` gained a required `<file>` argument.** `rejects resource subscribe` now
+  passes that argument, which lets the call actually reach the server instead of failing on mcpc's
+  own CLI parsing. The server correctly answers "Server does not support resource subscriptions (no
+  resources.subscribe capability)", which the case now asserts on directly.
 - **Does not fix the mcpc hang** documented above. Reproduces identically on 0.5.0.
-
-Verified: 281/281 pass on 0.5.0, ~76s wall clock (sharded).
 
 ## What this cannot cover
 
@@ -210,14 +166,17 @@ simultaneous isolation.
 
 ## Environment sensitivity
 
-Some probes depend on outbound network reach and will return `isError` on restricted networks. That
-does not break the diff — the same failure appears on both sides — but the probe stops carrying
-signal:
+Some probes depend on outbound network reach and return `isError` on restricted networks. Their
+`assert` accepts either the happy path or that specific failure, so the case still passes — but on
+a restricted network it is only proving the failure mode is the expected one, not exercising the
+real behavior:
 
-- `search-apify-docs` and `fetch-apify-docs` for `https://crawlee.dev`.
-- Anything touching `apify/example-mcp-server` (the MCP-proxy probes). Note that
-  `--tools=apify/example-mcp-server` legitimately loads **no** tools when the Actor is unreachable,
-  since loading an MCP-server Actor means connecting to it and enumerating its tools.
+- `searches Actors`, `searches the docs`, `searches Actors with an offset`, `searches the docs with
+  paging` — Algolia (Actor Store search) or a docs search backend may be unreachable.
+- `calls a tool through the MCP proxy` — depends on `apify/example-mcp-server` being reachable.
+  Note that `--tools=apify/example-mcp-server` (the `mcp-proxy` config) legitimately loads **no**
+  tools when the Actor is unreachable, since loading an MCP-server Actor means connecting to it and
+  enumerating its tools.
 
 The `no-token` config relies on `~/.apify/auth.json` being absent. `stdio.ts` falls back to that
 file, so a developer logged into the `apify` CLI silently gets a token and the config stops testing

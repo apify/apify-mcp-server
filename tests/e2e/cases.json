@@ -1,5 +1,5 @@
 {
-  "_note": "TEMPORARY, AI-GENERATED, NOT HUMAN-MAINTAINED. Delete tests/e2e/ when the stateless migration (#1128) closes. Pins the v1 protocol surface across the migration; not a permanent suite, not in CI. `\"configs\": [\"__all__\"]` runs a case against every configuration. See tests/e2e/README.md.",
+  "_note": "TEMPORARY, AI-GENERATED, NOT HUMAN-MAINTAINED. Delete tests/e2e/ when the stateless migration (#1128) closes. Pins the v1 protocol surface across the migration with real per-case assertions; not a permanent suite, not in CI. `\"configs\": [\"__all__\"]` runs a case against every configuration. See tests/e2e/README.md.",
   "configs": {
     "default": {},
     "category-actors": {
@@ -192,7 +192,8 @@
       "configs": [
         "__all__"
       ],
-      "args": []
+      "args": [],
+      "assert": ".serverInfo.name == \"apify-mcp-server\" and (.capabilities | has(\"tools\") and has(\"tasks\") and has(\"resources\") and has(\"prompts\") and has(\"logging\")) and ((.toolNames // []) | type == \"array\")"
     },
     {
       "id": "ping",
@@ -202,7 +203,7 @@
       "args": [
         "ping"
       ],
-      "redact": true
+      "assert": ".success == true"
     },
     {
       "id": "tools list",
@@ -212,7 +213,8 @@
       "args": [
         "tools-list",
         "--full"
-      ]
+      ],
+      "assert": "type == \"array\" and all(.[]; has(\"name\") and has(\"description\") and has(\"inputSchema\"))"
     },
     {
       "id": "prompts list",
@@ -221,7 +223,8 @@
       ],
       "args": [
         "prompts-list"
-      ]
+      ],
+      "assert": ". == []"
     },
     {
       "id": "resources list",
@@ -230,7 +233,8 @@
       ],
       "args": [
         "resources-list"
-      ]
+      ],
+      "assert": "type == \"array\""
     },
     {
       "id": "resource templates",
@@ -239,7 +243,8 @@
       ],
       "args": [
         "resources-templates-list"
-      ]
+      ],
+      "assert": "length == 5 and all(.[]; has(\"uriTemplate\") and has(\"name\"))"
     },
     {
       "id": "logging set level",
@@ -249,7 +254,8 @@
       "args": [
         "logging-set-level",
         "debug"
-      ]
+      ],
+      "assert": ".level == \"debug\""
     },
     {
       "id": "rejects unknown tool",
@@ -299,7 +305,8 @@
         "runId:=\"x\"",
         "waitSecs:=99"
       ],
-      "expectError": true
+      "expectError": true,
+      "assert": ".error | test(\"must be <= 45\")"
     },
     {
       "id": "rejects unknown prompt",
@@ -310,7 +317,8 @@
         "prompts-get",
         "nonexistent"
       ],
-      "expectError": true
+      "expectError": true,
+      "assert": ".error | test(\"not found\")"
     },
     {
       "id": "rejects a missing dataset resource",
@@ -321,7 +329,8 @@
         "resources-read",
         "https://api.apify.com/v2/datasets/nope/items"
       ],
-      "expectError": true
+      "expectError": true,
+      "assert": ".error | test(\"was not found\")"
     },
     {
       "id": "rejects a non-Apify resource URL",
@@ -332,7 +341,8 @@
         "resources-read",
         "https://example.com"
       ],
-      "expectError": true
+      "expectError": true,
+      "assert": ".error | test(\"only Apify API URLs\")"
     },
     {
       "id": "rejects resource subscribe",
@@ -341,9 +351,11 @@
       ],
       "args": [
         "resources-subscribe",
-        "ui://widget/actor-run.html"
+        "ui://widget/actor-run.html",
+        "/tmp/e2e-subscribe-placeholder.txt"
       ],
-      "expectError": true
+      "expectError": true,
+      "assert": ".error | test(\"does not support resource subscriptions\")"
     },
     {
       "id": "rejects an unknown Actor",
@@ -356,7 +368,6 @@
         "actor:=\"does/not-exist-xyz-123\"",
         "input:={}"
       ],
-      "redact": true,
       "expectError": true,
       "assert": ".isError == true"
     },
@@ -371,7 +382,6 @@
         "actor:=\"apify/example-mcp-server\"",
         "input:={}"
       ],
-      "redact": true,
       "expectError": true,
       "assert": ".isError == true"
     },
@@ -382,7 +392,8 @@
       ],
       "args": [
         "tools-list"
-      ]
+      ],
+      "assert": "([.[].name] | index(\"search-apify-docs\") != null) and ([.[].name] | index(\"call-actor\") == null)"
     },
     {
       "id": "calls an Actor and waits",
@@ -395,13 +406,12 @@
         "actor:=\"apify/normal-mode-test-actor\"",
         "input:={\"firstNumber\":1,\"secondNumber\":2}"
       ],
-      "redact": true,
       "capture": {
         "runId": ".structuredContent.runId",
         "datasetId": ".structuredContent.storages.datasets.default.id",
         "kvStoreId": ".structuredContent.storages.keyValueStores.default.id"
       },
-      "assert": ".isError != true and (.structuredContent.status == \"SUCCEEDED\")"
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\" and .structuredContent.exitCode == 0 and .structuredContent.storages.datasets.default.itemCount == 1"
     },
     {
       "id": "calls an Actor without waiting",
@@ -415,7 +425,7 @@
         "input:={\"firstNumber\":1,\"secondNumber\":2}",
         "waitSecs:=0"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.status == \"READY\""
     },
     {
       "id": "calls an Actor with a maxItems cap",
@@ -429,7 +439,7 @@
         "input:={\"firstNumber\":1,\"secondNumber\":2}",
         "callOptions:={\"maxItems\":1}"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\""
     },
     {
       "id": "gets the run",
@@ -441,7 +451,7 @@
         "get-actor-run",
         "runId:=\"{{runId}}\""
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\" and .structuredContent.exitCode == 0"
     },
     {
       "id": "gets the run log",
@@ -453,7 +463,7 @@
         "get-actor-log",
         "runId:=\"{{runId}}\""
       ],
-      "redact": true
+      "assert": ".isError != true and (.content[0].text | length > 0)"
     },
     {
       "id": "lists runs",
@@ -465,7 +475,7 @@
         "get-actor-run-list",
         "limit:=3"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.items | length <= 3)"
     },
     {
       "id": "gets dataset items",
@@ -477,7 +487,7 @@
         "get-dataset-items",
         "datasetId:=\"{{datasetId}}\""
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.itemCount == 1 and .structuredContent.items[0].sum == 3 and .structuredContent.items[0].isSumPrime == true"
     },
     {
       "id": "gets dataset items flattened",
@@ -490,7 +500,7 @@
         "datasetId:=\"{{datasetId}}\"",
         "flatten:=true"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.itemCount == 1 and .structuredContent.items[0].sum == 3"
     },
     {
       "id": "gets dataset metadata",
@@ -502,7 +512,7 @@
         "get-dataset",
         "datasetId:=\"{{datasetId}}\""
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent | has(\"id\") and has(\"itemCount\") and has(\"fields\"))"
     },
     {
       "id": "gets dataset schema",
@@ -514,7 +524,7 @@
         "get-dataset-schema",
         "datasetId:=\"{{datasetId}}\""
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.schema.items.properties | has(\"sum\") and has(\"isSumPrime\"))"
     },
     {
       "id": "lists datasets",
@@ -526,7 +536,7 @@
         "get-dataset-list",
         "limit:=3"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.items | length <= 3) and (.structuredContent.items | all(has(\"id\")))"
     },
     {
       "id": "gets key-value store metadata",
@@ -538,7 +548,7 @@
         "get-key-value-store",
         "keyValueStoreId:=\"{{kvStoreId}}\""
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent | has(\"id\") and has(\"keysPublicUrl\"))"
     },
     {
       "id": "lists key-value store keys",
@@ -550,7 +560,7 @@
         "get-key-value-store-keys",
         "keyValueStoreId:=\"{{kvStoreId}}\""
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.count == 5 and ([.structuredContent.items[].key] | sort) == [\"COVER\",\"INPUT\",\"LOG\",\"RESULT\",\"STATS\"]"
     },
     {
       "id": "gets the run INPUT record",
@@ -563,7 +573,7 @@
         "keyValueStoreId:=\"{{kvStoreId}}\"",
         "recordKey:=\"INPUT\""
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.value.firstNumber == 1 and .structuredContent.value.secondNumber == 2"
     },
     {
       "id": "lists key-value stores",
@@ -575,7 +585,7 @@
         "get-key-value-store-list",
         "limit:=3"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.items | length <= 3)"
     },
     {
       "id": "reads dataset items as a resource",
@@ -586,7 +596,7 @@
         "resources-read",
         "https://api.apify.com/v2/datasets/{{datasetId}}/items"
       ],
-      "redact": true
+      "assert": "(.contents[0].text | fromjson) as $d | ($d | type == \"array\") and ($d[0].sum == 3)"
     },
     {
       "id": "reads a key-value record as a resource",
@@ -597,7 +607,7 @@
         "resources-read",
         "https://api.apify.com/v2/key-value-stores/{{kvStoreId}}/records/INPUT"
       ],
-      "redact": true
+      "assert": "(.contents[0].text | fromjson) as $d | $d.firstNumber == 1 and $d.secondNumber == 2"
     },
     {
       "id": "searches Actors",
@@ -610,7 +620,7 @@
         "keywords:=\"instagram\"",
         "limit:=3"
       ],
-      "redact": true
+      "assert": "if .isError then (.content[0].text | test(\"allowlist\"; \"i\")) else (.structuredContent | has(\"actors\") and has(\"query\") and has(\"count\")) end"
     },
     {
       "id": "searches the docs",
@@ -622,7 +632,7 @@
         "search-apify-docs",
         "query:=\"actor input schema\""
       ],
-      "redact": true
+      "assert": "if .isError then (.content[0].text | test(\"allowlist\"; \"i\")) else (.structuredContent | has(\"results\")) end"
     },
     {
       "id": "fetches a docs page",
@@ -634,7 +644,7 @@
         "fetch-apify-docs",
         "url:=\"https://docs.apify.com/platform/actors\""
       ],
-      "redact": true
+      "assert": "if .isError then (.content[0].text | test(\"HTTP Status|allowlist\"; \"i\")) else (.structuredContent.content | length > 100) end"
     },
     {
       "id": "fetches Actor details with defaults",
@@ -646,7 +656,7 @@
         "fetch-actor-details",
         "actor:=\"apify/rag-web-browser\""
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent | has(\"actorInfo\") and has(\"inputSchema\") and has(\"readme\"))"
     },
     {
       "id": "fetches Actor details, input schema only",
@@ -659,7 +669,7 @@
         "actor:=\"apify/rag-web-browser\"",
         "output:={\"inputSchema\":true}"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent | keys) == [\"inputSchema\"]"
     },
     {
       "id": "fetches Actor details, description only",
@@ -672,7 +682,7 @@
         "actor:=\"apify/rag-web-browser\"",
         "output:={\"description\":true}"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent | keys) == [\"actorInfo\"] and (.structuredContent.actorInfo | has(\"description\"))"
     },
     {
       "id": "fetches Actor details, stats only",
@@ -685,7 +695,7 @@
         "actor:=\"apify/rag-web-browser\"",
         "output:={\"stats\":true}"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.actorInfo | has(\"stats\"))"
     },
     {
       "id": "fetches Actor details, pricing only",
@@ -698,7 +708,7 @@
         "actor:=\"apify/rag-web-browser\"",
         "output:={\"pricing\":true}"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.actorInfo | has(\"pricing\"))"
     },
     {
       "id": "fetches Actor details, readme only",
@@ -711,7 +721,7 @@
         "actor:=\"apify/rag-web-browser\"",
         "output:={\"readme\":true}"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent | keys) == [\"readme\"]"
     },
     {
       "id": "fetches Actor details, mcp tools only",
@@ -724,7 +734,7 @@
         "actor:=\"apify/rag-web-browser\"",
         "output:={\"mcpTools\":true}"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.mcpTools == \"Note: This Actor is not an MCP server and does not expose MCP tools.\""
     },
     {
       "id": "fetches Actor details, description and readme",
@@ -737,7 +747,7 @@
         "actor:=\"apify/rag-web-browser\"",
         "output:={\"description\":true,\"readme\":true}"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent | has(\"actorInfo\") and has(\"readme\")) and (.structuredContent | has(\"inputSchema\") | not)"
     },
     {
       "id": "fetches Actor details, rating and metadata",
@@ -750,7 +760,7 @@
         "actor:=\"apify/rag-web-browser\"",
         "output:={\"rating\":true,\"metadata\":true}"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.actorInfo | has(\"rating\") and has(\"modifiedAt\"))"
     },
     {
       "id": "fetches MCP tools for a regular Actor",
@@ -763,7 +773,7 @@
         "actor:=\"apify/normal-mode-test-actor\"",
         "output:={\"mcpTools\":true}"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.mcpTools == \"Note: This Actor is not an MCP server and does not expose MCP tools.\""
     },
     {
       "id": "calls a dedicated Actor tool",
@@ -776,7 +786,7 @@
         "firstNumber:=3",
         "secondNumber:=4"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\" and .structuredContent.exitCode == 0"
     },
     {
       "id": "calls a tool through the MCP proxy",
@@ -789,7 +799,7 @@
         "actor:=\"apify/example-mcp-server:add\"",
         "input:={\"firstNumber\":5,\"secondNumber\":6}"
       ],
-      "redact": true
+      "assert": "if .isError then (.content[0].text | test(\"Failed to connect|MCP server\"; \"i\")) else true end"
     },
     {
       "id": "reads the search-actors widget",
@@ -799,7 +809,8 @@
       "args": [
         "resources-read",
         "ui://widget/search-actors.html"
-      ]
+      ],
+      "assert": ".contents[0].mimeType == \"text/html;profile=mcp-app\" and (.contents[0].text | length > 1000)"
     },
     {
       "id": "reads the actor-run widget",
@@ -809,7 +820,8 @@
       "args": [
         "resources-read",
         "ui://widget/actor-run.html"
-      ]
+      ],
+      "assert": ".contents[0].mimeType == \"text/html;profile=mcp-app\" and (.contents[0].text | length > 1000)"
     },
     {
       "id": "starts a detached task",
@@ -826,7 +838,7 @@
       "capture": {
         "taskId": ".taskId"
       },
-      "redact": true
+      "assert": ".status == \"working\" and (.taskId | test(\"^[0-9a-f]{32}$\"))"
     },
     {
       "id": "lists tasks",
@@ -836,7 +848,7 @@
       "args": [
         "tasks-list"
       ],
-      "redact": true
+      "assert": ".tasks | any(.taskId == \"{{taskId}}\")"
     },
     {
       "id": "gets task status",
@@ -847,7 +859,7 @@
         "tasks-get",
         "{{taskId}}"
       ],
-      "redact": true
+      "assert": ".taskId == \"{{taskId}}\""
     },
     {
       "id": "starts a task to cancel",
@@ -864,7 +876,7 @@
       "capture": {
         "cancelTaskId": ".taskId"
       },
-      "redact": true
+      "assert": ".status == \"working\""
     },
     {
       "id": "cancels a task",
@@ -875,7 +887,7 @@
         "tasks-cancel",
         "{{cancelTaskId}}"
       ],
-      "redact": true
+      "assert": ".taskId == \"{{cancelTaskId}}\" and .status == \"cancelled\""
     },
     {
       "id": "rejects an unknown task",
@@ -886,7 +898,8 @@
         "tasks-get",
         "0000000000000000000000000000dead"
       ],
-      "expectError": true
+      "expectError": true,
+      "assert": ".error | test(\"not found\")"
     },
     {
       "id": "starts a run to abort",
@@ -903,7 +916,7 @@
       "capture": {
         "abortRunId": ".structuredContent.runId"
       },
-      "redact": true
+      "assert": ".isError != true and .structuredContent.status == \"READY\""
     },
     {
       "id": "aborts the run",
@@ -915,7 +928,7 @@
         "abort-actor-run",
         "runId:=\"{{abortRunId}}\""
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.status == \"ABORTING\" or .structuredContent.status == \"ABORTED\")"
     },
     {
       "id": "calls the search-actors widget",
@@ -928,7 +941,7 @@
         "keywords:=\"instagram\"",
         "limit:=2"
       ],
-      "redact": true
+      "assert": ".isError != true and (._meta | has(\"ui\")) and (.structuredContent | has(\"actors\") and has(\"widgetActors\"))"
     },
     {
       "id": "calls the fetch-actor-details widget",
@@ -940,7 +953,7 @@
         "fetch-actor-details-widget",
         "actor:=\"apify/rag-web-browser\""
       ],
-      "redact": true
+      "assert": ".isError != true and (._meta | has(\"ui\")) and (.structuredContent | has(\"actorDetails\"))"
     },
     {
       "id": "calls the call-actor widget",
@@ -956,7 +969,7 @@
       "capture": {
         "widgetRunId": ".structuredContent.runId"
       },
-      "redact": true
+      "assert": ".isError != true and (._meta | has(\"ui\")) and (.structuredContent | has(\"runId\") and has(\"status\"))"
     },
     {
       "id": "waits for the widget run to finish",
@@ -969,7 +982,7 @@
         "runId:=\"{{widgetRunId}}\"",
         "waitSecs:=45"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\""
     },
     {
       "id": "calls the get-actor-run widget",
@@ -981,7 +994,7 @@
         "get-actor-run-widget",
         "runId:=\"{{widgetRunId}}\""
       ],
-      "redact": true
+      "assert": ".isError != true and (._meta | has(\"ui\")) and .structuredContent.status == \"SUCCEEDED\""
     },
     {
       "id": "calls report-problem",
@@ -992,7 +1005,8 @@
         "tools-call",
         "report-problem",
         "message:=\"e2e probe\""
-      ]
+      ],
+      "assert": ".isError == false and .content[0].text == \"Problem reported. Thank you \u2014 this helps the Apify team improve its tools.\""
     },
     {
       "id": "gets a text/plain record",
@@ -1005,7 +1019,7 @@
         "keyValueStoreId:=\"{{kvStoreId}}\"",
         "recordKey:=\"LOG\""
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.contentType == \"text/plain\" and .structuredContent.value == \"Scrape finished. 3 book(s) pushed.\""
     },
     {
       "id": "gets an image/png record",
@@ -1018,7 +1032,7 @@
         "keyValueStoreId:=\"{{kvStoreId}}\"",
         "recordKey:=\"COVER\""
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.contentType == \"image/png\""
     },
     {
       "id": "gets dataset items with field projection",
@@ -1031,7 +1045,7 @@
         "datasetId:=\"{{datasetId}}\"",
         "fields:=\"sum,isSumPrime\""
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.items[0] == {\"isSumPrime\":true,\"sum\":3}"
     },
     {
       "id": "gets dataset items with omit",
@@ -1044,7 +1058,7 @@
         "datasetId:=\"{{datasetId}}\"",
         "omit:=\"math\""
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.items[0] | has(\"math\") | not) and .structuredContent.items[0].sum == 3"
     },
     {
       "id": "gets dataset items paged and descending",
@@ -1059,7 +1073,7 @@
         "offset:=0",
         "desc:=true"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.limit == 1 and (.structuredContent.items | length == 1)"
     },
     {
       "id": "gets dataset items cleaned",
@@ -1072,7 +1086,7 @@
         "datasetId:=\"{{datasetId}}\"",
         "clean:=true"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.itemCount == 1"
     },
     {
       "id": "searches Actors with an offset",
@@ -1086,7 +1100,7 @@
         "limit:=2",
         "offset:=2"
       ],
-      "redact": true
+      "assert": "if .isError then (.content[0].text | test(\"allowlist\"; \"i\")) else (.structuredContent.actors | type == \"array\") end"
     },
     {
       "id": "searches the docs with paging",
@@ -1100,7 +1114,7 @@
         "limit:=2",
         "offset:=1"
       ],
-      "redact": true
+      "assert": "if .isError then (.content[0].text | test(\"allowlist\"; \"i\")) else (.structuredContent | has(\"results\")) end"
     },
     {
       "id": "lists runs filtered by status",
@@ -1114,7 +1128,7 @@
         "status:=\"SUCCEEDED\"",
         "desc:=true"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.desc == true and (.structuredContent.items | all(.status == \"SUCCEEDED\"))"
     },
     {
       "id": "gets a truncated run log",
@@ -1127,7 +1141,7 @@
         "runId:=\"{{runId}}\"",
         "lines:=5"
       ],
-      "redact": true
+      "assert": ".isError != true and (.content[0].text | length > 0)"
     },
     {
       "id": "gets dataset schema with a limit",
@@ -1140,7 +1154,7 @@
         "datasetId:=\"{{datasetId}}\"",
         "limit:=1"
       ],
-      "redact": true
+      "assert": ".isError != true and (.structuredContent.schema.items.properties | has(\"sum\"))"
     },
     {
       "id": "lists store keys with a limit",
@@ -1153,7 +1167,7 @@
         "keyValueStoreId:=\"{{kvStoreId}}\"",
         "limit:=2"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.limit == 2 and (.structuredContent.items | length <= 2)"
     },
     {
       "id": "lists unnamed datasets descending",
@@ -1167,7 +1181,7 @@
         "unnamed:=true",
         "desc:=true"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.desc == true and (.structuredContent.items | all(.name == null))"
     },
     {
       "id": "gets the run with a wait",
@@ -1180,7 +1194,7 @@
         "runId:=\"{{runId}}\"",
         "waitSecs:=5"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\""
     },
     {
       "id": "calls an Actor with run options",
@@ -1194,7 +1208,7 @@
         "input:={\"firstNumber\":1,\"secondNumber\":2}",
         "callOptions:={\"memory\":512,\"timeout\":60}"
       ],
-      "redact": true
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\""
     },
     {
       "id": "reads the run as a resource",
@@ -1205,7 +1219,7 @@
         "resources-read",
         "https://api.apify.com/v2/actor-runs/{{runId}}"
       ],
-      "redact": true
+      "assert": "(.contents[0].text | fromjson.data.status) == \"SUCCEEDED\""
     },
     {
       "id": "reads the run log as a resource",
@@ -1216,7 +1230,7 @@
         "resources-read",
         "https://api.apify.com/v2/logs/{{runId}}"
       ],
-      "redact": true
+      "assert": ".contents[0].mimeType == \"text/plain; charset=utf-8\" and (.contents[0].text | length > 0)"
     },
     {
       "id": "reads store keys as a resource",
@@ -1227,7 +1241,7 @@
         "resources-read",
         "https://api.apify.com/v2/key-value-stores/{{kvStoreId}}/keys"
       ],
-      "redact": true
+      "assert": "(.contents[0].text | fromjson.data.items | length > 0)"
     },
     {
       "id": "gets the finished task result",
@@ -1238,8 +1252,8 @@
         "tasks-result",
         "{{taskId}}"
       ],
-      "redact": true,
-      "pollWhileWorking": true
+      "pollWhileWorking": true,
+      "assert": "(.content[0].text | fromjson.status) == \"SUCCEEDED\""
     }
   ]
 }

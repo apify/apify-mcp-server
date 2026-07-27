@@ -8,14 +8,13 @@
  * anything on top of it.
  *
  * It is scaffolding: it exists to prove the v1 (legacy sessionful) protocol surface is unchanged by
- * that migration, by probing two builds and diffing the output. `tests/integration/suite.ts`
- * remains the permanent, human-owned suite; do not migrate coverage into here, and do not wire this
- * into CI.
+ * that migration. `tests/integration/suite.ts` remains the permanent, human-owned suite; do not
+ * migrate coverage into here, and do not wire this into CI.
  *
- * See tests/e2e/README.md for how to run it, how to read a diff, and known instability.
+ * See tests/e2e/README.md for how to run it and known instability.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -25,19 +24,15 @@ type McpcCase = {
     id: string;
     configs: string[];
     args: string[];
-    /** Optional: cases without an assertion are snapshot-only, and just have to reach the server. */
+    /** jq filter run with `-e`. May reference `{{name}}` captures from earlier cases in the config. */
     assert?: string;
-    /** Expect a non-zero mcpc exit. Protocol errors exit 2 and write the payload to stderr. */
+    /** Expect a non-zero mcpc exit, or a tool-level `isError: true` — see `respondsWithSomeError`. */
     expectError?: boolean;
     /** jq filters whose results are stored for `{{name}}` interpolation in later cases of the same config. */
     capture?: Record<string, string>;
-    /** Run the snapshot through redact.jq. Needed for anything whose output embeds IDs or timings. */
-    redact?: boolean;
     /**
      * Retry this probe while mcpc reports the task as still running — `tasks-result` errors until
-     * the task reaches a terminal state. Splitting the task probes into their own configuration (see
-     * README, Parallelism) means this one no longer trails a long chain of unrelated probes, so it
-     * can no longer rely on those to run out the clock; it has to wait for real.
+     * the task reaches a terminal state.
      */
     pollWhileWorking?: boolean;
 };
@@ -52,7 +47,7 @@ type McpcServerConfig = {
     /**
      * Skip this configuration for `__all__` cases. Set on probe groups that only exist to split a
      * long chain of live probes across shards: they duplicate another configuration's arguments, so
-     * running the static surface against them again would just add identical snapshots.
+     * re-running the static surface against them too would just waste time on an identical probe.
      */
     excludeFromAll?: boolean;
 };
@@ -78,15 +73,7 @@ const suite = JSON.parse(readFileSync(new URL('./cases.json', import.meta.url), 
 /** mcpc is a devDependency, so it is only on PATH under `pnpm run`. Resolve it directly. */
 const MCPC_BIN = resolve('node_modules/.bin/mcpc');
 
-/** Point at another build (e.g. a pre-migration worktree) to compare behavior across commits. */
-const SERVER_ENTRY = resolve(process.env.E2E_SERVER_ENTRY ?? 'dist/stdio.js');
-
-/**
- * When set, every case writes its normalized output to `<dir>/<config>/<case>.json`. Capture two
- * builds via E2E_SERVER_ENTRY into two directories and `diff -r` them to find behavioral drift.
- */
-const SNAPSHOT_DIR = process.env.E2E_SNAPSHOT_DIR;
-const REDACT_FILTER = resolve('tests/e2e/redact.jq');
+const SERVER_ENTRY = resolve('dist/stdio.js');
 
 /** Base URL for HTTP configs, e.g. http://localhost:3001 with `pnpm run dev` running. */
 const HTTP_BASE = process.env.E2E_HTTP_BASE;
@@ -184,10 +171,9 @@ const POLL_MAX_ATTEMPTS = 20;
  *
  * mcpc 0.2.x exits 0 for this case; mcpc 0.5.x exits 2, identically to a genuine JSON-RPC protocol
  * error (unknown tool, invalid arguments), which leaves stdout empty. Exit code alone can no longer
- * tell the two apart, so this checks payload shape instead — which keeps every snapshot-only case
- * (`fetch-apify-docs` hitting a domain the sandbox can't reach, the MCP-proxy Actor being
- * unreachable, see README "Environment sensitivity") capturing a snapshot the way it always did,
- * on either mcpc version, rather than the exit-code coupling turning it into a hard failure.
+ * tell the two apart, so this checks payload shape instead — which keeps every case whose live
+ * dependency (an external Actor, an external search backend) can legitimately be unreachable from
+ * failing hard on that alone; its `assert` decides pass/fail from the actual payload instead.
  */
 function isToolLevelErrorResponse(stdout: string): boolean {
     try {
@@ -270,16 +256,9 @@ function buildServerEntry(config: McpcServerConfig) {
     return { command: 'node', args: [SERVER_ENTRY, ...(config.args ?? [])], env };
 }
 
-function toSlug(id: string) {
-    return id
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
-}
-
 /**
  * Removes mcpc's own `_mcpc` envelope. It carries the resolved APIFY_TOKEN in plaintext and the
- * absolute server path, so it must never reach a snapshot, an assertion or a failure message.
+ * absolute server path, so it must never reach an assertion or a failure message.
  */
 function stripMcpcEnvelope(payload: string) {
     const result = spawnSync('jq', ['if type == "object" then del(._mcpc) else . end'], {
@@ -289,24 +268,6 @@ function stripMcpcEnvelope(payload: string) {
     });
     // Non-JSON output (an mcpc crash, say) has no envelope to strip — assert against it as-is.
     return result.status === 0 ? result.stdout : payload;
-}
-
-/** Normalizes a probe result with jq (sorted keys, optional redaction) and writes it for diffing. */
-function writeSnapshot(directory: string, testCase: McpcCase, payload: string) {
-    const file = join(directory, `${toSlug(testCase.id)}.json`);
-    if (existsSync(file)) throw new Error(`Duplicate snapshot name for case "${testCase.id}"`);
-
-    const normalized = spawnSync('jq', testCase.redact ? ['-S', '-f', REDACT_FILTER] : ['-S', '.'], {
-        input: payload,
-        encoding: 'utf8',
-        maxBuffer: MAX_BUFFER,
-    });
-    if (normalized.error) throw normalized.error;
-    if (normalized.status !== 0) {
-        throw new Error(`jq failed to normalize the snapshot for "${testCase.id}":\n${normalized.stderr}`);
-    }
-
-    writeFileSync(file, normalized.stdout);
 }
 
 function interpolate(value: string, captured: Record<string, string>) {
@@ -338,16 +299,9 @@ export function defineMcpcShard(shardIndex: number, shardCount: number) {
             const session = `@e2e-${configName}`;
             /** Values captured by earlier cases in this config, for `{{name}}` interpolation. */
             const captured: Record<string, string> = {};
-            const snapshotDirectory = SNAPSHOT_DIR ? join(SNAPSHOT_DIR, configName) : undefined;
             let configDirectory: string;
 
             beforeAll(() => {
-                if (snapshotDirectory) {
-                    // Start clean so a diff never mixes results from an earlier run.
-                    rmSync(snapshotDirectory, { recursive: true, force: true });
-                    mkdirSync(snapshotDirectory, { recursive: true });
-                }
-
                 configDirectory = mkdtempSync(join(tmpdir(), `actors-mcp-e2e-${configName}-`));
                 const configPath = join(configDirectory, 'mcp.json');
                 writeFileSync(configPath, JSON.stringify({ mcpServers: { server: buildServerEntry(config) } }));
@@ -378,11 +332,9 @@ export function defineMcpcShard(shardIndex: number, shardCount: number) {
                 const payload = stripMcpcEnvelope(result.stdout.trim() || result.stderr);
 
                 if (testCase.assert) {
-                    const assertion = runJq(payload, testCase.assert);
+                    const assertion = runJq(payload, interpolate(testCase.assert, captured));
                     expect(assertion.status, `Assertion failed: ${testCase.assert}\n${payload}`).toBe(0);
                 }
-
-                if (snapshotDirectory) writeSnapshot(snapshotDirectory, testCase, payload);
 
                 for (const [name, filter] of Object.entries(testCase.capture ?? {})) {
                     const value = runJq(payload, filter, { raw: true }).stdout.trim();
