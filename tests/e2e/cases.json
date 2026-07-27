@@ -261,6 +261,7 @@
         "fetch-apify-docs",
         "url:=\"https://example.com\""
       ],
+      "expectError": true,
       "assert": ".isError == true"
     },
     {
@@ -332,6 +333,7 @@
         "input:={}"
       ],
       "redact": true,
+      "expectError": true,
       "assert": ".isError == true"
     },
     {
@@ -346,6 +348,7 @@
         "input:={}"
       ],
       "redact": true,
+      "expectError": true,
       "assert": ".isError == true"
     },
     {
