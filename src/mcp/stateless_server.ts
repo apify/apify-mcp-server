@@ -96,8 +96,7 @@ function toStatelessProtocolError(error: unknown): unknown {
         return new ProtocolError(ProtocolErrorCode.InternalError, error.message, error.data);
     }
     if (isMcpError(error)) {
-        const mcpError = error as { code: number; message: string; data?: unknown };
-        return new ProtocolError(mcpError.code, mcpError.message, mcpError.data);
+        return new ProtocolError(error.code, error.message, error.data);
     }
     return error;
 }

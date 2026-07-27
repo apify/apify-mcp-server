@@ -51,10 +51,10 @@ export function deriveResourceIds(args: Record<string, unknown> | undefined, res
 }
 
 /**
- * Neutral predicate: true if `error` is an SDK `McpError`. Lets the shared orchestration modules
+ * Type predicate: true if `error` is an SDK `McpError`. Lets the shared orchestration modules
  * keep the exact `instanceof McpError` behavior without importing the SDK error type themselves.
  */
-export function isMcpError(error: unknown): boolean {
+export function isMcpError(error: unknown): error is McpError {
     return error instanceof McpError;
 }
 

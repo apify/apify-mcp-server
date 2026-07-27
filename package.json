@@ -51,7 +51,6 @@
     "@apify/datastructures": "^2.0.3",
     "@apify/log": "^2.5.16",
     "@apify/utilities": "^2.25.1",
-    "@modelcontextprotocol/core": "2.0.0-beta.5",
     "@modelcontextprotocol/ext-apps": "^1.1.2",
     "@modelcontextprotocol/node": "2.0.0-beta.5",
     "@modelcontextprotocol/sdk": "1.29.0",

@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import type { Server as HttpServer } from 'node:http';
+import { request as httpRequest, type Server as HttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import {
@@ -136,7 +136,7 @@ const DEV_URL = '/?telemetry-enabled=false';
  * era routing and the stateless branch behind it are exercised through the same POST route a client
  * hits. Nothing leaves the machine: `getActors` is mocked, so no Actor metadata is fetched.
  */
-async function withDevServer<T>(run: (post: PostFn) => Promise<T>): Promise<T> {
+async function withDevServer<T>(run: (post: PostFn, port: number) => Promise<T>): Promise<T> {
     const httpServer: HttpServer = createExpressApp().listen(0, '127.0.0.1');
     await once(httpServer, 'listening');
     const { port } = httpServer.address() as AddressInfo;
@@ -152,7 +152,7 @@ async function withDevServer<T>(run: (post: PostFn) => Promise<T>): Promise<T> {
                 body: JSON.stringify(body),
             });
             return { status: response.status, headers: response.headers, body: await response.text() };
-        });
+        }, port);
     } finally {
         // Keep-alive sockets otherwise hold close() open past the test timeout.
         httpServer.closeAllConnections();
@@ -219,6 +219,43 @@ describe('createExpressApp() era routing', () => {
                 ...headers,
                 authorization: 'Bearer dev-token',
                 origin: 'https://evil.example.com',
+            });
+
+            expect(response.status).toBe(403);
+            expect(readJsonRpcPayload(response.body).error?.code).toBe(-32000);
+        });
+    });
+
+    it('rejects a non-localhost Host', async () => {
+        // The DNS-rebinding vector the Origin guard cannot see: a rebound hostname resolves here,
+        // the browser sends no Origin, and the Host header carries the attacker's name. `fetch`
+        // strips `Host` (a spec-forbidden header), so this probe goes through `node:http`.
+        await withDevServer(async (_post, port) => {
+            const { body, headers } = statelessRequest('tools/list');
+
+            const response = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+                const probe = httpRequest(
+                    `http://127.0.0.1:${port}${DEV_URL}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'content-type': 'application/json',
+                            accept: 'application/json, text/event-stream',
+                            authorization: 'Bearer dev-token',
+                            ...headers,
+                            host: 'evil.example.com',
+                        },
+                    },
+                    (res) => {
+                        const chunks: Buffer[] = [];
+                        res.on('data', (chunk) => chunks.push(chunk));
+                        res.on('end', () =>
+                            resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString() }),
+                        );
+                    },
+                );
+                probe.on('error', reject);
+                probe.end(JSON.stringify(body));
             });
 
             expect(response.status).toBe(403);
