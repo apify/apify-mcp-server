@@ -44,6 +44,15 @@ import { parseInputParamsFromUrl } from './utils.js';
 type ToolSource = { input: Input; actorTools: ToolEntry[] };
 
 /**
+ * Stable identity of a fetch input, so reloading the same input replaces its retained source rather
+ * than adding another (see {@link ActorsMcpServer.toolSources}). Keys are sorted because the same
+ * input reaches the loaders from several builders, which need not agree on property order.
+ */
+function toolSourceKey(input: Input): string {
+    return JSON.stringify(input, Object.keys(input).sort());
+}
+
+/**
  * The resolved mode plus client identity a composition or gating decision is made against. Passing it
  * as a parameter is what lets a caller compose against a view other than the instance's own (see
  * `servingContext`) — one derived from a single request — without mutating the shared facade.
@@ -138,12 +147,17 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     /**
      * The unresolved inputs `tools` is composed from — not a second tool registry. `tools` holds one
      * resolved output: the instance's own view, fixed once the connection handshake makes the client
-     * known. Retaining every source (never drained) lets a caller whose mode and client identity
-     * arrive with a single request compose its own resolved set from the same inputs, without
-     * touching `tools`. The same objects the pending queue holds; retention also keeps the fetched
-     * actor-tool arrays alive for the facade's lifetime.
+     * known. Retaining the sources (never drained, unlike the pending queue) lets a caller whose mode
+     * and client identity arrive with a single request compose its own resolved set from the same
+     * inputs, without touching `tools`.
+     *
+     * Keyed by input rather than appended, because nothing drains it: a long-lived facade reloads
+     * tools every time its tool set drifts, and each reload repeats an input already retained.
+     * Replacing bounds the map by distinct inputs — the same thing `tools` is already bounded by —
+     * instead of growing once per reload for the facade's lifetime, holding every superseded
+     * actor-tool array alive with it.
      */
-    private readonly toolSources: ToolSource[] = [];
+    private readonly toolSources = new Map<string, ToolSource>();
 
     // Telemetry configuration (resolved from options and env vars, see setupTelemetry)
     public readonly telemetryEnabled: boolean;
@@ -313,7 +327,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         // the instance's own view. Directly upserted tools are deliberately left out — carrying them
         // over would re-add tools this view's gating just withheld.
         const tools = new Map<string, ToolEntry>();
-        for (const source of this.toolSources) {
+        for (const source of this.toolSources.values()) {
             for (const tool of this.composeToolsForClient(source, view)) {
                 const stored = this.toStoredTool(tool);
                 tools.set(stored.name, stored);
@@ -441,7 +455,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      */
     private registerFetchedActorTools(input: Input, actorTools: ToolEntry[]): void {
         const source: ToolSource = { input, actorTools };
-        this.toolSources.push(source);
+        this.toolSources.set(toolSourceKey(input), source);
         if (!this.serverModeResolved) {
             this.pendingToolsUntilClientKnown.push(source);
             if (actorTools.length > 0) this.upsertTools(actorTools);
