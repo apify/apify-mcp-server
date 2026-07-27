@@ -2002,17 +2002,24 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     await client.close();
                 });
 
-                it('lists user key-value stores and finds the run KV store via get-key-value-store-list', async () => {
+                // Doesn't assert defaultKvId is in the page: on a shared account, concurrent runs can
+                // push it past the top-10 recency window between creation and the list call. Existence
+                // and readability of the store are already proven by the get-key-value-store test below.
+                it('lists unnamed key-value stores via get-key-value-store-list', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({
                         name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
                         arguments: { desc: true, unnamed: true, limit: 10 },
                     });
                     expect(result.isError).not.toBe(true);
-                    const { text } = (result.content as { text: string }[])[0];
-                    expect(text).toContain(defaultKvId);
-                    const sc = (result as { structuredContent?: { summary?: string } }).structuredContent;
-                    expect(sc?.summary).toContain('key-value stores');
+                    const sc = (
+                        result as { structuredContent?: { total?: number; unnamed?: boolean; items?: unknown[] } }
+                    ).structuredContent;
+                    expect(sc?.unnamed).toBe(true);
+                    expect(sc?.total).toBeGreaterThan(0);
+                    expect(Array.isArray(sc?.items)).toBe(true);
+                    expect(sc!.items!.length).toBeGreaterThan(0);
+                    expect(sc!.items!.length).toBeLessThanOrEqual(10);
                     await client.close();
                 });
 
