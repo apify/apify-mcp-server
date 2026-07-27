@@ -81,7 +81,7 @@ describe('isStatelessRequest()', () => {
         await expect(isStatelessRequest(post(body, { 'mcp-method': 'tools/list' }))).resolves.toBe(true);
     });
 
-    it('keeps a claim-less initialize on the sessionful path', async () => {
+    it('keeps a claim-less initialize on the stateful path', async () => {
         const body = {
             jsonrpc: '2.0',
             id: 1,
@@ -92,13 +92,13 @@ describe('isStatelessRequest()', () => {
         await expect(isStatelessRequest(post(body))).resolves.toBe(false);
     });
 
-    it('keeps a claim-less follow-up request on the sessionful path', async () => {
+    it('keeps a claim-less follow-up request on the stateful path', async () => {
         const body = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
 
         await expect(isStatelessRequest(post(body))).resolves.toBe(false);
     });
 
-    it('keeps session operations on the sessionful path', async () => {
+    it('keeps session operations on the stateful path', async () => {
         // `express.json()` leaves an empty object behind on a body-less request.
         for (const method of ['GET', 'DELETE']) {
             await expect(
@@ -204,7 +204,7 @@ describe('createExpressApp() era routing', () => {
             const response = await post(DEV_URL, body, { ...headers, authorization: 'Bearer dev-token' });
 
             expect(response.status).toBe(200);
-            // No session id: that header is the sessionful path's marker, and nothing was retained.
+            // No session id: that header is the stateful path's marker, and nothing was retained.
             expect(response.headers.get('mcp-session-id')).toBeNull();
             const tools = (readJsonRpcPayload(response.body).result?.tools ?? []) as { name: string }[];
             expect(tools.map((tool) => tool.name)).toContain(HELPER_TOOLS.ACTOR_CALL);
@@ -263,7 +263,7 @@ describe('createExpressApp() era routing', () => {
         });
     });
 
-    it('keeps a claim-less initialize on the sessionful path at the same endpoint', async () => {
+    it('keeps a claim-less initialize on the stateful path at the same endpoint', async () => {
         await withDevServer(async (post) => {
             const response = await post(
                 DEV_URL,
@@ -339,7 +339,7 @@ describe('createExpressApp() era routing', () => {
         });
     });
 
-    it('answers a stateless request carrying no token with the sessionful 401', async () => {
+    it('answers a stateless request carrying no token with the stateful 401', async () => {
         // The missing-token 401 is resolved inside the server factory — after the SDK's validation
         // ladder, to keep SEP-2243 ordering — and swapped in for the entry's 500 by the fetch
         // wrapper in `serveStatelessRequest`. The spy pins down that the sentinel throw is answered

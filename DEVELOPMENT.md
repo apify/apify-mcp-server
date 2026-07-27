@@ -46,16 +46,16 @@ This split matters for `serverMode: 'auto'`.
 - Before `initialize`, the server does not yet know whether the client supports MCP Apps.
 - Public preload helpers such as `ActorsMcpServer.loadToolsByName()` and `loadToolsFromUrl()` therefore queue mode-agnostic sources first.
 - Actor tools may still be loaded immediately because they are mode-agnostic.
-- During `initialize`, once client capabilities are known, the server resolves the queued sources into the sessionful connection's mode-dependent tool set.
+- During `initialize`, once client capabilities are known, the server resolves the queued sources into the stateful connection's mode-dependent tool set.
 
 ### Two places sources get resolved
 
 Fetched sources are **retained, not drained**, because there are two consumers:
 
-- The sessionful (2025-era) path resolves them once at `initialize`, as above, into the shared `ActorsMcpServer.tools` map that lives for the connection.
+- The stateful (2025-era) path resolves them once at `initialize`, as above, into the shared `ActorsMcpServer.tools` map that lives for the connection.
 - The stateless (2026-07-28) path has no `initialize`. `ActorsMcpServer.createRequestSnapshot()` re-composes **all** retained sources per request, against that request's own resolved mode and declared client identity, into a snapshot the shared map never sees.
 
-Consequence for both: a tool only reaches the stateless path if it arrives through a load path. `upsertTools()`, `removeToolsByName()` and `close()`'s tool-map clear all write the shared map directly and are not reflected back into the sources, so they change the sessionful tool list only (all three document this).
+Consequence for both: a tool only reaches the stateless path if it arrives through a load path. `upsertTools()`, `removeToolsByName()` and `close()`'s tool-map clear all write the shared map directly and are not reflected back into the sources, so they change the stateful tool list only (all three document this).
 
 Rule of thumb:
 

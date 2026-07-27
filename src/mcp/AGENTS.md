@@ -8,6 +8,15 @@ surface — **generic types only**. No Apify-internal infrastructure (Redis, Mon
 IAM) may leak in; the internal repo customizes behavior by swapping the SDK store
 implementations, not by importing from here.
 
+Two MCP protocol revisions are served, each by its own adapter:
+
+- **2025-era stateful protocol** ([spec](https://modelcontextprotocol.io/specification/2025-11-25)),
+  via the v1 SDK `@modelcontextprotocol/sdk` — `legacy_server.ts`.
+- **2026-07-28 stateless revision** ([spec](https://modelcontextprotocol.io/specification/2026-07-28)),
+  via the v2 SDK `@modelcontextprotocol/server` — `stateless_server.ts`. No `initialize`
+  handshake; every request carries a `_meta` envelope with protocol version, client info,
+  and capabilities.
+
 ## Files
 
 - `server.ts` — `ActorsMcpServer`, the shared facade for tools, server mode, services,

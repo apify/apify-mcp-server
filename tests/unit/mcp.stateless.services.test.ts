@@ -18,7 +18,7 @@ vi.mock('../../src/resources/api_resources.js', async (importOriginal) => {
 const { readApiResource } = await import('../../src/resources/api_resources.js');
 const readApiResourceMock = vi.mocked(readApiResource);
 
-/** The same request served by the sessionful path, for parity comparison. */
+/** The same request served by the stateful path, for parity comparison. */
 async function callViaLegacy(
     method: string,
     params: Record<string, unknown> = {},
@@ -27,7 +27,7 @@ async function callViaLegacy(
     return await withServer(async (server) => await getRequestHandler(server, method)({ method, params }, {}), options);
 }
 
-/** Wire-normalize a sessionful result so it compares against one that crossed a JSON boundary. */
+/** Wire-normalize a stateful result so it compares against one that crossed a JSON boundary. */
 function asWire(result: unknown): unknown {
     return JSON.parse(JSON.stringify(result));
 }
@@ -53,7 +53,7 @@ async function withTestPrompt<T>(run: () => Promise<T>): Promise<T> {
 
 describe('createStatelessServer() prompts and resources', () => {
     describe('prompts', () => {
-        it('lists the same prompts as the sessionful path', async () => {
+        it('lists the same prompts as the stateful path', async () => {
             await withTestPrompt(async () => {
                 const legacy = await callViaLegacy('prompts/list');
 
@@ -66,7 +66,7 @@ describe('createStatelessServer() prompts and resources', () => {
             });
         });
 
-        it('renders a known prompt with the same payload as the sessionful path', async () => {
+        it('renders a known prompt with the same payload as the stateful path', async () => {
             await withTestPrompt(async () => {
                 const params = { name: 'greet', arguments: { who: 'Ada' } };
                 const legacy = await callViaLegacy('prompts/get', params);
@@ -82,7 +82,7 @@ describe('createStatelessServer() prompts and resources', () => {
             });
         });
 
-        it('maps an unknown prompt name to invalid params, as the sessionful path does', async () => {
+        it('maps an unknown prompt name to invalid params, as the stateful path does', async () => {
             await expect(callViaLegacy('prompts/get', { name: 'no-such-prompt' })).rejects.toMatchObject({
                 code: -32602,
             });
@@ -97,7 +97,7 @@ describe('createStatelessServer() prompts and resources', () => {
     });
 
     describe('resources', () => {
-        it('lists the same resources as the sessionful path', async () => {
+        it('lists the same resources as the stateful path', async () => {
             // A usage-guide-carrying payment provider is what makes the list non-empty outside apps
             // mode; without one both paths return `[]` and the comparison would prove nothing.
             const options = { paymentProvider: await resolvePaymentProvider('skyfire') };
@@ -112,7 +112,7 @@ describe('createStatelessServer() prompts and resources', () => {
             }, options);
         });
 
-        it('lists the same resource templates as the sessionful path', async () => {
+        it('lists the same resource templates as the stateful path', async () => {
             const legacy = await callViaLegacy('resources/templates/list');
 
             await withStatelessServer(async ({ call }) => {
@@ -123,7 +123,7 @@ describe('createStatelessServer() prompts and resources', () => {
             });
         });
 
-        it('reads an API resource through the proxy, with the same payload as the sessionful path', async () => {
+        it('reads an API resource through the proxy, with the same payload as the stateful path', async () => {
             const uri = 'https://api.apify.com/v2/datasets/d1/items';
             readApiResourceMock.mockResolvedValue({ contents: [{ uri, text: '[]' }] } as never);
             const legacy = (await callViaLegacy('resources/read', { uri })) as { contents: unknown };
@@ -147,7 +147,7 @@ describe('createStatelessServer() prompts and resources', () => {
 
         it('reads with no Apify client when the request carries no token', async () => {
             // Deliberate: a payment-only session (x402/Skyfire, no Apify token) gets no client, so
-            // the proxy refuses the read. Same rule as the sessionful `resolveApifyClient`.
+            // the proxy refuses the read. Same rule as the stateful `resolveApifyClient`.
             const uri = 'https://api.apify.com/v2/datasets/d1/items';
             readApiResourceMock.mockResolvedValue({ contents: [] } as never);
 

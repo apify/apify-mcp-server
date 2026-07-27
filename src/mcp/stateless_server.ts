@@ -1,14 +1,14 @@
 /**
- * The 2026-07-28 SDK adapter and the package's public registration surface for it:
- * {@link createStatelessServer} (re-exported from `src/index.ts`) builds one v2 SDK `Server` per
- * request, with its handlers and its error/notification projection, reading shared Apify state
- * through {@link StatelessMcpServerHost}. The class behind the factory is module-private — unlike
- * `legacy_server.ts`, whose adapter is exported for the facade to construct.
+ * Adapter for the MCP 2026-07-28 protocol revision
+ * (https://modelcontextprotocol.io/specification/2026-07-28), served via the v2 SDK
+ * (`@modelcontextprotocol/server`). {@link createStatelessServer} (re-exported from
+ * `src/index.ts`) builds one SDK `Server` per request, reading shared Apify state through
+ * {@link StatelessMcpServerHost}. Sibling of `legacy_server.ts` (the 2025-era adapter on
+ * `@modelcontextprotocol/sdk`), not a layer on top of it.
  *
- * Sibling of `legacy_server.ts`, not a layer on top of it. There is no handshake on this protocol
- * revision: every request carries its own `_meta` envelope (protocol version, client info, client
- * capabilities), so client identity — and with it `'auto'` mode resolution and report-problem
- * visibility — is resolved per request from that envelope instead of from remembered session state.
+ * This protocol revision has no `initialize` handshake: every request carries its own `_meta`
+ * envelope (protocol version, client info, capabilities), so client identity — and with it
+ * `'auto'` mode resolution — is resolved per request instead of from session state.
  */
 
 import type { ServerNotification } from '@modelcontextprotocol/sdk/types.js';
@@ -49,8 +49,7 @@ import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telem
 
 /**
  * Everything one 2026-07-28 request is served from, derived once from the shared facade and never
- * mutated afterwards. Two concurrent requests declaring different identities get two snapshots, so
- * neither can see the other's resolved mode or tool set.
+ * mutated afterwards. Concurrent requests with different identities get separate snapshots.
  */
 export type StatelessRequestSnapshot = {
     readonly serverMode: SERVER_MODE;
@@ -58,18 +57,16 @@ export type StatelessRequestSnapshot = {
     readonly tools: Map<string, ToolEntry>;
     readonly resourceService: ReturnType<typeof createResourceService>;
     /**
-     * Token-scoped Apify client for `resources/read`, tagged with this request's own origin;
-     * `undefined` without a token. Bound by the facade, which owns client construction, so the
-     * adapter stays off the Apify API-client layer.
+     * Token-scoped Apify client for `resources/read`; `undefined` without a token. Bound by the
+     * facade so the adapter stays off the Apify API-client layer.
      */
     readonly createApifyClient: (token: string | undefined) => ApifyClient | undefined;
 };
 
 /**
- * Read-facing view of the shared `ActorsMcpServer` facade that the stateless adapter depends on.
- * The sibling of `LegacyMcpServerHost`: same one-directional coupling, and the adapter never sees
- * the concrete facade class. Everything request-scoped arrives through `createRequestSnapshot`;
- * the rest is construction-time configuration that is safe to share across requests.
+ * Read-facing view of the shared `ActorsMcpServer` facade (sibling of `LegacyMcpServerHost`).
+ * Request-scoped state arrives through `createRequestSnapshot`; the rest is construction-time
+ * configuration safe to share across requests.
  */
 export interface StatelessMcpServerHost {
     readonly actorStore?: ActorStore;
@@ -83,10 +80,8 @@ export interface StatelessMcpServerHost {
 }
 
 /**
- * Stateless protocol boundary: project a service's domain error to its v2 `ProtocolError`, copying
- * `message` and `data` unchanged. A v1 `McpError` raised by the shared tool-call engine (which still
- * speaks v1 protocol errors) is re-coded onto the v2 wire with its JSON-RPC code intact. Any other
- * error is returned unchanged, for the caller to rethrow — the SDK renders it as a JSON-RPC error.
+ * Map a domain or v1 `McpError` to a v2 `ProtocolError` with the same code/message/data.
+ * Any other error is returned unchanged for the caller to rethrow.
  */
 function toStatelessProtocolError(error: unknown): unknown {
     if (error instanceof InvalidParamsError) {
@@ -106,15 +101,10 @@ function isProtocolLevelError(error: unknown): boolean {
     return error instanceof ProtocolError || isMcpError(error);
 }
 
-/**
- * Client identity declared by one request, read from the validated `_meta` envelope the SDK lifted
- * out of `params._meta`. Absent only when a request carries no envelope at all, which the serving
- * entry does not let onto this path.
- */
+/** Client identity from the request's validated `_meta` envelope. */
 function buildClientContextFromEnvelope(envelope: Record<string, unknown> | undefined): McpClientContext | undefined {
     if (!envelope) return undefined;
-    // The envelope's client info/capabilities are the same runtime objects `initialize` carries;
-    // this cast only crosses the v2/v1 type boundary of two identical wire shapes.
+    // Same wire shapes as `initialize` carries; the cast only crosses the v2/v1 type boundary.
     return buildMcpClientContext({
         protocolVersion: envelope[PROTOCOL_VERSION_META_KEY],
         clientInfo: envelope[CLIENT_INFO_META_KEY],
@@ -130,9 +120,8 @@ class StatelessMcpServer {
     public readonly server: Server;
     private readonly host: StatelessMcpServerHost;
     /**
-     * The single request's snapshot, memoized as a promise so every handler awaits the same
-     * composition. There is no `initialize` to hook on this revision, so the snapshot is built
-     * lazily by whichever handler runs first — and no other handler can race ahead of it.
+     * The request's snapshot, memoized as a promise so every handler awaits the same composition.
+     * Built lazily by whichever handler runs first — there is no `initialize` to hook.
      */
     private snapshot: Promise<StatelessRequestSnapshot> | undefined;
 
@@ -140,16 +129,11 @@ class StatelessMcpServer {
         this.host = host;
         this.server = new Server(getServerInfo(), {
             capabilities: {
-                // No `tasks` (so `tasks/*` falls through to the SDK's method-not-found), no
-                // `logging` (deprecated by SEP-2577, and declaring it is what would let
-                // `notifications/message` be sent), and no `tools.listChanged` — a per-request
-                // instance can never push one.
-                // TODO: `subscriptions/listen` is out of scope here, but registering no handler does
-                // not refuse it — the SDK's serving entry answers that method upstream of our
-                // handlers and opens a subscription stream honoring none of the capabilities below,
-                // so it can never emit. The dev server closes it in its per-request `finally`; a
-                // long-lived host (internal #676) has nothing that does. Refusing the method
-                // outright is a follow-up.
+                // Deliberately no `tasks` (tasks/* → method-not-found), no `logging` (deprecated
+                // by SEP-2577), no `tools.listChanged` (a per-request instance can never push one).
+                // TODO: the SDK answers `subscriptions/listen` upstream of our handlers and opens a
+                // stream that can never emit; the dev server closes it per request, a long-lived
+                // host does not. Refusing the method outright is a follow-up.
                 tools: {},
                 resources: {},
                 prompts: {},
@@ -170,9 +154,8 @@ class StatelessMcpServer {
     }
 
     /**
-     * Token sources in order: the auth info the serving entry received from its caller (validated
-     * server-side, so it outranks anything the client wrote), then the shared facade's own chain
-     * (`_meta.apifyToken` > `options.token`).
+     * Token precedence: server-validated `authInfo` from the serving entry, then the facade's own
+     * chain (`_meta.apifyToken` > `options.token`).
      */
     private resolveRequestToken(ctx: ServerContext, meta?: ApifyRequestParams['_meta']): string | undefined {
         return ctx.http?.authInfo?.token || this.host.resolveApifyToken(meta);
@@ -184,8 +167,7 @@ class StatelessMcpServer {
             const tools = Array.from(snapshot.tools.values()).map((tool) =>
                 getToolPublicFieldOnly(tool, { mode: snapshot.serverMode, filterWidgetMeta: true }),
             );
-            // Our tool entries carry the same public fields as the SDK's `Tool`; the cast only
-            // crosses the boundary between the two descriptions of one wire shape.
+            // Tool entries carry the same public fields as the SDK's `Tool`; type-boundary cast only.
             return { tools } as unknown as ListToolsResult;
         });
 
@@ -197,8 +179,7 @@ class StatelessMcpServer {
             const progressToken = meta?.progressToken;
             const snapshot = await this.resolveSnapshot(ctx);
             const apifyToken = this.resolveRequestToken(ctx, meta) as string;
-            // No session exists on this path, so there is no session id to thread anywhere: log
-            // lines and telemetry take `undefined` and report it empty.
+            // No session on this path; logs and telemetry report the id empty.
             const mcpSessionId = undefined;
             const startTime = Date.now();
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
@@ -207,12 +188,11 @@ class StatelessMcpServer {
             let toolResult: unknown = null;
             let actorName: string | undefined;
             let actorId: string | undefined;
-            // Resolved up front, by the same rule `prepareToolCall` resolves the tool by, so every
-            // return path passes the schema this request advertised for the named tool — including
-            // the pre-dispatch failures that return before the engine hands the tool back. This is
-            // the only `tools/call` shell that projects; the legacy one returns engine results raw.
-            // Inert today either way: the 2026-07-28 codec discards the argument, and the v2 codec
-            // that does read it only re-wraps a non-object `structuredContent`, which no tool emits.
+            // Resolved up front (same rule as `prepareToolCall`) so every return path — including
+            // pre-dispatch failures — projects with the schema this request advertised. Only this
+            // call shell projects results. This is inert today: the 2026-07-28 codec discards the
+            // schema, while the codec that reads it only re-wraps non-object structured content,
+            // which no tool emits.
             const outputSchema = resolveToolEntry(name, snapshot.tools)?.outputSchema;
             const { clientContext } = snapshot;
             const { paymentProvider, allowUnauthMode } = this.host.options;
@@ -329,9 +309,8 @@ class StatelessMcpServer {
     }
 
     /**
-     * Run a tool result through the SDK's wire codec, as every low-level `tools/call` author must:
-     * the projection lives in the codec, not here — on this era the SEP-2106 §4.3 text auto-append
-     * (`structuredContent` re-shaping is legacy-only).
+     * Run a tool result through the SDK's wire codec, as every low-level `tools/call` author must
+     * (SEP-2106 §4.3 text auto-append; `structuredContent` re-shaping is legacy-only).
      */
     private projectResult(result: Record<string, unknown>, outputSchema: ToolEntry['outputSchema']) {
         return this.server.projectCallToolResult(
@@ -341,14 +320,9 @@ class StatelessMcpServer {
     }
 
     /**
-     * Forwards a notification the shared engine emits (progress, plus whatever an Actor-MCP tool
-     * relays from a remote 2025-era server) onto this request's response stream.
-     *
-     * The parameter type is the shared engine's v1 `ServerNotification`; v2's `notify` takes a
-     * structurally identical `Notification`, so the cast only crosses the two SDKs' type boundary.
-     * v2 refuses a notification that its era does not define or whose capability we did not declare
-     * (`notifications/message`, since `logging` is undeclared) — a relayed notification must never
-     * fail the tool call, so a refusal is logged and dropped.
+     * Forwards engine-emitted notifications (progress, Actor-MCP relays) onto this request's
+     * response stream. v2 refuses notifications its era does not define or whose capability we did
+     * not declare — a refusal must never fail the tool call, so it is logged and dropped.
      */
     private buildNotificationForwarder(ctx: ServerContext): (notification: ServerNotification) => Promise<void> {
         return async (notification) => {
@@ -401,19 +375,17 @@ class StatelessMcpServer {
 }
 
 /**
- * The side channel the shared engine uses for Actor-MCP connect failures. A stateless request
- * declares no `logging` capability, so there is no client-visible `notifications/message` to send;
- * the same text already reaches the client in the result body or the protocol error.
+ * Server-side log for Actor-MCP connect failures: no `logging` capability is declared, so there is
+ * no client-visible `notifications/message` to send. The text reaches the client in the result body
+ * or protocol error.
  */
 async function emitLogServerSide(msg: { level: string; data?: unknown }): Promise<void> {
     log.softFail('Tool call reported a failure', { level: msg.level, errMessage: String(msg.data) });
 }
 
 /**
- * Build the v2 SDK `Server` that serves one 2026-07-28 request from the shared facade.
- *
- * Pass this as (or from) the factory of the SDK's serving entry — `createMcpHandler` calls the
- * factory once per request:
+ * Build the v2 SDK `Server` that serves one 2026-07-28 request from the shared facade. Pass it as
+ * the factory of the SDK's serving entry, which calls it once per request:
  *
  * ```ts
  * const handler = createMcpHandler(() => createStatelessServer(actorsMcpServer), { legacy: 'reject' });

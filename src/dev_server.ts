@@ -1,5 +1,12 @@
 /*
  * Express server implementation used for standby Actor mode.
+ *
+ * Serves two MCP protocol revisions on one endpoint:
+ * - stateful Streamable HTTP with sessions, per the 2025-era spec
+ *   (https://modelcontextprotocol.io/specification/2025-11-25), via `@modelcontextprotocol/sdk`
+ * - stateless single requests, per the 2026-07-28 revision
+ *   (https://modelcontextprotocol.io/specification/2026-07-28), via the v2 SDK
+ *   (`@modelcontextprotocol/server` + `@modelcontextprotocol/node`)
  */
 
 import { randomUUID } from 'node:crypto';
@@ -112,33 +119,28 @@ type EraRoutableRequest = {
 };
 
 /**
- * Whether the 2026-07-28 stateless path must answer this request instead of the sessionful one.
- *
- * `isLegacyRequest` is the SDK's own discriminator: it reports `true` for claim-less traffic
- * (2025-era `initialize` and follow-ups, body-less session GET/DELETE, unparseable bodies) and
- * `false` for everything the 2026-07-28 entry answers — including that entry's own validation
- * rejections, which must not be re-routed to a legacy handler.
+ * Whether the 2026-07-28 stateless path must answer this request instead of the stateful one.
+ * Uses the SDK's own discriminator: `true` covers claim-less traffic (2025-era `initialize` and
+ * follow-ups, body-less session GET/DELETE, and unparseable bodies). `false` covers everything the
+ * 2026-07-28 entry answers, including its own validation rejections, which must not be re-routed.
  */
 export async function isStatelessRequest(req: EraRoutableRequest): Promise<boolean> {
-    // A parsed body is always supplied (`express.json()` ran), so nothing is read from the stream —
-    // which is what lets the narrow shape above stand in for a full `IncomingMessage`.
+    // `express.json()` already parsed the body, so nothing is read from the stream — which is what
+    // lets the narrow shape above stand in for a full `IncomingMessage`.
     return !(await isLegacyRequest(await toWebRequest(req as NodeIncomingMessageLike, req.body)));
 }
 
 /**
- * Serves one 2026-07-28 request: no session id, no handshake, nothing retained afterwards. The
- * URL-parameter handling is deliberately a second copy of the sessionful branch's rather than a
- * shared extraction, so that branch stays untouched by this change.
+ * Serves one 2026-07-28 request: no session id, no handshake, nothing retained afterwards.
+ * URL-parameter handling is deliberately a copy of the stateful branch's, so that branch stays
+ * untouched by this change.
  *
- * Auth deliberately diverges from the sessionful branch: the missing-token 401 is resolved inside
- * the server factory instead of up front. The SDK entry invokes the factory only after its
- * validation ladder has passed, and SEP-2243 requires a framing rejection (mismatched `Mcp-Method`/
- * `Mcp-Name`/`MCP-Protocol-Version`, 400/-32020) to be sent regardless of auth state. Done to
- * satisfy the `http-header-validation` conformance scenarios even though this is a dev-only server.
+ * The missing-token 401 is resolved inside the server factory, not up front: SEP-2243 requires
+ * framing rejections (400/-32020) regardless of auth state, and the SDK entry runs its validation
+ * ladder before invoking the factory.
  *
- * Dev-only shape: a facade is built per request, so `?actors=` re-fetches Actor metadata every time.
- * A host may instead share one facade across many requests to avoid that — snapshots are composed
- * per request either way, so the facade's lifecycle is the host's choice, not part of this contract.
+ * Dev-only shape: a facade is built per request, so `?actors=` re-fetches Actor metadata every
+ * time. A host may share one facade across requests instead — snapshots are per-request either way.
  */
 async function serveStatelessRequest(req: Request, res: Response, taskStore: InMemoryTaskStore): Promise<void> {
     const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
@@ -170,8 +172,8 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
                 paymentProvider,
                 token: apifyToken,
             });
-            // Client identity arrives per request in the `_meta` envelope, not up front as with an
-            // `initialize` handshake, so this fetch carries no request-origin tag.
+            // Client identity arrives per request in the `_meta` envelope (there is no initialize
+            // handshake), so this fetch carries no request-origin tag.
             await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken }));
             return createStatelessServer(mcpServer);
         },
@@ -182,9 +184,8 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
         },
     );
     try {
-        // The entry never derives `authInfo` from the `Authorization` header, so the token this
-        // server already extracted is passed through as `authInfo` for handlers to read as
-        // `ctx.http.authInfo`. No OAuth client sits behind a dev bearer token, hence empty `clientId`.
+        // The entry never derives `authInfo` from headers itself; pass the extracted token through
+        // for handlers to read as `ctx.http.authInfo`. No OAuth client here, hence empty `clientId`.
         if (apifyToken) {
             (req as Request & { auth?: AuthInfo }).auth = { token: apifyToken, clientId: '', scopes: [] };
         }
@@ -247,7 +248,7 @@ export function createExpressApp(): express.Express {
         log.info('Received MCP request:', req.body);
         try {
             // Both protocol eras are served on this one endpoint; everything the stateless path does
-            // not claim falls through to the sessionful path below, unchanged.
+            // not claim falls through to the stateful path below, unchanged.
             if (await isStatelessRequest(req)) {
                 await serveStatelessRequest(req, res, taskStore);
                 return;
@@ -416,12 +417,9 @@ export function createExpressApp(): express.Express {
 }
 
 /**
- * Finds the `initialize` message in a (possibly batched) request body, matching on `method`
- * alone like the pre-refactor `isInitializeRequest` did. This must stay a loose tag check: a
- * body with `method: 'initialize'` but malformed/incomplete `params` still needs to enter the
- * initialize branch below so the SDK's own initialize-schema validation produces the accurate
- * protocol error, instead of falling through to the generic "Mcp-Session-Id header is required"
- * 400 from the no-session branch.
+ * Finds the `initialize` message in a (possibly batched) request body by `method` tag alone.
+ * Deliberately loose: a body with malformed `params` must still enter the initialize branch so the
+ * SDK's schema validation produces the accurate protocol error instead of the generic 400.
  */
 export function extractInitializeMessage(body: unknown): { method: string; params?: unknown } | undefined {
     const messages = Array.isArray(body) ? body : [body];
