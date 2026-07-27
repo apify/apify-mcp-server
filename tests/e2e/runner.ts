@@ -179,23 +179,67 @@ const POLL_INTERVAL_SECONDS = '2';
 const POLL_MAX_ATTEMPTS = 20;
 
 /**
+ * True when `stdout` parses as a well-formed `CallToolResult` carrying `isError: true` — a valid
+ * response the server chose to return, not a bridge or protocol failure.
+ *
+ * mcpc 0.2.x exits 0 for this case; mcpc 0.5.x exits 2, identically to a genuine JSON-RPC protocol
+ * error (unknown tool, invalid arguments), which leaves stdout empty. Exit code alone can no longer
+ * tell the two apart, so this checks payload shape instead — which keeps every snapshot-only case
+ * (`fetch-apify-docs` hitting a domain the sandbox can't reach, the MCP-proxy Actor being
+ * unreachable, see README "Environment sensitivity") capturing a snapshot the way it always did,
+ * on either mcpc version, rather than the exit-code coupling turning it into a hard failure.
+ */
+function isToolLevelErrorResponse(stdout: string): boolean {
+    try {
+        const parsed: unknown = JSON.parse(stdout);
+        return (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            (parsed as { isError?: unknown }).isError === true &&
+            Array.isArray((parsed as { content?: unknown }).content)
+        );
+    } catch {
+        return false;
+    }
+}
+
+/** A non-zero mcpc exit that is not a valid tool-level error response: a protocol error, a bridge
+ * crash, or mcpc's own CLI argument parsing rejecting the probe's arguments. */
+function isGenuineFailure(result: { status: number | null; stdout: string }): boolean {
+    return result.status !== 0 && !isToolLevelErrorResponse(result.stdout);
+}
+
+/**
+ * True when the payload represents some kind of error — protocol-level (non-zero exit) or
+ * tool-level (`isError: true`, whichever exit code this mcpc version happens to use for it).
+ * `expectError` cases are checked against this, not raw exit code, so the same case definition
+ * holds across mcpc's exit-code change between 0.2.x and 0.5.x.
+ */
+function respondsWithSomeError(result: { status: number | null; stdout: string }): boolean {
+    return result.status !== 0 || isToolLevelErrorResponse(result.stdout);
+}
+
+/**
  * Runs a probe, retrying while `pollWhileWorking` is set and mcpc reports the task still running.
- * Any other failure — including running out of attempts — surfaces immediately as a normal
+ * Any other genuine failure — including running out of attempts — surfaces immediately as a normal
  * unexpected-exit error, same as a non-polling case.
  */
 function runMcpcCase(args: string[], testCase: McpcCase) {
-    const allowFailure = Boolean(testCase.expectError || testCase.pollWhileWorking);
-    let result = runMcpc(args, { allowFailure });
+    let result = runMcpc(args, { allowFailure: true });
 
     let attempt = 1;
-    while (testCase.pollWhileWorking && result.status !== 0 && result.stderr.includes(TASK_STILL_WORKING)) {
-        if (attempt >= POLL_MAX_ATTEMPTS) break;
+    while (
+        testCase.pollWhileWorking &&
+        isGenuineFailure(result) &&
+        result.stderr.includes(TASK_STILL_WORKING) &&
+        attempt < POLL_MAX_ATTEMPTS
+    ) {
         spawnSync('sleep', [POLL_INTERVAL_SECONDS]);
         result = runMcpc(args, { allowFailure: true });
         attempt += 1;
     }
 
-    if (!testCase.expectError && result.status !== 0) {
+    if (!testCase.expectError && isGenuineFailure(result)) {
         throw new Error(`mcpc ${args.join(' ')} failed:\n${result.stderr}`);
     }
     return result;
@@ -323,11 +367,14 @@ export function defineMcpcShard(shardIndex: number, shardCount: number) {
                 const args = testCase.args.map((arg) => interpolate(arg, captured));
                 const result = runMcpcCase(['--json', session, ...args], testCase);
 
-                if (testCase.expectError && result.status === 0) {
-                    throw new Error(`Expected a non-zero exit for "${testCase.id}", got 0:\n${result.stdout}`);
+                if (testCase.expectError && !respondsWithSomeError(result)) {
+                    throw new Error(
+                        `Expected an error response for "${testCase.id}", got a clean success:\n${result.stdout}`,
+                    );
                 }
 
-                // Protocol errors (exit 2) leave stdout empty and write the JSON payload to stderr.
+                // A protocol error leaves stdout empty and writes the JSON payload to stderr instead. A
+                // tool-level `isError: true` response is always on stdout, on every mcpc version.
                 const payload = stripMcpcEnvelope(result.stdout.trim() || result.stderr);
 
                 if (testCase.assert) {

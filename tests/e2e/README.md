@@ -99,12 +99,19 @@ used to rely on running last in a long chain to give the task time to finish in 
 after splitting the task probes into their own `tasks` configuration (see Parallelism) that chain
 is only 6 cases, too short to make that reliable, so it polls instead (`pollWhileWorking`, ~40s cap).
 
-Two error classes, both measured:
+Two error classes, both measured — and mcpc's exit code for the first one is **not** stable across
+versions, so the runner classifies by payload shape, not by exit code (`isToolLevelErrorResponse` /
+`isGenuineFailure` / `respondsWithSomeError` in `runner.ts`):
 
-| Class | Example | Exit | Payload |
-|---|---|---|---|
-| Tool-level | bad dataset id, forbidden URL | 0 | `{content, isError: true}` on stdout |
-| Protocol | unknown tool, missing required arg | 2 | `{"error": …}` on stderr |
+| Class | Example | Exit (0.2.x) | Exit (0.5.x) | Payload |
+|---|---|---|---|---|
+| Tool-level | bad dataset id, forbidden URL | 0 | 2 | `{content, isError: true}` on stdout |
+| Protocol | unknown tool, missing required arg | 2 | 2 | `{"error": …}` on stderr, stdout empty |
+
+A case with no `assert` and no `expectError` ("snapshot-only") tolerates a tool-level error either
+way — it was never asserting success, only that the server produced *some* well-formed response —
+so an unreachable external dependency (see "Environment sensitivity" below) still gets captured as
+a snapshot instead of throwing. Only a genuine protocol/bridge failure fails a snapshot-only case.
 
 ## Secrets
 
@@ -160,17 +167,29 @@ behaviour is environment- or state-dependent rather than permanent. `E2E_PROBE_T
 itself evidence of server drift — check whether it produced no output at all first. If these probes
 hang, re-run in a fresh container before drawing conclusions.
 
-## Pinned mcpc version
+## mcpc version
 
-`@apify/mcpc` stays on `^0.2.0`. 0.5.0 was evaluated and **not** adopted:
+`@apify/mcpc` is `^0.5.0`. It was evaluated once and rejected (exit-code semantics changed, see
+below), then adopted once the runner stopped depending on exit code for that classification.
 
-- Tool-level `isError: true` results changed from exit 0 to exit 2, which silently inverts the
-  meaning of the two error classes below.
-- `resources-subscribe` gained a required `<file>` argument, so that probe stopped exercising the
-  server and started failing on mcpc's own argument parsing.
-- It does not fix the hang above.
+What actually changed between 0.2.x and 0.5.x, and what was done about each:
 
-Re-evaluate on a fresh container, and expect to make the harness exit-code agnostic first.
+- **Tool-level `isError: true` results changed from exit 0 to exit 2** — identical to the exit code
+  of a genuine protocol error. Fixed structurally (`isToolLevelErrorResponse` inspects payload
+  shape, not exit code), not by adding `expectError: true` to every case that happens to return
+  `isError: true` in some environment. That whack-a-mole approach was tried first and missed two
+  cases (`searches the docs`, `searches the docs with paging` — both fail in network-restricted
+  sandboxes where `search-apify-docs`'s Algolia backend is unreachable) before the structural fix
+  replaced it.
+- **`resources-subscribe` gained a required `<file>` argument.** Not fixed. `rejects resource
+  subscribe` still passes, but now because mcpc's own CLI parser rejects the call for a missing
+  argument (`error: missing required argument 'file'` on stderr, exit 1) — not because the server
+  rejected an unsupported subscription. The case no longer exercises the server. Worth a real fix
+  (pass a scratch file and check what the server does with it) or replacing the probe; flagging
+  rather than guessing at the intended behavior.
+- **Does not fix the mcpc hang** documented above. Reproduces identically on 0.5.0.
+
+Verified: 281/281 pass on 0.5.0, ~76s wall clock (sharded).
 
 ## What this cannot cover
 
