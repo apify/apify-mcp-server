@@ -62,7 +62,7 @@ function makeSourceTool(name: string, description: string): ToolEntry {
     } as ToolEntry;
 }
 
-/** A sessionful handshake driven on the shared facade, to give it a client and a final tool set. */
+/** A stateful handshake driven on the shared facade, to give it a client and a final tool set. */
 const LEGACY_INITIALIZE = {
     method: 'initialize',
     params: {
@@ -327,7 +327,7 @@ describe('createStatelessServer() request context', () => {
             await withStatelessServer(
                 async ({ server, call }) => {
                     await loadSource(server, [], { tools: [HELPER_TOOLS.PROBLEM_REPORT] });
-                    // Drive the sessionful handshake on the same facade first, so its own tool map
+                    // Drive the stateful handshake on the same facade first, so its own tool map
                     // really holds report-problem. Without that the assertion below would pass for
                     // the wrong reason: an implementation reading `this.tools` (the legacy pattern)
                     // would also find nothing to mention.
@@ -348,7 +348,7 @@ describe('createStatelessServer() request context', () => {
         it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)(
             'keeps instructions at the configured mode after a legacy handshake resolves auto',
             async () => {
-                // One facade serves both eras at once, and a sessionful `initialize` resolves `'auto'`
+                // One facade serves both eras at once, and a stateful `initialize` resolves `'auto'`
                 // in place. Configuration-level instructions must not follow that resolution: reading
                 // the mutable resolved mode would let one legacy client decide what every later
                 // stateless request is told.
@@ -377,10 +377,10 @@ describe('createStatelessServer() request context', () => {
     });
 
     describe('retained tool sources', () => {
-        it('recomposes every retained source, the last load winning a name collision', async () => {
-            // A facade accumulates a source per load call and keeps them all, so a request composes
-            // the whole set. Two sources sharing a tool name pin the merge order: last load wins,
-            // matching how the sessionful path upserts them.
+        it('recomposes every distinct retained source, the last load winning a name collision', async () => {
+            // A facade retains one source per distinct input, so a request composes the whole set.
+            // Two sources sharing a tool name pin the merge order: last load wins, matching how the
+            // stateful path upserts them.
             await withStatelessServer(async ({ server, call }) => {
                 await loadSource(server, [
                     makeSourceTool('shared-tool', 'from the first source'),

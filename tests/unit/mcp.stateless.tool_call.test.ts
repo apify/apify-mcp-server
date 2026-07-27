@@ -150,7 +150,7 @@ const LEGACY_INITIALIZE = {
 };
 
 /**
- * The same call served by the sessionful path, for parity comparison. Values that only exist on that
+ * The same call served by the stateful path, for parity comparison. Values that only exist on that
  * path (a session id) are supplied the way it requires them. Each path gets its own tool objects
  * from `buildTools`, so neither can observe the other's teardown.
  */
@@ -180,7 +180,7 @@ async function listViaLegacy(buildTools: () => ToolEntry[], input: Input): Promi
     });
 }
 
-/** Wire-normalize a sessionful result so it compares against one that crossed a JSON boundary. */
+/** Wire-normalize a stateful result so it compares against one that crossed a JSON boundary. */
 function asWire(result: unknown): unknown {
     return JSON.parse(JSON.stringify(result));
 }
@@ -277,7 +277,7 @@ describe('createStatelessServer() tools/call', () => {
         });
     });
 
-    describe('parity with the sessionful path', () => {
+    describe('parity with the stateful path', () => {
         it('lists the same tools for the same sources', async () => {
             const buildTools = () => [makeActorTool(), makeActorMcpTool(), makeArgsRecorderTool().tool];
             const input: Input = { tools: [] };
@@ -411,7 +411,7 @@ describe('createStatelessServer() tools/call', () => {
             const outputSchema = server.tools.get(HELPER_TOOLS.ACTOR_CALL)?.outputSchema as object;
             const validate = new Ajv({ strict: false, allErrors: true }).compile(outputSchema);
             expect(validate(response.result?.structuredContent)).toBe(true);
-            // Byte-for-byte what the sessionful path returns for the same failure.
+            // Byte-for-byte what the stateful path returns for the same failure.
             expect(response.result).toMatchObject(asWire(legacy) as Record<string, unknown>);
         }, options);
     });

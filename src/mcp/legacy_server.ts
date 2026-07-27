@@ -1,6 +1,8 @@
 /**
- * Package-private v1 SDK adapter: owns the SDK `Server`, request handlers, notifications, and
- * transport lifecycle, reading shared Apify state through {@link LegacyMcpServerHost}.
+ * Adapter for the 2025-era MCP protocol (https://modelcontextprotocol.io/specification/2025-11-25),
+ * served via the v1 SDK (`@modelcontextprotocol/sdk`): owns the SDK `Server`, request handlers,
+ * notifications, and transport lifecycle, reading shared Apify state through
+ * {@link LegacyMcpServerHost}. Sibling of `stateless_server.ts`, the 2026-07-28 adapter.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -152,22 +154,15 @@ export class LegacyMcpServer {
     }
 
     /**
-     * Override the SDK's `initialize` request handler to run mode resolution and
-     * pending-source flush before `InitializeResult` is sent. Delegates boilerplate
-     * (protocolVersion, capabilities, instructions) to the SDK's captured `_oninitialize`.
-     *
-     * Not using `server.oninitialized`: the SDK dispatches notification handlers
-     * fire-and-forget (separate microtask), so a follow-up `tools/list` can race past them.
-     * The request handler guarantees tools are final before the response and the first `tools/list`.
+     * Override the SDK's `initialize` handler to run mode resolution and pending-source flush
+     * before `InitializeResult` is sent. `server.oninitialized` won't do: the SDK dispatches
+     * notification handlers fire-and-forget, so a follow-up `tools/list` could race past them.
      */
     private setupInitializeHandler() {
-        // Capture the SDK's default initialize handler installed in its constructor.
-        // Private-field access on the SDK Server — verified against
-        // @modelcontextprotocol/sdk ^1.25.x (see package.json). On SDK bumps, re-check
-        // `@modelcontextprotocol/sdk/shared/protocol.js` for a still-named `_oninitialize`;
-        // if renamed or made non-delegable, rebuild the InitializeResult shape here
-        // (protocolVersion, serverInfo, capabilities, instructions) instead of delegating.
-        // The capability-gating unit tests construct a server and act as a canary.
+        // Private-field access, verified against @modelcontextprotocol/sdk ^1.25.x. On SDK bumps,
+        // re-check `shared/protocol.js` for a still-named, delegable `_oninitialize`. If it changed,
+        // rebuild the InitializeResult here (protocolVersion, serverInfo, capabilities, instructions)
+        // instead of delegating. Capability-gating unit tests are the canary.
         // eslint-disable-next-line no-underscore-dangle
         const sdkInitHandler = (
             this.server as unknown as {
@@ -498,13 +493,10 @@ export class LegacyMcpServer {
                         mcpSessionId,
                     });
 
-                    // Pre-flight failure is already known — the outcome needs no work. Resolve the
-                    // task synchronously: store the failure as the terminal `completed` result and emit
-                    // exactly one `completed` status notification (no `updateTaskStatus('working')`, so no
-                    // `working` notification). Standby rejection wins over the generic payment-required
-                    // short-circuit, matching the sync path's precedence. Telemetry rides the handler's
-                    // outer `finally` (shouldTrackTelemetry stays true), firing once with the sync-path
-                    // properties plus the taskId on the log line.
+                    // Pre-flight failure is already known — resolve the task synchronously: store
+                    // the failure as the terminal `completed` result and emit exactly one status
+                    // notification. Standby rejection wins over payment-required, matching the sync
+                    // path. Telemetry rides the handler's outer `finally`.
                     const preflightResult = standbyRejection ?? paymentRequiredResult;
                     if (preflightResult) {
                         const outcome = buildPreflightFailureOutcome(
@@ -526,12 +518,9 @@ export class LegacyMcpServer {
                                 mcpSessionId,
                             );
                         } catch (error) {
-                            // A store failure (not expiry) would otherwise fall through to the generic
-                            // catch and return a task-less tool result the client rejects as a
-                            // CreateTaskResult parse error; surface it as a protocol error instead.
-                            // The pre-flight outcome left toolStatus=SOFT_FAIL, but a genuine store
-                            // outage is a hard failure — correct it before throwing so the handler
-                            // `finally` logs FAILED/INTERNAL_ERROR, not the stale pre-flight SOFT_FAIL.
+                            // A store failure (not expiry) must surface as a protocol error — the
+                            // generic catch would return a task-less result the client rejects.
+                            // Correct the stale pre-flight SOFT_FAIL to FAILED before throwing.
                             toolStatus = TOOL_STATUS.FAILED;
                             callDiagnostics = {
                                 failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
@@ -544,9 +533,8 @@ export class LegacyMcpServer {
                                 }`,
                             );
                         }
-                        // Defer so the client sees the CreateTaskResult (and learns the taskId) before
-                        // the terminal status notification — the async path's post-response ordering.
-                        // emitTaskStatusNotification never throws and no-ops if the task expired.
+                        // Defer so the client learns the taskId before the terminal status
+                        // notification. emitTaskStatusNotification never throws.
                         setImmediate(() => {
                             void emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
                         });
@@ -558,10 +546,8 @@ export class LegacyMcpServer {
                             failureCategory: callDiagnostics.failure_category,
                             failureHttpStatus: callDiagnostics.failure_http_status,
                         });
-                        // createTask returned status `working`; synthesize the terminal status instead of
-                        // re-fetching — if the task expired before the result store (the one case
-                        // storeTaskResultOrSkipIfExpired tolerates), a re-fetch would come back empty and a
-                        // `working` fallback would contradict the tasks/get 404 the client sees next.
+                        // Synthesize the terminal status instead of re-fetching: if the task expired
+                        // before the result store, a re-fetch would fall back to a stale `working`.
                         return { task: { ...task, status: 'completed' as const } };
                     }
 

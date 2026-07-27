@@ -16,7 +16,7 @@ directory you're editing.
   that import order.
 - `dev_server.ts` — Express server for local dev / standby Actor mode. Its POST route
   serves both protocol eras: `isStatelessRequest` sends 2026-07-28 (per-request
-  envelope) traffic to the stateless adapter, everything else to the sessionful flow.
+  envelope) traffic to the stateless adapter, everything else to the stateful flow.
 - `input.ts` — input processing (`processInput`, used by `stdio.ts` and the HTTP URL-param parser in `mcp/utils.ts`).
 - `apify_client.ts` — the Apify API client wrapper; use it rather than calling the
   API directly. `state.ts` — TTL caches. `const.ts`, `errors.ts`,

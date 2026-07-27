@@ -45,22 +45,18 @@ type ToolSource = { input: Input; actorTools: ToolEntry[] };
 
 /**
  * Stable identity of a fetch input, so reloading the same input replaces its retained source rather
- * than adding another (see {@link ActorsMcpServer.toolSources}). Keys are sorted because the same
- * input reaches the loaders from several builders, which need not agree on property order.
- *
- * The array replacer filters keys at every depth, which is safe only while `Input` stays flat
- * (strings, string arrays, numbers). If `Input` ever gains a nested object, swap this for a
- * top-level-only sort, or nested keys absent from the top level are silently dropped and distinct
- * inputs collide.
+ * than adding another (see {@link ActorsMcpServer.toolSources}). Keys are sorted because callers
+ * need not agree on property order. The array replacer filters keys at every depth — safe only
+ * while `Input` stays flat; a nested object's keys would be silently dropped and inputs collide.
  */
 function toolSourceKey(input: Input): string {
     return JSON.stringify(input, Object.keys(input).sort());
 }
 
 /**
- * The resolved mode plus client identity a composition or gating decision is made against. Passing it
- * as a parameter is what lets a caller compose against a view other than the instance's own (see
- * `servingContext`) — one derived from a single request — without mutating the shared facade.
+ * The resolved mode plus client identity a composition or gating decision is made against.
+ * Passed as a parameter so a caller can compose against a per-request view without mutating
+ * the shared facade.
  */
 type ServingContext = {
     readonly serverMode: SERVER_MODE;
@@ -68,10 +64,9 @@ type ServingContext = {
 };
 
 /**
- * Read the widget registry from disk. Module-level and mode-agnostic: the result depends only on
- * what is on disk, so a successful read can be resolved once and shared (see
- * {@link ActorsMcpServer.resolveWidgetsForMode}). Rejects on a failed scan, so the caller can tell
- * that apart from a successful empty registry.
+ * Read the widget registry from disk. Mode-agnostic, so a successful read is resolved once and
+ * shared (see {@link ActorsMcpServer.resolveWidgetsForMode}). Rejects on a failed scan so the
+ * caller can tell that apart from a successful empty registry.
  */
 async function resolveServableWidgets(): Promise<Map<string, AvailableWidget>> {
     const resolved = await resolveAvailableWidgets(dirname(fileURLToPath(import.meta.url)));
@@ -103,22 +98,17 @@ async function resolveServableWidgets(): Promise<Map<string, AvailableWidget>> {
 }
 
 /**
- * Create Apify MCP server.
- *
- * The shared-Apify-behavior facade: it owns the tool registry + loaders, server-mode resolution,
- * `actorStore`, telemetry config, widgets, prompt/resource services, and token/client resolution,
- * and constructs exactly one {@link LegacyMcpServer} (the v1 SDK adapter), delegating all v1
- * protocol work to it. It implements {@link LegacyMcpServerHost} so the adapter reads shared state
- * through a narrow contract, and {@link StatelessMcpServerHost} for the 2026-07-28 adapter — which
- * it does not construct: a stateless serving unit is built per request by `createStatelessServer`,
- * from a snapshot this facade hands out.
+ * The shared-Apify-behavior facade: owns the tool registry + loaders, server-mode resolution,
+ * telemetry config, widgets, prompt/resource services, and token/client resolution. Constructs
+ * exactly one {@link LegacyMcpServer} (2025-era adapter) and delegates all v1 protocol work to it.
+ * Implements {@link StatelessMcpServerHost} for the 2026-07-28 adapter too, but does not construct
+ * it — `createStatelessServer` builds one per request from a snapshot this facade hands out.
  */
 export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerHost {
     /**
-     * The resolved tool map the instance's own (sessionful) connection serves, composed from
-     * `toolSources` once the legacy handshake makes mode and client known. A stateless request
-     * never reads it: its identity arrives with the request, after this map is composed, so its
-     * snapshot re-composes from the sources instead ({@link createRequestSnapshot}).
+     * The resolved tool map the instance's own (stateful) connection serves, composed from
+     * `toolSources` once the handshake makes mode and client known. A stateless request never
+     * reads it — its snapshot re-composes from the sources ({@link createRequestSnapshot}).
      */
     public readonly tools: Map<string, ToolEntry>;
     public readonly options: ActorsMcpServerOptions;
@@ -136,35 +126,24 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * values bypass auto-detect.
      */
     private readonly serverModeOption: ServerModeOption;
-    /** True once the server mode is final: at construction for explicit `default`/`apps`, or after
-     *  the initialize handler resolves `'auto'`. Composing before this in `'auto'` mode would use
-     *  the preliminary DEFAULT mode and produce the wrong (non-widget) tool variants, so composition
-     *  waits for it. Distinct from {@link clientKnown}, which only withholds client-gated tools. */
+    /** True once the server mode is final (at construction, or after initialize resolves `'auto'`).
+     *  Composition waits for it — composing earlier in `'auto'` mode would produce the wrong tool
+     *  variants. Distinct from {@link clientKnown}, which only withholds client-gated tools. */
     private serverModeResolved: boolean;
     /**
-     * Tool sources queued until composition is possible. Enqueued when the mode is not yet resolved
-     * (`'auto'` before initialize), and re-composed by the initialize flush — which is also when the
-     * client becomes known, so any client-gated tools withheld by an eager compose are added then.
-     * We capture the exact actor-tool slice fetched for each request so the flush composes every
-     * entry against *its own* actor list rather than the accumulated union across unrelated requests.
-     *
-     * Keyed like {@link toolSources}, and for the same reason: a facade that never sees an
-     * initialize (the stateless-only host shape) never drains this queue, so a reload must replace
-     * its entry rather than append, keeping the queue bounded by distinct inputs.
+     * Tool sources queued until composition is possible (`'auto'` mode before initialize),
+     * re-composed by the initialize flush once mode and client are known. Each entry keeps the
+     * exact actor-tool slice fetched for its input, so the flush composes it against its own list.
+     * Keyed like {@link toolSources}: a stateless-only facade never drains this queue, so a reload
+     * replaces its entry instead of appending, keeping the queue bounded by distinct inputs.
      */
     private readonly pendingToolsUntilClientKnown = new Map<string, ToolSource>();
     /**
-     * The unresolved inputs `tools` is composed from — not a second tool registry. `tools` holds one
-     * resolved output: the instance's own view, fixed once the connection handshake makes the client
-     * known. Retaining the sources (never drained, unlike the pending queue) lets a caller whose mode
-     * and client identity arrive with a single request compose its own resolved set from the same
-     * inputs, without touching `tools`.
-     *
-     * Keyed by input rather than appended, because nothing drains it: a long-lived facade reloads
-     * tools every time its tool set drifts, and each reload repeats an input already retained.
-     * Replacing bounds the map by distinct inputs — the same thing `tools` is already bounded by —
-     * instead of growing once per reload for the facade's lifetime, holding every superseded
-     * actor-tool array alive with it.
+     * The unresolved inputs `tools` is composed from — not a second tool registry. Retained (never
+     * drained) so a stateless request, whose identity arrives per request, can compose its own
+     * resolved set from the same inputs without touching `tools`. Keyed by input because nothing
+     * drains it: a reload replaces its entry instead of appending, bounding the map by distinct
+     * inputs instead of growing per reload for the facade's lifetime.
      */
     private readonly toolSources = new Map<string, ToolSource>();
 
@@ -199,7 +178,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         return this._serverMode;
     }
 
-    /** The instance's own view: what a sessionful connection composes and gates against. */
+    /** The instance's own view: what a stateful connection composes and gates against. */
     private get servingContext(): ServingContext {
         return { serverMode: this._serverMode, clientContext: this._clientContext };
     }
@@ -260,15 +239,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Runs the shared initialize steps the legacy adapter delegates to before it returns the
-     * `InitializeResult`: refresh the client context from the wire request, capture the raw request
-     * for hosted session recovery, resolve `'auto'` server mode against client capabilities, flush
-     * pending tool sources, and resolve widgets. The adapter delegates the SDK boilerplate and
-     * overwrites `instructions` afterwards (see {@link getServerInstructions}).
-     *
-     * Ordering is load-bearing: mode before compose, compose before widgets/instructions.
-     * `composePendingToolsForClient` runs before the instructions are read so tool presence reflects
-     * the final composed set.
+     * The shared initialize steps the legacy adapter delegates to before returning
+     * `InitializeResult`: refresh client context, capture the raw request for session recovery,
+     * resolve `'auto'` mode against client capabilities, flush pending tool sources, resolve
+     * widgets. Ordering is load-bearing: mode before compose, compose before instructions, so tool
+     * presence reflects the final composed set.
      */
     public async applyInitialize(request: InitializeRequest): Promise<void> {
         this._clientContext = buildMcpClientContext(request.params);
@@ -304,27 +279,21 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Instructions for a stateless serving unit. The SDK answers `server/discover` from them at
-     * construction time, before any request's envelope is seen, so they are configuration-level: the
-     * configured mode (generic guidance while it is `'auto'`, since no client is known yet) and no
-     * report-problem mention, because that tool's presence is decided per request long after this
-     * string is frozen. Gating itself is unaffected — see {@link createRequestSnapshot}.
-     *
-     * From `serverModeOption`, never `_serverMode`: a legacy `initialize` rewrites that field in
-     * place, and one facade serves both eras, so reading it would let one legacy client's resolved
-     * mode decide what every later stateless request is told.
+     * Instructions for a stateless serving unit. The SDK answers `server/discover` from them before
+     * any request's envelope is seen, so they are configuration-level: no report-problem mention
+     * (that tool's presence is decided per request) and the configured mode only. Reads
+     * `serverModeOption`, never `_serverMode` — one facade serves both eras, and a legacy
+     * `initialize` rewrites `_serverMode`, which must not leak into later stateless requests.
      */
     public getStatelessServerInstructions(): string {
         return getServerInstructions(resolveServerMode(this.serverModeOption, false));
     }
 
     /**
-     * Build the read-only view one stateless (2026-07-28) request is served from: mode resolved
-     * against *that request's* declared UI capability, the tool set composed against that same
-     * identity (so report-problem gating is applied per request), and a resource service bound to
-     * both. Nothing request-specific is written back to the facade — the only instance field this
-     * touches is the identity-independent widget-resolution memo — so two concurrent requests
-     * declaring different identities cannot contaminate each other.
+     * Build the read-only view one stateless (2026-07-28) request is served from: mode and tool set
+     * resolved against *that request's* declared identity, and a resource service bound to both.
+     * Nothing request-specific is written back to the facade, so concurrent requests with different
+     * identities cannot contaminate each other.
      */
     public async createRequestSnapshot(clientContext: McpClientContext | undefined): Promise<StatelessRequestSnapshot> {
         // From the configured option, not `_serverMode` — same reason as
@@ -332,8 +301,8 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         const serverMode = resolveServerMode(this.serverModeOption, isUiSupportedByClient(clientContext));
         const view: ServingContext = { serverMode, clientContext };
 
-        // Re-compose from the retained sources, not the live `tools` map: that map was composed for
-        // the instance's own view. Directly upserted tools are deliberately left out — carrying them
+        // Re-compose from the retained sources, not the live `tools` map (composed for the
+        // instance's own view). Directly upserted tools are deliberately left out — carrying them
         // over would re-add tools this view's gating just withheld.
         const tools = new Map<string, ToolEntry>();
         for (const source of this.toolSources) {
@@ -366,13 +335,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
 
     /**
      * Compose one source's tool list against `view`: resolve mode-specific tools, then drop
-     * report-problem unless it is servable for that view (see {@link isReportProblemServable}). It is
-     * a default-injected tool rather than a category member, so servability is gated here; every
-     * other tool composes eagerly, so a recovery load without an initialize still restores it.
-     *
-     * Three callers. The input-driven load paths and the initialize flush pass the instance's own
-     * {@link servingContext}, where report-problem is withheld until the client is known and re-added
-     * by the flush; {@link createRequestSnapshot} passes a view derived from one stateless request.
+     * report-problem unless servable for that view ({@link isReportProblemServable}). Load paths
+     * and the initialize flush pass the instance's own {@link servingContext};
+     * {@link createRequestSnapshot} passes a view derived from one stateless request.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
         const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
@@ -381,14 +346,10 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Whether report-problem may be served against `view`:
-     * - Its only function is forwarding submissions via telemetry, so it is never servable when
-     *   telemetry is disabled (it would just fake an acknowledgement into the void).
-     * - It cannot be judged until the client is known, so it is withheld while `view` has none. On a
-     *   sessionful connection the initialize flush re-composes and adds it if the client allows; a
-     *   stateless request's view always names its client, so the answer is final on the spot.
-     * Every other tool is unconditionally servable, so recovery loads compose them eagerly and they
-     * survive a load that never sees an initialize.
+     * Whether report-problem may be served against `view`. Never without telemetry (submissions
+     * would vanish into the void) and never before the client is known — on a stateful connection
+     * the initialize flush re-adds it if the client allows; a stateless view always names its
+     * client, so the answer is final on the spot.
      */
     private isReportProblemServable(view: ServingContext): boolean {
         return (
@@ -455,12 +416,10 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Buffer-or-compose gate shared by the actor-tools loaders. If the server mode isn't resolved
-     * yet ('auto' before initialize), queue the whole source for `composePendingToolsForClient` and
-     * (if non-empty) upsert the mode-agnostic actor tools immediately.
-     * Once the mode is resolved, compose the client-specific set via `composeToolsForClient` (which
-     * withholds report-problem until the client is known) and upsert it; if the client still isn't
-     * known, queue the source so the initialize flush re-composes and adds the client-gated tools.
+     * Buffer-or-compose gate shared by the actor-tools loaders. Mode not resolved yet: queue the
+     * source for the initialize flush, upserting the mode-agnostic actor tools immediately. Mode
+     * resolved: compose and upsert now; if the client is still unknown, also queue the source so
+     * the flush adds the client-gated tools.
      */
     private registerFetchedActorTools(input: Input, actorTools: ToolEntry[]): void {
         const source: ToolSource = { input, actorTools };
@@ -507,14 +466,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Two-phase: getActors (async, client-agnostic Apify fetch) then composeToolsForClient
-     * (sync compose + servability filter). If the mode isn't resolved yet ('auto' before initialize)
-     * the whole source is queued for the flush. Otherwise tools compose immediately; client-gated
-     * tools are withheld until the client is known, and the source is queued so the flush adds them.
-     *
-     * Don't move the getActors await into the initialize handler — clients time out
-     * waiting for InitializeResult. The queue buffers already-fetched data, not network
-     * work. See #721.
+     * Two-phase: getActors (async, client-agnostic fetch) then the buffer-or-compose gate.
+     * Don't move the getActors await into the initialize handler — clients time out waiting for
+     * InitializeResult; the queue buffers already-fetched data, not network work. See #721.
      */
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
         const actorTools = await getActors(input, apifyClient, {
@@ -525,12 +479,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Delete tools from the server.
-     *
-     * Deletes from the shared tool map only, leaving the retained load sources in place, so a tool
-     * removed this way still appears in every stateless snapshot ({@link createRequestSnapshot}) —
-     * the more dangerous direction of the {@link upsertTools} divergence. No callers today; one that
-     * needs a tool gone on both protocol eras has to drop its source too.
+     * Delete tools from the shared tool map only — the retained load sources stay, so a tool
+     * removed this way still appears in every stateless snapshot. No callers today; one that needs
+     * a tool gone on both protocol eras has to drop its source too.
      */
     public removeToolsByName(toolNames: string[]): string[] {
         const removedTools: string[] = [];
@@ -543,19 +494,13 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Upsert new tools.
-     *
-     * Writes the shared tool map directly, bypassing the retained load sources, so a tool added only
-     * this way reaches no stateless snapshot ({@link createRequestSnapshot}). Load through
-     * `loadToolsFrom*` / `loadToolsByName` instead to serve a tool on both protocol eras.
-     *
-     * @param tools - Array of tool wrappers to add or update
-     * @returns Array of added/updated tool wrappers
+     * Upsert new tools. Writes the shared tool map directly, bypassing the retained load sources,
+     * so a tool added only this way reaches no stateless snapshot. Load through `loadToolsFrom*` /
+     * `loadToolsByName` instead to serve a tool on both protocol eras.
      */
     public upsertTools(tools: ToolEntry[]) {
-        // Client gating (e.g. hiding report-problem from Anthropic surfaces) is applied earlier, in
-        // composeToolsForClient — the single compose choke point where the client is known. Do not
-        // filter here: this is a low-level commit point reached before the client is known too.
+        // Client gating happens earlier, in composeToolsForClient. Do not filter here: this is a
+        // low-level commit point reached before the client is known too.
         for (const tool of tools) {
             const stored = this.toStoredTool(tool);
             this.tools.set(stored.name, stored);
@@ -606,14 +551,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
 
     /**
      * Widgets servable in `mode`: none outside apps mode, otherwise the disk registry. A successful
-     * scan is resolved once per facade and shared; a failed one is dropped so the next caller retries
-     * it (widget files not written yet must stay recoverable) and serves an empty registry. Touches no
-     * per-connection state, so a per-request caller cannot disturb a concurrent one.
-     *
-     * Memoizing a success is a deliberate behavior change, not behavior-preserving restructuring: an
-     * explicitly-`apps` facade used to scan disk — and log "Ready widgets" / "Some widgets are not
-     * ready" — twice, from `connect()` and again from `applyInitialize()`, and now scans once; and a
-     * widget file appearing after a successful scan is no longer picked up.
+     * scan is memoized per facade (a widget file appearing later is not picked up); a failed one is
+     * dropped so the next caller retries. Touches no per-connection state, so a per-request caller
+     * cannot disturb a concurrent one.
      */
     private async resolveWidgetsForMode(mode: SERVER_MODE): Promise<Map<string, AvailableWidget>> {
         if (mode !== SERVER_MODE.APPS) {
@@ -633,9 +573,8 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Resolve the instance's own widget map — what the instance `resourceService` reads through its
-     * getter — for this connection's mode. The only writer of that field: a caller resolving widgets
-     * for another view takes the map `resolveWidgetsForMode` returns and leaves the instance alone.
+     * Resolve the instance's own widget map for this connection's mode. The only writer of that
+     * field — per-request callers take the map `resolveWidgetsForMode` returns instead.
      */
     private async resolveInstanceWidgets(): Promise<void> {
         this.availableWidgets = await this.resolveWidgetsForMode(this.serverMode);
@@ -647,12 +586,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     async close(): Promise<void> {
-        // Reverse-of-connect (LIFO) teardown: take the transport/server down first (SIGINT removal +
-        // server close are the adapter's transport-lifecycle responsibility), then clear the shared
-        // tool map. The order is unobservable because `close()` only runs on a quiesced serving unit.
-        // Clearing `tools` leaves the retained sources in place, so a stateless snapshot taken after
-        // this still lists every loaded tool, re-composed from those sources — the third face of the
-        // `upsertTools` / `removeToolsByName` divergence. Latent: nothing closes a facade mid-traffic.
+        // Transport/server down first, then the tool map. Clearing `tools` leaves the retained
+        // sources in place, so a stateless snapshot taken after close still lists every loaded
+        // tool. Latent: nothing closes a facade mid-traffic.
         await this.legacyServer.close();
         this.tools.clear();
     }
