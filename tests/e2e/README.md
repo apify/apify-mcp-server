@@ -48,13 +48,40 @@ diff -r /tmp/e2e/base /tmp/e2e/head
 
 Requires `jq` on PATH. `mcpc` is resolved from `node_modules/.bin`, so bare `vitest` works too.
 
+## Parallelism
+
+The full table is ~280 probes and used to run as a single serial file — around 8 minutes, long
+enough that people skip it. Each probe spawns mcpc synchronously (`spawnSync`), which blocks the
+event loop, so nothing inside one file can overlap; the only axis that helps is separate files in
+separate worker processes.
+
+`runner.ts` holds all the logic and exports `defineMcpcShard(index, count)`. `shard-0.test.ts`
+through `shard-5.test.ts` each call it with their own index — that is the whole file, everything
+else lives in `runner.ts`. Configurations are bin-packed across shards by case count (heaviest
+first, each to the currently lightest shard) so no shard is left running long after the rest have
+finished; case counts vary a lot; some configs carry 8-40+ probes, most carry 7.
+
+`category-all`'s live-probe chain was the single biggest config by far, so `errors`,
+`actor-details`, `tasks` and `abort` were split out of it into their own configurations — each
+self-contained, with any `capture` it depends on re-established inside itself — purely so that
+chain can be spread across shards instead of anchoring one of them alone. `excludeFromAll: true` on
+those keeps `"configs": ["__all__"]` probes (the static ones) from also running against them, which
+would just be a duplicate snapshot of a config that already exists.
+
+`maxWorkers` (default 6, override with `E2E_WORKERS`) is set above the 4-core count on purpose —
+each probe is a short subprocess call that mostly waits on the network, not the CPU, so
+oversubscribing does not thrash.
+
 ## Structure
 
 `cases.json` holds `configs` (server configurations) and `cases` (probes).
 
 A case lists the configs it runs against. Use `"configs": ["__all__"]` for probes that apply
 everywhere — the static-surface ones do — so adding a configuration does not mean editing every
-case. Name configs after what they vary: `category-actors`, `retired-preview`, `telemetry-off`.
+case. Name configs after what they vary: `category-actors`, `retired-preview`, `telemetry-off`. A
+config can set `"excludeFromAll": true` to opt out of `__all__` cases — used for configs that exist
+only to shard a long probe chain and would otherwise duplicate another config's static snapshots
+(see Parallelism above).
 
 Case fields:
 
@@ -64,10 +91,13 @@ Case fields:
 | `expectError` | Expect a non-zero mcpc exit. Protocol errors exit 2 and write JSON to stderr. |
 | `capture` | jq filters stored for `{{name}}` interpolation in later cases of the same config. |
 | `redact` | Run the snapshot through `redact.jq`. Required for anything embedding IDs or timings. |
+| `pollWhileWorking` | Retry while mcpc reports the task still running (`tasks-result` errors until it is terminal). |
 
-Cases run in array order within a config, and `capture` values flow forward. Two orderings matter:
-`gets the finished task result` sits last because `tasks-result` errors while the task is still
-working, and the abort/cancel probes need their target created first.
+Cases run in array order within a config, and `capture` values flow forward — the abort/cancel
+probes need their target created earlier in the same config's list. `gets the finished task result`
+used to rely on running last in a long chain to give the task time to finish in the background;
+after splitting the task probes into their own `tasks` configuration (see Parallelism) that chain
+is only 6 cases, too short to make that reliable, so it polls instead (`pollWhileWorking`, ~40s cap).
 
 Two error classes, both measured:
 
