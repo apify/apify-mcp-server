@@ -287,12 +287,25 @@ describe('createExpressApp() era routing', () => {
         });
     });
 
+    it('rejects a header-mismatched request 400/-32020 even without a token', async () => {
+        // SEP-2243: a framing rejection outranks auth. The body names `tools/list` while the
+        // `Mcp-Method` header claims `tools/call`, and the request carries no token — the
+        // standard-header cross-check must answer, not the 401 auth gate.
+        await withDevServer(async (post) => {
+            const { body } = statelessRequest('tools/list');
+
+            const response = await post(DEV_URL, body, { 'mcp-method': 'tools/call' });
+
+            expect(response.status).toBe(400);
+            expect(readJsonRpcPayload(response.body).error?.code).toBe(-32020);
+        });
+    });
+
     it('answers a stateless request carrying no token with the sessionful 401', async () => {
-        // `resolveRequestAuth` already flushes this exact 401 body before the `if (!auth) return;`
-        // guard in `serveStatelessRequest` runs, so the response alone can't tell a live guard from a
-        // removed one: without it, execution falls through to destructuring a null `auth`, throws,
-        // and lands in `respondWithError`'s 500 branch, which logs via `log.exception` -- the guard
-        // is what keeps that from happening.
+        // The missing-token 401 is resolved inside the server factory — after the SDK's validation
+        // ladder, to keep SEP-2243 ordering — and swapped in for the entry's 500 by the fetch
+        // wrapper in `serveStatelessRequest`. The spy pins down that the sentinel throw is answered
+        // as the auth 401, not logged as an exception the way a real 500 would be.
         const exceptionSpy = vi.spyOn(log, 'exception').mockImplementation(() => log);
 
         await withDevServer(async (post) => {

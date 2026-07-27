@@ -68,6 +68,17 @@ function extractApiTokenFromRequest(req: Request): string | undefined {
     }
 }
 
+/** The 401 body both eras send for a missing token, JSON-RPC-shaped like production's. */
+const UNAUTHORIZED_RESPONSE_BODY = {
+    jsonrpc: '2.0',
+    error: {
+        code: -32001,
+        message:
+            'Unauthorized: Apify API token is missing. Pass it as `Authorization: Bearer <token>`, or set `?payment=<provider>` to use a third-party payment provider.',
+    },
+    id: null,
+} as const;
+
 /**
  * Returns the resolved token for a request, or sends a 401 response.
  * In payment mode, no token is required — returns `{ apifyToken: undefined }`.
@@ -83,15 +94,7 @@ function resolveRequestAuth(
     if (apifyToken) return { apifyToken };
 
     log.softFail('Apify API token missing on unauthenticated request', { statusCode: 401 });
-    res.status(401).json({
-        jsonrpc: '2.0',
-        error: {
-            code: -32001,
-            message:
-                'Unauthorized: Apify API token is missing. Pass it as `Authorization: Bearer <token>`, or set `?payment=<provider>` to use a third-party payment provider.',
-        },
-        id: null,
-    });
+    res.status(401).json(UNAUTHORIZED_RESPONSE_BODY);
     return null;
 }
 
@@ -119,8 +122,14 @@ export async function isStatelessRequest(req: EraRoutableRequest): Promise<boole
 
 /**
  * Serves one 2026-07-28 request: no session id, no handshake, nothing retained afterwards. The
- * URL-parameter and auth handling is deliberately a second copy of the sessionful branch's rather
- * than a shared extraction, so that branch stays untouched by this change.
+ * URL-parameter handling is deliberately a second copy of the sessionful branch's rather than a
+ * shared extraction, so that branch stays untouched by this change.
+ *
+ * Auth deliberately diverges from the sessionful branch: the missing-token 401 is resolved inside
+ * the server factory instead of up front. The SDK entry invokes the factory only after its
+ * validation ladder has passed, and SEP-2243 requires a framing rejection (mismatched `Mcp-Method`/
+ * `Mcp-Name`/`MCP-Protocol-Version`, 400/-32020) to be sent regardless of auth state. Done to
+ * satisfy the `http-header-validation` conformance scenarios even though this is a dev-only server.
  *
  * Dev-only shape: a facade is built per request, so `?actors=` re-fetches Actor metadata every time.
  * A host may instead share one facade across many requests to avoid that — snapshots are composed
@@ -136,28 +145,37 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
     const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
     const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
 
-    const auth = resolveRequestAuth(req, res, paymentProvider);
-    if (!auth) return;
-    const { apifyToken } = auth;
+    // No token required in payment mode, mirroring `resolveRequestAuth`.
+    const apifyToken = paymentProvider ? undefined : extractApiTokenFromRequest(req);
+    let unauthorized = false;
 
-    const mcpServer = new ActorsMcpServer({
-        taskStore,
-        setupSigintHandler: false,
-        transportType: 'http',
-        telemetry: { enabled: telemetryEnabled },
-        serverMode,
-        paymentProvider,
-        token: apifyToken,
-    });
-    // Client identity arrives per request in the `_meta` envelope, not up front as with an
-    // `initialize` handshake, so this fetch carries no request-origin tag.
-    await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken }));
-
-    const handler = createMcpHandler(() => createStatelessServer(mcpServer), {
-        legacy: 'reject',
-        onerror: (error) =>
-            log.softFail('Stateless MCP request rejected', { errMessage: sanitizeMezmoMessage(error.message) }),
-    });
+    const handler = createMcpHandler(
+        async () => {
+            // Reached only after the validation ladder passed (see the doc comment above).
+            if (!paymentProvider && !apifyToken) {
+                unauthorized = true;
+                throw new Error('Apify API token missing on unauthenticated request');
+            }
+            const mcpServer = new ActorsMcpServer({
+                taskStore,
+                setupSigintHandler: false,
+                transportType: 'http',
+                telemetry: { enabled: telemetryEnabled },
+                serverMode,
+                paymentProvider,
+                token: apifyToken,
+            });
+            // Client identity arrives per request in the `_meta` envelope, not up front as with an
+            // `initialize` handshake, so this fetch carries no request-origin tag.
+            await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken }));
+            return createStatelessServer(mcpServer);
+        },
+        {
+            legacy: 'reject',
+            onerror: (error) =>
+                log.softFail('Stateless MCP request rejected', { errMessage: sanitizeMezmoMessage(error.message) }),
+        },
+    );
     try {
         // The entry never derives `authInfo` from the `Authorization` header, so the token this
         // server already extracted is passed through as `authInfo` for handlers to read as
@@ -165,7 +183,16 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
         if (apifyToken) {
             (req as Request & { auth?: AuthInfo }).auth = { token: apifyToken, clientId: '', scopes: [] };
         }
-        await toNodeHandler(handler)(req, res, req.body);
+        // The factory's throw surfaces from the entry as a 500; swap in the 401 the auth gate owns.
+        await toNodeHandler({
+            ...handler,
+            fetch: async (request, options) => {
+                const response = await handler.fetch(request, options);
+                if (!unauthorized) return response;
+                log.softFail('Apify API token missing on unauthenticated request', { statusCode: 401 });
+                return Response.json(UNAUTHORIZED_RESPONSE_BODY, { status: 401 });
+            },
+        })(req, res, req.body);
     } finally {
         await handler.close();
     }
