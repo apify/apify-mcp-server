@@ -47,6 +47,11 @@ type ToolSource = { input: Input; actorTools: ToolEntry[] };
  * Stable identity of a fetch input, so reloading the same input replaces its retained source rather
  * than adding another (see {@link ActorsMcpServer.toolSources}). Keys are sorted because the same
  * input reaches the loaders from several builders, which need not agree on property order.
+ *
+ * The array replacer filters keys at every depth, which is safe only while `Input` stays flat
+ * (strings, string arrays, numbers). If `Input` ever gains a nested object, swap this for a
+ * top-level-only sort, or nested keys absent from the top level are silently dropped and distinct
+ * inputs collide.
  */
 function toolSourceKey(input: Input): string {
     return JSON.stringify(input, Object.keys(input).sort());
@@ -142,8 +147,12 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * client becomes known, so any client-gated tools withheld by an eager compose are added then.
      * We capture the exact actor-tool slice fetched for each request so the flush composes every
      * entry against *its own* actor list rather than the accumulated union across unrelated requests.
+     *
+     * Keyed like {@link toolSources}, and for the same reason: a facade that never sees an
+     * initialize (the stateless-only host shape) never drains this queue, so a reload must replace
+     * its entry rather than append, keeping the queue bounded by distinct inputs.
      */
-    private pendingToolsUntilClientKnown: ToolSource[] = [];
+    private readonly pendingToolsUntilClientKnown = new Map<string, ToolSource>();
     /**
      * The unresolved inputs `tools` is composed from — not a second tool registry. `tools` holds one
      * resolved output: the instance's own view, fixed once the connection handshake makes the client
@@ -388,13 +397,13 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     private composePendingToolsForClient(): void {
-        if (this.pendingToolsUntilClientKnown.length === 0) return;
+        if (this.pendingToolsUntilClientKnown.size === 0) return;
 
-        const tools = this.pendingToolsUntilClientKnown.flatMap((source) =>
+        const tools = [...this.pendingToolsUntilClientKnown.values()].flatMap((source) =>
             this.composeToolsForClient(source, this.servingContext),
         );
 
-        this.pendingToolsUntilClientKnown = [];
+        this.pendingToolsUntilClientKnown.clear();
 
         // Load paths already upserted the client-agnostic tools pre-init; re-upserting is
         // idempotent, and this pass adds the client-gated tools (e.g. report-problem) now that the
@@ -455,15 +464,16 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      */
     private registerFetchedActorTools(input: Input, actorTools: ToolEntry[]): void {
         const source: ToolSource = { input, actorTools };
-        this.toolSources.set(toolSourceKey(input), source);
+        const key = toolSourceKey(input);
+        this.toolSources.set(key, source);
         if (!this.serverModeResolved) {
-            this.pendingToolsUntilClientKnown.push(source);
+            this.pendingToolsUntilClientKnown.set(key, source);
             if (actorTools.length > 0) this.upsertTools(actorTools);
             return;
         }
         const tools = this.composeToolsForClient(source, this.servingContext);
         if (tools.length > 0) this.upsertTools(tools);
-        if (!this.clientKnown) this.pendingToolsUntilClientKnown.push(source);
+        if (!this.clientKnown) this.pendingToolsUntilClientKnown.set(key, source);
     }
 
     /**

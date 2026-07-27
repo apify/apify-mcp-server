@@ -6,7 +6,12 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import type { NodeIncomingMessageLike } from '@modelcontextprotocol/node';
-import { localhostOriginValidation, toNodeHandler, toWebRequest } from '@modelcontextprotocol/node';
+import {
+    localhostHostValidation,
+    localhostOriginValidation,
+    toNodeHandler,
+    toWebRequest,
+} from '@modelcontextprotocol/node';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { InitializeRequestParams } from '@modelcontextprotocol/sdk/types.js';
@@ -203,6 +208,7 @@ export function createExpressApp(): express.Express {
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
     const taskStore = new InMemoryTaskStore();
+    const validateHost = localhostHostValidation();
     const validateOrigin = localhostOriginValidation();
 
     function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
@@ -229,9 +235,10 @@ export function createExpressApp(): express.Express {
         }
     }
 
-    // Reject browser requests from non-local origins before parsing their bodies. See apify/apify-mcp-server#1140.
+    // DNS-rebinding protection, before parsing any body: reject non-local Host headers (a rebound
+    // hostname resolves here without a browser Origin) and non-local Origins. See apify/apify-mcp-server#1140.
     app.use((req, res, next) => {
-        if (validateOrigin(req, res)) next();
+        if (validateHost(req, res) && validateOrigin(req, res)) next();
     });
 
     // express.json() middleware to parse JSON bodies, before the POST / route.

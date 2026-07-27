@@ -21,6 +21,14 @@ function toolSourceKeys(server: ActorsMcpServer): string[] {
     return [...(server as unknown as { toolSources: Map<string, unknown> }).toolSources.keys()];
 }
 
+/** The pending queue is private too; read it directly to assert reloads replace instead of append. */
+function pendingToolKeys(server: ActorsMcpServer): string[] {
+    const { pendingToolsUntilClientKnown } = server as unknown as {
+        pendingToolsUntilClientKnown: Map<string, unknown>;
+    };
+    return [...pendingToolsUntilClientKnown.keys()];
+}
+
 describe('registerFetchedActorTools()', () => {
     const servers: ActorsMcpServer[] = [];
 
@@ -72,5 +80,17 @@ describe('registerFetchedActorTools()', () => {
         await load(server, { actors: ['apify/website-content-crawler'] });
 
         expect(toolSourceKeys(server)).toHaveLength(2);
+    });
+
+    it('re-queues a reloaded input in place while the client is unknown', async () => {
+        // A facade that never sees a legacy initialize (the stateless-only host shape) never drains
+        // the pending queue, so a reload must replace its entry — like `toolSources` — not append.
+        const server = makeServer();
+
+        await load(server, { actors: ['apify/rag-web-browser'] });
+        await load(server, { actors: ['apify/rag-web-browser'] });
+        await load(server, { actors: ['apify/rag-web-browser'] });
+
+        expect(pendingToolKeys(server)).toHaveLength(1);
     });
 });
