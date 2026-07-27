@@ -13,12 +13,12 @@
  *
  * See tests/e2e/README.md for how to run it and known instability.
  */
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 type McpcCase = {
     id: string;
@@ -44,11 +44,7 @@ type McpcServerConfig = {
     url?: string;
     /** Env overrides for the spawned server. A `null` value removes the variable. */
     env?: Record<string, string | null>;
-    /**
-     * Skip this configuration for `__all__` cases. Set on probe groups that only exist to split a
-     * long chain of live probes across shards: they duplicate another configuration's arguments, so
-     * re-running the static surface against them too would just waste time on an identical probe.
-     */
+    /** Skip this configuration for `__all__` cases when it duplicates another configuration. */
     excludeFromAll?: boolean;
 };
 
@@ -60,13 +56,6 @@ type McpcSuiteConfig = {
 /** `"configs": ["__all__"]` runs a case against every configuration, so probes that apply
  * everywhere do not have to restate the config list each time one is added. */
 const ALL_CONFIGS = '__all__';
-
-/**
- * Single source of truth for how many `shard-N.test.ts` files exist. Each one calls
- * `defineMcpcShard(N, SHARD_COUNT)`; keep `vitest.config.ts`'s `maxWorkers` default in step so
- * every shard gets its own worker.
- */
-export const SHARD_COUNT = 6;
 
 const suite = JSON.parse(readFileSync(new URL('./cases.json', import.meta.url), 'utf8')) as McpcSuiteConfig;
 
@@ -92,39 +81,10 @@ function casesFor(configName: string, config: McpcServerConfig) {
     );
 }
 
-/**
- * Splits configurations across shard files so vitest runs them in parallel workers.
- *
- * The probes call mcpc through `spawnSync`, which blocks the event loop, so `test.concurrent`
- * cannot interleave them — only separate worker processes can. Hence one file per shard.
- *
- * Heaviest configurations are placed first and each goes to whichever shard is currently lightest.
- * Case counts are very uneven, so round-robin would leave one shard running long after the rest
- * had finished.
- */
-function selectShard(shardIndex: number, shardCount: number) {
-    const caseCount = (configName: string, config: McpcServerConfig) => casesFor(configName, config).length;
-
-    const byWeight = [...activeConfigs].sort(([a, ca], [b, cb]) => caseCount(b, cb) - caseCount(a, ca));
-    const load = Array.from({ length: shardCount }, () => 0);
-    const shards: (typeof activeConfigs)[] = Array.from({ length: shardCount }, () => []);
-
-    for (const entry of byWeight) {
-        const lightest = load.indexOf(Math.min(...load));
-        shards[lightest].push(entry);
-        load[lightest] += caseCount(entry[0], entry[1]);
-    }
-
-    return shards[shardIndex];
-}
-
 const DEFAULT_SERVER_ENV: Record<string, string | null> = {
     APIFY_TOKEN: '${APIFY_TOKEN}',
     NODE_EXTRA_CA_CERTS: '${NODE_EXTRA_CA_CERTS}',
 };
-
-/** Widget resources are ~1.5 MB of inlined HTML, well past spawnSync's 1 MB default. */
-const MAX_BUFFER = 64 * 1024 * 1024;
 
 /**
  * Per-probe wall clock. Kept well under the vitest test timeout so a wedged mcpc bridge reports a
@@ -134,21 +94,69 @@ const MAX_BUFFER = 64 * 1024 * 1024;
  */
 const PROBE_TIMEOUT_MS = Number(process.env.E2E_PROBE_TIMEOUT_MS ?? 45_000);
 
-function runMcpc(args: string[], options: { allowFailure?: boolean } = {}) {
-    const result = spawnSync(MCPC_BIN, args, {
-        encoding: 'utf8',
-        maxBuffer: MAX_BUFFER,
-        timeout: PROBE_TIMEOUT_MS,
-    });
+type ProcessResult = {
+    status: number | null;
+    stdout: string;
+    stderr: string;
+};
 
-    // spawnSync reports a timeout kill as an ETIMEDOUT error with no usable output.
-    if (result.error) {
-        const timedOut = (result.error as NodeJS.ErrnoException).code === 'ETIMEDOUT';
+function runProcess(
+    command: string,
+    args: string[],
+    options: { input?: string; timeoutMs?: number } = {},
+): Promise<ProcessResult> {
+    return new Promise((resolvePromise, reject) => {
+        const child = spawn(command, args, { stdio: 'pipe' });
+        let stdout = '';
+        let stderr = '';
+        let hasTimedOut = false;
+
+        child.stdout.setEncoding('utf8');
+        child.stderr.setEncoding('utf8');
+        child.stdout.on('data', (chunk: string) => {
+            stdout += chunk;
+        });
+        child.stderr.on('data', (chunk: string) => {
+            stderr += chunk;
+        });
+
+        const timeout = options.timeoutMs
+            ? setTimeout(() => {
+                  hasTimedOut = true;
+                  child.kill('SIGKILL');
+              }, options.timeoutMs)
+            : undefined;
+
+        child.on('error', reject);
+        // mcpc bridges can keep inherited pipes open after the CLI exits, so `close` may never fire.
+        child.on('exit', (status) => {
+            if (timeout) clearTimeout(timeout);
+            setImmediate(() => {
+                child.stdout.destroy();
+                child.stderr.destroy();
+                if (hasTimedOut) {
+                    reject(new Error(`Process produced no output within ${options.timeoutMs}ms.`));
+                    return;
+                }
+                resolvePromise({ status, stdout, stderr });
+            });
+        });
+
+        child.stdin.end(options.input);
+    });
+}
+
+async function runMcpc(args: string[], options: { allowFailure?: boolean } = {}) {
+    let result: ProcessResult;
+    try {
+        result = await runProcess(MCPC_BIN, args, { timeoutMs: PROBE_TIMEOUT_MS });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         throw new Error(
-            timedOut
+            message.includes('produced no output')
                 ? `mcpc ${args.join(' ')} produced no output within ${PROBE_TIMEOUT_MS}ms. ` +
                       'A hung bridge, not a server failure — see tests/e2e/README.md.'
-                : `mcpc ${args.join(' ')} could not be run: ${result.error.message}`,
+                : `mcpc ${args.join(' ')} could not be run: ${message}`,
         );
     }
     if (!options.allowFailure && result.status !== 0) {
@@ -162,7 +170,7 @@ function runMcpc(args: string[], options: { allowFailure?: boolean } = {}) {
 const TASK_STILL_WORKING = 'is not completed yet';
 
 /** ~40s of polling: generous next to the test Actor's usual multi-second run. */
-const POLL_INTERVAL_SECONDS = '2';
+const POLL_INTERVAL_MS = 2_000;
 const POLL_MAX_ATTEMPTS = 20;
 
 /**
@@ -210,8 +218,8 @@ function respondsWithSomeError(result: { status: number | null; stdout: string }
  * Any other genuine failure — including running out of attempts — surfaces immediately as a normal
  * unexpected-exit error, same as a non-polling case.
  */
-function runMcpcCase(args: string[], testCase: McpcCase) {
-    let result = runMcpc(args, { allowFailure: true });
+async function runMcpcCase(args: string[], testCase: McpcCase) {
+    let result = await runMcpc(args, { allowFailure: true });
 
     let attempt = 1;
     while (
@@ -220,8 +228,10 @@ function runMcpcCase(args: string[], testCase: McpcCase) {
         result.stderr.includes(TASK_STILL_WORKING) &&
         attempt < POLL_MAX_ATTEMPTS
     ) {
-        spawnSync('sleep', [POLL_INTERVAL_SECONDS]);
-        result = runMcpc(args, { allowFailure: true });
+        await new Promise((resolvePromise) => {
+            setTimeout(resolvePromise, POLL_INTERVAL_MS);
+        });
+        result = await runMcpc(args, { allowFailure: true });
         attempt += 1;
     }
 
@@ -231,14 +241,8 @@ function runMcpcCase(args: string[], testCase: McpcCase) {
     return result;
 }
 
-function runJq(input: string, filter: string, options: { raw?: boolean } = {}) {
-    const result = spawnSync('jq', [options.raw ? '-r' : '-e', filter], {
-        input,
-        encoding: 'utf8',
-        maxBuffer: MAX_BUFFER,
-    });
-    if (result.error) throw result.error;
-    return result;
+async function runJq(input: string, filter: string, options: { raw?: boolean } = {}) {
+    return await runProcess('jq', [options.raw ? '-r' : '-e', filter], { input });
 }
 
 /** Builds the mcpc server entry written to the temporary config file. */
@@ -260,12 +264,8 @@ function buildServerEntry(config: McpcServerConfig) {
  * Removes mcpc's own `_mcpc` envelope. It carries the resolved APIFY_TOKEN in plaintext and the
  * absolute server path, so it must never reach an assertion or a failure message.
  */
-function stripMcpcEnvelope(payload: string) {
-    const result = spawnSync('jq', ['if type == "object" then del(._mcpc) else . end'], {
-        input: payload,
-        encoding: 'utf8',
-        maxBuffer: MAX_BUFFER,
-    });
+async function stripMcpcEnvelope(payload: string) {
+    const result = await runJq(payload, 'if type == "object" then del(._mcpc) else . end');
     // Non-JSON output (an mcpc crash, say) has no envelope to strip — assert against it as-is.
     return result.status === 0 ? result.stdout : payload;
 }
@@ -279,73 +279,58 @@ function interpolate(value: string, captured: Record<string, string>) {
     });
 }
 
-/** Defines the probes for one shard. Each `shard-N.test.ts` calls this with its own index. */
-export function defineMcpcShard(shardIndex: number, shardCount: number) {
-    const configs = selectShard(shardIndex, shardCount);
-
-    describe(`mcpc shard ${shardIndex + 1}/${shardCount}`, () => {
-        beforeAll(() => {
-            if (!existsSync(MCPC_BIN)) throw new Error(`mcpc not found at ${MCPC_BIN}. Run \`pnpm install\`.`);
-            if (!existsSync(SERVER_ENTRY)) {
-                throw new Error(`Server entry not found at ${SERVER_ENTRY}. Run \`pnpm run build\`.`);
-            }
-            const jq = spawnSync('jq', ['--version'], { encoding: 'utf8' });
-            if (jq.error || jq.status !== 0) {
-                throw new Error('`jq` is required by this suite but was not found on PATH.');
-            }
-        });
-
-        describe.each(configs)('%s', (configName, config) => {
-            const session = `@e2e-${configName}`;
-            /** Values captured by earlier cases in this config, for `{{name}}` interpolation. */
-            const captured: Record<string, string> = {};
-            let configDirectory: string;
-
-            beforeAll(() => {
-                configDirectory = mkdtempSync(join(tmpdir(), `actors-mcp-e2e-${configName}-`));
-                const configPath = join(configDirectory, 'mcp.json');
-                writeFileSync(configPath, JSON.stringify({ mcpServers: { server: buildServerEntry(config) } }));
-
-                runMcpc(['close', session], { allowFailure: true });
-                runMcpc(['connect', `${configPath}:server`, session]);
-            });
-
-            afterAll(() => {
-                runMcpc(['close', session], { allowFailure: true });
-                rmSync(configDirectory, { recursive: true, force: true });
-            });
-
-            const cases = casesFor(configName, config);
-
-            it.each(cases)('$id', (testCase) => {
-                const args = testCase.args.map((arg) => interpolate(arg, captured));
-                const result = runMcpcCase(['--json', session, ...args], testCase);
-
-                if (testCase.expectError && !respondsWithSomeError(result)) {
-                    throw new Error(
-                        `Expected an error response for "${testCase.id}", got a clean success:\n${result.stdout}`,
-                    );
-                }
-
-                // A protocol error leaves stdout empty and writes the JSON payload to stderr instead. A
-                // tool-level `isError: true` response is always on stdout, on every mcpc version.
-                const payload = stripMcpcEnvelope(result.stdout.trim() || result.stderr);
-
-                if (testCase.assert) {
-                    const assertion = runJq(payload, interpolate(testCase.assert, captured));
-                    expect(assertion.status, `Assertion failed: ${testCase.assert}\n${payload}`).toBe(0);
-                }
-
-                for (const [name, filter] of Object.entries(testCase.capture ?? {})) {
-                    const value = runJq(payload, filter, { raw: true }).stdout.trim();
-                    if (!value || value === 'null') {
-                        throw new Error(
-                            `Capture "${name}" (${filter}) produced no value in "${testCase.id}":\n${payload}`,
-                        );
-                    }
-                    captured[name] = value;
-                }
-            });
-        });
+describe('v1 protocol', () => {
+    beforeAll(async () => {
+        if (!existsSync(MCPC_BIN)) throw new Error(`mcpc not found at ${MCPC_BIN}. Run \`pnpm install\`.`);
+        if (!existsSync(SERVER_ENTRY)) {
+            throw new Error(`Server entry not found at ${SERVER_ENTRY}. Run \`pnpm run build\`.`);
+        }
+        const jq = await runProcess('jq', ['--version']);
+        if (jq.status !== 0) throw new Error('`jq` is required by this suite but was not found on PATH.');
     });
-}
+
+    it.concurrent.each(activeConfigs)('%s', async (configName, config) => {
+        const session = `@e2e-${configName}`;
+        const captured: Record<string, string> = {};
+        const configDirectory = mkdtempSync(join(tmpdir(), `actors-mcp-e2e-${configName}-`));
+        const configPath = join(configDirectory, 'mcp.json');
+        writeFileSync(configPath, JSON.stringify({ mcpServers: { server: buildServerEntry(config) } }));
+
+        try {
+            await runMcpc(['close', session], { allowFailure: true });
+            await runMcpc(['connect', `${configPath}:server`, session]);
+
+            for (const testCase of casesFor(configName, config)) {
+                try {
+                    const args = testCase.args.map((arg) => interpolate(arg, captured));
+                    const result = await runMcpcCase(['--json', session, ...args], testCase);
+
+                    // A protocol error writes its payload to stderr. A tool-level error uses stdout.
+                    const payload = await stripMcpcEnvelope(result.stdout.trim() || result.stderr);
+
+                    if (testCase.expectError && !respondsWithSomeError(result)) {
+                        throw new Error(`Expected an error response, got a clean success:\n${payload}`);
+                    }
+
+                    if (testCase.assert) {
+                        const assertion = await runJq(payload, interpolate(testCase.assert, captured));
+                        expect(assertion.status, `Assertion failed: ${testCase.assert}\n${payload}`).toBe(0);
+                    }
+
+                    for (const [name, filter] of Object.entries(testCase.capture ?? {})) {
+                        const value = (await runJq(payload, filter, { raw: true })).stdout.trim();
+                        if (!value || value === 'null') {
+                            throw new Error(`Capture "${name}" (${filter}) produced no value:\n${payload}`);
+                        }
+                        captured[name] = value;
+                    }
+                } catch (error) {
+                    throw new Error(`Probe "${testCase.id}" failed.`, { cause: error });
+                }
+            }
+        } finally {
+            await runMcpc(['close', session], { allowFailure: true });
+            rmSync(configDirectory, { recursive: true, force: true });
+        }
+    });
+});

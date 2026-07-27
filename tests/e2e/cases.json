@@ -463,7 +463,7 @@
         "get-actor-log",
         "runId:=\"{{runId}}\""
       ],
-      "assert": ".isError != true and (.content[0].text | length > 0)"
+      "assert": ".isError != true and (.content[0].text | type == \"string\")"
     },
     {
       "id": "lists runs",

@@ -32,33 +32,17 @@ Requires `jq` on PATH. `mcpc` is resolved from `node_modules/.bin`, so bare `vit
 |---|---|
 | `E2E_HTTP_BASE` | Base URL for HTTP configs, e.g. `http://localhost:3001` (needs `pnpm run dev` running). Those configs are skipped when unset. |
 | `E2E_PROBE_TIMEOUT_MS` | Per-probe wall clock before a hung mcpc bridge fails by name. Default 45000 — see "Known instability" below. |
-| `E2E_WORKERS` | Shard worker count. Default 6 — see "Parallelism" below. |
+| `E2E_WORKERS` | Concurrent server configurations. Default 6 — see "Parallelism" below. |
 
 ## Parallelism
 
-The full table is ~280 probes and used to run as a single serial file — around 8 minutes, long
-enough that people skip it. Each probe spawns mcpc synchronously (`spawnSync`), which blocks the
-event loop, so nothing inside one file can overlap; the only axis that helps is separate files in
-separate worker processes.
+The full table is ~280 probes and takes around 8 minutes serially. `protocol_v1.test.ts` runs up to
+six server configurations concurrently. Probes inside each configuration stay ordered because
+capture values flow between them. Set `E2E_WORKERS` to change the concurrency limit.
 
-`runner.ts` holds all the logic and exports `defineMcpcShard(index, count)`. `shard-0.test.ts`
-through `shard-5.test.ts` each call it with their own index — that is the whole file, everything
-else lives in `runner.ts`. Configurations are bin-packed across shards by case count (heaviest
-first, each to the currently lightest shard) so no shard is left running long after the rest have
-finished; case counts vary a lot; some configs carry 8-40+ probes, most carry 7.
-
-`category-all`'s live-probe chain was the single biggest config by far, so `errors`,
-`actor-details`, `tasks` and `abort` were split out of it into their own configurations — each
-self-contained, with any `capture` it depends on re-established inside itself — purely so that
-chain can be spread across shards instead of anchoring one of them alone. `excludeFromAll: true` on
-those keeps `"configs": ["__all__"]` probes (the static ones) from also running against them, which
-would just repeat an identical probe against a config that already covers it elsewhere.
-
-`maxWorkers` (default 6, override with `E2E_WORKERS`) is set above the 4-core count on purpose —
-each probe is a short subprocess call that mostly waits on the network, not the CPU, so
-oversubscribing does not thrash.
-
-Verified: 281/281 pass, ~76-130s wall clock (sharded) versus ~8 minutes serial.
+`category-all`'s live-probe chain is split into the `errors`, `actor-details`, `tasks`, and `abort`
+configurations so those chains can run concurrently. `excludeFromAll: true` prevents repeated
+static probes on these duplicate configurations.
 
 ## Structure
 
@@ -67,8 +51,8 @@ Verified: 281/281 pass, ~76-130s wall clock (sharded) versus ~8 minutes serial.
 A case lists the configs it runs against. Use `"configs": ["__all__"]` for probes that apply
 everywhere — the static-surface ones do — so adding a configuration does not mean editing every
 case. Name configs after what they vary: `category-actors`, `retired-preview`, `telemetry-off`. A
-config can set `"excludeFromAll": true` to opt out of `__all__` cases — used for configs that exist
-only to shard a long probe chain (see Parallelism above).
+config can set `"excludeFromAll": true` to opt out of `__all__` cases — used for configs that
+duplicate another config only to run independent probe chains concurrently.
 
 Case fields:
 
@@ -79,12 +63,13 @@ Case fields:
 | `capture` | jq filters stored for `{{name}}` interpolation in later cases (`args` or `assert`) of the same config. |
 | `pollWhileWorking` | Retry while mcpc reports the task still running (`tasks-result` errors until it is terminal). |
 
-Cases run in array order within a config, and `capture` values flow forward — the abort/cancel and
-task-lifecycle probes need their target created earlier in the same config's list.
+Each configuration is one Vitest test. A failure names the exact probe. Cases run in array order
+within a config, and `capture` values flow forward — the abort/cancel and task-lifecycle probes need
+their target created earlier in the same config's list.
 
 Two error classes — and mcpc's exit code for the first one is **not** stable across versions, so
 the runner classifies by payload shape, not by exit code (`isToolLevelErrorResponse` /
-`isGenuineFailure` / `respondsWithSomeError` in `runner.ts`):
+`isGenuineFailure` / `respondsWithSomeError` in `protocol_v1.test.ts`):
 
 | Class | Example | Exit (0.2.x) | Exit (0.5.x) | Payload |
 |---|---|---|---|---|
@@ -100,7 +85,8 @@ of asserting success unconditionally.
 ## Secrets
 
 mcpc's `_mcpc` envelope carries the resolved `APIFY_TOKEN` in plaintext. It is stripped from every
-payload before any assertion or failure message can see it (`stripMcpcEnvelope` in `runner.ts`).
+payload before any assertion or failure message can see it (`stripMcpcEnvelope` in
+`protocol_v1.test.ts`).
 
 ## Known instability — read before trusting a green run
 

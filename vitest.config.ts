@@ -30,14 +30,9 @@ export default defineConfig({
                 test: {
                     name: 'e2e',
                     include: ['tests/e2e/**/*.test.ts'],
-                    testTimeout: 120_000,
+                    testTimeout: 300_000,
                     hookTimeout: 60_000,
-                    // Shard files run in parallel workers — the only axis that helps, since the
-                    // probes block on spawnSync. Oversubscribed past the core count on purpose:
-                    // the probes wait on the network far more than they use CPU.
-                    // Default of 6 matches SHARD_COUNT in tests/e2e/runner.ts — keep them in step.
-                    fileParallelism: true,
-                    maxWorkers: Number(process.env.E2E_WORKERS ?? 6),
+                    maxConcurrency: Number(process.env.E2E_WORKERS ?? 6),
                 },
             },
         ],
