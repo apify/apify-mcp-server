@@ -149,6 +149,30 @@
         "UI_MODE": "apps"
       }
     },
+    "errors": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ],
+      "excludeFromAll": true
+    },
+    "actor-details": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ],
+      "excludeFromAll": true
+    },
+    "tasks": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ],
+      "excludeFromAll": true
+    },
+    "abort": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ],
+      "excludeFromAll": true
+    },
     "http-docs": {
       "url": "${E2E_HTTP_BASE}?tools=docs"
     },
@@ -230,7 +254,7 @@
     {
       "id": "rejects unknown tool",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "tools-call",
@@ -242,7 +266,7 @@
     {
       "id": "rejects missing required argument",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "tools-call",
@@ -254,7 +278,7 @@
     {
       "id": "rejects forbidden docs URL",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "tools-call",
@@ -267,7 +291,7 @@
     {
       "id": "rejects waitSecs above the maximum",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "tools-call",
@@ -280,7 +304,7 @@
     {
       "id": "rejects unknown prompt",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "prompts-get",
@@ -291,7 +315,7 @@
     {
       "id": "rejects a missing dataset resource",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "resources-read",
@@ -302,7 +326,7 @@
     {
       "id": "rejects a non-Apify resource URL",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "resources-read",
@@ -313,7 +337,7 @@
     {
       "id": "rejects resource subscribe",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "resources-subscribe",
@@ -324,7 +348,7 @@
     {
       "id": "rejects an unknown Actor",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "tools-call",
@@ -339,7 +363,7 @@
     {
       "id": "rejects an MCP Actor without a tool name",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "tools-call",
@@ -615,7 +639,7 @@
     {
       "id": "fetches Actor details with defaults",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -627,7 +651,7 @@
     {
       "id": "fetches Actor details, input schema only",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -640,7 +664,7 @@
     {
       "id": "fetches Actor details, description only",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -653,7 +677,7 @@
     {
       "id": "fetches Actor details, stats only",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -666,7 +690,7 @@
     {
       "id": "fetches Actor details, pricing only",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -679,7 +703,7 @@
     {
       "id": "fetches Actor details, readme only",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -692,7 +716,7 @@
     {
       "id": "fetches Actor details, mcp tools only",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -705,7 +729,7 @@
     {
       "id": "fetches Actor details, description and readme",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -718,7 +742,7 @@
     {
       "id": "fetches Actor details, rating and metadata",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -731,7 +755,7 @@
     {
       "id": "fetches MCP tools for a regular Actor",
       "configs": [
-        "category-all"
+        "actor-details"
       ],
       "args": [
         "tools-call",
@@ -790,7 +814,7 @@
     {
       "id": "starts a detached task",
       "configs": [
-        "category-all"
+        "tasks"
       ],
       "args": [
         "tools-call",
@@ -807,7 +831,7 @@
     {
       "id": "lists tasks",
       "configs": [
-        "category-all"
+        "tasks"
       ],
       "args": [
         "tasks-list"
@@ -817,7 +841,7 @@
     {
       "id": "gets task status",
       "configs": [
-        "category-all"
+        "tasks"
       ],
       "args": [
         "tasks-get",
@@ -828,7 +852,7 @@
     {
       "id": "starts a task to cancel",
       "configs": [
-        "category-all"
+        "tasks"
       ],
       "args": [
         "tools-call",
@@ -845,7 +869,7 @@
     {
       "id": "cancels a task",
       "configs": [
-        "category-all"
+        "tasks"
       ],
       "args": [
         "tasks-cancel",
@@ -856,7 +880,7 @@
     {
       "id": "rejects an unknown task",
       "configs": [
-        "category-all"
+        "errors"
       ],
       "args": [
         "tasks-get",
@@ -867,7 +891,7 @@
     {
       "id": "starts a run to abort",
       "configs": [
-        "category-all"
+        "abort"
       ],
       "args": [
         "tools-call",
@@ -884,7 +908,7 @@
     {
       "id": "aborts the run",
       "configs": [
-        "category-all"
+        "abort"
       ],
       "args": [
         "tools-call",
@@ -1208,13 +1232,14 @@
     {
       "id": "gets the finished task result",
       "configs": [
-        "category-all"
+        "tasks"
       ],
       "args": [
         "tasks-result",
         "{{taskId}}"
       ],
-      "redact": true
+      "redact": true,
+      "pollWhileWorking": true
     }
   ]
 }

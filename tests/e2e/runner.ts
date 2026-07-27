@@ -33,6 +33,13 @@ type McpcCase = {
     capture?: Record<string, string>;
     /** Run the snapshot through redact.jq. Needed for anything whose output embeds IDs or timings. */
     redact?: boolean;
+    /**
+     * Retry this probe while mcpc reports the task as still running — `tasks-result` errors until
+     * the task reaches a terminal state. Splitting the task probes into their own configuration (see
+     * README, Parallelism) means this one no longer trails a long chain of unrelated probes, so it
+     * can no longer rely on those to run out the clock; it has to wait for real.
+     */
+    pollWhileWorking?: boolean;
 };
 
 type McpcServerConfig = {
@@ -42,6 +49,12 @@ type McpcServerConfig = {
     url?: string;
     /** Env overrides for the spawned server. A `null` value removes the variable. */
     env?: Record<string, string | null>;
+    /**
+     * Skip this configuration for `__all__` cases. Set on probe groups that only exist to split a
+     * long chain of live probes across shards: they duplicate another configuration's arguments, so
+     * running the static surface against them again would just add identical snapshots.
+     */
+    excludeFromAll?: boolean;
 };
 
 type McpcSuiteConfig = {
@@ -52,6 +65,13 @@ type McpcSuiteConfig = {
 /** `"configs": ["__all__"]` runs a case against every configuration, so probes that apply
  * everywhere do not have to restate the config list each time one is added. */
 const ALL_CONFIGS = '__all__';
+
+/**
+ * Single source of truth for how many `shard-N.test.ts` files exist. Each one calls
+ * `defineMcpcShard(N, SHARD_COUNT)`; keep `vitest.config.ts`'s `maxWorkers` default in step so
+ * every shard gets its own worker.
+ */
+export const SHARD_COUNT = 6;
 
 const suite = JSON.parse(readFileSync(new URL('./cases.json', import.meta.url), 'utf8')) as McpcSuiteConfig;
 
@@ -76,6 +96,40 @@ const HTTP_BASE_TOKEN = '${E2E_HTTP_BASE}';
 const activeConfigs = Object.entries(suite.configs).filter(
     ([, config]) => !config.url?.includes(HTTP_BASE_TOKEN) || Boolean(HTTP_BASE),
 );
+
+/** The cases a configuration runs, in declaration order — capture chains depend on it. */
+function casesFor(configName: string, config: McpcServerConfig) {
+    return suite.cases.filter(
+        (testCase) =>
+            testCase.configs.includes(configName) || (testCase.configs.includes(ALL_CONFIGS) && !config.excludeFromAll),
+    );
+}
+
+/**
+ * Splits configurations across shard files so vitest runs them in parallel workers.
+ *
+ * The probes call mcpc through `spawnSync`, which blocks the event loop, so `test.concurrent`
+ * cannot interleave them — only separate worker processes can. Hence one file per shard.
+ *
+ * Heaviest configurations are placed first and each goes to whichever shard is currently lightest.
+ * Case counts are very uneven, so round-robin would leave one shard running long after the rest
+ * had finished.
+ */
+function selectShard(shardIndex: number, shardCount: number) {
+    const caseCount = (configName: string, config: McpcServerConfig) => casesFor(configName, config).length;
+
+    const byWeight = [...activeConfigs].sort(([a, ca], [b, cb]) => caseCount(b, cb) - caseCount(a, ca));
+    const load = Array.from({ length: shardCount }, () => 0);
+    const shards: (typeof activeConfigs)[] = Array.from({ length: shardCount }, () => []);
+
+    for (const entry of byWeight) {
+        const lightest = load.indexOf(Math.min(...load));
+        shards[lightest].push(entry);
+        load[lightest] += caseCount(entry[0], entry[1]);
+    }
+
+    return shards[shardIndex];
+}
 
 const DEFAULT_SERVER_ENV: Record<string, string | null> = {
     APIFY_TOKEN: '${APIFY_TOKEN}',
@@ -114,6 +168,36 @@ function runMcpc(args: string[], options: { allowFailure?: boolean } = {}) {
         throw new Error(`mcpc ${args.join(' ')} failed:\n${result.stderr}`);
     }
 
+    return result;
+}
+
+/** `tasks-result` on a running task fails with this phrase, distinct from every other failure. */
+const TASK_STILL_WORKING = 'is not completed yet';
+
+/** ~40s of polling: generous next to the test Actor's usual multi-second run. */
+const POLL_INTERVAL_SECONDS = '2';
+const POLL_MAX_ATTEMPTS = 20;
+
+/**
+ * Runs a probe, retrying while `pollWhileWorking` is set and mcpc reports the task still running.
+ * Any other failure — including running out of attempts — surfaces immediately as a normal
+ * unexpected-exit error, same as a non-polling case.
+ */
+function runMcpcCase(args: string[], testCase: McpcCase) {
+    const allowFailure = Boolean(testCase.expectError || testCase.pollWhileWorking);
+    let result = runMcpc(args, { allowFailure });
+
+    let attempt = 1;
+    while (testCase.pollWhileWorking && result.status !== 0 && result.stderr.includes(TASK_STILL_WORKING)) {
+        if (attempt >= POLL_MAX_ATTEMPTS) break;
+        spawnSync('sleep', [POLL_INTERVAL_SECONDS]);
+        result = runMcpc(args, { allowFailure: true });
+        attempt += 1;
+    }
+
+    if (!testCase.expectError && result.status !== 0) {
+        throw new Error(`mcpc ${args.join(' ')} failed:\n${result.stderr}`);
+    }
     return result;
 }
 
@@ -190,72 +274,79 @@ function interpolate(value: string, captured: Record<string, string>) {
     });
 }
 
-describe('mcpc', () => {
-    beforeAll(() => {
-        if (!existsSync(MCPC_BIN)) throw new Error(`mcpc not found at ${MCPC_BIN}. Run \`pnpm install\`.`);
-        if (!existsSync(SERVER_ENTRY)) {
-            throw new Error(`Server entry not found at ${SERVER_ENTRY}. Run \`pnpm run build\`.`);
-        }
-        const jq = spawnSync('jq', ['--version'], { encoding: 'utf8' });
-        if (jq.error || jq.status !== 0) throw new Error('`jq` is required by this suite but was not found on PATH.');
-    });
+/** Defines the probes for one shard. Each `shard-N.test.ts` calls this with its own index. */
+export function defineMcpcShard(shardIndex: number, shardCount: number) {
+    const configs = selectShard(shardIndex, shardCount);
 
-    describe.each(activeConfigs)('%s', (configName, config) => {
-        const session = `@e2e-${configName}`;
-        /** Values captured by earlier cases in this config, for `{{name}}` interpolation. */
-        const captured: Record<string, string> = {};
-        const snapshotDirectory = SNAPSHOT_DIR ? join(SNAPSHOT_DIR, configName) : undefined;
-        let configDirectory: string;
-
+    describe(`mcpc shard ${shardIndex + 1}/${shardCount}`, () => {
         beforeAll(() => {
-            if (snapshotDirectory) {
-                // Start clean so a diff never mixes results from an earlier run.
-                rmSync(snapshotDirectory, { recursive: true, force: true });
-                mkdirSync(snapshotDirectory, { recursive: true });
+            if (!existsSync(MCPC_BIN)) throw new Error(`mcpc not found at ${MCPC_BIN}. Run \`pnpm install\`.`);
+            if (!existsSync(SERVER_ENTRY)) {
+                throw new Error(`Server entry not found at ${SERVER_ENTRY}. Run \`pnpm run build\`.`);
             }
-
-            configDirectory = mkdtempSync(join(tmpdir(), `actors-mcp-e2e-${configName}-`));
-            const configPath = join(configDirectory, 'mcp.json');
-            writeFileSync(configPath, JSON.stringify({ mcpServers: { server: buildServerEntry(config) } }));
-
-            runMcpc(['close', session], { allowFailure: true });
-            runMcpc(['connect', `${configPath}:server`, session]);
+            const jq = spawnSync('jq', ['--version'], { encoding: 'utf8' });
+            if (jq.error || jq.status !== 0) {
+                throw new Error('`jq` is required by this suite but was not found on PATH.');
+            }
         });
 
-        afterAll(() => {
-            runMcpc(['close', session], { allowFailure: true });
-            rmSync(configDirectory, { recursive: true, force: true });
-        });
+        describe.each(configs)('%s', (configName, config) => {
+            const session = `@e2e-${configName}`;
+            /** Values captured by earlier cases in this config, for `{{name}}` interpolation. */
+            const captured: Record<string, string> = {};
+            const snapshotDirectory = SNAPSHOT_DIR ? join(SNAPSHOT_DIR, configName) : undefined;
+            let configDirectory: string;
 
-        const cases = suite.cases.filter(
-            (testCase) => testCase.configs.includes(ALL_CONFIGS) || testCase.configs.includes(configName),
-        );
-
-        it.each(cases)('$id', (testCase) => {
-            const args = testCase.args.map((arg) => interpolate(arg, captured));
-            const result = runMcpc(['--json', session, ...args], { allowFailure: testCase.expectError });
-
-            if (testCase.expectError && result.status === 0) {
-                throw new Error(`Expected a non-zero exit for "${testCase.id}", got 0:\n${result.stdout}`);
-            }
-
-            // Protocol errors (exit 2) leave stdout empty and write the JSON payload to stderr.
-            const payload = stripMcpcEnvelope(result.stdout.trim() || result.stderr);
-
-            if (testCase.assert) {
-                const assertion = runJq(payload, testCase.assert);
-                expect(assertion.status, `Assertion failed: ${testCase.assert}\n${payload}`).toBe(0);
-            }
-
-            if (snapshotDirectory) writeSnapshot(snapshotDirectory, testCase, payload);
-
-            for (const [name, filter] of Object.entries(testCase.capture ?? {})) {
-                const value = runJq(payload, filter, { raw: true }).stdout.trim();
-                if (!value || value === 'null') {
-                    throw new Error(`Capture "${name}" (${filter}) produced no value in "${testCase.id}":\n${payload}`);
+            beforeAll(() => {
+                if (snapshotDirectory) {
+                    // Start clean so a diff never mixes results from an earlier run.
+                    rmSync(snapshotDirectory, { recursive: true, force: true });
+                    mkdirSync(snapshotDirectory, { recursive: true });
                 }
-                captured[name] = value;
-            }
+
+                configDirectory = mkdtempSync(join(tmpdir(), `actors-mcp-e2e-${configName}-`));
+                const configPath = join(configDirectory, 'mcp.json');
+                writeFileSync(configPath, JSON.stringify({ mcpServers: { server: buildServerEntry(config) } }));
+
+                runMcpc(['close', session], { allowFailure: true });
+                runMcpc(['connect', `${configPath}:server`, session]);
+            });
+
+            afterAll(() => {
+                runMcpc(['close', session], { allowFailure: true });
+                rmSync(configDirectory, { recursive: true, force: true });
+            });
+
+            const cases = casesFor(configName, config);
+
+            it.each(cases)('$id', (testCase) => {
+                const args = testCase.args.map((arg) => interpolate(arg, captured));
+                const result = runMcpcCase(['--json', session, ...args], testCase);
+
+                if (testCase.expectError && result.status === 0) {
+                    throw new Error(`Expected a non-zero exit for "${testCase.id}", got 0:\n${result.stdout}`);
+                }
+
+                // Protocol errors (exit 2) leave stdout empty and write the JSON payload to stderr.
+                const payload = stripMcpcEnvelope(result.stdout.trim() || result.stderr);
+
+                if (testCase.assert) {
+                    const assertion = runJq(payload, testCase.assert);
+                    expect(assertion.status, `Assertion failed: ${testCase.assert}\n${payload}`).toBe(0);
+                }
+
+                if (snapshotDirectory) writeSnapshot(snapshotDirectory, testCase, payload);
+
+                for (const [name, filter] of Object.entries(testCase.capture ?? {})) {
+                    const value = runJq(payload, filter, { raw: true }).stdout.trim();
+                    if (!value || value === 'null') {
+                        throw new Error(
+                            `Capture "${name}" (${filter}) produced no value in "${testCase.id}":\n${payload}`,
+                        );
+                    }
+                    captured[name] = value;
+                }
+            });
         });
     });
-});
+}
