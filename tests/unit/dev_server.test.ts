@@ -211,6 +211,21 @@ describe('createExpressApp() era routing', () => {
         });
     });
 
+    it('rejects a non-localhost Origin', async () => {
+        await withDevServer(async (post) => {
+            const { body, headers } = statelessRequest('tools/list');
+
+            const response = await post(DEV_URL, body, {
+                ...headers,
+                authorization: 'Bearer dev-token',
+                origin: 'https://evil.example.com',
+            });
+
+            expect(response.status).toBe(403);
+            expect(readJsonRpcPayload(response.body).error?.code).toBe(-32000);
+        });
+    });
+
     it('keeps a claim-less initialize on the sessionful path at the same endpoint', async () => {
         await withDevServer(async (post) => {
             const response = await post(
