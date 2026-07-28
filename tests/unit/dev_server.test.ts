@@ -225,7 +225,6 @@ describe('createExpressApp() era routing', () => {
             expect(readJsonRpcPayload(response.body).error?.code).toBe(-32000);
         });
     });
-
     it('rejects a non-localhost Host', async () => {
         // The DNS-rebinding vector the Origin guard cannot see: a rebound hostname resolves here,
         // the browser sends no Origin, and the Host header carries the attacker's name. `fetch`
@@ -262,7 +261,6 @@ describe('createExpressApp() era routing', () => {
             expect(readJsonRpcPayload(response.body).error?.code).toBe(-32000);
         });
     });
-
     it('keeps a claim-less initialize on the stateful path at the same endpoint', async () => {
         await withDevServer(async (post) => {
             const response = await post(
@@ -353,7 +351,27 @@ describe('createExpressApp() era routing', () => {
 
             expect(response.status).toBe(401);
             expect(readJsonRpcPayload(response.body).error?.code).toBe(-32001);
+            // RFC 6750 §3: a 401 must name the scheme a client should authenticate with.
+            expect(response.headers.get('www-authenticate')).toEqual(expect.stringMatching(/^Bearer\b/));
             expect(exceptionSpy).not.toHaveBeenCalled();
+        });
+    });
+
+    it('answers an unauthenticated server/discover instead of demanding a token', async () => {
+        // Discovery is how a client learns which revisions and capabilities the endpoint serves, so
+        // it must not need credentials it can only obtain after discovery.
+        await withDevServer(async (post) => {
+            const { body, headers } = statelessRequest('server/discover');
+
+            const response = await post(DEV_URL, body, headers);
+
+            expect(response.status).toBe(200);
+            const { result } = readJsonRpcPayload(response.body);
+            expect(result?.supportedVersions).toContain(STATELESS_PROTOCOL_VERSION);
+            expect(result?.instructions).toBeTruthy();
+            // And it costs no Actor-metadata fetch: neither capabilities nor the configuration-level
+            // instructions read the tool set.
+            expect(getActorsMock).not.toHaveBeenCalled();
         });
     });
 });

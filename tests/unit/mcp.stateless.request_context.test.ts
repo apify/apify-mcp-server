@@ -305,6 +305,21 @@ describe('createStatelessServer() request context', () => {
             );
         });
 
+        // `client-info` is optional in the stateless envelope. A request declaring no client name
+        // matches no blocked substring and is served the tool by policy.
+        it('serves report-problem to a request whose envelope declares no client', async () => {
+            await withStatelessServer(
+                async ({ server, call }) => {
+                    await loadSource(server, [], { tools: [HELPER_TOOLS.PROBLEM_REPORT] });
+
+                    const response = await call('tools/list', {}, { client: null });
+
+                    expect(toolNames(response.result)).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                },
+                { telemetry: { enabled: true } },
+            );
+        });
+
         it('hides report-problem when telemetry is disabled, even for an allowed client', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {

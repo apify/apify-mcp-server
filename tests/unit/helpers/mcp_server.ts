@@ -98,7 +98,8 @@ export type StatelessClientIdentity = {
 };
 
 export type StatelessCallOptions = {
-    client?: StatelessClientIdentity;
+    /** Identity for the envelope's `client-info` key; `null` omits that (optional) key entirely. */
+    client?: StatelessClientIdentity | null;
     /** Extra `_meta` entries carried beside the envelope (e.g. `apifyToken`). */
     meta?: Record<string, unknown>;
     /** Auth info the serving entry receives from its caller, as the dev server's bearer passthrough sends. */
@@ -161,7 +162,7 @@ async function callStatelessMethod(
             ...params,
             _meta: {
                 [PROTOCOL_VERSION_META_KEY]: STATELESS_PROTOCOL_VERSION,
-                [CLIENT_INFO_META_KEY]: { name, version },
+                ...(options.client === null ? {} : { [CLIENT_INFO_META_KEY]: { name, version } }),
                 [CLIENT_CAPABILITIES_META_KEY]: supportsUi ? UI_CLIENT_CAPABILITIES : {},
                 ...options.meta,
             },
