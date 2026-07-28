@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.13.1 - **not yet released**
+
+### 🚀 Features
+
+- Serve 2026-07-28 MCP requests from a stateless adapter ([#1165](https://github.com/apify/apify-mcp-server/pull/1165)) ([6aae6c7](https://github.com/apify/apify-mcp-server/commit/6aae6c722020b0fc06915ffc11a32420e9edb510)) by [@jirispilka](https://github.com/jirispilka), closes [#1140](https://github.com/apify/apify-mcp-server/issues/1140)
+
+### 🐛 Bug Fixes
+
+- Drop validator nulling in close() that threw on frozen entries ([#1163](https://github.com/apify/apify-mcp-server/pull/1163)) ([9d0acda](https://github.com/apify/apify-mcp-server/commit/9d0acda8aa2dc00241c14d703f5b8a89007e0589)) by [@jirispilka](https://github.com/jirispilka)
+
+### 🚜 Refactor
+
+- [**breaking**] Separate legacy MCP wiring from ActorsMcpServer ([#1155](https://github.com/apify/apify-mcp-server/pull/1155)) ([5ebe0d8](https://github.com/apify/apify-mcp-server/commit/5ebe0d84cdaa1c0cc10d86b65c78c61c609f7fae)) by [@jirispilka](https://github.com/jirispilka), closes [#1147](https://github.com/apify/apify-mcp-server/issues/1147)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.13.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.13.0) (2026-07-27)
 
 ### 🚀 Features
