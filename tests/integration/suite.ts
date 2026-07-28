@@ -1,4 +1,3 @@
-import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
@@ -22,7 +21,7 @@ import type { SERVER_MODE, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
 import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
-import type { McpClientOptions } from '../helpers.js';
+import { asLegacyClient, type McpClientOptions, type McpSuiteClient } from '../helpers.js';
 import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAborted } from './utils/task_waits.js';
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
@@ -53,8 +52,8 @@ function findToolByName(name: string, mode: SERVER_MODE): ToolEntry | undefined 
 
 type IntegrationTestsSuiteOptions = {
     suiteName: string;
-    transport: 'streamable-http' | 'stdio';
-    createClientFn: (options?: McpClientOptions) => Promise<Client>;
+    transport: 'streamable-http' | 'stdio' | '2026-07-28';
+    createClientFn: (options?: McpClientOptions) => Promise<McpSuiteClient>;
     beforeAllFn?: () => Promise<void>;
     afterAllFn?: () => Promise<void>;
     beforeEachFn?: () => Promise<void>;
@@ -206,6 +205,10 @@ function expectUsageCostMeta(result: unknown): void {
 export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOptions) {
     const { suiteName, createClientFn, beforeAllFn, afterAllFn, beforeEachFn, afterEachFn } = options;
 
+    // The 2026-07-28 stateless adapter declares no `tasks` capability, so `tasks/*` is
+    // method-not-found there — the Tasks cases below run on the legacy dimensions only.
+    const hasTasksSupport = options.transport !== '2026-07-28';
+
     // Hooks
     if (beforeAllFn) {
         beforeAll(beforeAllFn);
@@ -227,7 +230,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             concurrent: false, // Make all tests sequential to prevent state interference
         },
         () => {
-            let client: Client | undefined;
+            let client: McpSuiteClient | undefined;
             afterEach(async () => {
                 await client?.close();
                 client = undefined;
@@ -367,9 +370,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const normalModeTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE));
                 expect(normalModeTool).toBeDefined();
 
-                // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly)
-                expect(normalModeTool).toHaveProperty('execution');
-                expect(normalModeTool?.execution).toBeDefined();
+                // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly).
+                // The 2026-07-28 codec strips `execution` as deleted vocabulary (no tasks capability there).
+                if (hasTasksSupport) {
+                    expect(normalModeTool).toHaveProperty('execution');
+                    expect(normalModeTool?.execution).toBeDefined();
+                } else {
+                    expect(normalModeTool).not.toHaveProperty('execution');
+                }
 
                 // Verify other expected fields are present
                 expect(normalModeTool).toHaveProperty('name');
@@ -1698,7 +1706,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     client = await createClientFn();
                     await client.listTools();
                     await expect(
-                        (client.transport as StreamableHTTPClientTransport).terminateSession(),
+                        (asLegacyClient(client).transport as StreamableHTTPClientTransport).terminateSession(),
                     ).resolves.toBeUndefined();
                 },
             );
@@ -1722,7 +1730,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     const capturingSince = new Date();
                     const controller = new AbortController();
-                    const requestPromise = client
+                    const requestPromise = asLegacyClient(client)
                         .request(
                             {
                                 method: 'tools/call' as const,
@@ -1758,7 +1766,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     const capturingSince = new Date();
                     const controller = new AbortController();
-                    const requestPromise = client
+                    const requestPromise = asLegacyClient(client)
                         .request(
                             {
                                 method: 'tools/call' as const,
@@ -2442,10 +2450,11 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             );
 
             // TODO: if we add more streamable task tool call tests it might be worth it to abstract the common logic but now it's not worth it
-            it('should be able to call a long running task tool call', async () => {
+            it.runIf(hasTasksSupport)('should be able to call a long running task tool call', async () => {
                 client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
+                const taskClient = asLegacyClient(client);
 
-                const stream = client.experimental.tasks.callToolStream(
+                const stream = taskClient.experimental.tasks.callToolStream(
                     {
                         name: actorNameToToolName(ACTOR_NORMAL_MODE),
                         // waitSeconds keeps the run open long enough to emit taskStatus updates.
@@ -2497,194 +2506,217 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 expect(lastStatus).not.toBe('');
             });
 
-            it('should be able to call a long running task and list it, get the status and then separately retrieve the result', async () => {
-                client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
+            it.runIf(hasTasksSupport)(
+                'should be able to call a long running task and list it, get the status and then separately retrieve the result',
+                async () => {
+                    client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
+                    const taskClient = asLegacyClient(client);
 
-                const stream = client.experimental.tasks.callToolStream(
-                    {
-                        name: actorNameToToolName(ACTOR_NORMAL_MODE),
-                        // waitSeconds keeps the run open long enough to observe `working` status.
-                        arguments: {
-                            firstNumber: 3,
-                            secondNumber: 4,
-                            waitSeconds: 10,
+                    const stream = taskClient.experimental.tasks.callToolStream(
+                        {
+                            name: actorNameToToolName(ACTOR_NORMAL_MODE),
+                            // waitSeconds keeps the run open long enough to observe `working` status.
+                            arguments: {
+                                firstNumber: 3,
+                                secondNumber: 4,
+                                waitSeconds: 10,
+                            },
                         },
-                    },
-                    CallToolResultSchema,
-                    {
-                        task: {
-                            ttl: 60000, // Keep results for 60 seconds
+                        CallToolResultSchema,
+                        {
+                            task: {
+                                ttl: 60000, // Keep results for 60 seconds
+                            },
                         },
-                    },
-                );
+                    );
 
-                let taskId: string | null = null;
-                for await (const message of stream) {
-                    if (message.type === 'taskCreated') {
-                        taskId = message.task.taskId;
+                    let taskId: string | null = null;
+                    for await (const message of stream) {
+                        if (message.type === 'taskCreated') {
+                            taskId = message.task.taskId;
 
-                        // Now we can get the task status
-                        const taskStatus = await client.experimental.tasks.getTask(taskId);
-                        expect(taskStatus).toHaveProperty('status');
-                        expect(taskStatus.status).toBe('working');
+                            // Now we can get the task status
+                            const taskStatus = await taskClient.experimental.tasks.getTask(taskId);
+                            expect(taskStatus).toHaveProperty('status');
+                            expect(taskStatus.status).toBe('working');
 
-                        // List and verify the task is present
-                        const tasks = await client.experimental.tasks.listTasks();
-                        const taskIds = tasks.tasks.map((task) => task.taskId);
-                        expect(taskIds).toContain(taskId);
-                    } else if (message.type === 'result') {
-                        // So typescript is happy
-                        if (!taskId) throw new Error('Task ID should be set before receiving result');
-                        // Task completed retrieve the result separately
-                        const result = await client.experimental.tasks.getTaskResult(taskId, CallToolResultSchema);
-                        const content = result.content as { text: string; type: string }[];
-                        expect(content.length).toBe(2);
+                            // List and verify the task is present
+                            const tasks = await taskClient.experimental.tasks.listTasks();
+                            const taskIds = tasks.tasks.map((task) => task.taskId);
+                            expect(taskIds).toContain(taskId);
+                        } else if (message.type === 'result') {
+                            // So typescript is happy
+                            if (!taskId) throw new Error('Task ID should be set before receiving result');
+                            // Task completed retrieve the result separately
+                            const result = await taskClient.experimental.tasks.getTaskResult(
+                                taskId,
+                                CallToolResultSchema,
+                            );
+                            const content = result.content as { text: string; type: string }[];
+                            expect(content.length).toBe(2);
+                        }
                     }
-                }
-            });
+                },
+            );
 
-            it('should be able to call a long running task and then cancel it midway', async () => {
-                client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
+            it.runIf(hasTasksSupport)(
+                'should be able to call a long running task and then cancel it midway',
+                async () => {
+                    client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
+                    const taskClient = asLegacyClient(client);
 
-                const stream = client.experimental.tasks.callToolStream(
-                    {
-                        name: actorNameToToolName(ACTOR_NORMAL_MODE),
-                        // waitSeconds keeps the run open long enough to cancel it mid-flight.
-                        arguments: {
-                            firstNumber: 5,
-                            secondNumber: 6,
-                            waitSeconds: 60,
+                    const stream = taskClient.experimental.tasks.callToolStream(
+                        {
+                            name: actorNameToToolName(ACTOR_NORMAL_MODE),
+                            // waitSeconds keeps the run open long enough to cancel it mid-flight.
+                            arguments: {
+                                firstNumber: 5,
+                                secondNumber: 6,
+                                waitSeconds: 60,
+                            },
                         },
-                    },
-                    CallToolResultSchema,
-                    {
-                        task: {
-                            ttl: 60000, // Keep results for 60 seconds
+                        CallToolResultSchema,
+                        {
+                            task: {
+                                ttl: 60000, // Keep results for 60 seconds
+                            },
                         },
-                    },
-                );
+                    );
 
-                let taskId: string | null = null;
-                for await (const message of stream) {
-                    if (message.type === 'taskCreated') {
-                        taskId = message.task.taskId;
+                    let taskId: string | null = null;
+                    for await (const message of stream) {
+                        if (message.type === 'taskCreated') {
+                            taskId = message.task.taskId;
 
-                        await client.experimental.tasks.cancelTask(taskId);
-                    } else if (message.type === 'taskStatus') {
-                        expect(message.task.status).toBe('cancelled');
-                    } else if (message.type === 'result') {
-                        throw new Error('Task should have been cancelled before completion');
+                            await taskClient.experimental.tasks.cancelTask(taskId);
+                        } else if (message.type === 'taskStatus') {
+                            expect(message.task.status).toBe('cancelled');
+                        } else if (message.type === 'result') {
+                            throw new Error('Task should have been cancelled before completion');
+                        }
                     }
-                }
-            });
+                },
+            );
 
             // Without the chained AbortController, the task flips to `cancelled` but the underlying
             // Apify run keeps consuming compute until natural finish.
-            it('should abort the Apify run when tasks/cancel is sent (direct actor tool)', { retry: 3 }, async () => {
-                client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
+            it.runIf(hasTasksSupport)(
+                'should abort the Apify run when tasks/cancel is sent (direct actor tool)',
+                { retry: 3 },
+                async () => {
+                    client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
+                    const taskClient = asLegacyClient(client);
 
-                const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-                const actor = await api.actor(ACTOR_NORMAL_MODE).get();
-                expect(actor).toBeDefined();
-                const actId = actor!.id as string;
+                    const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+                    const actor = await api.actor(ACTOR_NORMAL_MODE).get();
+                    expect(actor).toBeDefined();
+                    const actId = actor!.id as string;
 
-                // Discover runId in parallel with the stream so it's ready by the time we verify.
-                const runIdPromise = captureInflightActorRunId(api, actId, new Date());
+                    // Discover runId in parallel with the stream so it's ready by the time we verify.
+                    const runIdPromise = captureInflightActorRunId(api, actId, new Date());
 
-                const stream = client.experimental.tasks.callToolStream(
-                    {
-                        name: actorNameToToolName(ACTOR_NORMAL_MODE),
-                        // waitSeconds keeps the run open long enough to capture, cancel, and verify abort.
-                        arguments: { firstNumber: 1, secondNumber: 2, waitSeconds: 60 },
-                    },
-                    CallToolResultSchema,
-                    { task: { ttl: 60000 } },
-                );
+                    const stream = taskClient.experimental.tasks.callToolStream(
+                        {
+                            name: actorNameToToolName(ACTOR_NORMAL_MODE),
+                            // waitSeconds keeps the run open long enough to capture, cancel, and verify abort.
+                            arguments: { firstNumber: 1, secondNumber: 2, waitSeconds: 60 },
+                        },
+                        CallToolResultSchema,
+                        { task: { ttl: 60000 } },
+                    );
 
-                let cancelled = false;
-                for await (const message of stream) {
-                    if (message.type === 'taskCreated') {
-                        // Cancel mid-run, not before the run starts.
-                        await new Promise((resolve) => {
-                            setTimeout(resolve, 2000);
-                        });
-                        await client.experimental.tasks.cancelTask(message.task.taskId);
-                        cancelled = true;
-                    } else if (message.type === 'result') {
-                        throw new Error('Task should have been cancelled before completion');
+                    let cancelled = false;
+                    for await (const message of stream) {
+                        if (message.type === 'taskCreated') {
+                            // Cancel mid-run, not before the run starts.
+                            await new Promise((resolve) => {
+                                setTimeout(resolve, 2000);
+                            });
+                            await taskClient.experimental.tasks.cancelTask(message.task.taskId);
+                            cancelled = true;
+                        } else if (message.type === 'result') {
+                            throw new Error('Task should have been cancelled before completion');
+                        }
                     }
-                }
-                expect(cancelled).toBe(true);
+                    expect(cancelled).toBe(true);
 
-                const runId = await runIdPromise;
-                await waitForRunAborted(api, runId);
-            });
+                    const runId = await runIdPromise;
+                    await waitForRunAborted(api, runId);
+                },
+            );
 
-            it('should support call-actor tool in task mode (internal tool with taskSupport)', async () => {
-                client = await createClientFn({ tools: ['actors'] });
+            it.runIf(hasTasksSupport)(
+                'should support call-actor tool in task mode (internal tool with taskSupport)',
+                async () => {
+                    client = await createClientFn({ tools: ['actors'] });
+                    const taskClient = asLegacyClient(client);
 
-                const stream = client.experimental.tasks.callToolStream(
-                    {
-                        name: HELPER_TOOLS.ACTOR_CALL,
-                        arguments: {
-                            actor: ACTOR_NORMAL_MODE,
-                            input: {
-                                firstNumber: 10,
-                                secondNumber: 20,
+                    const stream = taskClient.experimental.tasks.callToolStream(
+                        {
+                            name: HELPER_TOOLS.ACTOR_CALL,
+                            arguments: {
+                                actor: ACTOR_NORMAL_MODE,
+                                input: {
+                                    firstNumber: 10,
+                                    secondNumber: 20,
+                                },
                             },
                         },
-                    },
-                    CallToolResultSchema,
-                    {
-                        task: {
-                            ttl: 60000, // Keep results for 60 seconds
+                        CallToolResultSchema,
+                        {
+                            task: {
+                                ttl: 60000, // Keep results for 60 seconds
+                            },
                         },
-                    },
-                );
+                    );
 
-                let resultReceived = false;
-                let taskCreated = false;
-                for await (const message of stream) {
-                    switch (message.type) {
-                        case 'taskCreated':
-                            taskCreated = true;
-                            expect(message.task.taskId).toBeDefined();
-                            break;
-                        case 'taskStatus':
-                            // Task should transition through statuses
-                            expect(['working', 'completed']).toContain(message.task.status);
-                            break;
-                        case 'result': {
-                            // Verify the result contains expected content
-                            const content = message.result.content as { text: string; type: string }[];
-                            expect(content.length).toBeGreaterThan(0);
-                            // Should contain dataset or run information
-                            const resultText = content.map((c) => c.text).join(' ');
-                            expect(resultText.length).toBeGreaterThan(0);
-                            resultReceived = true;
-                            break;
+                    let resultReceived = false;
+                    let taskCreated = false;
+                    for await (const message of stream) {
+                        switch (message.type) {
+                            case 'taskCreated':
+                                taskCreated = true;
+                                expect(message.task.taskId).toBeDefined();
+                                break;
+                            case 'taskStatus':
+                                // Task should transition through statuses
+                                expect(['working', 'completed']).toContain(message.task.status);
+                                break;
+                            case 'result': {
+                                // Verify the result contains expected content
+                                const content = message.result.content as { text: string; type: string }[];
+                                expect(content.length).toBeGreaterThan(0);
+                                // Should contain dataset or run information
+                                const resultText = content.map((c) => c.text).join(' ');
+                                expect(resultText.length).toBeGreaterThan(0);
+                                resultReceived = true;
+                                break;
+                            }
+                            case 'error':
+                                throw message.error;
+                            default:
+                                throw new Error(
+                                    `Unknown message type: ${(message as unknown as { type: string }).type}`,
+                                );
                         }
-                        case 'error':
-                            throw message.error;
-                        default:
-                            throw new Error(`Unknown message type: ${(message as unknown as { type: string }).type}`);
                     }
-                }
 
-                expect(taskCreated).toBe(true);
-                expect(resultReceived).toBe(true);
-            });
+                    expect(taskCreated).toBe(true);
+                    expect(resultReceived).toBe(true);
+                },
+            );
 
             // WARNING: These tests can be flaky on streamable HTTP transport due to timing —
             // the Actor may complete before the progress polling interval (PROGRESS_NOTIFICATION_INTERVAL_MS)
             // fires a statusMessage. See: https://github.com/apify/apify-mcp-server/issues/558
-            it(
+            it.runIf(hasTasksSupport)(
                 'should propagate statusMessage to tasks/get and tasks/list for internal tools in task mode',
                 { retry: 1 },
                 async () => {
                     client = await createClientFn({ tools: ['actors'] });
+                    const taskClient = asLegacyClient(client);
 
-                    const stream = client.experimental.tasks.callToolStream(
+                    const stream = taskClient.experimental.tasks.callToolStream(
                         {
                             name: HELPER_TOOLS.ACTOR_CALL,
                             arguments: {
@@ -2702,17 +2734,18 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                         },
                     );
 
-                    await assertStatusMessagePropagated(client, stream);
+                    await assertStatusMessagePropagated(taskClient, stream);
                 },
             );
 
-            it(
+            it.runIf(hasTasksSupport)(
                 'should propagate statusMessage to tasks/get and tasks/list for actor tools in task mode',
                 { retry: 1 },
                 async () => {
                     client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
+                    const taskClient = asLegacyClient(client);
 
-                    const stream = client.experimental.tasks.callToolStream(
+                    const stream = taskClient.experimental.tasks.callToolStream(
                         {
                             name: actorNameToToolName(ACTOR_NORMAL_MODE),
                             // waitSeconds keeps the run open long enough for the polling
@@ -2727,7 +2760,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                         },
                     );
 
-                    await assertStatusMessagePropagated(client, stream);
+                    await assertStatusMessagePropagated(taskClient, stream);
                 },
             );
 
@@ -3038,7 +3071,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 'should reject standby Actor in task-mode call-actor under x402 (not 402, not platform error)',
                 async () => {
                     client = await createClientFn({ payment: 'x402' });
-                    const stream = client.experimental.tasks.callToolStream(
+                    const stream = asLegacyClient(client).experimental.tasks.callToolStream(
                         {
                             name: 'call-actor',
                             arguments: {

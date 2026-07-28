@@ -1,3 +1,8 @@
+import {
+    Client as StatelessClient,
+    type ClientCapabilities as StatelessClientCapabilities,
+    StreamableHTTPClientTransport as StatelessStreamableHTTPClientTransport,
+} from '@modelcontextprotocol/client';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -5,6 +10,20 @@ import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import type { TelemetryEnv, ToolCategory } from '../src/types.js';
+
+/**
+ * Both client generations the integration suite drives: the v1 SDK client on the `stdio` and
+ * `streamable-http` dimensions, the v2 client on `2026-07-28`. One suite run exercises both.
+ */
+export type McpSuiteClient = Client | StatelessClient;
+
+/**
+ * Narrows a suite client to the v1 SDK client. Only for cases gated to the legacy dimensions:
+ * the v2 client has no `experimental.tasks`, no v1 `transport`, and a different `request()` shape.
+ */
+export function asLegacyClient(client: McpSuiteClient): Client {
+    return client as Client;
+}
 
 export type McpClientOptions = {
     actors?: string[];
@@ -77,6 +96,43 @@ export async function createMcpStreamableClient(serverUrl: string, options?: Mcp
         version: '1.0.0',
     });
     if (options?.clientCapabilities) client.registerCapabilities(options.clientCapabilities);
+    await client.connect(transport);
+
+    return client;
+}
+
+/**
+ * Builds a v2-SDK client for the 2026-07-28 revision. `versionNegotiation` belongs on the
+ * constructor — `connect()` only takes a cached verdict — and `mode: 'auto'` probes with
+ * `server/discover`, falling back to the legacy `initialize` handshake when it finds no modern
+ * server. Callers that must not silently run on legacy code check `getDiscoverResult()`.
+ */
+export async function createMcpStatelessClient(
+    serverUrl: string,
+    options?: McpClientOptions,
+): Promise<StatelessClient> {
+    checkApifyToken(options);
+    const url = new URL(serverUrl);
+    appendSearchParams(url, options);
+
+    const transport = new StatelessStreamableHTTPClientTransport(url, {
+        requestInit: {
+            headers: buildClientAuthHeaders(options),
+        },
+    });
+
+    const client = new StatelessClient(
+        {
+            name: options?.clientName || 'stateless-http-client',
+            version: '1.0.0',
+        },
+        { versionNegotiation: { mode: 'auto' } },
+    );
+    if (options?.clientCapabilities) {
+        // The two SDK generations derive their capability types from different schemas; the option
+        // shape shared with the legacy factories is the v1 one.
+        client.registerCapabilities(options.clientCapabilities as StatelessClientCapabilities);
+    }
     await client.connect(transport);
 
     return client;
