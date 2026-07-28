@@ -174,8 +174,8 @@ class StatelessMcpServer {
         this.server.setRequestHandler('tools/call', async (request, ctx) => {
             const params = request.params as ApifyRequestParams & { name: string; arguments?: Record<string, unknown> };
             // Keep telemetry on the decoded arguments.
-            // eslint-disable-next-line prefer-const
-            let { name, arguments: args, _meta: meta } = params;
+            const { name, arguments: initialArgs, _meta: meta } = params;
+            let args = initialArgs;
             const progressToken = meta?.progressToken;
             const snapshot = await this.resolveSnapshot(ctx);
             const apifyToken = this.resolveRequestToken(ctx, meta) as string;
