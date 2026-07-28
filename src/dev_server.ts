@@ -92,6 +92,17 @@ const UNAUTHORIZED_RESPONSE_BODY = {
 } as const;
 
 /**
+ * `WWW-Authenticate` challenge sent with that 401 (RFC 6750 §3), so a client is told how to
+ * authenticate and not merely that it failed. Same shape the SDK's `bearerAuthChallengeResponse`
+ * emits for a missing header, hand-written because that helper needs an OAuth token verifier and a
+ * protected-resource-metadata URL, and this server takes plain Apify API tokens with no PRM endpoint.
+ * Limitation: no `resource_metadata` parameter, so the token source is discoverable only by a human
+ * reading the description.
+ */
+const UNAUTHORIZED_CHALLENGE =
+    'Bearer error="invalid_token", error_description="Apify API token missing. Create one at https://console.apify.com/settings/integrations"';
+
+/**
  * Returns the resolved token for a request, or sends a 401 response.
  * In payment mode, no token is required — returns `{ apifyToken: undefined }`.
  */
@@ -106,7 +117,7 @@ function resolveRequestAuth(
     if (apifyToken) return { apifyToken };
 
     log.softFail('Apify API token missing on unauthenticated request', { statusCode: 401 });
-    res.status(401).json(UNAUTHORIZED_RESPONSE_BODY);
+    res.status(401).set('WWW-Authenticate', UNAUTHORIZED_CHALLENGE).json(UNAUTHORIZED_RESPONSE_BODY);
     return null;
 }
 
@@ -139,8 +150,9 @@ export async function isStatelessRequest(req: EraRoutableRequest): Promise<boole
  * framing rejections (400/-32020) regardless of auth state, and the SDK entry runs its validation
  * ladder before invoking the factory.
  *
- * Dev-only shape: a facade is built per request, so `?actors=` re-fetches Actor metadata every
- * time. A host may share one facade across requests instead — snapshots are per-request either way.
+ * Dev-only shape: a facade is built per request, so `?actors=` re-fetches Actor metadata every time
+ * (bar a `server/discover` probe, which loads no tools). A host may share one facade across requests
+ * instead — snapshots are per-request either way.
  */
 async function serveStatelessRequest(req: Request, res: Response, taskStore: InMemoryTaskStore): Promise<void> {
     const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
@@ -157,9 +169,17 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
     let unauthorized = false;
 
     const handler = createMcpHandler(
-        async () => {
+        async ({ requestInfo }) => {
+            // The SDK calls this factory before answering any modern method, `server/discover`
+            // included — so gating it on auth would make a client need a token to learn which
+            // revisions and capabilities this endpoint serves. Let discovery through, and skip the
+            // Actor-metadata fetch for it: discovery reports capabilities and configuration-level
+            // instructions, neither of which reads the tool set. The revision requires the method in
+            // a header, cross-checked against the body before this factory runs, so it is
+            // authoritative here.
+            const isDiscoverProbe = requestInfo?.headers.get('mcp-method') === 'server/discover';
             // Reached only after the validation ladder passed (see the doc comment above).
-            if (!paymentProvider && !apifyToken) {
+            if (!isDiscoverProbe && !paymentProvider && !apifyToken) {
                 unauthorized = true;
                 throw new Error('Apify API token missing on unauthenticated request');
             }
@@ -174,7 +194,9 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
             });
             // Client identity arrives per request in the `_meta` envelope (there is no initialize
             // handshake), so this fetch carries no request-origin tag.
-            await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken }));
+            if (!isDiscoverProbe) {
+                await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken }));
+            }
             return createStatelessServer(mcpServer);
         },
         {
@@ -196,7 +218,10 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
                 const response = await handler.fetch(request, options);
                 if (!unauthorized) return response;
                 log.softFail('Apify API token missing on unauthenticated request', { statusCode: 401 });
-                return Response.json(UNAUTHORIZED_RESPONSE_BODY, { status: 401 });
+                return Response.json(UNAUTHORIZED_RESPONSE_BODY, {
+                    status: 401,
+                    headers: { 'WWW-Authenticate': UNAUTHORIZED_CHALLENGE },
+                });
             },
         })(req, res, req.body);
     } finally {

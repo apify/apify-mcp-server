@@ -347,9 +347,12 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
 
     /**
      * Whether report-problem may be served against `view`. Never without telemetry (submissions
-     * would vanish into the void) and never before the client is known — on a stateful connection
-     * the initialize flush re-adds it if the client allows; a stateless view always names its
-     * client, so the answer is final on the spot.
+     * would vanish into the void) and never before a client context exists — on a stateful
+     * connection the initialize flush re-adds it once the handshake supplies one.
+     *
+     * The stateless envelope requires protocol and capability metadata but not `clientInfo`. A
+     * request declaring no client name matches no blocked substring and is served the tool by
+     * policy.
      */
     private isReportProblemServable(view: ServingContext): boolean {
         return (
@@ -562,10 +565,13 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     async close(): Promise<void> {
-        // Transport/server down first, then the tool map. Clearing `tools` leaves the retained
-        // sources in place, so a stateless snapshot taken after close still lists every loaded
-        // tool. Latent: nothing closes a facade mid-traffic.
+        // Transport/server down first, then everything this facade retains: the composed map plus
+        // both source maps, each holding every fetched `ToolEntry` with its compiled AJV validator.
+        // Close is the release point — a long-lived host churning sessions must not accumulate them
+        // — so a stateless snapshot taken after close composes no tools.
         await this.legacyServer.close();
         this.tools.clear();
+        this.toolSources.clear();
+        this.pendingToolsUntilClientKnown.clear();
     }
 }
