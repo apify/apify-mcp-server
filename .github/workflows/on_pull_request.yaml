@@ -30,6 +30,7 @@ jobs:
                             - 'pnpm-workspace.yaml'
                             - 'tsconfig.json'
                             - '.nvmrc'
+                            - '.github/workflows/_conformance_tests.yaml'
                             - '.github/workflows/_integration_tests.yaml'
                             - '.github/workflows/on_pull_request.yaml'
 

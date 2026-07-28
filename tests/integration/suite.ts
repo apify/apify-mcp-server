@@ -370,9 +370,14 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 const normalModeTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE));
                 expect(normalModeTool).toBeDefined();
 
-                // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly)
-                expect(normalModeTool).toHaveProperty('execution');
-                expect(normalModeTool?.execution).toBeDefined();
+                // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly).
+                // The 2026-07-28 codec strips `execution` as deleted vocabulary (no tasks capability there).
+                if (hasTasksSupport) {
+                    expect(normalModeTool).toHaveProperty('execution');
+                    expect(normalModeTool?.execution).toBeDefined();
+                } else {
+                    expect(normalModeTool).not.toHaveProperty('execution');
+                }
 
                 // Verify other expected fields are present
                 expect(normalModeTool).toHaveProperty('name');
