@@ -8,13 +8,27 @@ surface — **generic types only**. No Apify-internal infrastructure (Redis, Mon
 IAM) may leak in; the internal repo customizes behavior by swapping the SDK store
 implementations, not by importing from here.
 
+Two MCP protocol revisions are served, each by its own adapter:
+
+- **2025-era stateful protocol** ([spec](https://modelcontextprotocol.io/specification/2025-11-25)),
+  via the v1 SDK `@modelcontextprotocol/sdk` — `legacy_server.ts`.
+- **2026-07-28 stateless revision** ([spec](https://modelcontextprotocol.io/specification/2026-07-28)),
+  via the v2 SDK `@modelcontextprotocol/server` — `stateless_server.ts`. No `initialize`
+  handshake; every request carries a `_meta` envelope with protocol version, client info,
+  and capabilities.
+
 ## Files
 
 - `server.ts` — `ActorsMcpServer`, the shared facade for tools, server mode, services,
-  widgets, payments, and telemetry. It constructs and delegates v1 work to `LegacyMcpServer`.
+  widgets, payments, and telemetry. It constructs and delegates v1 work to `LegacyMcpServer`,
+  and hands the stateless adapter a per-request snapshot via `createRequestSnapshot`.
 - `legacy_server.ts` — package-private v1 SDK adapter for handlers, Tasks, errors,
   notifications, logging, and transport lifecycle. It reads shared state through
   `LegacyMcpServerHost`.
+- `stateless_server.ts` — `createStatelessServer(host)`: the 2026-07-28 (v2 SDK) adapter,
+  one `Server` per request, reading shared state through `StatelessMcpServerHost`. Serves
+  `tools/*`, `resources/*` and `prompts/*`; registers no Tasks (the SDK answers
+  method-not-found) and declares no `logging`.
 - `client_context.ts` — protocol-neutral client identity and capabilities.
 - `errors.ts` — protocol-neutral domain errors mapped by each protocol adapter.
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
@@ -32,11 +46,19 @@ implementations, not by importing from here.
 ## Gotchas & invariants
 
 - **Facade → adapter, one direction only.** `ActorsMcpServer` (facade) constructs and delegates
-  to `LegacyMcpServer` (adapter). The adapter reads shared state only through the
-  `LegacyMcpServerHost` interface and never imports the concrete facade class; the shared
-  synchronous execution modules (`tool_call_engine.ts`, `tool_dispatch.ts`) take plain values and
-  import no `ActorsMcpServer`, v1 `RequestHandlerExtra`, or v1 `McpError`, and nothing shared
-  imports `LegacyMcpServer`. Keep it that way so a second protocol adapter reuses one Apify core.
+  to `LegacyMcpServer`; `createStatelessServer` builds the stateless adapter per request from the
+  same facade, which never constructs it. Each adapter reads shared state only through its own
+  narrow host interface (`LegacyMcpServerHost`, `StatelessMcpServerHost`) and never imports the
+  concrete facade class; the shared synchronous execution modules (`tool_call_engine.ts`,
+  `tool_dispatch.ts`) take plain values and import no `ActorsMcpServer`, v1 `RequestHandlerExtra`,
+  or v1 `McpError`, and **nothing shared imports either adapter**. Keep it that way: the two
+  adapters are siblings over one Apify core, not layers.
+- **Per-request state lives in a snapshot, never on the facade.** The stateless adapter resolves
+  `'auto'` mode and report-problem visibility from *that request's* `_meta` envelope through
+  `createRequestSnapshot`, which writes no request-specific state back to the facade (the one
+  instance field it touches is the identity-independent widget-resolution memo). Never resolve a
+  stateless request by writing to the shared facade — concurrent requests would contaminate
+  each other.
 - **Tool names: capped + hash-deduped.** Names are capped at `MAX_TOOL_NAME_LENGTH`;
   over-length or colliding names get a `TOOL_NAME_HASH_LENGTH` hash suffix so the
   exposed set stays unique within the limit (the hashing is in `../tools/actor_tool_naming.ts`).

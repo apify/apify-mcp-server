@@ -27,7 +27,7 @@ tests/
 
 Key entry points:
 
-- `src/index.ts` - Main library export (`ActorsMcpServer` class)
+- `src/index.ts` - Main library export (`ActorsMcpServer` class, plus `createStatelessServer` — the per-request registration for 2026-07-28 traffic)
 - `src/index_internals.ts` - Internal exports for testing / advanced usage
 - `src/stdio.ts` - Standard input/output (CLI) entry point
 - `src/dev_server.ts` - Express HTTP server for local development (`pnpm start`)
@@ -46,7 +46,16 @@ This split matters for `serverMode: 'auto'`.
 - Before `initialize`, the server does not yet know whether the client supports MCP Apps.
 - Public preload helpers such as `ActorsMcpServer.loadToolsByName()` and `loadToolsFromUrl()` therefore queue mode-agnostic sources first.
 - Actor tools may still be loaded immediately because they are mode-agnostic.
-- During `initialize`, once client capabilities are known, the server resolves the queued sources into the final mode-dependent tool set.
+- During `initialize`, once client capabilities are known, the server resolves the queued sources into the stateful connection's mode-dependent tool set.
+
+### Two places sources get resolved
+
+Fetched sources are **retained, not drained**, because there are two consumers:
+
+- The stateful (2025-era) path resolves them once at `initialize`, as above, into the shared `ActorsMcpServer.tools` map that lives for the connection.
+- The stateless (2026-07-28) path has no `initialize`. `ActorsMcpServer.createRequestSnapshot()` re-composes **all** retained sources per request, against that request's own resolved mode and declared client identity, into a snapshot the shared map never sees.
+
+Consequence for both: a tool only reaches the stateless path if it arrives through a load path. `upsertTools()` writes the shared map directly and is not reflected back into the sources, so it changes the stateful tool list only (it documents this). `close()` is the opposite — the release point for everything the facade retains, sources included, so nothing composes after it.
 
 Rule of thumb:
 

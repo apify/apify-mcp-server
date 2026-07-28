@@ -9,11 +9,14 @@ directory you're editing.
 
 ## Entry points (top-level files)
 
-- `index.ts` — the library export (`ActorsMcpServer`); `index_internals.ts` — the
+- `index.ts` — the library export (`ActorsMcpServer` plus `createStatelessServer`, the
+  per-request registration for 2026-07-28 traffic); `index_internals.ts` — the
   `./internals.js` surface the internal repo consumes (keep it minimal).
 - `stdio.ts` — CLI entry (used for Docker). **Sentry must be imported first** — keep
   that import order.
-- `dev_server.ts` — Express server for local dev / standby Actor mode.
+- `dev_server.ts` — Express server for local dev / standby Actor mode. Its POST route
+  serves both protocol eras: `isStatelessRequest` sends 2026-07-28 (per-request
+  envelope) traffic to the stateless adapter, everything else to the stateful flow.
 - `input.ts` — input processing (`processInput`, used by `stdio.ts` and the HTTP URL-param parser in `mcp/utils.ts`).
 - `apify_client.ts` — the Apify API client wrapper; use it rather than calling the
   API directly. `state.ts` — TTL caches. `const.ts`, `errors.ts`,

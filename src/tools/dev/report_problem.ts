@@ -127,6 +127,8 @@ export const reportProblem: ToolEntry = Object.freeze({
     title: 'Report a problem',
     description: REPORT_PROBLEM_DESCRIPTION,
     inputSchema: reportProblemInputSchema,
+    // TODO(#1159): no `outputSchema` — the tool returns a fixed acknowledgement, so nothing here is
+    // affected by the `tools/call` result projection against an advertised schema.
     ajvValidate: compileSchema(reportProblemInputSchema),
     paymentRequired: false,
     annotations: {
