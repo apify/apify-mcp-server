@@ -4,7 +4,6 @@
 
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import type { ValidateFunction } from 'ajv';
 
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
@@ -477,16 +476,6 @@ export class ActorsMcpServer implements LegacyMcpServerHost {
         // server close are the adapter's transport-lifecycle responsibility), then clear the shared
         // tool map. The order is unobservable because `close()` only runs on a quiesced serving unit.
         await this.legacyServer.close();
-        this.clearTools();
-    }
-
-    /** Clear all tools and null their compiled schemas. */
-    private clearTools(): void {
-        for (const tool of this.tools.values()) {
-            if (tool.ajvValidate && typeof tool.ajvValidate === 'function') {
-                (tool as { ajvValidate: ValidateFunction<unknown> | null }).ajvValidate = null;
-            }
-        }
         this.tools.clear();
     }
 }

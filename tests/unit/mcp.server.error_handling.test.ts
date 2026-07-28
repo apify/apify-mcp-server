@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import log from '@apify/log';
 
 import { TOOL_STATUS } from '../../src/const.js';
+import { getDefaultTools } from '../../src/tools/index.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
 import { getLegacyServer, getRequestHandler, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
@@ -145,6 +146,23 @@ describe('resources/read and prompts/get error boundary', () => {
             expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
             expect((error as McpError).message).toContain('nonexistent');
             expect((error as McpError).message).toContain('Available prompts:');
+        });
+    });
+});
+
+/**
+ * Default tool entries are `Object.freeze`d module singletons; `close()` used to write to them
+ * (`ajvValidate = null`), which threw in ESM strict mode and left the tool map populated.
+ */
+describe('ActorsMcpServer close()', () => {
+    it('clears frozen tool entries instead of throwing on their read-only ajvValidate', async () => {
+        await withServer(async (server) => {
+            const [frozenTool] = getDefaultTools();
+            server.upsertTools([frozenTool, makeThrowingTool()]);
+
+            await expect(server.close()).resolves.toBeUndefined();
+
+            expect(server.listToolNames()).toEqual([]);
         });
     });
 });
