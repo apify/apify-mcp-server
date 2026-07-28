@@ -5,6 +5,7 @@ import type { ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
+import { reportProblemToolOutputSchema } from '../structured_output_schemas.js';
 
 const REPORT_PROBLEM_DESCRIPTION = `Report a problem with Apify's MCP tools or Actors to the Apify team.
 
@@ -127,8 +128,7 @@ export const reportProblem: ToolEntry = Object.freeze({
     title: 'Report a problem',
     description: REPORT_PROBLEM_DESCRIPTION,
     inputSchema: reportProblemInputSchema,
-    // TODO(#1159): no `outputSchema` — the tool returns a fixed acknowledgement, so nothing here is
-    // affected by the `tools/call` result projection against an advertised schema.
+    outputSchema: reportProblemToolOutputSchema,
     ajvValidate: compileSchema(reportProblemInputSchema),
     paymentRequired: false,
     annotations: {
@@ -139,6 +139,6 @@ export const reportProblem: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async () => {
-        return respondOk(ACKNOWLEDGEMENT);
+        return respondOk(ACKNOWLEDGEMENT, { structuredContent: { reported: true } });
     },
 } as const);

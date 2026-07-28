@@ -7,8 +7,13 @@ import {
     appendReportProblemNudge,
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
+import { reportProblemToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
-import { type TextToolResult, stubToolCallContext } from './helpers/tool_context.js';
+import {
+    expectSchemaConformingStructuredContent,
+    type TextToolResult,
+    stubToolCallContext,
+} from './helpers/tool_context.js';
 
 const errorResult = () => ({ content: [{ type: 'text', text: 'Actor not found.' }], isError: true });
 const nudgeCount = (r: { content: { text: string }[] }) =>
@@ -24,6 +29,16 @@ describe('reportProblem', () => {
 
             expect(isError).toBe(false);
             expect(content[0].text).toContain('Problem reported');
+        });
+
+        it('returns structuredContent conforming to the declared outputSchema', async () => {
+            const result = await (reportProblem as HelperTool).call(
+                stubToolCallContext({ message: 'The search-actors results were unclear.' }, {} as never),
+            );
+
+            expect((result as TextToolResult).structuredContent).toEqual({ reported: true });
+            expect((reportProblem as HelperTool).outputSchema).toBe(reportProblemToolOutputSchema);
+            expectSchemaConformingStructuredContent(result, reportProblemToolOutputSchema);
         });
     });
 
