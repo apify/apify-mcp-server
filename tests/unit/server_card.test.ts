@@ -6,7 +6,17 @@ import { getServerCard, getServerInfo } from '../../src/server_card.js';
 import { readJsonFile } from '../../src/utils/generic.js';
 import { getPackageVersion } from '../../src/utils/version.js';
 
-const serverJson = readJsonFile<{ description: string }>(import.meta.url, '../../server.json');
+const serverJson = readJsonFile<{
+    description: string;
+    remotes: {
+        headers: {
+            name: string;
+            description: string;
+            isRequired: boolean;
+            isSecret: boolean;
+        }[];
+    }[];
+}>(import.meta.url, '../../server.json');
 
 describe('getServerCard', () => {
     it('should return a valid MCP server card object', () => {
@@ -38,11 +48,21 @@ describe('getServerCard', () => {
         expect(card.capabilities.tools.listChanged).toBe(true);
     });
 
-    it('should require authentication with bearer and oauth2 schemes', () => {
+    it('declares authentication as optional with bearer and oauth2 schemes', () => {
         const card = getServerCard();
 
-        expect(card.authentication.required).toBe(true);
+        expect(card.authentication.required).toBe(false);
         expect(card.authentication.schemes).toEqual(['bearer', 'oauth2']);
+    });
+
+    it('declares the authorization header as optional for selected public tools', () => {
+        const authorizationHeader = serverJson.remotes[0].headers.find((header) => header.name === 'Authorization');
+
+        expect(authorizationHeader).toMatchObject({
+            isRequired: false,
+            isSecret: true,
+        });
+        expect(authorizationHeader?.description).toContain('?tools=');
     });
 
     it('should declare tools as dynamic', () => {

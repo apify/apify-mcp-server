@@ -14,8 +14,8 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Apify API token for authentication with Apify platform services. For example 'Bearer <apify-api-token>'",
-          "isRequired": true,
+          "description": "Optional Apify API token. Required for the default tool set and non-public tools. Anonymous access is available with ?tools=search-actors,fetch-actor-details,search-apify-docs,fetch-apify-docs.",
+          "isRequired": false,
           "isSecret": true
         }
       ]

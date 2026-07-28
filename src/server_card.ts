@@ -55,7 +55,7 @@ export function getServerCard(): ServerCard {
             tools: { listChanged: true },
         },
         authentication: {
-            required: true,
+            required: false,
             schemes: ['bearer', 'oauth2'],
         },
         tools: 'dynamic',
