@@ -305,7 +305,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         // instance's own view). Directly upserted tools are deliberately left out — carrying them
         // over would re-add tools this view's gating just withheld.
         const tools = new Map<string, ToolEntry>();
-        for (const source of this.toolSources) {
+        for (const source of this.toolSources.values()) {
             for (const tool of this.composeToolsForClient(source, view)) {
                 const stored = this.toStoredTool(tool);
                 tools.set(stored.name, stored);

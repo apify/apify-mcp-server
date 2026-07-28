@@ -397,14 +397,22 @@ describe('createStatelessServer() request context', () => {
             // Two sources sharing a tool name pin the merge order: last load wins, matching how the
             // stateful path upserts them.
             await withStatelessServer(async ({ server, call }) => {
-                await loadSource(server, [
-                    makeSourceTool('shared-tool', 'from the first source'),
-                    makeSourceTool('first-only-tool', 'only in the first source'),
-                ]);
-                await loadSource(server, [
-                    makeSourceTool('shared-tool', 'from the second source'),
-                    makeSourceTool('second-only-tool', 'only in the second source'),
-                ]);
+                await loadSource(
+                    server,
+                    [
+                        makeSourceTool('shared-tool', 'from the first source'),
+                        makeSourceTool('first-only-tool', 'only in the first source'),
+                    ],
+                    { actors: ['test/first-source'] },
+                );
+                await loadSource(
+                    server,
+                    [
+                        makeSourceTool('shared-tool', 'from the second source'),
+                        makeSourceTool('second-only-tool', 'only in the second source'),
+                    ],
+                    { actors: ['test/second-source'] },
+                );
 
                 const response = await call('tools/list');
 
