@@ -1,0 +1,1259 @@
+{
+  "_note": "TEMPORARY, AI-GENERATED, NOT HUMAN-MAINTAINED. Delete tests/e2e/ when the stateless migration (#1128) closes. Pins the v1 protocol surface across the migration with real per-case assertions; not a permanent suite, not in CI. `\"configs\": [\"__all__\"]` runs a case against every configuration. See tests/e2e/README.md.",
+  "configs": {
+    "default": {},
+    "category-actors": {
+      "args": [
+        "--tools=actors"
+      ]
+    },
+    "category-docs": {
+      "args": [
+        "--tools=docs"
+      ]
+    },
+    "category-runs": {
+      "args": [
+        "--tools=runs"
+      ]
+    },
+    "category-storage": {
+      "args": [
+        "--tools=storage"
+      ]
+    },
+    "category-dev": {
+      "args": [
+        "--tools=dev"
+      ]
+    },
+    "category-all": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ]
+    },
+    "tools-empty": {
+      "args": [
+        "--tools="
+      ]
+    },
+    "actors-empty": {
+      "args": [
+        "--actors="
+      ]
+    },
+    "both-empty": {
+      "args": [
+        "--tools=",
+        "--actors="
+      ]
+    },
+    "actor-single": {
+      "args": [
+        "--actors=apify/rag-web-browser"
+      ]
+    },
+    "actor-multi": {
+      "args": [
+        "--actors=apify/rag-web-browser,apify/normal-mode-test-actor"
+      ]
+    },
+    "actor-via-tools": {
+      "args": [
+        "--tools=apify/rag-web-browser"
+      ]
+    },
+    "tool-by-name": {
+      "args": [
+        "--tools=search-actors"
+      ]
+    },
+    "retired-add-actor": {
+      "args": [
+        "--tools=add-actor"
+      ]
+    },
+    "retired-experimental": {
+      "args": [
+        "--tools=experimental"
+      ]
+    },
+    "retired-preview": {
+      "args": [
+        "--tools=preview"
+      ]
+    },
+    "retired-mixed": {
+      "args": [
+        "--tools=actors,add-actor"
+      ]
+    },
+    "merge-compat": {
+      "args": [
+        "--tools=actors",
+        "--actors=apify/rag-web-browser"
+      ]
+    },
+    "ui-apps": {
+      "args": [
+        "--ui=apps"
+      ]
+    },
+    "ui-default": {
+      "args": [
+        "--ui=default"
+      ]
+    },
+    "ui-auto": {
+      "args": [
+        "--ui=auto"
+      ]
+    },
+    "full-apps": {
+      "args": [
+        "--tools=actors,docs,runs,storage",
+        "--ui=apps"
+      ]
+    },
+    "mcp-proxy": {
+      "args": [
+        "--tools=apify/example-mcp-server"
+      ]
+    },
+    "no-token": {
+      "args": [
+        "--tools=docs"
+      ],
+      "env": {
+        "APIFY_TOKEN": null
+      }
+    },
+    "telemetry-off": {
+      "args": [
+        "--tools=actors,docs,dev",
+        "--telemetry-enabled=false"
+      ]
+    },
+    "telemetry-on": {
+      "args": [
+        "--tools=actors,docs,dev"
+      ]
+    },
+    "env-tools": {
+      "env": {
+        "TOOLS": "docs"
+      }
+    },
+    "env-ui-mode": {
+      "env": {
+        "UI_MODE": "apps"
+      }
+    },
+    "errors": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ],
+      "excludeFromAll": true
+    },
+    "actor-details": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ],
+      "excludeFromAll": true
+    },
+    "tasks": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ],
+      "excludeFromAll": true
+    },
+    "abort": {
+      "args": [
+        "--tools=actors,docs,runs,storage"
+      ],
+      "excludeFromAll": true
+    },
+    "http-docs": {
+      "url": "${E2E_HTTP_BASE}?tools=docs"
+    },
+    "http-storage": {
+      "url": "${E2E_HTTP_BASE}?tools=storage"
+    },
+    "http-ui-apps": {
+      "url": "${E2E_HTTP_BASE}?ui=apps"
+    },
+    "http-payment-skyfire": {
+      "url": "${E2E_HTTP_BASE}?payment=skyfire"
+    }
+  },
+  "cases": [
+    {
+      "id": "server info",
+      "configs": [
+        "__all__"
+      ],
+      "args": [],
+      "assert": ".serverInfo.name == \"apify-mcp-server\" and (.capabilities | has(\"tools\") and has(\"tasks\") and has(\"resources\") and has(\"prompts\") and has(\"logging\")) and ((.toolNames // []) | type == \"array\")"
+    },
+    {
+      "id": "ping",
+      "configs": [
+        "__all__"
+      ],
+      "args": [
+        "ping"
+      ],
+      "assert": ".success == true"
+    },
+    {
+      "id": "tools list",
+      "configs": [
+        "__all__"
+      ],
+      "args": [
+        "tools-list",
+        "--full"
+      ],
+      "assert": "type == \"array\" and all(.[]; has(\"name\") and has(\"description\") and has(\"inputSchema\"))"
+    },
+    {
+      "id": "prompts list",
+      "configs": [
+        "__all__"
+      ],
+      "args": [
+        "prompts-list"
+      ],
+      "assert": ". == []"
+    },
+    {
+      "id": "resources list",
+      "configs": [
+        "__all__"
+      ],
+      "args": [
+        "resources-list"
+      ],
+      "assert": "type == \"array\""
+    },
+    {
+      "id": "resource templates",
+      "configs": [
+        "__all__"
+      ],
+      "args": [
+        "resources-templates-list"
+      ],
+      "assert": "length == 5 and all(.[]; has(\"uriTemplate\") and has(\"name\"))"
+    },
+    {
+      "id": "logging set level",
+      "configs": [
+        "__all__"
+      ],
+      "args": [
+        "logging-set-level",
+        "debug"
+      ],
+      "assert": ".level == \"debug\""
+    },
+    {
+      "id": "rejects unknown tool",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "tools-call",
+        "does-not-exist"
+      ],
+      "expectError": true,
+      "assert": ".error | test(\"was not found\")"
+    },
+    {
+      "id": "rejects missing required argument",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-record"
+      ],
+      "expectError": true,
+      "assert": ".error | test(\"must have required property\")"
+    },
+    {
+      "id": "rejects forbidden docs URL",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-apify-docs",
+        "url:=\"https://example.com\""
+      ],
+      "expectError": true,
+      "assert": ".isError == true"
+    },
+    {
+      "id": "rejects waitSecs above the maximum",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run",
+        "runId:=\"x\"",
+        "waitSecs:=99"
+      ],
+      "expectError": true,
+      "assert": ".error | test(\"must be <= 45\")"
+    },
+    {
+      "id": "rejects unknown prompt",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "prompts-get",
+        "nonexistent"
+      ],
+      "expectError": true,
+      "assert": ".error | test(\"not found\")"
+    },
+    {
+      "id": "rejects a missing dataset resource",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/datasets/nope/items"
+      ],
+      "expectError": true,
+      "assert": ".error | test(\"was not found\")"
+    },
+    {
+      "id": "rejects a non-Apify resource URL",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "resources-read",
+        "https://example.com"
+      ],
+      "expectError": true,
+      "assert": ".error | test(\"only Apify API URLs\")"
+    },
+    {
+      "id": "rejects resource subscribe",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "resources-subscribe",
+        "ui://widget/actor-run.html",
+        "/tmp/e2e-subscribe-placeholder.txt"
+      ],
+      "expectError": true,
+      "assert": ".error | test(\"does not support resource subscriptions\")"
+    },
+    {
+      "id": "rejects an unknown Actor",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"does/not-exist-xyz-123\"",
+        "input:={}"
+      ],
+      "expectError": true,
+      "assert": ".isError == true"
+    },
+    {
+      "id": "rejects an MCP Actor without a tool name",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/example-mcp-server\"",
+        "input:={}"
+      ],
+      "expectError": true,
+      "assert": ".isError == true"
+    },
+    {
+      "id": "serves no tools without a token",
+      "configs": [
+        "no-token"
+      ],
+      "args": [
+        "tools-list"
+      ],
+      "assert": "([.[].name] | index(\"search-apify-docs\") != null) and ([.[].name] | index(\"call-actor\") == null)"
+    },
+    {
+      "id": "calls an Actor and waits",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}"
+      ],
+      "capture": {
+        "runId": ".structuredContent.runId",
+        "datasetId": ".structuredContent.storages.datasets.default.id",
+        "kvStoreId": ".structuredContent.storages.keyValueStores.default.id"
+      },
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\" and .structuredContent.exitCode == 0 and .structuredContent.storages.datasets.default.itemCount == 1"
+    },
+    {
+      "id": "calls an Actor without waiting",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}",
+        "waitSecs:=0"
+      ],
+      "assert": ".isError != true and .structuredContent.status == \"READY\""
+    },
+    {
+      "id": "calls an Actor with a maxItems cap",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}",
+        "callOptions:={\"maxItems\":1}"
+      ],
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\""
+    },
+    {
+      "id": "gets the run",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run",
+        "runId:=\"{{runId}}\""
+      ],
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\" and .structuredContent.exitCode == 0"
+    },
+    {
+      "id": "gets the run log",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-log",
+        "runId:=\"{{runId}}\""
+      ],
+      "assert": ".isError != true and (.content[0].text | type == \"string\")"
+    },
+    {
+      "id": "lists runs",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run-list",
+        "limit:=3"
+      ],
+      "assert": ".isError != true and (.structuredContent.items | length <= 3)"
+    },
+    {
+      "id": "gets dataset items",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\""
+      ],
+      "assert": ".isError != true and .structuredContent.itemCount == 1 and .structuredContent.items[0].sum == 3 and .structuredContent.items[0].isSumPrime == true"
+    },
+    {
+      "id": "gets dataset items flattened",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "flatten:=true"
+      ],
+      "assert": ".isError != true and .structuredContent.itemCount == 1 and .structuredContent.items[0].sum == 3"
+    },
+    {
+      "id": "gets dataset metadata",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset",
+        "datasetId:=\"{{datasetId}}\""
+      ],
+      "assert": ".isError != true and (.structuredContent | has(\"id\") and has(\"itemCount\") and has(\"fields\"))"
+    },
+    {
+      "id": "gets dataset schema",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-schema",
+        "datasetId:=\"{{datasetId}}\""
+      ],
+      "assert": ".isError != true and (.structuredContent.schema.items.properties | has(\"sum\") and has(\"isSumPrime\"))"
+    },
+    {
+      "id": "lists datasets",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-list",
+        "limit:=3"
+      ],
+      "assert": ".isError != true and (.structuredContent.items | length <= 3) and (.structuredContent.items | all(has(\"id\")))"
+    },
+    {
+      "id": "gets key-value store metadata",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store",
+        "keyValueStoreId:=\"{{kvStoreId}}\""
+      ],
+      "assert": ".isError != true and (.structuredContent | has(\"id\") and has(\"keysPublicUrl\"))"
+    },
+    {
+      "id": "lists key-value store keys",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-keys",
+        "keyValueStoreId:=\"{{kvStoreId}}\""
+      ],
+      "assert": ".isError != true and .structuredContent.count == 5 and ([.structuredContent.items[].key] | sort) == [\"COVER\",\"INPUT\",\"LOG\",\"RESULT\",\"STATS\"]"
+    },
+    {
+      "id": "gets the run INPUT record",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-record",
+        "keyValueStoreId:=\"{{kvStoreId}}\"",
+        "recordKey:=\"INPUT\""
+      ],
+      "assert": ".isError != true and .structuredContent.value.firstNumber == 1 and .structuredContent.value.secondNumber == 2"
+    },
+    {
+      "id": "lists key-value stores",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-list",
+        "limit:=3"
+      ],
+      "assert": ".isError != true and (.structuredContent.items | length <= 3)"
+    },
+    {
+      "id": "reads dataset items as a resource",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/datasets/{{datasetId}}/items"
+      ],
+      "assert": "(.contents[0].text | fromjson) as $d | ($d | type == \"array\") and ($d[0].sum == 3)"
+    },
+    {
+      "id": "reads a key-value record as a resource",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/key-value-stores/{{kvStoreId}}/records/INPUT"
+      ],
+      "assert": "(.contents[0].text | fromjson) as $d | $d.firstNumber == 1 and $d.secondNumber == 2"
+    },
+    {
+      "id": "searches Actors",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "search-actors",
+        "keywords:=\"instagram\"",
+        "limit:=3"
+      ],
+      "assert": "if .isError then (.content[0].text | test(\"allowlist\"; \"i\")) else (.structuredContent | has(\"actors\") and has(\"query\") and has(\"count\")) end"
+    },
+    {
+      "id": "searches the docs",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "search-apify-docs",
+        "query:=\"actor input schema\""
+      ],
+      "assert": "if .isError then (.content[0].text | test(\"allowlist\"; \"i\")) else (.structuredContent | has(\"results\")) end"
+    },
+    {
+      "id": "fetches a docs page",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-apify-docs",
+        "url:=\"https://docs.apify.com/platform/actors\""
+      ],
+      "assert": "if .isError then (.content[0].text | test(\"HTTP Status|allowlist\"; \"i\")) else (.structuredContent.content | length > 100) end"
+    },
+    {
+      "id": "fetches Actor details with defaults",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\""
+      ],
+      "assert": ".isError != true and (.structuredContent | has(\"actorInfo\") and has(\"inputSchema\") and has(\"readme\"))"
+    },
+    {
+      "id": "fetches Actor details, input schema only",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"inputSchema\":true}"
+      ],
+      "assert": ".isError != true and (.structuredContent | keys) == [\"inputSchema\"]"
+    },
+    {
+      "id": "fetches Actor details, description only",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"description\":true}"
+      ],
+      "assert": ".isError != true and (.structuredContent | keys) == [\"actorInfo\"] and (.structuredContent.actorInfo | has(\"description\"))"
+    },
+    {
+      "id": "fetches Actor details, stats only",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"stats\":true}"
+      ],
+      "assert": ".isError != true and (.structuredContent.actorInfo | has(\"stats\"))"
+    },
+    {
+      "id": "fetches Actor details, pricing only",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"pricing\":true}"
+      ],
+      "assert": ".isError != true and (.structuredContent.actorInfo | has(\"pricing\"))"
+    },
+    {
+      "id": "fetches Actor details, readme only",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"readme\":true}"
+      ],
+      "assert": ".isError != true and (.structuredContent | keys) == [\"readme\"]"
+    },
+    {
+      "id": "fetches Actor details, mcp tools only",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"mcpTools\":true}"
+      ],
+      "assert": ".isError != true and .structuredContent.mcpTools == \"Note: This Actor is not an MCP server and does not expose MCP tools.\""
+    },
+    {
+      "id": "fetches Actor details, description and readme",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"description\":true,\"readme\":true}"
+      ],
+      "assert": ".isError != true and (.structuredContent | has(\"actorInfo\") and has(\"readme\")) and (.structuredContent | has(\"inputSchema\") | not)"
+    },
+    {
+      "id": "fetches Actor details, rating and metadata",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/rag-web-browser\"",
+        "output:={\"rating\":true,\"metadata\":true}"
+      ],
+      "assert": ".isError != true and (.structuredContent.actorInfo | has(\"rating\") and has(\"modifiedAt\"))"
+    },
+    {
+      "id": "fetches MCP tools for a regular Actor",
+      "configs": [
+        "actor-details"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "output:={\"mcpTools\":true}"
+      ],
+      "assert": ".isError != true and .structuredContent.mcpTools == \"Note: This Actor is not an MCP server and does not expose MCP tools.\""
+    },
+    {
+      "id": "calls a dedicated Actor tool",
+      "configs": [
+        "actor-multi"
+      ],
+      "args": [
+        "tools-call",
+        "apify--normal-mode-test-actor",
+        "firstNumber:=3",
+        "secondNumber:=4"
+      ],
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\" and .structuredContent.exitCode == 0"
+    },
+    {
+      "id": "calls a tool through the MCP proxy",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/example-mcp-server:add\"",
+        "input:={\"firstNumber\":5,\"secondNumber\":6}"
+      ],
+      "assert": "if .isError then (.content[0].text | test(\"Failed to connect|MCP server\"; \"i\")) else true end"
+    },
+    {
+      "id": "reads the search-actors widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "resources-read",
+        "ui://widget/search-actors.html"
+      ],
+      "assert": ".contents[0].mimeType == \"text/html;profile=mcp-app\" and (.contents[0].text | length > 1000)"
+    },
+    {
+      "id": "reads the actor-run widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "resources-read",
+        "ui://widget/actor-run.html"
+      ],
+      "assert": ".contents[0].mimeType == \"text/html;profile=mcp-app\" and (.contents[0].text | length > 1000)"
+    },
+    {
+      "id": "starts a detached task",
+      "configs": [
+        "tasks"
+      ],
+      "args": [
+        "tools-call",
+        "--detach",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}"
+      ],
+      "capture": {
+        "taskId": ".taskId"
+      },
+      "assert": ".status == \"working\" and (.taskId | test(\"^[0-9a-f]{32}$\"))"
+    },
+    {
+      "id": "lists tasks",
+      "configs": [
+        "tasks"
+      ],
+      "args": [
+        "tasks-list"
+      ],
+      "assert": ".tasks | any(.taskId == \"{{taskId}}\")"
+    },
+    {
+      "id": "gets task status",
+      "configs": [
+        "tasks"
+      ],
+      "args": [
+        "tasks-get",
+        "{{taskId}}"
+      ],
+      "assert": ".taskId == \"{{taskId}}\""
+    },
+    {
+      "id": "starts a task to cancel",
+      "configs": [
+        "tasks"
+      ],
+      "args": [
+        "tools-call",
+        "--detach",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":9,\"secondNumber\":9}"
+      ],
+      "capture": {
+        "cancelTaskId": ".taskId"
+      },
+      "assert": ".status == \"working\""
+    },
+    {
+      "id": "cancels a task",
+      "configs": [
+        "tasks"
+      ],
+      "args": [
+        "tasks-cancel",
+        "{{cancelTaskId}}"
+      ],
+      "assert": ".taskId == \"{{cancelTaskId}}\" and .status == \"cancelled\""
+    },
+    {
+      "id": "rejects an unknown task",
+      "configs": [
+        "errors"
+      ],
+      "args": [
+        "tasks-get",
+        "0000000000000000000000000000dead"
+      ],
+      "expectError": true,
+      "assert": ".error | test(\"not found\")"
+    },
+    {
+      "id": "starts a run to abort",
+      "configs": [
+        "abort"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}",
+        "waitSecs:=0"
+      ],
+      "capture": {
+        "abortRunId": ".structuredContent.runId"
+      },
+      "assert": ".isError != true and .structuredContent.status == \"READY\""
+    },
+    {
+      "id": "aborts the run",
+      "configs": [
+        "abort"
+      ],
+      "args": [
+        "tools-call",
+        "abort-actor-run",
+        "runId:=\"{{abortRunId}}\""
+      ],
+      "assert": ".isError != true and (.structuredContent.status == \"ABORTING\" or .structuredContent.status == \"ABORTED\")"
+    },
+    {
+      "id": "calls the search-actors widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "search-actors-widget",
+        "keywords:=\"instagram\"",
+        "limit:=2"
+      ],
+      "assert": ".isError != true and (._meta | has(\"ui\")) and (.structuredContent | has(\"actors\") and has(\"widgetActors\"))"
+    },
+    {
+      "id": "calls the fetch-actor-details widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "fetch-actor-details-widget",
+        "actor:=\"apify/rag-web-browser\""
+      ],
+      "assert": ".isError != true and (._meta | has(\"ui\")) and (.structuredContent | has(\"actorDetails\"))"
+    },
+    {
+      "id": "calls the call-actor widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor-widget",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}"
+      ],
+      "capture": {
+        "widgetRunId": ".structuredContent.runId"
+      },
+      "assert": ".isError != true and (._meta | has(\"ui\")) and (.structuredContent | has(\"runId\") and has(\"status\"))"
+    },
+    {
+      "id": "waits for the widget run to finish",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run",
+        "runId:=\"{{widgetRunId}}\"",
+        "waitSecs:=45"
+      ],
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\""
+    },
+    {
+      "id": "calls the get-actor-run widget",
+      "configs": [
+        "full-apps"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run-widget",
+        "runId:=\"{{widgetRunId}}\""
+      ],
+      "assert": ".isError != true and (._meta | has(\"ui\")) and .structuredContent.status == \"SUCCEEDED\""
+    },
+    {
+      "id": "calls report-problem",
+      "configs": [
+        "category-dev"
+      ],
+      "args": [
+        "tools-call",
+        "report-problem",
+        "message:=\"e2e probe\""
+      ],
+      "assert": ".isError == false and .content[0].text == \"Problem reported. Thank you \u2014 this helps the Apify team improve its tools.\""
+    },
+    {
+      "id": "gets a text/plain record",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-record",
+        "keyValueStoreId:=\"{{kvStoreId}}\"",
+        "recordKey:=\"LOG\""
+      ],
+      "assert": ".isError != true and .structuredContent.contentType == \"text/plain\" and .structuredContent.value == \"Scrape finished. 3 book(s) pushed.\""
+    },
+    {
+      "id": "gets an image/png record",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-record",
+        "keyValueStoreId:=\"{{kvStoreId}}\"",
+        "recordKey:=\"COVER\""
+      ],
+      "assert": ".isError != true and .structuredContent.contentType == \"image/png\""
+    },
+    {
+      "id": "gets dataset items with field projection",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "fields:=\"sum,isSumPrime\""
+      ],
+      "assert": ".isError != true and .structuredContent.items[0] == {\"isSumPrime\":true,\"sum\":3}"
+    },
+    {
+      "id": "gets dataset items with omit",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "omit:=\"math\""
+      ],
+      "assert": ".isError != true and (.structuredContent.items[0] | has(\"math\") | not) and .structuredContent.items[0].sum == 3"
+    },
+    {
+      "id": "gets dataset items paged and descending",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "limit:=1",
+        "offset:=0",
+        "desc:=true"
+      ],
+      "assert": ".isError != true and .structuredContent.limit == 1 and (.structuredContent.items | length == 1)"
+    },
+    {
+      "id": "gets dataset items cleaned",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-items",
+        "datasetId:=\"{{datasetId}}\"",
+        "clean:=true"
+      ],
+      "assert": ".isError != true and .structuredContent.itemCount == 1"
+    },
+    {
+      "id": "searches Actors with an offset",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "search-actors",
+        "keywords:=\"instagram\"",
+        "limit:=2",
+        "offset:=2"
+      ],
+      "assert": "if .isError then (.content[0].text | test(\"allowlist\"; \"i\")) else (.structuredContent.actors | type == \"array\") end"
+    },
+    {
+      "id": "searches the docs with paging",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "search-apify-docs",
+        "query:=\"actor input schema\"",
+        "limit:=2",
+        "offset:=1"
+      ],
+      "assert": "if .isError then (.content[0].text | test(\"allowlist\"; \"i\")) else (.structuredContent | has(\"results\")) end"
+    },
+    {
+      "id": "lists runs filtered by status",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run-list",
+        "limit:=2",
+        "status:=\"SUCCEEDED\"",
+        "desc:=true"
+      ],
+      "assert": ".isError != true and .structuredContent.desc == true and (.structuredContent.items | all(.status == \"SUCCEEDED\"))"
+    },
+    {
+      "id": "gets a truncated run log",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-log",
+        "runId:=\"{{runId}}\"",
+        "lines:=5"
+      ],
+      "assert": ".isError != true and (.content[0].text | length > 0)"
+    },
+    {
+      "id": "gets dataset schema with a limit",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-schema",
+        "datasetId:=\"{{datasetId}}\"",
+        "limit:=1"
+      ],
+      "assert": ".isError != true and (.structuredContent.schema.items.properties | has(\"sum\"))"
+    },
+    {
+      "id": "lists store keys with a limit",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-key-value-store-keys",
+        "keyValueStoreId:=\"{{kvStoreId}}\"",
+        "limit:=2"
+      ],
+      "assert": ".isError != true and .structuredContent.limit == 2 and (.structuredContent.items | length <= 2)"
+    },
+    {
+      "id": "lists unnamed datasets descending",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-dataset-list",
+        "limit:=2",
+        "unnamed:=true",
+        "desc:=true"
+      ],
+      "assert": ".isError != true and .structuredContent.desc == true and (.structuredContent.items | all(.name == null))"
+    },
+    {
+      "id": "gets the run with a wait",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "get-actor-run",
+        "runId:=\"{{runId}}\"",
+        "waitSecs:=5"
+      ],
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\""
+    },
+    {
+      "id": "calls an Actor with run options",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "tools-call",
+        "call-actor",
+        "actor:=\"apify/normal-mode-test-actor\"",
+        "input:={\"firstNumber\":1,\"secondNumber\":2}",
+        "callOptions:={\"memory\":512,\"timeout\":60}"
+      ],
+      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\""
+    },
+    {
+      "id": "reads the run as a resource",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/actor-runs/{{runId}}"
+      ],
+      "assert": "(.contents[0].text | fromjson.data.status) == \"SUCCEEDED\""
+    },
+    {
+      "id": "reads the run log as a resource",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/logs/{{runId}}"
+      ],
+      "assert": ".contents[0].mimeType == \"text/plain; charset=utf-8\" and (.contents[0].text | length > 0)"
+    },
+    {
+      "id": "reads store keys as a resource",
+      "configs": [
+        "category-all"
+      ],
+      "args": [
+        "resources-read",
+        "https://api.apify.com/v2/key-value-stores/{{kvStoreId}}/keys"
+      ],
+      "assert": "(.contents[0].text | fromjson.data.items | length > 0)"
+    },
+    {
+      "id": "gets the finished task result",
+      "configs": [
+        "tasks"
+      ],
+      "args": [
+        "tasks-result",
+        "{{taskId}}"
+      ],
+      "pollWhileWorking": true,
+      "assert": "(.content[0].text | fromjson.status) == \"SUCCEEDED\""
+    }
+  ]
+}
