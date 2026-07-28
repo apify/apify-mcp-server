@@ -479,21 +479,6 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Delete tools from the shared tool map only — the retained load sources stay, so a tool
-     * removed this way still appears in every stateless snapshot. No callers today; one that needs
-     * a tool gone on both protocol eras has to drop its source too.
-     */
-    public removeToolsByName(toolNames: string[]): string[] {
-        const removedTools: string[] = [];
-        for (const toolName of toolNames) {
-            if (this.removeToolByName(toolName)) {
-                removedTools.push(toolName);
-            }
-        }
-        return removedTools;
-    }
-
-    /**
      * Upsert new tools. Writes the shared tool map directly, bypassing the retained load sources,
      * so a tool added only this way reaches no stateless snapshot. Load through `loadToolsFrom*` /
      * `loadToolsByName` instead to serve a tool on both protocol eras.
@@ -510,15 +495,6 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
 
     private toStoredTool(tool: ToolEntry): ToolEntry {
         return this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
-    }
-
-    private removeToolByName(toolName: string): boolean {
-        if (this.tools.has(toolName)) {
-            this.tools.delete(toolName);
-            log.debug('Deleted tool', { toolName });
-            return true;
-        }
-        return false;
     }
 
     /**

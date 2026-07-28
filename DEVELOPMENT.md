@@ -55,7 +55,7 @@ Fetched sources are **retained, not drained**, because there are two consumers:
 - The stateful (2025-era) path resolves them once at `initialize`, as above, into the shared `ActorsMcpServer.tools` map that lives for the connection.
 - The stateless (2026-07-28) path has no `initialize`. `ActorsMcpServer.createRequestSnapshot()` re-composes **all** retained sources per request, against that request's own resolved mode and declared client identity, into a snapshot the shared map never sees.
 
-Consequence for both: a tool only reaches the stateless path if it arrives through a load path. `upsertTools()`, `removeToolsByName()` and `close()`'s tool-map clear all write the shared map directly and are not reflected back into the sources, so they change the stateful tool list only (all three document this).
+Consequence for both: a tool only reaches the stateless path if it arrives through a load path. `upsertTools()` and `close()`'s tool-map clear both write the shared map directly and are not reflected back into the sources, so they change the stateful tool list only (both document this).
 
 Rule of thumb:
 
