@@ -380,8 +380,8 @@ export class LegacyMcpServer {
         this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
             const params = request.params as ApifyRequestParams & { name: string; arguments?: Record<string, unknown> };
             // Keep telemetry on the decoded arguments.
-            // eslint-disable-next-line prefer-const
-            let { name, arguments: args, _meta: meta } = params;
+            const { name, arguments: initialArgs, _meta: meta } = params;
+            let args = initialArgs;
             const progressToken = meta?.progressToken;
             const apifyToken = this.host.resolveApifyToken(meta) as string;
             // Injected upstream; required for long-running tasks — the task store keys on it and
