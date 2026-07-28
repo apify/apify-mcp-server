@@ -1,0 +1,103 @@
+# Conformance scenarios excluded from the pass/fail gate of `pnpm run test:conformance` for the
+# 2026-07-28 era, served by the stateless adapter
+# (runner: @modelcontextprotocol/conformance 0.2.0-alpha.9, `--suite all --spec-version 2026-07-28`).
+# The 2025-11-25 era has its own ledger, `conformance_expected_failures_2025_11_25.yaml`.
+# The runner fails the command in both directions: an unlisted failure exits 1, and a listed
+# scenario that starts passing exits 1 as a stale entry. The loader stringifies each entry, so a
+# reason cannot be a field — the reason for each entry is the comment above it.
+#
+# Never attempted, in either era, and therefore not listed below: the ten extension-tagged
+# scenarios — tasks-capability-negotiation, tasks-dispatch-and-envelope, tasks-lifecycle,
+# tasks-mrtr-composition, tasks-mrtr-input, tasks-request-headers, tasks-request-state-removal,
+# tasks-required-task-error, tasks-status-notifications, tasks-wire-fields. The runner's
+# version-applicability predicate drops every scenario whose source carries an `extensionId`
+# whenever `--spec-version` is passed, and `--force` reaches only the single-`--scenario` path, so
+# no suite sweep can run them. They are not entries here because the runner's baseline comparison
+# walks results: an entry for a scenario that never ran would get zero enforcement and could never
+# be flagged stale.
+#
+# Also never attempted in this era, but for the opposite reason — not a gap, just version scoping:
+# resources-subscribe and resources-unsubscribe carry `removedIn: 2026-07-28`, so the same predicate
+# scopes them out of this revision. They are not part of it; they do run in the legacy era, where
+# they are live entries in that ledger. Not entries here either, for the same zero-enforcement
+# reason as above.
+server:
+    # --- Not applicable: the scenario drives the reference fixture server's own tools, resources,
+    # prompts or headers by name, which this server does not and will not expose. ---
+
+    # Needs fixture tool `test_simple_text`.
+    - tools-call-simple-text
+    # Needs fixture tool `test_image_content`.
+    - tools-call-image
+    # Needs fixture tool `test_audio_content`.
+    - tools-call-audio
+    # Needs fixture tool `test_embedded_resource`.
+    - tools-call-embedded-resource
+    # Needs fixture tool `test_multiple_content_types`.
+    - tools-call-mixed-content
+    # Needs fixture tool `test_error_handling`.
+    - tools-call-error
+    # Needs fixture tool `test_tool_with_progress`.
+    - tools-call-with-progress
+    # Needs fixture tool `json_schema_2020_12_tool`.
+    - json-schema-2020-12
+    # Needs fixture resource `test://static-text`.
+    - resources-read-text
+    # Needs fixture resource `test://static-binary`.
+    - resources-read-binary
+    # Needs fixture resource template `test://template/{id}/data`.
+    - resources-templates-read
+    # Needs fixture prompt `test_simple_prompt`; this server serves no prompts.
+    - prompts-get-simple
+    # Needs fixture prompt `test_prompt_with_arguments`.
+    - prompts-get-with-args
+    # Needs fixture prompt `test_prompt_with_embedded_resource`.
+    - prompts-get-embedded-resource
+    # Needs fixture prompt `test_prompt_with_image`.
+    - prompts-get-with-image
+    # Needs a tool annotated with `x-mcp-header`; no Apify tool declares one.
+    - http-custom-header-server-validation
+    # 3 of 13 checks probe over raw HTTP with the URL query dropped, so the `?token=` credential
+    # (the runner's only auth channel — it has no header flag) never arrives and the server 401s.
+    - http-header-validation
+    # Needs fixture tool `test_input_required_result_elicitation`.
+    - input-required-result-basic-elicitation
+    # Needs fixture tool `test_input_required_result_sampling`.
+    - input-required-result-basic-sampling
+    # Needs fixture tool `test_input_required_result_list_roots`.
+    - input-required-result-basic-list-roots
+    # Needs fixture tool `test_input_required_result_request_state`.
+    - input-required-result-request-state
+    # Needs fixture tool `test_input_required_result_multiple_inputs`.
+    - input-required-result-multiple-input-requests
+    # Needs fixture tool `test_tool_with_task`.
+    - input-required-result-multi-round
+    # Needs fixture tool `test_input_required_result_elicitation`.
+    - input-required-result-missing-input-response
+    # Needs fixture prompt `test_input_required_result_prompt`.
+    - input-required-result-non-tool-request
+    # Needs fixture tool `test_input_required_result_elicitation`.
+    - input-required-result-result-type
+    # Needs fixture tool `test_input_required_result_elicitation`.
+    - input-required-result-tampered-state
+    # Needs fixture tool `test_input_required_result_capabilities`.
+    - input-required-result-capability-check
+    # Needs fixture tool `test_input_required_result_elicitation`.
+    - input-required-result-ignore-extra-params
+
+    # --- Not supported by this server. ---
+
+    # The stateless adapter registers no `completion/complete` handler and declares no completions
+    # capability, so the scenario's request is method-not-found.
+    - completion-complete
+
+    # --- Behavior of our pinned SDK (`@modelcontextprotocol/server` 2.0.0-beta.5). No upstream
+    # issue exists for either behavior below; filing them is a follow-up, not a blocker. ---
+
+    # 7 of 28 checks fail, for three different reasons. SDK behavior: a request whose `_meta`
+    # envelope omits `clientInfo` is answered 200 instead of the expected -32602 / HTTP 400, and
+    # `server/discover` carries no `serverInfo` — the SDK stamps server identity into every
+    # result's `_meta` instead, which its own source attributes to spec PR #3002 as intentional.
+    # The remaining checks need fixture diagnostic tools (`test_missing_capability`,
+    # `test_streaming_elicitation`) and a `logging` capability the adapter does not declare.
+    - server-stateless

@@ -43,8 +43,9 @@ After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (def
 
 - **Unit tests**: `pnpm run test:unit`.
 - **Integration tests**: `pnpm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
+- **Conformance tests**: `pnpm run test:conformance` (needs `APIFY_TOKEN`) — boots the dev server once and runs the official MCP conformance runner against it twice, for the `2026-07-28` and `2025-11-25` revisions. Both eras always run; the exit code is the first non-zero. Scenarios excluded from each era's gate are listed with reasons in `scripts/conformance_expected_failures_2026_07_28.yaml` and `scripts/conformance_expected_failures_2025_11_25.yaml`.
 - **Package manager**: this repo uses **pnpm 11+**. `devEngines.packageManager` is pinned with `onFail: "error"`, so npm / yarn refuse to run inside the checkout — use `pnpm install` only.
-- `tests/integration/suite.ts` is the main suite, reused by stdio/streamable-http transports. Add new integration cases there, NOT in separate files.
+- `tests/integration/suite.ts` is the main suite, reused by the stdio, streamable-http and `2026-07-28` (stateless HTTP) transport dimensions. Add new integration cases there, NOT in separate files.
 - Follow existing test patterns (names, structure) — check neighboring files.
 - **Test naming**: `describe('fnName()')`, plain-verb `it()` names (no `should` prefix). Group with nested `describe()` per method when a factory/class exposes several.
 

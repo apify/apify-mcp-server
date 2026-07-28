@@ -147,7 +147,8 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 | Layer | Command | What it covers |
 |---|---|---|
 | **Unit tests** | `pnpm run test:unit` | Individual modules in isolation — no credentials needed |
-| **Integration tests** | `pnpm run test:integration` | Full server over all transports against real Apify API (requires `APIFY_TOKEN` + `pnpm run build`) |
+| **Integration tests** | `pnpm run test:integration` | Full server over stdio, streamable HTTP and the `2026-07-28` stateless HTTP dimension against real Apify API (requires `APIFY_TOKEN` + `pnpm run build`) |
+| **Conformance tests** | `pnpm run test:conformance` | Official MCP conformance runner (`--suite all`) against a dev server the command boots itself, run once per protocol era — spec versions `2026-07-28` and `2025-11-25`, in that order, against the same URL. Both eras always run; the exit code is the first non-zero. Excluded scenarios and their reasons live in `scripts/conformance_expected_failures_2026_07_28.yaml` and `scripts/conformance_expected_failures_2025_11_25.yaml` (requires `APIFY_TOKEN`) |
 | **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development |
 | **LLM evals** | CI only — apply `validated` label | Runs `evals/run_evaluation.ts` against multiple models via OpenRouter; requires `PHOENIX_*` and `OPENROUTER_*` secrets |
 
@@ -169,7 +170,7 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
   - `tests/integration/suite.ts` — **main integration test suite** where all test cases should be added
-  - Other files in this directory set up different transport modes (stdio, streamable-http) that all use `suite.ts`
+  - Other files in this directory set up different transport dimensions (stdio, streamable-http, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
 - `tests/helpers.ts` — shared test utilities
 - `tests/const.ts` — test constants
 

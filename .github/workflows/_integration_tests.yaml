@@ -29,3 +29,7 @@ jobs:
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
                 run: pnpm run test:integration
+            -   name: Conformance tests
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+                run: pnpm run test:conformance
