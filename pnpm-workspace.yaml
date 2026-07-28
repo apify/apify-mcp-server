@@ -13,6 +13,7 @@ minimumReleaseAgeExclude:
   # bump is a deliberate, reviewed change — the age gate adds nothing for these. Drop the
   # exclusions once the pins move to ranges. Mirrors apify-mcp-server-internal's workspace config.
   - "@modelcontextprotocol/core"
+  - "@modelcontextprotocol/client"
   - "@modelcontextprotocol/node"
   - "@modelcontextprotocol/server"
 
