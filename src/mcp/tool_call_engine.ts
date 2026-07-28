@@ -3,9 +3,7 @@
  * Returns neutral outcomes; the shell constructs protocol errors and side-channel notifications.
  */
 
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Notification, Request } from '@modelcontextprotocol/sdk/types.js';
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { ServerNotification } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 
 import log from '@apify/log';
@@ -13,22 +11,21 @@ import log from '@apify/log';
 import type { ApifyClient } from '../apify_client.js';
 import { ALLOWED_TASK_TOOL_EXECUTION_MODES, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
-import type { PaymentMeta, RequestHeaders } from '../payments/types.js';
+import type { PaymentMeta, PaymentProvider, RequestHeaders } from '../payments/types.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
-import type { CallDiagnostics, ToolCallTelemetryProperties, ToolEntry, ToolStatus } from '../types.js';
+import type { ActorStore, CallDiagnostics, ToolCallTelemetryProperties, ToolEntry, ToolStatus } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
 import { getRequestOriginForClient } from '../utils/mcp_clients.js';
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
-import { extractAjvErrorDetails } from '../utils/tool_status.js';
+import { extractAjvErrorDetails, isMcpError } from '../utils/tool_status.js';
 import { buildActorFields, extractActorId, extractActorName, getToolFullName } from '../utils/tools.js';
 import type { McpClientContext } from './client_context.js';
-import type { ActorsMcpServer } from './server.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { dispatchToolCall } from './tool_dispatch.js';
@@ -96,7 +93,6 @@ export function buildPreflightFailureOutcome(
 
 /** Prepares a call; protocol errors are left to the shell. */
 export async function prepareToolCall(params: {
-    apifyMcpServer: ActorsMcpServer;
     apifyToken: string;
     name: string;
     args: Record<string, unknown> | undefined;
@@ -106,15 +102,27 @@ export async function prepareToolCall(params: {
     mcpSessionId: string | undefined;
     telemetryData: ToolCallTelemetryProperties | null;
     clientContext: McpClientContext | undefined;
+    tools: Map<string, ToolEntry>;
+    paymentProvider?: PaymentProvider;
+    allowUnauthMode?: boolean;
     // Used to preserve abort status for a post-resolution classified failure.
-    extra?: RequestHandlerExtra<Request, Notification>;
+    signal?: AbortSignal;
 }): Promise<PreparedCall | InvalidToolCall | PreparedCallError> {
-    const { apifyMcpServer, apifyToken, name, meta, requestHeaders, isTaskRequest, telemetryData, clientContext } =
-        params;
+    const {
+        apifyToken,
+        name,
+        meta,
+        requestHeaders,
+        isTaskRequest,
+        telemetryData,
+        clientContext,
+        tools,
+        paymentProvider,
+        allowUnauthMode,
+    } = params;
     let { args } = params;
-    const { options, tools } = apifyMcpServer;
 
-    if (!apifyToken && !options.paymentProvider?.allowsUnauthenticated && !options.allowUnauthMode) {
+    if (!apifyToken && !paymentProvider?.allowsUnauthenticated && !allowUnauthMode) {
         return {
             message: dedent`
                 Apify API token is required but was not provided.
@@ -130,7 +138,7 @@ export async function prepareToolCall(params: {
     const toolEntry = Array.from(tools.values()).find((t) => t.name === newName || getToolFullName(t) === newName);
 
     if (!toolEntry) {
-        const availableTools = apifyMcpServer.listToolNames();
+        const availableTools = Array.from(tools.keys());
         return {
             message: dedent`
                 Tool "${name}" was not found.
@@ -181,7 +189,7 @@ export async function prepareToolCall(params: {
             apifyClient,
             paymentRequiredResult,
         } = prepareToolCallContext({
-            provider: options.paymentProvider,
+            provider: paymentProvider,
             tool,
             args: args as Record<string, unknown>,
             apifyToken,
@@ -239,7 +247,6 @@ export async function prepareToolCall(params: {
         }
 
         // Standby Actors need a specific rejection instead of a generic 402 in both modes.
-        const { paymentProvider } = options;
         const isCallActorTool = tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_CALL_WIDGET;
         const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
 
@@ -266,14 +273,14 @@ export async function prepareToolCall(params: {
         };
     } catch (error) {
         // Keep protocol errors as JSON-RPC errors; classify other failures with actor context.
-        if (error instanceof McpError) throw error;
+        if (isMcpError(error)) throw error;
         const outcome = classifyToolCallError(error, {
-            apifyMcpServer,
+            tools,
             toolName: name,
             failingToolName: resolvedToolName,
             actorName,
             actorId,
-            isAborted: Boolean(params.extra?.signal?.aborted),
+            isAborted: Boolean(params.signal?.aborted),
             mcpSessionId: params.mcpSessionId,
         });
         return { ...outcome, resolvedToolName, decodedArgs };
@@ -284,15 +291,30 @@ export async function prepareToolCall(params: {
 export async function executeSyncToolCall(
     prepared: PreparedCall,
     params: {
-        apifyMcpServer: ActorsMcpServer;
         apifyToken: string;
         toolName: string;
         mcpSessionId: string | undefined;
         progressToken: string | number | undefined;
-        extra: RequestHandlerExtra<Request, Notification>;
+        tools: Map<string, ToolEntry>;
+        actorStore?: ActorStore;
+        paymentProvider?: PaymentProvider;
+        signal: AbortSignal;
+        sendNotification: (notification: ServerNotification) => Promise<void>;
+        emitLog: (msg: { level: string; data?: unknown }) => Promise<void>;
     },
 ): Promise<ToolCallOutcome> {
-    const { apifyMcpServer, apifyToken, toolName, mcpSessionId, progressToken, extra } = params;
+    const {
+        apifyToken,
+        toolName,
+        mcpSessionId,
+        progressToken,
+        tools,
+        actorStore,
+        paymentProvider,
+        signal,
+        sendNotification,
+        emitLog,
+    } = params;
     const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, standbyRejection, paymentRequiredResult } =
         prepared;
     const resolvedToolName = getToolFullName(tool);
@@ -300,7 +322,7 @@ export async function executeSyncToolCall(
     const nudge = (result: unknown, callDiagnostics: CallDiagnostics): Record<string, unknown> =>
         withReportProblemNudge({
             result,
-            tools: apifyMcpServer.tools,
+            tools,
             failingToolName: resolvedToolName,
             failureCategory: callDiagnostics.failure_category,
             failureHttpStatus: callDiagnostics.failure_http_status,
@@ -322,7 +344,7 @@ export async function executeSyncToolCall(
         tool.type === TOOL_TYPE.ACTOR ||
         (tool.type === TOOL_TYPE.INTERNAL &&
             (tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_RUNS_GET));
-    const progressTracker = progressTrackerOptIn ? createProgressTracker(progressToken, extra.sendNotification) : null;
+    const progressTracker = progressTrackerOptIn ? createProgressTracker(progressToken, sendNotification) : null;
 
     try {
         const dispatchResult = await dispatchToolCall({
@@ -331,12 +353,16 @@ export async function executeSyncToolCall(
             logSafeArgs,
             apifyToken,
             apifyClient,
-            apifyMcpServer,
             mcpSessionId,
             progressToken,
             progressTracker,
             shouldForwardNotifications: true,
-            extra,
+            signal,
+            sendNotification,
+            emitLog,
+            actorStore,
+            paymentProvider,
+            tools,
             actorName,
             actorId,
             taskMode: false,
@@ -348,14 +374,14 @@ export async function executeSyncToolCall(
         };
     } catch (error) {
         // Protocol errors stay JSON-RPC errors; a 402-coded McpError must not become a payment result.
-        if (error instanceof McpError) throw error;
+        if (isMcpError(error)) throw error;
         return classifyToolCallError(error, {
-            apifyMcpServer,
+            tools,
             toolName,
             failingToolName: resolvedToolName,
             actorName,
             actorId,
-            isAborted: Boolean(extra.signal?.aborted),
+            isAborted: Boolean(signal.aborted),
             mcpSessionId,
         });
     }
@@ -365,7 +391,7 @@ export async function executeSyncToolCall(
 export function classifyToolCallError(
     error: unknown,
     params: {
-        apifyMcpServer: ActorsMcpServer;
+        tools: Map<string, ToolEntry>;
         toolName: string;
         failingToolName: string;
         actorName: string | undefined;
@@ -374,12 +400,12 @@ export function classifyToolCallError(
         mcpSessionId: string | undefined;
     },
 ): ToolCallOutcome {
-    const { apifyMcpServer, toolName, failingToolName, actorName, actorId, isAborted, mcpSessionId } = params;
+    const { tools, toolName, failingToolName, actorName, actorId, isAborted, mcpSessionId } = params;
 
     const nudge = (result: unknown, callDiagnostics: CallDiagnostics): Record<string, unknown> =>
         withReportProblemNudge({
             result,
-            tools: apifyMcpServer.tools,
+            tools,
             failingToolName,
             failureCategory: callDiagnostics.failure_category,
             failureHttpStatus: callDiagnostics.failure_http_status,

@@ -30,9 +30,9 @@ export function stubInternalToolArgs(args: Record<string, unknown>): InternalToo
     return {
         args,
         apifyToken: 'test-token',
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
         apifyClient: {} as InternalToolArgs['apifyClient'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
+        signal: new AbortController().signal,
+        paymentProvider: undefined,
+        loadedToolNames: [],
     };
 }

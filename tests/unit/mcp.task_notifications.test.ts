@@ -3,7 +3,7 @@ import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { emitTaskStatusNotification } from '../../src/mcp/task_execution.js';
-import { getRequestHandler, withServer } from './helpers/mcp_server.js';
+import { getRequestHandler, getTaskStore, withServer } from './helpers/mcp_server.js';
 
 // Helper to create a minimal TaskStore mock
 function makeTaskStore(task: Record<string, unknown> | undefined) {
@@ -114,8 +114,8 @@ describe('tasks/result _meta.related-task injection', () => {
 
     it('injects _meta.related-task into tasks/result response (MUST)', async () => {
         await withServer(async (server) => {
-            const task = await server.taskStore.createTask({ ttl: 60_000 }, 'req-1', fakeRequest as never);
-            await server.taskStore.storeTaskResult(
+            const task = await getTaskStore(server).createTask({ ttl: 60_000 }, 'req-1', fakeRequest as never);
+            await getTaskStore(server).storeTaskResult(
                 task.taskId,
                 'completed',
                 { content: [{ type: 'text', text: 'done' }] },
@@ -136,9 +136,9 @@ describe('tasks/result _meta.related-task injection', () => {
 
     it('merges _meta.related-task with existing _meta keys', async () => {
         await withServer(async (server) => {
-            const task = await server.taskStore.createTask({ ttl: 60_000 }, 'req-2', fakeRequest as never);
+            const task = await getTaskStore(server).createTask({ ttl: 60_000 }, 'req-2', fakeRequest as never);
             const existingMeta = { 'com.apify/ActorRun': { runId: 'run-abc' } };
-            await server.taskStore.storeTaskResult(
+            await getTaskStore(server).storeTaskResult(
                 task.taskId,
                 'completed',
                 {

@@ -208,7 +208,7 @@ export function buildActorDetailsTextResponse(options: {
  * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
-    const { args, apifyToken, apifyClient, apifyMcpServer, mcpSessionId } = toolArgs;
+    const { args, apifyToken, apifyClient, actorStore, paymentProvider, mcpSessionId } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
 
@@ -230,18 +230,12 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
 
     let actorOutputSchema: Record<string, unknown> | null | undefined;
     if (resolvedOutput.outputSchema) {
-        actorOutputSchema = apifyMcpServer.actorStore
-            ? await apifyMcpServer.actorStore.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
+        actorOutputSchema = actorStore
+            ? await actorStore.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
             : null;
     }
     const mcpToolsMessage = resolvedOutput.mcpTools
-        ? await getMcpToolsMessage(
-              actorName,
-              apifyClient,
-              apifyToken,
-              apifyMcpServer?.options.paymentProvider,
-              mcpSessionId,
-          )
+        ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
         : undefined;
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.

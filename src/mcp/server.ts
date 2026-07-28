@@ -2,113 +2,61 @@
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
-import { randomUUID } from 'node:crypto';
-
-import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
-import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest, InitializeResult, Task } from '@modelcontextprotocol/sdk/types.js';
-import {
-    CallToolRequestSchema,
-    CancelTaskRequestSchema,
-    ErrorCode,
-    GetPromptRequestSchema,
-    GetTaskPayloadRequestSchema,
-    GetTaskRequestSchema,
-    InitializeRequestSchema,
-    ListPromptsRequestSchema,
-    ListResourcesRequestSchema,
-    ListResourceTemplatesRequestSchema,
-    ListTasksRequestSchema,
-    ListToolsRequestSchema,
-    McpError,
-    ReadResourceRequestSchema,
-    RELATED_TASK_META_KEY,
-    SetLevelRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from '../apify_client.js';
-import {
-    DEFAULT_TELEMETRY_ENABLED,
-    DEFAULT_TELEMETRY_ENV,
-    FAILURE_CATEGORY,
-    HELPER_TOOLS,
-    TOOL_STATUS,
-} from '../const.js';
+import { DEFAULT_TELEMETRY_ENABLED, DEFAULT_TELEMETRY_ENV, HELPER_TOOLS } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { createPromptService } from '../prompts/prompt_service.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
-import { getServerInfo } from '../server_card.js';
 import { getTelemetryEnv } from '../telemetry.js';
-import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import type {
     ActorsMcpServerOptions,
     ActorStore,
     ApifyRequestParams,
-    CallDiagnostics,
     Input,
     ServerModeOption,
     TelemetryEnv,
     ToolEntry,
-    ToolStatus,
 } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
-import { isMcpClientFaultMessage, sanitizeMezmoMessage } from '../utils/logging.js';
 import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
-import { buildActorFields, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getActors, getToolsForServerMode, toolNamesToInput } from '../utils/tools_loader.js';
 import { buildMcpClientContext, isUiSupportedByClient } from './client_context.js';
 import type { McpClientContext } from './client_context.js';
-import { LOG_LEVEL_MAP } from './const.js';
-import { InternalError, InvalidParamsError } from './errors.js';
-import { emitTaskStatusNotification, executeToolAndUpdateTask } from './task_execution.js';
-import {
-    buildPreflightFailureOutcome,
-    classifyToolCallError,
-    executeSyncToolCall,
-    prepareToolCall,
-} from './tool_call_engine.js';
-import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telemetry.js';
-import { parseInputParamsFromUrl, storeTaskResultOrSkipIfExpired } from './utils.js';
+import { LegacyMcpServer } from './legacy_server.js';
+import type { LegacyMcpServerHost } from './legacy_server.js';
+import { parseInputParamsFromUrl } from './utils.js';
 
 /**
- * Legacy protocol boundary: project a service's domain error to its v1 `McpError`, copying `message`
- * and `data` unchanged so the wire output (code, message, presence of `data`) is byte-identical.
- * Non-domain errors pass through untouched.
+ * Create Apify MCP server.
+ *
+ * The shared-Apify-behavior facade: it owns the tool registry + loaders, server-mode resolution,
+ * `actorStore`, telemetry config, widgets, prompt/resource services, and token/client resolution,
+ * and constructs exactly one {@link LegacyMcpServer} (the v1 SDK adapter), delegating all v1
+ * protocol work to it. It implements {@link LegacyMcpServerHost} so the adapter reads shared state
+ * through a narrow contract.
  */
-function toLegacyMcpError(error: unknown): unknown {
-    if (error instanceof InvalidParamsError) return new McpError(ErrorCode.InvalidParams, error.message, error.data);
-    if (error instanceof InternalError) return new McpError(ErrorCode.InternalError, error.message, error.data);
-    return error;
-}
-
-/**
- * Create Apify MCP server
- */
-export class ActorsMcpServer {
-    public readonly server: Server;
+export class ActorsMcpServer implements LegacyMcpServerHost {
     public readonly tools: Map<string, ToolEntry>;
-    private sigintHandler: (() => Promise<void>) | undefined;
-    private currentLogLevel = 'info';
     public readonly options: ActorsMcpServerOptions;
-    public readonly taskStore: TaskStore;
     public readonly actorStore?: ActorStore;
-    private clientContext: McpClientContext | undefined;
+    private _clientContext: McpClientContext | undefined;
     /**
      * Resolved server mode. Preliminary value at construction (`'auto'` → `DEFAULT`).
-     * Finalized inside the `initialize` request handler (see constructor) once the
+     * Finalized inside the `initialize` request handler (see {@link applyInitialize}) once the
      * client's capabilities are known. Effectively set-once per connection.
      */
-    public serverMode: SERVER_MODE;
+    private _serverMode: SERVER_MODE;
     /**
      * Raw option captured from `options.serverMode` (or the legacy `uiMode`). Re-resolved
      * inside the initialize handler when set to `'auto'`; explicit `'default'`/`'apps'`
@@ -133,24 +81,30 @@ export class ActorsMcpServer {
     public readonly telemetryEnabled: boolean;
     public readonly telemetryEnv: TelemetryEnv;
 
+    // Neutral prompt/resource services; the legacy adapter wires SDK handlers to these.
+    public readonly promptService: ReturnType<typeof createPromptService>;
+    public readonly resourceService: ReturnType<typeof createResourceService>;
+
     // List of widgets that are ready to be served
     private availableWidgets: Map<string, AvailableWidget> = new Map();
 
     /** Set in the initialize handler once client capabilities are known. */
     public clientSupportsUi = false;
 
+    // The v1 SDK adapter. Package-private: constructed here and never exposed on the public surface.
+    private readonly legacyServer: LegacyMcpServer;
+
+    public get clientContext(): McpClientContext | undefined {
+        return this._clientContext;
+    }
+
+    public get serverMode(): SERVER_MODE {
+        return this._serverMode;
+    }
+
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
-        this.clientContext = buildMcpClientContext(options.initializeRequestData?.params);
-
-        // for stdio use in memory task store if not provided, otherwise use provided task store
-        if (this.options.transportType === 'stdio' && !this.options.taskStore) {
-            this.taskStore = new InMemoryTaskStore();
-        } else if (this.options.taskStore) {
-            this.taskStore = this.options.taskStore;
-        } else {
-            throw new Error('Task store must be provided for non-stdio transport types');
-        }
+        this._clientContext = buildMcpClientContext(options.initializeRequestData?.params);
         this.actorStore = options.actorStore;
         // Constructor is an ingestion boundary for programmatic callers. Normalize via
         // parseServerMode so that runtime-invalid values ('openai' alias, stray strings)
@@ -163,45 +117,22 @@ export class ActorsMcpServer {
             rawServerMode !== undefined ? parseServerMode(rawServerMode) : parseServerMode(legacyUiMode);
         // Preliminary resolution — re-resolved inside the initialize handler once
         // client capabilities are known (only for 'auto').
-        this.serverMode = resolveServerMode(this.serverModeOption, false);
+        this._serverMode = resolveServerMode(this.serverModeOption, false);
         this.serverModeResolved = this.serverModeOption !== 'auto';
 
-        const { setupSigintHandler = true } = options;
-        this.server = new Server(getServerInfo(), {
-            capabilities: {
-                tools: {
-                    listChanged: true,
-                },
-                // Declare long-running task support
-                tasks: {
-                    list: {},
-                    cancel: {},
-                    requests: {
-                        tools: {
-                            call: {},
-                        },
-                    },
-                },
-                // Declared but unused — some clients (e.g. Claude Desktop) fail without it.
-                resources: {},
-                prompts: {},
-                logging: {},
-            },
-            instructions: getServerInstructions(),
-        });
         const { telemetryEnabled, telemetryEnv } = this.setupTelemetry();
         this.telemetryEnabled = telemetryEnabled;
         this.telemetryEnv = telemetryEnv;
-        this.setupInitializeHandler();
-        this.setupLoggingProxy();
         this.tools = new Map();
-        this.setupErrorHandling(setupSigintHandler);
-        this.setupLoggingHandlers();
-        this.setupToolHandlers();
-        this.setupPromptHandlers();
-        // Handle resource requests so clients like Claude Desktop don't fail.
-        this.setupResourceHandlers();
-        this.setupTaskHandlers();
+
+        this.promptService = createPromptService(prompts);
+        this.resourceService = createResourceService({
+            paymentProvider: this.options.paymentProvider,
+            getMode: () => this.serverMode,
+            getAvailableWidgets: () => this.availableWidgets,
+        });
+
+        this.legacyServer = new LegacyMcpServer(this);
     }
 
     /**
@@ -227,60 +158,47 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Override the SDK's `initialize` request handler to run mode resolution and
-     * pending-source flush before `InitializeResult` is sent. Delegates boilerplate
-     * (protocolVersion, capabilities, instructions) to the SDK's captured `_oninitialize`.
+     * Runs the shared initialize steps the legacy adapter delegates to before it returns the
+     * `InitializeResult`: refresh the client context from the wire request, capture the raw request
+     * for hosted session recovery, resolve `'auto'` server mode against client capabilities, flush
+     * pending tool sources, and resolve widgets. The adapter delegates the SDK boilerplate and
+     * overwrites `instructions` afterwards (see {@link getServerInstructions}).
      *
-     * Not using `server.oninitialized`: the SDK dispatches notification handlers
-     * fire-and-forget (separate microtask), so a follow-up `tools/list` can race past them.
-     * The request handler guarantees tools are final before the response and the first `tools/list`.
+     * Ordering is load-bearing: mode before compose, compose before widgets/instructions.
+     * `composePendingToolsForClient` runs before the instructions are read so tool presence reflects
+     * the final composed set.
      */
-    private setupInitializeHandler() {
-        // Capture the SDK's default initialize handler installed in its constructor.
-        // Private-field access on the SDK Server — verified against
-        // @modelcontextprotocol/sdk ^1.25.x (see package.json). On SDK bumps, re-check
-        // `@modelcontextprotocol/sdk/shared/protocol.js` for a still-named `_oninitialize`;
-        // if renamed or made non-delegable, rebuild the InitializeResult shape here
-        // (protocolVersion, serverInfo, capabilities, instructions) instead of delegating.
-        // The capability-gating unit tests construct a server and act as a canary.
-        // eslint-disable-next-line no-underscore-dangle
-        const sdkInitHandler = (
-            this.server as unknown as {
-                _oninitialize(req: InitializeRequest): Promise<InitializeResult>;
+    public async applyInitialize(request: InitializeRequest): Promise<void> {
+        this._clientContext = buildMcpClientContext(request.params);
+        this.options.initializeRequestData = request;
+        this.clientSupportsUi = isUiSupportedByClient(this.clientContext);
+
+        if (this.serverModeOption === 'auto') {
+            const resolved = resolveServerMode('auto', this.clientSupportsUi);
+            if (resolved !== this._serverMode) {
+                this._serverMode = resolved;
             }
-        )._oninitialize.bind(this.server);
+            this.serverModeResolved = true;
+        }
 
-        this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
-            this.clientContext = buildMcpClientContext(request.params);
-            this.options.initializeRequestData = request;
-            this.clientSupportsUi = isUiSupportedByClient(this.clientContext);
-
-            if (this.serverModeOption === 'auto') {
-                const resolved = resolveServerMode('auto', this.clientSupportsUi);
-                if (resolved !== this.serverMode) {
-                    this.serverMode = resolved;
-                }
-                this.serverModeResolved = true;
-            }
-
-            log.info('Resolved server mode for client capabilities', {
-                serverMode: this.serverMode,
-                serverModeOption: this.serverModeOption,
-                clientSupportsUi: this.clientSupportsUi,
-                capabilities: request?.params?.capabilities,
-            });
-
-            this.composePendingToolsForClient();
-
-            await this.resolveWidgets();
-
-            const result = await sdkInitHandler(request);
-            // Tools are final here (composePendingToolsForClient ran above, applying the per-client
-            // blocklist), so tool presence is the ground truth for whether to advertise
-            // report-problem in the instructions.
-            result.instructions = getServerInstructions(this.serverMode, this.tools.has(HELPER_TOOLS.PROBLEM_REPORT));
-            return result;
+        log.info('Resolved server mode for client capabilities', {
+            serverMode: this.serverMode,
+            serverModeOption: this.serverModeOption,
+            clientSupportsUi: this.clientSupportsUi,
+            capabilities: request?.params?.capabilities,
         });
+
+        this.composePendingToolsForClient();
+
+        await this.resolveWidgets();
+    }
+
+    /**
+     * Server instructions for the current connection: mode plus whether report-problem is loaded.
+     * Read by the legacy adapter after `applyInitialize`, when the tool set is final.
+     */
+    public getServerInstructions(): string {
+        return getServerInstructions(this.serverMode, this.tools.has(HELPER_TOOLS.PROBLEM_REPORT));
     }
 
     /** True once the connecting client is known (set in the initialize handler, or hydrated by a
@@ -479,62 +397,13 @@ export class ActorsMcpServer {
         return false;
     }
 
-    private setupErrorHandling(setupSIGINTHandler = true): void {
-        this.server.onerror = (error) => {
-            // Known client faults are expected noise, not server bugs — softFail so they don't
-            // flood Mezmo error alerts. The fault patterns live in utils/logging.ts.
-            const message = error.message ?? '';
-            if (isMcpClientFaultMessage(message)) {
-                // Sanitize the errMessage value to preserve the soft-fail level (Mezmo promotes
-                // entries whose message contains "error").
-                log.softFail('MCP client fault, request could not be handled', {
-                    errMessage: sanitizeMezmoMessage(message),
-                });
-            } else {
-                log.error('[MCP Error]', { error });
-            }
-        };
-        if (setupSIGINTHandler) {
-            const handler = async () => {
-                await this.server.close();
-                process.exit(0);
-            };
-            process.once('SIGINT', handler);
-            this.sigintHandler = handler;
-        }
-    }
-
-    private setupLoggingProxy(): void {
-        const originalSendLoggingMessage = this.server.sendLoggingMessage.bind(this.server);
-
-        // Filter outgoing log messages below the client's requested level.
-        this.server.sendLoggingMessage = async (params: { level: string; data?: unknown; [key: string]: unknown }) => {
-            const messageLevelValue = LOG_LEVEL_MAP[params.level] ?? -1; // Unknown levels get -1, discard
-            const currentLevelValue = LOG_LEVEL_MAP[this.currentLogLevel] ?? LOG_LEVEL_MAP.info; // Default to info if invalid
-            if (messageLevelValue >= currentLevelValue) {
-                await originalSendLoggingMessage(params as Parameters<typeof originalSendLoggingMessage>[0]);
-            }
-        };
-    }
-
-    private setupLoggingHandlers(): void {
-        this.server.setRequestHandler(SetLevelRequestSchema, (request) => {
-            const { level } = request.params;
-            if (LOG_LEVEL_MAP[level] !== undefined) {
-                this.currentLogLevel = level;
-            }
-            // Sending empty result based on MCP spec
-            return {};
-        });
-    }
-
     /**
      * Token sources in order: per-request `_meta.apifyToken` (stdio inline) > server-instance
      * option (set by the transport from `Authorization` header or stdio env). No env fallback:
      * dev_server / production must extract the token from request headers so payment
      * mode (no token) behaves identically to production.
      */
-    private resolveApifyToken(meta?: ApifyRequestParams['_meta']): string | undefined {
+    public resolveApifyToken(meta?: ApifyRequestParams['_meta']): string | undefined {
         return meta?.apifyToken || this.options.token;
     }
 
@@ -544,415 +413,11 @@ export class ActorsMcpServer {
      * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
      * Still carries the request-origin tag from the client context captured by this point.
      */
-    private resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
+    public resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {
         const token = this.resolveApifyToken(params._meta);
         return token
             ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(this.clientContext) })
             : undefined;
-    }
-
-    private setupResourceHandlers(): void {
-        const resourceService = createResourceService({
-            paymentProvider: this.options.paymentProvider,
-            getMode: () => this.serverMode,
-            getAvailableWidgets: () => this.availableWidgets,
-        });
-
-        this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-            return await resourceService.listResources();
-        });
-
-        this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-            try {
-                return await resourceService.readResource(
-                    request.params.uri,
-                    this.resolveApifyClient(request.params as ApifyRequestParams),
-                );
-            } catch (error) {
-                throw toLegacyMcpError(error);
-            }
-        });
-
-        this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
-            return await resourceService.listResourceTemplates();
-        });
-    }
-
-    /**
-     * Sets up MCP request handlers for prompts. The prompt service throws domain errors; the
-     * boundary maps them to `McpError` so wire output is unchanged.
-     */
-    private setupPromptHandlers(): void {
-        const promptService = createPromptService(prompts);
-        this.server.setRequestHandler(ListPromptsRequestSchema, () => promptService.listPrompts());
-        this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-            try {
-                return promptService.getPrompt(request.params.name, request.params.arguments);
-            } catch (error) {
-                throw toLegacyMcpError(error);
-            }
-        });
-    }
-
-    /**
-     * Fetches a task by ID, softFail-logging and throwing a client-facing McpError if it doesn't exist.
-     */
-    private async getTaskOrThrow(taskId: string, mcpSessionId: string | undefined, logTag: string): Promise<Task> {
-        const task = await this.taskStore.getTask(taskId, mcpSessionId);
-        if (!task) {
-            // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
-            log.softFail(`[${logTag}] Task not found`, { taskId, mcpSessionId, statusCode: 404 });
-            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
-        }
-        return task;
-    }
-
-    /**
-     * Sets up MCP request handlers for long-running tasks.
-     * Each handler reads `_meta.mcpSessionId` (injected at the transport layer) to isolate
-     * per-session task stores.
-     */
-    private setupTaskHandlers(): void {
-        // List tasks
-        this.server.setRequestHandler(ListTasksRequestSchema, async (request) => {
-            const params = (request.params || {}) as ApifyRequestParams & { cursor?: string };
-            const { cursor } = params;
-            const mcpSessionId = params._meta?.mcpSessionId;
-            log.debug('[ListTasksRequestSchema] Listing tasks', { mcpSessionId });
-            const result = await this.taskStore.listTasks(cursor, mcpSessionId);
-            return { tasks: result.tasks, nextCursor: result.nextCursor };
-        });
-
-        // Get task status
-        this.server.setRequestHandler(GetTaskRequestSchema, async (request) => {
-            const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
-            const { taskId } = params;
-            const mcpSessionId = params._meta?.mcpSessionId;
-            log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
-            return await this.getTaskOrThrow(taskId, mcpSessionId, 'GetTaskRequestSchema');
-        });
-
-        // Get task result payload
-        this.server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
-            const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
-            const { taskId } = params;
-            const mcpSessionId = params._meta?.mcpSessionId;
-            log.debug('[GetTaskPayloadRequestSchema] Getting task result', { taskId, mcpSessionId });
-            const task = await this.getTaskOrThrow(taskId, mcpSessionId, 'GetTaskPayloadRequestSchema');
-            if (task.status !== 'completed' && task.status !== 'failed') {
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Task "${taskId}" is not completed yet. Current status: ${task.status}`,
-                );
-            }
-            const result = await this.taskStore.getTaskResult(taskId, mcpSessionId);
-            // taskId is not in the result body — _meta.related-task lets clients correlate them
-            return {
-                ...result,
-                _meta: {
-                    ...(result._meta as Record<string, unknown>),
-                    [RELATED_TASK_META_KEY]: { taskId },
-                },
-            };
-        });
-
-        // Cancel task
-        this.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
-            const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
-            const { taskId } = params;
-            const mcpSessionId = params._meta?.mcpSessionId;
-            log.debug('[CancelTaskRequestSchema] Cancelling task', { taskId, mcpSessionId });
-
-            const task = await this.getTaskOrThrow(taskId, mcpSessionId, 'CancelTaskRequestSchema');
-            if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
-                // Client error (cancel on terminal task) — softFail to avoid polluting error logs.
-                log.softFail('[CancelTaskRequestSchema] Task already in terminal state', {
-                    taskId,
-                    mcpSessionId,
-                    status: task.status,
-                    statusCode: 409,
-                });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Cannot cancel task "${taskId}" with status "${task.status}"`,
-                );
-            }
-            await this.taskStore.updateTaskStatus(taskId, 'cancelled', 'Cancelled by client', mcpSessionId);
-            const updatedTask = await this.taskStore.getTask(taskId, mcpSessionId);
-            log.debug('[CancelTaskRequestSchema] Task cancelled successfully', { taskId, mcpSessionId });
-            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-            return updatedTask!;
-        });
-    }
-
-    private setupToolHandlers(): void {
-        // Handles the request to list tools.
-        this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            const tools = Array.from(this.tools.values()).map((tool) =>
-                getToolPublicFieldOnly(tool, {
-                    mode: this.serverMode,
-                    filterWidgetMeta: true,
-                }),
-            );
-            return { tools };
-        });
-
-        /**
-         * Handles the request to call a tool. `extra` carries request-scoped helpers such as
-         * `sendNotification`. Throws {@link McpError} to mirror the MCP SDK's McpServer error codes.
-         */
-        this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-            const params = request.params as ApifyRequestParams & { name: string; arguments?: Record<string, unknown> };
-            // Keep telemetry on the decoded arguments.
-            // eslint-disable-next-line prefer-const
-            let { name, arguments: args, _meta: meta } = params;
-            const progressToken = meta?.progressToken;
-            const apifyToken = this.resolveApifyToken(meta) as string;
-            // Injected upstream; required for long-running tasks — the task store keys on it and
-            // there is no other channel to pass it.
-            const mcpSessionId = meta?.mcpSessionId;
-            if (!mcpSessionId) {
-                log.error('MCP Session ID is missing in tool call request. This should never happen.');
-                throw new Error('MCP Session ID is required for tool calls');
-            }
-            const startTime = Date.now();
-            let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
-            let callDiagnostics: CallDiagnostics = {};
-            let shouldTrackTelemetry = true;
-            let resolvedToolName = name;
-            // Set only on the pre-flight task path — the one task-mode flow whose telemetry rides
-            // this handler's `finally` — so its `Tool call completed` log line keeps the taskId the
-            // async path logs via finishTaskTracking.
-            let preflightTaskId: string | undefined;
-            // The nudge must be included in the measured result.
-            let toolResult: unknown = null;
-            // Keep actor context available to the outer catch.
-            let actorName: string | undefined;
-            let actorId: string | undefined;
-            const { clientContext } = this;
-
-            // Start with the raw name so early failures still have telemetry.
-            const { telemetryData, userId } = await prepareTelemetryData({
-                toolName: name,
-                mcpSessionId,
-                apifyToken,
-                apifyMcpServer: this,
-                clientContext,
-            });
-
-            try {
-                const prepared = await prepareToolCall({
-                    apifyMcpServer: this,
-                    apifyToken,
-                    name,
-                    args,
-                    meta,
-                    requestHeaders: extra.requestInfo?.headers,
-                    isTaskRequest: Boolean(request.params.task),
-                    mcpSessionId,
-                    telemetryData,
-                    clientContext,
-                    extra,
-                });
-
-                if ('result' in prepared) {
-                    // The engine already classified this post-resolution failure.
-                    resolvedToolName = prepared.resolvedToolName;
-                    args = prepared.decodedArgs;
-                    toolStatus = prepared.toolStatus;
-                    callDiagnostics = prepared.callDiagnostics;
-                    toolResult = prepared.result;
-                    return prepared.result;
-                }
-
-                if ('message' in prepared) {
-                    // Reproduce v1's invalid-params tail and preserve telemetry fields.
-                    resolvedToolName = prepared.resolvedToolName ?? resolvedToolName;
-                    if (prepared.decodedArgs) args = prepared.decodedArgs;
-                    toolStatus = prepared.toolStatus;
-                    callDiagnostics = prepared.callDiagnostics;
-                    log.softFail(prepared.message, {
-                        mcpSessionId,
-                        failureCategory: prepared.callDiagnostics.failure_category,
-                        actorName: prepared.callDiagnostics.actor_name,
-                        validationKeyword: prepared.callDiagnostics.validation_keyword,
-                        validationPath: prepared.callDiagnostics.validation_path,
-                        validationMissingProperty: prepared.callDiagnostics.validation_missing_property,
-                        validationAdditionalProperty: prepared.callDiagnostics.validation_additional_property,
-                        ...prepared.logFields,
-                    });
-                    await this.server.sendLoggingMessage({ level: 'error', data: prepared.message });
-                    throw new McpError(ErrorCode.InvalidParams, prepared.message);
-                }
-
-                const { tool, toolArgs, logSafeArgs, apifyClient, standbyRejection, paymentRequiredResult } = prepared;
-                actorName = prepared.actorName;
-                actorId = prepared.actorId;
-                resolvedToolName = getToolFullName(tool);
-                // Telemetry uses the decoded arguments.
-                args = prepared.decodedArgs;
-
-                // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
-                // Handle long-running task request
-                if (request.params.task) {
-                    const task = await this.taskStore.createTask(
-                        {
-                            ttl: request.params.task.ttl,
-                        },
-                        `call-tool-${name}-${randomUUID()}`,
-                        request,
-                        mcpSessionId,
-                    );
-                    log.debug('Created task for tool execution', {
-                        taskId: task.taskId,
-                        toolName: tool.name,
-                        mcpSessionId,
-                    });
-
-                    // Pre-flight failure is already known — the outcome needs no work. Resolve the
-                    // task synchronously: store the failure as the terminal `completed` result and emit
-                    // exactly one `completed` status notification (no `updateTaskStatus('working')`, so no
-                    // `working` notification). Standby rejection wins over the generic payment-required
-                    // short-circuit, matching the sync path's precedence. Telemetry rides the handler's
-                    // outer `finally` (shouldTrackTelemetry stays true), firing once with the sync-path
-                    // properties plus the taskId on the log line.
-                    const preflightResult = standbyRejection ?? paymentRequiredResult;
-                    if (preflightResult) {
-                        const outcome = buildPreflightFailureOutcome(
-                            standbyRejection,
-                            paymentRequiredResult,
-                            actorName,
-                            actorId,
-                        );
-                        toolStatus = outcome.toolStatus;
-                        callDiagnostics = outcome.callDiagnostics;
-                        preflightTaskId = task.taskId;
-                        try {
-                            await storeTaskResultOrSkipIfExpired(
-                                this.taskStore,
-                                tool.name,
-                                task.taskId,
-                                'completed',
-                                outcome.result,
-                                mcpSessionId,
-                            );
-                        } catch (error) {
-                            // A store failure (not expiry) would otherwise fall through to the generic
-                            // catch and return a task-less tool result the client rejects as a
-                            // CreateTaskResult parse error; surface it as a protocol error instead.
-                            // The pre-flight outcome left toolStatus=SOFT_FAIL, but a genuine store
-                            // outage is a hard failure — correct it before throwing so the handler
-                            // `finally` logs FAILED/INTERNAL_ERROR, not the stale pre-flight SOFT_FAIL.
-                            toolStatus = TOOL_STATUS.FAILED;
-                            callDiagnostics = {
-                                failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
-                                ...buildActorFields(actorName, actorId),
-                            };
-                            throw new McpError(
-                                ErrorCode.InternalError,
-                                `Failed to store the pre-flight result for task "${task.taskId}": ${
-                                    error instanceof Error ? error.message : String(error)
-                                }`,
-                            );
-                        }
-                        // Defer so the client sees the CreateTaskResult (and learns the taskId) before
-                        // the terminal status notification — the async path's post-response ordering.
-                        // emitTaskStatusNotification never throws and no-ops if the task expired.
-                        setImmediate(() => {
-                            void emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
-                        });
-                        // Measure the nudged result without changing the stored result.
-                        toolResult = withReportProblemNudge({
-                            result: outcome.result,
-                            tools: this.tools,
-                            failingToolName: resolvedToolName,
-                            failureCategory: callDiagnostics.failure_category,
-                            failureHttpStatus: callDiagnostics.failure_http_status,
-                        });
-                        // createTask returned status `working`; synthesize the terminal status instead of
-                        // re-fetching — if the task expired before the result store (the one case
-                        // storeTaskResultOrSkipIfExpired tolerates), a re-fetch would come back empty and a
-                        // `working` fallback would contradict the tasks/get 404 the client sees next.
-                        return { task: { ...task, status: 'completed' as const } };
-                    }
-
-                    // Execute the tool asynchronously and update task status
-                    setImmediate(() => {
-                        executeToolAndUpdateTask({
-                            taskId: task.taskId,
-                            tool,
-                            toolArgs,
-                            logSafeArgs,
-                            apifyClient,
-                            apifyToken,
-                            progressToken,
-                            extra,
-                            mcpSessionId,
-                            actorName,
-                            actorId,
-                            apifyMcpServer: this,
-                            clientContext,
-                        }).catch((error) =>
-                            // Benign task-expiry is handled in-method (see the catch block and
-                            // storeTaskResultOrSkipIfExpired); anything reaching here is genuinely unexpected.
-                            log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }),
-                        );
-                    });
-
-                    // Return the task immediately; execution continues asynchronously
-                    shouldTrackTelemetry = false;
-                    return { task };
-                }
-
-                // Sync path: run the shared dispatch tail and project its neutral outcome by identity.
-                const outcome = await executeSyncToolCall(prepared, {
-                    apifyMcpServer: this,
-                    apifyToken,
-                    toolName: name,
-                    mcpSessionId,
-                    progressToken,
-                    extra,
-                });
-                toolStatus = outcome.toolStatus;
-                callDiagnostics = outcome.callDiagnostics;
-                toolResult = outcome.result;
-                return outcome.result;
-            } catch (error) {
-                // Match v1: classify task-creation failures, but re-throw protocol errors as JSON-RPC.
-                if (error instanceof McpError) {
-                    throw error;
-                }
-                const outcome = classifyToolCallError(error, {
-                    apifyMcpServer: this,
-                    toolName: name,
-                    failingToolName: resolvedToolName,
-                    actorName,
-                    actorId,
-                    isAborted: Boolean(extra.signal?.aborted),
-                    mcpSessionId,
-                });
-                toolStatus = outcome.toolStatus;
-                callDiagnostics = outcome.callDiagnostics;
-                toolResult = outcome.result;
-                return outcome.result;
-            } finally {
-                if (shouldTrackTelemetry) {
-                    logToolCallAndTelemetry({
-                        toolName: resolvedToolName,
-                        mcpSessionId,
-                        toolStatus,
-                        startTime,
-                        telemetryData,
-                        userId,
-                        callDiagnostics,
-                        args,
-                        result: toolResult,
-                        taskId: preflightTaskId,
-                        apifyMcpServer: this,
-                    });
-                }
-            }
-        });
     }
 
     /**
@@ -1004,22 +469,24 @@ export class ActorsMcpServer {
 
     async connect(transport: Transport): Promise<void> {
         await this.resolveWidgets();
-        await this.server.connect(transport);
+        await this.legacyServer.connect(transport);
     }
 
     async close(): Promise<void> {
-        if (this.sigintHandler) {
-            process.removeListener('SIGINT', this.sigintHandler);
-            this.sigintHandler = undefined;
-        }
-        // Clear all tools and null their compiled schemas.
+        // Reverse-of-connect (LIFO) teardown: take the transport/server down first (SIGINT removal +
+        // server close are the adapter's transport-lifecycle responsibility), then clear the shared
+        // tool map. The order is unobservable because `close()` only runs on a quiesced serving unit.
+        await this.legacyServer.close();
+        this.clearTools();
+    }
+
+    /** Clear all tools and null their compiled schemas. */
+    private clearTools(): void {
         for (const tool of this.tools.values()) {
             if (tool.ajvValidate && typeof tool.ajvValidate === 'function') {
                 (tool as { ajvValidate: ValidateFunction<unknown> | null }).ajvValidate = null;
             }
         }
         this.tools.clear();
-        // Closing the server also removes its event handlers.
-        await this.server.close();
     }
 }

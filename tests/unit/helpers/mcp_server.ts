@@ -1,4 +1,6 @@
+import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 
@@ -20,16 +22,30 @@ export type HandlerFn = (
 ) => Promise<Record<string, unknown>>;
 
 /**
+ * Reach the legacy adapter's SDK `Server` through the facade's private `legacyServer` field. The
+ * v1 wiring moved off `ActorsMcpServer` into `LegacyMcpServer`; this cast keeps the reach into that
+ * SDK-owned seam centralized so an SDK/structure change only needs one fix.
+ */
+export function getLegacyServer(server: unknown): Server {
+    return (server as { legacyServer: { server: Server } }).legacyServer.server;
+}
+
+/** Reach the legacy adapter's task store through the facade's private `legacyServer` field. */
+export function getTaskStore(server: unknown): TaskStore {
+    return (server as { legacyServer: { taskStore: TaskStore } }).legacyServer.taskStore;
+}
+
+/**
  * Returns the real request handler the SDK registered for `method` (e.g. 'tools/call',
- * 'tasks/result'), reached through the server's private `_requestHandlers` map so a test can invoke
- * it directly. Throws if the handler is not registered. This reach into an SDK-internal seam is
- * centralized here so an SDK upgrade only needs one fix.
+ * 'tasks/result'), reached through the adapter server's private `_requestHandlers` map so a test can
+ * invoke it directly. Throws if the handler is not registered. This reach into an SDK-internal seam
+ * is centralized here so an SDK upgrade only needs one fix.
  */
 export function getRequestHandler(server: unknown, method: string): HandlerFn {
     // eslint-disable-next-line no-underscore-dangle
-    const handler = (server as { server: { _requestHandlers: Map<string, HandlerFn> } }).server._requestHandlers.get(
-        method,
-    );
+    const handler = (
+        getLegacyServer(server) as unknown as { _requestHandlers: Map<string, HandlerFn> }
+    )._requestHandlers.get(method);
     if (!handler) throw new Error(`Handler "${method}" not registered`);
     return handler;
 }
