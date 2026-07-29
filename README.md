@@ -38,8 +38,8 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 - [🤖 MCP clients](#-mcp-clients)
 - [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
 - [💰 Agentic payments](#-agentic-payments)
-  - [🪙 AGI (recommended)](#-agi-recommended)
   - [How agentic payments work](#how-agentic-payments-work)
+  - [🪙 AGI (recommended)](#-agi-recommended)
   - [💸 Direct x402](#-direct-x402)
   - [🔥 Skyfire](#-skyfire)
 - [🛠️ Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
@@ -123,12 +123,6 @@ You can pay for Actor runs without an Apify API token using **AGI**, **direct x4
 
 > Both direct x402 and Skyfire settle per Actor run under the Pay Per Event pricing model only — no minted token, no Standby Actor support.
 
-## 🪙 AGI (recommended)
-
-[AGI](https://agi.apify.com) (Apify Agent General Interface) is the recommended way for autonomous agents to pay for Apify usage without an account. Pay once via x402 or MPP, receive a prepaid, spend-capped Apify API token, and use it directly against `mcp.apify.com` and `api.apify.com` (`Authorization: Bearer <token>`) — for any Actor.
-
-Full protocol, supported payment methods, and current terms (minimum amount, token lifetime, refund policy) are documented at **[agi.apify.com/AGENTS.md](https://agi.apify.com/AGENTS.md)** — treat it as the single source of truth.
-
 ## How agentic payments work
 
 Actor run costs vary, so both payment methods use a prepaid balance model. The payment flow happens in four steps:
@@ -143,6 +137,12 @@ Actor run costs vary, so both payment methods use a prepaid balance model. The p
 4. **Resolution**: The tool returns the Actor results. Unused funds stay available for later runs.
    - **Direct x402**: After 60 minutes of inactivity, the server refunds any unused balance to the wallet on [Base](https://base.org).
    - **Skyfire**: Skyfire returns unused funds when the token expires.
+
+## 🪙 AGI (recommended)
+
+[AGI](https://agi.apify.com) (Apify Agent General Interface) is the recommended way for autonomous agents to pay for Apify usage without an account. Pay once via x402 or MPP, receive a prepaid, spend-capped Apify API token, and use it directly against `mcp.apify.com` and `api.apify.com` (`Authorization: Bearer <token>`) — for any Actor.
+
+Full protocol, supported payment methods, and current terms (minimum amount, token lifetime, refund policy) are documented at **[agi.apify.com/AGENTS.md](https://agi.apify.com/AGENTS.md)** — treat it as the single source of truth.
 
 ## 💸 Direct x402
 
