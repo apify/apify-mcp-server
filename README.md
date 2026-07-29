@@ -25,7 +25,7 @@ The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp
 
 > ⚠️ **Legacy SSE transport removed.** The `https://mcp.apify.com/sse` endpoint has been removed in favor of Streamable HTTP. Migrate your client to **[`https://mcp.apify.com`](https://mcp.apify.com)** — drop the `/sse` suffix from your configuration.
 
-💰 The server also supports [agentic payments](#-agentic-payments) via [x402](#-x402) and [Skyfire](#-skyfire), allowing AI agents to pay for Actor runs without an API token.
+💰 The server also supports [agentic payments](#-agentic-payments): buy a token from [AGI](#-agi-recommended) to run any Actor, or pay per-request via [x402](#-x402) (Pay Per Event Actors only) or [Skyfire](#-skyfire) — no API token required either way.
 
 Apify MCP Server is compatible with `Claude Code, Claude.ai, Cursor, VS Code` and any client that adheres to the Model Context Protocol.
 Check out the [MCP clients section](#-mcp-clients) for more details or visit the [MCP configuration page](https://mcp.apify.com).
@@ -38,6 +38,7 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 - [🤖 MCP clients](#-mcp-clients)
 - [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
 - [💰 Agentic payments](#-agentic-payments)
+  - [🪙 AGI (recommended)](#-agi-recommended)
   - [How agentic payments work](#how-agentic-payments-work)
   - [💸 x402](#-x402)
   - [🔥 Skyfire](#-skyfire)
@@ -114,10 +115,17 @@ Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, 
 
 # 💰 Agentic payments
 
-You can pay for Actor runs without an Apify API token using either **x402** or **Skyfire**.
+You can pay for Actor runs without an Apify API token using **AGI**, **x402**, or **Skyfire**.
 
-- **x402** pays with USDC on [Base](https://base.org) and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
+- **AGI** ([agi.apify.com](https://agi.apify.com)) mints a prepaid Apify API token in exchange for an x402 or MPP payment. Use the token like a normal API token against `api.apify.com` — works for any Actor, not just Pay Per Event ones. **Recommended** for new integrations; see [AGI (recommended)](#-agi-recommended) below.
+- **x402** pays with USDC on [Base](https://base.org) per request and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively. Narrower scope than AGI: Pay Per Event Actors only.
 - **Skyfire** pays with PAY tokens and requires a Skyfire account with a funded wallet. It does not require a special MCP client; the entire payment flow is handled directly through the MCP tool call parameters.
+
+## 🪙 AGI (recommended)
+
+[AGI](https://agi.apify.com) (Apify Agent General Interface) is the recommended way for autonomous agents to pay for Apify usage without an account. Pay once via x402 or MPP, receive a prepaid, spend-capped Apify API token, and use it directly against `api.apify.com` (`Authorization: Bearer <token>`) — for any Actor.
+
+Full protocol, supported payment methods, and current terms (minimum amount, token lifetime, refund policy) are documented at **[agi.apify.com/AGENTS.md](https://agi.apify.com/AGENTS.md)** (also served as `agi.apify.com/llms.txt`) — treat it as the single source of truth.
 
 ## How agentic payments work
 
@@ -135,6 +143,8 @@ Actor run costs vary, so both payment methods use a prepaid balance model. The p
    - **Skyfire**: Skyfire returns unused funds when the token expires.
 
 ## 💸 x402
+
+> Narrower scope than [AGI](#-agi-recommended): Pay Per Event Actors only, no minted token — settles per request instead.
 
 The [x402 protocol](https://www.x402.org/) enables direct, machine-to-machine payments. Your MCP client can use it to pay for Actor runs with USDC on the [Base blockchain](https://base.org/), completely bypassing the need for an Apify API token.
 
