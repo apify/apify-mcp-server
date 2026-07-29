@@ -121,7 +121,7 @@ You can pay for Actor runs without an Apify API token using **AGI**, **direct x4
 - **Direct x402** pays with USDC on [Base](https://base.org) per request and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
 - **Skyfire** pays with PAY tokens and requires a Skyfire account with a funded wallet. It does not require a special MCP client; the entire payment flow is handled directly through the MCP tool call parameters.
 
-> ℹ️ **Scope:** Both direct x402 and Skyfire are limited to Pay Per Event Actors and don't support Standby Actors — and settle per run instead of minting a token.
+> ℹ️ **Scope:** Both direct x402 and Skyfire are limited to Pay Per Event Actors, don't support Standby Actors, and settle per run instead of minting a token.
 
 ## How agentic payments work
 
