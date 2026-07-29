@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.13.1 - **not yet released**
+## [0.14.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.0) (2026-07-29)
 
 ### 🚀 Features
 
@@ -18,7 +17,6 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Separate legacy MCP wiring from ActorsMcpServer ([#1155](https://github.com/apify/apify-mcp-server/pull/1155)) ([5ebe0d8](https://github.com/apify/apify-mcp-server/commit/5ebe0d84cdaa1c0cc10d86b65c78c61c609f7fae)) by [@jirispilka](https://github.com/jirispilka), closes [#1147](https://github.com/apify/apify-mcp-server/issues/1147)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.13.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.13.0) (2026-07-27)
 
 ### 🚀 Features
