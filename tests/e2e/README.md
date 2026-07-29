@@ -31,8 +31,35 @@ Requires `jq` on PATH. `mcpc` is resolved from `node_modules/.bin`, so bare `vit
 | Variable | Effect |
 |---|---|
 | `E2E_HTTP_BASE` | Base URL for HTTP configs, e.g. `http://localhost:3001` (needs `pnpm run dev` running). Those configs are skipped when unset. |
+| `E2E_HTTP_ONLY` | `1` runs *every* config over HTTP against `E2E_HTTP_BASE` — see "Remote server" below. |
 | `E2E_PROBE_TIMEOUT_MS` | Per-probe wall clock before a hung mcpc bridge fails by name. Default 45000 — see "Known instability" below. |
 | `E2E_WORKERS` | Concurrent server configurations. Default 6 — see "Parallelism" below. |
+
+## Remote server
+
+```bash
+pnpm run test:e2e:remote                                          # https://mcp.apify.com
+E2E_HTTP_BASE=https://other-deployment/ pnpm run test:e2e:remote  # any other deployment
+```
+
+`E2E_HTTP_ONLY=1` translates each stdio config into the equivalent URL instead of spawning
+`dist/stdio.js` — `--tools=actors` becomes `?tools=actors`. Every flag the configs vary (`tools`,
+`actors`, `ui`, `payment`, `telemetry-enabled`) is also a query param, so the whole case table runs
+against the deployed server. Nothing local is started, so there is no build step.
+
+`no-token`, `env-tools` and `env-ui-mode` vary the server process's own environment and have no URL
+form. They are skipped, and the run prints their names.
+
+Known failures against a deployed server, neither a regression in this repo:
+
+- `reads dataset items as a resource`, `rejects a missing dataset resource` —
+  [#1176](https://github.com/apify/apify-mcp-server/issues/1176).
+- `starts a detached task` — the pinned `^[0-9a-f]{32}$` ID is the SDK in-memory store's format. That
+  store ignores the ID proposed in `legacy_server.ts`; the hosted store honors it, so IDs there are
+  `call-tool-<tool>-<uuid>`.
+
+It tests whatever is deployed, not your working tree, and it bills real Actor runs to the account
+behind `APIFY_TOKEN`.
 
 ## Parallelism
 
@@ -163,6 +190,13 @@ real behavior:
   Note that `--tools=apify/example-mcp-server` (the `mcp-proxy` config) legitimately loads **no**
   tools when the Actor is unreachable, since loading an MCP-server Actor means connecting to it and
   enumerating its tools.
+- `calls the search-actors widget` — a store index with no match returns `count: 0`, and that exit
+  carries no widget meta ([#1177](https://github.com/apify/apify-mcp-server/issues/1177)), so
+  `_meta.ui` is required only when the search returned something.
+
+`fetches Actor details, rating and metadata` asserts the response shape, not the values: `rating` and
+`modifiedAt` are account data that non-production environments do not carry, so it asserts that
+`output: {rating, metadata}` returns the `actorInfo` section and nothing else.
 
 The `no-token` config relies on `~/.apify/auth.json` being absent. `stdio.ts` falls back to that
 file, so a developer logged into the `apify` CLI silently gets a token and the config stops testing

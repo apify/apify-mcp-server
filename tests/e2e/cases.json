@@ -760,7 +760,7 @@
         "actor:=\"apify/rag-web-browser\"",
         "output:={\"rating\":true,\"metadata\":true}"
       ],
-      "assert": ".isError != true and (.structuredContent.actorInfo | has(\"rating\") and has(\"modifiedAt\"))"
+      "assert": ".isError != true and (.structuredContent | keys) == [\"actorInfo\"]"
     },
     {
       "id": "fetches MCP tools for a regular Actor",
@@ -941,7 +941,7 @@
         "keywords:=\"instagram\"",
         "limit:=2"
       ],
-      "assert": ".isError != true and (._meta | has(\"ui\")) and (.structuredContent | has(\"actors\") and has(\"widgetActors\"))"
+      "assert": ".isError != true and (.structuredContent | has(\"actors\") and has(\"widgetActors\")) and ((._meta | has(\"ui\")) or .structuredContent.count == 0)"
     },
     {
       "id": "calls the fetch-actor-details widget",

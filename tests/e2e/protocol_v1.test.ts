@@ -68,10 +68,48 @@ const SERVER_ENTRY = resolve('dist/stdio.js');
 const HTTP_BASE = process.env.E2E_HTTP_BASE;
 const HTTP_BASE_TOKEN = '${E2E_HTTP_BASE}';
 
+/** Run every configuration over HTTP against E2E_HTTP_BASE instead of spawning a stdio server. */
+const HTTP_ONLY = process.env.E2E_HTTP_ONLY === '1';
+if (HTTP_ONLY && !HTTP_BASE) throw new Error('E2E_HTTP_ONLY=1 requires E2E_HTTP_BASE.');
+
+/** Stdio flags that are also query params. Anything else would become a silently ignored param. */
+const HTTP_QUERY_FLAGS = new Set(['tools', 'actors', 'ui', 'payment', 'telemetry-enabled']);
+
+/**
+ * The URL that runs `config` over HTTP, or null when it cannot be expressed as one: configs that
+ * vary the server's own env (`no-token`, `env-tools`, `env-ui-mode`) need a spawned server.
+ */
+function httpUrlFor(config: McpcServerConfig): string | null {
+    if (config.url) return config.url;
+    if (config.env) return null;
+    const params = (config.args ?? []).map((arg) => arg.replace(/^--/, ''));
+    if (params.some((param) => !HTTP_QUERY_FLAGS.has(param.split('=')[0]))) return null;
+    return params.length > 0 ? `${HTTP_BASE_TOKEN}?${params.join('&')}` : HTTP_BASE_TOKEN;
+}
+
 /** HTTP configs need a running server, so they are skipped unless E2E_HTTP_BASE is set. */
-const activeConfigs = Object.entries(suite.configs).filter(
-    ([, config]) => !config.url?.includes(HTTP_BASE_TOKEN) || Boolean(HTTP_BASE),
-);
+function resolveActiveConfigs(): [string, McpcServerConfig][] {
+    const entries = Object.entries(suite.configs);
+    if (!HTTP_ONLY) {
+        return entries.filter(([, config]) => !config.url?.includes(HTTP_BASE_TOKEN) || Boolean(HTTP_BASE));
+    }
+
+    const dropped: string[] = [];
+    const active = entries.flatMap<[string, McpcServerConfig]>(([name, config]) => {
+        const url = httpUrlFor(config);
+        if (!url) {
+            dropped.push(name);
+            return [];
+        }
+        return [[name, { url, excludeFromAll: config.excludeFromAll }]];
+    });
+    if (dropped.length > 0) {
+        console.warn(`E2E_HTTP_ONLY skips configs that need a spawned server: ${dropped.join(', ')}`);
+    }
+    return active;
+}
+
+const activeConfigs = resolveActiveConfigs();
 
 /** The cases a configuration runs, in declaration order — capture chains depend on it. */
 function casesFor(configName: string, config: McpcServerConfig) {
@@ -214,19 +252,26 @@ function respondsWithSomeError(result: { status: number | null; stdout: string }
 }
 
 /**
- * Runs a probe, retrying while `pollWhileWorking` is set and mcpc reports the task still running.
- * Any other genuine failure — including running out of attempts — surfaces immediately as a normal
- * unexpected-exit error, same as a non-polling case.
+ * A deployed server rate-limits per token, which several configurations in flight trip on ordinary
+ * methods (`tools/list`, `prompts/list`). Retryable, so it is not reported as a server failure.
+ */
+function isRateLimited(result: ProcessResult): boolean {
+    return result.stderr.includes('Rate limit exceeded') || result.stdout.includes('Rate limit exceeded');
+}
+
+/**
+ * Runs a probe, retrying while `pollWhileWorking` is set and mcpc reports the task still running,
+ * or while the server is rate-limiting (any case, no opt-in). Any other genuine failure — including
+ * running out of attempts — surfaces immediately as a normal unexpected-exit error.
  */
 async function runMcpcCase(args: string[], testCase: McpcCase) {
     let result = await runMcpc(args, { allowFailure: true });
 
     let attempt = 1;
     while (
-        testCase.pollWhileWorking &&
         isGenuineFailure(result) &&
-        result.stderr.includes(TASK_STILL_WORKING) &&
-        attempt < POLL_MAX_ATTEMPTS
+        attempt < POLL_MAX_ATTEMPTS &&
+        ((testCase.pollWhileWorking && result.stderr.includes(TASK_STILL_WORKING)) || isRateLimited(result))
     ) {
         await new Promise((resolvePromise) => {
             setTimeout(resolvePromise, POLL_INTERVAL_MS);
@@ -282,7 +327,7 @@ function interpolate(value: string, captured: Record<string, string>) {
 describe('v1 protocol', () => {
     beforeAll(async () => {
         if (!existsSync(MCPC_BIN)) throw new Error(`mcpc not found at ${MCPC_BIN}. Run \`pnpm install\`.`);
-        if (!existsSync(SERVER_ENTRY)) {
+        if (!HTTP_ONLY && !existsSync(SERVER_ENTRY)) {
             throw new Error(`Server entry not found at ${SERVER_ENTRY}. Run \`pnpm run build\`.`);
         }
         const jq = await runProcess('jq', ['--version']);
