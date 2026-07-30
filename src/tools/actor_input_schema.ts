@@ -80,14 +80,15 @@ export function buildApifySpecificProperties(
 }
 
 /**
- * Filters schema properties to include only the necessary fields.
- * This is done to reduce the size of the input schema and to make it more readable.
+ * Filters schema properties to the fields MCP tools need: core shape, examples/defaults,
+ * and JSON Schema validation keywords. UI-only Actor hints (`editor`, `enumTitles`, …) are
+ * dropped to keep advertised schemas smaller.
  *
- * TODO(#675): This object literal unconditionally assigns every whitelisted key,
- * including `default: undefined`, on properties that didn't declare them upstream.
- * This creates phantom keys that broke `fixZodSchemaRequired()` via key-presence
- * checks (#637). The symptom is patched in `src/utils/ajv.ts` (value-check), but
- * this function should only emit keys whose upstream value is not `undefined`.
+ * Only emits keys whose upstream value is not `undefined` — assigning `default: undefined`
+ * (and similar) created phantom keys that broke `'default' in field` checks (#637 / #675).
+ *
+ * Validation keywords (`minimum`, `maximum`, `minLength`, …) are preserved so AJV compile
+ * and tools/list honor Actor-declared bounds instead of silently accepting out-of-range input.
  *
  * @param properties
  */
@@ -96,19 +97,48 @@ export function filterSchemaProperties(properties: { [key: string]: SchemaProper
 } {
     const filteredProperties: { [key: string]: SchemaProperties } = {};
     for (const [key, property] of Object.entries(properties)) {
-        filteredProperties[key] = {
-            title: property.title,
-            description: property.description,
-            enum: property.enum,
-            type: property.type,
-            default: property.default,
-            prefill: property.prefill,
-            properties: property.properties,
-            items: property.items,
-            required: property.required,
-        };
+        filteredProperties[key] = pickDefinedSchemaFields(property);
     }
     return filteredProperties;
+}
+
+/** Optional SchemaProperties keys that survive filtering when the upstream value is defined. */
+const OPTIONAL_SCHEMA_FIELD_KEYS = [
+    'enum',
+    'default',
+    'prefill',
+    'properties',
+    'items',
+    'required',
+    'examples',
+    'minimum',
+    'maximum',
+    'exclusiveMinimum',
+    'exclusiveMaximum',
+    'minLength',
+    'maxLength',
+    'minItems',
+    'maxItems',
+    'uniqueItems',
+    'pattern',
+] as const satisfies readonly (keyof SchemaProperties)[];
+
+function pickDefinedSchemaFields(property: SchemaProperties): SchemaProperties {
+    const filtered: SchemaProperties = {
+        type: property.type,
+        title: property.title,
+        description: property.description,
+    };
+
+    for (const field of OPTIONAL_SCHEMA_FIELD_KEYS) {
+        const value = property[field];
+        if (value !== undefined) {
+            // Indexed assignment through a keyof union needs a narrow cast.
+            (filtered as Record<string, unknown>)[field] = value;
+        }
+    }
+
+    return filtered;
 }
 
 /**
