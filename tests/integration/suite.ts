@@ -1989,31 +1989,34 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                 beforeAll(async () => {
                     const setupClient = await createClientFn({ tools: ['actors', 'storage'] });
-                    const callResult = await setupClient.callTool({
-                        name: HELPER_TOOLS.ACTOR_CALL,
-                        arguments: {
-                            actor: ACTOR_NORMAL_MODE,
-                            input: { firstNumber: 1, secondNumber: 2 },
-                            waitSecs: 45,
-                        },
-                    });
-                    const callStructured = callResult as {
-                        structuredContent?: {
-                            runId?: string;
-                            storages?: {
-                                datasets?: { default?: { id?: string } };
-                                keyValueStores?: { default?: { id?: string } };
+                    try {
+                        const callResult = await setupClient.callTool({
+                            name: HELPER_TOOLS.ACTOR_CALL,
+                            arguments: {
+                                actor: ACTOR_NORMAL_MODE,
+                                input: { firstNumber: 1, secondNumber: 2 },
+                                waitSecs: 45,
+                            },
+                        });
+                        const callStructured = callResult as {
+                            structuredContent?: {
+                                runId?: string;
+                                storages?: {
+                                    datasets?: { default?: { id?: string } };
+                                    keyValueStores?: { default?: { id?: string } };
+                                };
                             };
                         };
-                    };
-                    const sc = callStructured.structuredContent;
-                    expect(sc?.runId).toBeDefined();
-                    expect(sc?.storages?.datasets?.default?.id).toBeDefined();
-                    expect(sc?.storages?.keyValueStores?.default?.id).toBeDefined();
-                    datasetId = sc!.storages!.datasets!.default!.id!;
-                    defaultKvId = sc!.storages!.keyValueStores!.default!.id!;
-                    runId = sc!.runId!;
-                    await setupClient.close();
+                        const sc = callStructured.structuredContent;
+                        expect(sc?.runId).toBeDefined();
+                        expect(sc?.storages?.datasets?.default?.id).toBeDefined();
+                        expect(sc?.storages?.keyValueStores?.default?.id).toBeDefined();
+                        datasetId = sc!.storages!.datasets!.default!.id!;
+                        defaultKvId = sc!.storages!.keyValueStores!.default!.id!;
+                        runId = sc!.runId!;
+                    } finally {
+                        await setupClient.close();
+                    }
                 }, 60_000);
 
                 itc(
@@ -2435,34 +2438,27 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
-            it('should return Actor details both for full Actor name and ID', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-                    const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
-                    expect(actor).toBeDefined();
-                    const actorId = actor!.id as string;
+            itc('should return Actor details both for full Actor name and ID', undefined, async (client) => {
+                const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+                const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
+                expect(actor).toBeDefined();
+                const actorId = actor!.id as string;
 
-                    client = await createClientFn();
+                // Fetch by full Actor name
+                const resultByName = await client.callTool({
+                    name: 'fetch-actor-details',
+                    arguments: { actor: ACTOR_NORMAL_MODE },
+                });
+                const contentByName = resultByName.content as { text: string }[];
+                expect(contentByName[0].text).toContain(ACTOR_NORMAL_MODE);
 
-                    // Fetch by full Actor name
-                    const resultByName = await client.callTool({
-                        name: 'fetch-actor-details',
-                        arguments: { actor: ACTOR_NORMAL_MODE },
-                    });
-                    const contentByName = resultByName.content as { text: string }[];
-                    expect(contentByName[0].text).toContain(ACTOR_NORMAL_MODE);
-
-                    // Fetch by Actor ID only
-                    const resultById = await client.callTool({
-                        name: 'fetch-actor-details',
-                        arguments: { actor: actorId },
-                    });
-                    const contentById = resultById.content as { text: string }[];
-                    expect(contentById[0].text).toContain(ACTOR_NORMAL_MODE);
-                } finally {
-                    await client?.close();
-                }
+                // Fetch by Actor ID only
+                const resultById = await client.callTool({
+                    name: 'fetch-actor-details',
+                    arguments: { actor: actorId },
+                });
+                const contentById = resultById.content as { text: string }[];
+                expect(contentById[0].text).toContain(ACTOR_NORMAL_MODE);
             });
 
             itc(
