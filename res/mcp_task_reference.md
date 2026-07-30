@@ -185,7 +185,7 @@ interface CallToolResult {
 }
 ```
 
-- `tools.listChanged` — sent when `add-actor` adds a new tool
+- `tools.listChanged` — retained in the advertised legacy capability; no MCP tool mutates the tool list
 - `tasks` — full implementation (create, get, result, cancel, list)
 - `resources` — widgets + readme only, no dynamic resources
 - `prompts` — 1 helper prompt (`latest-news-on-topic`)

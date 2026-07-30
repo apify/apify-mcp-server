@@ -7,7 +7,7 @@ import type { ApifyClient } from 'apify-client';
 
 import log from '@apify/log';
 
-import { defaults, HELPER_TOOLS, type HelperToolName } from '../const.js';
+import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
@@ -27,7 +27,7 @@ import { SERVER_MODES, SERVER_MODE, TOOL_TYPE } from '../types.js';
 
 /**
  * Tools auto-injected alongside any actor-running tool (call-actor / direct
- * actor tools / add-actor). Order matches the workflow: fetch run status →
+ * actor tools / get-actor-run). Order matches the workflow: fetch run status →
  * fetch items → fetch KV record → abort.
  */
 export const AUTO_INJECTED_TOOLS: readonly ToolEntry[] = [
@@ -61,14 +61,12 @@ type NormalizedInput = {
      * explicitly-empty list.
      */
     selectors: string[] | undefined;
-    /** `true` when `input.enableAddingActors === true`. */
-    addActorEnabled: boolean;
     /** `true` when `input.actors` was explicitly empty (`[]` or `''`). */
     actorsExplicitlyEmpty: boolean;
 };
 
 /**
- * Normalize the raw {@link Input} into cleaned selectors + two non-derivable flags.
+ * Normalize the raw {@link Input} into cleaned selectors + the explicit-empty flag.
  * Shared by both loader phases so semantics stay consistent.
  */
 function normalizeInput(input: Input): NormalizedInput {
@@ -82,7 +80,6 @@ function normalizeInput(input: Input): NormalizedInput {
                   .filter((s) => s !== '');
     return {
         selectors,
-        addActorEnabled: input.enableAddingActors === true,
         actorsExplicitlyEmpty: input.actors === '' || (Array.isArray(input.actors) && input.actors.length === 0),
     };
 }
@@ -95,21 +92,21 @@ function normalizeInput(input: Input): NormalizedInput {
  * the *internal* tool variants around it differ by mode.
  *
  * Selectors classified as "actor names":
- *   - NOT the deprecated `'preview'` pseudo-category
+ *   - NOT a retired selector (`RETIRED_SELECTOR_NAMES`: `'preview'`, `'experimental'`, `'add-actor'`)
  *   - NOT a category name (from `CATEGORY_NAME_SET`)
  *   - NOT the name of an internal tool in any mode (from `ALL_INTERNAL_TOOL_NAMES`)
  *
  * If no selectors / no explicit actors: the defaults apply (or empty when
- * add-actor mode is on).
+ * `actors` was explicitly set to empty).
  */
 function resolveActorsToLoad(input: Input): string[] {
-    const { selectors, addActorEnabled, actorsExplicitlyEmpty } = normalizeInput(input);
+    const { selectors, actorsExplicitlyEmpty } = normalizeInput(input);
 
-    // Selectors that aren't categories or internal tools in any mode → Actor names.
+    // Selectors that aren't retired, categories, or internal tools in any mode → Actor names.
     const actorSelectorsFromTools: string[] = [];
     if (selectors !== undefined) {
         for (const sel of selectors) {
-            if (sel === 'preview') continue;
+            if (RETIRED_SELECTOR_NAMES.has(sel)) continue;
             if (CATEGORY_NAME_SET.has(sel)) continue;
             if (ALL_INTERNAL_TOOL_NAMES.has(sel)) continue;
             actorSelectorsFromTools.push(sel);
@@ -128,8 +125,8 @@ function resolveActorsToLoad(input: Input): string[] {
     if (actorsFromField !== undefined) return actorsFromField;
     if (actorSelectorsFromTools.length > 0) return actorSelectorsFromTools;
     if (selectors === undefined) {
-        // No selectors supplied: use defaults unless add-actor mode is enabled
-        return addActorEnabled || actorsExplicitlyEmpty ? [] : defaults.actors;
+        // No selectors supplied: use defaults unless actors were explicitly empty
+        return actorsExplicitlyEmpty ? [] : defaults.actors;
     }
     // Selectors provided but none are actors => do not load defaults
     return [];
@@ -159,6 +156,9 @@ export function toolNamesToInput(toolNames: string[]): Input {
     const actorToolNames: string[] = [];
 
     for (const toolName of toolNames) {
+        // A retired name in a restored session (e.g. a pre-cutoff `add-actor`) is inert: drop it
+        // rather than misroute it to `actors`, where it would trigger a fetch for a nonexistent Actor.
+        if (RETIRED_SELECTOR_NAMES.has(toolName)) continue;
         if (ALL_INTERNAL_TOOL_NAMES.has(toolName)) {
             internalToolNames.push(toolName);
         } else {
@@ -179,22 +179,16 @@ export function toolNamesToInput(toolNames: string[]): Input {
 
 /**
  * Compose the final tool list from pre-fetched actor tools and the original input for the given mode.
- *
- * @param isSessionRestore - `true` for a session restore (`toolNamesToInput()` via `loadToolsByName()`),
- * as opposed to a live selector. A restored session's stored name can be `'add-actor'` from before
- * the PR 0 cutoff below — it must resolve to itself, not get substituted like a fresh selector.
  */
 export function getToolsForServerMode(
     input: Input,
     actorTools: ToolEntry[],
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
-    isSessionRestore = false,
 ): ToolEntry[] {
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
 
-    const { selectors, addActorEnabled, actorsExplicitlyEmpty } = normalizeInput(input);
-    const selectorsExplicitEmpty = selectors?.length === 0;
+    const { selectors, actorsExplicitlyEmpty } = normalizeInput(input);
 
     // Build mode-specific tool-by-name map for individual tool selection
     const toolsByName = new Map<string, ToolEntry>();
@@ -210,24 +204,13 @@ export function getToolsForServerMode(
         }
     }
 
-    const callActorTool = toolsByName.get(HELPER_TOOLS.ACTOR_CALL);
-
     // Walk selectors for internal picks (mode-specific). Actor-name classification
     // happened in `resolveActorsToLoad`; we don't need to partition again here.
     const internalSelections: ToolEntry[] = [];
     if (selectors !== undefined && selectors.length > 0) {
         for (const sel of selectors) {
-            // Selectors that resolve to call-actor: the deprecated `preview` category (always), and
-            // the add-actor cutoff (PR 0) for a live `add-actor`/`experimental` selector — skipped on
-            // restore, where `sel` may be a pre-cutoff session's own stored name.
-            if (
-                sel === 'preview' ||
-                (!isSessionRestore && (sel === HELPER_TOOLS.ACTOR_ADD || sel === 'experimental'))
-            ) {
-                if (sel === 'preview') log.warning('Tool category "preview" is deprecated');
-                if (callActorTool) internalSelections.push(callActorTool);
-                continue;
-            }
+            // Retired selectors (add-actor, experimental, preview) are inert.
+            if (RETIRED_SELECTOR_NAMES.has(sel)) continue;
 
             const categoryTools = categories[sel as ToolCategory];
             if (categoryTools) {
@@ -254,15 +237,6 @@ export function getToolsForServerMode(
     // Internal tools
     if (selectors !== undefined) {
         result.push(...internalSelections);
-        // enableAddingActors cutoff (PR 0): substitute call-actor for add-actor. Restore inputs never
-        // set this flag (toolNamesToInput() doesn't), so this only fires for a live connection.
-        if (addActorEnabled && !selectorsExplicitEmpty && !actorsExplicitlyEmpty) {
-            const hasCallActor = result.some((e) => e.name === callActorTool?.name);
-            if (callActorTool && !hasCallActor) result.push(callActorTool);
-        }
-    } else if (addActorEnabled && !actorsExplicitlyEmpty) {
-        // No selectors: either expose only call-actor (add-actor substitution, when enabled) or default categories
-        if (callActorTool) result.push(callActorTool);
     } else if (!actorsExplicitlyEmpty) {
         // Use mode-resolved default categories
         for (const cat of toolCategoriesEnabledByDefault) {
@@ -281,7 +255,7 @@ export function getToolsForServerMode(
     }
 
     /**
-     * Auto-inject run-status and storage tools when call-actor, actor tools, or add-actor are present.
+     * Auto-inject run-status and storage tools when call-actor or actor tools are present.
      * Insert them right after call-actor (or appended at the end when call-actor is absent) so the
      * default tool list reads in workflow order: call → get-actor-run → get-dataset-items →
      * get-key-value-store-record → abort-actor-run. If the user explicitly selected these tools
@@ -289,7 +263,6 @@ export function getToolsForServerMode(
      */
     const hasCallActor = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === TOOL_TYPE.ACTOR);
-    const hasAddActorTool = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_ADD);
     // `get-actor-run`'s nextStep templates point at `get-dataset-items` / `get-key-value-store-record`,
     // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session
     // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
@@ -297,7 +270,7 @@ export function getToolsForServerMode(
 
     // Inject run-workflow helpers whenever any actor-running entrypoint is present; de-dup pass below drops repeats.
     const toolsToInject: ToolEntry[] = [];
-    if (hasCallActor || hasActorTools || hasAddActorTool || hasGetActorRun) {
+    if (hasCallActor || hasActorTools || hasGetActorRun) {
         toolsToInject.push(...AUTO_INJECTED_TOOLS);
     }
 

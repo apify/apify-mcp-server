@@ -29,8 +29,10 @@ export async function processParamsGetTools(
 
 export function parseInputParamsFromUrl(url: string): Input {
     const query = url.split('?')[1] || '';
-    const params = parse(query) as unknown as Input;
-    return processInput(params);
+    const params = parse(query);
+    delete params.enableAddingActors;
+    delete params.enableActorAutoLoading;
+    return processInput(params as unknown as Input);
 }
 
 /**

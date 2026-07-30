@@ -22,6 +22,19 @@ export default defineConfig({
                     testTimeout: 120_000,
                 },
             },
+            {
+                // TEMPORARY, AI-GENERATED, NOT HUMAN-MAINTAINED. Remove with tests/e2e/ when the
+                // stateless migration (#1128) closes.
+                // Opt-in only (`pnpm run test:e2e`); never add this project to CI.
+                extends: true,
+                test: {
+                    name: 'e2e',
+                    include: ['tests/e2e/**/*.test.ts'],
+                    testTimeout: 300_000,
+                    hookTimeout: 60_000,
+                    maxConcurrency: Number(process.env.E2E_WORKERS ?? 6),
+                },
+            },
         ],
     },
 });

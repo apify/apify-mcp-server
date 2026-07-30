@@ -24,7 +24,7 @@ export async function catchNotFound<T>(promise: Promise<T>): Promise<T | null> {
     }
 }
 
-function suggestTool(toolName: string, loadedToolNames: string[]): string | undefined {
+function suggestTool(toolName: string, loadedToolNames: readonly string[]): string | undefined {
     return loadedToolNames.includes(toolName) ? toolName : undefined;
 }
 
@@ -104,7 +104,7 @@ export function buildDatasetItemsSummaryNextStep(params: {
     totalItemCount: number;
     offset: number;
     /** Active loaded tool set; gates the terminal get-dataset reference (see #1007). */
-    loadedToolNames: string[];
+    loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
     const { datasetId, itemCount, totalItemCount, offset, loadedToolNames } = params;
     if (offset + itemCount < totalItemCount) {

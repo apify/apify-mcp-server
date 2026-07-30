@@ -33,7 +33,7 @@ Every advertised capability MUST have a working integration path.
 | `tools/call` AJV validation error | `server.ts:633` | One case (`'must have required property input'`) |
 | `tools/call` unknown tool name → JSON-RPC error | `server.ts:633` | **Missing** |
 | `tools/call` returning `isError: true` content | several | One case (`fetch-apify-docs` forbidden URL) |
-| `notifications/tools/list_changed` | `server.ts` upsert path | Covered (`add-actor`) |
+| `notifications/tools/list_changed` | No MCP tool mutates the tool list | Not applicable |
 | `notifications/cancelled` for `tools/call` | SDK abort wiring | Covered (streamable-http only) |
 | `notifications/progress` (`progressToken` on call) | `server.ts:637` + `createProgressTracker` | **Missing** — server emits, no test asserts client receives them |
 | `tasks/list` / `tasks/get` / `tasks/cancel` / `tasks/result` | `server.ts:524` | Covered (sync stream, list+get+result, cancel, statusMessage) |

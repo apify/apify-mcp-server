@@ -46,9 +46,6 @@ import { getPackageVersion } from './utils/version.js';
 // it is only relevant to the CLI/STDIO transport in this file
 type CliArgs = {
     actors?: string;
-    enableAddingActors: boolean;
-    /** @deprecated */
-    enableActorAutoLoading: boolean;
     /** Tool categories to include */
     tools?: string;
     /** Enable or disable telemetry tracking (default: true) */
@@ -92,17 +89,6 @@ const argv = yargs(hideBin(process.argv))
         describe:
             'Comma-separated list of Actor full names to add to the server. Can also be set via ACTORS environment variable.',
         example: 'apify/google-search-scraper,apify/instagram-scraper',
-    })
-    .option('enable-adding-actors', {
-        type: 'boolean',
-        default: false,
-        describe: `Deprecated: no longer adds Actors dynamically — substitutes call-actor. Use tools call-actor instead. Can also be set via ENABLE_ADDING_ACTORS environment variable.`,
-    })
-    .option('enableActorAutoLoading', {
-        type: 'boolean',
-        default: false,
-        hidden: true,
-        describe: 'Deprecated: Use tools call-actor instead.',
     })
     .options('tools', {
         type: 'string',
@@ -150,8 +136,6 @@ Only used when --telemetry-enabled is true`,
     .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/apify-mcp-server')
     .parseSync() as CliArgs;
 
-// Respect either the new flag or the deprecated one
-const enableAddingActors = Boolean(argv.enableAddingActors || argv.enableActorAutoLoading);
 const actorList = argv.actors !== undefined ? parseCommaSeparatedList(argv.actors) : undefined;
 const toolCategoryKeys = argv.tools !== undefined ? parseCommaSeparatedList(argv.tools) : undefined;
 
@@ -171,7 +155,6 @@ const apifyToken = process.env.APIFY_TOKEN || getTokenFromAuthFile();
 const requiresAuthentication = isApiTokenRequired({
     toolCategoryKeys,
     actorList,
-    enableAddingActors,
 });
 
 // Validate environment
@@ -206,7 +189,6 @@ async function main() {
     // Create an Input object from CLI arguments
     const input: Input = {
         actors: actorList,
-        enableAddingActors,
         tools: toolCategoryKeys as ToolSelector[],
     };
 

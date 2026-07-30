@@ -27,7 +27,7 @@ tests/
 
 Key entry points:
 
-- `src/index.ts` - Main library export (`ActorsMcpServer` class)
+- `src/index.ts` - Main library export (`ActorsMcpServer` class, plus `createStatelessServer` — the per-request registration for 2026-07-28 traffic)
 - `src/index_internals.ts` - Internal exports for testing / advanced usage
 - `src/stdio.ts` - Standard input/output (CLI) entry point
 - `src/dev_server.ts` - Express HTTP server for local development (`pnpm start`)
@@ -46,7 +46,16 @@ This split matters for `serverMode: 'auto'`.
 - Before `initialize`, the server does not yet know whether the client supports MCP Apps.
 - Public preload helpers such as `ActorsMcpServer.loadToolsByName()` and `loadToolsFromUrl()` therefore queue mode-agnostic sources first.
 - Actor tools may still be loaded immediately because they are mode-agnostic.
-- During `initialize`, once client capabilities are known, the server resolves the queued sources into the final mode-dependent tool set.
+- During `initialize`, once client capabilities are known, the server resolves the queued sources into the stateful connection's mode-dependent tool set.
+
+### Two places sources get resolved
+
+Fetched sources are **retained, not drained**, because there are two consumers:
+
+- The stateful (2025-era) path resolves them once at `initialize`, as above, into the shared `ActorsMcpServer.tools` map that lives for the connection.
+- The stateless (2026-07-28) path has no `initialize`. `ActorsMcpServer.createRequestSnapshot()` re-composes **all** retained sources per request, against that request's own resolved mode and declared client identity, into a snapshot the shared map never sees.
+
+Consequence for both: a tool only reaches the stateless path if it arrives through a load path. `upsertTools()` writes the shared map directly and is not reflected back into the sources, so it changes the stateful tool list only (it documents this). `close()` is the opposite — the release point for everything the facade retains, sources included, so nothing composes after it.
 
 Rule of thumb:
 
@@ -138,7 +147,8 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 | Layer | Command | What it covers |
 |---|---|---|
 | **Unit tests** | `pnpm run test:unit` | Individual modules in isolation — no credentials needed |
-| **Integration tests** | `pnpm run test:integration` | Full server over all transports against real Apify API (requires `APIFY_TOKEN` + `pnpm run build`) |
+| **Integration tests** | `pnpm run test:integration` | Full server over stdio, streamable HTTP and the `2026-07-28` stateless HTTP dimension against real Apify API (requires `APIFY_TOKEN` + `pnpm run build`) |
+| **Conformance tests** | `pnpm run test:conformance` | Official MCP conformance runner (`--suite all`) against a compiled dev server, run once per protocol era — spec versions `2026-07-28` and `2025-11-25`, in that order. The command builds first, runs both eras, and exits with the first non-zero code. `_conformance_tests.yaml`, called by `_integration_tests.yaml`, runs the same coverage in CI. Excluded scenarios and their reasons live in `scripts/conformance_expected_failures_2026_07_28.yaml` and `scripts/conformance_expected_failures_2025_11_25.yaml` (requires `APIFY_TOKEN`; set `PORT` to override port 3001) |
 | **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development |
 | **LLM evals** | CI only — apply `validated` label | Runs `evals/run_evaluation.ts` against multiple models via OpenRouter; requires `PHOENIX_*` and `OPENROUTER_*` secrets |
 
@@ -160,7 +170,7 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
   - `tests/integration/suite.ts` — **main integration test suite** where all test cases should be added
-  - Other files in this directory set up different transport modes (stdio, streamable-http) that all use `suite.ts`
+  - Other files in this directory set up different transport dimensions (stdio, streamable-http, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
 - `tests/helpers.ts` — shared test utilities
 - `tests/const.ts` — test constants
 

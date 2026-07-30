@@ -1,0 +1,33 @@
+name: Conformance tests
+
+on:
+    workflow_call:
+        secrets:
+            APIFY_TOKEN:
+                required: true
+
+jobs:
+    conformance_tests:
+        name: Conformance tests
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v6
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
+                with:
+                    node-version-file: '.nvmrc'
+            -   name: Install pnpm and dependencies
+                uses: apify/actions/pnpm-install@v1.1.2
+            # The conformance runner receives the token in its URL and may print either spelling.
+            -   name: Mask token URL
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+                run: |
+                    echo "::add-mask::$APIFY_TOKEN"
+                    encoded_token=$(node -p 'encodeURIComponent(process.env.APIFY_TOKEN)')
+                    echo "::add-mask::$encoded_token"
+            -   name: Conformance tests
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+                run: pnpm run test:conformance

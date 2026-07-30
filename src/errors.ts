@@ -24,9 +24,9 @@ export type ActorLoadErrorKind = (typeof ACTOR_LOAD_ERROR_KIND)[keyof typeof ACT
 
 /**
  * Surfaced (not thrown) by `getActorsAsTools` in the `errors[]` field when an
- * Actor cannot be loaded for a *sanitized*, user-safe reason. Single-Actor
- * callers (`add-actor`, `call-actor`) read `errors[0]` and forward the
- * message to the agent; bulk callers ignore the array.
+ * Actor cannot be loaded for a *sanitized*, user-safe reason. The single-Actor
+ * caller (`call-actor`) reads `errors[0]` and forwards the message to the agent;
+ * bulk callers ignore the array.
  *
  * `message` is always safe to forward to the LLM agent / client verbatim.
  * Raw backend errors (network, 5xx, auth) are caught at the call site and

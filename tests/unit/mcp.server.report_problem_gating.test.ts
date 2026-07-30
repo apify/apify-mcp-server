@@ -5,15 +5,17 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { SERVER_MODE } from '../../src/types.js';
+import { getLegacyServer } from './helpers/mcp_server.js';
 
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
 
-function makeServer(telemetryEnabled = true): ActorsMcpServer {
+function makeServer(telemetryEnabled = true, initializeRequestData?: InitializeRequest): ActorsMcpServer {
     return new ActorsMcpServer({
         taskStore: new InMemoryTaskStore(),
         setupSigintHandler: false,
         serverMode: SERVER_MODE.DEFAULT,
         telemetry: { enabled: telemetryEnabled },
+        initializeRequestData,
     });
 }
 
@@ -30,7 +32,7 @@ function makeInitializeRequest(clientName: string): InitializeRequest {
 
 async function dispatchInitialize(server: ActorsMcpServer, clientName: string): Promise<void> {
     const handler = (
-        server.server as unknown as {
+        getLegacyServer(server) as unknown as {
             // eslint-disable-next-line no-underscore-dangle
             _requestHandlers: Map<string, InitHandler>;
         }
@@ -99,6 +101,20 @@ describe('report-problem client gating', () => {
 
         expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
     });
+
+    it.each([
+        { clientName: 'test-client', isAvailable: true },
+        { clientName: 'claude-ai', isAvailable: false },
+    ])(
+        'uses constructor recovery data for client gating: $clientName available=$isAvailable',
+        async ({ clientName, isAvailable }) => {
+            const server = track(makeServer(true, makeInitializeRequest(clientName)));
+
+            await loadReportProblemByName(server);
+
+            expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(isAvailable);
+        },
+    );
 
     it('hides report-problem when telemetry is disabled, even for a non-blocked client', async () => {
         // The tool's only function is forwarding submissions via telemetry; with telemetry off it

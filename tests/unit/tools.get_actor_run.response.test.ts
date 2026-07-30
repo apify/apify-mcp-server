@@ -374,7 +374,7 @@ describe('get-actor-run default response', () => {
 
         const result = await (getActorRun as HelperTool).call({
             ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
-            extra: { signal: controller.signal } as InternalToolArgs['extra'],
+            signal: controller.signal,
         });
 
         // Cancelled requests return no payload per MCP spec — see `getActorRun`.

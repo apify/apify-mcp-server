@@ -42,7 +42,6 @@ Per [OpenAI guidelines](https://developers.openai.com/apps-sdk/deploy/submission
 | `call-actor` (both modes) | false | true | true | Runs Actors that can modify external state |
 | Dynamic Actor tools | false | true | true | Same as call-actor |
 | `abort-actor-run` | false | true | false | Irreversible abort within Apify platform |
-| `add-actor` | false | false | true | Reads from public Apify Store, modifies local tool list |
 | `get-html-skeleton` | true | — | true | Reads from arbitrary external URLs via Actor |
 | `search-actors` | true | — | false | Searches Apify Store (read-only) |
 | `fetch-actor-details` | true | — | false | Reads Actor metadata |

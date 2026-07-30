@@ -19,13 +19,14 @@ jobs:
                     node-version-file: '.nvmrc'
             -   name: Install pnpm and dependencies
                 uses: apify/actions/pnpm-install@v1.1.2
-            # Re-mask in case the token shows up transformed (base64/url-encoded/etc.) in
-            # any downstream log output. Literal value is already masked by GitHub.
-            -   name: Mask token
-                env:
-                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-                run: echo "::add-mask::$APIFY_TOKEN"
             -   name: Integration tests
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
                 run: pnpm run test:integration
+
+    conformance_tests:
+        needs: integration_tests
+        name: Conformance tests
+        uses: ./.github/workflows/_conformance_tests.yaml
+        secrets:
+            APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}

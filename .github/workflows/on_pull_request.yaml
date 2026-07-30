@@ -9,7 +9,7 @@ jobs:
         uses: ./.github/workflows/_check_code.yaml
 
     # Whitelist of paths whose changes can affect integration-test behavior.
-    # Anything outside this list (docs, evals, notebooks, research, scripts, ...)
+    # Anything outside this list (docs, evals, notebooks, research, ...)
     # skips the integration suite to save CI time.
     changes:
         name: Detect relevant changes
@@ -24,11 +24,13 @@ jobs:
                         code:
                             - 'src/**'
                             - 'tests/integration/**'
+                            - 'scripts/**'
                             - 'package.json'
                             - 'pnpm-lock.yaml'
                             - 'pnpm-workspace.yaml'
                             - 'tsconfig.json'
                             - '.nvmrc'
+                            - '.github/workflows/_conformance_tests.yaml'
                             - '.github/workflows/_integration_tests.yaml'
                             - '.github/workflows/on_pull_request.yaml'
 

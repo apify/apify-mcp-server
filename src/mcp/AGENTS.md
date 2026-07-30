@@ -8,40 +8,57 @@ surface — **generic types only**. No Apify-internal infrastructure (Redis, Mon
 IAM) may leak in; the internal repo customizes behavior by swapping the SDK store
 implementations, not by importing from here.
 
+Two MCP protocol revisions are served, each by its own adapter:
+
+- **2025-era stateful protocol** ([spec](https://modelcontextprotocol.io/specification/2025-11-25)),
+  via the v1 SDK `@modelcontextprotocol/sdk` — `legacy_server.ts`.
+- **2026-07-28 stateless revision** ([spec](https://modelcontextprotocol.io/specification/2026-07-28)),
+  via the v2 SDK `@modelcontextprotocol/server` — `stateless_server.ts`. No `initialize`
+  handshake; every request carries a `_meta` envelope with protocol version, client info,
+  and capabilities.
+
 ## Files
 
-- `server.ts` — `ActorsMcpServer`: tool/prompt/resource/task registration, the
-  `initialize` handshake, MCP Apps capability detection, `CallToolRequest` handling.
-  Both the sync handler and the task path (`executeToolAndUpdateTask`, now in
-  `task_execution.ts`) run the shared `dispatchToolCall` switch, in `tool_dispatch.ts`.
-  Uses the SDK `InMemoryTaskStore` only for stdio; non-stdio transports must be given
-  a task store (the internal repo injects a Redis one) or the constructor throws.
+- `server.ts` — `ActorsMcpServer`, the shared facade for tools, server mode, services,
+  widgets, payments, and telemetry. It constructs and delegates v1 work to `LegacyMcpServer`,
+  and hands the stateless adapter a per-request snapshot via `createRequestSnapshot`.
+- `legacy_server.ts` — package-private v1 SDK adapter for handlers, Tasks, errors,
+  notifications, logging, and transport lifecycle. It reads shared state through
+  `LegacyMcpServerHost`.
+- `stateless_server.ts` — `createStatelessServer(host)`: the 2026-07-28 (v2 SDK) adapter,
+  one `Server` per request, reading shared state through `StatelessMcpServerHost`. Serves
+  `tools/*`, `resources/*` and `prompts/*`; registers no Tasks (the SDK answers
+  method-not-found) and declares no `logging`.
+- `client_context.ts` — protocol-neutral client identity and capabilities.
+- `errors.ts` — protocol-neutral domain errors mapped by each protocol adapter.
+- `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
+  preparation; `executeSyncToolCall()` runs synchronous calls.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
-- `tool_call_error_mapper.ts` — `buildToolCallErrorResult()`: pure classifier both
-  `server.ts` tool-call catches share. Maps an error to a `kind: 'payment' | 'approval'
-  | 'execution'` result (status, diagnostics, response/userText). Never throws, logs,
-  or writes the store — the catch blocks own logging and store writes. For payment/approval
-  the mapper returns the ready-to-send `response`; the catch builds the wire result only for
-  the execution `userText`.
-- `tool_dispatch.ts` — `dispatchToolCall()`: the single exhaustive `switch (tool.type)`
-  (INTERNAL / ACTOR_MCP / ACTOR) both the sync handler and the task path run. Plain
-  function taking the `ActorsMcpServer` instance; touches no class state beyond `.server`.
-- `tool_call_telemetry.ts` — `prepareTelemetryData()` / `logToolCallAndTelemetry()`: shared by
-  the sync `CallToolRequestSchema` handler and the task path. Plain functions taking the
-  `ActorsMcpServer` instance (as `apifyMcpServer`), reading `telemetryEnabled`/`telemetryEnv`
-  and `options.*` off it — both are `public readonly` on `ActorsMcpServer`.
-- `task_execution.ts` — `executeToolAndUpdateTask()` / `emitTaskStatusNotification()`: the
-  long-running-task path. `executeToolAndUpdateTask()` takes the `ActorsMcpServer` instance
-  (as `apifyMcpServer`); `emitTaskStatusNotification()` takes `taskStore`/`server` directly
-  and also keeps two call sites in `server.ts` (the `tasks/cancel` handler and the pre-flight
-  `setImmediate` failure path).
+- `tool_call_error_mapper.ts` — shared tool-call error classification.
+- `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, and Actor tools.
+- `tool_call_telemetry.ts` — shared tool-call telemetry preparation and logging.
+- `task_execution.ts` — legacy long-running task execution and status notifications.
 - `const.ts` — the invariant constants below (the single source for these values).
 
 ## Gotchas & invariants
 
+- **Facade → adapter, one direction only.** `ActorsMcpServer` (facade) constructs and delegates
+  to `LegacyMcpServer`; `createStatelessServer` builds the stateless adapter per request from the
+  same facade, which never constructs it. Each adapter reads shared state only through its own
+  narrow host interface (`LegacyMcpServerHost`, `StatelessMcpServerHost`) and never imports the
+  concrete facade class; the shared synchronous execution modules (`tool_call_engine.ts`,
+  `tool_dispatch.ts`) take plain values and import no `ActorsMcpServer`, v1 `RequestHandlerExtra`,
+  or v1 `McpError`, and **nothing shared imports either adapter**. Keep it that way: the two
+  adapters are siblings over one Apify core, not layers.
+- **Per-request state lives in a snapshot, never on the facade.** The stateless adapter resolves
+  `'auto'` mode and report-problem visibility from *that request's* `_meta` envelope through
+  `createRequestSnapshot`, which writes no request-specific state back to the facade (the one
+  instance field it touches is the identity-independent widget-resolution memo). Never resolve a
+  stateless request by writing to the shared facade — concurrent requests would contaminate
+  each other.
 - **Tool names: capped + hash-deduped.** Names are capped at `MAX_TOOL_NAME_LENGTH`;
   over-length or colliding names get a `TOOL_NAME_HASH_LENGTH` hash suffix so the
   exposed set stays unique within the limit (the hashing is in `../tools/actor_tool_naming.ts`).
@@ -59,6 +76,10 @@ implementations, not by importing from here.
   `getToolsForServerMode()`) is documented once in
   [`../../DEVELOPMENT.md`](../../DEVELOPMENT.md) — read it before changing
   registration in `server.ts`; not restated here.
+- **Client data has two forms.** Keep `options.initializeRequestData` unchanged for hosted
+  session recovery. Use the `McpClientContext` snapshot for client gating, request origin,
+  telemetry, resources, and scheduled tasks. Do not export the context from the package root
+  or `./internals`.
 
 ## Local commands
 

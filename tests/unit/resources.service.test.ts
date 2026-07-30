@@ -1,6 +1,9 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { Readable } from 'node:stream';
+
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ApifyClient } from '../../src/apify_client.js';
+import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
 import { SKYFIRE_README_CONTENT } from '../../src/payments/const.js';
 import { resolvePaymentProvider } from '../../src/payments/index.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
@@ -98,10 +101,9 @@ describe('createResourceService()', () => {
 
             const error = await service.readResource('file://missing.md').catch((e: unknown) => e);
 
-            expect(error).toBeInstanceOf(McpError);
-            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
-            expect((error as McpError).message).toContain('file://missing.md');
-            expect((error as McpError).data).toEqual({ uri: 'file://missing.md' });
+            expect(error).toBeInstanceOf(InvalidParamsError);
+            expect((error as InvalidParamsError).message).toContain('file://missing.md');
+            expect((error as InvalidParamsError).data).toEqual({ uri: 'file://missing.md' });
         });
 
         it('throws the origin refusal for a non-Apify https URL', async () => {
@@ -114,9 +116,37 @@ describe('createResourceService()', () => {
 
             const error = await service.readResource('https://example.com/steal-my-token').catch((e: unknown) => e);
 
-            expect(error).toBeInstanceOf(McpError);
-            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
-            expect((error as McpError).message).toContain('only Apify API URLs');
+            expect(error).toBeInstanceOf(InvalidParamsError);
+            expect((error as InvalidParamsError).message).toContain('only Apify API URLs');
+        });
+
+        it('throws InternalError when the API read hits a 5xx', async () => {
+            // http(s) URIs route to readApiResource; a resolved 5xx maps to the InternalError class,
+            // which must survive back out of readResource untouched (message + data preserved).
+            const uri = 'https://api.apify.com/v2/datasets/ds-1/items';
+            const apifyClient = {
+                httpClient: {
+                    axios: {
+                        request: async () => ({
+                            data: Readable.from([]),
+                            headers: { 'content-type': 'application/json' },
+                            status: 500,
+                            statusText: 'Internal Server Error',
+                        }),
+                    },
+                },
+            } as unknown as ApifyClient;
+            const service = createResourceService({
+                getMode: () => 'default',
+                getAvailableWidgets: () => new Map(),
+            });
+
+            const error = await service.readResource(uri, apifyClient).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(InternalError);
+            expect((error as InternalError).message).toContain('Failed to read');
+            expect((error as InternalError).message).toContain('HTTP 500');
+            expect((error as InternalError).data).toEqual({ uri });
         });
 
         it('returns widget HTML when the widget exists', async () => {

@@ -30,6 +30,8 @@ USAGE EXAMPLES:
 - user_input: Get logs for run y2h7sK3Wc`,
     inputSchema: z.toJSONSchema(GetRunLogArgs) as ToolInputSchema,
     // It does not make sense to add structured output here since the log API just returns plain text
+    // TODO(#1160): no `outputSchema`, so the `tools/call` result projection against an advertised
+    // schema does not apply to this tool either way.
     ajvValidate: compileSchema(z.toJSONSchema(GetRunLogArgs)),
     paymentRequired: true,
     annotations: {

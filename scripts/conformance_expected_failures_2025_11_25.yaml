@@ -1,0 +1,80 @@
+# Conformance scenarios excluded from the pass/fail gate of `pnpm run test:conformance` for the
+# 2025-11-25 era, served by the sessionful `StreamableHTTPServerTransport` path
+# (runner: @modelcontextprotocol/conformance 0.2.0-alpha.9, `--suite all --spec-version 2025-11-25`).
+# The 2026-07-28 era has its own ledger, `conformance_expected_failures_2026_07_28.yaml`.
+# The runner fails the command in both directions: an unlisted failure exits 1, and a listed
+# scenario that starts passing exits 1 as a stale entry. The loader stringifies each entry, so a
+# reason cannot be a field — the reason for each entry is the comment above it.
+#
+# Never attempted, in either era, and therefore not listed below: the ten extension-tagged
+# scenarios — tasks-capability-negotiation, tasks-dispatch-and-envelope, tasks-lifecycle,
+# tasks-mrtr-composition, tasks-mrtr-input, tasks-request-headers, tasks-request-state-removal,
+# tasks-required-task-error, tasks-status-notifications, tasks-wire-fields. The runner's
+# version-applicability predicate drops every scenario whose source carries an `extensionId`
+# whenever `--spec-version` is passed, and `--force` reaches only the single-`--scenario` path, so
+# no suite sweep can run them. They are not entries here because the runner's baseline comparison
+# walks results: an entry for a scenario that never ran would get zero enforcement and could never
+# be flagged stale. This era's server does declare a `tasks` capability, so the gap is the runner's,
+# not the server's.
+server:
+    # --- Not applicable: the scenario drives the reference fixture server's own tools, resources
+    # or prompts by name, which this server does not and will not expose. ---
+
+    # Needs fixture tool `test_simple_text`.
+    - tools-call-simple-text
+    # Needs fixture tool `test_image_content`.
+    - tools-call-image
+    # Needs fixture tool `test_audio_content`.
+    - tools-call-audio
+    # Needs fixture tool `test_embedded_resource`.
+    - tools-call-embedded-resource
+    # Needs fixture tool `test_multiple_content_types`.
+    - tools-call-mixed-content
+    # Needs fixture tool `test_tool_with_logging`.
+    - tools-call-with-logging
+    # Needs fixture tool `test_error_handling`.
+    - tools-call-error
+    # Needs fixture tool `test_tool_with_progress`.
+    - tools-call-with-progress
+    # Needs fixture tool `test_sampling`.
+    - tools-call-sampling
+    # Needs fixture tool `test_elicitation`.
+    - tools-call-elicitation
+    # Needs fixture tool `json_schema_2020_12_tool`.
+    - json-schema-2020-12
+    # Needs fixture tool `test_elicitation_sep1034_defaults`.
+    - elicitation-sep1034-defaults
+    # Needs fixture tool `test_elicitation_sep1330_enums`.
+    - elicitation-sep1330-enums
+    # Needs fixture resource `test://static-text`.
+    - resources-read-text
+    # Needs fixture resource `test://static-binary`.
+    - resources-read-binary
+    # Needs fixture resource template `test://template/{id}/data`.
+    - resources-templates-read
+    # Needs fixture prompt `test_simple_prompt`; this server serves no prompts.
+    - prompts-get-simple
+    # Needs fixture prompt `test_prompt_with_arguments`.
+    - prompts-get-with-args
+    # Needs fixture prompt `test_prompt_with_embedded_resource`.
+    - prompts-get-embedded-resource
+    # Needs fixture prompt `test_prompt_with_image`.
+    - prompts-get-with-image
+
+    # --- Not supported by this server. ---
+
+    # No `completion/complete` handler and no completions capability, so the request is
+    # method-not-found.
+    - completion-complete
+    # No `resources/subscribe` handler and the declared `resources` capability sets no `subscribe`,
+    # so the request is method-not-found.
+    - resources-subscribe
+    # Same as above for `resources/unsubscribe`.
+    - resources-unsubscribe
+
+    # --- Behavior of our pinned SDK (`@modelcontextprotocol/sdk` 1.29.0). ---
+
+    # Two WARNING checks, which the runner counts as failures: on a POST SSE stream the SDK's
+    # `StreamableHTTPServerTransport` sends neither a priming event carrying an event id nor a
+    # `retry:` field. Both are recommendations for resumability, not requirements.
+    - server-sse-polling

@@ -8,12 +8,12 @@ import type {
     Resource,
     TextResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
+import { InvalidParamsError } from '../mcp/errors.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { SERVER_MODE } from '../types.js';
 import { readApiResource } from './api_resources.js';
@@ -164,7 +164,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         // A URI that is neither an http(s) URL, the usage guide, nor a served widget is not a
         // readable resource — throw so the SDK returns a JSON-RPC error instead of success-shaped
         // "not found" content (see SEP-2164 and src/resources/AGENTS.md).
-        throw new McpError(ErrorCode.InvalidParams, `Failed to read ${uri}: not a readable resource.`, { uri });
+        throw new InvalidParamsError(`Failed to read ${uri}: not a readable resource.`, { uri });
     };
 
     // Advertise the common URL shapes so clients that never surface the server instructions can

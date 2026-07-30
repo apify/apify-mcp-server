@@ -9,8 +9,8 @@ import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import { callActorApps } from '../../src/tools/actors/call_actor.js';
 import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
-import type { ServerModeOption, ToolEntry } from '../../src/types.js';
-import { SERVER_MODE, TOOL_TYPE } from '../../src/types.js';
+import type { ServerModeOption } from '../../src/types.js';
+import { SERVER_MODE } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
 import { getRequestHandler } from './helpers/mcp_server.js';
@@ -23,13 +23,6 @@ vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
 });
 
 const getActorsMock = vi.mocked(getActors);
-
-const FAKE_ACTOR_FULL_NAME = 'apify/fake-actor';
-const FAKE_ACTOR_TOOL: ToolEntry = {
-    type: TOOL_TYPE.ACTOR,
-    name: 'apify--fake-actor',
-    actorFullName: FAKE_ACTOR_FULL_NAME,
-} as unknown as ToolEntry;
 
 function makeInitializeRequest(supportsUi: boolean): InitializeRequest {
     const extensions = supportsUi ? { 'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] } } : {};
@@ -181,13 +174,9 @@ describe('ActorsMcpServer initialize handler', () => {
         async () => {
             const server = track(makeServer('auto'));
             const apifyClient = new ApifyClient({ token: 'test-token' });
-            const loadActorsAsTools = vi
-                .spyOn(server, 'loadActorsAsTools')
-                .mockResolvedValue({ tools: [], errors: [] });
 
             await server.loadToolsByName([HELPER_TOOLS.STORE_SEARCH_WIDGET], apifyClient);
 
-            expect(loadActorsAsTools).not.toHaveBeenCalled();
             expect(server.tools.has(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(false);
 
             await dispatchInitialize(server, makeInitializeRequest(true));
@@ -195,70 +184,4 @@ describe('ActorsMcpServer initialize handler', () => {
             expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
         },
     );
-
-    describe('registerFetchedActorTools notify behavior', () => {
-        it('loadToolsByName notifies eagerly pre-mode-resolution when actor tools are non-empty', async () => {
-            const server = track(makeServer('auto'));
-            const apifyClient = new ApifyClient({ token: 'test-token' });
-            const notifyHandler = vi.fn();
-            server.registerToolsChangedHandler(notifyHandler);
-            getActorsMock.mockResolvedValueOnce([FAKE_ACTOR_TOOL]);
-
-            await server.loadToolsByName(['apify/fake-actor'], apifyClient);
-
-            expect(notifyHandler).toHaveBeenCalledTimes(1);
-        });
-
-        it('loadToolsByName notifies with the composed set when server mode is already resolved', async () => {
-            const server = track(makeServer(SERVER_MODE.DEFAULT));
-            const apifyClient = new ApifyClient({ token: 'test-token' });
-            const notifyHandler = vi.fn();
-            server.registerToolsChangedHandler(notifyHandler);
-            getActorsMock.mockResolvedValueOnce([FAKE_ACTOR_TOOL]);
-
-            await server.loadToolsByName(['apify/fake-actor'], apifyClient);
-
-            expect(notifyHandler).toHaveBeenCalledTimes(1);
-        });
-
-        it('loadToolsFromInput does not notify pre-mode-resolution even when actor tools are non-empty', async () => {
-            const server = track(makeServer('auto'));
-            const apifyClient = new ApifyClient({ token: 'test-token' });
-            const notifyHandler = vi.fn();
-            server.registerToolsChangedHandler(notifyHandler);
-            getActorsMock.mockResolvedValueOnce([FAKE_ACTOR_TOOL]);
-
-            await server.loadToolsFromInput({ actors: ['apify/fake-actor'] }, apifyClient);
-
-            expect(notifyHandler).not.toHaveBeenCalled();
-        });
-
-        it('loadToolsFromUrl does not notify pre-mode-resolution even when actor tools are non-empty', async () => {
-            const server = track(makeServer('auto'));
-            const apifyClient = new ApifyClient({ token: 'test-token' });
-            const notifyHandler = vi.fn();
-            server.registerToolsChangedHandler(notifyHandler);
-            getActorsMock.mockResolvedValueOnce([FAKE_ACTOR_TOOL]);
-
-            await server.loadToolsFromUrl('http://localhost?actors=apify/fake-actor', apifyClient);
-
-            expect(notifyHandler).not.toHaveBeenCalled();
-        });
-
-        it('notifies with the full set once initialize runs the pending-tools reconcile', async () => {
-            const server = track(makeServer('auto'));
-            const apifyClient = new ApifyClient({ token: 'test-token' });
-            getActorsMock.mockResolvedValueOnce([FAKE_ACTOR_TOOL]);
-
-            await server.loadToolsFromInput({ actors: ['apify/fake-actor'] }, apifyClient);
-
-            const notifyHandler = vi.fn();
-            server.registerToolsChangedHandler(notifyHandler);
-
-            await dispatchInitialize(server, makeInitializeRequest(true));
-
-            expect(notifyHandler).toHaveBeenCalledTimes(1);
-            expect(notifyHandler.mock.calls[0][0]).toContain(FAKE_ACTOR_FULL_NAME);
-        });
-    });
 });

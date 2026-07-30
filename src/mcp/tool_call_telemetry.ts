@@ -1,23 +1,29 @@
-import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify_client.js';
 import { HELPER_TOOLS, TOOL_STATUS } from '../const.js';
 import { buildReportedProblemProperties, trackReportedProblem, trackToolCall } from '../telemetry.js';
-import type { CallDiagnostics, ToolCallTelemetryProperties, ToolStatus } from '../types.js';
+import type {
+    CallDiagnostics,
+    TelemetryEnv,
+    ToolCallTelemetryProperties,
+    ToolStatus,
+    TransportType,
+} from '../types.js';
 import { computeToolResponseBytes } from '../utils/mcp.js';
 import { getRequestOriginForClient } from '../utils/mcp_clients.js';
 import { deriveResourceIds } from '../utils/tool_status.js';
 import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
-import type { ActorsMcpServer } from './server.js';
+import type { McpClientContext } from './client_context.js';
 
 type PrepareTelemetryDataParams = {
     toolName: string;
     mcpSessionId: string | undefined;
     apifyToken: string;
-    apifyMcpServer: ActorsMcpServer;
+    telemetryEnabled: boolean;
+    transportType?: TransportType;
+    clientContext: McpClientContext | undefined;
 };
 
 /**
@@ -26,30 +32,28 @@ type PrepareTelemetryDataParams = {
 export async function prepareTelemetryData(
     params: PrepareTelemetryDataParams,
 ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
-    const { toolName, mcpSessionId, apifyToken, apifyMcpServer } = params;
-    if (!apifyMcpServer.telemetryEnabled) {
+    const { toolName, mcpSessionId, apifyToken, telemetryEnabled, transportType, clientContext } = params;
+    if (!telemetryEnabled) {
         return { telemetryData: null, userId: null };
     }
 
     // Get userId from cache or fetch from API
     let userId: string | null = null;
     if (apifyToken) {
-        const requestOrigin = getRequestOriginForClient(apifyMcpServer.options.initializeRequestData);
+        const requestOrigin = getRequestOriginForClient(clientContext);
         const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
         ({ userId } = await getUserInfoCached(apifyToken, apifyClient));
         log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
     }
-    const capabilities = apifyMcpServer.options.initializeRequestData?.params?.capabilities;
-    const initializeParams = apifyMcpServer.options.initializeRequestData?.params as InitializeRequest['params'];
     const telemetryData: ToolCallTelemetryProperties = {
         app: 'mcp',
         app_version: getPackageVersion() || '',
-        mcp_client_name: initializeParams?.clientInfo?.name || '',
-        mcp_client_version: initializeParams?.clientInfo?.version || '',
-        mcp_protocol_version: initializeParams?.protocolVersion || '',
-        mcp_client_capabilities: capabilities || null,
+        mcp_client_name: clientContext?.clientInfo?.name || '',
+        mcp_client_version: clientContext?.clientInfo?.version || '',
+        mcp_protocol_version: clientContext?.protocolVersion || '',
+        mcp_client_capabilities: clientContext?.capabilities || null,
         mcp_session_id: mcpSessionId || '',
-        transport_type: apifyMcpServer.options.transportType || '',
+        transport_type: transportType || '',
         tool_name: toolName,
         tool_status: TOOL_STATUS.SUCCEEDED, // Will be updated in finally
         tool_exec_time_ms: 0, // Will be calculated in finally
@@ -75,7 +79,7 @@ type LogToolCallAndTelemetryParams = {
     callDiagnostics?: CallDiagnostics;
     args?: Record<string, unknown>;
     result?: unknown;
-    apifyMcpServer: ActorsMcpServer;
+    telemetryEnv: TelemetryEnv;
 };
 
 export function logToolCallAndTelemetry(params: LogToolCallAndTelemetryParams): void {
@@ -113,7 +117,7 @@ export function logToolCallAndTelemetry(params: LogToolCallAndTelemetryParams): 
             // threads them back. Applied uniformly, last. See deriveResourceIds.
             ...deriveResourceIds(params.args, params.result),
         };
-        trackToolCall(params.userId, params.apifyMcpServer.telemetryEnv, finalizedTelemetryData);
+        trackToolCall(params.userId, params.telemetryEnv, finalizedTelemetryData);
 
         // A successful report-problem call also emits a dedicated feedback event carrying the
         // submission. A downstream Segment destination fans it out to Slack/GitHub.
@@ -124,7 +128,7 @@ export function logToolCallAndTelemetry(params: LogToolCallAndTelemetryParams): 
         ) {
             trackReportedProblem(
                 params.userId,
-                params.apifyMcpServer.telemetryEnv,
+                params.telemetryEnv,
                 buildReportedProblemProperties(finalizedTelemetryData, params.args),
             );
         }

@@ -278,8 +278,8 @@ export function fixActorNameInput(actorName: string): string {
  * describing why the load failed.
  *
  * Bulk callers (`getActors`, server load-helpers) typically only read
- * `tools`. Single-Actor callers (`add-actor`, `call-actor`) read `errors[0]`
- * to surface the precise reason back to the agent.
+ * `tools`. The single-Actor caller (`call-actor`) reads `errors[0]` to surface
+ * the precise reason back to the agent.
  */
 export type ActorsAsToolsResult = {
     tools: ToolEntry[];
@@ -289,9 +289,9 @@ export type ActorsAsToolsResult = {
 /**
  * Loads Actor metadata + builds MCP tool entries for the requested Actor
  * names. Returns both successful tools and `ActorLoadError` entries so
- * callers can surface precise reasons when needed (single-Actor flows like
- * `add-actor` / `call-actor`) or just ignore failures (bulk session-boot
- * flows that build the initial tool surface).
+ * callers can surface precise reasons when needed (a single-Actor flow like
+ * `call-actor`) or just ignore failures (bulk session-boot flows that build
+ * the initial tool surface).
  *
  * When `paymentProvider` is set, standby and MCP-server Actors are reported
  * as `STANDBY_PAYMENT_NOT_SUPPORTED` errors instead of contributing tools.

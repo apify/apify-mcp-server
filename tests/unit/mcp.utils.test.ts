@@ -39,22 +39,13 @@ describe('parseInputParamsFromUrl()', () => {
         expect(result.actors).toBeUndefined();
     });
 
-    it('parses the deprecated enableActorAutoLoading flag as enableAddingActors', () => {
-        const url = 'https://mcp.apify.com?enableActorAutoLoading=true';
-        const result = parseInputParamsFromUrl(url);
-        expect(result.enableAddingActors).toBe(true);
-    });
+    it.for(['enableAddingActors', 'enableActorAutoLoading'])('strips removed URL field "%s"', (field) => {
+        const result = parseInputParamsFromUrl(`https://mcp.apify.com?tools=docs&${field}=true`);
 
-    it('parses enableAddingActors=true', () => {
-        const url = 'https://mcp.apify.com?enableAddingActors=true';
-        const result = parseInputParamsFromUrl(url);
-        expect(result.enableAddingActors).toBe(true);
-    });
-
-    it('parses enableAddingActors=false', () => {
-        const url = 'https://mcp.apify.com?enableAddingActors=false';
-        const result = parseInputParamsFromUrl(url);
-        expect(result.enableAddingActors).toBe(false);
+        expect(result).toEqual({
+            actors: undefined,
+            tools: ['docs'],
+        });
     });
 });
 

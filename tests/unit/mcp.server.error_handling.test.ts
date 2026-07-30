@@ -1,10 +1,14 @@
+import { Readable } from 'node:stream';
+
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
 import { TOOL_STATUS } from '../../src/const.js';
+import { getDefaultTools } from '../../src/tools/index.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
-import { getRequestHandler, makeThrowingTool, withServer } from './helpers/mcp_server.js';
+import { getLegacyServer, getRequestHandler, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
 /**
  * Covers the `server.onerror` wiring in `setupErrorHandling()`: client faults softFail with a
@@ -19,13 +23,13 @@ describe('ActorsMcpServer onerror', () => {
             const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
             const errorLog = vi.spyOn(log, 'error').mockImplementation(() => log);
 
-            server.server.onerror?.(new Error('Parse error: Invalid JSON-RPC message'));
+            getLegacyServer(server).onerror?.(new Error('Parse error: Invalid JSON-RPC message'));
             expect(errorLog).not.toHaveBeenCalled();
             expect(softFail).toHaveBeenCalledWith('MCP client fault, request could not be handled', {
                 errMessage: 'Parse failure: Invalid JSON-RPC message',
             });
 
-            server.server.onerror?.(new Error('Unexpected internal failure'));
+            getLegacyServer(server).onerror?.(new Error('Unexpected internal failure'));
             expect(errorLog).toHaveBeenCalledTimes(1);
         });
     });
@@ -70,5 +74,95 @@ describe('CallToolRequestSchema handler outer catch', () => {
 
         expect(result.isError).toBe(true);
         expect(result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.FAILED });
+    });
+});
+
+/**
+ * Wire oracle for the domain-error → McpError boundary in `setupResourceHandlers`/`setupPromptHandlers`:
+ * the services throw protocol-neutral domain errors, and the handler must surface them as `McpError`
+ * carrying the original code, message, and `data` unchanged.
+ */
+describe('resources/read and prompts/get error boundary', () => {
+    it('surfaces a resources/read failure as McpError(InvalidParams) with the uri in data', async () => {
+        await withServer(async (server) => {
+            const handler = getRequestHandler(server, 'resources/read');
+
+            const error = await handler(
+                { method: 'resources/read', params: { uri: 'file://missing.md' } },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            ).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+            expect((error as McpError).message).toContain('file://missing.md');
+            expect((error as McpError).data).toEqual({ uri: 'file://missing.md' });
+        });
+    });
+
+    it('surfaces a resources/read 5xx as McpError(InternalError) — not downgraded to InvalidParams', async () => {
+        await withServer(async (server) => {
+            const uri = 'https://api.apify.com/v2/datasets/ds-1/items';
+            const stubClient = {
+                httpClient: {
+                    axios: {
+                        request: async () => ({
+                            data: Readable.from([]),
+                            headers: { 'content-type': 'application/json' },
+                            status: 500,
+                            statusText: 'Internal Server Error',
+                        }),
+                    },
+                },
+            };
+            // The handler builds its own token-scoped client; stub it so the read resolves a 5xx,
+            // driving readApiResource down the InternalError arm through the real resources/read seam.
+            vi.spyOn(server as unknown as { resolveApifyClient: () => unknown }, 'resolveApifyClient').mockReturnValue(
+                stubClient,
+            );
+            const handler = getRequestHandler(server, 'resources/read');
+
+            const error = await handler(
+                { method: 'resources/read', params: { uri } },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            ).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InternalError);
+            expect((error as McpError).message).toContain('HTTP 500');
+            expect((error as McpError).data).toEqual({ uri });
+        });
+    });
+
+    it('surfaces a prompts/get failure for an unknown name as McpError(InvalidParams)', async () => {
+        await withServer(async (server) => {
+            const handler = getRequestHandler(server, 'prompts/get');
+
+            const error = await handler(
+                { method: 'prompts/get', params: { name: 'nonexistent' } },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            ).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(McpError);
+            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+            expect((error as McpError).message).toContain('nonexistent');
+            expect((error as McpError).message).toContain('Available prompts:');
+        });
+    });
+});
+
+/**
+ * Default tool entries are `Object.freeze`d module singletons; `close()` used to write to them
+ * (`ajvValidate = null`), which threw in ESM strict mode and left the tool map populated.
+ */
+describe('ActorsMcpServer close()', () => {
+    it('clears frozen tool entries instead of throwing on their read-only ajvValidate', async () => {
+        await withServer(async (server) => {
+            const [frozenTool] = getDefaultTools();
+            server.upsertTools([frozenTool, makeThrowingTool()]);
+
+            await expect(server.close()).resolves.toBeUndefined();
+
+            expect(server.listToolNames()).toEqual([]);
+        });
     });
 });

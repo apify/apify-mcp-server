@@ -34,7 +34,6 @@ export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
 export const HELPER_TOOLS = {
-    ACTOR_ADD: 'add-actor',
     ACTOR_CALL: 'call-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
@@ -61,12 +60,21 @@ export const HELPER_TOOLS = {
 export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
 
 /**
+ * Retired tool selectors: `add-actor` and `experimental` (add-actor was deleted in the stateless
+ * migration) and the deprecated `preview` pseudo-category. They name neither a registry category
+ * nor a real tool anymore, so they resolve to nothing — never loaded, never treated as an Actor ID,
+ * never requiring a token by themselves.
+ */
+export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set(['add-actor', 'experimental', 'preview']);
+
+/**
  * Client-name substrings (lowercased, matched against `clientInfo.name`) that `report-problem` is
- * hidden from. Applied once per connection in the compose step, where the client is known.
- * `report-problem` is hidden from Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code /
- * `local-agent-mode-apify`) pending the directory review. Substring matching covers new client builds
- * without a maintained allowlist; over-matching only hides an optional tool, which is the safe failure
- * mode.
+ * hidden from: Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code /
+ * `local-agent-mode-apify`) pending the directory review. Applied in the compose step — once per
+ * connection on the 2025 path, per request on the 2026-07-28 one. Stateless `client-info` is
+ * optional; a request declaring no client name matches no blocked substring and is served the tool
+ * by policy. Substring matching covers new client builds without a maintained allowlist;
+ * over-matching only hides an optional tool.
  */
 export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
 
