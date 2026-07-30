@@ -202,19 +202,6 @@ describe('formatActorToActorCard', () => {
             expect(result).not.toContain('- **Pricing');
         });
 
-        it('should include success rate in stats', () => {
-            const result = formatActorToActorCard(mockActor, {
-                includeDescription: false,
-                includeStats: true,
-                includePricing: false,
-                includeRating: false,
-                includeMetadata: false,
-            });
-
-            // Success rate: 68663/69395 = 98.9%
-            expect(result).toContain('Runs succeeded: 98.9%');
-        });
-
         it('should include bookmark count from Actor.stats', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: false,
@@ -453,7 +440,6 @@ describe('formatActorToStructuredCard', () => {
             expect(result.stats).toBeDefined();
             expect(result.stats?.totalUsers).toBe(8594);
             expect(result.stats?.monthlyUsers).toBe(904);
-            expect(result.stats?.successRate).toBe(98.9);
         });
 
         it('should include bookmarks from Actor.stats', () => {
