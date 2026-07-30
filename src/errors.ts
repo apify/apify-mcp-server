@@ -23,7 +23,7 @@ export const ACTOR_LOAD_ERROR_KIND = {
 export type ActorLoadErrorKind = (typeof ACTOR_LOAD_ERROR_KIND)[keyof typeof ACTOR_LOAD_ERROR_KIND];
 
 /**
- * Surfaced (not thrown) by `getActorsAsTools` in the `errors[]` field when an
+ * Surfaced (not thrown) by `fetchActorsAsTools` in the `errors[]` field when an
  * Actor cannot be loaded for a *sanitized*, user-safe reason. The single-Actor
  * caller (`call-actor`) reads `errors[0]` and forwards the message to the agent;
  * bulk callers ignore the array.

@@ -72,7 +72,7 @@ Two MCP protocol revisions are served, each by its own adapter:
   **timeout** returns `null` with no SSE fallback (a timeout means unreachable, not
   the wrong transport). `getActorMCPServerPath()` prioritizes the `/mcp` streamable
   endpoint when an Actor lists several.
-- **Two-phase tool loading** (mode-agnostic `getActors()` vs mode-dependent
+- **Two-phase tool loading** (mode-agnostic `getActorsFromInput()` vs mode-dependent
   `getToolsForServerMode()`) is documented once in
   [`../../DEVELOPMENT.md`](../../DEVELOPMENT.md) — read it before changing
   registration in `server.ts`; not restated here.

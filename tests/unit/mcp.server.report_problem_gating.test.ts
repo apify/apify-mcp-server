@@ -42,7 +42,7 @@ async function dispatchInitialize(server: ActorsMcpServer, clientName: string): 
     await handler(makeInitializeRequest(clientName), {});
 }
 
-// report-problem carries no actor name, so getActors short-circuits and never touches the client —
+// report-problem carries no actor name, so getActorsFromInput short-circuits and never touches the client —
 // this drives the real compose path (getToolsForServerMode + blocklist filter) without any network.
 async function loadReportProblemByName(server: ActorsMcpServer): Promise<void> {
     await server.loadToolsByName([HELPER_TOOLS.PROBLEM_REPORT], {} as never);

@@ -6,29 +6,29 @@ import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
 import type * as ToolsIndexModule from '../../src/tools/index.js';
 import { SERVER_MODE } from '../../src/types.js';
-import { getActors, getToolsForServerMode, toolNamesToInput } from '../../src/utils/tools_loader.js';
+import { getActorsFromInput, getToolsForServerMode, toolNamesToInput } from '../../src/utils/tools_loader.js';
 
 const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview'] as const;
 
 vi.mock('../../src/tools/index.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsIndexModule>();
-    return { ...actual, getActorsAsTools: vi.fn().mockResolvedValue({ tools: [], errors: [] }) };
+    return { ...actual, fetchActorsAsTools: vi.fn().mockResolvedValue({ tools: [], errors: [] }) };
 });
 
-const { getActorsAsTools } = await import('../../src/tools/index.js');
-const getActorsAsToolsMock = vi.mocked(getActorsAsTools);
+const { fetchActorsAsTools } = await import('../../src/tools/index.js');
+const fetchActorsAsToolsMock = vi.mocked(fetchActorsAsTools);
 const apifyClient = new ApifyClient({ token: 'test-token' });
 
 beforeEach(() => {
-    getActorsAsToolsMock.mockClear();
+    fetchActorsAsToolsMock.mockClear();
 });
 
-describe('getActors()', () => {
+describe('getActorsFromInput()', () => {
     it.for(RETIRED_SELECTORS)('does not fetch retired selector "%s"', async (selector) => {
-        const tools = await getActors({ tools: [selector] }, apifyClient);
+        const tools = await getActorsFromInput({ tools: [selector] }, apifyClient);
 
         expect(tools).toEqual([]);
-        expect(getActorsAsToolsMock).not.toHaveBeenCalled();
+        expect(fetchActorsAsToolsMock).not.toHaveBeenCalled();
     });
 });
 
@@ -68,7 +68,7 @@ describe('ActorsMcpServer.loadToolsByName()', () => {
 
         await server.loadToolsByName([selector], apifyClient);
 
-        expect(getActorsAsToolsMock).not.toHaveBeenCalled();
+        expect(fetchActorsAsToolsMock).not.toHaveBeenCalled();
         expect(server.listAllToolNames()).toEqual([]);
     });
 });
