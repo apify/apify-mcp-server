@@ -34,7 +34,7 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
   preparation; `executeSyncToolCall()` runs synchronous calls.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
-- `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`.
+- `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(url, toolName)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
@@ -61,8 +61,9 @@ Two MCP protocol revisions are served, each by its own adapter:
   each other.
 - **Tool names: capped + hash-deduped.** Names are capped at `MAX_TOOL_NAME_LENGTH`;
   over-length or colliding names get a `TOOL_NAME_HASH_LENGTH` hash suffix so the
-  exposed set stays unique within the limit (the hashing is in `../tools/actor_tool_naming.ts`).
-  Never widen the cap — downstream clients depend on it.
+  exposed set stays unique within the limit (Actor tools: `../tools/actor_tool_naming.ts`;
+  proxied Actor-MCP tools: `proxy.ts` `getProxyMCPServerToolName`). Never widen the
+  cap — downstream clients depend on it.
 - **Proxy server IDs are keyed by URL, not Actor ID.** `getMCPServerID(url)` is
   `sha256(url)` sliced to `SERVER_ID_LENGTH`. One Actor can expose both an SSE and a
   streamable endpoint; keying by URL keeps those distinct. Keying by Actor ID would

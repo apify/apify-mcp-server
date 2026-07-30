@@ -1,5 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { ContentBlock } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -15,6 +16,7 @@ import {
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import { connectMCPClient } from '../../mcp/client.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import type { ActorInfo, ApifyToken, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
@@ -324,8 +326,10 @@ export async function handleMcpToolCall(params: {
     mcpServerUrl: string | false;
     apifyToken: string;
     mcpSessionId?: string;
+    signal: AbortSignal;
 }): Promise<ToolResponse | null> {
-    const { baseActorName, mcpToolName, input, isActorMcpServer, mcpServerUrl, apifyToken, mcpSessionId } = params;
+    const { baseActorName, mcpToolName, input, isActorMcpServer, mcpServerUrl, apifyToken, mcpSessionId, signal } =
+        params;
 
     if (!isActorMcpServer) {
         return respondServerError(`Actor '${baseActorName}' is not an MCP server.`);
@@ -337,6 +341,10 @@ export async function handleMcpToolCall(params: {
         );
     }
 
+    if (signal.aborted) {
+        return respondAborted();
+    }
+
     let client: Client | null = null;
     try {
         client = await connectMCPClient(mcpServerUrl as string, apifyToken, mcpSessionId);
@@ -344,10 +352,21 @@ export async function handleMcpToolCall(params: {
             return respondServerError(`Failed to connect to MCP server ${mcpServerUrl}`);
         }
 
-        const result = await client.callTool({
-            name: mcpToolName,
-            arguments: input,
-        });
+        if (signal.aborted) {
+            return respondAborted();
+        }
+
+        const result = await client.callTool(
+            {
+                name: mcpToolName,
+                arguments: input,
+            },
+            CallToolResultSchema,
+            {
+                timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
+                signal,
+            },
+        );
 
         // `call-actor` declares `actorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
         // without `structuredContent` (unless `isError: true`) with -32600. The pass-through has no
@@ -369,6 +388,9 @@ export async function handleMcpToolCall(params: {
             },
         });
     } catch (error) {
+        if (signal.aborted) {
+            return respondAborted();
+        }
         logHttpError(error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {
             actorName: baseActorName,
             toolName: mcpToolName,
@@ -529,6 +551,7 @@ export async function callActorPreExecute(
             mcpServerUrl: mcpServerUrlOrFalse,
             apifyToken,
             mcpSessionId,
+            signal: toolArgs.signal,
         });
         if (mcpResult) {
             return { earlyResponse: mcpResult };

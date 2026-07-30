@@ -181,6 +181,10 @@ export async function dispatchToolCall(params: {
                     CallToolResultSchema,
                     {
                         timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
+                        // Same abort source as ACTOR/INTERNAL branches: request signal for sync,
+                        // cancel-watcher signal for tasks. Without this, cancel/disconnect cannot
+                        // stop the remote call before EXTERNAL_TOOL_CALL_TIMEOUT_MSEC.
+                        signal,
                     },
                 );
 
