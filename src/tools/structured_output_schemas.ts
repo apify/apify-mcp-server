@@ -549,6 +549,15 @@ const actorRunListItemSchema = {
 /** Schema for get-actor-run-list output (paginated list of runs). */
 export const actorRunListOutputSchema = paginatedListOutputSchema(actorRunListItemSchema, 'Actor runs.');
 
+/** Schema for get-actor-run-log output. Plain-text log wrapped for uniformity (#1160). */
+export const getActorRunLogToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        log: { type: 'string', description: 'Last N lines of the run log (plain text).' },
+    },
+    required: ['log'],
+};
+
 /**
  * Schema for dataset items retrieval tools (get-dataset-items).
  * Contains dataset items with pagination and count information.

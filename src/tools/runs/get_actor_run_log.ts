@@ -4,7 +4,8 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { respondRaw } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
+import { getActorRunLogToolOutputSchema } from '../structured_output_schemas.js';
 
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
@@ -29,9 +30,7 @@ USAGE EXAMPLES:
 - user_input: Show last 20 lines of logs for run y2h7sK3Wc
 - user_input: Get logs for run y2h7sK3Wc`,
     inputSchema: z.toJSONSchema(GetRunLogArgs) as ToolInputSchema,
-    // It does not make sense to add structured output here since the log API just returns plain text
-    // TODO(#1160): no `outputSchema`, so the `tools/call` result projection against an advertised
-    // schema does not apply to this tool either way.
+    outputSchema: getActorRunLogToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(GetRunLogArgs)),
     paymentRequired: true,
     annotations: {
@@ -47,6 +46,6 @@ USAGE EXAMPLES:
         const v = (await client.run(parsed.runId).log().get()) ?? '';
         const lines = v.split('\n');
         const text = lines.slice(lines.length - parsed.lines - 1, lines.length).join('\n');
-        return respondRaw({ content: [{ type: 'text', text }] });
+        return respondOk(text, { structuredContent: { log: text } });
     },
 } as const);
