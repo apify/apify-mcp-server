@@ -209,6 +209,29 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
     // method-not-found there — the Tasks cases below run on the legacy dimensions only.
     const hasTasksSupport = options.transport !== '2026-07-28';
 
+    // Creates a client via createClientFn(clientOptions), runs the test body with it, and
+    // guarantees client.close() runs even if the body throws — one place owns the cleanup
+    // contract instead of a `let client` + try/finally repeated in every test. Tests that need
+    // custom control flow (it.runIf/it.for/{retry}, or more than one client) call createClientFn
+    // directly instead of going through this wrapper.
+    function itc(
+        name: string,
+        clientOptions: Parameters<typeof createClientFn>[0],
+        testFn: (client: McpSuiteClient) => Promise<void>,
+    ): void {
+        // thin wrapper: `name` is the caller's title string, and assertions live in the
+        // caller's testFn, not here.
+        // eslint-disable-next-line vitest/valid-title vitest/expect-expect
+        it(name, async () => {
+            const client = await createClientFn(clientOptions);
+            try {
+                await testFn(client);
+            } finally {
+                await client.close();
+            }
+        });
+    }
+
     // Hooks
     if (beforeAllFn) {
         beforeAll(beforeAllFn);
@@ -230,28 +253,22 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             concurrent: true, // Every test declares and closes its own client — safe to parallelize.
         },
         () => {
-            it('should list all default tools and Actors', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn();
-                    const tools = await client.listTools();
-                    expect(tools.tools.length).toEqual(servedDefaultTools().length + defaults.actors.length + 4);
+            itc('should list all default tools and Actors', undefined, async (client) => {
+                const tools = await client.listTools();
+                expect(tools.tools.length).toEqual(servedDefaultTools().length + defaults.actors.length + 4);
 
-                    const names = getToolNames(tools);
-                    expectToolNamesToContain(names, servedDefaultToolNames());
-                    expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-                    // get-actor-run + storage/abort helpers are auto-injected alongside call-actor.
-                    expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-                    expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                } finally {
-                    await client?.close();
-                }
+                const names = getToolNames(tools);
+                expectToolNamesToContain(names, servedDefaultToolNames());
+                expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
+                // get-actor-run + storage/abort helpers are auto-injected alongside call-actor.
+                expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+                expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             });
 
-            it('should match spec default: actors,docs,apify/rag-web-browser when no params provided', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn();
+            itc(
+                'should match spec default: actors,docs,apify/rag-web-browser when no params provided',
+                undefined,
+                async (client) => {
                     const tools = await client.listTools();
                     const names = getToolNames(tools);
 
@@ -272,10 +289,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
                     // get-actor-run should be automatically included when call-actor is present
                     expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
             describe('report-problem', () => {
                 // report-problem is served only when telemetry is enabled; this suite runs with telemetry
@@ -283,192 +298,153 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 // emitting telemetry. The served path (listed for non-Anthropic clients, hidden from
                 // Anthropic clients, acknowledges a submission) is covered by the unit tests
                 // tests/unit/mcp.server.report_problem_gating.test.ts and tests/unit/tools.report_problem.test.ts.
-                it('is not served when telemetry is disabled', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn();
-                        const names = getToolNames(await client.listTools());
-                        expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
-                    } finally {
-                        await client?.close();
-                    }
+                itc('is not served when telemetry is disabled', undefined, async (client) => {
+                    const names = getToolNames(await client.listTools());
+                    expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
                 });
             });
 
-            it('should return outputSchema, title, and icons in tools list response', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn();
-                    const response = await client.listTools();
+            itc('should return outputSchema, title, and icons in tools list response', undefined, async (client) => {
+                const response = await client.listTools();
 
-                    // Find a tool with outputSchema (e.g., search-apify-docs)
-                    const searchApiifyDocsTool = response.tools.find((tool) => tool.name === 'search-apify-docs');
-                    expect(searchApiifyDocsTool).toBeDefined();
+                // Find a tool with outputSchema (e.g., search-apify-docs)
+                const searchApiifyDocsTool = response.tools.find((tool) => tool.name === 'search-apify-docs');
+                expect(searchApiifyDocsTool).toBeDefined();
 
-                    // Verify that outputSchema is present
-                    expect(typeof searchApiifyDocsTool?.outputSchema).toBe('object');
-                    expect(searchApiifyDocsTool?.outputSchema).toHaveProperty('type');
-                    expect(searchApiifyDocsTool?.outputSchema).toHaveProperty('properties');
-                } finally {
-                    await client?.close();
-                }
+                // Verify that outputSchema is present
+                expect(typeof searchApiifyDocsTool?.outputSchema).toBe('object');
+                expect(searchApiifyDocsTool?.outputSchema).toHaveProperty('type');
+                expect(searchApiifyDocsTool?.outputSchema).toHaveProperty('properties');
             });
 
-            it('should list all default tools and Actors', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn();
-                    const names = getToolNames(await client.listTools());
-                    expect(names.length).toEqual(servedDefaultTools().length + defaults.actors.length + 4);
+            itc('should list all default tools and Actors', undefined, async (client) => {
+                const names = getToolNames(await client.listTools());
+                expect(names.length).toEqual(servedDefaultTools().length + defaults.actors.length + 4);
 
-                    expectToolNamesToContain(names, servedDefaultToolNames());
-                    expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-                    expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                    // get-actor-run should be automatically included when call-actor is present
-                    expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-                } finally {
-                    await client?.close();
-                }
+                expectToolNamesToContain(names, servedDefaultToolNames());
+                expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
+                expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+                // get-actor-run should be automatically included when call-actor is present
+                expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
             });
 
-            it('loads no tools for retired selectors', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: [...RETIRED_SELECTORS] });
-
-                    const names = getToolNames(await client.listTools());
-                    expect(names).toHaveLength(0);
-                } finally {
-                    await client?.close();
-                }
+            itc('loads no tools for retired selectors', { tools: [...RETIRED_SELECTORS] }, async (client) => {
+                const names = getToolNames(await client.listTools());
+                expect(names).toHaveLength(0);
             });
 
-            it('should list two loaded Actors plus auto-injected storage and abort tools', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const actors = ['apify/python-example', 'apify/rag-web-browser'];
-                    client = await createClientFn({ actors, serverMode: 'default' });
-                    const names = getToolNames(await client.listTools());
-                    // Actor tools trigger auto-injected helpers (get-actor-run, storage, abort).
-                    expect(names.length).toEqual(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
-                    expectToolNamesToContain(
-                        names,
-                        actors.map((actor) => actorNameToToolName(actor)),
-                    );
-                    expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                } finally {
-                    await client?.close();
-                }
+            {
+                const actors = ['apify/python-example', 'apify/rag-web-browser'];
+                itc(
+                    'should list two loaded Actors plus auto-injected storage and abort tools',
+                    { actors, serverMode: 'default' },
+                    async (client) => {
+                        const names = getToolNames(await client.listTools());
+                        // Actor tools trigger auto-injected helpers (get-actor-run, storage, abort).
+                        expect(names.length).toEqual(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
+                        expectToolNamesToContain(
+                            names,
+                            actors.map((actor) => actorNameToToolName(actor)),
+                        );
+                        expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+                    },
+                );
+            }
+
+            {
+                const actors = [ACTOR_NORMAL_MODE];
+                itc(
+                    'should load only specified actors when actors param is provided (no other tools)',
+                    { actors, serverMode: 'default' },
+                    async (client) => {
+                        const names = getToolNames(await client.listTools());
+
+                        // Should only load the specified actor plus auto-injected storage/abort helpers
+                        expect(names.length).toEqual(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
+                        expect(names).toContain(actorNameToToolName(actors[0]));
+                        expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+
+                        // Should NOT include any default category tools
+                        expect(names).not.toContain('search-actors');
+                        expect(names).not.toContain('fetch-actor-details');
+                        expect(names).not.toContain('call-actor');
+                        expect(names).not.toContain('search-apify-docs');
+                        expect(names).not.toContain('fetch-apify-docs');
+                    },
+                );
+            }
+
+            {
+                const actors = [ACTOR_NORMAL_MODE];
+                itc(
+                    'should return tool with execution field when listing tools with apify/normal-mode-test-actor',
+                    { tools: actors },
+                    async (client) => {
+                        const tools = await client.listTools();
+
+                        // Find the tool for apify/normal-mode-test-actor
+                        const normalModeTool = tools.tools.find(
+                            (tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE),
+                        );
+                        expect(normalModeTool).toBeDefined();
+
+                        // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly).
+                        // The 2026-07-28 codec strips `execution` as deleted vocabulary (no tasks capability there).
+                        if (hasTasksSupport) {
+                            expect(normalModeTool).toHaveProperty('execution');
+                            expect(normalModeTool?.execution).toBeDefined();
+                        } else {
+                            expect(normalModeTool).not.toHaveProperty('execution');
+                        }
+
+                        // Verify other expected fields are present
+                        expect(normalModeTool).toHaveProperty('name');
+                        expect(normalModeTool).toHaveProperty('description');
+                        expect(normalModeTool).toHaveProperty('inputSchema');
+                    },
+                );
+            }
+
+            itc('should not load any tools when tools param is empty', { tools: [] }, async (client) => {
+                const names = getToolNames(await client.listTools());
+                expect(names).toHaveLength(0);
             });
 
-            it('should load only specified actors when actors param is provided (no other tools)', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const actors = [ACTOR_NORMAL_MODE];
-                    client = await createClientFn({ actors, serverMode: 'default' });
-                    const names = getToolNames(await client.listTools());
-
-                    // Should only load the specified actor plus auto-injected storage/abort helpers
-                    expect(names.length).toEqual(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
-                    expect(names).toContain(actorNameToToolName(actors[0]));
-                    expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-
-                    // Should NOT include any default category tools
-                    expect(names).not.toContain('search-actors');
-                    expect(names).not.toContain('fetch-actor-details');
-                    expect(names).not.toContain('call-actor');
-                    expect(names).not.toContain('search-apify-docs');
-                    expect(names).not.toContain('fetch-apify-docs');
-                } finally {
-                    await client?.close();
-                }
+            itc('should not load any tools when actors param is empty', { actors: [] }, async (client) => {
+                const names = getToolNames(await client.listTools());
+                expect(names.length).toEqual(0);
             });
 
-            it('should return tool with execution field when listing tools with apify/normal-mode-test-actor', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const actors = [ACTOR_NORMAL_MODE];
-                    client = await createClientFn({ tools: actors });
-                    const tools = await client.listTools();
-
-                    // Find the tool for apify/normal-mode-test-actor
-                    const normalModeTool = tools.tools.find(
-                        (tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE),
-                    );
-                    expect(normalModeTool).toBeDefined();
-
-                    // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly).
-                    // The 2026-07-28 codec strips `execution` as deleted vocabulary (no tasks capability there).
-                    if (hasTasksSupport) {
-                        expect(normalModeTool).toHaveProperty('execution');
-                        expect(normalModeTool?.execution).toBeDefined();
-                    } else {
-                        expect(normalModeTool).not.toHaveProperty('execution');
-                    }
-
-                    // Verify other expected fields are present
-                    expect(normalModeTool).toHaveProperty('name');
-                    expect(normalModeTool).toHaveProperty('description');
-                    expect(normalModeTool).toHaveProperty('inputSchema');
-                } finally {
-                    await client?.close();
-                }
-            });
-
-            it('should not load any tools when tools param is empty', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: [] });
-                    const names = getToolNames(await client.listTools());
-                    expect(names).toHaveLength(0);
-                } finally {
-                    await client?.close();
-                }
-            });
-
-            it('should not load any tools when actors param is empty', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ actors: [] });
+            itc(
+                'should not load any tools when both tools and actors params are empty',
+                { tools: [], actors: [] },
+                async (client) => {
                     const names = getToolNames(await client.listTools());
                     expect(names.length).toEqual(0);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should not load any tools when both tools and actors params are empty', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: [], actors: [] });
-                    const names = getToolNames(await client.listTools());
-                    expect(names.length).toEqual(0);
-                } finally {
-                    await client?.close();
-                }
-            });
+            {
+                const actors = [ACTOR_NORMAL_MODE];
+                itc(
+                    'should load only specified Actors via tools selectors when actors param omitted',
+                    { tools: actors, serverMode: 'default' },
+                    async (client) => {
+                        const names = getToolNames(await client.listTools());
+                        // The Actor plus auto-injected storage/abort helpers.
+                        expect(names).toHaveLength(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
+                        expect(names).toContain(actorNameToToolName(actors[0]));
+                        expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+                    },
+                );
+            }
 
-            it('should load only specified Actors via tools selectors when actors param omitted', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const actors = [ACTOR_NORMAL_MODE];
-                    client = await createClientFn({ tools: actors, serverMode: 'default' });
-                    const names = getToolNames(await client.listTools());
-                    // The Actor plus auto-injected storage/abort helpers.
-                    expect(names).toHaveLength(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
-                    expect(names).toContain(actorNameToToolName(actors[0]));
-                    expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                } finally {
-                    await client?.close();
-                }
-            });
-
-            it('should treat selectors with slashes as Actor names', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['docs', ACTOR_NORMAL_MODE],
-                    });
+            itc(
+                'should treat selectors with slashes as Actor names',
+                {
+                    tools: ['docs', ACTOR_NORMAL_MODE],
+                },
+                async (client) => {
                     const names = getToolNames(await client.listTools());
 
                     // Should include docs category
@@ -477,200 +453,177 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     // Should include actor (if it exists/is valid)
                     expect(names).toContain(actorNameToToolName(ACTOR_NORMAL_MODE));
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should merge actors param into tools selectors (backward compatibility)', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const actors = [ACTOR_NORMAL_MODE];
-                    const categories = ['docs'] as ToolCategory[];
+            {
+                const actors = [ACTOR_NORMAL_MODE];
+                const categories = ['docs'] as ToolCategory[];
 
-                    client = await createClientFn({ tools: categories, actors });
+                itc(
+                    'should merge actors param into tools selectors (backward compatibility)',
+                    { tools: categories, actors },
+                    async (client) => {
+                        const names = getToolNames(await client.listTools());
+                        const docsToolNames = getExpectedToolNamesByCategories(categories);
+                        const expected = [...docsToolNames, actorNameToToolName(actors[0])];
+                        // Actor tool triggers auto-injection of storage/abort helpers.
+                        expect(names).toHaveLength(expected.length + AUTO_INJECTED_TOOL_NAMES.length);
 
-                    const names = getToolNames(await client.listTools());
-                    const docsToolNames = getExpectedToolNamesByCategories(categories);
-                    const expected = [...docsToolNames, actorNameToToolName(actors[0])];
-                    // Actor tool triggers auto-injection of storage/abort helpers.
-                    expect(names).toHaveLength(expected.length + AUTO_INJECTED_TOOL_NAMES.length);
+                        const containsExpected = expected.every((n) => names.includes(n));
+                        expect(containsExpected).toBe(true);
+                        expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+                    },
+                );
+            }
 
-                    const containsExpected = expected.every((n) => names.includes(n));
-                    expect(containsExpected).toBe(true);
-                    expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                } finally {
-                    await client?.close();
-                }
-            });
-
-            it('loads docs while dropping retired selectors', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['docs', ...RETIRED_SELECTORS],
-                    });
+            itc(
+                'loads docs while dropping retired selectors',
+                {
+                    tools: ['docs', ...RETIRED_SELECTORS],
+                },
+                async (client) => {
                     const names = getToolNames(await client.listTools());
 
                     expect(names).toEqual([HELPER_TOOLS.DOCS_SEARCH, HELPER_TOOLS.DOCS_FETCH]);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should load only docs tools', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const categories = ['docs'] as ToolCategory[];
-                    client = await createClientFn({ tools: categories, actors: [] });
+            {
+                const categories = ['docs'] as ToolCategory[];
+                itc('should load only docs tools', { tools: categories, actors: [] }, async (client) => {
                     const names = getToolNames(await client.listTools());
                     const expected = getExpectedToolNamesByCategories(categories);
                     expect(names.length).toEqual(expected.length);
                     expectToolNamesToContain(names, expected);
-                } finally {
-                    await client?.close();
-                }
-            });
+                });
+            }
 
-            it('should load only a specific tool when tools includes a tool name', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['fetch-actor-details'], actors: [] });
+            itc(
+                'should load only a specific tool when tools includes a tool name',
+                { tools: ['fetch-actor-details'], actors: [] },
+                async (client) => {
                     const names = getToolNames(await client.listTools());
                     expect(names).toEqual(['fetch-actor-details']);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should not load any tools when tools param is empty and actors omitted', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: [] });
+            itc(
+                'should not load any tools when tools param is empty and actors omitted',
+                { tools: [] },
+                async (client) => {
                     const names = getToolNames(await client.listTools());
                     expect(names.length).toEqual(0);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should not load any internal tools when tools param is empty and use custom Actor if specified', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: [], actors: [ACTOR_NORMAL_MODE] });
-
+            itc(
+                'should not load any internal tools when tools param is empty and use custom Actor if specified',
+                { tools: [], actors: [ACTOR_NORMAL_MODE] },
+                async (client) => {
                     const names = getToolNames(await client.listTools());
                     // Actor tool triggers auto-injected helpers (get-actor-run, storage, abort).
                     expect(names.length).toEqual(1 + AUTO_INJECTED_TOOL_NAMES.length);
                     expect(names).toContain(actorNameToToolName(ACTOR_NORMAL_MODE));
                     expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('calls an Actor directly via call-actor without a separate add step', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
-                    client = await createClientFn({ tools: ['call-actor'] });
-                    const names = getToolNames(await client.listTools());
-                    expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
-                    expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
-                    expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                    expect(names).not.toContain(selectedToolName);
+            {
+                const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
+                itc(
+                    'calls an Actor directly via call-actor without a separate add step',
+                    { tools: ['call-actor'] },
+                    async (client) => {
+                        const names = getToolNames(await client.listTools());
+                        expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
+                        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+                        expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+                        expect(names).not.toContain(selectedToolName);
 
-                    // No dynamic "add" step exists — call-actor calls any Actor by name directly.
-                    const result = await client.callTool({
-                        name: HELPER_TOOLS.ACTOR_CALL,
-                        arguments: {
-                            actor: ACTOR_NORMAL_MODE,
-                            input: {
-                                firstNumber: 1,
-                                secondNumber: 2,
-                            },
-                        },
-                    });
-                    expectNormalModeTestStructuredContent(result);
-                } finally {
-                    await client?.close();
-                }
-            });
-
-            it('should call Actor dynamically via generic call-actor tool without need to add it first', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
-                    client = await createClientFn({ tools: ['actors'] });
-                    const names = getToolNames(await client.listTools());
-                    // actors category (already has call-actor) + auto-injected helpers.
-                    const numberOfTools = getCategoryTools('default').actors.length + AUTO_INJECTED_TOOL_NAMES.length;
-                    expect(names).toHaveLength(numberOfTools);
-                    // get-actor-run should be automatically included when call-actor is present
-                    expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-                    expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                    // Check that the Actor is not in the tools list
-                    expect(names).not.toContain(selectedToolName);
-
-                    const result = await client.callTool({
-                        name: HELPER_TOOLS.ACTOR_CALL,
-                        arguments: {
-                            actor: ACTOR_NORMAL_MODE,
-                            input: {
-                                firstNumber: 1,
-                                secondNumber: 2,
-                            },
-                        },
-                    });
-
-                    const content = result.content as { text: string; type: string }[];
-                    // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
-                    expect(content[0]?.type).toBe('text');
-                    const mirrored = JSON.parse(content[0].text) as { runId?: string; status?: string };
-                    expect(mirrored.runId).toBeDefined();
-                    expect(mirrored.status).toBe('SUCCEEDED');
-
-                    // Validate structured output has run-response metadata for the normal-mode-test-actor.
-                    expectNormalModeTestStructuredContent(result);
-                } finally {
-                    await client?.close();
-                }
-            });
-
-            it('should call Actor directly with required input', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
-
-                    // Should fail without input (AJV validation error)
-                    await expect(
-                        client!.callTool({
+                        // No dynamic "add" step exists — call-actor calls any Actor by name directly.
+                        const result = await client.callTool({
                             name: HELPER_TOOLS.ACTOR_CALL,
                             arguments: {
                                 actor: ACTOR_NORMAL_MODE,
+                                input: {
+                                    firstNumber: 1,
+                                    secondNumber: 2,
+                                },
                             },
-                        }),
-                    ).rejects.toThrow(/must have required property 'input'/);
+                        });
+                        expectNormalModeTestStructuredContent(result);
+                    },
+                );
+            }
 
-                    // Should succeed with input
-                    const callResult = await client.callTool({
+            {
+                const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
+                itc(
+                    'should call Actor dynamically via generic call-actor tool without need to add it first',
+                    { tools: ['actors'] },
+                    async (client) => {
+                        const names = getToolNames(await client.listTools());
+                        // actors category (already has call-actor) + auto-injected helpers.
+                        const numberOfTools =
+                            getCategoryTools('default').actors.length + AUTO_INJECTED_TOOL_NAMES.length;
+                        expect(names).toHaveLength(numberOfTools);
+                        // get-actor-run should be automatically included when call-actor is present
+                        expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+                        expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+                        // Check that the Actor is not in the tools list
+                        expect(names).not.toContain(selectedToolName);
+
+                        const result = await client.callTool({
+                            name: HELPER_TOOLS.ACTOR_CALL,
+                            arguments: {
+                                actor: ACTOR_NORMAL_MODE,
+                                input: {
+                                    firstNumber: 1,
+                                    secondNumber: 2,
+                                },
+                            },
+                        });
+
+                        const content = result.content as { text: string; type: string }[];
+                        // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
+                        expect(content[0]?.type).toBe('text');
+                        const mirrored = JSON.parse(content[0].text) as { runId?: string; status?: string };
+                        expect(mirrored.runId).toBeDefined();
+                        expect(mirrored.status).toBe('SUCCEEDED');
+
+                        // Validate structured output has run-response metadata for the normal-mode-test-actor.
+                        expectNormalModeTestStructuredContent(result);
+                    },
+                );
+            }
+
+            itc('should call Actor directly with required input', { tools: ['actors'] }, async (client) => {
+                // Should fail without input (AJV validation error)
+                await expect(
+                    client!.callTool({
                         name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
                             actor: ACTOR_NORMAL_MODE,
-                            input: { firstNumber: 1, secondNumber: 2 },
                         },
-                    });
-                    expect(callResult.content).toBeDefined();
-                } finally {
-                    await client?.close();
-                }
+                    }),
+                ).rejects.toThrow(/must have required property 'input'/);
+
+                // Should succeed with input
+                const callResult = await client.callTool({
+                    name: HELPER_TOOLS.ACTOR_CALL,
+                    arguments: {
+                        actor: ACTOR_NORMAL_MODE,
+                        input: { firstNumber: 1, secondNumber: 2 },
+                    },
+                });
+                expect(callResult.content).toBeDefined();
             });
 
-            it('returns terminal RunResponse with usage cost meta when the run completes within waitSecs', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
-
+            itc(
+                'returns terminal RunResponse with usage cost meta when the run completes within waitSecs',
+                { tools: ['actors'] },
+                async (client) => {
                     const callResult = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
@@ -690,16 +643,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(sc?.summary).toMatch(/SUCCEEDED/);
 
                     expectUsageCostMeta(callResult);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('returns immediately with a non-terminal RunResponse when waitSecs=0', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
-
+            itc(
+                'returns immediately with a non-terminal RunResponse when waitSecs=0',
+                { tools: ['actors'] },
+                async (client) => {
                     const callResult = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
@@ -716,40 +666,30 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(sc?.runId).toBeDefined();
                     // Non-blocking: status is typically READY or RUNNING at this point (terminal also tolerated for very fast actors).
                     expect(['READY', 'RUNNING', 'SUCCEEDED']).toContain(sc?.status);
-                } finally {
-                    await client?.close();
-                }
+                },
+            );
+
+            itc('accepts but ignores the deprecated previewOutput field', { tools: ['actors'] }, async (client) => {
+                const callResult = await client.callTool({
+                    name: HELPER_TOOLS.ACTOR_CALL,
+                    arguments: {
+                        actor: ACTOR_NORMAL_MODE,
+                        input: { firstNumber: 1, secondNumber: 2 },
+                        previewOutput: false,
+                        waitSecs: 45,
+                    },
+                });
+
+                // previewOutput is deprecated and ignored; the response is the canonical RunResponse
+                // regardless of the flag. Validate the metadata is intact.
+                validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
+                expectNormalModeTestStructuredContent(callResult);
             });
 
-            it('accepts but ignores the deprecated previewOutput field', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
-
-                    const callResult = await client.callTool({
-                        name: HELPER_TOOLS.ACTOR_CALL,
-                        arguments: {
-                            actor: ACTOR_NORMAL_MODE,
-                            input: { firstNumber: 1, secondNumber: 2 },
-                            previewOutput: false,
-                            waitSecs: 45,
-                        },
-                    });
-
-                    // previewOutput is deprecated and ignored; the response is the canonical RunResponse
-                    // regardless of the flag. Validate the metadata is intact.
-                    validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
-                    expectNormalModeTestStructuredContent(callResult);
-                } finally {
-                    await client?.close();
-                }
-            });
-
-            it('accepts callOptions.maxItems on call-actor and runs successfully', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
-
+            itc(
+                'accepts callOptions.maxItems on call-actor and runs successfully',
+                { tools: ['actors'] },
+                async (client) => {
                     const callResult = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
@@ -771,16 +711,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     ).structuredContent;
                     expect(sc?.status).toBe('SUCCEEDED');
                     expect(sc?.storages?.datasets?.default?.id).toBeDefined();
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('surfaces dataset fields in the canonical response (no inline preview)', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
-
+            itc(
+                'surfaces dataset fields in the canonical response (no inline preview)',
+                { tools: ['actors'] },
+                async (client) => {
                     const callResult = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
@@ -805,16 +742,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     ).structuredContent;
                     // nextStep should interpolate the datasetId so a text-only client can act without parsing storages.
                     expect(sc?.nextStep).toContain(sc?.storages?.datasets?.default?.id ?? '__unset__');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('surfaces aliased storages from run.storageIds in the canonical response', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
-
+            itc(
+                'surfaces aliased storages from run.storageIds in the canonical response',
+                { tools: ['actors'] },
+                async (client) => {
                     const callResult = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_CALL,
                         arguments: {
@@ -838,17 +772,12 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     // surface it alongside the default, enriched with its own metadata (id at minimum).
                     expect(sc?.storages?.datasets?.default?.id).toBeDefined();
                     expect(sc?.storages?.datasets?.books?.id).toEqual(expect.any(String));
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should find Actors in store search', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const query = 'normal-mode-test-actor';
-                    client = await createClientFn();
-
+            {
+                const query = 'normal-mode-test-actor';
+                itc('should find Actors in store search', undefined, async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.STORE_SEARCH,
                         arguments: {
@@ -858,43 +787,34 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     });
                     const content = result.content as { text: string }[];
                     expect(content.some((item) => item.text.includes(ACTOR_NORMAL_MODE))).toBe(true);
-                } finally {
-                    await client?.close();
-                }
-            });
+                });
+            }
 
             // Upstream-contract canary: apify-core's `AGENT_SAFE_PRICING_MODELS` filter
             // (`GET /v2/store`) is what excludes rental Actors. If that contract ever
             // drifts, this test catches the regression on the MCP side.
-            it('should not return rental Actors from store search', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn();
+            itc('should not return rental Actors from store search', undefined, async (client) => {
+                const result = await client.callTool({
+                    name: HELPER_TOOLS.STORE_SEARCH,
+                    arguments: {
+                        keywords: 'rental',
+                        limit: MAX_LIMIT_WITH_INPUT_SCHEMA,
+                    },
+                });
+                const content = result.content as { text: string }[];
+                expect(content.length).toBe(1);
+                const outputText = content[0].text;
 
-                    const result = await client.callTool({
-                        name: HELPER_TOOLS.STORE_SEARCH,
-                        arguments: {
-                            keywords: 'rental',
-                            limit: MAX_LIMIT_WITH_INPUT_SCHEMA,
-                        },
-                    });
-                    const content = result.content as { text: string }[];
-                    expect(content.length).toBe(1);
-                    const outputText = content[0].text;
-
-                    // Sanity check that the output format hasn't drifted in a way that
-                    // would make the negative assertion below silently meaningless.
-                    expect(outputText).toContain('This Actor');
-                    expect(outputText).not.toContain('This Actor is rental');
-                } finally {
-                    await client?.close();
-                }
+                // Sanity check that the output format hasn't drifted in a way that
+                // would make the negative assertion below silently meaningless.
+                expect(outputText).toContain('This Actor');
+                expect(outputText).not.toContain('This Actor is rental');
             });
 
-            it('should return an Actor-not-found error when calling a non-existent actor via call-actor', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
+            itc(
+                'should return an Actor-not-found error when calling a non-existent actor via call-actor',
+                { tools: ['actors'] },
+                async (client) => {
                     const nonExistentActor = 'apify/this-actor-does-not-exist';
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_CALL,
@@ -906,10 +826,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(content.length).toBeGreaterThan(0);
                     expect(content[0].text).toContain(nonExistentActor);
                     expect(content[0].text).toContain('was not found');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
             // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
             // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4
@@ -917,11 +835,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             // the tool validators (which happens on `listTools()` — every real client does this on connect).
             // The happy-path test above never calls `listTools()`, so the SDK skips validation and the bug stays
             // invisible at the integration layer. This test surfaces it.
-            it('MCP server actor:tool pass-through returns structuredContent satisfying outputSchema', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
-
+            itc(
+                'MCP server actor:tool pass-through returns structuredContent satisfying outputSchema',
+                { tools: ['actors'] },
+                async (client) => {
                     // Populates the SDK's `_cachedToolOutputValidators` map so callTool runs schema validation.
                     await client.listTools();
 
@@ -953,17 +870,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     // `isError` must reflect the remote tool's status — false on the happy path. Forwarding this
                     // closes a second drop on the same line: `handleMcpToolCall` currently discards `result.isError`.
                     expect(callResult.isError ?? false).toBe(false);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should search Apify documentation', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['docs'],
-                    });
+            itc(
+                'should search Apify documentation',
+                {
+                    tools: ['docs'],
+                },
+                async (client) => {
                     const toolName = HELPER_TOOLS.DOCS_SEARCH;
 
                     const query = 'standby actor';
@@ -981,18 +896,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     // Should contain at least one apify docs url
                     const standbyDocUrl = 'https://docs.apify.com';
                     expect(content.some((item) => item.text.includes(standbyDocUrl))).toBe(true);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should fetch Apify documentation page', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['docs'],
-                    });
-
+            itc(
+                'should fetch Apify documentation page',
+                {
+                    tools: ['docs'],
+                },
+                async (client) => {
                     const documentUrl = 'https://docs.apify.com/academy/getting-started/creating-actors';
                     const result = await client.callTool({
                         name: HELPER_TOOLS.DOCS_FETCH,
@@ -1004,18 +916,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     const content = result.content as { text: string }[];
                     expect(content.length).toBeGreaterThan(0);
                     expect(content[0].text).toContain(documentUrl);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should reject fetch-apify-docs with forbidden URL (not from allowed domains)', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['docs'],
-                    });
-
+            itc(
+                'should reject fetch-apify-docs with forbidden URL (not from allowed domains)',
+                {
+                    tools: ['docs'],
+                },
+                async (client) => {
                     const forbiddenUrl = 'https://example.com/some-page';
                     const result = await client.callTool({
                         name: HELPER_TOOLS.DOCS_FETCH,
@@ -1032,18 +941,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(content[0].text).toContain('Invalid URL');
                     expect(content[0].text).toContain('https://docs.apify.com');
                     expect(content[0].text).toContain('https://crawlee.dev');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should allow fetch-apify-docs from Crawlee domain (https://crawlee.dev)', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['docs'],
-                    });
-
+            itc(
+                'should allow fetch-apify-docs from Crawlee domain (https://crawlee.dev)',
+                {
+                    tools: ['docs'],
+                },
+                async (client) => {
                     const crawleeDocsUrl = 'https://crawlee.dev/js/docs/quick-start';
                     const result = await client.callTool({
                         name: HELPER_TOOLS.DOCS_FETCH,
@@ -1058,17 +964,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(content.length).toBeGreaterThan(0);
                     // Verify the response contains the URL we fetched
                     expect(content[0].text).toContain('Fetched content from');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return structured output for search-apify-docs matching outputSchema', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['docs'],
-                    });
+            itc(
+                'should return structured output for search-apify-docs matching outputSchema',
+                {
+                    tools: ['docs'],
+                },
+                async (client) => {
                     const toolName = HELPER_TOOLS.DOCS_SEARCH;
 
                     const query = 'standby actor';
@@ -1085,17 +989,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(content.length).toBeGreaterThan(0);
 
                     validateStructuredOutputForTool(result, HELPER_TOOLS.DOCS_SEARCH, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return structured output for fetch-actor-details matching outputSchema', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
+            itc(
+                'should return structured output for fetch-actor-details matching outputSchema',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
                     const result = await client.callTool({
@@ -1109,18 +1011,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(content.length).toBeGreaterThan(0);
 
                     validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return only input schema when output={ inputSchema: true }', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should return only input schema when output={ inputSchema: true }',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                         arguments: {
@@ -1142,18 +1041,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     // Should contain schema but NOT readme or actor card
                     expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
                     expect(content.some((item) => item.text.includes('README'))).toBe(false);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return only description and stats when specified', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should return only description and stats when specified',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                         arguments: {
@@ -1175,18 +1071,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     // Should contain actor info but NOT readme or schema
                     expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
                     expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should list MCP tools when output={ mcpTools: true } for MCP server Actor', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should list MCP tools when output={ mcpTools: true } for MCP server Actor',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                         arguments: {
@@ -1207,18 +1100,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     const content = result.content as { text: string }[];
                     expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(true);
                     expect(content.some((item) => item.text.includes('add'))).toBe(true);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return graceful note when output={ mcpTools: true } for regular Actor', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should return graceful note when output={ mcpTools: true } for regular Actor',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                         arguments: {
@@ -1238,17 +1128,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     const content = result.content as { text: string }[];
                     expect(content.some((item) => item.text.includes('This Actor is not an MCP server'))).toBe(true);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return structured output for fetch-actor-details with selective output matching outputSchema', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
+            itc(
+                'should return structured output for fetch-actor-details with selective output matching outputSchema',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
                     // Test with output={ mcpTools: true } - should validate against schema even with selective fields
@@ -1274,17 +1162,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     // This should validate successfully - structured output must match schema
                     validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
+            itc(
+                'should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
                     // Test with output={ description: true, readme: true } - inputSchema should be undefined
@@ -1310,18 +1196,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     // This should validate successfully - structured output must match schema
                     validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return only pricing when output={ pricing: true }', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should return only pricing when output={ pricing: true }',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                         arguments: {
@@ -1347,18 +1230,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     // Validate structured output
                     validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return only readme when output={ readme: true }', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should return only readme when output={ readme: true }',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                         arguments: {
@@ -1384,18 +1264,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     // Validate structured output
                     validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return README content (summary or full) in text and structured response for fetch-actor-details', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should return README content (summary or full) in text and structured response for fetch-actor-details',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: 'fetch-actor-details',
                         arguments: {
@@ -1424,19 +1301,16 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                         findToolByName(HELPER_TOOLS.ACTOR_GET_DETAILS, 'default')?.outputSchema,
                         'fetch-actor-details',
                     );
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should render widget payload via fetch-actor-details-widget in apps mode', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                        serverMode: 'apps',
-                    });
-
+            itc(
+                'should render widget payload via fetch-actor-details-widget in apps mode',
+                {
+                    tools: ['actors'],
+                    serverMode: 'apps',
+                },
+                async (client) => {
                     // fetch-actor-details-widget is only available in apps mode
                     const result = await client.callTool({
                         name: 'fetch-actor-details-widget',
@@ -1460,18 +1334,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(structured.actorDetails!.actorInfo).toBeDefined();
                     expect(typeof structured.actorDetails!.readme).toBe('string');
                     expect(structured.actorDetails!.readme!.length).toBeGreaterThan(0);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should use default values when output object is not provided', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should use default values when output object is not provided',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     // When output is not provided, all fields should default to their default values
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -1486,18 +1357,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
                     expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
                     expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(false);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return all fields when output includes all standard options', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should return all fields when output includes all standard options',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                         arguments: {
@@ -1531,18 +1399,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
                     // Validate against schema
                     validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should support granular output controls for rating and metadata', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should support granular output controls for rating and metadata',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     // Test 1: Only pricing (should include pricing, NOT other sections)
                     const pricingOnlyResult = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -1677,18 +1542,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     validateStructuredOutputForTool(ratingOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
                     validateStructuredOutputForTool(metadataOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
                     validateStructuredOutputForTool(combinationResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should dynamically test all output options and verify section presence/absence', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
-
+            itc(
+                'should dynamically test all output options and verify section presence/absence',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     // Define all output options with their expected markers in text
                     const outputOptions = [
                         {
@@ -1855,17 +1717,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(allCardText).not.toContain('Input schema');
 
                     validateStructuredOutputForTool(allCardSectionsResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return structured output for search-actors matching outputSchema', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                    });
+            itc(
+                'should return structured output for search-actors matching outputSchema',
+                {
+                    tools: ['actors'],
+                },
+                async (client) => {
                     const toolName = HELPER_TOOLS.STORE_SEARCH;
 
                     const result = await client.callTool({
@@ -1881,17 +1741,15 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(content.length).toBeGreaterThan(0);
 
                     validateStructuredOutputForTool(result, HELPER_TOOLS.STORE_SEARCH, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return structured output for fetch-apify-docs matching outputSchema', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['docs'],
-                    });
+            itc(
+                'should return structured output for fetch-apify-docs matching outputSchema',
+                {
+                    tools: ['docs'],
+                },
+                async (client) => {
                     const toolName = HELPER_TOOLS.DOCS_FETCH;
 
                     const result = await client.callTool({
@@ -1905,10 +1763,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(content.length).toBeGreaterThan(0);
 
                     validateStructuredOutputForTool(result, HELPER_TOOLS.DOCS_FETCH, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
             // The `dev` category holds only report-problem, which is telemetry-gated (off in this suite),
             // so it can't load standalone here; its gating is covered by unit tests.
@@ -1935,35 +1791,28 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
-            it('should handle multiple tool category keys input correctly', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    const categories = ['docs', 'runs', 'storage'] as ToolCategory[];
-                    client = await createClientFn({
+            {
+                const categories = ['docs', 'runs', 'storage'] as ToolCategory[];
+                itc(
+                    'should handle multiple tool category keys input correctly',
+                    {
                         tools: categories,
-                    });
+                    },
+                    async (client) => {
+                        const loadedTools = await client.listTools();
+                        const toolNames = getToolNames(loadedTools);
 
-                    const loadedTools = await client.listTools();
-                    const toolNames = getToolNames(loadedTools);
+                        const expectedToolNames = getExpectedToolNamesByCategories(categories);
+                        expect(toolNames).toHaveLength(expectedToolNames.length);
+                        const containsExpectedTools = toolNames.every((name) => expectedToolNames.includes(name));
+                        expect(containsExpectedTools).toBe(true);
+                    },
+                );
+            }
 
-                    const expectedToolNames = getExpectedToolNamesByCategories(categories);
-                    expect(toolNames).toHaveLength(expectedToolNames.length);
-                    const containsExpectedTools = toolNames.every((name) => expectedToolNames.includes(name));
-                    expect(containsExpectedTools).toBe(true);
-                } finally {
-                    await client?.close();
-                }
-            });
-
-            it('should list all prompts', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn();
-                    const prompts = await client.listPrompts();
-                    expect(prompts.prompts.length).toBe(0);
-                } finally {
-                    await client?.close();
-                }
+            itc('should list all prompts', undefined, async (client) => {
+                const prompts = await client.listPrompts();
+                expect(prompts.prompts.length).toBe(0);
             });
 
             // Session termination is only possible for streamable HTTP transport.
@@ -2102,10 +1951,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
-            it('should auto-inject storage and abort tools after call-actor in expected order', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn();
+            itc(
+                'should auto-inject storage and abort tools after call-actor in expected order',
+                undefined,
+                async (client) => {
                     const tools = await client.listTools();
                     const names = tools.tools.map((t) => t.name);
 
@@ -2120,22 +1969,18 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(runIndex).toBeLessThan(datasetIndex);
                     expect(datasetIndex).toBeLessThan(kvIndex);
                     expect(kvIndex).toBeLessThan(abortIndex);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should not auto-inject storage and abort tools when no actor-touching tools are present', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['docs'] });
+            itc(
+                'should not auto-inject storage and abort tools when no actor-touching tools are present',
+                { tools: ['docs'] },
+                async (client) => {
                     const names = getToolNames(await client.listTools());
                     for (const name of AUTO_INJECTED_TOOL_NAMES) expect(names).not.toContain(name);
                     expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
             describe('normal-mode-test-actor run reads via storage tools', () => {
                 let datasetId: string;
@@ -2171,10 +2016,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     await setupClient.close();
                 }, 60_000);
 
-                it('applies the default `limit` of 20 when omitted on get-dataset-items', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
+                itc(
+                    'applies the default `limit` of 20 when omitted on get-dataset-items',
+                    { tools: ['storage'] },
+                    async (client) => {
                         const result = await client.callTool({
                             name: HELPER_TOOLS.DATASET_GET_ITEMS,
                             arguments: { datasetId },
@@ -2184,15 +2029,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                             .structuredContent;
                         expect(structured?.limit).toBe(20);
                         expect((structured?.items ?? []).length).toBeLessThanOrEqual(20);
-                    } finally {
-                        await client?.close();
-                    }
-                });
+                    },
+                );
 
-                it("reads INPUT from the run's default KV store via get-actor-run + get-key-value-store-record", async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['runs', 'storage'] });
+                itc(
+                    "reads INPUT from the run's default KV store via get-actor-run + get-key-value-store-record",
+                    { tools: ['runs', 'storage'] },
+                    async (client) => {
                         const runResult = await client.callTool({
                             name: HELPER_TOOLS.ACTOR_RUNS_GET,
                             arguments: { runId },
@@ -2217,37 +2060,29 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                             .structuredContent;
                         expect(kvSc?.summary).toContain("Read 'INPUT'");
                         expect(kvSc).not.toHaveProperty('nextStep');
-                    } finally {
-                        await client?.close();
-                    }
+                    },
+                );
+
+                itc('returns dataset metadata via get-dataset', { tools: ['storage'] }, async (client) => {
+                    const result = await client.callTool({
+                        name: HELPER_TOOLS.DATASET_GET,
+                        arguments: { datasetId },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const { text } = (result.content as { text: string }[])[0];
+                    expect(text).toContain(datasetId);
+                    expect(text).toContain('firstNumber');
+                    expect(text).toContain('sum');
+                    const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } })
+                        .structuredContent;
+                    expect(sc?.summary).toContain('items');
+                    expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
                 });
 
-                it('returns dataset metadata via get-dataset', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
-                        const result = await client.callTool({
-                            name: HELPER_TOOLS.DATASET_GET,
-                            arguments: { datasetId },
-                        });
-                        expect(result.isError).not.toBe(true);
-                        const { text } = (result.content as { text: string }[])[0];
-                        expect(text).toContain(datasetId);
-                        expect(text).toContain('firstNumber');
-                        expect(text).toContain('sum');
-                        const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } })
-                            .structuredContent;
-                        expect(sc?.summary).toContain('items');
-                        expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
-                    } finally {
-                        await client?.close();
-                    }
-                });
-
-                it('infers schema from dataset items via get-dataset-schema', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
+                itc(
+                    'infers schema from dataset items via get-dataset-schema',
+                    { tools: ['storage'] },
+                    async (client) => {
                         const result = await client.callTool({
                             name: HELPER_TOOLS.DATASET_SCHEMA_GET,
                             arguments: { datasetId },
@@ -2262,15 +2097,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                             .structuredContent;
                         expect(sc?.summary).toContain('Schema inferred');
                         expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
-                    } finally {
-                        await client?.close();
-                    }
-                });
+                    },
+                );
 
-                it('returns key-value store metadata via get-key-value-store', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
+                itc(
+                    'returns key-value store metadata via get-key-value-store',
+                    { tools: ['storage'] },
+                    async (client) => {
                         const result = await client.callTool({
                             name: HELPER_TOOLS.KEY_VALUE_STORE_GET,
                             arguments: { keyValueStoreId: defaultKvId },
@@ -2280,15 +2113,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                         expect(text).toContain(defaultKvId);
                         const sc = (result as { structuredContent?: { nextStep?: string } }).structuredContent;
                         expect(sc?.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET);
-                    } finally {
-                        await client?.close();
-                    }
-                });
+                    },
+                );
 
-                it('lists keys in the run KV store via get-key-value-store-keys', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
+                itc(
+                    'lists keys in the run KV store via get-key-value-store-keys',
+                    { tools: ['storage'] },
+                    async (client) => {
                         const result = await client.callTool({
                             name: HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
                             arguments: { keyValueStoreId: defaultKvId, limit: 10 },
@@ -2304,18 +2135,16 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                             .structuredContent;
                         expect(sc?.summary).toContain('keys');
                         expect(sc?.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
-                    } finally {
-                        await client?.close();
-                    }
-                });
+                    },
+                );
 
                 // Doesn't assert defaultKvId is in the page: on a shared account, concurrent runs can
                 // push it past the top-10 recency window between creation and the list call. Existence
                 // and readability of the store are already proven by the get-key-value-store test below.
-                it('lists unnamed key-value stores via get-key-value-store-list', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
+                itc(
+                    'lists unnamed key-value stores via get-key-value-store-list',
+                    { tools: ['storage'] },
+                    async (client) => {
                         const result = await client.callTool({
                             name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
                             arguments: { desc: true, unnamed: true, limit: 10 },
@@ -2329,128 +2158,99 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                         expect(Array.isArray(sc?.items)).toBe(true);
                         expect(sc!.items!.length).toBeGreaterThan(0);
                         expect(sc!.items!.length).toBeLessThanOrEqual(10);
-                    } finally {
-                        await client?.close();
-                    }
-                });
+                    },
+                );
 
                 // Apify-contract canary for #880: get-dataset-items only sends the top-level prefix
                 // (e.g. `flatten=math` for fields `math.factorial.first`). If Apify's `flatten` ever
                 // stops recursing through nested levels, this 3-deep field will come back undefined and
                 // signal that we need to emit every prefix.
-                it('flattens 3-level nested fields via get-dataset-items', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
-                        const result = await client.callTool({
-                            name: HELPER_TOOLS.DATASET_GET_ITEMS,
-                            arguments: { datasetId, fields: 'math.factorial.first' },
-                        });
-                        expect(result.isError).not.toBe(true);
-                        const items = (result as { structuredContent?: { items?: Record<string, unknown>[] } })
-                            .structuredContent?.items;
-                        expect(Array.isArray(items)).toBe(true);
-                        // >=1 (not ==1): the signal is whether the nested field surfaces, not the count.
-                        expect(items!.length).toBeGreaterThanOrEqual(1);
-                        // factorial.first = 1! = 1; if flatten recurses, the value appears under the dot-notated key.
-                        expect(items![0]['math.factorial.first']).toBe(1);
-                    } finally {
-                        await client?.close();
-                    }
+                itc('flattens 3-level nested fields via get-dataset-items', { tools: ['storage'] }, async (client) => {
+                    const result = await client.callTool({
+                        name: HELPER_TOOLS.DATASET_GET_ITEMS,
+                        arguments: { datasetId, fields: 'math.factorial.first' },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const items = (result as { structuredContent?: { items?: Record<string, unknown>[] } })
+                        .structuredContent?.items;
+                    expect(Array.isArray(items)).toBe(true);
+                    // >=1 (not ==1): the signal is whether the nested field surfaces, not the count.
+                    expect(items!.length).toBeGreaterThanOrEqual(1);
+                    // factorial.first = 1! = 1; if flatten recurses, the value appears under the dot-notated key.
+                    expect(items![0]['math.factorial.first']).toBe(1);
                 });
 
-                it('reads dataset items via resources/read', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
-                        const result = await client.readResource({
-                            uri: `https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`,
-                        });
-                        const contents = result.contents[0] as { mimeType?: string; text?: string };
-                        // The proxy passes through the API's declared Content-Type, which carries a charset
-                        // (e.g. `application/json; charset=utf-8`), so match the base type rather than the exact string.
-                        expect(contents.mimeType).toContain('application/json');
-                        // The generic proxy returns the raw API body — a bare JSON array of items.
-                        const items = JSON.parse(contents.text as string) as unknown[];
-                        expect(Array.isArray(items)).toBe(true);
-                    } finally {
-                        await client?.close();
-                    }
+                itc('reads dataset items via resources/read', { tools: ['storage'] }, async (client) => {
+                    const result = await client.readResource({
+                        uri: `https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`,
+                    });
+                    const contents = result.contents[0] as { mimeType?: string; text?: string };
+                    // The proxy passes through the API's declared Content-Type, which carries a charset
+                    // (e.g. `application/json; charset=utf-8`), so match the base type rather than the exact string.
+                    expect(contents.mimeType).toContain('application/json');
+                    // The generic proxy returns the raw API body — a bare JSON array of items.
+                    const items = JSON.parse(contents.text as string) as unknown[];
+                    expect(Array.isArray(items)).toBe(true);
                 });
 
-                it('reads a KV record via resources/read', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
-                        const result = await client.readResource({
-                            uri: `https://api.apify.com/v2/key-value-stores/${defaultKvId}/records/INPUT`,
-                        });
-                        const contents = result.contents[0] as { text?: string };
-                        expect(contents.text).toContain('firstNumber');
-                    } finally {
-                        await client?.close();
-                    }
+                itc('reads a KV record via resources/read', { tools: ['storage'] }, async (client) => {
+                    const result = await client.readResource({
+                        uri: `https://api.apify.com/v2/key-value-stores/${defaultKvId}/records/INPUT`,
+                    });
+                    const contents = result.contents[0] as { text?: string };
+                    expect(contents.text).toContain('firstNumber');
                 });
 
-                it('rejects resources/read of a nonexistent dataset with a JSON-RPC error', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
+                itc(
+                    'rejects resources/read of a nonexistent dataset with a JSON-RPC error',
+                    { tools: ['storage'] },
+                    async (client) => {
                         await expect(
                             client.readResource({
                                 uri: 'https://api.apify.com/v2/datasets/this-dataset-does-not-exist-xyz/items',
                             }),
                         ).rejects.toThrow(/Failed to read/i);
-                    } finally {
-                        await client?.close();
-                    }
-                });
+                    },
+                );
 
-                it('rejects resources/read of a non-Apify URL with a JSON-RPC error', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
+                itc(
+                    'rejects resources/read of a non-Apify URL with a JSON-RPC error',
+                    { tools: ['storage'] },
+                    async (client) => {
                         await expect(
                             client.readResource({ uri: 'https://example.com/steal-my-token' }),
                         ).rejects.toThrow(/Failed to read/i);
-                    } finally {
-                        await client?.close();
-                    }
-                });
+                    },
+                );
 
-                it('advertises API URL templates via resources/templates/list', async () => {
-                    let client: McpSuiteClient | undefined;
-                    try {
-                        client = await createClientFn({ tools: ['storage'] });
+                itc(
+                    'advertises API URL templates via resources/templates/list',
+                    { tools: ['storage'] },
+                    async (client) => {
                         const { resourceTemplates } = await client.listResourceTemplates();
                         const datasetItems = resourceTemplates.find((t) => t.name === 'dataset-items');
                         expect(datasetItems?.uriTemplate).toContain('/v2/datasets/{datasetId}/items{?limit,offset,');
-                    } finally {
-                        await client?.close();
-                    }
-                });
+                    },
+                );
             });
 
-            it('rejects get-key-value-store-record when required keyValueStoreId is missing', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['storage'] });
+            itc(
+                'rejects get-key-value-store-record when required keyValueStoreId is missing',
+                { tools: ['storage'] },
+                async (client) => {
                     await expect(
                         client.callTool({
                             name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
                             arguments: { recordKey: 'INPUT' },
                         }),
                     ).rejects.toThrow(/must have required property 'keyValueStoreId'/);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('calls normal-mode-test-actor, verifies canonical shape and dataset fields, and fetches via get-dataset-items', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors', 'storage'] });
-
+            itc(
+                'calls normal-mode-test-actor, verifies canonical shape and dataset fields, and fetches via get-dataset-items',
+                { tools: ['actors', 'storage'] },
+                async (client) => {
                     const callResult = await client.callTool({
                         name: 'call-actor',
                         arguments: {
@@ -2502,16 +2302,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(items!.length).toBeGreaterThan(0);
                     expect(items![0]).toHaveProperty('firstNumber', 1);
                     expect(items![0]).toHaveProperty('sum', 3);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('calls apify/normal-mode-test-actor tool directly and retrieves sum via get-dataset-items', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['storage'], actors: [ACTOR_NORMAL_MODE] });
-
+            itc(
+                'calls apify/normal-mode-test-actor tool directly and retrieves sum via get-dataset-items',
+                { tools: ['storage'], actors: [ACTOR_NORMAL_MODE] },
+                async (client) => {
                     const result = await client.callTool({
                         name: actorNameToToolName(ACTOR_NORMAL_MODE),
                         // Max wait (45s) so the test does not flake on a slow run.
@@ -2559,15 +2356,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(items![0]).toHaveProperty('sum', 10);
 
                     validateStructuredOutputForTool(outputResult, HELPER_TOOLS.DATASET_GET_ITEMS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('calls apify/normal-mode-test-actor tool directly and retrieves full dataset via get-dataset-items', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['storage'], actors: [ACTOR_NORMAL_MODE] });
+            itc(
+                'calls apify/normal-mode-test-actor tool directly and retrieves full dataset via get-dataset-items',
+                { tools: ['storage'], actors: [ACTOR_NORMAL_MODE] },
+                async (client) => {
                     const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
                     const input = { firstNumber: 5, secondNumber: 7 };
 
@@ -2607,16 +2402,13 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(items![0]).toHaveProperty('sum', input.firstNumber + input.secondNumber);
 
                     validateStructuredOutputForTool(outputResult, HELPER_TOOLS.DATASET_GET_ITEMS, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return structured output for get-actor-run matching outputSchema', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors', 'runs'] });
-
+            itc(
+                'should return structured output for get-actor-run matching outputSchema',
+                { tools: ['actors', 'runs'] },
+                async (client) => {
                     // First, start an async actor run to get a runId
                     const callResult = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_CALL,
@@ -2640,10 +2432,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(runResult.content).toBeDefined();
                     // Validate structured output for get-actor-run
                     validateStructuredOutputForTool(runResult, HELPER_TOOLS.ACTOR_RUNS_GET, 'default');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
             it('should return Actor details both for full Actor name and ID', async () => {
                 let client: McpSuiteClient | undefined;
@@ -2675,11 +2465,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 }
             });
 
-            it('should return structured output for get-dataset-items matching outputSchema', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors', 'storage'] });
-
+            itc(
+                'should return structured output for get-dataset-items matching outputSchema',
+                { tools: ['actors', 'storage'] },
+                async (client) => {
                     // First, run an actor to get a datasetId
                     const callResult = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_CALL,
@@ -2723,21 +2512,17 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 7);
                     expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('firstNumber', 3);
                     expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('secondNumber', 4);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should connect to MCP server and at least one tool is available', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: [ACTOR_EXAMPLE_MCP_SERVER] });
+            itc(
+                'should connect to MCP server and at least one tool is available',
+                { tools: [ACTOR_EXAMPLE_MCP_SERVER] },
+                async (client) => {
                     const tools = await client.listTools();
                     expect(tools.tools.length).toBeGreaterThan(0);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
             it.runIf(options.transport === 'streamable-http')(
                 'should serve call-actor when a dynamic-tools client selects the actors category',
@@ -2785,11 +2570,10 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
-            it('should return error message when trying to call MCP server Actor without tool name in actor parameter', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors'] });
-
+            itc(
+                'should return error message when trying to call MCP server Actor without tool name in actor parameter',
+                { tools: ['actors'] },
+                async (client) => {
                     const response = await client.callTool({
                         name: 'call-actor',
                         arguments: {
@@ -2802,10 +2586,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(content.length).toBeGreaterThan(0);
                     expect(content[0].text).toContain(CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG);
                     expect(response.isError).toBe(true);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
             // Environment variable precedence tests
             it.runIf(options.transport === 'stdio')(
@@ -3195,62 +2977,54 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
-            it('should enable apps mode when serverMode is apps', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ serverMode: 'apps' });
-                    const tools = await client.listTools();
-                    const toolNames = getToolNames(tools);
-                    expect(tools.tools.length).toBeGreaterThan(0);
+            itc('should enable apps mode when serverMode is apps', { serverMode: 'apps' }, async (client) => {
+                const tools = await client.listTools();
+                const toolNames = getToolNames(tools);
+                expect(tools.tools.length).toBeGreaterThan(0);
 
-                    expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-                    expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-                    expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
 
-                    // Verify that tools have widget metadata when UI mode is enabled via URL parameter
-                    expectWidgetToolMeta(tools);
-                } finally {
-                    await client?.close();
-                }
+                // Verify that tools have widget metadata when UI mode is enabled via URL parameter
+                expectWidgetToolMeta(tools);
             });
 
-            it('should treat serverMode=true the same as serverMode=apps', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    // 'true' is the standard external value for ?ui= (maps to 'apps' internally via parseServerMode)
-                    client = await createClientFn({ serverMode: 'true' });
-                    const tools = await client.listTools();
-                    const toolNames = getToolNames(tools);
-                    expect(tools.tools.length).toBeGreaterThan(0);
+            {
+                // 'true' is the standard external value for ?ui= (maps to 'apps' internally via parseServerMode)
+                itc(
+                    'should treat serverMode=true the same as serverMode=apps',
+                    { serverMode: 'true' },
+                    async (client) => {
+                        const tools = await client.listTools();
+                        const toolNames = getToolNames(tools);
+                        expect(tools.tools.length).toBeGreaterThan(0);
 
-                    expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-                    expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-                    expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-                    expectWidgetToolMeta(tools);
-                } finally {
-                    await client?.close();
-                }
-            });
+                        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+                        expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+                        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+                        expectWidgetToolMeta(tools);
+                    },
+                );
+            }
 
-            it('should automatically include get-actor-run for default settings when call-actor is enabled', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ serverMode: 'apps' });
+            itc(
+                'should automatically include get-actor-run for default settings when call-actor is enabled',
+                { serverMode: 'apps' },
+                async (client) => {
                     const tools = await client.listTools();
                     const toolNames = getToolNames(tools);
 
                     // When serverMode is enabled, default tools include call-actor, so get-actor-run should be included
                     expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
                     expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should not include get-actor-run when only docs tools are selected', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ serverMode: 'apps', tools: ['docs'] });
+            itc(
+                'should not include get-actor-run when only docs tools are selected',
+                { serverMode: 'apps', tools: ['docs'] },
+                async (client) => {
                     const tools = await client.listTools();
                     const toolNames = getToolNames(tools);
 
@@ -3262,10 +3036,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(toolNames).toContain(HELPER_TOOLS.DOCS_FETCH);
                     // call-actor should NOT be present since only 'docs' was selected
                     expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
             it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)(
                 'auto mode: client advertising UI capability receives apps-mode tools with widget metadata',
@@ -3288,29 +3060,29 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
-            it('auto mode: client without UI capability receives default-mode tools without widget metadata', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    // serverMode omitted → server defaults to 'auto'; client sends no UI capability → server resolves to 'default'
-                    client = await createClientFn();
-                    const tools = await client.listTools();
-                    const toolNames = getToolNames(tools);
+            {
+                // serverMode omitted → server defaults to 'auto'; client sends no UI capability → server resolves to 'default'
+                itc(
+                    'auto mode: client without UI capability receives default-mode tools without widget metadata',
+                    undefined,
+                    async (client) => {
+                        const tools = await client.listTools();
+                        const toolNames = getToolNames(tools);
 
-                    expect(toolNames).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-                    expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-                    for (const toolName of [
-                        HELPER_TOOLS.STORE_SEARCH,
-                        HELPER_TOOLS.ACTOR_GET_DETAILS,
-                        HELPER_TOOLS.ACTOR_CALL,
-                    ]) {
-                        const tool = tools.tools.find((t) => t.name === toolName);
-                        expect(tool).toBeDefined();
-                        expect((tool?._meta as Record<string, unknown> | undefined)?.ui).toBeUndefined();
-                    }
-                } finally {
-                    await client?.close();
-                }
-            });
+                        expect(toolNames).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+                        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+                        for (const toolName of [
+                            HELPER_TOOLS.STORE_SEARCH,
+                            HELPER_TOOLS.ACTOR_GET_DETAILS,
+                            HELPER_TOOLS.ACTOR_CALL,
+                        ]) {
+                            const tool = tools.tools.find((t) => t.name === toolName);
+                            expect(tool).toBeDefined();
+                            expect((tool?._meta as Record<string, unknown> | undefined)?.ui).toBeUndefined();
+                        }
+                    },
+                );
+            }
 
             // Skyfire mode only works with Streamable-HTTP transport.
             it.runIf(options.transport === 'streamable-http')(
@@ -3598,90 +3370,76 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
-            it('returns structuredContent for get-actor-run', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors', 'runs'] });
+            itc('returns structuredContent for get-actor-run', { tools: ['actors', 'runs'] }, async (client) => {
+                // First, start an async actor run to get a runId
+                const callResult = await client.callTool({
+                    name: HELPER_TOOLS.ACTOR_CALL,
+                    arguments: {
+                        actor: ACTOR_NORMAL_MODE,
+                        input: { firstNumber: 1, secondNumber: 2 },
+                        waitSecs: 0,
+                    },
+                });
 
-                    // First, start an async actor run to get a runId
-                    const callResult = await client.callTool({
-                        name: HELPER_TOOLS.ACTOR_CALL,
-                        arguments: {
-                            actor: ACTOR_NORMAL_MODE,
-                            input: { firstNumber: 1, secondNumber: 2 },
-                            waitSecs: 0,
-                        },
-                    });
+                const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
+                const runId = resultWithStructured.structuredContent!.runId!;
 
-                    const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
-                    const runId = resultWithStructured.structuredContent!.runId!;
+                // Now test get-actor-run with waitSecs to drive it to terminal state.
+                const runResult = await client.callTool({
+                    name: HELPER_TOOLS.ACTOR_RUNS_GET,
+                    arguments: { runId, waitSecs: 30 },
+                });
 
-                    // Now test get-actor-run with waitSecs to drive it to terminal state.
-                    const runResult = await client.callTool({
-                        name: HELPER_TOOLS.ACTOR_RUNS_GET,
-                        arguments: { runId, waitSecs: 30 },
-                    });
-
-                    const runContent = runResult as {
-                        structuredContent?: {
-                            runId: string;
-                            actorId: string;
-                            actorName?: string;
-                            status: string;
-                            summary: string;
-                            nextStep: string;
-                            storages: {
-                                datasets?: { default: { id: string; itemCount?: number; fields?: string[] } };
-                                keyValueStores?: { default: { id: string } };
-                            };
+                const runContent = runResult as {
+                    structuredContent?: {
+                        runId: string;
+                        actorId: string;
+                        actorName?: string;
+                        status: string;
+                        summary: string;
+                        nextStep: string;
+                        storages: {
+                            datasets?: { default: { id: string; itemCount?: number; fields?: string[] } };
+                            keyValueStores?: { default: { id: string } };
                         };
                     };
+                };
 
-                    expect(runContent.structuredContent).toBeDefined();
-                    expect(runContent.structuredContent?.runId).toBe(runId);
-                    expect(runContent.structuredContent?.actorId).toBeDefined();
-                    expect(runContent.structuredContent?.status).toBeDefined();
-                    expect(runContent.structuredContent?.summary).toBeDefined();
-                    expect(runContent.structuredContent?.nextStep).toBeDefined();
-                    expect(runContent.structuredContent?.storages).toBeDefined();
+                expect(runContent.structuredContent).toBeDefined();
+                expect(runContent.structuredContent?.runId).toBe(runId);
+                expect(runContent.structuredContent?.actorId).toBeDefined();
+                expect(runContent.structuredContent?.status).toBeDefined();
+                expect(runContent.structuredContent?.summary).toBeDefined();
+                expect(runContent.structuredContent?.nextStep).toBeDefined();
+                expect(runContent.structuredContent?.storages).toBeDefined();
 
-                    // No inlined dataset items or KV record bodies anywhere on the response.
-                    const dump = JSON.stringify(runContent.structuredContent);
-                    expect(dump).not.toContain('previewItems');
+                // No inlined dataset items or KV record bodies anywhere on the response.
+                const dump = JSON.stringify(runContent.structuredContent);
+                expect(dump).not.toContain('previewItems');
 
-                    if (runContent.structuredContent?.status === 'SUCCEEDED') {
-                        expect(runContent.structuredContent?.storages.datasets?.default.id).toBeDefined();
-                    }
-                } finally {
-                    await client?.close();
+                if (runContent.structuredContent?.status === 'SUCCEEDED') {
+                    expect(runContent.structuredContent?.storages.datasets?.default.id).toBeDefined();
                 }
             });
 
-            it('rejects get-actor-run waitSecs above 45', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({ tools: ['actors', 'runs'] });
-                    // runId is a real-looking value so a missing-run path can't accidentally satisfy this
-                    // assertion; the failure must come from waitSecs validation, not from run lookup.
-                    await expect(
-                        client.callTool({
-                            name: HELPER_TOOLS.ACTOR_RUNS_GET,
-                            arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
-                        }),
-                    ).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
-                } finally {
-                    await client?.close();
-                }
+            itc('rejects get-actor-run waitSecs above 45', { tools: ['actors', 'runs'] }, async (client) => {
+                // runId is a real-looking value so a missing-run path can't accidentally satisfy this
+                // assertion; the failure must come from waitSecs validation, not from run lookup.
+                await expect(
+                    client.callTool({
+                        name: HELPER_TOOLS.ACTOR_RUNS_GET,
+                        arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
+                    }),
+                ).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
             });
 
-            it('should return required structuredContent fields for ActorSearch widget (search-actors-widget)', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                        serverMode: 'apps', // Enable UI mode to get widgetActors
-                    });
-
+            itc(
+                'should return required structuredContent fields for ActorSearch widget (search-actors-widget)',
+                {
+                    tools: ['actors'],
+                    serverMode: 'apps', // Enable UI mode to get widgetActors
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.STORE_SEARCH_WIDGET,
                         arguments: {
@@ -3711,19 +3469,16 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                         expect(actor).toHaveProperty('username');
                         expect(actor).toHaveProperty('description');
                     }
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
 
-            it('should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details-widget)', async () => {
-                let client: McpSuiteClient | undefined;
-                try {
-                    client = await createClientFn({
-                        tools: ['actors'],
-                        serverMode: 'apps', // Enable UI mode to get widget structured content
-                    });
-
+            itc(
+                'should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details-widget)',
+                {
+                    tools: ['actors'],
+                    serverMode: 'apps', // Enable UI mode to get widget structured content
+                },
+                async (client) => {
                     const result = await client.callTool({
                         name: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
                         arguments: {
@@ -3760,10 +3515,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     expect(details.actorInfo).toHaveProperty('name');
                     expect(details.actorInfo).toHaveProperty('username');
                     expect(details.actorInfo).toHaveProperty('description');
-                } finally {
-                    await client?.close();
-                }
-            });
+                },
+            );
         },
     );
 }
