@@ -342,6 +342,28 @@ export const fetchApifyDocsToolOutputSchema = {
     required: ['url', 'content'],
 };
 
+/**
+ * Schema for the fixed acknowledgement returned by report-problem.
+ */
+export const reportProblemToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        reported: { type: 'boolean', description: 'Always true; the problem report was submitted' },
+    },
+    required: ['reported'],
+};
+
+/**
+ * Schema for get-actor-log. The log API returns plain text, so the schema wraps it in a single field.
+ */
+export const getActorRunLogToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        log: { type: 'string', description: 'The last N lines of the run log, as plain text' },
+    },
+    required: ['log'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
