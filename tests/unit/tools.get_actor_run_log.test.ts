@@ -36,11 +36,20 @@ describe('get-actor-run-log', () => {
         );
         const { content } = result as TextToolResult;
 
-        // Expected derived from the same slice expression the tool uses (current behavior; the -1
-        // off-by-one is intentional and out of scope here).
-        const expected = LOG_LINES.slice(LOG_LINES.length - 5 - 1, LOG_LINES.length).join('\n');
+        const expected = LOG_LINES.slice(-5).join('\n');
         expect(content[0].text).toBe(expected);
         expect(runMock).toHaveBeenCalledWith('run-1');
+    });
+
+    it('returns the entire log when lines is 0', async () => {
+        getMock.mockResolvedValue(LOG_TEXT);
+
+        const result = await (getActorRunLog as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', lines: 0 }, stubClient),
+        );
+        const { content } = result as TextToolResult;
+
+        expect(content[0].text).toBe(LOG_TEXT);
     });
 
     it('mirrors the text content in structuredContent.log', async () => {

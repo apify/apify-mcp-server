@@ -9,7 +9,11 @@ import { getActorRunLogToolOutputSchema } from '../structured_output_schemas.js'
 
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
-    lines: z.number().max(50).describe('Output the last NUM lines, instead of the last 10').default(10),
+    lines: z
+        .number()
+        .max(50)
+        .describe('Output the last NUM lines, instead of the last 10. Pass 0 to return the entire log.')
+        .default(10),
 });
 
 /**
@@ -45,7 +49,7 @@ USAGE EXAMPLES:
         const parsed = GetRunLogArgs.parse(args);
         const v = (await client.run(parsed.runId).log().get()) ?? '';
         const lines = v.split('\n');
-        const text = lines.slice(lines.length - parsed.lines - 1, lines.length).join('\n');
+        const text = lines.slice(-parsed.lines).join('\n');
         return respondOk(text, { structuredContent: { log: text } });
     },
 } as const);

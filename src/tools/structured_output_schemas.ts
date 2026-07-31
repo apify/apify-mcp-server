@@ -553,7 +553,7 @@ export const actorRunListOutputSchema = paginatedListOutputSchema(actorRunListIt
 export const getActorRunLogToolOutputSchema = {
     type: 'object' as const,
     properties: {
-        log: { type: 'string', description: 'Last N lines of the run log (plain text).' },
+        log: { type: 'string', description: 'The last N lines of the run log, as plain text' },
     },
     required: ['log'],
 };
