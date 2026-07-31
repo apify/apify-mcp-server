@@ -16,7 +16,8 @@
       "pnpm run type-check",
       "pnpm run lint",
       "pnpm run test:unit",
-      "pnpm run check:agents"
+      "pnpm run check:agents",
+      "pnpm run format:check"
     ]
   },
   "limits": { "inner_iterations": 3, "final_review_rounds": 2 },
