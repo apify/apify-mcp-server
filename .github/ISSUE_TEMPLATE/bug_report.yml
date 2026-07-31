@@ -3,6 +3,15 @@ description: Report a bug or issue with the Apify MCP server
 title: "[Bug]: "
 labels: ["bug","t-ai"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        A precise bug report is the most valuable thing you can send us — more than a patch.
+
+        Reproduce the bug yourself before filing, and write the report in your own words.
+        If an AI tool found it or drafted this, say so and trim its output to the point.
+        See [AI-assisted contributions](https://github.com/apify/apify-mcp-server/blob/master/CONTRIBUTING.md#ai-assisted-contributions).
+
   - type: dropdown
     id: server-type
     attributes:
@@ -45,7 +54,7 @@ body:
     id: description
     attributes:
       label: What happened?
-      description: What did you do, what went wrong, and what did you expect instead?
+      description: What did you do, what went wrong, and what did you expect instead? Does it happen every time?
       placeholder: "Describe the issue..."
     validations:
       required: true

@@ -548,14 +548,16 @@ For full details on data collection, usage, sharing, and retention, see [Apify L
 
 # 🤝 Contributing
 
-We welcome contributions to improve the Apify MCP Server! Here's how you can help:
+We welcome contributions to improve the Apify MCP Server. **Send us the problem, not the patch.** Generating code is nearly free now; working out whether it's the right code is not, and that cost lands on us. A precise issue with a reproduction is worth more to us than a pull request — it's the part only you have.
 
-- **🐛 Report issues**: Find a bug or have a feature request? [Open an issue](https://github.com/apify/apify-mcp-server/issues).
-- **🔧 Submit pull requests**: Fork the repo and submit pull requests with enhancements or fixes.
-- **📚 Documentation**: Improvements to docs and examples are always welcome.
-- **💡 Share use cases**: Contribute examples to help other users.
+- **🐛 Report a bug**: [Open an issue](https://github.com/apify/apify-mcp-server/issues) with a reproduction. This is the single most useful thing you can send us.
+- **💡 Propose a feature**: [Open an issue](https://github.com/apify/apify-mcp-server/issues) describing the problem, who hits it, and why now. Not the implementation.
+- **🔧 Code**: We implement. An open issue is not an invitation to pick it up — unsolicited pull requests are closed. If we want your help on one, we'll ask.
+- **📚 Documentation**: Typos, broken links, and wrong commands can go straight to a PR.
 
-For major changes, please open an issue first to discuss your proposal and ensure it aligns with the project's goals.
+Using AI tools? Read [AI-assisted contributions](./CONTRIBUTING.md#ai-assisted-contributions) first — disclosure, understanding, and proof are required.
+
+Full rules: [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 # 📚 Learn more
 

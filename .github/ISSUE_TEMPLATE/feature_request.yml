@@ -3,21 +3,35 @@ description: Suggest a new feature or improvement
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Describe the problem, not the implementation.** We decide what gets built and how it fits
+        the rest of the server. Don't send a pull request for this — unsolicited ones are closed.
+        If we want your help implementing it, we'll ask here.
+
+        Write it in your own words. See [Before you write code](https://github.com/apify/apify-mcp-server/blob/master/CONTRIBUTING.md#before-you-write-code).
+
   - type: textarea
     id: problem
     attributes:
       label: Problem or motivation
-      description: What problem does this solve? Why do you need it?
+      description: >-
+        What can't you do today, and who else hits it? Be concrete — include the error,
+        the client you're using, how often it happens, or a link to where it came up.
+        "Users are confused" is weak; "3 users reported X in #channel" is strong.
     validations:
       required: true
 
   - type: textarea
-    id: solution
+    id: outcome
     attributes:
-      label: Proposed solution
-      description: How would you like it to work?
+      label: What would good look like?
+      description: >-
+        The outcome you need, not the implementation. If you have a concrete design in mind
+        you're welcome to add it, but the problem above is the part we need.
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: alternatives

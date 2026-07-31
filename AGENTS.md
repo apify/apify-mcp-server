@@ -2,6 +2,8 @@
 
 TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.ts`) and **HTTP Streamable** (`dev_server.ts`).
 
+**Before implementing**: work from an issue that is assigned or explicitly agreed. An open issue is not an invitation — many are stale or unrefined, and the fix isn't settled. If nobody asked for this change, open an issue instead of a PR (docs fixes excepted). Disclose AI use in the PR; never add a model as co-author. See [CONTRIBUTING.md](./CONTRIBUTING.md#before-you-write-code).
+
 ### Communication style — MANDATORY
 
 **This applies to ALL written output: code comments, commit messages, PR descriptions, issue specs**
