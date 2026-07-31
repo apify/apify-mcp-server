@@ -9,11 +9,11 @@ All pull requests are subject to automated and manual review against these guide
 
 **Send us the problem, not the patch.**
 
-Generating a patch is nearly free now; working out whether it's the *right* patch is not, and that cost lands on us. A pull request with no agreed problem behind it is a proposal we have to reverse-engineer from a diff — it will be closed.
+Generating a patch is cheap; validating the right patch takes maintainer time. A pull request with no agreed problem behind it is a proposal we must reverse-engineer from a diff, so we will close it.
 
 ### 1. Open an issue
 
-Use the templates — [bug report](https://github.com/apify/apify-mcp-server/issues/new?template=bug_report.yml) or [feature request](https://github.com/apify/apify-mcp-server/issues/new?template=feature_request.yml) — and fill in the optional fields; versions, config and logs are what turn a report into a fix.
+Use the templates — [bug report](https://github.com/apify/apify-mcp-server/issues/new?template=bug_report.yml) or [feature request](https://github.com/apify/apify-mcp-server/issues/new?template=feature_request.yml) — and include relevant versions, configuration, and logs. They turn a report into a fix.
 
 Two things the form can't enforce:
 
@@ -22,7 +22,7 @@ Two things the form can't enforce:
 
 ### 2. We take it from there
 
-**An open issue is not an invitation to implement it.** Many are unrefined, stale, or parked, and the easiest-looking ones are open precisely because the right fix isn't settled. We decide what gets built and when — filing a good issue *is* the contribution.
+**An open issue is not an invitation to implement it.** Some are unrefined, stale, or parked because the right fix is not settled. We decide what gets built and when — filing a good issue *is* the contribution.
 
 Two exceptions: **documentation fixes** (typos, broken links, wrong commands) go straight to a PR, and **work a maintainer invited you to do** — scope it to that issue and link it with `Closes #123`.
 
@@ -33,8 +33,9 @@ Two exceptions: **documentation fixes** (typos, broken links, wrong commands) go
 AI tools are welcome — we use them, and this repo ships [`AGENTS.md`](./AGENTS.md) for them. These rules are about accountability, and they don't replace the issue-first process above.
 
 - **Reviewers talk to you, not your agent.** Answer review comments in your own words.
-- **Show it works.** A test, an `mcpc` transcript, a screenshot, an Actor run. Green CI is not verification.
-- **No automated AI review** on your PR, and none on other people's.
+- **Disclose AI assistance.** In the issue or PR description, name the tool and what it did. Do not add a model as a co-author.
+- **Show it works.** Include a test, an `mcpc` transcript, a screenshot, or an Actor run. Green CI alone is not enough.
+- **Do not post automated AI review comments** on your PR or other people's.
 - **Verify issues yourself.** Don't file a bug an agent "found" without reproducing it, and never file a speculative security report.
 
 Contributions that ignore this are closed with a link here. Repeated low-effort submissions lead to restricted participation.

@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Reproduce it yourself before filing, and write the report in your own words. If an AI tool
-        found it or drafted this, say so and trim its output — see
+        found it or drafted this, say how it helped and trim its output — see
         [AI-assisted contributions](https://github.com/apify/apify-mcp-server/blob/master/CONTRIBUTING.md#ai-assisted-contributions).
 
   - type: dropdown
