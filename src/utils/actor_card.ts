@@ -97,7 +97,6 @@ type ExtractedActorData = {
     stats?: {
         totalUsers: number;
         monthlyUsers: number;
-        successRate?: number;
         bookmarks?: number;
     };
     rating?: {
@@ -143,17 +142,6 @@ function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptio
                 totalUsers: stats.totalUsers,
                 monthlyUsers: stats.totalUsers30Days,
             };
-        }
-
-        if ('publicActorRunStats30Days' in stats && stats.publicActorRunStats30Days) {
-            const runStats = stats.publicActorRunStats30Days as {
-                SUCCEEDED: number;
-                TOTAL: number;
-            };
-            if (runStats.TOTAL > 0) {
-                data.stats ??= { totalUsers: 0, monthlyUsers: 0 };
-                data.stats.successRate = Number(((runStats.SUCCEEDED / runStats.TOTAL) * 100).toFixed(1));
-            }
         }
 
         const bookmarkCount =
@@ -230,9 +218,6 @@ export function formatActorToActorCard(
         const statsParts = [
             `${data.stats.totalUsers.toLocaleString()} total users, ${data.stats.monthlyUsers.toLocaleString()} monthly users`,
         ];
-        if (data.stats.successRate !== undefined) {
-            statsParts.push(`Runs succeeded: ${data.stats.successRate}%`);
-        }
         if (data.stats.bookmarks) {
             statsParts.push(`${data.stats.bookmarks} bookmarks`);
         }

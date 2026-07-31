@@ -91,7 +91,6 @@ export const MOCK_ACTOR_DETAILS_RESPONSE = {
             stats: {
                 totalUsers: 734,
                 monthlyUsers: 113,
-                successRate: 100,
                 bookmarks: 5,
             },
             modifiedAt: '2026-01-23T08:11:16.995Z',

@@ -641,7 +641,6 @@ export type StructuredActorCard = {
     stats?: {
         totalUsers: number;
         monthlyUsers: number;
-        successRate?: number;
         bookmarks?: number;
     };
     rating?: {
