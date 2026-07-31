@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 - Add outputSchema to report-problem and get-actor-log ([#1175](https://github.com/apify/apify-mcp-server/pull/1175)) ([21bb370](https://github.com/apify/apify-mcp-server/commit/21bb370170b811b665ba869240862f2c854819df)) by [@jirispilka](https://github.com/jirispilka), closes [#1159](https://github.com/apify/apify-mcp-server/issues/1159), [#1160](https://github.com/apify/apify-mcp-server/issues/1160)
 
+### 🐛 Bug Fixes
+
+- Remove gameable Runs succeeded stat from actor search&#x2F;details ([#1182](https://github.com/apify/apify-mcp-server/pull/1182)) ([7142233](https://github.com/apify/apify-mcp-server/commit/7142233d5fca240b1094b516d3d6972a4d35d586)) by [@MQ37](https://github.com/MQ37)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.14.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.0) (2026-07-29)
