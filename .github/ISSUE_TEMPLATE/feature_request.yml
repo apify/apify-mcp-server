@@ -6,11 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Describe the problem, not the implementation.** We decide what gets built and how it fits
-        the rest of the server. Don't send a pull request for this — unsolicited ones are closed.
-        If we want your help implementing it, we'll ask here.
-
-        Write it in your own words. See [Before you write code](https://github.com/apify/apify-mcp-server/blob/master/CONTRIBUTING.md#before-you-write-code).
+        **Describe the problem, not the implementation.** We decide what gets built — don't send a
+        pull request for this; if we want your help, we'll ask here. Write it in your own words, see
+        [Before you write code](https://github.com/apify/apify-mcp-server/blob/master/CONTRIBUTING.md#before-you-write-code).
 
   - type: textarea
     id: problem

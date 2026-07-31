@@ -9,47 +9,35 @@ All pull requests are subject to automated and manual review against these guide
 
 **Send us the problem, not the patch.**
 
-Generating a patch is nearly free now. Working out whether it's the *right* patch is not, and that cost lands on us. So the valuable half of a contribution is no longer the code — it's the precise problem statement with a reproduction, which is the part only you have and the part no tool can generate for you.
+Generating a patch is nearly free now; working out whether it's the *right* patch is not, and that cost lands on us. A pull request with no agreed problem behind it is a proposal we have to reverse-engineer from a diff — it will be closed.
 
-A pull request that arrives without an agreed problem behind it is a proposal we have to reverse-engineer from a diff. It will be closed.
+### 1. Open an issue
 
-### 1. Open an issue — in your own words
-
-Use the templates — they ask for what we need: [bug report](https://github.com/apify/apify-mcp-server/issues/new?template=bug_report.yml) or [feature request](https://github.com/apify/apify-mcp-server/issues/new?template=feature_request.yml). Fill in the optional fields too; versions, config and logs are usually what turns a report into a fix.
+Use the templates — [bug report](https://github.com/apify/apify-mcp-server/issues/new?template=bug_report.yml) or [feature request](https://github.com/apify/apify-mcp-server/issues/new?template=feature_request.yml) — and fill in the optional fields; versions, config and logs are what turn a report into a fix.
 
 Two things the form can't enforce:
 
-- **Evidence over adjectives.** A reproduction, an error, an `mcpc` transcript, a client config. "Users are confused" is weak; "3 users hit this on Claude Desktop, log attached" is strong.
-- **Write it yourself.** A pasted agent transcript is not an issue — it's material we have to read through before we can find the point. Trim it to the point first.
-
-A well-reproduced bug report is the single most useful thing you can send us. It is worth more to us than a patch, and we would rather have ten of them than one PR.
+- **Evidence over adjectives.** "Users are confused" is weak; "3 users hit this on Claude Desktop, log attached" is strong.
+- **Write it yourself.** A pasted agent transcript is not an issue. Trim it to the point first.
 
 ### 2. We take it from there
 
-**An open issue is not an invitation to implement it.** Many of our issues are unrefined, stale, or deliberately parked. The ones that look easiest to pick up are often open precisely because the right fix isn't settled yet — implementing one before that decision wastes your time and ours.
+**An open issue is not an invitation to implement it.** Many are unrefined, stale, or parked, and the easiest-looking ones are open precisely because the right fix isn't settled. We decide what gets built and when — filing a good issue *is* the contribution.
 
-**Implementation is ours.** We decide what gets built, when, and how it fits the rest of the server. Filing a good issue *is* the contribution; you don't need to write the fix to have helped, and writing it unasked doesn't make the issue land sooner.
-
-Two exceptions:
-
-- **Documentation fixes** — typos, broken links, wrong commands. Send those straight as a PR.
-- **We asked you to.** If a maintainer explicitly invites you to implement an issue, it's yours. Scope the PR to that issue, link it with `Closes #123`, and follow the rest of this document.
+Two exceptions: **documentation fixes** (typos, broken links, wrong commands) go straight to a PR, and **work a maintainer invited you to do** — scope it to that issue and link it with `Closes #123`.
 
 ---
 
 ## AI-assisted contributions
 
-AI tools are welcome. We use them ourselves, and this repo ships [`AGENTS.md`](./AGENTS.md) to make them work better here. The rules below are about accountability, not tooling — and they do not replace the issue-first process above.
+AI tools are welcome — we use them, and this repo ships [`AGENTS.md`](./AGENTS.md) for them. These rules are about accountability, and they don't replace the issue-first process above.
 
-- **Disclose it.** Name the tool and what it did, in the issue or PR description.
-- **You own the diff.** Be able to explain every line, and how it interacts with the rest of the system, without re-prompting. If you can't, don't submit it.
 - **Reviewers talk to you, not your agent.** Answer review comments in your own words.
-- **No AI co-authors.** No `Co-authored-by:` or `Assisted-by:` trailer naming a model. A model can't agree to the license.
-- **Show it works.** A test, an `mcpc` transcript, a screenshot, a link to an Actor run. Green CI is not verification, and "the agent said it works" is not proof.
-- **Don't request an automated AI review** on your PR — run it on your fork before submitting. Unsolicited AI review comments on someone else's PR are noise.
+- **Show it works.** A test, an `mcpc` transcript, a screenshot, an Actor run. Green CI is not verification.
+- **No automated AI review** on your PR, and none on other people's.
 - **Verify issues yourself.** Don't file a bug an agent "found" without reproducing it, and never file a speculative security report.
 
-Contributions that ignore this are closed with a link to this section. Repeated low-effort submissions lead to restricted participation.
+Contributions that ignore this are closed with a link here. Repeated low-effort submissions lead to restricted participation.
 
 ---
 
