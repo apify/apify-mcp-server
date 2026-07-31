@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.14.1 - **not yet released**
+## [0.14.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.1) (2026-07-31)
 
 ### 🚀 Features
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Remove gameable Runs succeeded stat from actor search&#x2F;details ([#1182](https://github.com/apify/apify-mcp-server/pull/1182)) ([7142233](https://github.com/apify/apify-mcp-server/commit/7142233d5fca240b1094b516d3d6972a4d35d586)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.14.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.0) (2026-07-29)
 
 ### 🚀 Features
