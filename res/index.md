@@ -60,6 +60,11 @@ time). Pull from the backlog instead of re-sweeping.
 Keeping widget bundles small (narrow `@apify/ui-library/dist/src/...` imports, markdown stack
 cost). Re-measure when changing widget dependencies or markdown rendering.
 
+### [issue_triage_2026-08.md](./issue_triage_2026-08.md)
+Triage of all 122 open issues as of 2026-08-01: already-shipped, duplicate, unactionable and
+declined buckets, plus a benefit-ranked list of what to work. Every "already done" claim was
+verified against the tree at `1e5fd7c`. Point-in-time — re-verify before closing anything.
+
 ---
 
 ## Guidelines
