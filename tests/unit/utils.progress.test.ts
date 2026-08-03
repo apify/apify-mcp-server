@@ -171,6 +171,33 @@ describe('ProgressTracker', () => {
         });
     });
 
+    it('includes taskId and runId metadata once set via setRunId()', async () => {
+        const mockSendNotification = vi.fn();
+        const tracker = new ProgressTracker({
+            progressToken: 'tok',
+            sendNotification: mockSendNotification,
+            taskId: 'task-abc',
+        });
+        tracker.setRunId('run-xyz');
+
+        await tracker.updateProgress('running');
+
+        expect(mockSendNotification).toHaveBeenCalledWith({
+            method: 'notifications/progress',
+            params: {
+                progressToken: 'tok',
+                progress: 1,
+                message: 'running',
+                _meta: {
+                    [RELATED_TASK_META_KEY]: {
+                        taskId: 'task-abc',
+                    },
+                    'com.apify/ActorRun': { runId: 'run-xyz' },
+                },
+            },
+        });
+    });
+
     it('does not re-emit on first poll tick when run state matches the seeded initial', async () => {
         vi.useFakeTimers();
         try {
