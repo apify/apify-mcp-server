@@ -6,6 +6,7 @@ import { getActorRunLogToolOutputSchema } from '../../src/tools/structured_outpu
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -105,12 +106,26 @@ describe('get-actor-log', () => {
     });
 
     it('returns conforming structuredContent for an empty log', async () => {
-        getMock.mockResolvedValue(undefined);
+        getMock.mockResolvedValue('');
 
         const result = await callTool({ runId: 'run-1', lines: 10 });
 
         expect(result.content[0].text).toBe('');
         expect(result.structuredContent).toEqual({ log: '' });
         expectSchemaConformingStructuredContent(result, getActorRunLogToolOutputSchema);
+    });
+
+    // The client returns undefined on a 404 — the run does not exist.
+    it('returns isError with a not-found message when the run does not exist', async () => {
+        getMock.mockResolvedValue(undefined);
+
+        const result = await (getActorRunLog as HelperTool).call(
+            stubToolCallContext({ runId: '1', lines: 10 }, stubClient),
+        );
+        const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
+
+        expectSoftFailInvalidInput(result);
+        expect(structuredContent).toBeUndefined();
+        expect(content[0].text).toBe("Run with ID '1' not found.");
     });
 });

@@ -3207,6 +3207,18 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 ).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
             });
 
+            // Regression (#1193): a missing run used to yield a successful empty log instead of an error.
+            it('returns a not-found error for get-actor-log with a non-existent runId', async () => {
+                client = await createClientFn({ tools: ['runs'] });
+                const result = await client.callTool({
+                    name: HELPER_TOOLS.ACTOR_RUNS_LOG,
+                    arguments: { runId: '1' },
+                });
+                expect(result.isError).toBe(true);
+                expect((result.content as { text: string }[])[0].text).toContain("Run with ID '1' not found.");
+                await client.close();
+            });
+
             it('should return required structuredContent fields for ActorSearch widget (search-actors-widget)', async () => {
                 client = await createClientFn({
                     tools: ['actors'],
