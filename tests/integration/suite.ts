@@ -1924,6 +1924,22 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     await client.close();
                 });
 
+                // Guards the positive path of the not-found branch added in #1193: a run that exists
+                // must still return its log, not the not-found error.
+                it('returns log text for an existing run via get-actor-log', async () => {
+                    client = await createClientFn({ tools: ['runs'] });
+                    const result = await client.callTool({
+                        name: HELPER_TOOLS.ACTOR_RUNS_LOG,
+                        arguments: { runId, lines: 3 },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const [{ text }] = result.content as { text: string }[];
+                    expect(text.length).toBeGreaterThan(0);
+                    expect(text.split('\n').length).toBeLessThanOrEqual(3);
+                    expect((result as { structuredContent?: { log?: string } }).structuredContent?.log).toBe(text);
+                    await client.close();
+                });
+
                 it('returns dataset metadata via get-dataset', async () => {
                     client = await createClientFn({ tools: ['storage'] });
                     const result = await client.callTool({

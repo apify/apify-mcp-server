@@ -47,8 +47,9 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
-        // The client returns undefined on a 404 — the run does not exist. An existing run with no
-        // log lines yet returns an empty string, so only undefined is a not-found.
+        // The client soft-catches a 404 (missing run, or one this token can't see) and returns
+        // undefined. An existing run with no log lines returns an empty string, so only undefined
+        // is a not-found. Message matches `get-actor-run` for the same input.
         const v = await client.run(parsed.runId).log().get();
         if (v === undefined) return respondUserError(`Run with ID '${parsed.runId}' not found.`);
         // Logs from the API end with a newline; drop it so the tail slice counts only content lines.
