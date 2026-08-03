@@ -4,6 +4,8 @@
 
 <!-- Human author: an AI draft is a draft, not a description. Before requesting review: (1) self-review your own diff in the GitHub UI, (2) check every claim below against the diff and cut what you wouldn't say yourself, (3) write "Notes for reviewers" in your own words. -->
 
+> **Outside contributors:** maintainers implement unassigned issues. Unless this is a documentation fix or a maintainer asked you to write it, close this and [open an issue](https://github.com/apify/apify-mcp-server/issues) instead. A reproduction is more useful than a patch. See [Before you write code](https://github.com/apify/apify-mcp-server/blob/master/CONTRIBUTING.md#before-you-write-code). Using AI? [Disclose it and show proof](https://github.com/apify/apify-mcp-server/blob/master/CONTRIBUTING.md#ai-assisted-contributions).
+
 ## Why
 <!-- "Closes #123". No issue? Ad-hoc is the exception, not the default — one line on the problem and why the change is needed. Evidence beats adjectives: a measurement, a failing run, a probe result. -->
 
