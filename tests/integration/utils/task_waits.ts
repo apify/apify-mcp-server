@@ -54,6 +54,12 @@ export async function assertStatusMessagePropagated(taskClient: Client, stream: 
     expect(listTasksSawStatusMessage).toBe(true);
 }
 
+// Progress notifications are same-process and land within milliseconds of the run starting, so
+// this only ever matters on an actual delivery regression — kept well under the suite's smallest
+// testTimeout (30s) so that regression fails fast with a specific cause instead of a generic
+// "Test timed out" once the outer timeout finally trips.
+const RUN_ID_PROGRESS_TIMEOUT_MS = 10_000;
+
 /**
  * Resolves runIdPromise from the first notifications/progress message (works for plain requests
  * and task-augmented calls — pass `onprogress` alongside `task` too). The caller awaits it before
@@ -64,7 +70,7 @@ export function captureRunIdFromProgress(): {
     runIdPromise: Promise<string>;
 } {
     let resolveRunId: (runId: string) => void;
-    const runIdPromise = new Promise<string>((resolve) => {
+    const captured = new Promise<string>((resolve) => {
         resolveRunId = resolve;
     });
     const onprogress = (progress: Progress) => {
@@ -73,6 +79,22 @@ export function captureRunIdFromProgress(): {
         const runId = (meta?.[APIFY_ACTOR_RUN_META_KEY] as { runId?: string } | undefined)?.runId;
         if (runId) resolveRunId(runId);
     };
+    const runIdPromise = Promise.race([
+        captured,
+        new Promise<string>((_, reject) => {
+            const timer = setTimeout(
+                () =>
+                    reject(
+                        new Error(
+                            `No runId observed via notifications/progress within ${RUN_ID_PROGRESS_TIMEOUT_MS}ms`,
+                        ),
+                    ),
+                RUN_ID_PROGRESS_TIMEOUT_MS,
+            );
+            timer.unref();
+            void captured.then(() => clearTimeout(timer));
+        }),
+    ]);
     return { onprogress, runIdPromise };
 }
 
