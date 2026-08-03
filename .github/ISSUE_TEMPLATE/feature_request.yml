@@ -17,6 +17,7 @@ body:
       description: >-
         What can't you do today, and who else hits it? Be concrete — include the error,
         the client you're using, how often it happens, or a link to where it came up.
+        If it happened in a chat, include the relevant part of the AI conversation.
         "Users are confused" is weak; "3 users reported X in #channel" is strong.
     validations:
       required: true
