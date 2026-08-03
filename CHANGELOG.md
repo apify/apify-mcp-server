@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.14.2 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Parallelize integration test suite ([#1137](https://github.com/apify/apify-mcp-server/pull/1137)) ([a42e66f](https://github.com/apify/apify-mcp-server/commit/a42e66f6cedf9419f9d9e6213579050bb1774949)) by [@MQ37](https://github.com/MQ37)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.14.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.1) (2026-07-31)
