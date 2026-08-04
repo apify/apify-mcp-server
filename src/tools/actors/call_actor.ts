@@ -352,10 +352,6 @@ export async function handleMcpToolCall(params: {
             return respondServerError(`Failed to connect to MCP server ${mcpServerUrl}`);
         }
 
-        if (signal.aborted) {
-            return respondAborted();
-        }
-
         const result = await client.callTool(
             {
                 name: mcpToolName,
@@ -389,6 +385,9 @@ export async function handleMcpToolCall(params: {
         });
     } catch (error) {
         if (signal.aborted) {
+            // Yield a macrotask first: the SDK sends notifications/cancelled fire-and-forget on the
+            // transport's AbortController, which the finally's close() would abort before it flushes.
+            await new Promise((resolve) => setImmediate(resolve));
             return respondAborted();
         }
         logHttpError(error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {

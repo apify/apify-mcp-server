@@ -370,7 +370,7 @@ describe('call_actor_common', () => {
         });
 
         it('returns aborted when the signal is already aborted before the remote call', async () => {
-            const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient');
+            const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
             const controller = new AbortController();
             controller.abort();
 
