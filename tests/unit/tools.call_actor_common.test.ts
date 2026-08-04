@@ -1,3 +1,4 @@
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,11 +9,14 @@ import {
     HELPER_TOOLS,
     TOOL_STATUS,
 } from '../../src/const.js';
+import * as mcpClient from '../../src/mcp/client.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import {
     buildCallActorAppsDescription,
     buildCallActorDescription,
     buildCallActorErrorResponse,
     callActorArgs,
+    handleMcpToolCall,
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
@@ -329,6 +333,82 @@ describe('call_actor_common', () => {
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                 actorId: 'actor-id-rag',
             });
+        });
+    });
+
+    describe('handleMcpToolCall()', () => {
+        beforeEach(() => {
+            vi.restoreAllMocks();
+        });
+
+        it('forwards signal and timeout into client.callTool options', async () => {
+            const callTool = vi.fn().mockResolvedValue({
+                content: [{ type: 'text', text: 'remote ok' }],
+                isError: false,
+            });
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
+                callTool,
+                close: vi.fn().mockResolvedValue(undefined),
+            } as unknown as Client);
+
+            const controller = new AbortController();
+            const result = await handleMcpToolCall({
+                baseActorName: 'apify/mcp-demo',
+                mcpToolName: 'search',
+                input: { q: 'x' },
+                isActorMcpServer: true,
+                mcpServerUrl: 'https://example.invalid/mcp',
+                apifyToken: 'token',
+                signal: controller.signal,
+            });
+
+            expect(result?.isError).not.toBe(true);
+            expect(callTool).toHaveBeenCalledTimes(1);
+            const options = callTool.mock.calls[0][2] as { signal?: AbortSignal; timeout?: number };
+            expect(options.signal).toBe(controller.signal);
+            expect(options.timeout).toBe(EXTERNAL_TOOL_CALL_TIMEOUT_MSEC);
+        });
+
+        it('returns aborted when the signal is already aborted before the remote call', async () => {
+            const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
+            const controller = new AbortController();
+            controller.abort();
+
+            const result = await handleMcpToolCall({
+                baseActorName: 'apify/mcp-demo',
+                mcpToolName: 'search',
+                input: { q: 'x' },
+                isActorMcpServer: true,
+                mcpServerUrl: 'https://example.invalid/mcp',
+                apifyToken: 'token',
+                signal: controller.signal,
+            });
+
+            expect(result).toEqual({});
+            expect(connectSpy).not.toHaveBeenCalled();
+        });
+
+        it('returns aborted when the remote call rejects after the signal aborts', async () => {
+            const controller = new AbortController();
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
+                callTool: vi.fn().mockImplementation(async () => {
+                    controller.abort();
+                    throw new Error('aborted');
+                }),
+                close: vi.fn().mockResolvedValue(undefined),
+            } as unknown as Client);
+
+            const result = await handleMcpToolCall({
+                baseActorName: 'apify/mcp-demo',
+                mcpToolName: 'search',
+                input: { q: 'x' },
+                isActorMcpServer: true,
+                mcpServerUrl: 'https://example.invalid/mcp',
+                apifyToken: 'token',
+                signal: controller.signal,
+            });
+
+            expect(result).toEqual({});
         });
     });
 });

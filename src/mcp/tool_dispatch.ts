@@ -181,6 +181,7 @@ export async function dispatchToolCall(params: {
                     CallToolResultSchema,
                     {
                         timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
+                        signal,
                     },
                 );
 
@@ -198,6 +199,11 @@ export async function dispatchToolCall(params: {
 
                 result = { ...res };
             } catch (error) {
+                if (signal.aborted) {
+                    // Yield a macrotask first: the SDK sends notifications/cancelled fire-and-forget on
+                    // the transport's AbortController, which the finally's close() would abort.
+                    await new Promise((resolve) => setImmediate(resolve));
+                }
                 ({ toolStatus, callDiagnostics } = buildExecutionDiagnostics({
                     error,
                     isAborted: Boolean(signal.aborted),

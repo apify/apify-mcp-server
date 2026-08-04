@@ -6,7 +6,7 @@ import { fixedAjvCompile } from '../tools/actor_input_schema.js';
 import type { ActorMcpTool, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { ajv } from '../utils/ajv.js';
-import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
+import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH, TOOL_NAME_HASH_LENGTH } from './const.js';
 
 /**
  * Generates a unique server ID by hashing the URL.
@@ -20,14 +20,20 @@ export function getMCPServerID(url: string): string {
 }
 
 /**
- * Prefixes the tool name with the server ID hash and truncates to MAX_TOOL_NAME_LENGTH.
- * Truncation can in theory collide two different origin tool names.
+ * Prefixes the tool name with the server ID hash. Over-length names get a hash suffix
+ * (same pattern as actor tool names) so bare truncation cannot collide two different
+ * origin tool names into one exposed name.
  */
-function getProxyMCPServerToolName(url: string, toolName: string): string {
+export function getProxyMCPServerToolName(url: string, toolName: string): string {
     const prefix = getMCPServerID(url);
-
     const fullName = `${prefix}-${toolName}`;
-    return fullName.slice(0, MAX_TOOL_NAME_LENGTH);
+
+    if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
+        return fullName;
+    }
+
+    const hash = createHash('sha256').update(fullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
+    return `${fullName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
 }
 
 export async function getMCPServerTools(actorID: string, client: Client, serverUrl: string): Promise<ToolEntry[]> {
