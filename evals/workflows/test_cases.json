@@ -151,6 +151,14 @@
       "maxTurns": 20
     },
     {
+      "id": "storage-actor-run-status-seeded",
+      "category": "storage",
+      "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then look up that specific run by its run ID to confirm its status, and retrieve its dataset items. Tell me the run status and the title of the scraped page.",
+      "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-actor-run with the runId from that call, and call get-dataset-items with the datasetId from that run. PASS only if get-actor-run was called with a runId argument, get-dataset-items was called with a datasetId argument, and the final answer states the run status and a page title.",
+      "tools": ["actors", "get-actor-run", "get-dataset-items"],
+      "maxTurns": 14
+    },
+    {
       "id": "storage-run-list-recent",
       "category": "storage",
       "query": "List my 10 most recent Actor runs, newest first. For each run report its run ID, the Actor it ran, and its status.",
