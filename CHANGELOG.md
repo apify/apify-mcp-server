@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Parallelize integration test suite ([#1137](https://github.com/apify/apify-mcp-server/pull/1137)) ([a42e66f](https://github.com/apify/apify-mcp-server/commit/a42e66f6cedf9419f9d9e6213579050bb1774949)) by [@MQ37](https://github.com/MQ37)
 - Honor AbortSignal on Actor-MCP calls and hash-dedupe proxy names ([#1185](https://github.com/apify/apify-mcp-server/pull/1185)) ([7b24c9e](https://github.com/apify/apify-mcp-server/commit/7b24c9e3609958f276d00f9547d61a2c6773f379)) by [@Ayush7614](https://github.com/Ayush7614)
+- Stop reporting a cancelled Actor-MCP call as a failure ([#1197](https://github.com/apify/apify-mcp-server/pull/1197)) ([cbbfb79](https://github.com/apify/apify-mcp-server/commit/cbbfb79b0aa4c0e426fcf328b484325e76717f4c)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
 
 
 <!-- git-cliff-unreleased-end -->
