@@ -27,7 +27,8 @@ import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
  * Both the sync `CallToolRequestSchema` handler and `executeToolAndUpdateTask` call this after their
  * own pre-dispatch validation and keep their own try/catch + buildToolCallErrorResult around it.
  * INTERNAL and ACTOR execution errors propagate to the caller's catch; the ACTOR_MCP case keeps its
- * own inner catch and returns a soft-fail result instead of throwing.
+ * own inner catch and returns a soft-fail result instead of throwing — except on abort, which
+ * returns an empty result like ACTOR.
  *
  * `extractToolTelemetry` (via `applyToolTelemetry`) runs once here, in the INTERNAL and ACTOR
  * cases, and strips `toolTelemetry` in place, so callers must not re-strip. ACTOR_MCP sets
@@ -123,10 +124,10 @@ export async function dispatchToolCall(params: {
 
         case TOOL_TYPE.ACTOR_MCP: {
             // This case never throws: connect/exec failures resolve to a soft-fail `result`
-            // (isError body) below instead. As a task, that means the outer completeTask
-            // stores it via the 'completed' path (isError body) — deliberately matching sync's
-            // own soft-fail semantics, unlike ACTOR/INTERNAL, whose thrown errors land in the
-            // task caller's 'failed' path.
+            // (isError body) below instead, and an abort resolves to an empty one. As a task, that
+            // means the outer completeTask stores it via the 'completed' path (isError body) —
+            // deliberately matching sync's own soft-fail semantics, unlike ACTOR/INTERNAL, whose
+            // thrown errors land in the task caller's 'failed' path.
             let client: Client | null = null;
             try {
                 client = await connectMCPClient(tool.serverUrl, apifyToken, mcpSessionId);
@@ -203,6 +204,11 @@ export async function dispatchToolCall(params: {
                     // Yield a macrotask first: the SDK sends notifications/cancelled fire-and-forget on
                     // the transport's AbortController, which the finally's close() would abort.
                     await new Promise((resolve) => setImmediate(resolve));
+                    // Same as the ACTOR branch below: a cancelled request gets no response, and a
+                    // cancel is not a failure — so no error body, no failure_* fields, no error log.
+                    toolStatus = TOOL_STATUS.ABORTED;
+                    result = {};
+                    break;
                 }
                 ({ toolStatus, callDiagnostics } = buildExecutionDiagnostics({
                     error,
