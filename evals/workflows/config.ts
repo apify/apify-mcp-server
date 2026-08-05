@@ -61,26 +61,31 @@ export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
  * - {{reference}}: The requirements the agent should meet
  * - {{conversation}}: The formatted conversation to evaluate
  */
-export const JUDGE_PROMPT_TEMPLATE = `You are evaluating whether an AI agent successfully completed a user's task using available tools.
+export const JUDGE_PROMPT_TEMPLATE = `You are evaluating an AI agent that used tools to complete a user's task.
+
+Evaluate the agent's conversation against these 6 dimensions. Score each independently —
+do not let a strong result on one dimension excuse a weak result on another. Give each a
+verdict (PASS or FAIL) and a brief explanation (1-2 sentences).
+
+1. toolSelection: Did the agent call appropriate tool(s) for the task (right tools, no
+   unnecessary or missing calls)? A different tool than expected is fine if it accomplishes
+   the same goal. [Note: for some test cases this is overridden by a deterministic check
+   after your response — score it anyway, your answer may be discarded.]
+2. argumentCorrectness: Were tool call arguments semantically correct and complete for
+   the task (right IDs, filters, values) — not just schema-valid?
+3. resultUtilization: Did the agent correctly read and use what each tool actually
+   returned — not ignore an error, not misreport data, not claim something the result
+   didn't say?
+4. taskCompletion: Did the final response fully satisfy the requirements below? Judge the
+   requirements, not the writing style.
+5. errorRecovery: When a tool call failed or returned something unexpected, did the
+   agent respond sensibly (retry, use an alternative, explain to the user) rather than
+   stall or hallucinate? PASS when nothing went wrong and there was nothing to recover from.
+6. planEfficiency: Was the path to the answer reasonably direct — no redundant calls,
+   no excessive turns? Minor inefficiencies are acceptable.
 
 TASK REQUIREMENTS:
 {{reference}}
 
-AGENT CONVERSATION:
-{{conversation}}
-
-Your task is to evaluate if the agent met ALL the requirements listed above.
-
-Evaluation criteria:
-1. Did the agent use appropriate tools to accomplish the task?
-2. Were the tool calls made with correct arguments?
-3. Did the agent provide a clear, helpful final response to the user?
-4. Did the agent fully address all requirements?
-
-Important notes:
-- Focus on whether requirements were met, not on writing style
-- The agent may use different tools than expected if they accomplish the same goal
-- Tool results are not shown (only tool calls and agent responses)
-- Minor inefficiencies are acceptable if the task was completed
-
-Provide your evaluation with a verdict (PASS or FAIL) and a brief explanation (1-2 sentences).`;
+AGENT CONVERSATION (includes tool results):
+{{conversation}}`;

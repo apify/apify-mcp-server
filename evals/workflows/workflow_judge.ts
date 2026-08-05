@@ -8,25 +8,80 @@ import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
 import type { WorkflowTestCase } from '../shared/types.js';
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
+import type { SchemaValidityCheck, ToolSelectionCheck } from './deterministic_checks.js';
+import { checkSchemaValidity, checkToolSelection } from './deterministic_checks.js';
 import type { LlmClient } from './llm_client.js';
-import type { ConversationHistory } from './types.js';
+import type { ConversationHistory, McpTool } from './types.js';
+
+/**
+ * Verdict for one rubric dimension
+ */
+export type DimensionResult = { verdict: 'PASS' | 'FAIL'; reason: string };
+
+/**
+ * The fixed 6-dimension rubric, scored independently for every test case
+ */
+export type RubricResult = {
+    toolSelection: DimensionResult;
+    argumentCorrectness: DimensionResult;
+    resultUtilization: DimensionResult;
+    taskCompletion: DimensionResult;
+    errorRecovery: DimensionResult;
+    planEfficiency: DimensionResult;
+};
+
+/**
+ * Rubric dimensions in display order, with the short glyph label used in the compact results table.
+ */
+export const RUBRIC_DIMENSIONS = [
+    { key: 'toolSelection', glyph: 'tool', label: 'Tool selection' },
+    { key: 'argumentCorrectness', glyph: 'args', label: 'Argument correctness' },
+    { key: 'resultUtilization', glyph: 'result', label: 'Result utilization' },
+    { key: 'taskCompletion', glyph: 'complete', label: 'Task completion' },
+    { key: 'errorRecovery', glyph: 'recover', label: 'Error recovery' },
+    { key: 'planEfficiency', glyph: 'eff', label: 'Plan efficiency' },
+] as const satisfies readonly { key: keyof RubricResult; glyph: string; label: string }[];
 
 /**
  * Judge evaluation result
  */
 export type JudgeResult = {
-    /** PASS or FAIL verdict */
-    verdict: 'PASS' | 'FAIL';
-    /** Explanation from judge */
-    reason: string;
+    /** Mirrors rubric.taskCompletion.verdict — informational, the harness exit code does not use it */
+    overallVerdict: 'PASS' | 'FAIL';
+    /** The 6 rubric dimensions (toolSelection may be overridden by the deterministic check) */
+    rubric: RubricResult;
+    /** Deterministic expectedTools exact-match */
+    toolSelectionCheck: ToolSelectionCheck;
+    /** Deterministic per-call inputSchema validation */
+    schemaValidityCheck: SchemaValidityCheck;
     /** Raw response from judge (for debugging) */
     rawResponse: string;
 };
+
+/** Per-result cap on tool output shown to the judge, so a huge dataset can't crowd out the rest. */
+const MAX_RESULT_CHARS = 2000;
 
 /**
  * JSON schema for structured judge output
  * Guarantees the LLM returns valid JSON matching this schema
  */
+const DIMENSION_SCHEMA = {
+    type: 'object',
+    properties: {
+        verdict: {
+            type: 'string',
+            enum: ['PASS', 'FAIL'],
+            description: 'Whether the agent passed or failed this dimension',
+        },
+        reason: {
+            type: 'string',
+            description: 'Brief explanation in 1-2 sentences',
+        },
+    },
+    required: ['verdict', 'reason'],
+    additionalProperties: false,
+};
+
 const JUDGE_RESPONSE_SCHEMA: ResponseFormatJSONSchema = {
     type: 'json_schema',
     json_schema: {
@@ -34,26 +89,27 @@ const JUDGE_RESPONSE_SCHEMA: ResponseFormatJSONSchema = {
         strict: true,
         schema: {
             type: 'object',
-            properties: {
-                verdict: {
-                    type: 'string',
-                    enum: ['PASS', 'FAIL'],
-                    description: 'Whether the agent passed or failed the evaluation',
-                },
-                reason: {
-                    type: 'string',
-                    description: 'Brief explanation in 1-2 sentences explaining why the agent passed or failed',
-                },
-            },
-            required: ['verdict', 'reason'],
+            properties: Object.fromEntries(RUBRIC_DIMENSIONS.map(({ key }) => [key, DIMENSION_SCHEMA])),
+            required: RUBRIC_DIMENSIONS.map(({ key }) => key),
             additionalProperties: false,
         },
     },
 };
 
 /**
+ * Serialize a tool result and cut it to `maxChars`, noting the cut so the judge knows the output
+ * continued rather than ended.
+ */
+export function truncateResult(result: unknown, maxChars = MAX_RESULT_CHARS): string {
+    const serialized = typeof result === 'string' ? result : JSON.stringify(result);
+    if (serialized === undefined) return 'undefined';
+    if (serialized.length <= maxChars) return serialized;
+    return `${serialized.slice(0, maxChars)}  [truncated at ${maxChars} chars, ${serialized.length} total]`;
+}
+
+/**
  * Format conversation for judge evaluation
- * Judge sees: tool calls + arguments + final responses (NOT tool results)
+ * Judge sees: tool calls + arguments + truncated tool results + final responses
  */
 function formatConversationForJudge(conversation: ConversationHistory): string {
     const lines: string[] = [];
@@ -64,10 +120,17 @@ function formatConversationForJudge(conversation: ConversationHistory): string {
 
     // Each turn
     for (const turn of conversation.turns) {
-        // Show tool calls (if any)
-        if (turn.toolCalls.length > 0) {
-            for (const toolCall of turn.toolCalls) {
-                lines.push(`AGENT: [Called tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.arguments)}]`);
+        // Show tool calls paired with their results (both arrays are filled in call order)
+        for (const [index, toolCall] of turn.toolCalls.entries()) {
+            lines.push(`AGENT: [Called tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.arguments)}]`);
+
+            const toolResult = turn.toolResults[index];
+            if (!toolResult) continue;
+            if (toolResult.success) {
+                lines.push(`TOOL RESULT (${toolResult.toolName}): ${truncateResult(toolResult.result)}`);
+            } else {
+                // Show the error text, not "no result" — errorRecovery is scored on what the agent saw.
+                lines.push(`TOOL ERROR (${toolResult.toolName}): ${truncateResult(toolResult.error)}`);
             }
         }
 
@@ -85,36 +148,64 @@ function formatConversationForJudge(conversation: ConversationHistory): string {
 /**
  * Parse structured JSON response from judge
  */
-function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reason: string } {
+function parseJudgeResponse(response: string): RubricResult {
+    let parsed: Partial<Record<keyof RubricResult, DimensionResult>>;
     try {
-        const parsed = JSON.parse(response) as { verdict: 'PASS' | 'FAIL'; reason: string };
-
-        // Validate the structure (should be guaranteed by schema, but double-check)
-        if (!parsed.verdict || (parsed.verdict !== 'PASS' && parsed.verdict !== 'FAIL')) {
-            throw new Error(`Invalid verdict: ${parsed.verdict}`);
-        }
-
-        if (!parsed.reason || typeof parsed.reason !== 'string') {
-            throw new Error(`Invalid reason: ${parsed.reason}`);
-        }
-
-        return parsed;
+        parsed = JSON.parse(response) as Partial<Record<keyof RubricResult, DimensionResult>>;
     } catch (error) {
         throw new Error(
             `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}\n` +
                 `Raw response: ${response}`,
         );
     }
+
+    // Validate the structure (should be guaranteed by schema, but double-check)
+    for (const { key } of RUBRIC_DIMENSIONS) {
+        const dimension = parsed[key];
+        if (!dimension || (dimension.verdict !== 'PASS' && dimension.verdict !== 'FAIL')) {
+            throw new Error(`Invalid verdict for dimension ${key}: ${JSON.stringify(dimension)}`);
+        }
+        if (!dimension.reason || typeof dimension.reason !== 'string') {
+            throw new Error(`Invalid reason for dimension ${key}: ${JSON.stringify(dimension.reason)}`);
+        }
+    }
+
+    return parsed as RubricResult;
 }
 
 /**
- * Evaluate a conversation using the judge LLM
+ * Build a JudgeResult for a test that errored before it could be judged.
+ */
+export function createErrorJudgeResult(reason: string): JudgeResult {
+    const dimension: DimensionResult = { verdict: 'FAIL', reason };
+    return {
+        overallVerdict: 'FAIL',
+        rubric: {
+            toolSelection: dimension,
+            argumentCorrectness: dimension,
+            resultUtilization: dimension,
+            taskCompletion: dimension,
+            errorRecovery: dimension,
+            planEfficiency: dimension,
+        },
+        toolSelectionCheck: { checked: false, verdict: null, expected: [], actual: [] },
+        schemaValidityCheck: { verdict: 'PASS', invalidCalls: [] },
+        rawResponse: '',
+    };
+}
+
+/**
+ * Evaluate a conversation using the judge LLM plus the deterministic checks.
+ *
+ * @param mcpTools - Tool list snapshot taken after the conversation finished, used to validate
+ *                   each tool call's arguments against the tool's declared inputSchema
  */
 export async function evaluateConversation(
     testCase: WorkflowTestCase,
     conversation: ConversationHistory,
     llmClient: LlmClient,
     judgeModel: string = MODELS.judge,
+    mcpTools: McpTool[] = [],
 ): Promise<JudgeResult> {
     // Format conversation for judge
     const formattedConversation = formatConversationForJudge(conversation);
@@ -134,19 +225,27 @@ export async function evaluateConversation(
     );
 
     const rawResponse = response.content || '';
+    const rubric = parseJudgeResponse(rawResponse);
 
-    // Parse response
-    try {
-        const { verdict, reason } = parseJudgeResponse(rawResponse);
-        return {
-            verdict,
-            reason,
-            rawResponse,
+    // Deterministic checks. When expectedTools is set, code decides toolSelection and the judge's
+    // own answer for that dimension is discarded.
+    const toolSelectionCheck = checkToolSelection(testCase.expectedTools, conversation);
+    if (toolSelectionCheck.checked) {
+        rubric.toolSelection = {
+            verdict: toolSelectionCheck.verdict as 'PASS' | 'FAIL',
+            reason:
+                `Deterministic: expected [${toolSelectionCheck.expected.join(', ')}], ` +
+                `got [${toolSelectionCheck.actual.join(', ')}]`,
         };
-    } catch (error) {
-        throw new Error(
-            `Failed to parse judge response: ${error instanceof Error ? error.message : String(error)}\n` +
-                `Raw response: ${rawResponse}`,
-        );
     }
+
+    const schemaValidityCheck = checkSchemaValidity(conversation, mcpTools);
+
+    return {
+        overallVerdict: rubric.taskCompletion.verdict,
+        rubric,
+        toolSelectionCheck,
+        schemaValidityCheck,
+        rawResponse,
+    };
 }

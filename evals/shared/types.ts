@@ -49,6 +49,13 @@ export type WorkflowTestCase = {
      * that the live server + API cannot reproduce on demand. See mcp_client.ts.
      */
     failTools?: string[];
+    /**
+     * Exact tool-call sequence (by name, order-independent, dedup'd) that constitutes correct tool
+     * selection for this test. When set, the `toolSelection` rubric dimension is scored
+     * deterministically (code exact-match) instead of by the judge. Omit only when multiple tool
+     * paths are genuinely valid.
+     */
+    expectedTools?: string[];
 } & BaseTestCase;
 
 /**

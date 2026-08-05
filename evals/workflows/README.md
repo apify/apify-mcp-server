@@ -62,7 +62,7 @@ Tests AI agents executing tasks using Apify MCP server tools through multi-turn 
 - Multi-turn conversations with tool calling
 - Dynamic tool discovery during execution
 - MCP server instructions automatically added to agent system prompt
-- LLM-based evaluation against requirements
+- LLM judge scoring a fixed 6-dimension rubric, plus two code-based checks
 - Isolated MCP server per test
 - Configurable tool call timeout (default: 60 seconds)
 - Strict pass/fail (all tests must pass)
@@ -139,23 +139,51 @@ while (turnNumber < maxTurns) {
 
 **Location:** `run-workflow-evals.ts`
 
-### 4. Judge Sees Tool Calls, Not Results
+### 4. Six-Dimension Rubric, Backed by Deterministic Checks
 
-**Decision:** Judge sees tool calls with arguments and agent responses, but NOT raw tool results.
+**Decision:** The judge scores 6 fixed dimensions instead of one PASS/FAIL, and it sees truncated
+tool results alongside the calls. Two checks are computed in code, not by the LLM.
 
 **Why:**
-- Evaluates agent behavior (tool selection, arguments)
-- Tool results are often very long and noisy
-- Agent should summarize results, judge evaluates the summary
+- One opaque verdict doesn't say *which* capability regressed in a PR
+- `resultUtilization` and `errorRecovery` are unjudgeable without seeing what tools returned
+- Tool selection and schema validity have knowable answers; an LLM adds noise, not signal
+
+**Dimensions** (same 6 for every test case, scored independently):
+
+| Dimension | Question |
+|-----------|----------|
+| `toolSelection` | Right tools, no unnecessary or missing calls? |
+| `argumentCorrectness` | Arguments semantically correct (right IDs, filters, values)? |
+| `resultUtilization` | Did the agent read and use what the tools actually returned? |
+| `taskCompletion` | Does the final response satisfy the test case's `reference`? |
+| `errorRecovery` | On a failed or unexpected result, did the agent respond sensibly? |
+| `planEfficiency` | Reasonably direct path — no redundant calls or excessive turns? |
+
+**Deterministic checks** (`deterministic_checks.ts`):
+- `toolSelectionCheck` — exact set-match (deduped, order-independent) of the tools called against
+  the test case's `expectedTools`. When `expectedTools` is set, this **overrides** the judge's
+  `toolSelection` verdict; when unset, the judge's own verdict stands.
+- `schemaValidityCheck` — every tool call's arguments validated with AJV against that tool's
+  declared `inputSchema`. Reported separately from `argumentCorrectness`: schema-valid arguments
+  can still be semantically wrong. Calls naming a tool absent from the final tool list are skipped.
+
+**Overall verdict:** `overallVerdict` = the `taskCompletion` verdict. No separate aggregation rule.
+The rubric is **reporting only** — the exit code still reflects errors and task completion, and
+nothing here is gated in CI.
 
 **Judge input format:**
 ```
 USER: Find actors for Google Maps
 AGENT: [Called tool: search-actors with args: {"keywords":"google maps","limit":5}]
+TOOL RESULT (search-actors): {"actors":[...]}  [truncated at 2000 chars, 4213 total]
 AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 ```
 
-**Location:** `workflow-judge.ts`
+Each result is truncated to 2000 chars. Failed calls show the error text, not "no result" — that
+is exactly what `errorRecovery` is scored on.
+
+**Location:** `workflow_judge.ts`, `deterministic_checks.ts`, `config.ts` (`JUDGE_PROMPT_TEMPLATE`)
 
 ### 5. LLM Client Shared, MCP Client Isolated
 
@@ -221,6 +249,7 @@ const conversation = await executeConversation({
 - `convert-mcp-tools.ts` - MCP → OpenAI tool format
 - `conversation-executor.ts` - Multi-turn loop with dynamic tools and server instructions
 - `workflow-judge.ts` - Judge evaluation
+- `deterministic_checks.ts` - Code-based tool-selection and schema-validity checks
 - `test-cases-loader.ts` - Load/filter test cases
 - `output-formatter.ts` - Results formatting
 - `run-workflow-evals.ts` - Main CLI entry
@@ -362,6 +391,21 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
       "testId": "search-google-maps",
       "verdict": "PASS",
       "reason": "Agent successfully searched for Google Maps actors",
+      "rubric": {
+        "toolSelection": { "verdict": "PASS", "reason": "Deterministic: expected [search-actors], got [search-actors]" },
+        "argumentCorrectness": { "verdict": "PASS", "reason": "Keywords matched the request" },
+        "resultUtilization": { "verdict": "PASS", "reason": "Reported the actors the search returned" },
+        "taskCompletion": { "verdict": "PASS", "reason": "Agent successfully searched for Google Maps actors" },
+        "errorRecovery": { "verdict": "PASS", "reason": "No tool call failed" },
+        "planEfficiency": { "verdict": "PASS", "reason": "One search, one answer" }
+      },
+      "toolSelectionCheck": {
+        "checked": true,
+        "verdict": "PASS",
+        "expected": ["search-actors"],
+        "actual": ["search-actors"]
+      },
+      "schemaValidityCheck": { "verdict": "PASS", "invalidCalls": [] },
       "durationMs": 5234,
       "turns": 3,
       "resultBytes": 18452,
@@ -379,8 +423,15 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
 - `agentModel` - LLM model used for the agent
 - `judgeModel` - LLM model used for judging
 - `testId` - Test case identifier
-- `verdict` - `PASS` or `FAIL`
-- `reason` - Judge reasoning or error message
+- `verdict` - `PASS` or `FAIL`. Mirrors `rubric.taskCompletion.verdict`; kept under the old name so
+  existing readers don't break
+- `reason` - Mirrors `rubric.taskCompletion.reason`, or the error message on an errored test
+- `rubric` - All 6 dimension verdicts and reasons (see design decision #4). Absent on errored tests
+  and in records written before the rubric existed
+- `toolSelectionCheck` - Deterministic `expectedTools` exact-match: `checked`, `verdict`, `expected`,
+  `actual`. `checked` is `false` (and `verdict` `null`) when the test case declares no `expectedTools`
+- `schemaValidityCheck` - Deterministic per-call `inputSchema` validation: `verdict` plus
+  `invalidCalls` (`{ toolName, errors }`, empty on PASS)
 - `durationMs` - Test duration in milliseconds
 - `turns` - Number of conversation turns
 - `resultBytes` - Total UTF-8 bytes of tool results returned to the agent across the conversation (measured at the point each result is fed to the LLM, so it reflects what the agent actually receives). Compare across branches to quantify byte savings.
@@ -415,9 +466,11 @@ The `results.json` file is tracked in git, allowing you to:
 - Compare results across branches
 - Track performance regressions in PRs
 
-### Comparing against a baseline (byte/token deltas)
+### Comparing against a baseline (byte/token and rubric deltas)
 
-Every run automatically compares against a baseline and prints per-test and aggregate **deltas** for tool bytes and tokens — no manual file diffing. This is how you answer "did this change grow the response size?".
+Every run automatically compares against a baseline and prints per-test and aggregate **deltas** for tool bytes, tokens, and each rubric dimension's pass rate — no manual file diffing. This is how you answer "did this change grow the response size?" and "which capability regressed?".
+
+Dimension deltas read as `Result utilization (30/30): 27/30 passed (▼ -2 vs baseline 29/30)`. Polarity is the opposite of the byte/token metrics: more passes is better, so ▲ is an improvement and ▼ a regression. They are matched only against baseline records that carry a `rubric` field.
 
 - **Default baseline** is the committed `evals/workflows/results.json`. Each test is matched by its `agentModel:judgeModel:testId` key.
 - **Custom baseline:** `--baseline <path>` compares against any saved results file.
@@ -462,6 +515,7 @@ File: `test-cases.json`
 - `maxTurns` - Override default (10)
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
 - `failTools` - Tool names the harness force-fails with a synthetic `INTERNAL_ERROR` result carrying the real `report-problem` nudge, instead of calling the server (e.g. `["call-actor"]`). Use it to deterministically throw a nudge-eligible error that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after a failure. See `mcp_client.ts`.
+- `expectedTools` - Exact set of tool names the agent should call (order-independent, deduped), e.g. `["call-actor", "get-dataset-items"]`. When set, the `toolSelection` dimension is scored in code by exact match and the judge's own verdict for it is discarded. Omit it only when multiple tool paths are genuinely valid — 5 of the 30 test cases do (the "which is the best scraper" searches, where fetching details on top of searching is legitimate, and the cases reachable either via a dedicated Actor or `apify/rag-web-browser`). Use the names as they appear in `HELPER_TOOLS` (`src/const.ts`).
 
 ## Performance
 

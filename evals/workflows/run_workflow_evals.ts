@@ -35,7 +35,7 @@ import {
 } from './results_writer.js';
 import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test_cases_loader.js';
 import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test_cases_loader.js';
-import { evaluateConversation } from './workflow_judge.js';
+import { createErrorJudgeResult, evaluateConversation } from './workflow_judge.js';
 
 type CliArgs = {
     category?: string;
@@ -98,8 +98,10 @@ async function runSingleTest(
             serverInstructions,
         });
 
-        // Judge conversation
-        const judgeResult = await evaluateConversation(testCase, conversation, llmClient, argv.judgeModel);
+        // Judge conversation. The tool list is snapshotted now (before cleanup clears it) so the
+        // schema-validity check has the inputSchema of every tool the agent could have called.
+        const mcpTools = mcpClient.getTools();
+        const judgeResult = await evaluateConversation(testCase, conversation, llmClient, argv.judgeModel, mcpTools);
 
         const durationMs = Date.now() - startTime;
 
@@ -112,7 +114,7 @@ async function runSingleTest(
 
         logWithPrefix(
             testId,
-            `  ${judgeResult.verdict === 'PASS' ? '✅' : '❌'} ${judgeResult.verdict} (${durationMs}ms)`,
+            `  ${judgeResult.overallVerdict === 'PASS' ? '✅' : '❌'} ${judgeResult.overallVerdict} (${durationMs}ms)`,
         );
     } catch (error) {
         const durationMs = Date.now() - startTime;
@@ -126,11 +128,7 @@ async function runSingleTest(
                 hitMaxTurns: false,
                 totalTurns: 0,
             },
-            judgeResult: {
-                verdict: 'FAIL',
-                reason: 'Error during execution',
-                rawResponse: '',
-            },
+            judgeResult: createErrorJudgeResult('Error during execution'),
             durationMs,
             error: error instanceof Error ? error.message : String(error),
         };
@@ -393,7 +391,7 @@ async function main() {
 
     // Exit with appropriate code - ALL tests must pass
     const totalTests = results.length;
-    const passedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'PASS').length;
+    const passedTests = results.filter((r) => !r.error && r.judgeResult.overallVerdict === 'PASS').length;
     const errorTests = results.filter((r) => r.error).length;
 
     // Exit 0 only if ALL tests passed with no errors

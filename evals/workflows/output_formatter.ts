@@ -2,9 +2,11 @@
  * Output formatter for evaluation results
  */
 
+import type { SchemaValidityCheck, ToolSelectionCheck } from './deterministic_checks.js';
 import type { WorkflowTestCase } from './test_cases_loader.js';
 import type { ConversationHistory } from './types.js';
-import type { JudgeResult } from './workflow_judge.js';
+import type { JudgeResult, RubricResult } from './workflow_judge.js';
+import { RUBRIC_DIMENSIONS } from './workflow_judge.js';
 
 /**
  * Single evaluation result
@@ -65,10 +67,33 @@ export function formatWithDelta(current: number, baseline: number | undefined, f
 }
 
 /**
+ * Render a pass count followed by its change vs a baseline pass count over the same test subset.
+ * More passes is better here, so ▲ marks an improvement and ▼ a regression — the opposite reading
+ * of the byte/token deltas, where lower is better.
+ */
+export function formatPassRateWithDelta(current: number, baseline: number, total: number): string {
+    const diff = current - baseline;
+    if (diff === 0) return `${current}/${total} passed (= baseline)`;
+
+    const arrow = diff > 0 ? '▲' : '▼';
+    const sign = diff > 0 ? '+' : '-';
+    return `${current}/${total} passed (${arrow} ${sign}${Math.abs(diff)} vs baseline ${baseline}/${total})`;
+}
+
+/**
+ * Render the rubric as one compact line of per-dimension glyphs, e.g.
+ * `tool✓ args✓ result✗ complete✓ recover✓ eff✓`.
+ */
+export function formatRubricGlyphs(rubric: RubricResult): string {
+    return RUBRIC_DIMENSIONS.map(({ key, glyph }) => `${glyph}${rubric[key].verdict === 'PASS' ? '✓' : '✗'}`).join(' ');
+}
+
+/**
  * Format results as a table.
  *
  * @param results - Evaluation results to render
- * @param baseline - Optional prior results keyed by test ID; when present, byte/token deltas are shown
+ * @param baseline - Optional prior results keyed by test ID; when present, byte/token and
+ *                   per-dimension pass-rate deltas are shown
  */
 export function formatResultsTable(results: EvaluationResult[], baseline?: Map<string, TestResultRecord>): string {
     const lines: string[] = [];
@@ -84,7 +109,7 @@ export function formatResultsTable(results: EvaluationResult[], baseline?: Map<s
         let status: string;
         if (result.error) {
             status = '🔥 ERROR';
-        } else if (result.judgeResult.verdict === 'PASS') {
+        } else if (result.judgeResult.overallVerdict === 'PASS') {
             status = '✅ PASS';
         } else {
             status = '❌ FAIL';
@@ -99,10 +124,17 @@ export function formatResultsTable(results: EvaluationResult[], baseline?: Map<s
             const prior = baseline?.get(result.testCase.id);
             const bytes = sumResultBytes(result.conversation);
             const tokens = result.conversation.totalTokens ?? 0;
+            lines.push(`  Rubric: ${formatRubricGlyphs(result.judgeResult.rubric)}`);
             lines.push(`  Turns: ${result.conversation.totalTurns} | Duration: ${result.durationMs}ms`);
             lines.push(`  Tool bytes: ${formatWithDelta(bytes, prior?.resultBytes, formatBytes)}`);
             lines.push(`  Tokens: ${formatWithDelta(tokens, prior?.totalTokens, formatTokens)}`);
-            lines.push(`  Reason: ${result.judgeResult.reason}`);
+            lines.push(`  Reason: ${result.judgeResult.rubric.taskCompletion.reason}`);
+            // Only surfaced on failure; a passing schema check is the uninteresting default.
+            const { invalidCalls } = result.judgeResult.schemaValidityCheck;
+            if (invalidCalls.length > 0) {
+                const summary = invalidCalls.map((call) => `${call.toolName} (${call.errors.join('; ')})`).join(', ');
+                lines.push(`  Schema-invalid calls: ${summary}`);
+            }
         }
 
         lines.push('');
@@ -113,8 +145,8 @@ export function formatResultsTable(results: EvaluationResult[], baseline?: Map<s
 
     // Summary stats at the END
     const totalTests = results.length;
-    const passedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'PASS').length;
-    const failedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'FAIL').length;
+    const passedTests = results.filter((r) => !r.error && r.judgeResult.overallVerdict === 'PASS').length;
+    const failedTests = results.filter((r) => !r.error && r.judgeResult.overallVerdict === 'FAIL').length;
     const errorTests = results.filter((r) => r.error).length;
 
     const totalBytes = results.reduce((sum, r) => sum + sumResultBytes(r.conversation), 0);
@@ -129,10 +161,26 @@ export function formatResultsTable(results: EvaluationResult[], baseline?: Map<s
     let tokensMatched = 0;
     let tokensCurrent = 0;
     let tokensBaseline = 0;
+    // Per-dimension pass counts, matched over the tests whose baseline record carries a rubric
+    // (records written before the rubric existed have none).
+    let rubricMatched = 0;
+    const dimensionCurrent = new Map<string, number>();
+    const dimensionBaseline = new Map<string, number>();
     if (baseline) {
         for (const result of results) {
             const prior = baseline.get(result.testCase.id);
             if (!prior) continue;
+            if (prior.rubric) {
+                rubricMatched++;
+                for (const { key } of RUBRIC_DIMENSIONS) {
+                    if (result.judgeResult.rubric[key].verdict === 'PASS') {
+                        dimensionCurrent.set(key, (dimensionCurrent.get(key) ?? 0) + 1);
+                    }
+                    if (prior.rubric[key]?.verdict === 'PASS') {
+                        dimensionBaseline.set(key, (dimensionBaseline.get(key) ?? 0) + 1);
+                    }
+                }
+            }
             // Records written before these metrics existed lack the field, so match each independently.
             const priorBytes = prior.resultBytes;
             if (priorBytes !== undefined) {
@@ -161,8 +209,14 @@ export function formatResultsTable(results: EvaluationResult[], baseline?: Map<s
         lines.push(
             `  Tokens used: ${formatTokens(totalTokens)} total, ${formatTokens(Math.round(totalTokens / totalTests))} avg/test`,
         );
+        lines.push('');
+        lines.push(`  Rubric pass rates:`);
+        for (const { key, label } of RUBRIC_DIMENSIONS) {
+            const passed = results.filter((r) => r.judgeResult.rubric[key].verdict === 'PASS').length;
+            lines.push(`    ${label}: ${passed}/${totalTests} passed`);
+        }
     }
-    if (bytesMatched > 0 || tokensMatched > 0) {
+    if (bytesMatched > 0 || tokensMatched > 0 || rubricMatched > 0) {
         lines.push('');
         lines.push(`  vs baseline:`);
         if (bytesMatched > 0) {
@@ -174,6 +228,15 @@ export function formatResultsTable(results: EvaluationResult[], baseline?: Map<s
             lines.push(
                 `    Tokens (${tokensMatched}/${totalTests}): ${formatWithDelta(tokensCurrent, tokensBaseline, formatTokens)}`,
             );
+        }
+        if (rubricMatched > 0) {
+            for (const { key, label } of RUBRIC_DIMENSIONS) {
+                const current = dimensionCurrent.get(key) ?? 0;
+                const prior = dimensionBaseline.get(key) ?? 0;
+                lines.push(
+                    `    ${label} (${rubricMatched}/${totalTests}): ${formatPassRateWithDelta(current, prior, rubricMatched)}`,
+                );
+            }
         }
     }
     lines.push('');
@@ -252,8 +315,27 @@ export function formatDetailedResult(result: EvaluationResult): string {
     }
     lines.push('');
 
-    lines.push(`⚖️  Judge Verdict: ${result.judgeResult.verdict}`);
-    lines.push(`  Reason: ${result.judgeResult.reason}`);
+    lines.push(`⚖️  Overall verdict (= task completion): ${result.judgeResult.overallVerdict}`);
+    for (const { key, label } of RUBRIC_DIMENSIONS) {
+        const dimension = result.judgeResult.rubric[key];
+        lines.push(`  ${dimension.verdict === 'PASS' ? '✓' : '✗'} ${label}: ${dimension.reason}`);
+    }
+    lines.push('');
+
+    const { toolSelectionCheck, schemaValidityCheck } = result.judgeResult;
+    lines.push(`🧮 Deterministic checks:`);
+    if (toolSelectionCheck.checked) {
+        lines.push(`  Tool selection: ${toolSelectionCheck.verdict}`);
+        lines.push(`    Expected: [${toolSelectionCheck.expected.join(', ')}]`);
+        lines.push(`    Actual:   [${toolSelectionCheck.actual.join(', ')}]`);
+    } else {
+        lines.push(`  Tool selection: not checked (no expectedTools on this test case)`);
+        lines.push(`    Actual:   [${toolSelectionCheck.actual.join(', ')}]`);
+    }
+    lines.push(`  Schema validity: ${schemaValidityCheck.verdict}`);
+    for (const invalidCall of schemaValidityCheck.invalidCalls) {
+        lines.push(`    ${invalidCall.toolName}: ${invalidCall.errors.join('; ')}`);
+    }
     lines.push('');
 
     lines.push(`⏱️  Duration: ${result.durationMs}ms`);
@@ -276,10 +358,16 @@ export type TestResultRecord = {
     judgeModel: string;
     /** Test case ID */
     testId: string;
-    /** Test verdict (PASS or FAIL) */
+    /** Test verdict (PASS or FAIL) — mirrors `rubric.taskCompletion.verdict`, kept for readers of the old field */
     verdict: 'PASS' | 'FAIL';
-    /** Judge reasoning or error message */
+    /** Judge reasoning or error message — mirrors `rubric.taskCompletion.reason` */
     reason: string;
+    /** All 6 rubric dimensions (absent in records written before the rubric existed) */
+    rubric?: RubricResult;
+    /** Deterministic expectedTools exact-match (absent in records written before it existed, and on errored tests) */
+    toolSelectionCheck?: ToolSelectionCheck;
+    /** Deterministic per-call inputSchema validation (absent in records written before it existed, and on errored tests) */
+    schemaValidityCheck?: SchemaValidityCheck;
     /** Test duration in milliseconds */
     durationMs: number;
     /** Number of conversation turns */
