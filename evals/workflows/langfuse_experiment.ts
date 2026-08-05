@@ -9,7 +9,6 @@
 import { executeConversation } from './conversation_executor.js';
 import type { LlmClient } from './llm_client.js';
 import { McpClient } from './mcp_client.js';
-import { sumResultBytes } from './output_formatter.js';
 import type { WorkflowTestCase } from './test_cases_loader.js';
 import type { ConversationHistory } from './types.js';
 import type { JudgeResult } from './workflow_judge.js';
@@ -26,12 +25,8 @@ export type WorkflowTaskOutput = {
 /** Evaluation shape returned to Langfuse (a subset of ScoreBody). */
 export type WorkflowEvaluation = { name: string; value: number; comment?: string };
 
-/** An experiment data item built from a test case (local array, not a Langfuse dataset). */
-export type WorkflowExperimentItem = {
-    input: { query: string };
-    expectedOutput: string | null;
-    metadata: { testCase: WorkflowTestCase };
-};
+/** Metadata every dataset item carries; see `testCaseToDatasetItem`. */
+export type WorkflowItemMetadata = { testCase: WorkflowTestCase };
 
 /** Last path segment of a model id, e.g. `claude-haiku-4.5` from `anthropic/claude-haiku-4.5`. */
 export function shortModelName(model: string): string {
@@ -44,13 +39,18 @@ export function buildRunName(gitBranch: string, agentModel: string, now: number)
     return `${gitBranch}-${shortModelName(agentModel)}-${now}`;
 }
 
-/** Map a test case to a local experiment data item. Pure. */
-export function testCaseToExperimentItem(testCase: WorkflowTestCase): WorkflowExperimentItem {
-    return {
-        input: { query: testCase.query },
-        expectedOutput: testCase.reference ?? null,
-        metadata: { testCase },
-    };
+/**
+ * Sum the byte size of all tool results returned to the agent across a conversation.
+ * This is the data volume returned by the tools, independent of the model's own output.
+ */
+export function sumResultBytes(conversation: ConversationHistory): number {
+    let total = 0;
+    for (const turn of conversation.turns) {
+        for (const toolResult of turn.toolResults) {
+            total += toolResult.resultBytes ?? 0;
+        }
+    }
+    return total;
 }
 
 /** workflow_judge score: 1 when the judge verdict is PASS, else 0. Strict gate. */
@@ -88,15 +88,15 @@ export type WorkflowTaskOptions = {
 };
 
 /**
- * Build the experiment task. For each item it spins up a fresh isolated
+ * Build the experiment task. For each dataset item it spins up a fresh isolated
  * McpClient, runs the conversation, then the judge. Errors are captured into
  * the output (verdict FAIL) so the item completes and evaluators still run.
  */
 export function makeTask(options: WorkflowTaskOptions) {
     const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout } = options;
 
-    return async (params: { metadata?: unknown }): Promise<WorkflowTaskOutput> => {
-        const { testCase } = params.metadata as { testCase: WorkflowTestCase };
+    return async (item: { metadata?: unknown }): Promise<WorkflowTaskOutput> => {
+        const { testCase } = item.metadata as WorkflowItemMetadata;
         const mcpClient = new McpClient(toolTimeout, testCase.failTools);
 
         try {

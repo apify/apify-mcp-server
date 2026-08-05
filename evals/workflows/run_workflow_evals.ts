@@ -23,13 +23,12 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config.js';
-import { syncDataset, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
+import { selectDatasetItems, syncDataset, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
 import {
     buildRunName,
     evaluators,
     makeTask,
-    testCaseToExperimentItem,
-    type WorkflowExperimentItem,
+    type WorkflowItemMetadata,
     type WorkflowTaskOutput,
 } from './langfuse_experiment.js';
 import { getMissingLangfuseEnvVars, initTracing, LANGFUSE_BASE_URLS, shutdownTracing } from './langfuse_tracing.js';
@@ -155,6 +154,21 @@ async function main() {
         // Sync ALL test cases into the dataset (independent of run filters).
         console.log(`📇 Syncing ${allTestCases.length} test case(s) into dataset "${WORKFLOW_DATASET_NAME}"...`);
         await syncDataset(langfuse, allTestCases);
+
+        // Run against the dataset items themselves, so the run is recorded as a
+        // Langfuse dataset run and is comparable with every other run.
+        const dataset = await langfuse.dataset.get(WORKFLOW_DATASET_NAME);
+        const { selected: data, missingIds } = selectDatasetItems(dataset.items, filteredTestCases);
+        if (missingIds.length > 0) {
+            console.warn(
+                `⚠️  Skipping ${missingIds.length} test case(s) missing from the dataset: ${missingIds.join(', ')}`,
+            );
+        }
+        if (data.length === 0) {
+            throw new Error(
+                `No items to run — dataset "${WORKFLOW_DATASET_NAME}" has none of the filtered test cases.`,
+            );
+        }
         console.log();
 
         // Wrap the agent/judge LLM client so calls nest under each item's trace.
@@ -163,8 +177,6 @@ async function main() {
         const runName = buildRunName(getGitBranch(), argv.agentModel, Date.now());
         console.log(`▶️  Running experiment "${runName}" with concurrency ${argv.concurrency}...`);
         console.log();
-
-        const data: WorkflowExperimentItem[] = filteredTestCases.map(testCaseToExperimentItem);
 
         const result = await langfuse.experiment.run({
             name: 'workflow-evals',
@@ -199,7 +211,7 @@ async function main() {
             const isPass = judge?.value === 1;
             if (isPass) passed += 1;
 
-            const id = (item.item.metadata as { testCase?: { id?: string } })?.testCase?.id ?? '(unknown)';
+            const id = (item.item.metadata as WorkflowItemMetadata | undefined)?.testCase?.id ?? '(unknown)';
             const status = output.error ? '🔥 ERROR' : isPass ? '✅ PASS' : '❌ FAIL';
             const reason = output.error ?? output.judgeResult.reason;
             console.log(`${status} | ${id} | ${reason}`);
@@ -208,11 +220,7 @@ async function main() {
         const total = result.itemResults.length;
         console.log('-'.repeat(100));
         console.log(`📊 ${passed}/${total} passed`);
-        if (result.datasetRunUrl) {
-            console.log(`🔗 ${result.datasetRunUrl}`);
-        } else {
-            console.log(`🔗 Run "${result.runName}" (experiment ${result.experimentId}) — view in Langfuse Cloud`);
-        }
+        console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" — view in Langfuse Cloud`}`);
         console.log('='.repeat(100));
 
         // Strict gate: every item must have workflow_judge === 1 (errored items score 0).

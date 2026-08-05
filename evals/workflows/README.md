@@ -47,7 +47,7 @@ pnpm run evals:workflow -- --concurrency 8
 - `0` = All tests passed ✅
 - `1` = Any test failed or error occurred ❌
 
-Every run upserts all test cases from `test_cases.json` into the Langfuse dataset `workflow-evals` (by `id`, so it stays complete regardless of filters), then runs the filtered subset as an experiment named `workflow-evals`. The run name is `<git-branch>-<agent-model>-<timestamp>`.
+Every run upserts all test cases from `test_cases.json` into the Langfuse dataset `workflow-evals` (by `id`, so it stays complete regardless of filters), then runs the filtered dataset items as an experiment named `workflow-evals`. The run name is `<git-branch>-<agent-model>-<timestamp>`.
 
 ---
 
@@ -218,10 +218,9 @@ const conversation = await executeConversation({
 - `conversation_executor.ts` - Multi-turn loop with dynamic tools and server instructions
 - `workflow_judge.ts` - Judge evaluation
 - `test_cases_loader.ts` - Load/filter test cases
-- `output_formatter.ts` - `sumResultBytes` helper (tool-result byte total)
 - `langfuse_tracing.ts` - OpenTelemetry + Langfuse span processor init/shutdown, env validation
-- `langfuse_dataset.ts` - Get-or-create dataset and upsert test cases
-- `langfuse_experiment.ts` - Experiment task, evaluators, run-name/item helpers
+- `langfuse_dataset.ts` - Get-or-create dataset, upsert test cases, select items to run
+- `langfuse_experiment.ts` - Experiment task, evaluators, run-name and metric helpers
 - `run_workflow_evals.ts` - Main CLI entry
 
 ## Configuration
@@ -294,8 +293,8 @@ pnpm run evals:workflow -- --tool-timeout 300
 
 Results are recorded in Langfuse Cloud, not to a local file. Each run:
 
-- **Syncs the dataset** `workflow-evals` — every test case in `test_cases.json` is upserted by `id`, so the dataset stays complete regardless of `--id`/`--category` filters.
-- **Runs an experiment** named `workflow-evals`, run name `<git-branch>-<agent-model>-<timestamp>`, with run metadata `{ agentModel, judgeModel, toolTimeout }`.
+- **Syncs the dataset** `workflow-evals` — every test case in `test_cases.json` is upserted by `id` (its full body lands in the item metadata), so the dataset stays complete regardless of `--id`/`--category` filters.
+- **Runs an experiment** over the filtered dataset items, named `workflow-evals`, run name `<git-branch>-<agent-model>-<timestamp>`, with run metadata `{ agentModel, judgeModel, toolTimeout }`. Because it runs on dataset items, it is recorded as a Langfuse **dataset run** and the console prints its direct URL.
 - **Traces** every item's agent/judge LLM calls (via `observeOpenAI`) and each MCP tool call (as a `tool` observation with its arguments and result) nested under the item's trace.
 - **Scores** each item with three evaluators:
   - `workflow_judge` — `1` if the judge verdict is PASS, else `0` (comment = judge reason). This is the strict gate; an errored item scores `0`.

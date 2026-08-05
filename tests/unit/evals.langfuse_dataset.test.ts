@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { testCaseToDatasetItem, WORKFLOW_DATASET_NAME } from '../../evals/workflows/langfuse_dataset.js';
+import {
+    selectDatasetItems,
+    testCaseToDatasetItem,
+    WORKFLOW_DATASET_NAME,
+} from '../../evals/workflows/langfuse_dataset.js';
 import type { WorkflowTestCase } from '../../evals/workflows/test_cases_loader.js';
 
 describe('testCaseToDatasetItem()', () => {
@@ -11,7 +15,6 @@ describe('testCaseToDatasetItem()', () => {
         expect(item.id).toBe('search-001');
         expect(item.input).toEqual({ query: 'q' });
         expect(item.expectedOutput).toBe('r');
-        expect(item.metadata).toEqual({ category: 'search' });
     });
 
     it('uses null expectedOutput when there is no reference', () => {
@@ -19,7 +22,7 @@ describe('testCaseToDatasetItem()', () => {
         expect(testCaseToDatasetItem(testCase).expectedOutput).toBeNull();
     });
 
-    it('carries optional fields into metadata only when present', () => {
+    it('carries the whole test case in metadata so the task can run off the item', () => {
         const testCase: WorkflowTestCase = {
             id: 'a',
             category: 'basic',
@@ -28,11 +31,23 @@ describe('testCaseToDatasetItem()', () => {
             tools: ['actors'],
             failTools: ['call-actor'],
         };
-        expect(testCaseToDatasetItem(testCase).metadata).toEqual({
-            category: 'basic',
-            maxTurns: 5,
-            tools: ['actors'],
-            failTools: ['call-actor'],
-        });
+        expect(testCaseToDatasetItem(testCase).metadata).toEqual({ testCase });
+    });
+});
+
+describe('selectDatasetItems()', () => {
+    const testCase = (id: string): WorkflowTestCase => ({ id, category: 'basic', query: 'q' });
+
+    it('returns the matching items in test case order', () => {
+        const items = [{ id: 'b' }, { id: 'a' }, { id: 'c' }];
+        const { selected, missingIds } = selectDatasetItems(items, [testCase('a'), testCase('c')]);
+        expect(selected).toEqual([{ id: 'a' }, { id: 'c' }]);
+        expect(missingIds).toEqual([]);
+    });
+
+    it('reports test cases with no dataset item instead of dropping them silently', () => {
+        const { selected, missingIds } = selectDatasetItems([{ id: 'a' }], [testCase('a'), testCase('missing')]);
+        expect(selected).toEqual([{ id: 'a' }]);
+        expect(missingIds).toEqual(['missing']);
     });
 });

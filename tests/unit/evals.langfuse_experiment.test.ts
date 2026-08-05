@@ -6,11 +6,20 @@ import {
     scoreResultBytes,
     scoreTotalTokens,
     shortModelName,
-    testCaseToExperimentItem,
+    sumResultBytes,
     type WorkflowTaskOutput,
 } from '../../evals/workflows/langfuse_experiment.js';
-import type { WorkflowTestCase } from '../../evals/workflows/test_cases_loader.js';
 import type { ConversationHistory } from '../../evals/workflows/types.js';
+
+function makeConversation(turns: ConversationHistory['turns']): ConversationHistory {
+    return {
+        userPrompt: 'test',
+        turns,
+        completed: true,
+        hitMaxTurns: false,
+        totalTurns: turns.length,
+    };
+}
 
 function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOutput {
     const conversation: ConversationHistory = {
@@ -46,19 +55,43 @@ describe('buildRunName()', () => {
     });
 });
 
-describe('testCaseToExperimentItem()', () => {
-    it('maps query to input and reference to expectedOutput and carries the test case', () => {
-        const testCase: WorkflowTestCase = { id: 'a', category: 'basic', query: 'do a thing', reference: 'must do X' };
-        expect(testCaseToExperimentItem(testCase)).toEqual({
-            input: { query: 'do a thing' },
-            expectedOutput: 'must do X',
-            metadata: { testCase },
-        });
+describe('sumResultBytes()', () => {
+    it('returns 0 for a conversation with no tool results', () => {
+        const conversation = makeConversation([{ turnNumber: 1, toolCalls: [], toolResults: [], finalResponse: 'hi' }]);
+        expect(sumResultBytes(conversation)).toBe(0);
     });
 
-    it('uses null expectedOutput when there is no reference', () => {
-        const testCase: WorkflowTestCase = { id: 'a', category: 'basic', query: 'q' };
-        expect(testCaseToExperimentItem(testCase).expectedOutput).toBeNull();
+    it('sums resultBytes across all tool results in all turns', () => {
+        const conversation = makeConversation([
+            {
+                turnNumber: 1,
+                toolCalls: [],
+                toolResults: [
+                    { toolName: 'a', success: true, resultBytes: 100 },
+                    { toolName: 'b', success: true, resultBytes: 50 },
+                ],
+            },
+            {
+                turnNumber: 2,
+                toolCalls: [],
+                toolResults: [{ toolName: 'c', success: true, resultBytes: 25 }],
+            },
+        ]);
+        expect(sumResultBytes(conversation)).toBe(175);
+    });
+
+    it('treats missing resultBytes as 0', () => {
+        const conversation = makeConversation([
+            {
+                turnNumber: 1,
+                toolCalls: [],
+                toolResults: [
+                    { toolName: 'a', success: true },
+                    { toolName: 'b', success: true, resultBytes: 30 },
+                ],
+            },
+        ]);
+        expect(sumResultBytes(conversation)).toBe(30);
     });
 });
 

@@ -18,7 +18,9 @@ type CreateDatasetItemRequest = Parameters<LangfuseClient['dataset']['createItem
 
 /**
  * Map a test case to a Langfuse dataset item upsert request. The test case id
- * is used as the item id, so re-syncing is idempotent (upsert in place). Pure.
+ * is used as the item id, so re-syncing is idempotent (upsert in place). The
+ * whole test case goes into metadata because the experiment task runs off the
+ * dataset item, not the local file. Pure.
  */
 export function testCaseToDatasetItem(testCase: WorkflowTestCase): CreateDatasetItemRequest {
     return {
@@ -26,13 +28,33 @@ export function testCaseToDatasetItem(testCase: WorkflowTestCase): CreateDataset
         id: testCase.id,
         input: { query: testCase.query },
         expectedOutput: testCase.reference ?? null,
-        metadata: {
-            category: testCase.category,
-            ...(testCase.maxTurns !== undefined ? { maxTurns: testCase.maxTurns } : {}),
-            ...(testCase.tools ? { tools: testCase.tools } : {}),
-            ...(testCase.failTools ? { failTools: testCase.failTools } : {}),
-        },
+        metadata: { testCase },
     };
+}
+
+/**
+ * Select the dataset items to run, in the order of the given test cases.
+ * The join is by id, which `testCaseToDatasetItem` keeps identical on both
+ * sides. Missing items are skipped and reported by the caller. Pure.
+ */
+export function selectDatasetItems<T extends { id: string }>(
+    items: T[],
+    testCases: WorkflowTestCase[],
+): { selected: T[]; missingIds: string[] } {
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+    const selected: T[] = [];
+    const missingIds: string[] = [];
+
+    for (const testCase of testCases) {
+        const item = itemsById.get(testCase.id);
+        if (item) {
+            selected.push(item);
+        } else {
+            missingIds.push(testCase.id);
+        }
+    }
+
+    return { selected, missingIds };
 }
 
 /**
