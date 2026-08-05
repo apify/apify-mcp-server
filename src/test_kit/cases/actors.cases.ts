@@ -1,15 +1,14 @@
 import { expect } from 'vitest';
 
-import { ApifyClient } from '../../../src/apify_client.js';
-import { HELPER_TOOLS } from '../../../src/const.js';
-import { registerScenarios } from '../../../src/test_kit/index.js';
-import { actorNameToToolName } from '../../../src/tools/actor_tool_naming.js';
+import { ApifyClient } from '../../apify_client.js';
+import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
+import { actorNameToToolName } from '../../tools/actor_tool_naming.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
-import { getCategoryTools } from '../../../src/tools/index.js';
-import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE } from '../../const.js';
+import { getCategoryTools } from '../../tools/index.js';
 import {
+    ACTOR_EXAMPLE_MCP_SERVER,
+    ACTOR_NORMAL_MODE,
     AUTO_INJECTED_TOOL_NAMES,
-    type CasesCtx,
     expectNormalModeTestStructuredContent,
     expectReadmeInStructuredContent,
     expectToolNamesToContain,
@@ -18,22 +17,21 @@ import {
     getToolNames,
     validateStructuredOutput,
     validateStructuredOutputForTool,
-} from './shared.js';
-import { actorsCriticalScenarios } from './shared_scenarios.js';
+    withClient,
+} from '../helpers.js';
+import type { Case } from '../types.js';
 
 /**
  * Actor-facing behavior: search-actors, fetch-actor-details (all `output=` variants),
  * call-actor (direct + dynamic), get-actor-run, and their outputSchema validation.
  */
-export function registerActorsCases(ctx: CasesCtx): void {
-    const { itc } = ctx;
-
-    {
+export const actorsCases: Case[] = [
+    (() => {
         const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
-        itc(
-            'calls an Actor directly via call-actor without a separate add step',
-            { tools: ['call-actor'] },
-            async (client) => {
+        return {
+            name: 'calls an Actor directly via call-actor without a separate add step',
+            critical: false,
+            run: withClient({ tools: ['call-actor'] }, async (client) => {
                 const names = getToolNames(await client.listTools());
                 expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
                 expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
@@ -43,25 +41,18 @@ export function registerActorsCases(ctx: CasesCtx): void {
                 // No dynamic "add" step exists — call-actor calls any Actor by name directly.
                 const result = await client.callTool({
                     name: HELPER_TOOLS.ACTOR_CALL,
-                    arguments: {
-                        actor: ACTOR_NORMAL_MODE,
-                        input: {
-                            firstNumber: 1,
-                            secondNumber: 2,
-                        },
-                    },
+                    arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
                 });
                 expectNormalModeTestStructuredContent(result);
-            },
-        );
-    }
-
-    {
+            }),
+        };
+    })(),
+    (() => {
         const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
-        itc(
-            'should call Actor dynamically via generic call-actor tool without need to add it first',
-            { tools: ['actors'] },
-            async (client) => {
+        return {
+            name: 'should call Actor dynamically via generic call-actor tool without need to add it first',
+            critical: false,
+            run: withClient({ tools: ['actors'] }, async (client) => {
                 const names = getToolNames(await client.listTools());
                 // actors category (already has call-actor) + auto-injected helpers.
                 const numberOfTools = getCategoryTools('default').actors.length + AUTO_INJECTED_TOOL_NAMES.length;
@@ -74,13 +65,7 @@ export function registerActorsCases(ctx: CasesCtx): void {
 
                 const result = await client.callTool({
                     name: HELPER_TOOLS.ACTOR_CALL,
-                    arguments: {
-                        actor: ACTOR_NORMAL_MODE,
-                        input: {
-                            firstNumber: 1,
-                            secondNumber: 2,
-                        },
-                    },
+                    arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
                 });
 
                 const content = result.content as { text: string; type: string }[];
@@ -92,44 +77,37 @@ export function registerActorsCases(ctx: CasesCtx): void {
 
                 // Validate structured output has run-response metadata for the normal-mode-test-actor.
                 expectNormalModeTestStructuredContent(result);
-            },
-        );
-    }
-
-    itc('should call Actor directly with required input', { tools: ['actors'] }, async (client) => {
-        // Should fail without input (AJV validation error)
-        await expect(
-            client!.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                },
             }),
-        ).rejects.toThrow(/must have required property 'input'/);
+        };
+    })(),
+    {
+        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit — cheapest
+        // full-pipeline smoke test (auth + baseUrl + real Actor run), same class as the two
+        // wrong-environment regressions this session already found in the direct-ApifyClient path.
+        name: 'should call Actor directly with required input',
+        critical: true,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            // Should fail without input (AJV validation error)
+            await expect(
+                client.callTool({ name: HELPER_TOOLS.ACTOR_CALL, arguments: { actor: ACTOR_NORMAL_MODE } }),
+            ).rejects.toThrow(/must have required property 'input'/);
 
-        // Should succeed with input
-        const callResult = await client.callTool({
-            name: HELPER_TOOLS.ACTOR_CALL,
-            arguments: {
-                actor: ACTOR_NORMAL_MODE,
-                input: { firstNumber: 1, secondNumber: 2 },
-            },
-        });
-        expect(callResult.content).toBeDefined();
-    });
-
-    itc(
-        'returns terminal RunResponse with usage cost meta when the run completes within waitSecs',
-        { tools: ['actors'] },
-        async (client) => {
+            // Should succeed with input
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                    input: { firstNumber: 1, secondNumber: 2 },
-                    // Max wait (45s) so the test does not flake on a slow run.
-                    waitSecs: 45,
-                },
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
+            });
+            expect(callResult.content).toBeDefined();
+        }),
+    },
+    {
+        name: 'returns terminal RunResponse with usage cost meta when the run completes within waitSecs',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const callResult = await client.callTool({
+                name: HELPER_TOOLS.ACTOR_CALL,
+                // Max wait (45s) so the test does not flake on a slow run.
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 45 },
             });
 
             validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
@@ -140,20 +118,15 @@ export function registerActorsCases(ctx: CasesCtx): void {
             expect(sc?.summary).toMatch(/SUCCEEDED/);
 
             expectUsageCostMeta(callResult);
-        },
-    );
-
-    itc(
-        'returns immediately with a non-terminal RunResponse when waitSecs=0',
-        { tools: ['actors'] },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'returns immediately with a non-terminal RunResponse when waitSecs=0',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                    input: { firstNumber: 1, secondNumber: 2 },
-                    waitSecs: 0,
-                },
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 0 },
             });
 
             validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
@@ -162,61 +135,59 @@ export function registerActorsCases(ctx: CasesCtx): void {
             expect(sc?.runId).toBeDefined();
             // Non-blocking: status is typically READY or RUNNING at this point (terminal also tolerated for very fast actors).
             expect(['READY', 'RUNNING', 'SUCCEEDED']).toContain(sc?.status);
-        },
-    );
-
-    itc('accepts but ignores the deprecated previewOutput field', { tools: ['actors'] }, async (client) => {
-        const callResult = await client.callTool({
-            name: HELPER_TOOLS.ACTOR_CALL,
-            arguments: {
-                actor: ACTOR_NORMAL_MODE,
-                input: { firstNumber: 1, secondNumber: 2 },
-                previewOutput: false,
-                waitSecs: 45,
-            },
-        });
-
-        // previewOutput is deprecated and ignored; the response is the canonical RunResponse
-        // regardless of the flag. Validate the metadata is intact.
-        validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
-        expectNormalModeTestStructuredContent(callResult);
-    });
-
-    itc('accepts callOptions.maxItems on call-actor and runs successfully', { tools: ['actors'] }, async (client) => {
-        const callResult = await client.callTool({
-            name: HELPER_TOOLS.ACTOR_CALL,
-            arguments: {
-                actor: ACTOR_NORMAL_MODE,
-                input: { firstNumber: 1, secondNumber: 2 },
-                callOptions: { maxItems: 1 },
-                waitSecs: 45,
-            },
-        });
-
-        expect(callResult.isError).not.toBe(true);
-        const sc = (
-            callResult as {
-                structuredContent?: {
-                    status?: string;
-                    storages?: { datasets?: { default?: { id?: string } } };
-                };
-            }
-        ).structuredContent;
-        expect(sc?.status).toBe('SUCCEEDED');
-        expect(sc?.storages?.datasets?.default?.id).toBeDefined();
-    });
-
-    itc(
-        'surfaces dataset fields in the canonical response (no inline preview)',
-        { tools: ['actors'] },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'accepts but ignores the deprecated previewOutput field',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
+                    previewOutput: false,
                     waitSecs: 45,
                 },
+            });
+
+            // previewOutput is deprecated and ignored; the response is the canonical RunResponse
+            // regardless of the flag. Validate the metadata is intact.
+            validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
+            expectNormalModeTestStructuredContent(callResult);
+        }),
+    },
+    {
+        name: 'accepts callOptions.maxItems on call-actor and runs successfully',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const callResult = await client.callTool({
+                name: HELPER_TOOLS.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_NORMAL_MODE,
+                    input: { firstNumber: 1, secondNumber: 2 },
+                    callOptions: { maxItems: 1 },
+                    waitSecs: 45,
+                },
+            });
+
+            expect(callResult.isError).not.toBe(true);
+            const sc = (
+                callResult as {
+                    structuredContent?: { status?: string; storages?: { datasets?: { default?: { id?: string } } } };
+                }
+            ).structuredContent;
+            expect(sc?.status).toBe('SUCCEEDED');
+            expect(sc?.storages?.datasets?.default?.id).toBeDefined();
+        }),
+    },
+    {
+        name: 'surfaces dataset fields in the canonical response (no inline preview)',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const callResult = await client.callTool({
+                name: HELPER_TOOLS.ACTOR_CALL,
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 45 },
             });
 
             // The canonical response doesn't inline preview items — agents fetch them via
@@ -226,55 +197,71 @@ export function registerActorsCases(ctx: CasesCtx): void {
 
             const sc = (
                 callResult as {
-                    structuredContent?: {
-                        nextStep?: string;
-                        storages?: { datasets?: { default?: { id?: string } } };
-                    };
+                    structuredContent?: { nextStep?: string; storages?: { datasets?: { default?: { id?: string } } } };
                 }
             ).structuredContent;
             // nextStep should interpolate the datasetId so a text-only client can act without parsing storages.
             expect(sc?.nextStep).toContain(sc?.storages?.datasets?.default?.id ?? '__unset__');
-        },
-    );
-
-    itc(
-        'surfaces aliased storages from run.storageIds in the canonical response',
-        { tools: ['actors'] },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'surfaces aliased storages from run.storageIds in the canonical response',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                    input: { firstNumber: 1, secondNumber: 2 },
-                    waitSecs: 45,
-                },
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 45 },
             });
 
             expect(callResult.isError).not.toBe(true);
             // Schema validation must accept the alias entries (additionalProperties: full dataset shape).
             validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
             const sc = (
-                callResult as {
-                    structuredContent?: {
-                        storages?: { datasets?: Record<string, { id?: string }> };
-                    };
-                }
+                callResult as { structuredContent?: { storages?: { datasets?: Record<string, { id?: string }> } } }
             ).structuredContent;
             // normal-mode-test-actor opens an aliased 'books' dataset; the run response must
             // surface it alongside the default, enriched with its own metadata (id at minimum).
             expect(sc?.storages?.datasets?.default?.id).toBeDefined();
             expect(sc?.storages?.datasets?.books?.id).toEqual(expect.any(String));
-        },
-    );
-
-    // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit — single
-    // source of truth for these two, see tests/integration/cases/shared_scenarios.ts.
-    registerScenarios('actors (shared)', actorsCriticalScenarios, { createClientFn: ctx.createClientFn });
-
-    itc(
-        'should return an Actor-not-found error when calling a non-existent actor via call-actor',
-        { tools: ['actors'] },
-        async (client) => {
+        }),
+    },
+    {
+        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit —
+        // deploy-health relevant: confirms the store search Actor-discovery path actually works.
+        name: 'should find Actors in store search',
+        critical: true,
+        run: withClient(undefined, async (client) => {
+            const result = await client.callTool({
+                name: HELPER_TOOLS.STORE_SEARCH,
+                arguments: { keywords: 'normal-mode-test-actor', limit: 5 },
+            });
+            const content = result.content as { text: string }[];
+            expect(content.some((item) => item.text.includes(ACTOR_NORMAL_MODE))).toBe(true);
+        }),
+    },
+    {
+        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit.
+        // Upstream-contract canary: apify-core's `AGENT_SAFE_PRICING_MODELS` filter
+        // (`GET /v2/store`) is what excludes rental Actors. If that contract ever
+        // drifts, this test catches the regression on the MCP side.
+        name: 'should not return rental Actors from store search',
+        critical: false,
+        run: withClient(undefined, async (client) => {
+            const result = await client.callTool({
+                name: HELPER_TOOLS.STORE_SEARCH,
+                arguments: { keywords: 'rental', limit: MAX_LIMIT_WITH_INPUT_SCHEMA },
+            });
+            const content = result.content as { text: string }[];
+            expect(content.length).toBe(1);
+            const outputText = content[0].text;
+            expect(outputText).toContain('This Actor');
+            expect(outputText).not.toContain('This Actor is rental');
+        }),
+    },
+    {
+        name: 'should return an Actor-not-found error when calling a non-existent actor via call-actor',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const nonExistentActor = 'apify/this-actor-does-not-exist';
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
@@ -286,37 +273,25 @@ export function registerActorsCases(ctx: CasesCtx): void {
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(nonExistentActor);
             expect(content[0].text).toContain('was not found');
-        },
-    );
-
-    itc(
-        'should return structured output for fetch-actor-details matching outputSchema',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return structured output for fetch-actor-details matching outputSchema',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
-
-            const result = await client.callTool({
-                name: toolName,
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                },
-            });
+            const result = await client.callTool({ name: toolName, arguments: { actor: ACTOR_NORMAL_MODE } });
 
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
             validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-        },
-    );
-
-    itc(
-        'should return only input schema when output={ inputSchema: true }',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return only input schema when output={ inputSchema: true }',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                 arguments: {
@@ -338,15 +313,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
             // Should contain schema but NOT readme or actor card
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
             expect(content.some((item) => item.text.includes('README'))).toBe(false);
-        },
-    );
-
-    itc(
-        'should return only description and stats when specified',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return only description and stats when specified',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                 arguments: {
@@ -368,15 +340,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
             // Should contain actor info but NOT readme or schema
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
-        },
-    );
-
-    itc(
-        'should list MCP tools when output={ mcpTools: true } for MCP server Actor',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should list MCP tools when output={ mcpTools: true } for MCP server Actor',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                 arguments: {
@@ -397,15 +366,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
             const content = result.content as { text: string }[];
             expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(true);
             expect(content.some((item) => item.text.includes('add'))).toBe(true);
-        },
-    );
-
-    itc(
-        'should return graceful note when output={ mcpTools: true } for regular Actor',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return graceful note when output={ mcpTools: true } for regular Actor',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                 arguments: {
@@ -425,15 +391,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
 
             const content = result.content as { text: string }[];
             expect(content.some((item) => item.text.includes('This Actor is not an MCP server'))).toBe(true);
-        },
-    );
-
-    itc(
-        'should return structured output for fetch-actor-details with selective output matching outputSchema',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return structured output for fetch-actor-details with selective output matching outputSchema',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
             // Test with output={ mcpTools: true } - should validate against schema even with selective fields
@@ -459,15 +422,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
 
             // This should validate successfully - structured output must match schema
             validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-        },
-    );
-
-    itc(
-        'should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
             // Test with output={ description: true, readme: true } - inputSchema should be undefined
@@ -493,15 +453,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
 
             // This should validate successfully - structured output must match schema
             validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-        },
-    );
-
-    itc(
-        'should return only pricing when output={ pricing: true }',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return only pricing when output={ pricing: true }',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                 arguments: {
@@ -527,15 +484,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
 
             // Validate structured output
             validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-        },
-    );
-
-    itc(
-        'should return only readme when output={ readme: true }',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return only readme when output={ readme: true }',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                 arguments: {
@@ -561,25 +515,15 @@ export function registerActorsCases(ctx: CasesCtx): void {
 
             // Validate structured output
             validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-        },
-    );
-
-    itc(
-        'should return README content (summary or full) in text and structured response for fetch-actor-details',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return README content (summary or full) in text and structured response for fetch-actor-details',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: 'fetch-actor-details',
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                    output: {
-                        description: true,
-                        readme: true,
-                        inputSchema: true,
-                    },
-                },
+                arguments: { actor: ACTOR_NORMAL_MODE, output: { description: true, readme: true, inputSchema: true } },
             });
 
             expect(result.content).toBeDefined();
@@ -598,21 +542,16 @@ export function registerActorsCases(ctx: CasesCtx): void {
                 findToolByName(HELPER_TOOLS.ACTOR_GET_DETAILS, 'default')?.outputSchema,
                 'fetch-actor-details',
             );
-        },
-    );
-
-    itc(
-        'should use default values when output object is not provided',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should use default values when output object is not provided',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             // When output is not provided, all fields should default to their default values
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                },
+                arguments: { actor: ACTOR_NORMAL_MODE },
             });
 
             const content = result.content as { text: string }[];
@@ -621,15 +560,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
             expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(false);
-        },
-    );
-
-    itc(
-        'should return all fields when output includes all standard options',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return all fields when output includes all standard options',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
                 arguments: {
@@ -663,15 +599,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
 
             // Validate against schema
             validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-        },
-    );
-
-    itc(
-        'should support granular output controls for rating and metadata',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should support granular output controls for rating and metadata',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             // Test 1: Only pricing (should include pricing, NOT other sections)
             const pricingOnlyResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -806,15 +739,12 @@ export function registerActorsCases(ctx: CasesCtx): void {
             validateStructuredOutputForTool(ratingOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             validateStructuredOutputForTool(metadataOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
             validateStructuredOutputForTool(combinationResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-        },
-    );
-
-    itc(
-        'should dynamically test all output options and verify section presence/absence',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should dynamically test all output options and verify section presence/absence',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             // Define all output options with their expected markers in text
             const outputOptions = [
                 {
@@ -979,45 +909,32 @@ export function registerActorsCases(ctx: CasesCtx): void {
             expect(allCardText).not.toContain('Input schema');
 
             validateStructuredOutputForTool(allCardSectionsResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-        },
-    );
-
-    itc(
-        'should return structured output for search-actors matching outputSchema',
-        {
-            tools: ['actors'],
-        },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return structured output for search-actors matching outputSchema',
+        critical: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const toolName = HELPER_TOOLS.STORE_SEARCH;
-
             const result = await client.callTool({
                 name: toolName,
-                arguments: {
-                    keywords: 'rag web browser',
-                    limit: 5,
-                    offset: 0,
-                },
+                arguments: { keywords: 'rag web browser', limit: 5, offset: 0 },
             });
 
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
             validateStructuredOutputForTool(result, HELPER_TOOLS.STORE_SEARCH, 'default');
-        },
-    );
-
-    itc(
-        'should return structured output for get-actor-run matching outputSchema',
-        { tools: ['actors', 'runs'] },
-        async (client) => {
+        }),
+    },
+    {
+        name: 'should return structured output for get-actor-run matching outputSchema',
+        critical: false,
+        run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
             // First, start an async actor run to get a runId
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                    input: { firstNumber: 1, secondNumber: 2 },
-                    waitSecs: 0,
-                },
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 0 },
             });
 
             const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
@@ -1025,100 +942,99 @@ export function registerActorsCases(ctx: CasesCtx): void {
             const runId = resultWithStructured.structuredContent!.runId!;
 
             // Now test get-actor-run
-            const runResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_RUNS_GET,
-                arguments: { runId },
-            });
+            const runResult = await client.callTool({ name: HELPER_TOOLS.ACTOR_RUNS_GET, arguments: { runId } });
 
             expect(runResult.content).toBeDefined();
             // Validate structured output for get-actor-run
             validateStructuredOutputForTool(runResult, HELPER_TOOLS.ACTOR_RUNS_GET, 'default');
-        },
-    );
+        }),
+    },
+    {
+        name: 'should return Actor details both for full Actor name and ID',
+        critical: false,
+        run: withClient(undefined, async (client) => {
+            const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+            const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
+            expect(actor).toBeDefined();
+            const actorId = actor!.id as string;
 
-    itc('should return Actor details both for full Actor name and ID', undefined, async (client) => {
-        const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-        const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
-        expect(actor).toBeDefined();
-        const actorId = actor!.id as string;
+            // Fetch by full Actor name
+            const resultByName = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: ACTOR_NORMAL_MODE },
+            });
+            const contentByName = resultByName.content as { text: string }[];
+            expect(contentByName[0].text).toContain(ACTOR_NORMAL_MODE);
 
-        // Fetch by full Actor name
-        const resultByName = await client.callTool({
-            name: 'fetch-actor-details',
-            arguments: { actor: ACTOR_NORMAL_MODE },
-        });
-        const contentByName = resultByName.content as { text: string }[];
-        expect(contentByName[0].text).toContain(ACTOR_NORMAL_MODE);
+            // Fetch by Actor ID only
+            const resultById = await client.callTool({ name: 'fetch-actor-details', arguments: { actor: actorId } });
+            const contentById = resultById.content as { text: string }[];
+            expect(contentById[0].text).toContain(ACTOR_NORMAL_MODE);
+        }),
+    },
+    {
+        name: 'returns structuredContent for get-actor-run',
+        critical: false,
+        run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
+            // First, start an async actor run to get a runId
+            const callResult = await client.callTool({
+                name: HELPER_TOOLS.ACTOR_CALL,
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 0 },
+            });
 
-        // Fetch by Actor ID only
-        const resultById = await client.callTool({
-            name: 'fetch-actor-details',
-            arguments: { actor: actorId },
-        });
-        const contentById = resultById.content as { text: string }[];
-        expect(contentById[0].text).toContain(ACTOR_NORMAL_MODE);
-    });
+            const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
+            const runId = resultWithStructured.structuredContent!.runId!;
 
-    itc('returns structuredContent for get-actor-run', { tools: ['actors', 'runs'] }, async (client) => {
-        // First, start an async actor run to get a runId
-        const callResult = await client.callTool({
-            name: HELPER_TOOLS.ACTOR_CALL,
-            arguments: {
-                actor: ACTOR_NORMAL_MODE,
-                input: { firstNumber: 1, secondNumber: 2 },
-                waitSecs: 0,
-            },
-        });
+            // Now test get-actor-run with waitSecs to drive it to terminal state.
+            const runResult = await client.callTool({
+                name: HELPER_TOOLS.ACTOR_RUNS_GET,
+                arguments: { runId, waitSecs: 30 },
+            });
 
-        const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
-        const runId = resultWithStructured.structuredContent!.runId!;
-
-        // Now test get-actor-run with waitSecs to drive it to terminal state.
-        const runResult = await client.callTool({
-            name: HELPER_TOOLS.ACTOR_RUNS_GET,
-            arguments: { runId, waitSecs: 30 },
-        });
-
-        const runContent = runResult as {
-            structuredContent?: {
-                runId: string;
-                actorId: string;
-                actorName?: string;
-                status: string;
-                summary: string;
-                nextStep: string;
-                storages: {
-                    datasets?: { default: { id: string; itemCount?: number; fields?: string[] } };
-                    keyValueStores?: { default: { id: string } };
+            const runContent = runResult as {
+                structuredContent?: {
+                    runId: string;
+                    actorId: string;
+                    actorName?: string;
+                    status: string;
+                    summary: string;
+                    nextStep: string;
+                    storages: {
+                        datasets?: { default: { id: string; itemCount?: number; fields?: string[] } };
+                        keyValueStores?: { default: { id: string } };
+                    };
                 };
             };
-        };
 
-        expect(runContent.structuredContent).toBeDefined();
-        expect(runContent.structuredContent?.runId).toBe(runId);
-        expect(runContent.structuredContent?.actorId).toBeDefined();
-        expect(runContent.structuredContent?.status).toBeDefined();
-        expect(runContent.structuredContent?.summary).toBeDefined();
-        expect(runContent.structuredContent?.nextStep).toBeDefined();
-        expect(runContent.structuredContent?.storages).toBeDefined();
+            expect(runContent.structuredContent).toBeDefined();
+            expect(runContent.structuredContent?.runId).toBe(runId);
+            expect(runContent.structuredContent?.actorId).toBeDefined();
+            expect(runContent.structuredContent?.status).toBeDefined();
+            expect(runContent.structuredContent?.summary).toBeDefined();
+            expect(runContent.structuredContent?.nextStep).toBeDefined();
+            expect(runContent.structuredContent?.storages).toBeDefined();
 
-        // No inlined dataset items or KV record bodies anywhere on the response.
-        const dump = JSON.stringify(runContent.structuredContent);
-        expect(dump).not.toContain('previewItems');
+            // No inlined dataset items or KV record bodies anywhere on the response.
+            const dump = JSON.stringify(runContent.structuredContent);
+            expect(dump).not.toContain('previewItems');
 
-        if (runContent.structuredContent?.status === 'SUCCEEDED') {
-            expect(runContent.structuredContent?.storages.datasets?.default.id).toBeDefined();
-        }
-    });
-
-    itc('rejects get-actor-run waitSecs above 45', { tools: ['actors', 'runs'] }, async (client) => {
-        // runId is a real-looking value so a missing-run path can't accidentally satisfy this
-        // assertion; the failure must come from waitSecs validation, not from run lookup.
-        await expect(
-            client.callTool({
-                name: HELPER_TOOLS.ACTOR_RUNS_GET,
-                arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
-            }),
-        ).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
-    });
-}
+            if (runContent.structuredContent?.status === 'SUCCEEDED') {
+                expect(runContent.structuredContent?.storages.datasets?.default.id).toBeDefined();
+            }
+        }),
+    },
+    {
+        name: 'rejects get-actor-run waitSecs above 45',
+        critical: false,
+        run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
+            // runId is a real-looking value so a missing-run path can't accidentally satisfy this
+            // assertion; the failure must come from waitSecs validation, not from run lookup.
+            await expect(
+                client.callTool({
+                    name: HELPER_TOOLS.ACTOR_RUNS_GET,
+                    arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
+                }),
+            ).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
+        }),
+    },
+];

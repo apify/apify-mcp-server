@@ -13,17 +13,9 @@ export type McpClientOptions = SuiteClientOptions;
 
 /**
  * Both client generations the integration suite drives: the v1 SDK client on the `stdio` and
- * `streamable-http` dimensions, the v2 client on `2026-07-28`. One suite run exercises both.
+ * `2025-11-25` dimensions, the v2 client on `2026-07-28`. One suite run exercises both.
  */
 export type McpSuiteClient = Client | StatelessClient;
-
-/**
- * Narrows a suite client to the v1 SDK client. Only for cases gated to the legacy dimensions:
- * the v2 client has no `experimental.tasks`, no v1 `transport`, and a different `request()` shape.
- */
-export function asLegacyClient(client: McpSuiteClient): Client {
-    return client as Client;
-}
 
 /** stdio spawns this repo's own dist/stdio.js — not something a hosted-deploy consumer needs. */
 export async function createMcpStdioClient(options?: McpClientOptions): Promise<Client> {

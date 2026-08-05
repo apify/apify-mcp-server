@@ -169,17 +169,19 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
 
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
-  - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching file under `tests/integration/cases/*.cases.ts`, not here
-  - `tests/integration/cases/*.cases.ts` — test cases grouped by capability (`registration`, `tools`, `actors`, `apps`, `tasks`, `storage`, `payments`), each exporting a `register*Cases(ctx)`; `shared.ts` holds the cross-cutting assertion helpers, `shared_scenarios.ts` holds the small subset shared with `apify-mcp-server-internal` (see below)
-  - Other files in this directory set up different transport dimensions (stdio, streamable-http, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
+  - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `src/test_kit/cases/*.cases.ts`, not here
+  - `tests/integration/cases/storage_grouped.cases.ts` — the one group of storage cases that shares a `beforeAll`-seeded Actor run and so can't be a flat `Case[]` array (see `src/test_kit/` below); stays local, not published, not critical-eligible
+  - Other files in this directory set up different transport dimensions (`stdio`, `2025-11-25` streamable HTTP, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
 - `tests/helpers.ts` — shared test utilities
 - `tests/const.ts` — test constants
 
 ### Test organization across repos
 
-This package is also used by the hosted server in `apify-mcp-server-internal`. To avoid copying test bodies across the boundary, each repo owns its own tests — except a small, curated subset marked `critical: true` in `tests/integration/cases/shared_scenarios.ts`, published behind the package's `./test-kit` export (`src/test_kit/`, `vitest` optional peerDependency) and imported by internal via `@apify/actors-mcp-server/test-kit` to run against its own live staging/prod deploy. Growing that subset is a per-PR judgment call, not automatic — most cases stay this-repo-only.
+This package is also used by the hosted server in `apify-mcp-server-internal`. Every integration case is a `Case` object (`{ name, critical, run, ... }`) defined in `src/test_kit/cases/*.cases.ts` — published behind the package's `./test-kit` export (`vitest` optional peerDependency). This repo's own `suite.ts` runs every case via `registerCases(name, allGroupCases, ctx)`; internal imports the same case arrays via `@apify/actors-mcp-server/test-kit` and calls `registerCases(name, allCases, { ...ctx, criticalOnly: true })` against its own live staging/prod deploy — non-critical cases register as `it.skip` there, so nothing needs re-registering by hand.
 
-**Tests in this repo** cover the package's MCP and library surface. They live in `tests/integration/cases/*.cases.ts` (registered through `suite.ts`) and `tests/unit/`:
+Marking a case `critical: true` is a one-line edit on its existing definition — there is no second array or file to keep in sync, and internal picks up every current and future critical case automatically on its next dependency bump. Flipping a case to critical is a per-PR judgment call, not automatic — most cases stay `critical: false` (this-repo-only in practice, since internal only registers the critical subset).
+
+**Tests in this repo** cover the package's MCP and library surface. They live in `src/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
 - Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name capability detection, `?ui=` server-mode parsing.
