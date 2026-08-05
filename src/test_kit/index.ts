@@ -5,5 +5,7 @@
  * deploy, instead of hand-duplicating those assertions. `vitest` is an optional
  * peerDependency of this package — only consumers that import `./test-kit` need it installed.
  */
+export { createMcpStatelessClient, createMcpStreamableClient } from './mcp_client.js';
+export type { SuiteClientOptions } from './mcp_client.js';
 export { registerScenarios } from './register.js';
 export type { Scenario, ScenarioClientOptions, ScenarioCtx, SuiteClient } from './types.js';
