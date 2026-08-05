@@ -1,104 +1,87 @@
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import { expect, it } from 'vitest';
+import { expect } from 'vitest';
 
-import { HELPER_TOOLS } from '../../../src/const.js';
-import { SKYFIRE_ENABLED_TOOLS } from '../../../src/payments/const.js';
-import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE } from '../../const.js';
-import { asLegacyClient, type McpSuiteClient } from '../../helpers.js';
-import type { CasesCtx } from './shared.js';
+import { HELPER_TOOLS } from '../../const.js';
+import { SKYFIRE_ENABLED_TOOLS } from '../../payments/const.js';
+import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, asLegacyClient } from '../helpers.js';
+import type { Case, CaseCtx } from '../types.js';
+
+// Agentic payment modes (x402, skyfire) require HTTP headers — never on stdio. All but the
+// task-mode case below also work on the 2026-07-28 v2 client (plain listTools/callTool).
+function notStdio(ctx: CaseCtx): boolean {
+    return ctx.transport === 'stdio';
+}
 
 /**
- * Agentic payment modes: Skyfire and x402. Both require HTTP headers, so every case here
- * is `it.runIf(transport === 'streamable-http')`-gated.
+ * Agentic payment modes: Skyfire and x402.
  */
-export function registerPaymentsCases(ctx: CasesCtx): void {
-    const { createClientFn, transport } = ctx;
-
-    // Skyfire mode only works with Streamable-HTTP transport.
-    it.runIf(transport === 'streamable-http')(
-        'should inject skyfire-pay-id parameter into all SKYFIRE_ENABLED_TOOLS when skyfireMode is enabled',
-        async () => {
-            let client: McpSuiteClient | undefined;
+export const paymentsCases: Case[] = [
+    {
+        name: 'should inject skyfire-pay-id parameter into all SKYFIRE_ENABLED_TOOLS when skyfireMode is enabled',
+        critical: false,
+        skipIf: notStdio,
+        run: async (ctx) => {
+            const client = await ctx.createClientFn({ payment: 'skyfire', tools: Array.from(SKYFIRE_ENABLED_TOOLS) });
             try {
-                client = await createClientFn({
-                    payment: 'skyfire',
-                    tools: Array.from(SKYFIRE_ENABLED_TOOLS),
-                });
-
                 const toolsList = await client.listTools();
                 const skyfireEnabledToolNames = Array.from(SKYFIRE_ENABLED_TOOLS);
 
-                // Check each skyfire-enabled tool
                 for (const toolName of skyfireEnabledToolNames) {
                     const tool = toolsList.tools.find((t) => t.name === toolName);
-
-                    // Tool should exist
                     expect(tool, `Tool "${toolName}" should exist in the tools list`).toBeDefined();
-
                     if (!tool) continue;
 
-                    // Tool should have inputSchema with properties
                     expect(tool.inputSchema, `Tool "${toolName}" should have inputSchema`).toBeDefined();
                     expect(
                         tool.inputSchema && 'properties' in tool.inputSchema,
                         `Tool "${toolName}" should have inputSchema.properties`,
                     ).toBe(true);
-
                     if (!tool.inputSchema || !('properties' in tool.inputSchema)) continue;
 
                     const properties = tool.inputSchema.properties as Record<string, unknown>;
-
-                    // skyfire-pay-id property should exist
                     expect(
                         properties['skyfire-pay-id'],
                         `Tool "${toolName}" should have skyfire-pay-id property in inputSchema`,
                     ).toBeDefined();
 
-                    // Verify skyfire-pay-id has the correct structure
                     const skyfireProperty = properties['skyfire-pay-id'] as Record<string, unknown>;
                     expect(skyfireProperty.type, `skyfire-pay-id should have type "string"`).toBe('string');
                     expect(skyfireProperty.description, `skyfire-pay-id should have description`).toBeDefined();
 
-                    // Tool description should contain skyfire instructions
                     expect(
                         tool.description?.includes('skyfire-pay-id'),
                         `Tool "${toolName}" description should mention skyfire-pay-id`,
                     ).toBe(true);
                 }
             } finally {
-                await client?.close();
+                await client.close();
             }
         },
-    );
+    },
+    {
+        name: 'should advertise x402 metadata on all paymentRequired tools when x402 payment is enabled',
+        critical: false,
+        skipIf: notStdio,
+        run: async (ctx) => {
+            // Hardcoded list of tools expected to advertise _meta.x402 (i.e. paymentRequired: true).
+            // Kept independent of any production constant so this test pins the expected paid set
+            // and any silent drift (e.g. a tool losing paymentRequired) is caught here.
+            const paidToolNames = [
+                HELPER_TOOLS.ACTOR_CALL,
+                HELPER_TOOLS.ACTOR_RUNS_GET,
+                HELPER_TOOLS.ACTOR_RUNS_LOG,
+                HELPER_TOOLS.ACTOR_RUNS_ABORT,
+                HELPER_TOOLS.DATASET_GET,
+                HELPER_TOOLS.DATASET_GET_ITEMS,
+                HELPER_TOOLS.DATASET_SCHEMA_GET,
+                HELPER_TOOLS.KEY_VALUE_STORE_GET,
+                HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+                HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+            ];
+            const freeToolNames = [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.DOCS_SEARCH];
 
-    // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
-    it.runIf(transport === 'streamable-http')(
-        'should advertise x402 metadata on all paymentRequired tools when x402 payment is enabled',
-        async () => {
-            let client: McpSuiteClient | undefined;
+            const client = await ctx.createClientFn({ payment: 'x402', tools: [...paidToolNames, ...freeToolNames] });
             try {
-                // Hardcoded list of tools expected to advertise _meta.x402 (i.e. paymentRequired: true).
-                // Kept independent of any production constant so this test pins the expected paid set
-                // and any silent drift (e.g. a tool losing paymentRequired) is caught here.
-                const paidToolNames = [
-                    HELPER_TOOLS.ACTOR_CALL,
-                    HELPER_TOOLS.ACTOR_RUNS_GET,
-                    HELPER_TOOLS.ACTOR_RUNS_LOG,
-                    HELPER_TOOLS.ACTOR_RUNS_ABORT,
-                    HELPER_TOOLS.DATASET_GET,
-                    HELPER_TOOLS.DATASET_GET_ITEMS,
-                    HELPER_TOOLS.DATASET_SCHEMA_GET,
-                    HELPER_TOOLS.KEY_VALUE_STORE_GET,
-                    HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
-                    HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
-                ];
-                const freeToolNames = [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.DOCS_SEARCH];
-
-                client = await createClientFn({
-                    payment: 'x402',
-                    tools: [...paidToolNames, ...freeToolNames],
-                });
-
                 const toolsList = await client.listTools();
 
                 // Positive: paid tools advertise _meta.x402 with both shapes —
@@ -136,22 +119,21 @@ export function registerPaymentsCases(ctx: CasesCtx): void {
                     expect(meta?.x402, `Tool "${toolName}" should not advertise _meta.x402`).toBeUndefined();
                 }
             } finally {
-                await client?.close();
+                await client.close();
             }
         },
-    );
-
-    // Agentic payment modes (x402, skyfire) only work with Streamable-HTTP transport (require HTTP headers).
-    // `ACTOR_EXAMPLE_MCP_SERVER` is a standby MCP-server Actor; in normal mode the proxy registers its
-    // sub-tools (e.g. `*-add`), in payment mode the standby/MCP filter drops them from list-tools.
-    it.runIf(transport === 'streamable-http')(
-        'should filter standby MCP-server Actor from list-tools in payment mode',
-        async () => {
-            let client: McpSuiteClient | undefined;
+    },
+    {
+        // `ACTOR_EXAMPLE_MCP_SERVER` is a standby MCP-server Actor; in normal mode the proxy
+        // registers its sub-tools (e.g. `*-add`), in payment mode the standby/MCP filter drops
+        // them from list-tools.
+        name: 'should filter standby MCP-server Actor from list-tools in payment mode',
+        critical: false,
+        skipIf: notStdio,
+        run: async (ctx) => {
+            const isProxiedAddTool = (name: string) => name.endsWith('-add');
+            let client = await ctx.createClientFn({ payment: 'x402', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
             try {
-                const isProxiedAddTool = (name: string) => name.endsWith('-add');
-
-                client = await createClientFn({ payment: 'x402', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
                 const x402Tools = await client.listTools();
                 expect(
                     x402Tools.tools.filter((t) => isProxiedAddTool(t.name)),
@@ -159,7 +141,7 @@ export function registerPaymentsCases(ctx: CasesCtx): void {
                 ).toHaveLength(0);
                 await client.close();
 
-                client = await createClientFn({ payment: 'skyfire', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
+                client = await ctx.createClientFn({ payment: 'skyfire', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
                 const skyfireTools = await client.listTools();
                 expect(
                     skyfireTools.tools.filter((t) => isProxiedAddTool(t.name)),
@@ -169,31 +151,27 @@ export function registerPaymentsCases(ctx: CasesCtx): void {
 
                 // Standard token auth — sub-tools must load normally so the regression also catches
                 // an over-eager filter that would block them outside payment mode.
-                client = await createClientFn({ actors: [ACTOR_EXAMPLE_MCP_SERVER] });
+                client = await ctx.createClientFn({ actors: [ACTOR_EXAMPLE_MCP_SERVER] });
                 const normalTools = await client.listTools();
                 expect(
                     normalTools.tools.filter((t) => isProxiedAddTool(t.name)),
                     'standby MCP-server sub-tools should be loaded under standard token auth',
                 ).not.toHaveLength(0);
             } finally {
-                await client?.close();
+                await client.close();
             }
         },
-    );
-
-    // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
-    it.runIf(transport === 'streamable-http')(
-        'should return error when calling a standby Actor via call-actor in x402 payment mode',
-        async () => {
-            let client: McpSuiteClient | undefined;
+    },
+    {
+        name: 'should return error when calling a standby Actor via call-actor in x402 payment mode',
+        critical: false,
+        skipIf: notStdio,
+        run: async (ctx) => {
+            const client = await ctx.createClientFn({ payment: 'x402' });
             try {
-                client = await createClientFn({ payment: 'x402' });
                 const result = await client.callTool({
                     name: 'call-actor',
-                    arguments: {
-                        actor: ACTOR_EXAMPLE_MCP_SERVER,
-                        input: {},
-                    },
+                    arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER, input: {} },
                 });
                 expect(result).toBeDefined();
                 expect(result.isError).toBe(true);
@@ -201,28 +179,23 @@ export function registerPaymentsCases(ctx: CasesCtx): void {
                 expect(content.length).toBeGreaterThan(0);
                 expect(content[0].text).toContain('is not supported in agentic payment mode');
             } finally {
-                await client?.close();
+                await client.close();
             }
         },
-    );
-
-    // Task-mode `call-actor` declares `taskSupport: 'optional'`, so it must hit the same
-    // standby guard the sync path does — otherwise the stored task result would be a generic
-    // 402 PaymentRequired rather than the precise standby rejection. Regression for #893.
-    it.runIf(transport === 'streamable-http')(
-        'should reject standby Actor in task-mode call-actor under x402 (not 402, not platform error)',
-        async () => {
-            let client: McpSuiteClient | undefined;
+    },
+    {
+        // Task-mode `call-actor` declares `taskSupport: 'optional'`, so it must hit the same
+        // standby guard the sync path does — otherwise the stored task result would be a generic
+        // 402 PaymentRequired rather than the precise standby rejection. Regression for #893.
+        // Needs `.experimental.tasks` (v1 SDK only) — legacy HTTP transport only, unlike its siblings.
+        name: 'should reject standby Actor in task-mode call-actor under x402 (not 402, not platform error)',
+        critical: false,
+        skipIf: (ctx) => ctx.transport !== '2025-11-25',
+        run: async (ctx) => {
+            const client = await ctx.createClientFn({ payment: 'x402' });
             try {
-                client = await createClientFn({ payment: 'x402' });
                 const stream = asLegacyClient(client).experimental.tasks.callToolStream(
-                    {
-                        name: 'call-actor',
-                        arguments: {
-                            actor: ACTOR_EXAMPLE_MCP_SERVER,
-                            input: {},
-                        },
-                    },
+                    { name: 'call-actor', arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER, input: {} } },
                     CallToolResultSchema,
                     { task: { ttl: 60000 } },
                 );
@@ -253,25 +226,20 @@ export function registerPaymentsCases(ctx: CasesCtx): void {
                 expect(resultText).toContain('is not supported in agentic payment mode');
                 expect(resultText).not.toContain('x402');
             } finally {
-                await client?.close();
+                await client.close();
             }
         },
-    );
-
-    // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
-    it.runIf(transport === 'streamable-http')(
-        'should return x402 payment error when calling paymentRequired tool without payment signature',
-        async () => {
-            let client: McpSuiteClient | undefined;
+    },
+    {
+        name: 'should return x402 payment error when calling paymentRequired tool without payment signature',
+        critical: false,
+        skipIf: notStdio,
+        run: async (ctx) => {
+            const client = await ctx.createClientFn({ tools: ['actors'], payment: 'x402' });
             try {
-                client = await createClientFn({ tools: ['actors'], payment: 'x402' });
-
                 const result = await client.callTool({
                     name: HELPER_TOOLS.ACTOR_CALL,
-                    arguments: {
-                        actor: ACTOR_NORMAL_MODE,
-                        input: { firstNumber: 1, secondNumber: 2 },
-                    },
+                    arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
                 });
 
                 expect(result.isError).toBe(true);
@@ -285,8 +253,8 @@ export function registerPaymentsCases(ctx: CasesCtx): void {
                 expect(structured?.x402Version, 'structuredContent.x402Version should be set').toBeDefined();
                 expect(structured?.accepts, 'structuredContent.accepts should be an array').toBeInstanceOf(Array);
             } finally {
-                await client?.close();
+                await client.close();
             }
         },
-    );
-}
+    },
+];

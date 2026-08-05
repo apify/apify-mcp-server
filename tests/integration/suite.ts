@@ -1,18 +1,22 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe } from 'vitest';
 
+import {
+    actorsCases,
+    appsCases,
+    paymentsCases,
+    registerCases,
+    registrationCases,
+    storageCases,
+    tasksCases,
+    toolsCases,
+} from '../../src/test_kit/index.js';
+import type { CaseCtx, Transport } from '../../src/test_kit/types.js';
 import type { McpClientOptions, McpSuiteClient } from '../helpers.js';
-import { registerActorsCases } from './cases/actors.cases.js';
-import { registerAppsCases } from './cases/apps.cases.js';
-import { registerPaymentsCases } from './cases/payments.cases.js';
-import { registerRegistrationCases } from './cases/registration.cases.js';
-import { createItc, type CreateClientFn } from './cases/shared.js';
-import { registerStorageCases } from './cases/storage.cases.js';
-import { registerTasksCases } from './cases/tasks.cases.js';
-import { registerToolsCases } from './cases/tools.cases.js';
+import { registerStorageGroupedCases } from './cases/storage_grouped.cases.js';
 
 export type IntegrationTestsSuiteOptions = {
     suiteName: string;
-    transport: 'streamable-http' | 'stdio' | '2026-07-28';
+    transport: Transport;
     createClientFn: (options?: McpClientOptions) => Promise<McpSuiteClient>;
     beforeAllFn?: () => Promise<void>;
     afterAllFn?: () => Promise<void>;
@@ -21,13 +25,13 @@ export type IntegrationTestsSuiteOptions = {
 };
 
 /**
- * One suite, three transport dimensions (stdio / streamable-http / 2026-07-28 stateless) — each
- * `actor.server_*.test.ts` / `stdio.test.ts` entry point calls this with its own `createClientFn`.
- * Cases live in `tests/integration/cases/*.cases.ts`, grouped by capability, each exporting a
- * plain `register*Cases(ctx)` that registers its `it`/`describe` blocks directly into this
- * `describe(suiteName, ...)` — same flat structure and test names as before the split, just not
- * all typed into one 3000+-line file. `tests/integration/cases/shared.ts` holds the assertion
- * helpers and the `itc` (create client → run → always close) contract multiple groups share.
+ * One suite, three transport dimensions (stdio / 2025-11-25 streamable-HTTP / 2026-07-28
+ * stateless) — each `actor.server_*.test.ts` / `stdio.test.ts` entry point calls this with its
+ * own `createClientFn`. Every group's cases live in `src/test_kit/cases/*.cases.ts` (published
+ * behind `./test-kit` so `apify-mcp-server-internal` can import the exact same definitions);
+ * `registerCases` here registers all of them (critical and non-critical) for this repo's own CI
+ * run. The one group that doesn't fit the flat Case model (storage's shared-`beforeAll` block)
+ * stays local — see `cases/storage_grouped.cases.ts`.
  */
 export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOptions) {
     const { suiteName, createClientFn, beforeAllFn, afterAllFn, beforeEachFn, afterEachFn } = options;
@@ -48,20 +52,20 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             concurrent: true, // Every test declares and closes its own client — safe to parallelize.
         },
         () => {
-            const ctx = {
-                itc: createItc(createClientFn as CreateClientFn),
-                createClientFn: createClientFn as CreateClientFn,
+            const ctx: CaseCtx = {
+                createClientFn: createClientFn as CaseCtx['createClientFn'],
                 transport: options.transport,
                 hasTasksSupport,
             };
 
-            registerRegistrationCases(ctx);
-            registerToolsCases(ctx);
-            registerActorsCases(ctx);
-            registerAppsCases(ctx);
-            registerTasksCases(ctx);
-            registerStorageCases(ctx);
-            registerPaymentsCases(ctx);
+            registerCases('registration', registrationCases, ctx);
+            registerCases('tools', toolsCases, ctx);
+            registerCases('actors', actorsCases, ctx);
+            registerCases('apps', appsCases, ctx);
+            registerCases('tasks', tasksCases, ctx);
+            registerCases('storage', storageCases, ctx);
+            registerStorageGroupedCases(createClientFn as CaseCtx['createClientFn']);
+            registerCases('payments', paymentsCases, ctx);
         },
     );
 }
