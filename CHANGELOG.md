@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.14.2 - **not yet released**
+## [0.14.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.2) (2026-08-05)
 
 ### 🐛 Bug Fixes
 
@@ -12,7 +11,6 @@ All notable changes to this project will be documented in this file.
 - Stop reporting a cancelled Actor-MCP call as a failure ([#1197](https://github.com/apify/apify-mcp-server/pull/1197)) ([cbbfb79](https://github.com/apify/apify-mcp-server/commit/cbbfb79b0aa4c0e426fcf328b484325e76717f4c)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.14.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.1) (2026-07-31)
 
 ### 🚀 Features
