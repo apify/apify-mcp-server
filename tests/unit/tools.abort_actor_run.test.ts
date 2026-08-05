@@ -62,4 +62,15 @@ describe('abort-actor-run', () => {
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
+
+    it('does not contain "Dataset metadata unavailable" for a SUCCEEDED run', async () => {
+        const run = mockAbortedRun({ status: 'SUCCEEDED' });
+        const result = await (abortActorRun as HelperTool).call(abortContext({ runId: 'run-1' }, run));
+        const { structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(structuredContent.status).toBe('SUCCEEDED');
+        expect(structuredContent.summary as string).not.toContain('Dataset metadata unavailable');
+    });
 });

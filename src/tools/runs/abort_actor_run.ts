@@ -51,7 +51,7 @@ USAGE EXAMPLES:
 
         const dataset = run.defaultDatasetId ? { id: run.defaultDatasetId } : undefined;
         const keyValueStore = run.defaultKeyValueStoreId ? { id: run.defaultKeyValueStoreId } : undefined;
-        const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });
+        const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore, datasetMetadataFetched: false });
 
         const structuredContent: RunResponse = {
             runId: run.id,
