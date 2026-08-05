@@ -169,16 +169,17 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
 
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
-  - `tests/integration/suite.ts` — **main integration test suite** where all test cases should be added
+  - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching file under `tests/integration/cases/*.cases.ts`, not here
+  - `tests/integration/cases/*.cases.ts` — test cases grouped by capability (`registration`, `tools`, `actors`, `apps`, `tasks`, `storage`, `payments`), each exporting a `register*Cases(ctx)`; `shared.ts` holds the cross-cutting assertion helpers, `shared_scenarios.ts` holds the small subset shared with `apify-mcp-server-internal` (see below)
   - Other files in this directory set up different transport dimensions (stdio, streamable-http, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
 - `tests/helpers.ts` — shared test utilities
 - `tests/const.ts` — test constants
 
 ### Test organization across repos
 
-This package is also used by the hosted server in `apify-mcp-server-internal`. To avoid copying test bodies across the boundary, each repo owns its own tests.
+This package is also used by the hosted server in `apify-mcp-server-internal`. To avoid copying test bodies across the boundary, each repo owns its own tests — except a small, curated subset marked `critical: true` in `tests/integration/cases/shared_scenarios.ts`, published behind the package's `./test-kit` export (`src/test_kit/`, `vitest` optional peerDependency) and imported by internal via `@apify/actors-mcp-server/test-kit` to run against its own live staging/prod deploy. Growing that subset is a per-PR judgment call, not automatic — most cases stay this-repo-only.
 
-**Tests in this repo** cover the package's MCP and library surface. They live in `tests/integration/suite.ts` and `tests/unit/`:
+**Tests in this repo** cover the package's MCP and library surface. They live in `tests/integration/cases/*.cases.ts` (registered through `suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
 - Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name capability detection, `?ui=` server-mode parsing.
