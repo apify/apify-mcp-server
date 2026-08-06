@@ -23,6 +23,22 @@ export interface CaseCtx {
     hasTasksSupport: boolean;
     /** true when the caller only wants `critical: true` cases registered. */
     criticalOnly?: boolean;
+    /**
+     * Resolves a shared `Fixture` — `fixture.setup(ctx)` runs at most once per `registerCases`
+     * call (i.e. once per transport dimension), memoized by `fixture.key`; every case that asks
+     * for the same fixture awaits the same in-flight/resolved promise. Lets several cases share
+     * one expensive setup (e.g. one seeded Actor run) without a vitest `beforeAll` — which can't
+     * express "shared by only some cases in this array" — and without paying for the setup once
+     * per case. See `register.ts`.
+     */
+    getFixture: <T>(fixture: Fixture<T>) => Promise<T>;
+}
+
+/** A value computed once and shared across whichever cases ask for it via `ctx.getFixture`. */
+export interface Fixture<T> {
+    /** Unique across the cases array it's used in — same key resolves to the same memoized value. */
+    key: string;
+    setup: (ctx: CaseCtx) => Promise<T>;
 }
 
 /**

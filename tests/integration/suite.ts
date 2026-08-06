@@ -12,7 +12,6 @@ import {
 } from '../../src/test_kit/index.js';
 import type { CaseCtx, Transport } from '../../src/test_kit/types.js';
 import type { McpClientOptions, McpSuiteClient } from '../helpers.js';
-import { registerStorageGroupedCases } from './cases/storage_grouped.cases.js';
 
 export type IntegrationTestsSuiteOptions = {
     suiteName: string;
@@ -30,8 +29,9 @@ export type IntegrationTestsSuiteOptions = {
  * own `createClientFn`. Every group's cases live in `src/test_kit/cases/*.cases.ts` (published
  * behind `./test-kit` so `apify-mcp-server-internal` can import the exact same definitions);
  * `registerCases` here registers all of them (critical and non-critical) for this repo's own CI
- * run. The one group that doesn't fit the flat Case model (storage's shared-`beforeAll` block)
- * stays local — see `cases/storage_grouped.cases.ts`.
+ * run. Cases that share expensive setup (e.g. one seeded Actor run) do so via `ctx.getFixture`
+ * (see `src/test_kit/types.ts`), not a vitest `beforeAll` — that lets the setup stay scoped to
+ * only the cases that need it while still running once per dimension, not once per case.
  */
 export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOptions) {
     const { suiteName, createClientFn, beforeAllFn, afterAllFn, beforeEachFn, afterEachFn } = options;
@@ -52,7 +52,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             concurrent: true, // Every test declares and closes its own client — safe to parallelize.
         },
         () => {
-            const ctx: CaseCtx = {
+            const ctx: Omit<CaseCtx, 'getFixture'> = {
                 createClientFn: createClientFn as CaseCtx['createClientFn'],
                 transport: options.transport,
                 hasTasksSupport,
@@ -64,7 +64,6 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             registerCases('apps', appsCases, ctx);
             registerCases('tasks', tasksCases, ctx);
             registerCases('storage', storageCases, ctx);
-            registerStorageGroupedCases(createClientFn as CaseCtx['createClientFn']);
             registerCases('payments', paymentsCases, ctx);
         },
     );

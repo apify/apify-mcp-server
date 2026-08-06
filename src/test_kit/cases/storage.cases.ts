@@ -11,14 +11,70 @@ import {
     validateStructuredOutputForTool,
     withClient,
 } from '../helpers.js';
-import type { Case } from '../types.js';
+import type { Case, CaseCtx, Fixture, SuiteClient } from '../types.js';
+
+interface NormalModeRun {
+    datasetId: string;
+    defaultKvId: string;
+    runId: string;
+}
 
 /**
- * Dataset and key-value-store read tools: `get-dataset-items`, `resources/read`, etc. — the
- * self-contained subset (each case opens its own client/Actor run). A shared-`beforeAll`-seeded
- * group of 13 more storage cases lives in `tests/integration/cases/storage_grouped.cases.ts`
- * (this repo's own suite only) — it can't be flattened into standalone Cases without paying for
- * 13x redundant Actor runs, so it isn't part of the critical-sharing model (yet).
+ * Seeds one normal-mode-test-actor run and shares it across the 13 cases below via
+ * `ctx.getFixture` — computed at most once per transport dimension (see `register.ts`), not once
+ * per case, regardless of how many of the 13 actually run (e.g. `criticalOnly` skips most of them).
+ */
+const normalModeRunFixture: Fixture<NormalModeRun> = {
+    key: 'storage.normal-mode-run',
+    setup: async (ctx) => {
+        const setupClient = await ctx.createClientFn({ tools: ['actors', 'storage'] });
+        try {
+            const callResult = await setupClient.callTool({
+                name: HELPER_TOOLS.ACTOR_CALL,
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 45 },
+            });
+            const callStructured = callResult as {
+                structuredContent?: {
+                    runId?: string;
+                    storages?: {
+                        datasets?: { default?: { id?: string } };
+                        keyValueStores?: { default?: { id?: string } };
+                    };
+                };
+            };
+            const sc = callStructured.structuredContent;
+            expect(sc?.runId).toBeDefined();
+            expect(sc?.storages?.datasets?.default?.id).toBeDefined();
+            expect(sc?.storages?.keyValueStores?.default?.id).toBeDefined();
+            return {
+                datasetId: sc!.storages!.datasets!.default!.id!,
+                defaultKvId: sc!.storages!.keyValueStores!.default!.id!,
+                runId: sc!.runId!,
+            };
+        } finally {
+            await setupClient.close();
+        }
+    },
+};
+
+/** Builds a case's `run(ctx)` for a case that needs the seeded `normalModeRunFixture`. */
+function withNormalModeRun(
+    clientOptions: Parameters<CaseCtx['createClientFn']>[0],
+    testFn: (client: SuiteClient, run: NormalModeRun) => Promise<void>,
+): Case['run'] {
+    return async (ctx) => {
+        const run = await ctx.getFixture(normalModeRunFixture);
+        const client = await ctx.createClientFn(clientOptions);
+        try {
+            await testFn(client, run);
+        } finally {
+            await client.close();
+        }
+    };
+}
+
+/**
+ * Dataset and key-value-store read tools: `get-dataset-items`, `resources/read`, etc.
  */
 export const storageCases: Case[] = [
     {
@@ -214,6 +270,206 @@ export const storageCases: Case[] = [
             expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 7);
             expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('firstNumber', 3);
             expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('secondNumber', 4);
+        }),
+    },
+    {
+        name: 'applies the default `limit` of 20 when omitted on get-dataset-items',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
+            const result = await client.callTool({ name: HELPER_TOOLS.DATASET_GET_ITEMS, arguments: { datasetId } });
+            expect(result.isError).not.toBe(true);
+            const structured = (result as { structuredContent?: { items?: unknown[]; limit?: number } })
+                .structuredContent;
+            expect(structured?.limit).toBe(20);
+            expect((structured?.items ?? []).length).toBeLessThanOrEqual(20);
+        }),
+    },
+    {
+        name: "reads INPUT from the run's default KV store via get-actor-run + get-key-value-store-record",
+        critical: false,
+        run: withNormalModeRun({ tools: ['runs', 'storage'] }, async (client, { runId }) => {
+            const runResult = await client.callTool({ name: HELPER_TOOLS.ACTOR_RUNS_GET, arguments: { runId } });
+            expect(runResult.isError).not.toBe(true);
+            const runText = (runResult.content as { text: string }[])[0].text;
+            // content[0] is JSON.stringify(structuredContent), not markdown-embedded JSON.
+            const runData = JSON.parse(runText) as { storages?: { keyValueStores?: { default?: { id?: string } } } };
+            const kvId = runData.storages?.keyValueStores?.default?.id;
+            expect(kvId).toBeDefined();
+
+            const kvResult = await client.callTool({
+                name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+                arguments: { keyValueStoreId: kvId!, recordKey: 'INPUT' },
+            });
+            expect(kvResult.isError).not.toBe(true);
+            expect((kvResult.content as { text: string }[])[0].text).toContain('firstNumber');
+            // Reading a record is terminal: summary present, no nextStep.
+            const kvSc = (kvResult as { structuredContent?: { summary?: string; nextStep?: string } })
+                .structuredContent;
+            expect(kvSc?.summary).toContain("Read 'INPUT'");
+            expect(kvSc).not.toHaveProperty('nextStep');
+        }),
+    },
+    {
+        name: 'returns dataset metadata via get-dataset',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
+            const result = await client.callTool({ name: HELPER_TOOLS.DATASET_GET, arguments: { datasetId } });
+            expect(result.isError).not.toBe(true);
+            const { text } = (result.content as { text: string }[])[0];
+            expect(text).toContain(datasetId);
+            expect(text).toContain('firstNumber');
+            expect(text).toContain('sum');
+            const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } }).structuredContent;
+            expect(sc?.summary).toContain('items');
+            expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+        }),
+    },
+    {
+        name: 'infers schema from dataset items via get-dataset-schema',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
+            const result = await client.callTool({ name: HELPER_TOOLS.DATASET_SCHEMA_GET, arguments: { datasetId } });
+            expect(result.isError).not.toBe(true);
+            const { text } = (result.content as { text: string }[])[0];
+            expect(text).toContain('properties');
+            // `math` is a nested object in the default-dataset item; its presence in the schema
+            // proves the inference walks nested shapes, not just top-level fields.
+            expect(text).toContain('math');
+            const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } }).structuredContent;
+            expect(sc?.summary).toContain('Schema inferred');
+            expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+        }),
+    },
+    {
+        name: 'returns key-value store metadata via get-key-value-store',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
+            const result = await client.callTool({
+                name: HELPER_TOOLS.KEY_VALUE_STORE_GET,
+                arguments: { keyValueStoreId: defaultKvId },
+            });
+            expect(result.isError).not.toBe(true);
+            const { text } = (result.content as { text: string }[])[0];
+            expect(text).toContain(defaultKvId);
+            const sc = (result as { structuredContent?: { nextStep?: string } }).structuredContent;
+            expect(sc?.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET);
+        }),
+    },
+    {
+        name: 'lists keys in the run KV store via get-key-value-store-keys',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
+            const result = await client.callTool({
+                name: HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+                arguments: { keyValueStoreId: defaultKvId, limit: 10 },
+            });
+            expect(result.isError).not.toBe(true);
+            const { text } = (result.content as { text: string }[])[0];
+            expect(text).toContain('INPUT');
+            expect(text).toContain('RESULT');
+            expect(text).toContain('STATS');
+            expect(text).toContain('LOG');
+            expect(text).toContain('COVER');
+            const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } }).structuredContent;
+            expect(sc?.summary).toContain('keys');
+            expect(sc?.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+        }),
+    },
+    {
+        // Doesn't assert defaultKvId is in the page: on a shared account, concurrent runs can
+        // push it past the top-10 recency window between creation and the list call. Existence
+        // and readability of the store are already proven by the get-key-value-store test above.
+        name: 'lists unnamed key-value stores via get-key-value-store-list',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
+            const result = await client.callTool({
+                name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+                arguments: { desc: true, unnamed: true, limit: 10 },
+            });
+            expect(result.isError).not.toBe(true);
+            const sc = (result as { structuredContent?: { total?: number; unnamed?: boolean; items?: unknown[] } })
+                .structuredContent;
+            expect(sc?.unnamed).toBe(true);
+            expect(sc?.total).toBeGreaterThan(0);
+            expect(Array.isArray(sc?.items)).toBe(true);
+            expect(sc!.items!.length).toBeGreaterThan(0);
+            expect(sc!.items!.length).toBeLessThanOrEqual(10);
+        }),
+    },
+    {
+        // Apify-contract canary for #880: get-dataset-items only sends the top-level prefix
+        // (e.g. `flatten=math` for fields `math.factorial.first`). If Apify's `flatten` ever
+        // stops recursing through nested levels, this 3-deep field will come back undefined and
+        // signal that we need to emit every prefix.
+        name: 'flattens 3-level nested fields via get-dataset-items',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
+            const result = await client.callTool({
+                name: HELPER_TOOLS.DATASET_GET_ITEMS,
+                arguments: { datasetId, fields: 'math.factorial.first' },
+            });
+            expect(result.isError).not.toBe(true);
+            const items = (result as { structuredContent?: { items?: Record<string, unknown>[] } }).structuredContent
+                ?.items;
+            expect(Array.isArray(items)).toBe(true);
+            // >=1 (not ==1): the signal is whether the nested field surfaces, not the count.
+            expect(items!.length).toBeGreaterThanOrEqual(1);
+            // factorial.first = 1! = 1; if flatten recurses, the value appears under the dot-notated key.
+            expect(items![0]['math.factorial.first']).toBe(1);
+        }),
+    },
+    {
+        name: 'reads dataset items via resources/read',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
+            const result = await client.readResource({
+                uri: `https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`,
+            });
+            const contents = result.contents[0] as { mimeType?: string; text?: string };
+            // The proxy passes through the API's declared Content-Type, which carries a charset
+            // (e.g. `application/json; charset=utf-8`), so match the base type rather than the exact string.
+            expect(contents.mimeType).toContain('application/json');
+            // The generic proxy returns the raw API body — a bare JSON array of items.
+            const items = JSON.parse(contents.text as string) as unknown[];
+            expect(Array.isArray(items)).toBe(true);
+        }),
+    },
+    {
+        name: 'reads a KV record via resources/read',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
+            const result = await client.readResource({
+                uri: `https://api.apify.com/v2/key-value-stores/${defaultKvId}/records/INPUT`,
+            });
+            const contents = result.contents[0] as { text?: string };
+            expect(contents.text).toContain('firstNumber');
+        }),
+    },
+    {
+        name: 'rejects resources/read of a nonexistent dataset with a JSON-RPC error',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
+            await expect(
+                client.readResource({ uri: 'https://api.apify.com/v2/datasets/this-dataset-does-not-exist-xyz/items' }),
+            ).rejects.toThrow(/Failed to read/i);
+        }),
+    },
+    {
+        name: 'rejects resources/read of a non-Apify URL with a JSON-RPC error',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
+            await expect(client.readResource({ uri: 'https://example.com/steal-my-token' })).rejects.toThrow(
+                /Failed to read/i,
+            );
+        }),
+    },
+    {
+        name: 'advertises API URL templates via resources/templates/list',
+        critical: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
+            const { resourceTemplates } = await client.listResourceTemplates();
+            const datasetItems = resourceTemplates.find((t) => t.name === 'dataset-items');
+            expect(datasetItems?.uriTemplate).toContain('/v2/datasets/{datasetId}/items{?limit,offset,');
         }),
     },
 ];
