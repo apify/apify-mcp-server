@@ -8,7 +8,7 @@ import { ThemeProvider } from 'styled-components';
 import { UiDependencyProvider } from '@apify/ui-library';
 import { cssColorsVariablesLight, cssColorsVariablesDark } from '@apify/ui-library';
 
-import { McpAppProvider, useMcpApp } from '../context/mcp-app-context';
+import { McpAppProvider, useMcpApp, type RefetchToolForArgs } from '../context/mcp-app-context';
 
 function applyDocumentTheme(theme: McpUiTheme): void {
     document.documentElement.setAttribute('data-theme', theme);
@@ -145,7 +145,7 @@ function injectStylesheets(): void {
     });
 }
 
-export const renderWidget = (Component: React.FC) => {
+export const renderWidget = (Component: React.FC, options?: { refetchToolForArgs?: RefetchToolForArgs }) => {
     const initWidget = () => {
         const rootElement = document.getElementById('root');
         if (!rootElement) return;
@@ -188,7 +188,7 @@ export const renderWidget = (Component: React.FC) => {
         root.render(
             <ThemeProvider theme={{}}>
                 <UiDependencyProvider dependencies={dependencies as any}>
-                    <McpAppProvider>
+                    <McpAppProvider refetchToolForArgs={options?.refetchToolForArgs}>
                         <ThemeSync />
                         <Component />
                     </McpAppProvider>

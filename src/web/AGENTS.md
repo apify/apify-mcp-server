@@ -13,6 +13,11 @@ server code does not import widgets.
 
 - A widget renders from a **tool's output** — to put data on a widget, change the
   corresponding tool's return value, not the widget's props by hand.
+- Claude Desktop strips `structuredContent` from the tool-result notification
+  ([ext-apps#696](https://github.com/modelcontextprotocol/ext-apps/issues/696));
+  `mcp-app-context.tsx` recovers it. Every widget tool must support one recovery path:
+  mirror `structuredContent` as JSON in `content[0]` (run widgets), or be registered in
+  the entry's `refetchToolForArgs` (idempotent tools only — never run-starting ones).
 - Rendering requires **UI mode**: `?ui=true` on the endpoint or `UI_MODE=true`.
 - Editing `src/web/src/widgets/*.tsx` hot-reloads; adding a new widget filename
   requires reconnecting the MCP client to pick it up.
