@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.14.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Recover widget structuredContent stripped by Claude Desktop ([#1187](https://github.com/apify/apify-mcp-server/pull/1187)) ([94dcfe3](https://github.com/apify/apify-mcp-server/commit/94dcfe3b13e0baef94f1d0f5155f0044b02f42df)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.14.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.2) (2026-08-05)
 
 ### 🐛 Bug Fixes
