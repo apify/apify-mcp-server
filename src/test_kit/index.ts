@@ -13,6 +13,10 @@ export { createMcpStatelessClient, createMcpStreamableClient } from './mcp_clien
 export type { SuiteClientOptions } from './mcp_client.js';
 export { registerCases } from './register.js';
 export type { Case, CaseCtx, Fixture, SuiteClient, Transport } from './types.js';
+// withClient is the per-case client-lifecycle helper every simple Case's `run` is built from —
+// published so consumers (apify-mcp-server-internal) can build their own local, unpublished
+// Case arrays the same way instead of reinventing client open/close bookkeeping.
+export { withClient } from './helpers.js';
 
 export { actorsCases } from './cases/actors.cases.js';
 export { appsCases } from './cases/apps.cases.js';
