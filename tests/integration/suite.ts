@@ -57,6 +57,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 transport: options.transport,
                 hasTasksSupport,
                 getApifyToken: () => process.env.APIFY_TOKEN as string,
+                getApifyApiBaseUrl: () => process.env.APIFY_API_BASE_URL,
             };
 
             registerCases('registration', registrationCases, ctx);

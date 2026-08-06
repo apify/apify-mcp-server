@@ -41,6 +41,17 @@ export interface CaseCtx {
      * so it works the same regardless of which repo registers the case.
      */
     getApifyToken: () => string;
+    /**
+     * Base URL of the Apify REST API `getApifyToken()`'s token is valid against — for the same
+     * direct-`ApifyClient` cases. Required, not defaulted to production: internal's dev/staging
+     * environments run their own local platform (e.g. `http://localhost:3333`) with test-user
+     * tokens that don't exist on real production `api.apify.com` — defaulting would silently hit
+     * the wrong API and fail with a real but misleading "token is not valid" error instead of a
+     * compile error. Each caller wires this to whatever its own API base URL source already is
+     * (this repo's own suite: `process.env.APIFY_API_BASE_URL` or apify-client's own default;
+     * internal: `getSettings().apiBaseUrl`).
+     */
+    getApifyApiBaseUrl: () => string | undefined;
 }
 
 /** A value computed once and shared across whichever cases ask for it via `ctx.getFixture`. */

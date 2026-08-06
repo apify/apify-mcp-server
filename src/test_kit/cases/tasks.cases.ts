@@ -37,7 +37,7 @@ export const tasksCases: Case[] = [
             // Load the Actor at connection time — add-actor's dynamic add is gone (PR 0).
             const client = (await ctx.createClientFn({ actors: [ACTOR_NORMAL_MODE] })) as ClientV1;
             try {
-                const api = new ApifyClient({ token: ctx.getApifyToken() });
+                const api = new ApifyClient({ token: ctx.getApifyToken(), baseUrl: ctx.getApifyApiBaseUrl() });
                 const controller = new AbortController();
                 const { onprogress, runIdPromise } = captureRunIdFromProgress();
                 const requestPromise = client
@@ -74,7 +74,7 @@ export const tasksCases: Case[] = [
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: ['actors'] })) as ClientV1;
             try {
-                const api = new ApifyClient({ token: ctx.getApifyToken() });
+                const api = new ApifyClient({ token: ctx.getApifyToken(), baseUrl: ctx.getApifyApiBaseUrl() });
                 const controller = new AbortController();
                 const { onprogress, runIdPromise } = captureRunIdFromProgress();
                 const requestPromise = client
@@ -239,7 +239,7 @@ export const tasksCases: Case[] = [
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
             try {
-                const api = new ApifyClient({ token: ctx.getApifyToken() });
+                const api = new ApifyClient({ token: ctx.getApifyToken(), baseUrl: ctx.getApifyApiBaseUrl() });
                 const { onprogress, runIdPromise } = captureRunIdFromProgress();
 
                 const stream = client.experimental.tasks.callToolStream(

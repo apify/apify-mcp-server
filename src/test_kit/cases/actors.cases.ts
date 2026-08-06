@@ -950,7 +950,7 @@ export const actorsCases: Case[] = [
         name: 'should return Actor details both for full Actor name and ID',
         critical: false,
         run: async (ctx) => {
-            const apifyClient = new ApifyClient({ token: ctx.getApifyToken() });
+            const apifyClient = new ApifyClient({ token: ctx.getApifyToken(), baseUrl: ctx.getApifyApiBaseUrl() });
             return withClient(undefined, async (client) => {
                 const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
                 expect(actor).toBeDefined();
