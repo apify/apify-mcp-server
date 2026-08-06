@@ -31,29 +31,53 @@ function onlyStdio(ctx: CaseCtx): boolean {
  */
 export const registrationCases: Case[] = [
     {
-        name: 'should match spec default: actors,docs,apify/rag-web-browser when no params provided',
-        critical: false,
-        run: withClient(undefined, async (client) => {
+        // telemetry explicitly forced off (not relying on the suite's own default) so this case's
+        // expectation is deterministic regardless of which repo/environment registers it — see
+        // apify-mcp-server-internal's report-problem telemetry-gating investigation (#776 follow-up).
+        name: 'should match spec default: actors,docs,apify/rag-web-browser when no params provided (telemetry off)',
+        critical: true,
+        run: withClient({ telemetry: { enabled: false } }, async (client) => {
             const tools = await client.listTools();
             const names = getToolNames(tools);
 
             // Should be equivalent to tools=actors,docs,apify/rag-web-browser
             // Note: UI tools (search-actors-widget, fetch-actor-details-widget) are only available in apps mode
-            // report-problem is telemetry-gated and telemetry is off in this suite, so it is not listed.
             const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
             const expectedActors = [actorNameToToolName('apify/rag-web-browser')];
 
             const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
-            expect(names).toHaveLength(expectedTotal.length + 4);
+            expect(names).toHaveLength(expectedTotal.length + AUTO_INJECTED_TOOL_NAMES.length);
 
             expectToolNamesToContain(names, expectedActorsTools);
             expectToolNamesToContain(names, expectedDocsTools);
             expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
             expectToolNamesToContain(names, expectedActors);
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-            // get-actor-run should be automatically included when call-actor is present
-            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+        }),
+    },
+    {
+        // Same scenario, telemetry explicitly forced on - the only expected difference from the
+        // case above is report-problem's presence; everything else in the tools list is identical.
+        name: 'should match spec default: actors,docs,apify/rag-web-browser when no params provided (telemetry on)',
+        critical: true,
+        run: withClient({ telemetry: { enabled: true } }, async (client) => {
+            const tools = await client.listTools();
+            const names = getToolNames(tools);
+
+            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
+            const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
+            const expectedActors = [actorNameToToolName('apify/rag-web-browser')];
+            const expectedFeedbackTools = [HELPER_TOOLS.PROBLEM_REPORT];
+
+            const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors, expectedFeedbackTools);
+            expect(names).toHaveLength(expectedTotal.length + AUTO_INJECTED_TOOL_NAMES.length);
+
+            expectToolNamesToContain(names, expectedActorsTools);
+            expectToolNamesToContain(names, expectedDocsTools);
+            expect(names).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+            expectToolNamesToContain(names, expectedActors);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
         }),
     },
     {
@@ -208,6 +232,24 @@ export const registrationCases: Case[] = [
             }),
         };
     })(),
+    {
+        // A category selector ('docs') mixed with individual tool-name selectors, in one `tools`
+        // param - proves selection is precise (search-actors, part of the same "actors" concept
+        // as call-actor, must stay excluded) rather than silently widening to a whole category.
+        name: 'should handle mixed categories and specific tools in tools param',
+        critical: true,
+        run: withClient({ tools: ['docs', 'fetch-actor-details', 'call-actor'] }, async (client) => {
+            const names = getToolNames(await client.listTools());
+
+            expect(names).toContain('search-apify-docs'); // from docs category
+            expect(names).toContain('fetch-apify-docs'); // from docs category
+            expect(names).toContain('fetch-actor-details'); // specific tool
+            expect(names).toContain('call-actor'); // specific tool
+
+            // Should NOT include other actors-category tools
+            expect(names).not.toContain('search-actors');
+        }),
+    },
     {
         name: 'loads docs while dropping retired selectors',
         critical: false,
