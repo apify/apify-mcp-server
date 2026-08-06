@@ -949,25 +949,30 @@ export const actorsCases: Case[] = [
     {
         name: 'should return Actor details both for full Actor name and ID',
         critical: false,
-        run: withClient(undefined, async (client) => {
-            const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-            const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
-            expect(actor).toBeDefined();
-            const actorId = actor!.id as string;
+        run: async (ctx) => {
+            const apifyClient = new ApifyClient({ token: ctx.getApifyToken() });
+            return withClient(undefined, async (client) => {
+                const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
+                expect(actor).toBeDefined();
+                const actorId = actor!.id as string;
 
-            // Fetch by full Actor name
-            const resultByName = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: { actor: ACTOR_NORMAL_MODE },
-            });
-            const contentByName = resultByName.content as { text: string }[];
-            expect(contentByName[0].text).toContain(ACTOR_NORMAL_MODE);
+                // Fetch by full Actor name
+                const resultByName = await client.callTool({
+                    name: 'fetch-actor-details',
+                    arguments: { actor: ACTOR_NORMAL_MODE },
+                });
+                const contentByName = resultByName.content as { text: string }[];
+                expect(contentByName[0].text).toContain(ACTOR_NORMAL_MODE);
 
-            // Fetch by Actor ID only
-            const resultById = await client.callTool({ name: 'fetch-actor-details', arguments: { actor: actorId } });
-            const contentById = resultById.content as { text: string }[];
-            expect(contentById[0].text).toContain(ACTOR_NORMAL_MODE);
-        }),
+                // Fetch by Actor ID only
+                const resultById = await client.callTool({
+                    name: 'fetch-actor-details',
+                    arguments: { actor: actorId },
+                });
+                const contentById = resultById.content as { text: string }[];
+                expect(contentById[0].text).toContain(ACTOR_NORMAL_MODE);
+            })(ctx);
+        },
     },
     {
         name: 'returns structuredContent for get-actor-run',

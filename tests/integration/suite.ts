@@ -56,6 +56,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 createClientFn: createClientFn as CaseCtx['createClientFn'],
                 transport: options.transport,
                 hasTasksSupport,
+                getApifyToken: () => process.env.APIFY_TOKEN as string,
             };
 
             registerCases('registration', registrationCases, ctx);

@@ -32,6 +32,15 @@ export interface CaseCtx {
      * per case. See `register.ts`.
      */
     getFixture: <T>(fixture: Fixture<T>) => Promise<T>;
+    /**
+     * The real Apify API token this run authenticates with — for cases that poll the raw Apify
+     * REST API directly (via `ApifyClient`) instead of through an MCP connection, independent of
+     * whatever token `createClientFn` used for any one client. Each caller wires this to whatever
+     * its own token source is (this repo's own suite: `process.env.APIFY_TOKEN`; internal:
+     * whatever its own test-user token helper resolves) — not read from a global env var directly,
+     * so it works the same regardless of which repo registers the case.
+     */
+    getApifyToken: () => string;
 }
 
 /** A value computed once and shared across whichever cases ask for it via `ctx.getFixture`. */
