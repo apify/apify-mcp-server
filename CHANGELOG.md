@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Recover widget structuredContent stripped by Claude Desktop ([#1187](https://github.com/apify/apify-mcp-server/pull/1187)) ([94dcfe3](https://github.com/apify/apify-mcp-server/commit/94dcfe3b13e0baef94f1d0f5155f0044b02f42df)) by [@jirispilka](https://github.com/jirispilka)
+- Align Node floor to 22 and drop dead smithery.yaml ([#1210](https://github.com/apify/apify-mcp-server/pull/1210)) ([6c4ac08](https://github.com/apify/apify-mcp-server/commit/6c4ac08c6a7e3b11d075dd7d1684d05599a50728)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
