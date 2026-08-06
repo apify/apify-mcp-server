@@ -11,8 +11,9 @@ import {
 } from './helpers/tool_context.js';
 
 const getMock = vi.fn();
+const getRunMock = vi.fn();
 
-const stubClient = { run: () => ({ log: () => ({ get: getMock }) }) } as unknown as InternalToolArgs['apifyClient'];
+const stubClient = { run: () => ({ log: () => ({ get: getMock }), get: getRunMock }) } as unknown as InternalToolArgs['apifyClient'];
 
 const numberedLog = (count: number) => Array.from({ length: count }, (_, i) => `line ${i + 1}`).join('\n');
 
@@ -106,11 +107,22 @@ describe('get-actor-log', () => {
 
     it('returns conforming structuredContent for an empty log', async () => {
         getMock.mockResolvedValue(undefined);
+        getRunMock.mockResolvedValue({ id: 'run-1' });
 
         const result = await callTool({ runId: 'run-1', lines: 10 });
 
         expect(result.content[0].text).toBe('');
         expect(result.structuredContent).toEqual({ log: '' });
         expectSchemaConformingStructuredContent(result, getActorRunLogToolOutputSchema);
+    });
+
+    it('returns an error when the run is not found', async () => {
+        getMock.mockResolvedValue(undefined);
+        getRunMock.mockResolvedValue(undefined);
+
+        const result = await callTool({ runId: 'run-nonexistent', lines: 10 });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("Run with ID 'run-nonexistent' not found.");
     });
 });
