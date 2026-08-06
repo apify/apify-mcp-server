@@ -1,145 +1,27 @@
-import {
-    Client as StatelessClient,
-    type ClientCapabilities as StatelessClientCapabilities,
-    StreamableHTTPClientTransport as StatelessStreamableHTTPClientTransport,
-} from '@modelcontextprotocol/client';
+import type { Client as StatelessClient } from '@modelcontextprotocol/client';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
-import type { TelemetryEnv, ToolCategory } from '../src/types.js';
+import { createMcpStatelessClient, createMcpStreamableClient, type SuiteClientOptions } from '../src/test_kit/index.js';
+
+// Re-exported so this repo's own suite keeps its existing names — the factories themselves
+// now live in src/test_kit/mcp_client.ts (published behind the "./test-kit" export) so
+// apify-mcp-server-internal can import the same code instead of maintaining its own copy.
+export { createMcpStatelessClient, createMcpStreamableClient };
+export type McpClientOptions = SuiteClientOptions;
 
 /**
  * Both client generations the integration suite drives: the v1 SDK client on the `stdio` and
- * `streamable-http` dimensions, the v2 client on `2026-07-28`. One suite run exercises both.
+ * `2025-11-25` dimensions, the v2 client on `2026-07-28`. One suite run exercises both.
  */
 export type McpSuiteClient = Client | StatelessClient;
 
-/**
- * Narrows a suite client to the v1 SDK client. Only for cases gated to the legacy dimensions:
- * the v2 client has no `experimental.tasks`, no v1 `transport`, and a different `request()` shape.
- */
-export function asLegacyClient(client: McpSuiteClient): Client {
-    return client as Client;
-}
-
-export type McpClientOptions = {
-    actors?: string[];
-    tools?: (ToolCategory | string)[]; // Tool categories, specific tool or Actor names to include
-    useEnv?: boolean; // Use environment variables instead of command line arguments (stdio only)
-    clientName?: string; // Client name for identification
-    telemetry?: {
-        enabled?: boolean; // Enable or disable telemetry (default: false for tests)
-        env?: TelemetryEnv; // Telemetry environment (default: 'PROD', only used when telemetry.enabled is true)
-    };
-    serverMode?: string; // Raw server-mode value passed as ?ui= URL param or --ui CLI arg (e.g. 'apps', 'true', or the deprecated 'openai')
-    payment?: string; // Payment provider identifier (e.g., 'x402', 'skyfire')
-    clientCapabilities?: ClientCapabilities; // Extra capabilities advertised by the client during initialize
-};
-
-/**
- * Ensures `APIFY_TOKEN` is set unless the test runs in payment mode
- * (where production also skips token requirements — see
- * `apify-mcp-server-internal/src/server/shared.ts:authorizeRequestMiddleware`).
- */
-function checkApifyToken(options?: McpClientOptions): void {
-    if (options?.payment) return;
-    if (!process.env.APIFY_TOKEN) {
+/** stdio spawns this repo's own dist/stdio.js — not something a hosted-deploy consumer needs. */
+export async function createMcpStdioClient(options?: McpClientOptions): Promise<Client> {
+    if (!options?.payment && !process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
-}
-
-/**
- * Returns the request headers a test client should send.
- * In payment mode no `Authorization` header is sent — the server resolves
- * the payment provider from the `?payment=` query param instead.
- */
-function buildClientAuthHeaders(options?: McpClientOptions): Record<string, string> {
-    if (options?.payment) return {};
-    return { authorization: `Bearer ${process.env.APIFY_TOKEN}` };
-}
-
-function appendSearchParams(url: URL, options?: McpClientOptions): void {
-    const { actors, tools, telemetry, serverMode, payment } = options || {};
-    if (actors !== undefined) {
-        url.searchParams.append('actors', actors.join(','));
-    }
-    if (tools !== undefined) {
-        url.searchParams.append('tools', tools.join(','));
-    }
-    // Append telemetry parameters (default to false for tests when not explicitly set)
-    const telemetryEnabled = telemetry?.enabled !== undefined ? telemetry.enabled : false;
-    url.searchParams.append('telemetry-enabled', telemetryEnabled.toString());
-    if (serverMode !== undefined) {
-        url.searchParams.append('ui', serverMode);
-    }
-    if (payment) {
-        url.searchParams.append('payment', payment);
-    }
-}
-
-export async function createMcpStreamableClient(serverUrl: string, options?: McpClientOptions): Promise<Client> {
-    checkApifyToken(options);
-    const url = new URL(serverUrl);
-    appendSearchParams(url, options);
-
-    const transport = new StreamableHTTPClientTransport(url, {
-        requestInit: {
-            headers: buildClientAuthHeaders(options),
-        },
-    });
-
-    const client = new Client({
-        name: options?.clientName || 'streamable-http-client',
-        version: '1.0.0',
-    });
-    if (options?.clientCapabilities) client.registerCapabilities(options.clientCapabilities);
-    await client.connect(transport);
-
-    return client;
-}
-
-/**
- * Builds a v2-SDK client for the 2026-07-28 revision. `versionNegotiation` belongs on the
- * constructor — `connect()` only takes a cached verdict — and `mode: 'auto'` probes with
- * `server/discover`, falling back to the legacy `initialize` handshake when it finds no modern
- * server. Callers that must not silently run on legacy code check `getDiscoverResult()`.
- */
-export async function createMcpStatelessClient(
-    serverUrl: string,
-    options?: McpClientOptions,
-): Promise<StatelessClient> {
-    checkApifyToken(options);
-    const url = new URL(serverUrl);
-    appendSearchParams(url, options);
-
-    const transport = new StatelessStreamableHTTPClientTransport(url, {
-        requestInit: {
-            headers: buildClientAuthHeaders(options),
-        },
-    });
-
-    const client = new StatelessClient(
-        {
-            name: options?.clientName || 'stateless-http-client',
-            version: '1.0.0',
-        },
-        { versionNegotiation: { mode: 'auto' } },
-    );
-    if (options?.clientCapabilities) {
-        // The two SDK generations derive their capability types from different schemas; the option
-        // shape shared with the legacy factories is the v1 one.
-        client.registerCapabilities(options.clientCapabilities as StatelessClientCapabilities);
-    }
-    await client.connect(transport);
-
-    return client;
-}
-
-export async function createMcpStdioClient(options?: McpClientOptions): Promise<Client> {
-    checkApifyToken(options);
     const { actors, tools, useEnv, telemetry, serverMode, payment } = options || {};
     const args = ['dist/stdio.js'];
     const env: Record<string, string> = {

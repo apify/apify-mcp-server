@@ -17,7 +17,7 @@ let mcpUrl: string;
 
 createIntegrationTestsSuite({
     suiteName: 'Apify MCP Server Streamable HTTP',
-    transport: 'streamable-http',
+    transport: '2025-11-25',
     createClientFn: async (options) => await createMcpStreamableClient(mcpUrl, options),
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);

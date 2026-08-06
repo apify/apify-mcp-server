@@ -20,7 +20,16 @@
     ".": "./dist/index.js",
     "./internals": "./dist/index_internals.js",
     "./internals.js": "./dist/index_internals.js",
+    "./test-kit": "./dist/test_kit/index.js",
     "./manifest.json": "./manifest.json"
+  },
+  "peerDependencies": {
+    "vitest": "^4.1.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   },
   "bin": {
     "actors-mcp-server": "./dist/stdio.js"

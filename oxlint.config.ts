@@ -18,6 +18,18 @@ export default defineConfig({
                 'jest/no-conditional-expect': 'off',
             },
         },
+        {
+            // src/test_kit/cases/*.cases.ts define `Case` objects whose `run(ctx)` is built via
+            // the `withClient(options, testFn)` helper — `expect()` calls inside `testFn` really
+            // do execute inside a real `it()` block (wired up by `registerCases` in register.ts),
+            // but oxlint's static vitest rules can't trace that indirection and flag them as
+            // standalone. False positive, not a real issue — see src/test_kit/register.ts.
+            files: ['src/test_kit/**'],
+            rules: {
+                'vitest/no-standalone-expect': 'off',
+                'vitest/expect-expect': 'off',
+            },
+        },
     ],
     options: {
         typeAware: true,
