@@ -1,5 +1,5 @@
 /**
- * Two-phase tool loading: {@link getActors} fetches Actor metadata (async, mode-agnostic);
+ * Two-phase tool loading: {@link getActorsFromInput} fetches Actor metadata (async, mode-agnostic);
  * {@link loadToolsFromInput} runs both in sequence.
  */
 
@@ -10,7 +10,7 @@ import log from '@apify/log';
 import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
-import { getActorsAsTools } from '../tools/index.js';
+import { fetchActorsAsTools } from '../tools/index.js';
 import {
     CATEGORY_NAME_SET,
     CATEGORY_NAMES,
@@ -137,16 +137,16 @@ function resolveActorsToLoad(input: Input): string[] {
  *
  * Pass `paymentProvider` for sessions authenticated via an external payment
  * provider (x402, Skyfire) so standby/MCP-server Actors are filtered out —
- * see `getActorsAsTools` for the full rationale.
+ * see `fetchActorsAsTools` for the full rationale.
  */
-export async function getActors(
+export async function getActorsFromInput(
     input: Input,
     apifyClient: ApifyClient,
     options?: { actorStore?: ActorStore; paymentProvider?: PaymentProvider },
 ): Promise<ToolEntry[]> {
     const actorNames = resolveActorsToLoad(input);
     if (actorNames.length === 0) return [];
-    const { tools } = await getActorsAsTools(actorNames, apifyClient, options);
+    const { tools } = await fetchActorsAsTools(actorNames, apifyClient, options);
     return tools;
 }
 
@@ -222,7 +222,7 @@ export function getToolsForServerMode(
                 internalSelections.push(internalByName);
                 continue;
             }
-            // Internal tool from another mode → skip silently (getActors already
+            // Internal tool from another mode → skip silently (getActorsFromInput already
             // routed it away from actor names).
             if (ALL_INTERNAL_TOOL_NAMES.has(sel)) {
                 log.debug(`Skipping selector "${sel}" — it is an internal tool from another mode (current: "${mode}")`);
@@ -299,13 +299,13 @@ export function getToolsForServerMode(
     return result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
 }
 
-/** Convenience wrapper: {@link getActors} + {@link getToolsForServerMode} in sequence. */
+/** Convenience wrapper: {@link getActorsFromInput} + {@link getToolsForServerMode} in sequence. */
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
-    const actorTools = await getActors(input, apifyClient, { actorStore });
+    const actorTools = await getActorsFromInput(input, apifyClient, { actorStore });
     return getToolsForServerMode(input, actorTools, mode);
 }

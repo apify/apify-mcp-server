@@ -16,14 +16,14 @@ import type { Input, ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
-import { getActors } from '../../src/utils/tools_loader.js';
+import { getActorsFromInput } from '../../src/utils/tools_loader.js';
 import { getRequestHandler, makeRecorderTool, withServer, withStatelessServer } from './helpers/mcp_server.js';
 
-// Stub getActors so a facade can be given tool sources without a network fetch. The compose path
+// Stub getActorsFromInput so a facade can be given tool sources without a network fetch. The compose path
 // (getToolsForServerMode + the report-problem gate) stays real — that is what these tests exercise.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
-    return { ...actual, getActors: vi.fn() };
+    return { ...actual, getActorsFromInput: vi.fn() };
 });
 
 // Stub the widget disk scan so apps-mode widget resolution yields a deterministic registry whose
@@ -33,11 +33,11 @@ vi.mock('../../src/resources/widgets.js', async (importOriginal) => {
     return { ...actual, resolveAvailableWidgets: vi.fn() };
 });
 
-const getActorsMock = vi.mocked(getActors);
+const getActorsFromInputMock = vi.mocked(getActorsFromInput);
 const resolveAvailableWidgetsMock = vi.mocked(resolveAvailableWidgets);
 
 async function loadSource(server: ActorsMcpServer, actorTools: ToolEntry[], input: Input = { tools: [] }) {
-    getActorsMock.mockResolvedValue(actorTools);
+    getActorsFromInputMock.mockResolvedValue(actorTools);
     await server.loadToolsFromInput(input, {} as never);
 }
 
@@ -97,8 +97,8 @@ function resourceUris(result: Record<string, unknown> | undefined): string[] {
 
 describe('createStatelessServer() request context', () => {
     afterEach(() => {
-        getActorsMock.mockReset();
-        getActorsMock.mockResolvedValue([]);
+        getActorsFromInputMock.mockReset();
+        getActorsFromInputMock.mockResolvedValue([]);
         vi.restoreAllMocks();
     });
 

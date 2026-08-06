@@ -2,7 +2,7 @@ import { HELPER_TOOLS } from '../const.js';
 import type { ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODE } from '../types.js';
 import { getExpectedToolsByCategories } from '../utils/tool_categories_helpers.js';
-import { getActorsAsTools } from './actors/actor_tools_factory.js';
+import { fetchActorsAsTools } from './actors/actor_tools_factory.js';
 import type { ActorsAsToolsResult } from './actors/actor_tools_factory.js';
 import {
     CATEGORY_NAME_SET,
@@ -46,5 +46,5 @@ export function getUnauthEnabledToolCategories(): ToolCategory[] {
 }
 
 // Export actor-related tools
-export { getActorsAsTools };
+export { fetchActorsAsTools };
 export type { ActorsAsToolsResult };
