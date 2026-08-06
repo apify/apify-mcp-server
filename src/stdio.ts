@@ -166,10 +166,10 @@ if (requiresAuthentication && !apifyToken) {
 async function main() {
     // Node.js version guard — surface a clear error instead of cryptic failures
     const [major] = process.versions.node.split('.').map(Number);
-    if (major < 20) {
+    if (major < 22) {
         // eslint-disable-next-line no-console
         console.error(
-            `Error: Apify MCP server requires Node.js 20 or later (you have ${process.version}).\n` +
+            `Error: Apify MCP server requires Node.js 22 or later (you have ${process.version}).\n` +
                 'Please update Node.js: https://nodejs.org',
         );
         process.exit(1);
