@@ -78,6 +78,25 @@ describe('executeConversation()', () => {
         expect(conversation.totalTokens).toBeUndefined();
     });
 
+    it('records a tool call whose arguments are not valid JSON instead of aborting the item', async () => {
+        const conversation = await executeConversation({
+            userPrompt: 'go',
+            mcpClient: makeMcpClient({ toolName: 'search-actors', success: true, result: { items: [] } }),
+            llmClient: makeLlmClient([
+                { content: null, toolCalls: [{ id: 'call-1', name: 'search-actors', arguments: '{"q":' }] },
+                finalResponse(),
+            ]),
+        });
+
+        // The turn keeps the call, and its result carries the parse error the agent saw.
+        expect(conversation.turns[0].toolCalls).toEqual([{ name: 'search-actors', arguments: {} }]);
+        expect(conversation.turns[0].toolResults[0]).toMatchObject({
+            toolName: 'search-actors',
+            success: false,
+        });
+        expect(conversation.turns[0].toolResults[0].error).toMatch(/Failed to parse arguments/);
+    });
+
     it('returns the partial sum when only some turns report usage', async () => {
         const conversation = await executeConversation({
             userPrompt: 'go',
