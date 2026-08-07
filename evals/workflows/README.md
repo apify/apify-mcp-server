@@ -1,6 +1,6 @@
 # Workflow Evaluation System
 
-Tests AI agents performing multi-turn conversations with Apify MCP tools, evaluated by an LLM judge.
+Tests AI agents performing multi-turn conversations with Apify MCP tools, evaluated by an LLM judge. Results (traces, scores, dataset, experiment runs) are recorded in **Langfuse**: the self-hosted instance at [langfuse.apify.dev](https://langfuse.apify.dev), project `MCP Workflow`.
 
 ---
 
@@ -10,12 +10,16 @@ Tests AI agents performing multi-turn conversations with Apify MCP tools, evalua
 - Node.js installed
 - Apify account with API token
 - OpenRouter API key
+- Langfuse project (public + secret key)
 
 **Run evaluations:**
 ```bash
-# 1. Set environment variables
+# 1. Set environment variables (a .env file at the repo root is loaded automatically)
 export APIFY_TOKEN="your_apify_token"
 export OPENROUTER_API_KEY="your_openrouter_key"
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+export LANGFUSE_BASE_URL="https://langfuse.apify.dev"
 
 # 2. Build the MCP server
 pnpm run build
@@ -24,33 +28,16 @@ pnpm run build
 pnpm run evals:workflow
 ```
 
-**Common options:**
-```bash
-# Filter by category
-pnpm run evals:workflow -- --category search
-
-# Run specific test
-pnpm run evals:workflow -- --id search-google-maps
-
-# Filter by line range in test_cases.json
-pnpm run evals:workflow -- --lines 277-283
-
-# Show detailed conversation logs
-pnpm run evals:workflow -- --verbose
-
-# Increase timeout for long-running Actors (default: 60s)
-pnpm run evals:workflow -- --tool-timeout 300
-
-# Run tests in parallel (default: 4)
-pnpm run evals:workflow -- --concurrency 8
-
-# Save results to JSON file
-pnpm run evals:workflow -- --output
-```
+Run `pnpm run evals:workflow -- --help` for the full option list. `--category` and `--id` narrow the run, `--concurrency` defaults to 4 (each item spawns its own MCP server, so higher values use more resources), and `--tool-timeout` defaults to 60s; raise it for Actor calls that scrape a lot of data.
 
 **Exit codes:**
-- `0` = All tests passed ✅
-- `1` = Any test failed or error occurred ❌
+- `0` = every requested test ran and passed ✅
+- `1` = any test failed, any test never ran, or setup failed ❌
+
+**Sync the dataset only** (no evaluation, no build, no Apify/OpenRouter keys). Use this to seed a fresh Langfuse instance:
+```bash
+pnpm run evals:workflow:sync-dataset
+```
 
 ---
 
@@ -69,7 +56,20 @@ Tests AI agents executing tasks using Apify MCP server tools through multi-turn 
 
 ## Critical Design Decisions
 
-### 1. MCP Server Isolation Per Test
+### 1. The dataset item is the source of truth
+
+**Decision:** Every run upserts `test_cases.json` into the Langfuse dataset first, then executes the matching dataset items.
+
+**Why:**
+- `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when it is given real dataset items
+- One source of truth means no id-matching contract to maintain between a local file and a remote dataset
+- Editing an item in the Langfuse UI changes the next run, because nothing the run needs is duplicated elsewhere
+
+An item's `input.query` is the agent prompt, `expectedOutput` is what the judge scores against, and `metadata` carries the harness knobs (`category`, `maxTurns`, `tools`, `failTools`).
+
+**Location:** `langfuse_dataset.ts`, `run_workflow_evals.ts`
+
+### 2. MCP Server Isolation Per Test
 
 **Decision:** Each test gets a fresh MCP server instance.
 
@@ -78,24 +78,11 @@ Tests AI agents executing tasks using Apify MCP server tools through multi-turn 
 - State from one test can contaminate subsequent tests
 - Each test must start with clean state
 
-**Implementation:**
-```typescript
-for (const test of tests) {
-    const mcpClient = new McpClient();
-    try {
-        await mcpClient.start(apifyToken);
-        // Run test
-    } finally {
-        await mcpClient.cleanup();  // Always cleanup
-    }
-}
-```
-
 **Trade-off:** ~20-30% slower (1-2s spawn overhead per test) but guarantees isolation.
 
-**Location:** `run-workflow-evals.ts`
+**Location:** `langfuse_experiment.ts`
 
-### 2. Dynamic Tool Fetching Per Turn
+### 3. Dynamic Tool Fetching Per Turn
 
 **Decision:** Refresh tools from MCP server after each conversation turn.
 
@@ -104,42 +91,23 @@ for (const test of tests) {
 - a restored pre-cutover session may still have `add-actor` loaded and register new Actor tools mid-conversation (`add-actor` itself is no longer selectable for new sessions)
 - LLM must see updated tool list to use new tools
 
-**Implementation:**
-```typescript
-while (turnNumber < maxTurns) {
-    // Call LLM with current tools
-    const llmResponse = await llmClient.callLlm(messages, model, tools);
-
-    // Execute tool calls
-    for (const toolCall of llmResponse.toolCalls) {
-        await mcpClient.callTool(toolCall);
-    }
-
-    // Refresh tools for next turn
-    tools = mcpToolsToOpenAiTools(mcpClient.getTools());
-}
-```
-
 **Trade-off:** ~10-15% slower (100-200ms per turn) but supports dynamic workflows.
 
-**Location:** `conversation-executor.ts`
+**Location:** `conversation_executor.ts`
 
-### 3. Strict Pass/Fail (No Threshold)
+### 4. Strict Pass/Fail Gated On The Requested Count
 
-**Decision:** ALL tests must pass for exit code 0. Any failure = exit code 1.
+**Decision:** Exit code 0 only when every requested item ran and scored `workflow_judge === 1`.
 
 **Why:**
-- Clear CI/CD signal
-- No ambiguity about which tests are critical
-- Quality bar: all functionality must work
+- Clear CI/CD signal, no ambiguity about which tests are critical
+- The item count matters as much as the scores: the Langfuse SDK drops an item whose task throws, so gating on the results it returns would report `7/7 passed` on a run where three tests never executed
 
-**Exit codes:**
-- `0`: ALL tests passed
-- `1`: ANY test failed or error occurred
+Harness failures (MCP spawn, OpenRouter, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
 
-**Location:** `run-workflow-evals.ts`
+**Location:** `langfuse_experiment.ts` (`buildRunSummary`)
 
-### 4. Judge Sees Tool Calls, Not Results
+### 5. Judge Sees Tool Calls, Not Results
 
 **Decision:** Judge sees tool calls with arguments and agent responses, but NOT raw tool results.
 
@@ -155,9 +123,9 @@ AGENT: [Called tool: search-actors with args: {"keywords":"google maps","limit":
 AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 ```
 
-**Location:** `workflow-judge.ts`
+**Location:** `workflow_judge.ts`
 
-### 5. LLM Client Shared, MCP Client Isolated
+### 6. LLM Client Shared, MCP Client Isolated
 
 **Decision:** One LLM client shared across tests, MCP client isolated per test.
 
@@ -166,9 +134,9 @@ AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 - No cross-test contamination risk
 - Saves initialization overhead
 
-**Location:** `run-workflow-evals.ts`
+**Location:** `run_workflow_evals.ts`
 
-### 6. Agent vs Judge Models
+### 7. Agent vs Judge Models
 
 **Agent:** `anthropic/claude-haiku-4.5` (fast, good at tools)<br>
 **Judge:** `deepseek/deepseek-v4-flash` (strong reasoning)
@@ -177,7 +145,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 **Location:** `config.ts`
 
-### 7. MCP Server Instructions in System Prompt
+### 8. MCP Server Instructions in System Prompt
 
 **Decision:** Automatically append MCP server instructions to agent system prompt.
 
@@ -187,28 +155,13 @@ Separation allows independent optimization for speed vs evaluation quality.
 - Agents perform better when they understand tool relationships (e.g., `call-actor` requires two steps)
 - Avoids duplicating server instructions in our agent prompt
 
-**Implementation:**
-```typescript
-// Retrieve instructions after connecting to MCP server
-await mcpClient.start(apifyToken);
-const serverInstructions = mcpClient.getInstructions();
-
-// Append to agent system prompt
-const conversation = await executeConversation({
-    userPrompt: testCase.query,
-    mcpClient,
-    llmClient,
-    serverInstructions, // Automatically appended to system prompt
-});
-```
-
 **Instructions content:**
 - Actor concepts and execution workflow
 - Tool dependencies (e.g., `call-actor` two-step process)
 - Tool disambiguation (e.g., `search-actors` vs `apify/rag-web-browser`)
 - Storage types (datasets vs key-value stores)
 
-**Location:** `mcp-client.ts`, `conversation-executor.ts`
+**Location:** `mcp_client.ts`, `conversation_executor.ts`
 
 ## System Components
 
@@ -216,14 +169,16 @@ const conversation = await executeConversation({
 
 - `types.ts` - Type definitions
 - `config.ts` - Models, prompts, constants
-- `mcp-client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions)
-- `llm-client.ts` - OpenRouter wrapper
-- `convert-mcp-tools.ts` - MCP → OpenAI tool format
-- `conversation-executor.ts` - Multi-turn loop with dynamic tools and server instructions
-- `workflow-judge.ts` - Judge evaluation
-- `test-cases-loader.ts` - Load/filter test cases
-- `output-formatter.ts` - Results formatting
-- `run-workflow-evals.ts` - Main CLI entry
+- `mcp_client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions)
+- `llm_client.ts` - OpenRouter wrapper; records each call as a Langfuse generation with usage and cost
+- `conversation_executor.ts` - Multi-turn loop with dynamic tools and server instructions
+- `workflow_judge.ts` - Judge evaluation
+- `test_cases_loader.ts` - Load and validate test cases
+- `langfuse_tracing.ts` - Env validation, Langfuse client, OpenTelemetry span processor init/shutdown
+- `langfuse_dataset.ts` - Dataset item mapping and validation, dataset name resolution, upsert
+- `langfuse_experiment.ts` - Experiment task, evaluators, run summary and exit gate
+- `run_workflow_evals.ts` - Main CLI entry
+- `sync_dataset.ts` - Dataset-only CLI entry (`pnpm run evals:workflow:sync-dataset`)
 
 ## Configuration
 
@@ -232,250 +187,64 @@ const conversation = await executeConversation({
 ```bash
 export APIFY_TOKEN="your_apify_token"           # Get from https://console.apify.com/account/integrations
 export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai/keys
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."          # Langfuse project settings
+export LANGFUSE_SECRET_KEY="sk-lf-..."          # Langfuse project settings
+export LANGFUSE_BASE_URL="https://langfuse.apify.dev"  # self-hosted instance
 ```
 
-### CLI Options
+Both entry points fail fast (before any test runs) listing every missing variable at once, and sanitize these values in place first, because the Langfuse SDK reads `process.env` directly and a secret with a trailing newline dies inside `node:http` instead. They can also be set in a `.env` file at the repo root.
 
-| Option | Alias | Description | Default |
-|--------|-------|-------------|---------|
-| `--category <name>` | | Filter tests by category | All categories |
-| `--id <id>` | | Run specific test by ID | All tests |
-| `--lines <range>` | `-l` | Filter by line range in test-cases.json | All tests |
-| `--verbose` | | Show detailed conversation logs | `false` |
-| `--test-cases-path <path>` | | Custom test cases file path | `test_cases.json` |
-| `--agent-model <model>` | | Override agent model | `anthropic/claude-haiku-4.5` |
-| `--judge-model <model>` | | Override judge model | `deepseek/deepseek-v4-flash` |
-| `--tool-timeout <seconds>` | | Tool call timeout | `60` |
-| `--concurrency <number>` | `-c` | Number of tests to run in parallel | `4` |
-| `--output` | `-o` | Save results to JSON file | `false` |
-| `--baseline <path>` | | Results JSON to compare against (prints byte/token deltas) | `results.json` |
-| `--help` | | Show help message | - |
+### Results in Langfuse
 
-### Line Range Filtering
+Results are recorded in Langfuse, not to a local file. Each run:
 
-The `--lines` (or `-l`) option filters test cases by their line numbers in the `test_cases.json` file.
+- **Syncs the dataset** `workflow-evals`: every test case in `test_cases.json` is upserted by `id`, so the dataset stays complete regardless of `--id`/`--category` filters. A `--test-cases-path` pointing at any file other than the canonical `test_cases.json` syncs into its own dataset (`workflow-evals-<filename>-<path-hash>`), with item ids namespaced as `<dataset>:<test-case-id>`, so a scratch file cannot overwrite the inputs of runs already recorded against the shared one. Item ids are unique per Langfuse project and cannot be reused across datasets, hence the namespacing; the path hash keeps same-named files in different directories apart.
+- **Runs an experiment** over the matching dataset items, run name `<git-branch>-<agent-model>-<timestamp>`, with run metadata `{ agentModel, judgeModel, toolTimeout }`. Because it runs on dataset items, it is recorded as a Langfuse **dataset run** and the console prints its direct URL.
+- **Traces** every item's agent/judge LLM calls (as a `generation` observation) and each MCP tool call (as a `tool` observation with its arguments and result) nested under the item's trace. Each generation carries the cost OpenRouter reports for that call (`usage: { include: true }`), because Langfuse's own price table is keyed by canonical model names and has no entry for OpenRouter's (`anthropic/claude-haiku-4.5`, `deepseek/deepseek-v4-flash`), which left every run at cost 0.
+- **Scores** each item with three evaluators:
+  - `workflow_judge`: `1` if the judge verdict is PASS, else `0` (comment = judge reason). This is the strict gate.
+  - `total_tokens`: agent LLM tokens billed across the conversation. Omitted entirely when the provider reported no usage, so an unmeasured run cannot look like a free one.
+  - `result_bytes`: UTF-8 bytes of tool results returned to the agent.
+- **Scores the run** with `pass_rate`: passing items over the number of items requested, so runs are comparable across branches and models even when items were dropped.
 
-**Format options:**
-- **Single line:** `--lines 100` (includes tests that contain line 100)
-- **Range:** `--lines 10-20` (includes tests that overlap with lines 10-20)
-- **Multiple ranges:** `--lines 10-20,50-60,100` (comma-separated, includes tests that overlap with any range)
+The console prints only failures, the `passed/requested` count, and the run link; per-item detail is in Langfuse.
 
-**Overlap logic (inclusive):**
-- A test case is included if it overlaps with ANY specified range
-- Example: `--lines 277-283` includes tests that start before line 283 AND end after line 277
-
-**Combine with other filters (AND logic):**
-```bash
-# Line range + category
-pnpm run evals:workflow -- --lines 100-200 --category call
-
-# Line range + ID pattern
-pnpm run evals:workflow -- --lines 50-100 --id "search.*"
-
-# All three filters
-pnpm run evals:workflow -- --lines 277-283 --category mcp --verbose
-```
-
-**Error handling:**
-- Invalid format (e.g., `abc-def`) → Error with usage examples
-- Invalid range (e.g., `300-200`) → Error: start must be ≤ end
-- Out of bounds (e.g., `500-600` when file has 319 lines) → Error with line count
-
-**Use cases:**
-- Debug specific test cases by examining their location in the JSON file
-- Run tests added in a specific PR by targeting the affected line ranges
-- Quickly iterate on a subset of tests during development
-
-**Examples:**
-```bash
-# Single test at specific line
-pnpm run evals:workflow -- --lines 283
-
-# Range of tests
-pnpm run evals:workflow -- --lines 277-283
-
-# Multiple ranges
-pnpm run evals:workflow -- --lines 10-20,50-60,100-110
-
-# With verbose output for debugging
-pnpm run evals:workflow -- --lines 277-283 --verbose
-```
+Compare tokens/bytes across runs (branches, models) directly in the Langfuse experiment view.
 
 ### Concurrency
 
-The `--concurrency` (or `-c`) option controls how many tests run in parallel.
-
-**Concurrency recommendations:**
-- **Default (4)**: Balanced performance for most systems
-- **8-12**: High-performance systems with good network bandwidth
-- **1**: Debug mode, run tests sequentially
-- **Higher values**: May hit API rate limits or resource constraints
-
-**Example:**
-```bash
-# Run 8 tests in parallel
-pnpm run evals:workflow -- --concurrency 8
-pnpm run evals:workflow -- -c 8
-```
-
-**Note:** Each test spawns its own MCP server instance, so higher concurrency uses more system resources.
-
-### Tool Timeout
-
-The `--tool-timeout` option sets the maximum time (in seconds) to wait for a single tool call to complete.
-
-**When a tool times out:**
-- Error returned: `"MCP error -32001: Request timed out"`
-- The LLM receives this error and can decide how to proceed
-
-**Timeout recommendations:**
-- **Default (60s)**: Suitable for most tools (search, fetch details)
-- **300s (5 min)**: For Actor calls that scrape moderate amounts of data
-- **600s (10 min)**: For large-scale scraping operations
-- **1s (testing)**: Use for testing timeout behavior
-
-**Example:**
-```bash
-# Long-running Actor calls
-pnpm run evals:workflow -- --tool-timeout 300
-```
-
-### Saving Results to File
-
-The `--output` (or `-o`) option saves test results to `evals/workflows/results.json` for tracking over time.
-
-**How it works:**
-- Results are stored per combination of: `agentModel:judgeModel:testId`
-- Running the same test with the same models **overwrites** the previous result
-- Running with different model combinations **adds** new entries
-- Results are **versioned in git** for historical tracking
-
-**Data structure:**
-```json
-{
-  "version": "1.0",
-  "results": {
-    "anthropic/claude-haiku-4.5:x-ai/grok-4.1-fast:search-google-maps": {
-      "timestamp": "2026-01-07T10:45:23.123Z",
-      "agentModel": "anthropic/claude-haiku-4.5",
-      "judgeModel": "x-ai/grok-4.1-fast",
-      "testId": "search-google-maps",
-      "verdict": "PASS",
-      "reason": "Agent successfully searched for Google Maps actors",
-      "durationMs": 5234,
-      "turns": 3,
-      "resultBytes": 18452,
-      "promptTokens": 6231,
-      "completionTokens": 412,
-      "totalTokens": 6643,
-      "error": null
-    }
-  }
-}
-```
-
-**Each result contains:**
-- `timestamp` - ISO timestamp when test was run
-- `agentModel` - LLM model used for the agent
-- `judgeModel` - LLM model used for judging
-- `testId` - Test case identifier
-- `verdict` - `PASS` or `FAIL`
-- `reason` - Judge reasoning or error message
-- `durationMs` - Test duration in milliseconds
-- `turns` - Number of conversation turns
-- `resultBytes` - Total UTF-8 bytes of tool results returned to the agent across the conversation (measured at the point each result is fed to the LLM, so it reflects what the agent actually receives). Compare across branches to quantify byte savings.
-- `promptTokens` / `completionTokens` / `totalTokens` - Tokens billed across all agent LLM calls (summed over turns; judge calls excluded). Tokens — not bytes — are what fill the context window, so this is the primary cost signal. Bytes are a deterministic, tokenizer-free proxy.
-- `error` - Error message if execution failed, `null` otherwise
-
-**Examples:**
-```bash
-# Basic usage - save all test results
-pnpm run evals:workflow -- --output
-pnpm run evals:workflow -- -o
-
-# Save results for specific category
-pnpm run evals:workflow -- --category search --output
-
-# Compare different agent models
-pnpm run evals:workflow -- --agent-model anthropic/claude-haiku-4.5 --output
-pnpm run evals:workflow -- --agent-model openai/gpt-4o --output
-# Results file now contains entries for both models
-
-# Compare different judge models
-pnpm run evals:workflow -- --judge-model x-ai/grok-4.1-fast --output
-pnpm run evals:workflow -- --judge-model openai/gpt-4o --output
-```
-
-**Partial runs:**
-When using filters (`--category`, `--id`), only the filtered tests are updated in the results file. Other entries remain unchanged.
-
-**Version control:**
-The `results.json` file is tracked in git, allowing you to:
-- See result changes over time in commits
-- Compare results across branches
-- Track performance regressions in PRs
-
-### Comparing against a baseline (byte/token deltas)
-
-Every run automatically compares against a baseline and prints per-test and aggregate **deltas** for tool bytes and tokens — no manual file diffing. This is how you answer "did this change grow the response size?".
-
-- **Default baseline** is the committed `evals/workflows/results.json`. Each test is matched by its `agentModel:judgeModel:testId` key.
-- **Custom baseline:** `--baseline <path>` compares against any saved results file.
-- Deltas read as `▼ -2.1 KB / -10.2%` (reduction) or `▲ +900 / +3.4%` (increase). Lower is better for both metrics.
-- This is **reporting only** — a regression never fails the run. Task success (all tests PASS) is the hard gate.
-
-```bash
-# Compare the current code against the committed baseline (default)
-pnpm run evals:workflow
-
-# Compare against a saved baseline file
-cp evals/workflows/results.json /tmp/baseline.json
-pnpm run evals:workflow -- --baseline /tmp/baseline.json   # prints byte/token deltas vs the baseline
-```
-
-> **Bootstrap note:** records written before these metrics existed have no `resultBytes`/`*Tokens` fields, so the first run after this change shows `(no baseline)` for them and writes fresh values with `--output`. Subsequent runs show real deltas.
+`--concurrency` maps to the SDK's `maxConcurrency`, which runs **sequential batches** of that size rather than a rolling window: one slow test stalls the rest of its batch.
 
 ### Test Case Format
 
-File: `test-cases.json`
+File: `test_cases.json`
 
 ```json
-[
-  {
-    "id": "test-001",
-    "category": "basic",
-    "prompt": "User prompt for agent",
-    "requirements": "What agent must do to pass",
-    "maxTurns": 10,
-    "tools": ["actors", "docs"]
-  }
-]
+{
+  "version": "1.0",
+  "testCases": [
+    {
+      "id": "test-001",
+      "category": "basic",
+      "query": "User prompt for agent",
+      "reference": "What agent must do to pass",
+      "maxTurns": 10,
+      "tools": ["actors", "docs"]
+    }
+  ]
+}
 ```
 
 **Required fields:**
 - `id` - Unique identifier
 - `category` - For filtering
-- `prompt` - User request
-- `requirements` - Success criteria for judge
+- `query` - User request
+- `reference` - Success criteria for judge
 
 **Optional:**
 - `maxTurns` - Override default (10)
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
 - `failTools` - Tool names the harness force-fails with a synthetic `INTERNAL_ERROR` result carrying the real `report-problem` nudge, instead of calling the server (e.g. `["call-actor"]`). Use it to deterministically throw a nudge-eligible error that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after a failure. See `mcp_client.ts`.
-
-## Performance
-
-**Per test overhead:**
-- MCP spawn: ~1-2s
-- Tool refresh/turn: ~100-200ms
-- LLM call/turn: ~1-5s
-- Judge evaluation: ~2-4s
-
-**5 tests (2-3 turns each):** ~45s total
-
-**vs shared MCP (previous):** ~37s (18% faster but unsafe)
-
-Trade-off: Slower execution for correctness and isolation is acceptable.
 
 ## Key Insights
 
@@ -540,33 +309,6 @@ Format must be exact for LLM context understanding.
 - Check tool results are helpful
 - Reduce `maxTurns` to fail faster
 - Try different LLM model
-
-## Future Enhancements
-
-### Possible bug with MCP server Actors
-
-**Issue:** The workflow test run sometimes hangs and I just discovered there were two running MCP server Actors and once I killed them the test run finished instantly. So maybe the client is waiting for the Actors to finish?
-
-### Three-LLM Conversational Approach
-
-**Concept:** More realistic simulation of MCP usage through chat interface.
-
-**Architecture:**
-1. **User LLM** - Given a goal, prompts the MCP Server LLM to accomplish tasks
-2. **MCP Server LLM** - Receives prompts from User LLM, uses MCP tools to fulfill requests
-3. **Judge LLM** - Evaluates the entire conversation for correctness
-
-**Benefits:**
-- Simulates real-world chat interface usage pattern
-- Tests natural language interaction between user and MCP-enabled assistant
-- More realistic conversation flow with back-and-forth dialogue
-- Better evaluation of how users would actually interact with MCP tools
-
-**Current approach vs Future:**
-- **Current:** Single LLM directly given task → uses tools → judge evaluates
-- **Future:** User LLM with goal → prompts Server LLM → Server LLM uses tools → judge evaluates
-
-**Status:** Current two-LLM approach (agent + judge) is sufficient for validating tool functionality and basic workflows. The three-LLM approach would be valuable for testing conversational UX and more complex multi-turn interactions.
 
 ## References
 

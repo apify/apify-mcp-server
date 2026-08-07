@@ -3,13 +3,21 @@
  * Phase 3: Added support for tool calling
  */
 
+import { startActiveObservation } from '@langfuse/tracing';
 import OpenAI from 'openai';
 // eslint-disable-next-line import/extensions
-import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
+import type {
+    ChatCompletionCreateParamsNonStreaming,
+    ChatCompletionMessageParam,
+    ChatCompletionTool,
+} from 'openai/resources/chat/completions';
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
 import { OPENROUTER_CONFIG } from './config.js';
+
+/** Low temperature for deterministic evaluation results. */
+const TEMPERATURE = 0.15;
 
 /**
  * Token usage reported by the LLM API for a single call
@@ -19,6 +27,12 @@ export type LlmUsage = {
     completionTokens: number;
     totalTokens: number;
 };
+
+/**
+ * OpenRouter's usage-accounting extension: with `usage: { include: true }` in the
+ * request, the usage payload carries what the call actually cost, in USD.
+ */
+type OpenRouterUsage = OpenAI.CompletionUsage & { cost?: number };
 
 /**
  * Response from LLM - either text or tool calls
@@ -57,6 +71,9 @@ export class LlmClient {
      * Call LLM with messages and optional tools
      * Phase 3: Added tools parameter
      * Phase 4: Added responseFormat for structured outputs
+     *
+     * Each call is recorded as a Langfuse generation. No-ops when tracing is not
+     * initialized (OTel returns a no-op tracer).
      */
     async callLlm(
         messages: ChatCompletionMessageParam[],
@@ -64,51 +81,80 @@ export class LlmClient {
         tools?: ChatCompletionTool[],
         responseFormat?: ResponseFormatJSONSchema,
     ): Promise<LlmResponse> {
-        const response = await this.openai.chat.completions.create({
-            model,
-            messages,
-            temperature: 0.15, // Low temperature for deterministic evaluation results
-            ...(tools && tools.length > 0 ? { tools } : {}),
-            ...(responseFormat ? { response_format: responseFormat } : {}),
-        });
+        return startActiveObservation(
+            'OpenAI.chat',
+            async (generation) => {
+                generation.update({ model, input: messages, modelParameters: { temperature: TEMPERATURE } });
 
-        const message = response.choices[0]?.message;
+                const response = await this.openai.chat.completions.create({
+                    model,
+                    messages,
+                    temperature: TEMPERATURE,
+                    // OpenRouter extension, not in the OpenAI types: report what the call cost.
+                    usage: { include: true },
+                    ...(tools && tools.length > 0 ? { tools } : {}),
+                    ...(responseFormat ? { response_format: responseFormat } : {}),
+                } as ChatCompletionCreateParamsNonStreaming);
 
-        if (!message) {
-            throw new Error('LLM returned no message');
-        }
+                const message = response.choices[0]?.message;
 
-        const usage: LlmUsage | undefined = response.usage
-            ? {
-                  promptTokens: response.usage.prompt_tokens,
-                  completionTokens: response.usage.completion_tokens,
-                  totalTokens: response.usage.total_tokens,
-              }
-            : undefined;
+                if (!message) {
+                    throw new Error('LLM returned no message');
+                }
 
-        // Check if LLM wants to call tools
-        if (message.tool_calls && message.tool_calls.length > 0) {
-            return {
-                content: message.content,
-                toolCalls: message.tool_calls.map((tc) => {
-                    // Handle both function and custom tool calls
-                    if (tc.type === 'function') {
-                        return {
-                            id: tc.id,
-                            name: tc.function.name,
-                            arguments: tc.function.arguments,
-                        };
-                    }
-                    throw new Error(`Unsupported tool call type: ${tc.type}`);
-                }),
-                usage,
-            };
-        }
+                const rawUsage = response.usage as OpenRouterUsage | undefined;
+                const usage: LlmUsage | undefined = rawUsage
+                    ? {
+                          promptTokens: rawUsage.prompt_tokens,
+                          completionTokens: rawUsage.completion_tokens,
+                          totalTokens: rawUsage.total_tokens,
+                      }
+                    : undefined;
 
-        // Regular text response
-        return {
-            content: message.content || null,
-            usage,
-        };
+                // Cost comes from the provider, not from Langfuse's price table: the table
+                // is keyed by canonical model names and has no entry for OpenRouter's, so
+                // matching it would mean maintaining a price per model we ever evaluate.
+                generation.update({
+                    output: message,
+                    model: response.model,
+                    ...(usage
+                        ? {
+                              usageDetails: {
+                                  input: usage.promptTokens,
+                                  output: usage.completionTokens,
+                                  total: usage.totalTokens,
+                              },
+                          }
+                        : {}),
+                    ...(rawUsage?.cost === undefined ? {} : { costDetails: { total: rawUsage.cost } }),
+                });
+
+                // Check if LLM wants to call tools
+                if (message.tool_calls && message.tool_calls.length > 0) {
+                    return {
+                        content: message.content,
+                        toolCalls: message.tool_calls.map((tc) => {
+                            // Handle both function and custom tool calls
+                            if (tc.type === 'function') {
+                                return {
+                                    id: tc.id,
+                                    name: tc.function.name,
+                                    arguments: tc.function.arguments,
+                                };
+                            }
+                            throw new Error(`Unsupported tool call type: ${tc.type}`);
+                        }),
+                        usage,
+                    };
+                }
+
+                // Regular text response
+                return {
+                    content: message.content || null,
+                    usage,
+                };
+            },
+            { asType: 'generation' },
+        );
     }
 }
