@@ -106,7 +106,10 @@ export type WorkflowTaskOptions = {
  *
  * Harness errors (MCP spawn, OpenRouter, judge) are left to throw. The SDK logs
  * them and drops the item, and `buildRunSummary` fails the run on the shortfall,
- * so a broken harness no longer masquerades as a failing eval.
+ * so a broken harness no longer masquerades as a failing eval. They are rethrown
+ * prefixed with the item id first: the SDK's own log line carries none, and at
+ * concurrency 4 the operator otherwise gets interleaved anonymous errors that
+ * cannot be paired with the "Never completed" list.
  */
 export function makeTask(options: WorkflowTaskOptions) {
     const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout } = options;
@@ -129,6 +132,10 @@ export function makeTask(options: WorkflowTaskOptions) {
 
             const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
             return { id: item.id, conversation, judgeResult };
+        } catch (error) {
+            throw new Error(`Item "${item.id}": ${error instanceof Error ? error.message : String(error)}`, {
+                cause: error,
+            });
         } finally {
             // cleanup() races a 2s close then SIGKILLs, but it can still reject, and a
             // rejection here would replace the item's real result. Log and move on.

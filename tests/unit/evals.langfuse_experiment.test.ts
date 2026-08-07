@@ -1,7 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { buildRunSummary, evaluators, type WorkflowTaskOutput } from '../../evals/workflows/langfuse_experiment.js';
+import {
+    buildRunSummary,
+    evaluators,
+    makeTask,
+    type WorkflowTaskOutput,
+} from '../../evals/workflows/langfuse_experiment.js';
+import type { LlmClient } from '../../evals/workflows/llm_client.js';
 import type { ConversationHistory } from '../../evals/workflows/types.js';
+
+// The task builds its own McpClient, which would otherwise spawn the real server.
+vi.mock('../../evals/workflows/mcp_client.js', () => ({
+    McpClient: class {
+        async start(): Promise<void> {
+            throw new Error('spawn ENOENT');
+        }
+
+        async cleanup(): Promise<void> {}
+    },
+}));
 
 function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOutput {
     const conversation: ConversationHistory = {
@@ -59,6 +76,22 @@ describe('evaluators', () => {
 
     it('sums tool-result bytes across all turns, treating missing sizes as 0', async () => {
         expect(await evaluators[2]({ output: makeOutput() })).toEqual({ name: 'result_bytes', value: 125 });
+    });
+});
+
+describe('makeTask()', () => {
+    it('names the item in a harness error, which the SDK log line omits', async () => {
+        const task = makeTask({
+            llmClient: {} as LlmClient,
+            apifyToken: 'token',
+            agentModel: 'agent',
+            judgeModel: 'judge',
+            toolTimeout: 1,
+        });
+
+        await expect(
+            task({ id: 'search-001', input: { query: 'q' }, expectedOutput: 'r', metadata: { category: 'search' } }),
+        ).rejects.toThrow('Item "search-001": spawn ENOENT');
     });
 });
 
