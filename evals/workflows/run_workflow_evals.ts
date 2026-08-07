@@ -4,9 +4,10 @@
 /**
  * Main CLI entry point for workflow evaluations (Langfuse backend).
  *
- * Runs each test case as a Langfuse experiment item: a fresh MCP client, a
+ * Every run syncs test_cases.json into the Langfuse dataset and executes the
+ * matching dataset items as an experiment: a fresh MCP client per item, a
  * multi-turn agent conversation, then an LLM judge. Traces, scores, and the
- * dataset live in Langfuse Cloud.
+ * dataset live in Langfuse.
  *
  * Usage:
  *   pnpm run evals:workflow
@@ -15,25 +16,21 @@
  *   pnpm run evals:workflow -- --concurrency 8
  */
 
+// Must be the first import: config modules read process.env at load time.
+import 'dotenv/config';
+
 import { execSync } from 'node:child_process';
 
-import { LangfuseClient } from '@langfuse/client';
 import { observeOpenAI } from '@langfuse/openai';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
-import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config.js';
-import { selectDatasetItems, syncDataset, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
-import {
-    buildRunName,
-    evaluators,
-    makeTask,
-    type WorkflowItemMetadata,
-    type WorkflowTaskOutput,
-} from './langfuse_experiment.js';
-import { getMissingLangfuseEnvVars, initTracing, LANGFUSE_BASE_URLS, shutdownTracing } from './langfuse_tracing.js';
+import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS } from './config.js';
+import { parseWorkflowItem, resolveDatasetName, syncDataset } from './langfuse_dataset.js';
+import { buildRunSummary, evaluators, makeTask } from './langfuse_experiment.js';
+import { createLangfuseClient, initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
-import { filterTestCases, loadTestCases } from './test_cases_loader.js';
+import { loadTestCases } from './test_cases_loader.js';
 
 type CliArgs = {
     category?: string;
@@ -55,131 +52,58 @@ function getGitBranch(): string {
 }
 
 async function main() {
+    // yargs infers the kebab-case key, not the camelCase alias, hence the cast.
     const argv = (await yargs(hideBin(process.argv))
-        .option('category', {
-            type: 'string',
-            description: 'Filter by test case category',
-        })
-        .option('id', {
-            type: 'string',
-            description: 'Run specific test case by ID',
-        })
-        .option('test-cases-path', {
-            type: 'string',
-            description: 'Path to test cases JSON file',
-        })
-        .option('agent-model', {
-            type: 'string',
-            description: `LLM model for the agent (default: ${MODELS.agent})`,
-            default: MODELS.agent,
-        })
-        .option('judge-model', {
-            type: 'string',
-            description: `LLM model for the judge (default: ${MODELS.judge})`,
-            default: MODELS.judge,
-        })
-        .option('tool-timeout', {
-            type: 'number',
-            description: `Tool call timeout in seconds (default: ${DEFAULT_TOOL_TIMEOUT_SECONDS})`,
-            default: DEFAULT_TOOL_TIMEOUT_SECONDS,
-        })
-        .option('concurrency', {
-            alias: 'c',
-            type: 'number',
-            description: 'Number of items to run in parallel (default: 4)',
-            default: 4,
+        .options({
+            category: { type: 'string', description: 'Filter by test case category (supports * wildcard)' },
+            id: { type: 'string', description: 'Run test cases whose ID matches this regex' },
+            'test-cases-path': { type: 'string', description: 'Path to test cases JSON file (own dataset)' },
+            'agent-model': { type: 'string', description: 'LLM model for the agent', default: MODELS.agent },
+            'judge-model': { type: 'string', description: 'LLM model for the judge', default: MODELS.judge },
+            'tool-timeout': {
+                type: 'number',
+                description: 'Tool call timeout in seconds',
+                default: DEFAULT_TOOL_TIMEOUT_SECONDS,
+            },
+            concurrency: { alias: 'c', type: 'number', description: 'Items to run in parallel', default: 4 },
         })
         .help().argv) as CliArgs;
 
-    console.log('='.repeat(100));
-    console.log('Workflow Evaluation Runner (Langfuse)');
-    console.log('='.repeat(100));
-    console.log();
-
-    // Environment variables.
-    const apifyToken = sanitizeEnvValue(process.env.APIFY_TOKEN);
-    const openrouterKey = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
-
-    if (!apifyToken) {
-        console.error('❌ Error: APIFY_TOKEN environment variable is required');
-        process.exit(1);
-    }
-
-    if (!openrouterKey) {
-        console.error('❌ Error: OPENROUTER_API_KEY environment variable is required');
-        process.exit(1);
-    }
-
-    const missingLangfuse = getMissingLangfuseEnvVars();
-    if (missingLangfuse.length > 0) {
-        console.error(`❌ Error: missing Langfuse environment variable(s): ${missingLangfuse.join(', ')}`);
-        console.error(
-            `   Set all of: ${['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 'LANGFUSE_BASE_URL'].join(', ')}`,
-        );
-        console.error(`   LANGFUSE_BASE_URL must be one of: ${LANGFUSE_BASE_URLS.join(' or ')}`);
-        process.exit(1);
-    }
-
-    // Load test cases.
-    console.log('📂 Loading test cases...');
-    let allTestCases;
-    try {
-        allTestCases = loadTestCases(argv.testCasesPath);
-    } catch (error) {
-        console.error(`❌ Failed to load test cases: ${error}`);
-        process.exit(1);
-    }
-
-    const filteredTestCases = filterTestCases(allTestCases, { id: argv.id, category: argv.category });
-
-    if (filteredTestCases.length === 0) {
-        console.log('⚠️  No test cases found matching the filters.');
-        console.log('');
-        console.log('Available test cases:');
-        for (const tc of allTestCases) {
-            console.log(`  - ${tc.id} (${tc.category}): ${tc.query}`);
-        }
-        process.exit(0);
-    }
-
-    console.log(`✅ Loaded ${filteredTestCases.length} of ${allTestCases.length} test case(s)`);
-    console.log();
-
-    // Start tracing and the Langfuse client.
-    initTracing();
-    const langfuse = new LangfuseClient();
+    const langfuse = createLangfuseClient(['APIFY_TOKEN', 'OPENROUTER_API_KEY']);
+    // Non-empty and sanitized: createLangfuseClient exits otherwise.
+    const apifyToken = process.env.APIFY_TOKEN as string;
+    const datasetName = resolveDatasetName(argv.testCasesPath);
 
     let exitCode = 1;
     try {
-        // Sync ALL test cases into the dataset (independent of run filters).
-        console.log(`📇 Syncing ${allTestCases.length} test case(s) into dataset "${WORKFLOW_DATASET_NAME}"...`);
-        await syncDataset(langfuse, allTestCases);
+        // The dataset items are the only source of truth for a run, so sync first and
+        // filter what comes back. Running on real dataset items is what makes the run
+        // a Langfuse dataset run, comparable with every other run.
+        const items = await syncDataset(langfuse, datasetName, loadTestCases(argv.testCasesPath));
 
-        // Run against the dataset items themselves, so the run is recorded as a
-        // Langfuse dataset run and is comparable with every other run.
-        const dataset = await langfuse.dataset.get(WORKFLOW_DATASET_NAME);
-        const { selected: data, missingIds } = selectDatasetItems(dataset.items, filteredTestCases);
-        if (missingIds.length > 0) {
-            console.warn(
-                `⚠️  Skipping ${missingIds.length} test case(s) missing from the dataset: ${missingIds.join(', ')}`,
+        const idRegex = argv.id ? new RegExp(argv.id) : undefined;
+        const categoryRegex = argv.category ? new RegExp(`^${argv.category.replace(/\*/g, '.*')}$`) : undefined;
+        const data = items.filter((rawItem) => {
+            const item = parseWorkflowItem(rawItem);
+            return (
+                (!idRegex || idRegex.test(item.id)) && (!categoryRegex || categoryRegex.test(item.metadata.category))
             );
-        }
+        });
         if (data.length === 0) {
-            throw new Error(
-                `No items to run — dataset "${WORKFLOW_DATASET_NAME}" has none of the filtered test cases.`,
-            );
+            throw new Error(`No test case in "${datasetName}" matches --id/--category`);
         }
-        console.log();
+        const requestedIds = data.map((item) => item.id);
+
+        initTracing();
 
         // Wrap the agent/judge LLM client so calls nest under each item's trace.
         const llmClient = new LlmClient((client) => observeOpenAI(client));
 
-        const runName = buildRunName(getGitBranch(), argv.agentModel, Date.now());
-        console.log(`▶️  Running experiment "${runName}" with concurrency ${argv.concurrency}...`);
-        console.log();
+        const runName = `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`;
+        console.log(`▶️  Running experiment "${runName}" over ${data.length} item(s), concurrency ${argv.concurrency}`);
 
         const result = await langfuse.experiment.run({
-            name: 'workflow-evals',
+            name: datasetName,
             runName,
             description: 'Multi-turn workflow evals for the Apify MCP server.',
             data,
@@ -191,6 +115,14 @@ async function main() {
                 toolTimeout: argv.toolTimeout,
             }),
             evaluators,
+            runEvaluators: [
+                // Denominator is the requested count, not itemResults.length, so items the
+                // SDK dropped pull the rate down instead of vanishing from it.
+                async ({ itemResults }) => ({
+                    name: 'pass_rate',
+                    value: buildRunSummary(requestedIds, itemResults).passedCount / requestedIds.length,
+                }),
+            ],
             maxConcurrency: argv.concurrency,
             metadata: {
                 agentModel: argv.agentModel,
@@ -199,34 +131,22 @@ async function main() {
             },
         });
 
-        // Compact pass/fail table.
-        console.log('='.repeat(100));
-        console.log('Results');
-        console.log('='.repeat(100));
-
-        let passed = 0;
-        for (const item of result.itemResults) {
-            const output = item.output as WorkflowTaskOutput;
-            const judge = item.evaluations.find((e) => e.name === 'workflow_judge');
-            const isPass = judge?.value === 1;
-            if (isPass) passed += 1;
-
-            const id = (item.item.metadata as WorkflowItemMetadata | undefined)?.testCase?.id ?? '(unknown)';
-            const status = output.error ? '🔥 ERROR' : isPass ? '✅ PASS' : '❌ FAIL';
-            const reason = output.error ?? output.judgeResult.reason;
-            console.log(`${status} | ${id} | ${reason}`);
+        // Compact on purpose: CI logs only need what went wrong, and Langfuse holds the
+        // full per-item view behind the run link below.
+        const summary = buildRunSummary(requestedIds, result.itemResults);
+        for (const failure of summary.failures) {
+            console.log(`❌ ${failure.id}: ${failure.reason}`);
+        }
+        if (summary.droppedIds.length > 0) {
+            console.error(`🔥 Never completed (task threw, see errors above): ${summary.droppedIds.join(', ')}`);
         }
 
-        const total = result.itemResults.length;
-        console.log('-'.repeat(100));
-        console.log(`📊 ${passed}/${total} passed`);
-        console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" — view in Langfuse Cloud`}`);
-        console.log('='.repeat(100));
+        console.log(`📊 ${summary.passedCount}/${requestedIds.length} passed`);
+        console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" (view in Langfuse)`}`);
 
-        // Strict gate: every item must have workflow_judge === 1 (errored items score 0).
-        exitCode = total > 0 && passed === total ? 0 : 1;
+        exitCode = summary.exitCode;
     } catch (error) {
-        console.error(`❌ Experiment failed: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`❌ Run failed: ${error instanceof Error ? error.message : String(error)}`);
         exitCode = 1;
     } finally {
         // Flush scores and spans before exit or the last batch is lost.

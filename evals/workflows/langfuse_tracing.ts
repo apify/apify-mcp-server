@@ -1,28 +1,38 @@
 /**
- * Langfuse OpenTelemetry tracing setup for workflow evaluations.
+ * Langfuse client and OpenTelemetry tracing setup for workflow evaluations.
  *
- * Spans are exported to Langfuse Cloud. Credentials are read from the
- * environment by the Langfuse SDK: LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY,
- * LANGFUSE_BASE_URL.
+ * Credentials are read from the environment by the Langfuse SDK itself:
+ * LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_BASE_URL.
  */
 
+import { LangfuseClient } from '@langfuse/client';
 import { LangfuseSpanProcessor } from '@langfuse/otel';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
-import { sanitizeEnvValue } from '../shared/config.js';
+import { sanitizeProcessEnv } from './config.js';
 
 /** Environment variables the Langfuse SDK reads to authenticate. */
-export const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 'LANGFUSE_BASE_URL'] as const;
-
-/** Valid values for LANGFUSE_BASE_URL, surfaced in the fail-fast message. */
-export const LANGFUSE_BASE_URLS = ['https://us.cloud.langfuse.com (US)', 'https://cloud.langfuse.com (EU)'] as const;
+const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 'LANGFUSE_BASE_URL'] as const;
 
 /**
- * Return the names of any required Langfuse env vars that are unset or empty
- * (after sanitizing). Pure — used both for the fail-fast check and in tests.
+ * Fail fast on missing configuration, then build the Langfuse client. Shared by
+ * both CLI entry points; `extraEnvKeys` are the caller's own requirements.
+ *
+ * Sanitizing happens here rather than at each read site because the SDK reads
+ * process.env directly: a CI secret with a trailing newline would otherwise pass
+ * this gate and then die inside node:http with ERR_INVALID_CHAR.
  */
-export function getMissingLangfuseEnvVars(env: NodeJS.ProcessEnv = process.env): string[] {
-    return LANGFUSE_ENV_VARS.filter((key) => !sanitizeEnvValue(env[key]));
+export function createLangfuseClient(extraEnvKeys: readonly string[] = []): LangfuseClient {
+    sanitizeProcessEnv();
+
+    const missing = [...LANGFUSE_ENV_VARS, ...extraEnvKeys].filter((key) => !process.env[key]);
+    if (missing.length > 0) {
+        // eslint-disable-next-line no-console
+        console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
+        process.exit(1);
+    }
+
+    return new LangfuseClient();
 }
 
 let sdk: NodeSDK | null = null;

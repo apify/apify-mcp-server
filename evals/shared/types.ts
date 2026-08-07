@@ -2,6 +2,8 @@
  * Shared type definitions for evaluation systems
  */
 
+import { z } from 'zod';
+
 /**
  * Base test case interface - common fields for all test types
  */
@@ -37,19 +39,32 @@ export type ToolSelectionTestCase = {
 /**
  * Test case for workflow evaluation (multi-turn agent conversations)
  * Used in: evals/workflows/
+ *
+ * Validated rather than cast because it is read from a JSON file and, once synced,
+ * from a Langfuse dataset item that can be edited outside this repo.
  */
-export type WorkflowTestCase = {
-    /** Maximum number of turns allowed (optional, defaults to config value) */
-    maxTurns?: number;
-    /** Tools to enable for this test (optional, e.g., ["actors", "docs", "apify/rag-web-browser"]) */
-    tools?: string[];
+export const WorkflowTestCaseValidator = z.object({
+    /** Unique test case ID */
+    id: z.string().min(1),
+    /** Category for grouping (e.g., "search-actors", "call-actor") */
+    category: z.string().min(1),
+    /** User query/prompt given to the agent */
+    query: z.string().min(1),
+    /** Requirements the judge scores the conversation against */
+    reference: z.string().min(1),
+    /** Maximum number of turns allowed (defaults to the config value) */
+    maxTurns: z.number().int().positive().optional(),
+    /** Tools to enable for this test (e.g., ["actors", "docs", "apify/rag-web-browser"]) */
+    tools: z.array(z.string()).optional(),
     /**
      * Tool names the harness force-fails with a synthetic INTERNAL_ERROR carrying the real
-     * report-problem nudge (optional). Lets an eval deterministically throw a nudge-eligible error
+     * report-problem nudge. Lets an eval deterministically throw a nudge-eligible error
      * that the live server + API cannot reproduce on demand. See mcp_client.ts.
      */
-    failTools?: string[];
-} & BaseTestCase;
+    failTools: z.array(z.string()).optional(),
+});
+
+export type WorkflowTestCase = z.infer<typeof WorkflowTestCaseValidator>;
 
 /**
  * Test data structure wrapping test cases with version

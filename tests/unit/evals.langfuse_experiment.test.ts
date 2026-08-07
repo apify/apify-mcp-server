@@ -1,137 +1,104 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-    buildRunName,
-    scoreJudge,
-    scoreResultBytes,
-    scoreTotalTokens,
-    shortModelName,
-    sumResultBytes,
-    type WorkflowTaskOutput,
-} from '../../evals/workflows/langfuse_experiment.js';
+import { buildRunSummary, evaluators, type WorkflowTaskOutput } from '../../evals/workflows/langfuse_experiment.js';
 import type { ConversationHistory } from '../../evals/workflows/types.js';
-
-function makeConversation(turns: ConversationHistory['turns']): ConversationHistory {
-    return {
-        userPrompt: 'test',
-        turns,
-        completed: true,
-        hitMaxTurns: false,
-        totalTurns: turns.length,
-    };
-}
 
 function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOutput {
     const conversation: ConversationHistory = {
         userPrompt: 'q',
-        turns: [{ turnNumber: 1, toolCalls: [], toolResults: [{ toolName: 't', success: true, resultBytes: 42 }] }],
+        turns: [
+            {
+                turnNumber: 1,
+                toolCalls: [],
+                toolResults: [
+                    { toolName: 'a', success: true, resultBytes: 100 },
+                    { toolName: 'b', success: true },
+                ],
+            },
+            { turnNumber: 2, toolCalls: [], toolResults: [{ toolName: 'c', success: true, resultBytes: 25 }] },
+        ],
         completed: true,
         hitMaxTurns: false,
-        totalTurns: 1,
+        totalTurns: 2,
         totalTokens: 1234,
     };
     return {
+        id: 'search-001',
         conversation,
         judgeResult: { verdict: 'PASS', reason: 'looks good', rawResponse: '' },
         ...overrides,
     };
 }
 
-describe('shortModelName()', () => {
-    it('returns the last path segment of a model id', () => {
-        expect(shortModelName('anthropic/claude-haiku-4.5')).toBe('claude-haiku-4.5');
-    });
+/** An item result as the SDK hands it to the run gate. */
+function makeScoredItem(output: WorkflowTaskOutput, judgeValue: number) {
+    return { output, evaluations: [{ name: 'workflow_judge', value: judgeValue }] };
+}
 
-    it('returns the id unchanged when there is no slash', () => {
-        expect(shortModelName('gpt-4o')).toBe('gpt-4o');
-    });
-});
-
-describe('buildRunName()', () => {
-    it('joins branch, short model name, and timestamp', () => {
-        expect(buildRunName('feat/langfuse-workflow-evals', 'anthropic/claude-haiku-4.5', 1234567890)).toBe(
-            'feat/langfuse-workflow-evals-claude-haiku-4.5-1234567890',
-        );
-    });
-});
-
-describe('sumResultBytes()', () => {
-    it('returns 0 for a conversation with no tool results', () => {
-        const conversation = makeConversation([{ turnNumber: 1, toolCalls: [], toolResults: [], finalResponse: 'hi' }]);
-        expect(sumResultBytes(conversation)).toBe(0);
-    });
-
-    it('sums resultBytes across all tool results in all turns', () => {
-        const conversation = makeConversation([
-            {
-                turnNumber: 1,
-                toolCalls: [],
-                toolResults: [
-                    { toolName: 'a', success: true, resultBytes: 100 },
-                    { toolName: 'b', success: true, resultBytes: 50 },
-                ],
-            },
-            {
-                turnNumber: 2,
-                toolCalls: [],
-                toolResults: [{ toolName: 'c', success: true, resultBytes: 25 }],
-            },
-        ]);
-        expect(sumResultBytes(conversation)).toBe(175);
-    });
-
-    it('treats missing resultBytes as 0', () => {
-        const conversation = makeConversation([
-            {
-                turnNumber: 1,
-                toolCalls: [],
-                toolResults: [
-                    { toolName: 'a', success: true },
-                    { toolName: 'b', success: true, resultBytes: 30 },
-                ],
-            },
-        ]);
-        expect(sumResultBytes(conversation)).toBe(30);
-    });
-});
-
-describe('scoreJudge()', () => {
-    it('scores 1 with the judge reason as comment on PASS', () => {
-        expect(scoreJudge(makeOutput())).toEqual({ name: 'workflow_judge', value: 1, comment: 'looks good' });
-    });
-
-    it('scores 0 on FAIL', () => {
-        const output = makeOutput({ judgeResult: { verdict: 'FAIL', reason: 'missed X', rawResponse: '' } });
-        expect(scoreJudge(output)).toEqual({ name: 'workflow_judge', value: 0, comment: 'missed X' });
-    });
-
-    it('appends the error message to the comment when the item errored', () => {
-        const output = makeOutput({
-            judgeResult: { verdict: 'FAIL', reason: 'Error during execution', rawResponse: '' },
-            error: 'boom',
-        });
-        expect(scoreJudge(output)).toEqual({
+describe('evaluators', () => {
+    it('scores workflow_judge 1 with the judge reason as comment on PASS', async () => {
+        expect(await evaluators[0]({ output: makeOutput() })).toEqual({
             name: 'workflow_judge',
-            value: 0,
-            comment: 'Error during execution (boom)',
+            value: 1,
+            comment: 'looks good',
         });
     });
-});
 
-describe('scoreTotalTokens()', () => {
-    it('reads totalTokens from the conversation', () => {
-        expect(scoreTotalTokens(makeOutput())).toEqual({ name: 'total_tokens', value: 1234 });
+    it('scores workflow_judge 0 on FAIL', async () => {
+        const output = makeOutput({ judgeResult: { verdict: 'FAIL', reason: 'missed X', rawResponse: '' } });
+        expect(await evaluators[0]({ output })).toEqual({ name: 'workflow_judge', value: 0, comment: 'missed X' });
     });
 
-    it('defaults to 0 when totalTokens is undefined', () => {
+    it('reports the conversation token total, defaulting to 0 when unmeasured', async () => {
+        expect(await evaluators[1]({ output: makeOutput() })).toEqual({ name: 'total_tokens', value: 1234 });
+
         const output = makeOutput();
         output.conversation.totalTokens = undefined;
-        expect(scoreTotalTokens(output)).toEqual({ name: 'total_tokens', value: 0 });
+        expect(await evaluators[1]({ output })).toEqual({ name: 'total_tokens', value: 0 });
+    });
+
+    it('sums tool-result bytes across all turns, treating missing sizes as 0', async () => {
+        expect(await evaluators[2]({ output: makeOutput() })).toEqual({ name: 'result_bytes', value: 125 });
     });
 });
 
-describe('scoreResultBytes()', () => {
-    it('sums tool-result bytes across the conversation', () => {
-        expect(scoreResultBytes(makeOutput())).toEqual({ name: 'result_bytes', value: 42 });
+describe('buildRunSummary()', () => {
+    it('exits 0 when every requested item ran and passed', () => {
+        const itemResults = [makeScoredItem(makeOutput({ id: 'a' }), 1), makeScoredItem(makeOutput({ id: 'b' }), 1)];
+        expect(buildRunSummary(['a', 'b'], itemResults)).toEqual({
+            passedCount: 2,
+            failures: [],
+            droppedIds: [],
+            exitCode: 0,
+        });
+    });
+
+    it('exits 1 and names the failure when an item scored 0', () => {
+        const failing = makeOutput({ id: 'b', judgeResult: { verdict: 'FAIL', reason: 'missed X', rawResponse: '' } });
+        const summary = buildRunSummary(
+            ['a', 'b'],
+            [makeScoredItem(makeOutput({ id: 'a' }), 1), makeScoredItem(failing, 0)],
+        );
+        expect(summary.passedCount).toBe(1);
+        expect(summary.failures).toEqual([{ id: 'b', reason: 'missed X' }]);
+        expect(summary.exitCode).toBe(1);
+    });
+
+    it('exits 1 when the SDK dropped an item, instead of shrinking the denominator', () => {
+        const summary = buildRunSummary(['a', 'b', 'c'], [makeScoredItem(makeOutput({ id: 'a' }), 1)]);
+        expect(summary.passedCount).toBe(1);
+        expect(summary.droppedIds).toEqual(['b', 'c']);
+        expect(summary.exitCode).toBe(1);
+    });
+
+    it('exits 1 when nothing ran at all', () => {
+        expect(buildRunSummary(['a'], []).exitCode).toBe(1);
+        expect(buildRunSummary([], []).exitCode).toBe(1);
+    });
+
+    it('treats a missing workflow_judge score as a failure', () => {
+        const summary = buildRunSummary(['a'], [{ output: makeOutput({ id: 'a' }), evaluations: [] }]);
+        expect(summary.passedCount).toBe(0);
+        expect(summary.exitCode).toBe(1);
     });
 });

@@ -1,83 +1,87 @@
 /**
- * Experiment task and evaluators for the Langfuse workflow-evals port.
+ * Experiment task, evaluators, and run gate for the Langfuse workflow-evals port.
  *
- * The experiment runs a fresh agent conversation per test case (MCP state is
- * isolated per test) and scores it with three evaluators: the LLM judge
- * (strict pass/fail gate), total tokens, and tool-result bytes.
+ * The task runs a fresh agent conversation per dataset item (MCP state is isolated
+ * per item) and three evaluators score it: the LLM judge (the pass/fail gate),
+ * total tokens, and tool-result bytes.
  */
 
+import type { Evaluation } from '@langfuse/client';
+
 import { executeConversation } from './conversation_executor.js';
+import { parseWorkflowItem } from './langfuse_dataset.js';
 import type { LlmClient } from './llm_client.js';
 import { McpClient } from './mcp_client.js';
-import type { WorkflowTestCase } from './test_cases_loader.js';
 import type { ConversationHistory } from './types.js';
 import type { JudgeResult } from './workflow_judge.js';
 import { evaluateConversation } from './workflow_judge.js';
 
-/** Output produced by the experiment task for a single test case. */
+/** Output produced by the experiment task for a single dataset item. */
 export type WorkflowTaskOutput = {
+    /** Dataset item id, so the run summary can name items without re-reading them. */
+    id: string;
     conversation: ConversationHistory;
     judgeResult: JudgeResult;
-    /** Set when the conversation could not run (MCP/LLM error). */
-    error?: string;
 };
-
-/** Evaluation shape returned to Langfuse (a subset of ScoreBody). */
-export type WorkflowEvaluation = { name: string; value: number; comment?: string };
-
-/** Metadata every dataset item carries; see `testCaseToDatasetItem`. */
-export type WorkflowItemMetadata = { testCase: WorkflowTestCase };
-
-/** Last path segment of a model id, e.g. `claude-haiku-4.5` from `anthropic/claude-haiku-4.5`. */
-export function shortModelName(model: string): string {
-    const segments = model.split('/');
-    return segments[segments.length - 1] || model;
-}
-
-/** Experiment run name: `<gitBranch>-<agentModelShort>-<timestamp>`. */
-export function buildRunName(gitBranch: string, agentModel: string, now: number): string {
-    return `${gitBranch}-${shortModelName(agentModel)}-${now}`;
-}
-
-/**
- * Sum the byte size of all tool results returned to the agent across a conversation.
- * This is the data volume returned by the tools, independent of the model's own output.
- */
-export function sumResultBytes(conversation: ConversationHistory): number {
-    let total = 0;
-    for (const turn of conversation.turns) {
-        for (const toolResult of turn.toolResults) {
-            total += toolResult.resultBytes ?? 0;
-        }
-    }
-    return total;
-}
-
-/** workflow_judge score: 1 when the judge verdict is PASS, else 0. Strict gate. */
-export function scoreJudge(output: WorkflowTaskOutput): WorkflowEvaluation {
-    return {
-        name: 'workflow_judge',
-        value: output.judgeResult.verdict === 'PASS' ? 1 : 0,
-        comment: output.error ? `${output.judgeResult.reason} (${output.error})` : output.judgeResult.reason,
-    };
-}
-
-/** total_tokens score: agent LLM tokens billed across the conversation. */
-export function scoreTotalTokens(output: WorkflowTaskOutput): WorkflowEvaluation {
-    return { name: 'total_tokens', value: output.conversation.totalTokens ?? 0 };
-}
-
-/** result_bytes score: UTF-8 bytes of tool results returned to the agent. */
-export function scoreResultBytes(output: WorkflowTaskOutput): WorkflowEvaluation {
-    return { name: 'result_bytes', value: sumResultBytes(output.conversation) };
-}
 
 /** The evaluators attached to each experiment item. */
 export const evaluators = [
-    async ({ output }: { output: WorkflowTaskOutput }) => scoreJudge(output),
-    async ({ output }: { output: WorkflowTaskOutput }) => scoreTotalTokens(output),
-    async ({ output }: { output: WorkflowTaskOutput }) => scoreResultBytes(output),
+    async ({ output }: { output: WorkflowTaskOutput }): Promise<Evaluation> => ({
+        name: 'workflow_judge',
+        value: output.judgeResult.verdict === 'PASS' ? 1 : 0,
+        comment: output.judgeResult.reason,
+    }),
+    async ({ output }: { output: WorkflowTaskOutput }): Promise<Evaluation> => ({
+        name: 'total_tokens',
+        value: output.conversation.totalTokens ?? 0,
+    }),
+    async ({ output }: { output: WorkflowTaskOutput }): Promise<Evaluation> => ({
+        name: 'result_bytes',
+        value: output.conversation.turns
+            .flatMap((turn) => turn.toolResults)
+            .reduce((total, toolResult) => total + (toolResult.resultBytes ?? 0), 0),
+    }),
 ];
+
+/** Minimal view of an ExperimentItemResult: what the run gate reads. */
+type ScoredItem = { output: WorkflowTaskOutput; evaluations: { name: string; value?: unknown }[] };
+
+export type RunSummary = {
+    /** Items that scored workflow_judge === 1. */
+    passedCount: number;
+    /** Items that completed but did not pass, with the judge's reason. */
+    failures: { id: string; reason: string }[];
+    /** Requested ids with no result at all: the task threw and the SDK skipped the item. */
+    droppedIds: string[];
+    /** 0 only when every requested item ran and passed. */
+    exitCode: number;
+};
+
+/**
+ * Score a finished experiment against the ids that were requested.
+ *
+ * The requested ids are the denominator on purpose. When a task throws, the SDK
+ * logs it and omits the item from `itemResults`, so gating on `itemResults.length`
+ * would report "7/7 passed" and exit 0 on a run where three tests never executed.
+ */
+export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[]): RunSummary {
+    const failures: { id: string; reason: string }[] = [];
+    let passedCount = 0;
+
+    for (const result of itemResults) {
+        if (result.evaluations.find((evaluation) => evaluation.name === 'workflow_judge')?.value === 1) {
+            passedCount += 1;
+            continue;
+        }
+        failures.push({ id: result.output.id, reason: result.output.judgeResult.reason });
+    }
+
+    const completedIds = new Set(itemResults.map((result) => result.output.id));
+    const droppedIds = requestedIds.filter((id) => !completedIds.has(id));
+    const isPass = requestedIds.length > 0 && droppedIds.length === 0 && passedCount === requestedIds.length;
+
+    return { passedCount, failures, droppedIds, exitCode: isPass ? 0 : 1 };
+}
 
 export type WorkflowTaskOptions = {
     llmClient: LlmClient;
@@ -89,49 +93,40 @@ export type WorkflowTaskOptions = {
 
 /**
  * Build the experiment task. For each dataset item it spins up a fresh isolated
- * McpClient, runs the conversation, then the judge. Errors are captured into
- * the output (verdict FAIL) so the item completes and evaluators still run.
+ * McpClient, runs the conversation, then the judge.
+ *
+ * Harness errors (MCP spawn, OpenRouter, judge) are left to throw. The SDK logs
+ * them and drops the item, and `buildRunSummary` fails the run on the shortfall,
+ * so a broken harness no longer masquerades as a failing eval.
  */
 export function makeTask(options: WorkflowTaskOptions) {
     const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout } = options;
 
-    return async (item: { metadata?: unknown }): Promise<WorkflowTaskOutput> => {
-        const { testCase } = item.metadata as WorkflowItemMetadata;
-        const mcpClient = new McpClient(toolTimeout, testCase.failTools);
+    return async (rawItem: unknown): Promise<WorkflowTaskOutput> => {
+        const item = parseWorkflowItem(rawItem);
+        const mcpClient = new McpClient(toolTimeout, item.metadata.failTools);
 
         try {
-            await mcpClient.start(apifyToken, testCase.tools);
-            const serverInstructions = mcpClient.getInstructions();
+            await mcpClient.start(apifyToken, item.metadata.tools);
 
             const conversation = await executeConversation({
-                userPrompt: testCase.query,
+                userPrompt: item.input.query,
                 mcpClient,
                 llmClient,
-                maxTurns: testCase.maxTurns,
+                maxTurns: item.metadata.maxTurns,
                 model: agentModel,
-                serverInstructions,
+                serverInstructions: mcpClient.getInstructions(),
             });
 
-            const judgeResult = await evaluateConversation(testCase, conversation, llmClient, judgeModel);
-            return { conversation, judgeResult };
-        } catch (error) {
-            return {
-                conversation: {
-                    userPrompt: testCase.query,
-                    turns: [],
-                    completed: false,
-                    hitMaxTurns: false,
-                    totalTurns: 0,
-                },
-                judgeResult: { verdict: 'FAIL', reason: 'Error during execution', rawResponse: '' },
-                error: error instanceof Error ? error.message : String(error),
-            };
+            const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
+            return { id: item.id, conversation, judgeResult };
         } finally {
-            try {
-                await mcpClient.cleanup();
-            } catch {
-                // Best-effort cleanup; a failure here must not fail the item.
-            }
+            // cleanup() races a 2s close then SIGKILLs, but it can still reject, and a
+            // rejection here would replace the item's real result. Log and move on.
+            await mcpClient.cleanup().catch((error) => {
+                // eslint-disable-next-line no-console
+                console.warn(`⚠️  MCP cleanup failed for "${item.id}": ${error}`);
+            });
         }
     };
 }
