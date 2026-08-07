@@ -96,9 +96,10 @@ describe('buildRunSummary()', () => {
         expect(buildRunSummary([], []).exitCode).toBe(1);
     });
 
-    it('treats a missing workflow_judge score as a failure', () => {
+    it('treats a missing workflow_judge score as a failure, without quoting the stale judge reason', () => {
         const summary = buildRunSummary(['a'], [{ output: makeOutput({ id: 'a' }), evaluations: [] }]);
         expect(summary.passedCount).toBe(0);
         expect(summary.exitCode).toBe(1);
+        expect(summary.failures).toEqual([{ id: 'a', reason: 'no workflow_judge score (the evaluator threw)' }]);
     });
 });

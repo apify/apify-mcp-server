@@ -69,11 +69,20 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
     let passedCount = 0;
 
     for (const result of itemResults) {
-        if (result.evaluations.find((evaluation) => evaluation.name === 'workflow_judge')?.value === 1) {
+        const judgeScore = result.evaluations.find((evaluation) => evaluation.name === 'workflow_judge')?.value;
+        if (judgeScore === 1) {
             passedCount += 1;
             continue;
         }
-        failures.push({ id: result.output.id, reason: result.output.judgeResult.reason });
+        // No score means the evaluator itself threw, so judgeResult.reason is stale - it can
+        // hold the judge's PASS rationale, printed under a failure marker. Say what happened.
+        failures.push({
+            id: result.output.id,
+            reason:
+                judgeScore === undefined
+                    ? 'no workflow_judge score (the evaluator threw)'
+                    : result.output.judgeResult.reason,
+        });
     }
 
     const completedIds = new Set(itemResults.map((result) => result.output.id));
