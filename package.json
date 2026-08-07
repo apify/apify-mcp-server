@@ -75,7 +75,6 @@
     "@arizeai/phoenix-client": "^6.6.0",
     "@arizeai/phoenix-evals": "^1.0.2",
     "@langfuse/client": "5.9.1",
-    "@langfuse/openai": "5.9.1",
     "@langfuse/otel": "5.9.1",
     "@langfuse/tracing": "5.9.1",
     "@modelcontextprotocol/client": "2.0.0",

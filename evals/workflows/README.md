@@ -170,7 +170,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 - `types.ts` - Type definitions
 - `config.ts` - Models, prompts, constants
 - `mcp_client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions)
-- `llm_client.ts` - OpenRouter wrapper (optionally wrapped with `observeOpenAI` for tracing)
+- `llm_client.ts` - OpenRouter wrapper; records each call as a Langfuse generation with usage and cost
 - `conversation_executor.ts` - Multi-turn loop with dynamic tools and server instructions
 - `workflow_judge.ts` - Judge evaluation
 - `test_cases_loader.ts` - Load and validate test cases
@@ -200,7 +200,7 @@ Results are recorded in Langfuse, not to a local file. Each run:
 
 - **Syncs the dataset** `workflow-evals`: every test case in `test_cases.json` is upserted by `id`, so the dataset stays complete regardless of `--id`/`--category` filters. A `--test-cases-path` pointing at any file other than the canonical `test_cases.json` syncs into its own dataset (`workflow-evals-<filename>-<path-hash>`), with item ids namespaced as `<dataset>:<test-case-id>`, so a scratch file cannot overwrite the inputs of runs already recorded against the shared one. Item ids are unique per Langfuse project and cannot be reused across datasets, hence the namespacing; the path hash keeps same-named files in different directories apart.
 - **Runs an experiment** over the matching dataset items, run name `<git-branch>-<agent-model>-<timestamp>`, with run metadata `{ agentModel, judgeModel, toolTimeout }`. Because it runs on dataset items, it is recorded as a Langfuse **dataset run** and the console prints its direct URL.
-- **Traces** every item's agent/judge LLM calls (via `observeOpenAI`) and each MCP tool call (as a `tool` observation with its arguments and result) nested under the item's trace.
+- **Traces** every item's agent/judge LLM calls (as a `generation` observation) and each MCP tool call (as a `tool` observation with its arguments and result) nested under the item's trace. Each generation carries the cost OpenRouter reports for that call (`usage: { include: true }`), because Langfuse's own price table is keyed by canonical model names and has no entry for OpenRouter's (`anthropic/claude-haiku-4.5`, `deepseek/deepseek-v4-flash`), which left every run at cost 0.
 - **Scores** each item with three evaluators:
   - `workflow_judge`: `1` if the judge verdict is PASS, else `0` (comment = judge reason). This is the strict gate.
   - `total_tokens`: agent LLM tokens billed across the conversation. Omitted entirely when the provider reported no usage, so an unmeasured run cannot look like a free one.

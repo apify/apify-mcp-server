@@ -287,9 +287,6 @@ importers:
       '@langfuse/client':
         specifier: 5.9.1
         version: 5.9.1(@opentelemetry/api@1.9.1)
-      '@langfuse/openai':
-        specifier: 5.9.1
-        version: 5.9.1(@opentelemetry/api@1.9.1)
       '@langfuse/otel':
         specifier: 5.9.1
         version: 5.9.1(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.9.0(@opentelemetry/api@1.9.1))
@@ -1039,9 +1036,6 @@ packages:
     resolution: {integrity: sha512-XXz1DBEwGMpNXz8DZHFsixqo+3vBkfYpat3oLLldRMuT8ur6OWQ81Kgh5Obh0CZ31adaR4FrLTHh4N9eBXo64A==}
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
-
-  '@langfuse/openai@5.9.1':
-    resolution: {integrity: sha512-3dNPg7GqczJuklz9KNmbYTMFQ5wacWbEqMLHYMFoP25KzRDRsv6zr3TxlTm1qYUfC0hGeeyg5HsCCwslP71WTg==}
 
   '@langfuse/otel@5.9.1':
     resolution: {integrity: sha512-viM5Qq/AIPZPXfO7YdSmDHxEDSrNU/MyGzuE9zKA6hGBII1iLowU+qL99O+TjnXqxoADqlNibhY2pg1/WTIPcw==}
@@ -5278,13 +5272,6 @@ snapshots:
   '@langfuse/core@5.10.0(@opentelemetry/api@1.9.1)':
     dependencies:
       '@opentelemetry/api': 1.9.1
-
-  '@langfuse/openai@5.9.1(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@langfuse/core': 5.10.0(@opentelemetry/api@1.9.1)
-      '@langfuse/tracing': 5.9.1(@opentelemetry/api@1.9.1)
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
 
   '@langfuse/otel@5.9.1(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.9.0(@opentelemetry/api@1.9.1))':
     dependencies:

@@ -21,7 +21,6 @@ import 'dotenv/config';
 
 import { execSync } from 'node:child_process';
 
-import { observeOpenAI } from '@langfuse/openai';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
@@ -102,8 +101,8 @@ async function main() {
 
         initTracing();
 
-        // Wrap the agent/judge LLM client so calls nest under each item's trace.
-        const llmClient = new LlmClient((client) => observeOpenAI(client));
+        // Traces every agent/judge call as a generation nested under the item's trace.
+        const llmClient = new LlmClient();
 
         const runName = `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`;
         console.log(`▶️  Running experiment "${runName}" over ${data.length} item(s), concurrency ${argv.concurrency}`);
