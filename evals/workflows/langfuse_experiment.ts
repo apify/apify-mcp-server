@@ -31,10 +31,12 @@ export const evaluators = [
         value: output.judgeResult.verdict === 'PASS' ? 1 : 0,
         comment: output.judgeResult.reason,
     }),
-    async ({ output }: { output: WorkflowTaskOutput }): Promise<Evaluation> => ({
-        name: 'total_tokens',
-        value: output.conversation.totalTokens ?? 0,
-    }),
+    // No score when the provider never reported usage. A 0 would read as a real
+    // measurement and skew cross-run model comparisons in Langfuse.
+    async ({ output }: { output: WorkflowTaskOutput }): Promise<Evaluation[]> =>
+        output.conversation.totalTokens === undefined
+            ? []
+            : [{ name: 'total_tokens', value: output.conversation.totalTokens }],
     async ({ output }: { output: WorkflowTaskOutput }): Promise<Evaluation> => ({
         name: 'result_bytes',
         value: output.conversation.turns

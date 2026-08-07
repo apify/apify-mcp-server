@@ -203,7 +203,7 @@ Results are recorded in Langfuse, not to a local file. Each run:
 - **Traces** every item's agent/judge LLM calls (via `observeOpenAI`) and each MCP tool call (as a `tool` observation with its arguments and result) nested under the item's trace.
 - **Scores** each item with three evaluators:
   - `workflow_judge`: `1` if the judge verdict is PASS, else `0` (comment = judge reason). This is the strict gate.
-  - `total_tokens`: agent LLM tokens billed across the conversation.
+  - `total_tokens`: agent LLM tokens billed across the conversation. Omitted entirely when the provider reported no usage, so an unmeasured run cannot look like a free one.
   - `result_bytes`: UTF-8 bytes of tool results returned to the agent.
 - **Scores the run** with `pass_rate`: passing items over the number of items requested, so runs are comparable across branches and models even when items were dropped.
 

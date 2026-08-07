@@ -66,12 +66,14 @@ describe('evaluators', () => {
         expect(await evaluators[0]({ output })).toEqual({ name: 'workflow_judge', value: 0, comment: 'missed X' });
     });
 
-    it('reports the conversation token total, defaulting to 0 when unmeasured', async () => {
-        expect(await evaluators[1]({ output: makeOutput() })).toEqual({ name: 'total_tokens', value: 1234 });
+    it('reports the conversation token total', async () => {
+        expect(await evaluators[1]({ output: makeOutput() })).toEqual([{ name: 'total_tokens', value: 1234 }]);
+    });
 
+    it('emits no token score when the provider never reported usage', async () => {
         const output = makeOutput();
         output.conversation.totalTokens = undefined;
-        expect(await evaluators[1]({ output })).toEqual({ name: 'total_tokens', value: 0 });
+        expect(await evaluators[1]({ output })).toEqual([]);
     });
 
     it('sums tool-result bytes across all turns, treating missing sizes as 0', async () => {
