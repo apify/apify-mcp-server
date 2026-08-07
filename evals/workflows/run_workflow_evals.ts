@@ -25,8 +25,9 @@ import { observeOpenAI } from '@langfuse/openai';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS } from './config.js';
-import { parseWorkflowItem, resolveDatasetName, syncDataset } from './langfuse_dataset.js';
+import { resolveDatasetName, resolveItemId, syncDataset } from './langfuse_dataset.js';
 import { buildRunSummary, evaluators, makeTask } from './langfuse_experiment.js';
 import { createLangfuseClient, initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
@@ -80,16 +81,16 @@ async function main() {
         // The dataset items are the only source of truth for a run, so sync first and
         // filter what comes back. Running on real dataset items is what makes the run
         // a Langfuse dataset run, comparable with every other run.
-        const items = await syncDataset(langfuse, datasetName, loadTestCases(testCasesPath));
+        const testCases = loadTestCases(testCasesPath);
+        const items = await syncDataset(langfuse, datasetName, testCases);
 
-        const idRegex = argv.id ? new RegExp(argv.id) : undefined;
-        const categoryRegex = argv.category ? new RegExp(`^${argv.category.replace(/\*/g, '.*')}$`) : undefined;
-        const data = items.filter((rawItem) => {
-            const item = parseWorkflowItem(rawItem);
-            return (
-                (!idRegex || idRegex.test(item.id)) && (!categoryRegex || categoryRegex.test(item.metadata.category))
-            );
-        });
+        // Match on the test cases with the shared helpers, then pick the dataset items
+        // they map to. One matching rule for every entry point that filters test cases.
+        let selected = testCases;
+        if (argv.id) selected = filterById(selected, argv.id);
+        if (argv.category) selected = filterByCategory(selected, argv.category);
+        const selectedIds = new Set(selected.map((testCase) => resolveItemId(datasetName, testCase.id)));
+        const data = items.filter((item) => selectedIds.has(item.id));
         if (data.length === 0) {
             throw new Error(`No test case in "${datasetName}" matches --id/--category`);
         }
