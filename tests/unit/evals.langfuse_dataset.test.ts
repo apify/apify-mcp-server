@@ -5,10 +5,11 @@ import {
     type DatasetItem,
     parseWorkflowItem,
     resolveDatasetName,
+    resolveItemId,
     syncDataset,
     WORKFLOW_DATASET_NAME,
 } from '../../evals/workflows/langfuse_dataset.js';
-import type { WorkflowTestCase } from '../../evals/workflows/test_cases_loader.js';
+import { DEFAULT_TEST_CASES_PATH, type WorkflowTestCase } from '../../evals/workflows/test_cases_loader.js';
 
 const testCase: WorkflowTestCase = { id: 'search-001', category: 'search', query: 'q', reference: 'r' };
 
@@ -29,12 +30,30 @@ function makeLangfuseClient() {
 }
 
 describe('resolveDatasetName()', () => {
-    it('uses the canonical dataset when no test cases path is given', () => {
-        expect(resolveDatasetName()).toBe(WORKFLOW_DATASET_NAME);
+    it('uses the canonical dataset for the default test cases file', () => {
+        expect(resolveDatasetName(DEFAULT_TEST_CASES_PATH)).toBe(WORKFLOW_DATASET_NAME);
     });
 
     it('derives a separate dataset for a custom file so the shared one is never overwritten', () => {
-        expect(resolveDatasetName('/tmp/scratch.json')).toBe(`${WORKFLOW_DATASET_NAME}-scratch`);
+        expect(resolveDatasetName('/tmp/scratch.json')).toMatch(
+            new RegExp(`^${WORKFLOW_DATASET_NAME}-scratch-[0-9a-f]{8}$`),
+        );
+    });
+
+    it('keeps same-named files in different directories apart', () => {
+        expect(resolveDatasetName('/tmp/a/scratch.json')).not.toBe(resolveDatasetName('/tmp/b/scratch.json'));
+    });
+});
+
+describe('resolveItemId()', () => {
+    it('keeps bare test case ids on the canonical dataset, preserving its run history', () => {
+        expect(resolveItemId(WORKFLOW_DATASET_NAME, 'search-001')).toBe('search-001');
+    });
+
+    it('namespaces items of a scratch dataset, since ids cannot be reused across datasets', () => {
+        expect(resolveItemId('workflow-evals-scratch-1a2b3c4d', 'search-001')).toBe(
+            'workflow-evals-scratch-1a2b3c4d:search-001',
+        );
     });
 });
 
@@ -67,12 +86,12 @@ describe('parseWorkflowItem()', () => {
 describe('syncDataset()', () => {
     it('upserts each test case by id, splitting query, reference and harness knobs', async () => {
         const { client, created, datasets } = makeLangfuseClient();
-        await syncDataset(client, 'scratch', [{ ...testCase, maxTurns: 3, tools: ['actors'] }]);
+        await syncDataset(client, WORKFLOW_DATASET_NAME, [{ ...testCase, maxTurns: 3, tools: ['actors'] }]);
 
-        expect(datasets).toEqual(['scratch']);
+        expect(datasets).toEqual([WORKFLOW_DATASET_NAME]);
         expect(created).toEqual([
             {
-                datasetName: 'scratch',
+                datasetName: WORKFLOW_DATASET_NAME,
                 id: 'search-001',
                 input: { query: 'q' },
                 expectedOutput: 'r',
@@ -81,9 +100,16 @@ describe('syncDataset()', () => {
         ]);
     });
 
+    it('namespaces the ids it upserts into a scratch dataset', async () => {
+        const { client, created } = makeLangfuseClient();
+        await syncDataset(client, 'scratch', [testCase]);
+
+        expect(created[0].id).toBe('scratch:search-001');
+    });
+
     it('returns the created items so the caller never re-fetches the dataset', async () => {
         const { client } = makeLangfuseClient();
-        const items = await syncDataset(client, 'scratch', [testCase, { ...testCase, id: 'search-002' }]);
+        const items = await syncDataset(client, WORKFLOW_DATASET_NAME, [testCase, { ...testCase, id: 'search-002' }]);
 
         expect(items.map((item) => item.id)).toEqual(['search-001', 'search-002']);
         expect(items.every((item) => item.datasetId === 'ds-1')).toBe(true);

@@ -19,7 +19,7 @@ import { hideBin } from 'yargs/helpers';
 
 import { resolveDatasetName, syncDataset } from './langfuse_dataset.js';
 import { createLangfuseClient } from './langfuse_tracing.js';
-import { loadTestCases } from './test_cases_loader.js';
+import { loadTestCases, resolveTestCasesPath } from './test_cases_loader.js';
 
 async function main() {
     const argv = (await yargs(hideBin(process.argv))
@@ -29,8 +29,9 @@ async function main() {
         .help().argv) as { testCasesPath?: string };
 
     const langfuse = createLangfuseClient();
-    const datasetName = resolveDatasetName(argv.testCasesPath);
-    const items = await syncDataset(langfuse, datasetName, loadTestCases(argv.testCasesPath));
+    const testCasesPath = resolveTestCasesPath(argv.testCasesPath);
+    const datasetName = resolveDatasetName(testCasesPath);
+    const items = await syncDataset(langfuse, datasetName, loadTestCases(testCasesPath));
 
     console.log(`✅ Dataset "${datasetName}" now has ${items.length} item(s)`);
 }

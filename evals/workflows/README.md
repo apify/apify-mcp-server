@@ -198,7 +198,7 @@ Both entry points fail fast (before any test runs) listing every missing variabl
 
 Results are recorded in Langfuse, not to a local file. Each run:
 
-- **Syncs the dataset** `workflow-evals`: every test case in `test_cases.json` is upserted by `id`, so the dataset stays complete regardless of `--id`/`--category` filters. A non-default `--test-cases-path` syncs into its own dataset (`workflow-evals-<filename>`) so a scratch file cannot overwrite the inputs of runs already recorded against the shared one.
+- **Syncs the dataset** `workflow-evals`: every test case in `test_cases.json` is upserted by `id`, so the dataset stays complete regardless of `--id`/`--category` filters. A `--test-cases-path` pointing at any file other than the canonical `test_cases.json` syncs into its own dataset (`workflow-evals-<filename>-<path-hash>`), with item ids namespaced as `<dataset>:<test-case-id>`, so a scratch file cannot overwrite the inputs of runs already recorded against the shared one. Item ids are unique per Langfuse project and cannot be reused across datasets, hence the namespacing; the path hash keeps same-named files in different directories apart.
 - **Runs an experiment** over the matching dataset items, run name `<git-branch>-<agent-model>-<timestamp>`, with run metadata `{ agentModel, judgeModel, toolTimeout }`. Because it runs on dataset items, it is recorded as a Langfuse **dataset run** and the console prints its direct URL.
 - **Traces** every item's agent/judge LLM calls (via `observeOpenAI`) and each MCP tool call (as a `tool` observation with its arguments and result) nested under the item's trace.
 - **Scores** each item with three evaluators:

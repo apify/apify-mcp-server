@@ -30,7 +30,7 @@ import { parseWorkflowItem, resolveDatasetName, syncDataset } from './langfuse_d
 import { buildRunSummary, evaluators, makeTask } from './langfuse_experiment.js';
 import { createLangfuseClient, initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
-import { loadTestCases } from './test_cases_loader.js';
+import { loadTestCases, resolveTestCasesPath } from './test_cases_loader.js';
 
 type CliArgs = {
     category?: string;
@@ -72,14 +72,15 @@ async function main() {
     const langfuse = createLangfuseClient(['APIFY_TOKEN', 'OPENROUTER_API_KEY']);
     // Non-empty and sanitized: createLangfuseClient exits otherwise.
     const apifyToken = process.env.APIFY_TOKEN as string;
-    const datasetName = resolveDatasetName(argv.testCasesPath);
+    const testCasesPath = resolveTestCasesPath(argv.testCasesPath);
+    const datasetName = resolveDatasetName(testCasesPath);
 
     let exitCode = 1;
     try {
         // The dataset items are the only source of truth for a run, so sync first and
         // filter what comes back. Running on real dataset items is what makes the run
         // a Langfuse dataset run, comparable with every other run.
-        const items = await syncDataset(langfuse, datasetName, loadTestCases(argv.testCasesPath));
+        const items = await syncDataset(langfuse, datasetName, loadTestCases(testCasesPath));
 
         const idRegex = argv.id ? new RegExp(argv.id) : undefined;
         const categoryRegex = argv.category ? new RegExp(`^${argv.category.replace(/\*/g, '.*')}$`) : undefined;

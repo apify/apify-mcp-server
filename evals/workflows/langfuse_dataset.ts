@@ -8,6 +8,7 @@
  * the next run.
  */
 
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 import type { LangfuseClient } from '@langfuse/client';
@@ -15,6 +16,7 @@ import { z } from 'zod';
 
 import { WorkflowTestCaseValidator } from '../shared/types.js';
 import type { WorkflowTestCase } from '../shared/types.js';
+import { DEFAULT_TEST_CASES_PATH } from './test_cases_loader.js';
 
 /** Name of the Langfuse dataset that mirrors test_cases.json. */
 export const WORKFLOW_DATASET_NAME = 'workflow-evals';
@@ -47,13 +49,32 @@ export function parseWorkflowItem(item: unknown): WorkflowItem {
 }
 
 /**
- * A non-default --test-cases-path gets its own dataset. A scratch file reusing the
- * canonical ids would otherwise overwrite the inputs of every run already recorded
- * against the shared dataset.
+ * A test cases file other than the canonical one gets its own dataset. A scratch
+ * file reusing the canonical ids would otherwise overwrite the inputs of every run
+ * already recorded against the shared dataset.
+ *
+ * Takes the absolute path from `resolveTestCasesPath`: the identity of the file,
+ * not the spelling of the argument, is what decides. Explicitly passing the default
+ * path therefore stays on the canonical dataset, and two scratch files sharing a
+ * basename in different directories get different datasets (hence the path hash).
  */
-export function resolveDatasetName(testCasesPath?: string): string {
-    if (!testCasesPath) return WORKFLOW_DATASET_NAME;
-    return `${WORKFLOW_DATASET_NAME}-${path.basename(testCasesPath, '.json')}`;
+export function resolveDatasetName(testCasesPath: string): string {
+    if (testCasesPath === DEFAULT_TEST_CASES_PATH) return WORKFLOW_DATASET_NAME;
+    const digest = createHash('sha1').update(testCasesPath).digest('hex').slice(0, 8);
+    return `${WORKFLOW_DATASET_NAME}-${path.basename(testCasesPath, '.json')}-${digest}`;
+}
+
+/**
+ * Dataset item id for a test case id.
+ *
+ * Item ids are unique per project and cannot be reused across datasets, so a
+ * scratch dataset carrying the canonical ids would re-parent the canonical items
+ * instead of isolating anything. Non-canonical datasets namespace their items;
+ * the canonical dataset keeps bare test case ids so its existing items and their
+ * run history survive.
+ */
+export function resolveItemId(datasetName: string, testCaseId: string): string {
+    return datasetName === WORKFLOW_DATASET_NAME ? testCaseId : `${datasetName}:${testCaseId}`;
 }
 
 /**
@@ -82,7 +103,7 @@ export async function syncDataset(
         testCases.map(async ({ id, query, reference, ...knobs }) =>
             langfuse.dataset.createItem({
                 datasetName,
-                id,
+                id: resolveItemId(datasetName, id),
                 input: { query },
                 expectedOutput: reference,
                 metadata: knobs,
