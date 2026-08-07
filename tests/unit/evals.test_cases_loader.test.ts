@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -34,5 +36,14 @@ describe('loadTestCases()', () => {
         expect(() => loadTestCases('nope.json')).toThrow(
             `Test cases file not found: ${path.join(process.cwd(), 'nope.json')}`,
         );
+    });
+
+    it('rejects a typoed harness knob instead of dropping it', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-evals-'));
+        const file = path.join(dir, 'typo.json');
+        const testCase = { id: 'a', category: 'search', query: 'q', reference: 'r', failTool: ['call-actor'] };
+        fs.writeFileSync(file, JSON.stringify({ version: '1', testCases: [testCase] }));
+
+        expect(() => loadTestCases(file)).toThrow(/failTool/);
     });
 });

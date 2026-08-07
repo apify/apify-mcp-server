@@ -42,8 +42,12 @@ export type ToolSelectionTestCase = {
  *
  * Validated rather than cast because it is read from a JSON file and, once synced,
  * from a Langfuse dataset item that can be edited outside this repo.
+ *
+ * Strict: an unknown key is a typo'd harness knob. Stripping it silently would let
+ * `failTool` sync as nothing, the forced INTERNAL_ERROR never fire, and the eval go
+ * green without testing what it claims to test.
  */
-export const WorkflowTestCaseValidator = z.object({
+export const WorkflowTestCaseValidator = z.strictObject({
     /** Unique test case ID */
     id: z.string().min(1),
     /** Category for grouping (e.g., "search-actors", "call-actor") */
