@@ -17,9 +17,14 @@ import 'dotenv/config';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+import { sanitizeProcessEnv } from './config.js';
 import { resolveDatasetName, syncDataset } from './langfuse_dataset.js';
 import { createLangfuseClient } from './langfuse_tracing.js';
 import { loadTestCases, resolveTestCasesPath } from './test_cases_loader.js';
+
+// Before anything reads process.env: the Langfuse SDK passes these straight to
+// node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
+sanitizeProcessEnv();
 
 async function main() {
     const argv = (await yargs(hideBin(process.argv))

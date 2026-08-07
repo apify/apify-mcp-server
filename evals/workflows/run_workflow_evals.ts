@@ -26,12 +26,16 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
-import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS } from './config.js';
+import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { resolveDatasetName, resolveItemId, syncDataset } from './langfuse_dataset.js';
 import { buildRunSummary, evaluators, makeTask } from './langfuse_experiment.js';
 import { createLangfuseClient, initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
 import { loadTestCases, resolveTestCasesPath } from './test_cases_loader.js';
+
+// Before anything reads process.env: the Langfuse SDK and the Apify client pass these
+// straight to node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
+sanitizeProcessEnv();
 
 type CliArgs = {
     category?: string;
@@ -71,7 +75,7 @@ async function main() {
         .help().argv) as CliArgs;
 
     const langfuse = createLangfuseClient(['APIFY_TOKEN', 'OPENROUTER_API_KEY']);
-    // Non-empty and sanitized: createLangfuseClient exits otherwise.
+    // Non-empty: createLangfuseClient exits otherwise. Sanitized above.
     const apifyToken = process.env.APIFY_TOKEN as string;
     const testCasesPath = resolveTestCasesPath(argv.testCasesPath);
     const datasetName = resolveDatasetName(testCasesPath);

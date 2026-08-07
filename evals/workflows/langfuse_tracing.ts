@@ -9,8 +9,6 @@ import { LangfuseClient } from '@langfuse/client';
 import { LangfuseSpanProcessor } from '@langfuse/otel';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
-import { sanitizeProcessEnv } from './config.js';
-
 /** Environment variables the Langfuse SDK reads to authenticate. */
 const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 'LANGFUSE_BASE_URL'] as const;
 
@@ -18,13 +16,10 @@ const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 'LANGFU
  * Fail fast on missing configuration, then build the Langfuse client. Shared by
  * both CLI entry points; `extraEnvKeys` are the caller's own requirements.
  *
- * Sanitizing happens here rather than at each read site because the SDK reads
- * process.env directly: a CI secret with a trailing newline would otherwise pass
- * this gate and then die inside node:http with ERR_INVALID_CHAR.
+ * Assumes `sanitizeProcessEnv()` already ran: the entry point owns that, as in the
+ * other eval entry points.
  */
 export function createLangfuseClient(extraEnvKeys: readonly string[] = []): LangfuseClient {
-    sanitizeProcessEnv();
-
     const missing = [...LANGFUSE_ENV_VARS, ...extraEnvKeys].filter((key) => !process.env[key]);
     if (missing.length > 0) {
         // eslint-disable-next-line no-console

@@ -13,16 +13,6 @@ export const OPENROUTER_CONFIG = {
 };
 
 /**
- * Get required environment variables
- * Note: OPENROUTER_BASE_URL is optional (defaults to https://openrouter.ai/api/v1)
- */
-export function getRequiredEnvVars(): Record<string, string | undefined> {
-    return {
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
-    };
-}
-
-/**
  * Strips control characters, trims whitespace, and removes surrounding double quotes.
  * CI secrets often contain trailing newlines or invisible control chars that break HTTP headers.
  */
@@ -86,22 +76,4 @@ export function sanitizeProcessEnv(): void {
             console.log(`env ${key}: ${redact(raw)}`);
         }
     }
-}
-
-/**
- * Validate that all required environment variables are present
- */
-export function validateEnvVars(): boolean {
-    const envVars = getRequiredEnvVars();
-    const missing = Object.entries(envVars)
-        .filter(([, value]) => !value)
-        .map(([key]) => key);
-
-    if (missing.length > 0) {
-        // eslint-disable-next-line no-console
-        console.error(`Missing required environment variables: ${missing.join(', ')}`);
-        return false;
-    }
-
-    return true;
 }
