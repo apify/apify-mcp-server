@@ -98,7 +98,7 @@ Two error classes — and mcpc's exit code for the first one is **not** stable a
 the runner classifies by payload shape, not by exit code (`isToolLevelErrorResponse` /
 `isGenuineFailure` / `respondsWithSomeError` in `protocol_v1.test.ts`):
 
-| Class | Example | Exit (0.2.x) | Exit (0.5.x) | Payload |
+| Class | Example | Exit (0.2.x) | Exit (0.5.x+) | Payload |
 |---|---|---|---|---|
 | Tool-level | bad dataset id, forbidden URL | 0 | 2 | `{content, isError: true}` on stdout |
 | Protocol | unknown tool, missing required arg | 2 | 2 | `{"error": …}` on stderr, stdout empty |
@@ -119,7 +119,8 @@ payload before any assertion or failure message can see it (`stripMcpcEnvelope` 
 
 **mcpc can hang indefinitely on a `tools/call` or `prompts/get` protocol error**, producing no
 output on either stream and never exiting. Observed on both 0.2.6 and 0.5.0, reproducibly, on
-freshly created sessions after wiping `~/.mcpc` and killing every bridge. In the same session
+freshly created sessions after wiping `~/.mcpc` and killing every bridge. Not re-evaluated on 0.6.0,
+which switched the bridge to MCP TypeScript SDK v2 — assume it still reproduces. In the same session
 `ping`, `tools-list`, `tasks-get`, `resources-read` and tool calls that return `isError: true` all
 answer in under a second, so the server is fine — the bridge is not forwarding the error.
 
@@ -142,7 +143,7 @@ If these probes hang, re-run in a fresh container before concluding anything abo
 
 ## mcpc version
 
-`@apify/mcpc` is `^0.5.0`. It was evaluated once and rejected (exit-code semantics changed, see
+`@apify/mcpc` is `^0.6.0`. It was evaluated once and rejected (exit-code semantics changed, see
 below), then adopted once the runner stopped depending on exit code for that classification.
 
 What actually changed between 0.2.x and 0.5.x, and what was done about each:
@@ -159,6 +160,20 @@ What actually changed between 0.2.x and 0.5.x, and what was done about each:
   own CLI parsing. The server correctly answers "Server does not support resource subscriptions (no
   resources.subscribe capability)", which the case now asserts on directly.
 - **Does not fix the mcpc hang** documented above. Reproduces identically on 0.5.0.
+
+0.6.0 adds MCP `2026-07-28` support, which this harness does **not** want: mcpc now probes every
+server with `server/discover` and only falls back to `2025-11-25`. Against the local stdio server
+that fallback lands on `2025-11-25` as before (verified with `mcpc @stdio` — `MCP: version
+2025-11-25 / stdio (stateful)`), so the pin still measures v1. It is only a hazard for
+`test:e2e:remote`: if the deployed server ever negotiates `2026-07-28`, the `--detach` and `tasks-*`
+probes fail outright (mcpc does not support the new tasks extension yet) and `logging-set-level`
+returns an error. Pass `--protocol-version 2025-11-25` on connect to pin the era explicitly if that
+happens. Two further 0.6.0 changes are in this harness's path but benign here:
+`--detach` against a server without task support now fails instead of silently running the tool
+synchronously, and `logging-set-level` is deprecated (still works on `2025-11-25`).
+
+Not re-run since the bump — the suite bills real Actor runs and needs `APIFY_TOKEN`, so run
+`pnpm run test:e2e` by hand before trusting it.
 
 ## What this cannot cover
 
