@@ -3,7 +3,8 @@ import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
-import { fetchActorDetails, typeObjectToString } from '../../src/utils/actor_details.js';
+import { CODE_RUNTIME_ACTOR_ID } from '../../src/const.js';
+import { fetchActorDetails, resolveReadmeContent, typeObjectToString } from '../../src/utils/actor_details.js';
 
 vi.mock('../../src/utils/actor_search.js', () => ({
     searchActorsByKeywords: vi.fn().mockResolvedValue([]),
@@ -22,6 +23,47 @@ function stubApifyClient(getActor: () => Promise<unknown>): ApifyClient {
         }),
     } as unknown as ApifyClient;
 }
+
+const OTHER_ACTOR = { id: 'someOtherActorId12345' };
+const CODE_RUNTIME_ACTOR = { id: CODE_RUNTIME_ACTOR_ID };
+
+describe('resolveReadmeContent()', () => {
+    it('prefers the summary when present for a regular Actor', () => {
+        const result = resolveReadmeContent({
+            actorInfo: OTHER_ACTOR,
+            readme: '# Full',
+            readmeSummary: 'Short summary.',
+        });
+        expect(result).toEqual({ content: 'Short summary.', heading: '# README summary' });
+    });
+
+    it('falls back to the full readme when there is no summary', () => {
+        const result = resolveReadmeContent({ actorInfo: OTHER_ACTOR, readme: '# Full' });
+        expect(result).toEqual({ content: '# Full', heading: '# README' });
+    });
+
+    it('always returns the full readme for apify/code-runtime, even with a summary present', () => {
+        const result = resolveReadmeContent({
+            actorInfo: CODE_RUNTIME_ACTOR,
+            readme: '# Full',
+            readmeSummary: 'Short summary.',
+        });
+        expect(result).toEqual({ content: '# Full', heading: '# README' });
+    });
+
+    it('ignores a blank summary the same way for a regular Actor or code-runtime', () => {
+        expect(resolveReadmeContent({ actorInfo: OTHER_ACTOR, readme: '# Full', readmeSummary: '   ' })).toEqual({
+            content: '# Full',
+            heading: '# README',
+        });
+        expect(resolveReadmeContent({ actorInfo: CODE_RUNTIME_ACTOR, readme: '# Full', readmeSummary: '   ' })).toEqual(
+            {
+                content: '# Full',
+                heading: '# README',
+            },
+        );
+    });
+});
 
 describe('typeObjectToString', () => {
     it('formats a flat object of string-typed fields', () => {
