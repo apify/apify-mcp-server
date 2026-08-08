@@ -118,7 +118,7 @@ Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, 
 You can pay for Actor runs without an Apify API token using **AGI**, **direct x402**, or **Skyfire**.
 
 - **AGI** ([agi.apify.com](https://agi.apify.com)) mints a prepaid Apify API token in exchange for an x402 or MPP payment. Use the token like a normal API token against `mcp.apify.com` and `api.apify.com` — works for any Actor, not just Pay Per Event ones. **Recommended** for new integrations; see [AGI (recommended)](#-agi-recommended) below.
-- **Direct x402** pays with USDC on [Base](https://base.org) per request and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
+- **Direct x402** pays with USDC on [Base](https://base.org) per request and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcpc) (`brew install apify/tap/mcpc` or `npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
 - **Skyfire** pays with PAY tokens and requires a Skyfire account with a funded wallet. It does not require a special MCP client; the entire payment flow is handled directly through the MCP tool call parameters.
 
 > ℹ️ **Scope:** Both direct x402 and Skyfire are limited to Pay Per Event Actors, don't support Standby Actors, and settle per run instead of minting a token.
@@ -163,8 +163,8 @@ mcpc x402 init
 # Import an existing wallet
 mcpc x402 import <private-key>
 
-# Show the wallet address so you can fund it with USDC on Base (https://base.org)
-mcpc x402 info
+# Show the wallet address and a funding QR code, so you can fund it with USDC on Base (https://base.org)
+mcpc x402
 ```
 
 Connect to the server with x402 enabled:

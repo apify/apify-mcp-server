@@ -42,7 +42,7 @@ pnpm run build
 mcpc
 
 # 3a. If @stdio is NOT listed — connect:
-mcpc --config .mcp.json stdio connect @stdio
+mcpc connect .mcp.json:stdio @stdio
 
 # 3b. If @stdio IS listed — restart to pick up the new build:
 mcpc @stdio restart
@@ -85,23 +85,30 @@ Three ways to pass arguments to `tools-call` and `prompts-get`:
 
 ## All session subcommands
 
-Beyond tools, mcpc exposes the full MCP protocol surface:
+Beyond tools, mcpc exposes the full MCP protocol surface. Each command also accepts its
+JSON-RPC method name as an alias (`tools/list` → `tools-list`).
 
 | Command | Purpose |
 |---|---|
-| `tools-list` / `tools` | List available tools |
+| _(none — bare `mcpc @stdio`)_ | Server info, capabilities, negotiated MCP version and transport, tools overview |
+| `tools-list` | List available tools |
 | `tools-get <name>` | Get tool schema details |
 | `tools-call <name> [args...]` | Call a tool |
-| `resources-list` / `resources` | List available resources |
-| `resources-read <uri>` | Read a resource by URI |
+| `resources-list` | List available resources |
+| `resources-read <uri>` | Read a resource by URI (`-o <file>` to save, `--raw` to pipe) |
 | `resources-templates-list` | List resource templates |
-| `prompts-list` / `prompts` | List available prompts |
+| `resources-subscribe <uri> <file>` | Keep a local file in sync with the resource |
+| `resources-unsubscribe <uri>` | Stop syncing, keep the file |
+| `prompts-list` | List available prompts |
 | `prompts-get <name> [args...]` | Get a prompt with arguments |
+| `skills-list` / `skills-get <name>` | Server-published agent skills (draft extension) |
 | `ping` | Check if server is alive |
-| `help` | Show server instructions and capabilities |
 | `grep <pattern>` | Search tools and instructions in session |
+| `logs` | Bridge log (`-n <N>`, `--follow`, `--since 1h`) — server-side log messages land here |
+| `server-discover` | What the server advertises now (2026-07-28 connections only) |
 | `tasks-list` | List active MCP tasks |
 | `tasks-get <taskId>` | Get task status |
+| `tasks-result <taskId>` | Block until the final task result is ready |
 | `tasks-cancel <taskId>` | Cancel a running task |
 
 ## Useful flags
@@ -111,11 +118,16 @@ Beyond tools, mcpc exposes the full MCP protocol surface:
 | `--json` / `-j` | Machine-readable JSON output (also via `MCPC_JSON=1`) |
 | `--full` | Show complete input schema on `tools-list` |
 | `--verbose` | Debug logging (also via `MCPC_VERBOSE=1`) |
-| `--timeout <sec>` | Request timeout (default: 300s) |
+| `--timeout <sec>` | Request timeout (default: 60s) |
+| `--max-chars <n>` | Truncate human-readable output (ignored with `--json`) |
 | `--schema <file>` | Validate tool schema against expected schema file |
 | `--schema-mode <mode>` | Schema validation: `strict`, `compatible` (default), `ignore` |
-| `--task` | Async task execution (experimental) |
+| `--task` | Async task execution |
 | `--detach` | Start task and return immediately with task ID |
+
+`--task` / `--detach` and the `tasks-*` commands need a server on MCP 2025-11-25 that advertises
+the tasks capability (`tools-list` flags it per tool as `[task:optional|required|forbidden]`).
+Otherwise they fail — they never silently fall back to a synchronous call.
 
 ## Common verification patterns
 
@@ -138,8 +150,8 @@ mcpc --json @stdio tools-list | jq 'length'
 # Search across all tools by name/description
 mcpc @stdio grep "search"
 
-# Check server capabilities and instructions
-mcpc @stdio help
+# Check server capabilities, instructions and negotiated protocol version
+mcpc @stdio
 
 # Verify server is alive
 mcpc @stdio ping
