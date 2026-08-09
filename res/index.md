@@ -55,6 +55,14 @@ time). Pull from the backlog instead of re-sweeping.
 Keeping widget bundles small (narrow `@apify/ui-library/dist/src/...` imports, markdown stack
 cost). Re-measure when changing widget dependencies or markdown rendering.
 
+### [code_runtime_eval.md](./code_runtime_eval.md)
+Blind A/B runbook for `apify/code-runtime` (Code Mode) vs normal Actor tool use: 7 tests, the
+single mode-line variable, how to measure tokens and Apify spend, per-test grading checks.
+
+### [code_runtime_eval_results.md](./code_runtime_eval_results.md)
+Results of that runbook, 2026-08-08 on Sonnet 5: per-run cost/wall/pass table, mode-held audit,
+retry counts, and the confounds to fix before re-running.
+
 ---
 
 ## Guidelines
