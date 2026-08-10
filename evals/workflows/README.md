@@ -169,7 +169,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 - `types.ts` - Type definitions
 - `config.ts` - Models, prompts, constants
-- `mcp_client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions)
+- `mcp_client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions); records each tool call as a Langfuse tool observation
 - `llm_client.ts` - OpenRouter wrapper; records each call as a Langfuse generation with usage and cost
 - `conversation_executor.ts` - Multi-turn loop with dynamic tools and server instructions
 - `workflow_judge.ts` - Judge evaluation

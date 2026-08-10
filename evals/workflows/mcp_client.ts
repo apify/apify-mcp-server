@@ -3,6 +3,7 @@
  * Handles spawning, connecting, and communicating with the MCP server
  */
 
+import { startActiveObservation } from '@langfuse/tracing';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -109,9 +110,28 @@ export class McpClient {
     }
 
     /**
-     * Call a tool on the MCP server
+     * Call a tool on the MCP server, recorded as a Langfuse tool observation so each
+     * call appears in the trace with its arguments and result. No-ops when tracing is
+     * not initialized (OTel returns a no-op tracer).
      */
     async callTool(toolCall: McpToolCall): Promise<McpToolResult> {
+        return startActiveObservation(
+            toolCall.name,
+            async (span) => {
+                const result = await this.executeToolCall(toolCall);
+                span.update({
+                    input: toolCall.arguments,
+                    output: result.success ? result.result : { error: result.error },
+                    ...(result.success ? {} : { level: 'ERROR' as const }),
+                });
+                return result;
+            },
+            { asType: 'tool' },
+        );
+    }
+
+    /** The call itself: transport, failure injection, and error-to-result mapping. */
+    private async executeToolCall(toolCall: McpToolCall): Promise<McpToolResult> {
         if (!this.client) {
             throw new Error('MCP client is not started');
         }
