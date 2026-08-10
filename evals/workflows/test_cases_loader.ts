@@ -1,6 +1,5 @@
 /**
  * Test case loading and validation for workflow evaluations.
- * Uses the shared JSON reader plus the workflow test case schema.
  */
 
 import fs from 'node:fs';
@@ -12,43 +11,32 @@ import { z } from 'zod';
 import type { TestCaseWithLineNumbers } from '../shared/line_range_filter.js';
 import { loadTestCases as loadTestCasesShared } from '../shared/test_case_loader.js';
 
-/** The canonical test cases file, resolved from this module so cwd cannot change it. */
+/** Resolved from this module so cwd cannot change it. */
 export const DEFAULT_TEST_CASES_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'test_cases.json');
 
 /**
- * A workflow test case (multi-turn agent conversation).
- *
- * Validated rather than cast because it is read from a JSON file and, once synced,
- * from a Langfuse dataset item that can be edited outside this repo.
- *
- * Strict: an unknown key is a typo'd harness knob. Stripping it silently would let
- * `failTool` sync as nothing, the forced INTERNAL_ERROR never fire, and the eval go
- * green without testing what it claims to test.
+ * A workflow test case. Strict: cases also come back from a Langfuse dataset that can be
+ * edited outside this repo, and a silently stripped typo (e.g. `failTool`) turns off the
+ * behavior a case tests while it still passes.
  */
 export const WorkflowTestCaseValidator = z.strictObject({
-    /** Unique test case ID */
     id: z.string().min(1),
-    /** Category for grouping (e.g., "search-actors", "call-actor") */
+    /** Grouping key, e.g. "search-actors" */
     category: z.string().min(1),
-    /** User query/prompt given to the agent */
+    /** Prompt given to the agent */
     query: z.string().min(1),
     /** Requirements the judge scores the conversation against */
     reference: z.string().min(1),
-    /** Maximum number of turns allowed (defaults to the config value) */
+    /** Defaults to the config value */
     maxTurns: z.number().int().positive().optional(),
-    /** Tools to enable for this test (e.g., ["actors", "docs", "apify/rag-web-browser"]) */
+    /** Tools to enable, e.g. ["actors", "docs", "apify/rag-web-browser"] */
     tools: z.array(z.string()).optional(),
-    /**
-     * Tool names the harness force-fails with a synthetic INTERNAL_ERROR carrying the real
-     * report-problem nudge. Lets an eval deterministically throw a nudge-eligible error
-     * that the live server + API cannot reproduce on demand. See mcp_client.ts.
-     */
+    /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See mcp_client.ts. */
     failTools: z.array(z.string()).optional(),
 });
 
 export type WorkflowTestCase = z.infer<typeof WorkflowTestCaseValidator>;
 
-/** A test case plus the line span it occupies in the JSON file, for --lines. */
 export type WorkflowTestCaseWithLineNumbers = WorkflowTestCase & TestCaseWithLineNumbers;
 
 const WorkflowTestCasesValidator = z
@@ -58,38 +46,27 @@ const WorkflowTestCasesValidator = z
     });
 
 /**
- * Absolute path of the file a run reads.
- *
- * `--test-cases-path` is resolved against cwd, like any other CLI path argument.
- * Resolving here rather than at each use site is what keeps the read and the dataset
- * name pointing at one file: the shared reader resolves relative paths against
- * `evals/`, so an unresolved path would name one file and read another.
+ * Resolve `--test-cases-path` against cwd. Callers must resolve once, up front: the shared
+ * reader resolves relative paths against `evals/`, so an unresolved path would name one
+ * file and read another.
  */
 export function resolveTestCasesPath(filePath?: string): string {
     return filePath ? path.resolve(filePath) : DEFAULT_TEST_CASES_PATH;
 }
 
-/**
- * Load workflow test cases, validating every case.
- *
- * Takes an absolute path from `resolveTestCasesPath`. A missing file surfaces as the
- * reader's own ENOENT, which already names the path.
- */
+/** Takes an absolute path from `resolveTestCasesPath`. */
 export function loadTestCases(testCasesPath: string): WorkflowTestCase[] {
     return WorkflowTestCasesValidator.parse(loadTestCasesShared(testCasesPath).testCases);
 }
 
-/**
- * Line span of one test case object in the raw JSON: found from its "id" field, then
- * matched to the closing brace of the object containing it.
- */
+/** Line span of one test case object in the raw JSON, located by its "id" field. */
 function findLineSpan(fileContent: string, id: string): TestCaseWithLineNumbers {
     const idPosition = fileContent.indexOf(`"id": "${id}"`);
     if (idPosition === -1) {
         throw new Error(`Failed to find test case with id "${id}" in file`);
     }
 
-    // Walk back to the '{' that opens this test case, then forward to its match.
+    // Walk back to the '{' opening this test case, then forward to its match.
     let braceStart = idPosition;
     while (braceStart > 0 && fileContent[braceStart] !== '{') braceStart--;
 
@@ -112,12 +89,7 @@ function findLineSpan(fileContent: string, id: string): TestCaseWithLineNumbers 
     };
 }
 
-/**
- * Load test cases with the line span each occupies in the file, for --lines filtering.
- *
- * Validation is the same parse as loadTestCases; only the spans are extra work, which
- * is why the plain loader stays the default.
- */
+/** Like `loadTestCases`, plus the line span each case occupies, for `--lines` filtering. */
 export function loadTestCasesWithLineNumbers(testCasesPath: string): {
     testCases: WorkflowTestCaseWithLineNumbers[];
     totalLines: number;
