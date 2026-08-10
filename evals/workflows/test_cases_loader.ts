@@ -1,195 +1,104 @@
 /**
- * Test case loader and filter for workflow evaluations
- * Uses shared utilities with workflow-specific validation
+ * Test case loading and validation for workflow evaluations.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { z } from 'zod';
 
 import type { TestCaseWithLineNumbers } from '../shared/line_range_filter.js';
-import {
-    filterTestCases as filterTestCasesShared,
-    loadTestCases as loadTestCasesShared,
-} from '../shared/test_case_loader.js';
-import type { WorkflowTestCase } from '../shared/types.js';
+import { loadTestCases as loadTestCasesShared } from '../shared/test_case_loader.js';
 
-// Re-export WorkflowTestCase type for backwards compatibility
-export type { WorkflowTestCase } from '../shared/types.js';
+/** Resolved from this module so cwd cannot change it. */
+export const DEFAULT_TEST_CASES_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'test_cases.json');
 
 /**
- * Workflow test case with line number metadata
+ * A workflow test case. Strict: cases also come back from a Langfuse dataset that can be
+ * edited outside this repo, and a silently stripped typo (e.g. `failTool`) turns off the
+ * behavior a case tests while it still passes.
  */
+export const WorkflowTestCaseValidator = z.strictObject({
+    id: z.string().min(1),
+    /** Grouping key, e.g. "search-actors" */
+    category: z.string().min(1),
+    /** Prompt given to the agent */
+    query: z.string().min(1),
+    /** Requirements the judge scores the conversation against */
+    reference: z.string().min(1),
+    /** Defaults to the config value */
+    maxTurns: z.number().int().positive().optional(),
+    /** Tools to enable, e.g. ["actors", "docs", "apify/rag-web-browser"] */
+    tools: z.array(z.string()).optional(),
+    /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See mcp_client.ts. */
+    failTools: z.array(z.string()).optional(),
+});
+
+export type WorkflowTestCase = z.infer<typeof WorkflowTestCaseValidator>;
+
 export type WorkflowTestCaseWithLineNumbers = WorkflowTestCase & TestCaseWithLineNumbers;
 
+const WorkflowTestCasesValidator = z
+    .array(WorkflowTestCaseValidator)
+    .refine((testCases) => new Set(testCases.map((testCase) => testCase.id)).size === testCases.length, {
+        message: 'Test case ids must be unique',
+    });
+
 /**
- * Load workflow test cases from JSON file with validation
+ * Resolve `--test-cases-path` against cwd. Callers must resolve once, up front: the shared
+ * reader resolves relative paths against `evals/`, so an unresolved path would name one
+ * file and read another.
  */
-export function loadTestCases(filePath?: string): WorkflowTestCase[] {
-    const testCasesPath = filePath || path.join(process.cwd(), 'evals/workflows/test_cases.json');
-
-    if (!fs.existsSync(testCasesPath)) {
-        throw new Error(`Test cases file not found: ${testCasesPath}`);
-    }
-
-    // Use shared loader
-    const testData = loadTestCasesShared(testCasesPath);
-    const testCases = testData.testCases as WorkflowTestCase[];
-
-    // Validate test cases
-    const seenIds = new Set<string>();
-
-    for (let i = 0; i < testCases.length; i++) {
-        const tc = testCases[i];
-        const testCaseRef = `Test case #${i + 1} (id: ${tc.id || 'missing'})`;
-
-        // Check required fields
-        const missingFields: string[] = [];
-        if (!tc.id) missingFields.push('id');
-        if (!tc.category) missingFields.push('category');
-        if (!tc.query) missingFields.push('query');
-        if (!tc.reference) missingFields.push('reference');
-
-        if (missingFields.length > 0) {
-            throw new Error(
-                `${testCaseRef}: Missing or empty required field(s): ${missingFields.join(', ')}\n` +
-                    `Required fields: id, category, query, reference\n` +
-                    `Test case: ${JSON.stringify(tc, null, 2)}`,
-            );
-        }
-
-        // Check for duplicate IDs
-        if (seenIds.has(tc.id)) {
-            throw new Error(
-                `${testCaseRef}: Duplicate test case ID '${tc.id}'\n` + `Each test case must have a unique ID.`,
-            );
-        }
-        seenIds.add(tc.id);
-    }
-
-    return testCases;
+export function resolveTestCasesPath(filePath?: string): string {
+    return filePath ? path.resolve(filePath) : DEFAULT_TEST_CASES_PATH;
 }
 
-/**
- * Filter test cases by ID or category
- * Wrapper around shared filter function
- */
-export function filterTestCases(
-    testCases: WorkflowTestCase[],
-    options: { id?: string; category?: string },
-): WorkflowTestCase[] {
-    return filterTestCasesShared(testCases, options);
+/** Takes an absolute path from `resolveTestCasesPath`. */
+export function loadTestCases(testCasesPath: string): WorkflowTestCase[] {
+    return WorkflowTestCasesValidator.parse(loadTestCasesShared(testCasesPath).testCases);
 }
 
-/**
- * Load test cases with line number metadata
- * Tracks which lines each test case spans in the JSON file
- *
- * @param filePath - Optional path to test cases JSON file
- * @returns Test cases with line numbers and total line count
- */
-export function loadTestCasesWithLineNumbers(filePath?: string): {
-    testCases: WorkflowTestCaseWithLineNumbers[];
-    totalLines: number;
-} {
-    const testCasesPath = filePath || path.join(process.cwd(), 'evals/workflows/test_cases.json');
-
-    if (!fs.existsSync(testCasesPath)) {
-        throw new Error(`Test cases file not found: ${testCasesPath}`);
+/** Line span of one test case object in the raw JSON, located by its "id" field. */
+function findLineSpan(fileContent: string, id: string): TestCaseWithLineNumbers {
+    const idPosition = fileContent.indexOf(`"id": "${id}"`);
+    if (idPosition === -1) {
+        throw new Error(`Failed to find test case with id "${id}" in file`);
     }
 
-    // Read file content and parse
-    const fileContent = fs.readFileSync(testCasesPath, 'utf-8');
-    const lines = fileContent.split('\n');
-    const totalLines = lines.length;
+    // Walk back to the '{' opening this test case, then forward to its match.
+    let braceStart = idPosition;
+    while (braceStart > 0 && fileContent[braceStart] !== '{') braceStart--;
 
-    // Parse JSON
-    const testData = JSON.parse(fileContent);
-    const testCases = testData.testCases as WorkflowTestCase[];
-
-    // Validate test cases (same as loadTestCases)
-    const seenIds = new Set<string>();
-
-    for (let i = 0; i < testCases.length; i++) {
-        const tc = testCases[i];
-        const testCaseRef = `Test case #${i + 1} (id: ${tc.id || 'missing'})`;
-
-        // Check required fields
-        const missingFields: string[] = [];
-        if (!tc.id) missingFields.push('id');
-        if (!tc.category) missingFields.push('category');
-        if (!tc.query) missingFields.push('query');
-        if (!tc.reference) missingFields.push('reference');
-
-        if (missingFields.length > 0) {
-            throw new Error(
-                `${testCaseRef}: Missing or empty required field(s): ${missingFields.join(', ')}\n` +
-                    `Required fields: id, category, query, reference\n` +
-                    `Test case: ${JSON.stringify(tc, null, 2)}`,
-            );
-        }
-
-        // Check for duplicate IDs
-        if (seenIds.has(tc.id)) {
-            throw new Error(
-                `${testCaseRef}: Duplicate test case ID '${tc.id}'\n` + `Each test case must have a unique ID.`,
-            );
-        }
-        seenIds.add(tc.id);
-    }
-
-    // Attach line numbers to each test case by finding their position in the file
-    const testCasesWithLines: WorkflowTestCaseWithLineNumbers[] = [];
-
-    for (const tc of testCases) {
-        // Find this test case's "id" field in the file to locate it
-        const searchPattern = `"id": "${tc.id}"`;
-        const idPosition = fileContent.indexOf(searchPattern);
-
-        if (idPosition === -1) {
-            throw new Error(`Failed to find test case with id "${tc.id}" in file`);
-        }
-
-        // Count newlines up to this position to get line start
-        const contentBeforeId = fileContent.substring(0, idPosition);
-        const lineStart = contentBeforeId.split('\n').length;
-
-        // Find the closing brace for this test case object
-        // Start from the opening brace before the id field
-        let braceStart = idPosition;
-        while (braceStart > 0 && fileContent[braceStart] !== '{') {
-            braceStart--;
-        }
-
-        // Now count braces forward from here
-        let braceCount = 0;
-        let endPosition = braceStart;
-
-        for (let j = braceStart; j < fileContent.length; j++) {
-            if (fileContent[j] === '{') {
-                braceCount++;
-            }
-            if (fileContent[j] === '}') {
-                braceCount--;
-                if (braceCount === 0) {
-                    endPosition = j;
-                    break;
-                }
+    let depth = 0;
+    let endPosition = braceStart;
+    for (let i = braceStart; i < fileContent.length; i++) {
+        if (fileContent[i] === '{') depth++;
+        if (fileContent[i] === '}') {
+            depth--;
+            if (depth === 0) {
+                endPosition = i;
+                break;
             }
         }
-
-        // Count newlines up to end position
-        const contentToEnd = fileContent.substring(0, endPosition + 1);
-        const lineEnd = contentToEnd.split('\n').length;
-
-        testCasesWithLines.push({
-            ...tc,
-            _lineStart: lineStart,
-            _lineEnd: lineEnd,
-        });
     }
 
     return {
-        testCases: testCasesWithLines,
-        totalLines,
+        _lineStart: fileContent.substring(0, idPosition).split('\n').length,
+        _lineEnd: fileContent.substring(0, endPosition + 1).split('\n').length,
+    };
+}
+
+/** Like `loadTestCases`, plus the line span each case occupies, for `--lines` filtering. */
+export function loadTestCasesWithLineNumbers(testCasesPath: string): {
+    testCases: WorkflowTestCaseWithLineNumbers[];
+    totalLines: number;
+} {
+    const testCases = loadTestCases(testCasesPath);
+    const fileContent = fs.readFileSync(testCasesPath, 'utf-8');
+
+    return {
+        testCases: testCases.map((testCase) => ({ ...testCase, ...findLineSpan(fileContent, testCase.id) })),
+        totalLines: fileContent.split('\n').length,
     };
 }

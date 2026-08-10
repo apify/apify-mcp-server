@@ -21,6 +21,7 @@ import { hideBin } from 'yargs/helpers';
 import { filterByLineRanges } from '../shared/line_range_filter.js';
 import type { LineRange } from '../shared/line_range_parser.js';
 import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line_range_parser.js';
+import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config.js';
 import { executeConversation } from './conversation_executor.js';
 import { LlmClient } from './llm_client.js';
@@ -34,7 +35,7 @@ import {
     updateResultsWithEvaluations,
 } from './results_writer.js';
 import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test_cases_loader.js';
-import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test_cases_loader.js';
+import { loadTestCases, loadTestCasesWithLineNumbers, resolveTestCasesPath } from './test_cases_loader.js';
 import { evaluateConversation } from './workflow_judge.js';
 
 type CliArgs = {
@@ -243,12 +244,12 @@ async function main() {
     try {
         if (argv.lines) {
             // Load with line number metadata
-            const result = loadTestCasesWithLineNumbers(argv.testCasesPath);
+            const result = loadTestCasesWithLineNumbers(resolveTestCasesPath(argv.testCasesPath));
             testCases = result.testCases;
             totalLines = result.totalLines;
         } else {
             // Normal load (no line tracking overhead)
-            testCases = loadTestCases(argv.testCasesPath);
+            testCases = loadTestCases(resolveTestCasesPath(argv.testCasesPath));
         }
     } catch (error) {
         console.error(`❌ Failed to load test cases: ${error}`);
@@ -295,10 +296,8 @@ async function main() {
     }
 
     // Then apply ID/category filters
-    filteredTestCases = filterTestCases(filteredTestCases, {
-        id: argv.id,
-        category: argv.category,
-    });
+    if (argv.id) filteredTestCases = filterById(filteredTestCases, argv.id);
+    if (argv.category) filteredTestCases = filterByCategory(filteredTestCases, argv.category);
 
     if (filteredTestCases.length === 0) {
         console.log('⚠️  No test cases found matching the filters.');
