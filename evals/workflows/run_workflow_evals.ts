@@ -29,7 +29,7 @@ import { findMissingEnvVars } from '../shared/config.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { resolveDatasetName, syncDataset } from './langfuse_dataset.js';
-import { buildRunSummary, evaluators, makeTask } from './langfuse_experiment.js';
+import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_experiment.js';
 import { initTracing, LANGFUSE_ENV_VARS, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
 import { loadTestCases, resolveTestCasesPath } from './test_cases_loader.js';
@@ -134,7 +134,7 @@ async function main() {
                 // SDK dropped pull the rate down instead of vanishing from it.
                 async ({ itemResults }) => ({
                     name: 'pass_rate',
-                    value: buildRunSummary(requestedIds, itemResults).passedCount / requestedIds.length,
+                    value: countPassed(itemResults) / requestedIds.length,
                 }),
             ],
             maxConcurrency: argv.concurrency,
@@ -158,7 +158,9 @@ async function main() {
         console.log(`📊 ${summary.passedCount}/${requestedIds.length} passed`);
         console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" (view in Langfuse)`}`);
 
-        exitCode = summary.exitCode;
+        // 0 only when every requested item ran and passed: a dropped item leaves
+        // passedCount short of the request, so this covers it too.
+        exitCode = summary.passedCount === requestedIds.length ? 0 : 1;
     } catch (error) {
         console.error(`❌ Run failed: ${error instanceof Error ? error.message : String(error)}`);
         exitCode = 1;

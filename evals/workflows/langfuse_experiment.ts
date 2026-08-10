@@ -16,37 +16,60 @@ import type { ConversationHistory } from './types.js';
 import type { JudgeResult } from './workflow_judge.js';
 import { evaluateConversation } from './workflow_judge.js';
 
-/** Output produced by the experiment task for a single dataset item. */
+/**
+ * Output produced by the experiment task for a single dataset item.
+ *
+ * A summary, not the transcript: the SDK writes whatever the task returns to the
+ * item's root span, and the conversation is already in the trace as the per-tool and
+ * per-generation observations. Returning it again would upload every tool payload a
+ * third time and hold all transcripts in memory until the run ends.
+ */
 export type WorkflowTaskOutput = {
-    /** Dataset item id, so the run summary can name items without re-reading them. */
+    /**
+     * Dataset item id, so the run summary can name items. Carried here rather than read
+     * from `ExperimentItemResult.item`: the SDK types that as a union whose non-dataset
+     * branch declares no `id`, so reading it would need an unchecked cast.
+     */
     id: string;
-    conversation: ConversationHistory;
     judgeResult: JudgeResult;
+    /** Agent tokens across the conversation; undefined when the provider never reported usage. */
+    totalTokens?: number;
+    /** UTF-8 bytes of tool results returned to the agent. */
+    resultBytes: number;
 };
 
+/** UTF-8 bytes of every tool result the agent received, across all turns. */
+export function sumResultBytes(conversation: ConversationHistory): number {
+    return conversation.turns
+        .flatMap((turn) => turn.toolResults)
+        .reduce((total, toolResult) => total + (toolResult.resultBytes ?? 0), 0);
+}
+
+type WorkflowEvaluator = (params: { output: WorkflowTaskOutput }) => Promise<Evaluation | Evaluation[]>;
+
 /** The evaluators attached to each experiment item. */
-export const evaluators = [
-    async ({ output }: { output: WorkflowTaskOutput }): Promise<Evaluation> => ({
+export const evaluators: WorkflowEvaluator[] = [
+    async ({ output }) => ({
         name: 'workflow_judge',
         value: output.judgeResult.verdict === 'PASS' ? 1 : 0,
         comment: output.judgeResult.reason,
     }),
     // No score when the provider never reported usage. A 0 would read as a real
     // measurement and skew cross-run model comparisons in Langfuse.
-    async ({ output }: { output: WorkflowTaskOutput }): Promise<Evaluation[]> =>
-        output.conversation.totalTokens === undefined
-            ? []
-            : [{ name: 'total_tokens', value: output.conversation.totalTokens }],
-    async ({ output }: { output: WorkflowTaskOutput }): Promise<Evaluation> => ({
-        name: 'result_bytes',
-        value: output.conversation.turns
-            .flatMap((turn) => turn.toolResults)
-            .reduce((total, toolResult) => total + (toolResult.resultBytes ?? 0), 0),
-    }),
+    async ({ output }) =>
+        output.totalTokens === undefined ? [] : [{ name: 'total_tokens', value: output.totalTokens }],
+    async ({ output }) => ({ name: 'result_bytes', value: output.resultBytes }),
 ];
 
 /** Minimal view of an ExperimentItemResult: what the run gate reads. */
 type ScoredItem = { output: WorkflowTaskOutput; evaluations: { name: string; value?: unknown }[] };
+
+/** Items that scored `workflow_judge === 1`. */
+export function countPassed(itemResults: ScoredItem[]): number {
+    return itemResults.filter(
+        (result) => result.evaluations.find((evaluation) => evaluation.name === 'workflow_judge')?.value === 1,
+    ).length;
+}
 
 export type RunSummary = {
     /** Items that scored workflow_judge === 1. */
@@ -55,8 +78,6 @@ export type RunSummary = {
     failures: { id: string; reason: string }[];
     /** Requested ids with no result at all: the task threw and the SDK skipped the item. */
     droppedIds: string[];
-    /** 0 only when every requested item ran and passed. */
-    exitCode: number;
 };
 
 /**
@@ -68,14 +89,10 @@ export type RunSummary = {
  */
 export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[]): RunSummary {
     const failures: { id: string; reason: string }[] = [];
-    let passedCount = 0;
 
     for (const result of itemResults) {
         const judgeScore = result.evaluations.find((evaluation) => evaluation.name === 'workflow_judge')?.value;
-        if (judgeScore === 1) {
-            passedCount += 1;
-            continue;
-        }
+        if (judgeScore === 1) continue;
         // No score means the evaluator itself threw, so judgeResult.reason is stale - it can
         // hold the judge's PASS rationale, printed under a failure marker. Say what happened.
         failures.push({
@@ -88,10 +105,12 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
     }
 
     const completedIds = new Set(itemResults.map((result) => result.output.id));
-    const droppedIds = requestedIds.filter((id) => !completedIds.has(id));
-    const isPass = requestedIds.length > 0 && droppedIds.length === 0 && passedCount === requestedIds.length;
 
-    return { passedCount, failures, droppedIds, exitCode: isPass ? 0 : 1 };
+    return {
+        passedCount: countPassed(itemResults),
+        failures,
+        droppedIds: requestedIds.filter((id) => !completedIds.has(id)),
+    };
 }
 
 export type WorkflowTaskOptions = {
@@ -133,7 +152,13 @@ export function makeTask(options: WorkflowTaskOptions) {
             });
 
             const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
-            return { id: item.id, conversation, judgeResult };
+
+            return {
+                id: item.id,
+                judgeResult,
+                totalTokens: conversation.totalTokens,
+                resultBytes: sumResultBytes(conversation),
+            };
         } catch (error) {
             throw new Error(`Item "${item.id}": ${error instanceof Error ? error.message : String(error)}`, {
                 cause: error,

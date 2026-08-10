@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
     buildRunSummary,
+    countPassed,
     evaluators,
     makeTask,
+    sumResultBytes,
     type WorkflowTaskOutput,
 } from '../../evals/workflows/langfuse_experiment.js';
 import type { LlmClient } from '../../evals/workflows/llm_client.js';
@@ -21,32 +23,18 @@ vi.mock('../../evals/workflows/mcp_client.js', () => ({
 }));
 
 function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOutput {
-    const conversation: ConversationHistory = {
-        userPrompt: 'q',
-        turns: [
-            {
-                turnNumber: 1,
-                toolCalls: [],
-                toolResults: [
-                    { toolName: 'a', success: true, resultBytes: 100 },
-                    { toolName: 'b', success: true },
-                ],
-            },
-            { turnNumber: 2, toolCalls: [], toolResults: [{ toolName: 'c', success: true, resultBytes: 25 }] },
-        ],
-        totalTokens: 1234,
-    };
     return {
         id: 'search-001',
-        conversation,
         judgeResult: { verdict: 'PASS', reason: 'looks good', rawResponse: '' },
+        totalTokens: 1234,
+        resultBytes: 125,
         ...overrides,
     };
 }
 
 /** An item result as the SDK hands it to the run gate. */
-function makeScoredItem(output: WorkflowTaskOutput, judgeValue: number) {
-    return { output, evaluations: [{ name: 'workflow_judge', value: judgeValue }] };
+function makeScoredItem(id: string, judgeValue: number, output: Partial<WorkflowTaskOutput> = {}) {
+    return { output: makeOutput({ id, ...output }), evaluations: [{ name: 'workflow_judge', value: judgeValue }] };
 }
 
 describe('evaluators', () => {
@@ -68,12 +56,10 @@ describe('evaluators', () => {
     });
 
     it('emits no token score when the provider never reported usage', async () => {
-        const output = makeOutput();
-        output.conversation.totalTokens = undefined;
-        expect(await evaluators[1]({ output })).toEqual([]);
+        expect(await evaluators[1]({ output: makeOutput({ totalTokens: undefined }) })).toEqual([]);
     });
 
-    it('sums tool-result bytes across all turns, treating missing sizes as 0', async () => {
+    it('reports the tool-result byte total', async () => {
         expect(await evaluators[2]({ output: makeOutput() })).toEqual({ name: 'result_bytes', value: 125 });
     });
 });
@@ -94,44 +80,66 @@ describe('makeTask()', () => {
     });
 });
 
+describe('sumResultBytes()', () => {
+    it('sums tool-result bytes across all turns, treating missing sizes as 0', () => {
+        const conversation: ConversationHistory = {
+            userPrompt: 'q',
+            turns: [
+                {
+                    turnNumber: 1,
+                    toolCalls: [],
+                    toolResults: [
+                        { toolName: 'a', success: true, resultBytes: 100 },
+                        { toolName: 'b', success: true },
+                    ],
+                },
+                { turnNumber: 2, toolCalls: [], toolResults: [{ toolName: 'c', success: true, resultBytes: 25 }] },
+            ],
+        };
+        expect(sumResultBytes(conversation)).toBe(125);
+    });
+});
+
 describe('buildRunSummary()', () => {
-    it('exits 0 when every requested item ran and passed', () => {
-        const itemResults = [makeScoredItem(makeOutput({ id: 'a' }), 1), makeScoredItem(makeOutput({ id: 'b' }), 1)];
-        expect(buildRunSummary(['a', 'b'], itemResults)).toEqual({
+    it('counts every requested item that passed', () => {
+        expect(buildRunSummary(['a', 'b'], [makeScoredItem('a', 1), makeScoredItem('b', 1)])).toEqual({
             passedCount: 2,
             failures: [],
             droppedIds: [],
-            exitCode: 0,
         });
     });
 
-    it('exits 1 and names the failure when an item scored 0', () => {
-        const failing = makeOutput({ id: 'b', judgeResult: { verdict: 'FAIL', reason: 'missed X', rawResponse: '' } });
-        const summary = buildRunSummary(
-            ['a', 'b'],
-            [makeScoredItem(makeOutput({ id: 'a' }), 1), makeScoredItem(failing, 0)],
-        );
+    it('names the failure when an item scored 0', () => {
+        const failing = { judgeResult: { verdict: 'FAIL' as const, reason: 'missed X', rawResponse: '' } };
+        const summary = buildRunSummary(['a', 'b'], [makeScoredItem('a', 1), makeScoredItem('b', 0, failing)]);
         expect(summary.passedCount).toBe(1);
         expect(summary.failures).toEqual([{ id: 'b', reason: 'missed X' }]);
-        expect(summary.exitCode).toBe(1);
     });
 
-    it('exits 1 when the SDK dropped an item, instead of shrinking the denominator', () => {
-        const summary = buildRunSummary(['a', 'b', 'c'], [makeScoredItem(makeOutput({ id: 'a' }), 1)]);
+    it('reports items the SDK dropped instead of shrinking the denominator', () => {
+        const summary = buildRunSummary(['a', 'b', 'c'], [makeScoredItem('a', 1)]);
         expect(summary.passedCount).toBe(1);
         expect(summary.droppedIds).toEqual(['b', 'c']);
-        expect(summary.exitCode).toBe(1);
     });
 
-    it('exits 1 when nothing ran at all', () => {
-        expect(buildRunSummary(['a'], []).exitCode).toBe(1);
-        expect(buildRunSummary([], []).exitCode).toBe(1);
+    it('reports every requested id as dropped when nothing ran at all', () => {
+        expect(buildRunSummary(['a'], [])).toEqual({ passedCount: 0, failures: [], droppedIds: ['a'] });
     });
 
     it('treats a missing workflow_judge score as a failure, without quoting the stale judge reason', () => {
         const summary = buildRunSummary(['a'], [{ output: makeOutput({ id: 'a' }), evaluations: [] }]);
         expect(summary.passedCount).toBe(0);
-        expect(summary.exitCode).toBe(1);
         expect(summary.failures).toEqual([{ id: 'a', reason: 'no workflow_judge score (the evaluator threw)' }]);
+    });
+});
+
+describe('countPassed()', () => {
+    it('counts only items scored 1, ignoring failures and missing scores', () => {
+        const itemResults = [
+            makeScoredItem('a', 1),
+            makeScoredItem('b', 0),
+            { output: makeOutput({ id: 'c' }), evaluations: [] },
+        ];
+        expect(countPassed(itemResults)).toBe(1);
     });
 });
