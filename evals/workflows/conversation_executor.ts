@@ -71,11 +71,9 @@ export async function executeConversation(options: ConversationExecutorOptions):
     ];
 
     let turnNumber = 0;
-    let completed = false;
-    let promptTokens = 0;
-    let completionTokens = 0;
-    // Track whether the provider ever reported usage; if it never does, totals stay undefined
-    // rather than a fabricated 0 that reads as a real measurement.
+    let totalTokens = 0;
+    // Track whether the provider ever reported usage; if it never does, the total stays
+    // undefined rather than a fabricated 0 that reads as a real measurement.
     let hasUsage = false;
 
     // Fetch tools initially
@@ -90,8 +88,7 @@ export async function executeConversation(options: ConversationExecutorOptions):
         // Accumulate token usage across the agent loop (cost grows with tool-result size)
         if (llmResponse.usage) {
             hasUsage = true;
-            promptTokens += llmResponse.usage.promptTokens;
-            completionTokens += llmResponse.usage.completionTokens;
+            totalTokens += llmResponse.usage.totalTokens;
         }
 
         // Check if LLM wants to call tools
@@ -104,7 +101,6 @@ export async function executeConversation(options: ConversationExecutorOptions):
                 finalResponse: llmResponse.content || '',
             });
 
-            completed = true;
             break;
         }
 
@@ -191,11 +187,6 @@ export async function executeConversation(options: ConversationExecutorOptions):
     return {
         userPrompt,
         turns,
-        completed,
-        hitMaxTurns: turnNumber >= maxTurns && !completed,
-        totalTurns: turnNumber,
-        promptTokens: hasUsage ? promptTokens : undefined,
-        completionTokens: hasUsage ? completionTokens : undefined,
-        totalTokens: hasUsage ? promptTokens + completionTokens : undefined,
+        totalTokens: hasUsage ? totalTokens : undefined,
     };
 }

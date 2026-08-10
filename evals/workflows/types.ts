@@ -63,23 +63,13 @@ export type ConversationTurn = {
 };
 
 /**
- * Complete conversation history
+ * Complete conversation history: what the judge reads and what the experiment scores.
  */
 export type ConversationHistory = {
     /** Initial user prompt */
     userPrompt: string;
     /** All turns in the conversation */
     turns: ConversationTurn[];
-    /** Whether conversation completed successfully */
-    completed: boolean;
-    /** Whether conversation hit max turns limit */
-    hitMaxTurns: boolean;
-    /** Total number of turns */
-    totalTurns: number;
-    /** Prompt tokens billed across all agent LLM calls (sum over turns; judge calls excluded) */
-    promptTokens?: number;
-    /** Completion tokens billed across all agent LLM calls */
-    completionTokens?: number;
-    /** Total tokens billed across all agent LLM calls (prompt + completion) */
+    /** Total tokens billed across all agent LLM calls (undefined if the provider never reported usage) */
     totalTokens?: number;
 };

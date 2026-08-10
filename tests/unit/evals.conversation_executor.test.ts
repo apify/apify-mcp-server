@@ -49,8 +49,6 @@ describe('executeConversation()', () => {
             ]),
         });
 
-        expect(conversation.promptTokens).toBe(30);
-        expect(conversation.completionTokens).toBe(12);
         expect(conversation.totalTokens).toBe(42);
     });
 
@@ -66,15 +64,13 @@ describe('executeConversation()', () => {
         expect(toolResult.resultBytes).toBe(Buffer.byteLength(JSON.stringify(toolResult.result), 'utf8'));
     });
 
-    it('leaves token totals undefined when the provider never reports usage', async () => {
+    it('leaves the token total undefined when the provider never reports usage', async () => {
         const conversation = await executeConversation({
             userPrompt: 'go',
             mcpClient: makeMcpClient({ toolName: 'search-actors', success: true, result: { items: [] } }),
             llmClient: makeLlmClient([toolCallResponse(), finalResponse()]),
         });
 
-        expect(conversation.promptTokens).toBeUndefined();
-        expect(conversation.completionTokens).toBeUndefined();
         expect(conversation.totalTokens).toBeUndefined();
     });
 
@@ -107,8 +103,6 @@ describe('executeConversation()', () => {
             ]),
         });
 
-        expect(conversation.promptTokens).toBe(20);
-        expect(conversation.completionTokens).toBe(7);
         expect(conversation.totalTokens).toBe(27);
     });
 });

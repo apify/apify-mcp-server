@@ -34,9 +34,6 @@ function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOu
             },
             { turnNumber: 2, toolCalls: [], toolResults: [{ toolName: 'c', success: true, resultBytes: 25 }] },
         ],
-        completed: true,
-        hitMaxTurns: false,
-        totalTurns: 2,
         totalTokens: 1234,
     };
     return {
