@@ -44,9 +44,11 @@ async function main() {
 
     const testCasesPath = resolveTestCasesPath(argv.testCasesPath);
     const datasetName = resolveDatasetName(testCasesPath);
-    const items = await syncDataset(new LangfuseClient(), datasetName, loadTestCases(testCasesPath));
+    const testCases = loadTestCases(testCasesPath);
+    console.log(`📇 Syncing ${testCases.length} test case(s) into dataset "${datasetName}"...`);
+    const items = await syncDataset(new LangfuseClient(), datasetName, testCases);
 
-    console.log(`✅ Dataset "${datasetName}" now has ${items.length} item(s)`);
+    console.log(`✅ Dataset "${datasetName}" now has ${items.size} item(s)`);
 }
 
 void main();

@@ -28,7 +28,7 @@ import { hideBin } from 'yargs/helpers';
 import { findMissingEnvVars } from '../shared/config.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
-import { resolveDatasetName, resolveItemId, syncDataset } from './langfuse_dataset.js';
+import { resolveDatasetName, syncDataset } from './langfuse_dataset.js';
 import { buildRunSummary, evaluators, makeTask } from './langfuse_experiment.js';
 import { initTracing, LANGFUSE_ENV_VARS, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
@@ -94,15 +94,15 @@ async function main() {
         // filter what comes back. Running on real dataset items is what makes the run
         // a Langfuse dataset run, comparable with every other run.
         const testCases = loadTestCases(testCasesPath);
-        const items = await syncDataset(langfuse, datasetName, testCases);
+        console.log(`📇 Syncing ${testCases.length} test case(s) into dataset "${datasetName}"...`);
+        const itemsByTestCaseId = await syncDataset(langfuse, datasetName, testCases);
 
         // Match on the test cases with the shared helpers, then pick the dataset items
         // they map to. One matching rule for every entry point that filters test cases.
         let selected = testCases;
         if (argv.id) selected = filterById(selected, argv.id);
         if (argv.category) selected = filterByCategory(selected, argv.category);
-        const selectedIds = new Set(selected.map((testCase) => resolveItemId(datasetName, testCase.id)));
-        const data = items.filter((item) => selectedIds.has(item.id));
+        const data = selected.flatMap((testCase) => itemsByTestCaseId.get(testCase.id) ?? []);
         if (data.length === 0) {
             throw new Error(`No test case in "${datasetName}" matches --id/--category`);
         }

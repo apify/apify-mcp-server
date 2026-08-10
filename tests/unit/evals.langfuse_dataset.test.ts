@@ -5,7 +5,6 @@ import {
     type DatasetItem,
     parseWorkflowItem,
     resolveDatasetName,
-    resolveItemId,
     syncDataset,
     WORKFLOW_DATASET_NAME,
 } from '../../evals/workflows/langfuse_dataset.js';
@@ -42,18 +41,6 @@ describe('resolveDatasetName()', () => {
 
     it('keeps same-named files in different directories apart', () => {
         expect(resolveDatasetName('/tmp/a/scratch.json')).not.toBe(resolveDatasetName('/tmp/b/scratch.json'));
-    });
-});
-
-describe('resolveItemId()', () => {
-    it('keeps bare test case ids on the canonical dataset, preserving its run history', () => {
-        expect(resolveItemId(WORKFLOW_DATASET_NAME, 'search-001')).toBe('search-001');
-    });
-
-    it('namespaces items of a scratch dataset, since ids cannot be reused across datasets', () => {
-        expect(resolveItemId('workflow-evals-scratch-1a2b3c4d', 'search-001')).toBe(
-            'workflow-evals-scratch-1a2b3c4d:search-001',
-        );
     });
 });
 
@@ -100,18 +87,20 @@ describe('syncDataset()', () => {
         ]);
     });
 
-    it('namespaces the ids it upserts into a scratch dataset', async () => {
+    it('namespaces the ids it upserts into a scratch dataset, since ids cannot be reused across datasets', async () => {
         const { client, created } = makeLangfuseClient();
-        await syncDataset(client, 'scratch', [testCase]);
+        const items = await syncDataset(client, 'scratch', [testCase]);
 
         expect(created[0].id).toBe('scratch:search-001');
+        // Keyed by test case id, so no caller has to re-derive the namespacing rule.
+        expect(items.get('search-001')?.id).toBe('scratch:search-001');
     });
 
     it('returns the created items so the caller never re-fetches the dataset', async () => {
         const { client } = makeLangfuseClient();
         const items = await syncDataset(client, WORKFLOW_DATASET_NAME, [testCase, { ...testCase, id: 'search-002' }]);
 
-        expect(items.map((item) => item.id)).toEqual(['search-001', 'search-002']);
-        expect(items.every((item) => item.datasetId === 'ds-1')).toBe(true);
+        expect([...items.keys()]).toEqual(['search-001', 'search-002']);
+        expect([...items.values()].every((item) => item.datasetId === 'ds-1')).toBe(true);
     });
 });

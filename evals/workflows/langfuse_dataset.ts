@@ -59,7 +59,7 @@ export function parseWorkflowItem(item: unknown): WorkflowItem {
  */
 export function resolveDatasetName(testCasesPath: string): string {
     if (testCasesPath === DEFAULT_TEST_CASES_PATH) return WORKFLOW_DATASET_NAME;
-    const digest = createHash('sha1').update(testCasesPath).digest('hex').slice(0, 8);
+    const digest = createHash('sha256').update(testCasesPath).digest('hex').slice(0, 8);
     return `${WORKFLOW_DATASET_NAME}-${path.basename(testCasesPath, '.json')}-${digest}`;
 }
 
@@ -71,42 +71,46 @@ export function resolveDatasetName(testCasesPath: string): string {
  * instead of isolating anything. Non-canonical datasets namespace their items;
  * the canonical dataset keeps bare test case ids so its existing items and their
  * run history survive.
+ *
+ * Private on purpose: `syncDataset` returns items keyed by test case id, so no
+ * caller has to re-derive this mapping.
  */
-export function resolveItemId(datasetName: string, testCaseId: string): string {
+function resolveItemId(datasetName: string, testCaseId: string): string {
     return datasetName === WORKFLOW_DATASET_NAME ? testCaseId : `${datasetName}:${testCaseId}`;
 }
 
 /**
  * Get-or-create the dataset and upsert every test case into it, keyed by test case id.
  *
- * Returns the created items. They already carry the id, datasetId, input,
- * expectedOutput and metadata that `experiment.run` needs, so the caller never
- * has to fetch the dataset back. Errors are left to throw: a 401 or a wrong base
- * URL must stop the run, not be downgraded to a warning.
+ * Returns the created items keyed by test case id. They already carry the id,
+ * datasetId, input, expectedOutput and metadata that `experiment.run` needs, so the
+ * caller never has to fetch the dataset back, nor reproduce the item-id rule to look
+ * one up. Errors are left to throw: a 401 or a wrong base URL must stop the run, not
+ * be downgraded to a warning.
  */
 export async function syncDataset(
     langfuse: LangfuseClient,
     datasetName: string,
     testCases: WorkflowTestCase[],
-): Promise<DatasetItem[]> {
-    // eslint-disable-next-line no-console
-    console.log(`📇 Syncing ${testCases.length} test case(s) into dataset "${datasetName}"...`);
-
+): Promise<Map<string, DatasetItem>> {
     await langfuse.api.datasets.create({
         name: datasetName,
         description: 'Multi-turn workflow evals for the Apify MCP server (mirrors test_cases.json).',
     });
 
     // There is no batch item endpoint, so concurrency is the only lever here.
-    return Promise.all(
-        testCases.map(async ({ id, query, reference, ...knobs }) =>
-            langfuse.dataset.createItem({
+    const items = await Promise.all(
+        testCases.map(async ({ id, query, reference, ...knobs }) => {
+            const item = await langfuse.dataset.createItem({
                 datasetName,
                 id: resolveItemId(datasetName, id),
                 input: { query },
                 expectedOutput: reference,
                 metadata: knobs,
-            }),
-        ),
+            });
+            return [id, item] as const;
+        }),
     );
+
+    return new Map(items);
 }
