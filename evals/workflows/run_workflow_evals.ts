@@ -18,9 +18,6 @@ import pLimit from 'p-limit';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
-import { filterByLineRanges } from '../shared/line_range_filter.js';
-import type { LineRange } from '../shared/line_range_parser.js';
-import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line_range_parser.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config.js';
 import { executeConversation } from './conversation_executor.js';
 import { LlmClient } from './llm_client.js';
@@ -33,14 +30,13 @@ import {
     saveResultsDatabase,
     updateResultsWithEvaluations,
 } from './results_writer.js';
-import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test_cases_loader.js';
-import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test_cases_loader.js';
+import type { WorkflowTestCase } from './test_cases_loader.js';
+import { filterTestCases, loadTestCases } from './test_cases_loader.js';
 import { evaluateConversation } from './workflow_judge.js';
 
 type CliArgs = {
     category?: string;
     id?: string;
-    lines?: string;
     verbose?: boolean;
     testCasesPath?: string;
     agentModel?: string;
@@ -165,13 +161,6 @@ async function main() {
             type: 'string',
             description: 'Run specific test case by ID',
         })
-        .option('lines', {
-            alias: 'l',
-            type: 'string',
-            description:
-                'Filter by line range in test-cases.json ' +
-                '(format: "start-end" or single line, comma-separated, e.g., "10-20,50-60,100")',
-        })
         .option('verbose', {
             type: 'boolean',
             description: 'Show detailed output for each test',
@@ -235,79 +224,27 @@ async function main() {
         process.exit(1);
     }
 
-    // Load test cases (with or without line numbers based on --lines flag)
     console.log('📂 Loading test cases...');
-    let testCases: WorkflowTestCase[] | WorkflowTestCaseWithLineNumbers[];
-    let totalLines: number | undefined;
+    let testCases: WorkflowTestCase[];
 
     try {
-        if (argv.lines) {
-            // Load with line number metadata
-            const result = loadTestCasesWithLineNumbers(argv.testCasesPath);
-            testCases = result.testCases;
-            totalLines = result.totalLines;
-        } else {
-            // Normal load (no line tracking overhead)
-            testCases = loadTestCases(argv.testCasesPath);
-        }
+        testCases = loadTestCases(argv.testCasesPath);
     } catch (error) {
         console.error(`❌ Failed to load test cases: ${error}`);
         process.exit(1);
     }
 
-    // Parse and validate line ranges (if provided)
-    let lineRanges: LineRange[] | undefined;
-    if (argv.lines) {
-        try {
-            lineRanges = parseLineRanges(argv.lines);
-            validateLineRanges(lineRanges);
-
-            // Check if ranges are out of bounds
-            if (checkRangesOutOfBounds(lineRanges, totalLines!)) {
-                console.error(`❌ Error: Line range out of bounds`);
-                console.error(`   Test cases file has ${totalLines} lines`);
-                console.error(`   Requested ranges: ${argv.lines}`);
-                console.log('');
-                process.exit(1);
-            }
-        } catch (error) {
-            console.error(`❌ Failed to parse line ranges: ${error}`);
-            console.log('');
-            console.log('Usage: --lines <range>');
-            console.log('  Single line:      --lines 100');
-            console.log('  Range:            --lines 10-20');
-            console.log('  Multiple ranges:  --lines 10-20,50-60,100');
-            console.log('');
-            process.exit(1);
-        }
-    }
-
-    // Apply filters (AND logic)
-    let filteredTestCases = testCases;
-
-    // Filter by line ranges first (if provided)
-    if (lineRanges && testCases.length > 0 && '_lineStart' in testCases[0]) {
-        filteredTestCases = filterByLineRanges(
-            filteredTestCases as WorkflowTestCaseWithLineNumbers[],
-            lineRanges,
-        ) as WorkflowTestCase[];
-        console.log(`🔍 Filtered by line ranges ${argv.lines}: ${filteredTestCases.length} test case(s)`);
-    }
-
-    // Then apply ID/category filters
-    filteredTestCases = filterTestCases(filteredTestCases, {
+    const filteredTestCases = filterTestCases(testCases, {
         id: argv.id,
         category: argv.category,
     });
 
     if (filteredTestCases.length === 0) {
         console.log('⚠️  No test cases found matching the filters.');
-        if (!argv.lines) {
-            console.log('');
-            console.log('Available test cases:');
-            for (const tc of testCases) {
-                console.log(`  - ${tc.id} (${tc.category}): ${tc.query}`);
-            }
+        console.log('');
+        console.log('Available test cases:');
+        for (const tc of testCases) {
+            console.log(`  - ${tc.id} (${tc.category}): ${tc.query}`);
         }
         process.exit(0);
     }

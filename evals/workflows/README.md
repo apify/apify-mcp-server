@@ -32,9 +32,6 @@ pnpm run evals:workflow -- --category search
 # Run specific test
 pnpm run evals:workflow -- --id search-google-maps
 
-# Filter by line range in test_cases.json
-pnpm run evals:workflow -- --lines 277-283
-
 # Show detailed conversation logs
 pnpm run evals:workflow -- --verbose
 
@@ -240,7 +237,6 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 |--------|-------|-------------|---------|
 | `--category <name>` | | Filter tests by category | All categories |
 | `--id <id>` | | Run specific test by ID | All tests |
-| `--lines <range>` | `-l` | Filter by line range in test-cases.json | All tests |
 | `--verbose` | | Show detailed conversation logs | `false` |
 | `--test-cases-path <path>` | | Custom test cases file path | `test_cases.json` |
 | `--agent-model <model>` | | Override agent model | `anthropic/claude-haiku-4.5` |
@@ -250,56 +246,6 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 | `--output` | `-o` | Save results to JSON file | `false` |
 | `--baseline <path>` | | Results JSON to compare against (prints byte/token deltas) | `results.json` |
 | `--help` | | Show help message | - |
-
-### Line Range Filtering
-
-The `--lines` (or `-l`) option filters test cases by their line numbers in the `test_cases.json` file.
-
-**Format options:**
-- **Single line:** `--lines 100` (includes tests that contain line 100)
-- **Range:** `--lines 10-20` (includes tests that overlap with lines 10-20)
-- **Multiple ranges:** `--lines 10-20,50-60,100` (comma-separated, includes tests that overlap with any range)
-
-**Overlap logic (inclusive):**
-- A test case is included if it overlaps with ANY specified range
-- Example: `--lines 277-283` includes tests that start before line 283 AND end after line 277
-
-**Combine with other filters (AND logic):**
-```bash
-# Line range + category
-pnpm run evals:workflow -- --lines 100-200 --category call
-
-# Line range + ID pattern
-pnpm run evals:workflow -- --lines 50-100 --id "search.*"
-
-# All three filters
-pnpm run evals:workflow -- --lines 277-283 --category mcp --verbose
-```
-
-**Error handling:**
-- Invalid format (e.g., `abc-def`) → Error with usage examples
-- Invalid range (e.g., `300-200`) → Error: start must be ≤ end
-- Out of bounds (e.g., `500-600` when file has 319 lines) → Error with line count
-
-**Use cases:**
-- Debug specific test cases by examining their location in the JSON file
-- Run tests added in a specific PR by targeting the affected line ranges
-- Quickly iterate on a subset of tests during development
-
-**Examples:**
-```bash
-# Single test at specific line
-pnpm run evals:workflow -- --lines 283
-
-# Range of tests
-pnpm run evals:workflow -- --lines 277-283
-
-# Multiple ranges
-pnpm run evals:workflow -- --lines 10-20,50-60,100-110
-
-# With verbose output for debugging
-pnpm run evals:workflow -- --lines 277-283 --verbose
-```
 
 ### Concurrency
 
