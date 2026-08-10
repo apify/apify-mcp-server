@@ -34,6 +34,9 @@ export type LlmUsage = {
  */
 type OpenRouterUsage = OpenAI.CompletionUsage & { cost?: number };
 
+/** A chat completion request plus OpenRouter's usage-accounting opt-in. */
+type OpenRouterCreateParams = ChatCompletionCreateParamsNonStreaming & { usage?: { include: boolean } };
+
 /**
  * Response from LLM - either text or tool calls
  */
@@ -86,15 +89,20 @@ export class LlmClient {
             async (generation) => {
                 generation.update({ model, input: messages, modelParameters: { temperature: TEMPERATURE } });
 
-                const response = await this.openai.chat.completions.create({
+                // Typed as an intersection rather than cast whole: `usage` is an OpenRouter
+                // extension absent from the OpenAI types, and casting the object literal
+                // would also stop model/messages/tools/response_format being checked.
+                const params: OpenRouterCreateParams = {
                     model,
                     messages,
                     temperature: TEMPERATURE,
-                    // OpenRouter extension, not in the OpenAI types: report what the call cost.
+                    // OpenRouter extension: report what the call cost.
                     usage: { include: true },
                     ...(tools && tools.length > 0 ? { tools } : {}),
                     ...(responseFormat ? { response_format: responseFormat } : {}),
-                } as ChatCompletionCreateParamsNonStreaming);
+                };
+
+                const response = await this.openai.chat.completions.create(params);
 
                 const message = response.choices[0]?.message;
 
