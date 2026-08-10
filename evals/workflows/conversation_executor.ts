@@ -106,14 +106,14 @@ export async function executeConversation(options: ConversationExecutorOptions):
 
         // LLM wants to call tools. Parse the arguments once: the same outcome feeds the
         // recorded turn and the execution loop below.
-        const parsedArguments = llmResponse.toolCalls.map((tc) => parseToolArguments(tc.arguments));
+        const toolCalls = llmResponse.toolCalls.map((toolCall) => ({
+            ...toolCall,
+            parsed: parseToolArguments(toolCall.arguments),
+        }));
 
         const turn: ConversationTurn = {
             turnNumber,
-            toolCalls: llmResponse.toolCalls.map((tc, index) => {
-                const parsed = parsedArguments[index];
-                return { name: tc.name, arguments: parsed.ok ? parsed.args : {} };
-            }),
+            toolCalls: toolCalls.map(({ name, parsed }) => ({ name, arguments: parsed.ok ? parsed.args : {} })),
             toolResults: [],
         };
 
@@ -132,8 +132,8 @@ export async function executeConversation(options: ConversationExecutorOptions):
         });
 
         // Execute each tool call
-        for (const [index, toolCall] of llmResponse.toolCalls.entries()) {
-            const parsed = parsedArguments[index];
+        for (const toolCall of toolCalls) {
+            const { parsed } = toolCall;
             if (!parsed.ok) {
                 // Invalid JSON arguments
                 const errorContent = JSON.stringify({ error: parsed.error });
@@ -153,12 +153,11 @@ export async function executeConversation(options: ConversationExecutorOptions):
                 });
                 continue;
             }
-            const { args } = parsed;
 
             // Execute tool via MCP
             const result = await mcpClient.callTool({
                 name: toolCall.name,
-                arguments: args,
+                arguments: parsed.args,
             });
 
             // Serialize the tool result exactly as the agent (LLM) receives it,
