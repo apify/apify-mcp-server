@@ -14,12 +14,14 @@
 // Must be the first import: config modules read process.env at load time.
 import 'dotenv/config';
 
+import { LangfuseClient } from '@langfuse/client';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+import { findMissingEnvVars } from '../shared/config.js';
 import { sanitizeProcessEnv } from './config.js';
 import { resolveDatasetName, syncDataset } from './langfuse_dataset.js';
-import { createLangfuseClient } from './langfuse_tracing.js';
+import { LANGFUSE_ENV_VARS } from './langfuse_tracing.js';
 import { loadTestCases, resolveTestCasesPath } from './test_cases_loader.js';
 
 // Before anything reads process.env: the Langfuse SDK passes these straight to
@@ -33,10 +35,16 @@ async function main() {
         })
         .help().argv) as { testCasesPath?: string };
 
-    const langfuse = createLangfuseClient();
+    // Fail before touching Langfuse, listing every missing variable at once.
+    const missing = findMissingEnvVars(LANGFUSE_ENV_VARS);
+    if (missing.length > 0) {
+        console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
+        process.exit(1);
+    }
+
     const testCasesPath = resolveTestCasesPath(argv.testCasesPath);
     const datasetName = resolveDatasetName(testCasesPath);
-    const items = await syncDataset(langfuse, datasetName, loadTestCases(testCasesPath));
+    const items = await syncDataset(new LangfuseClient(), datasetName, loadTestCases(testCasesPath));
 
     console.log(`✅ Dataset "${datasetName}" now has ${items.length} item(s)`);
 }

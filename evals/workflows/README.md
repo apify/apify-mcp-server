@@ -174,7 +174,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 - `conversation_executor.ts` - Multi-turn loop with dynamic tools and server instructions
 - `workflow_judge.ts` - Judge evaluation
 - `test_cases_loader.ts` - Load and validate test cases
-- `langfuse_tracing.ts` - Env validation, Langfuse client, OpenTelemetry span processor init/shutdown
+- `langfuse_tracing.ts` - Required Langfuse env vars, OpenTelemetry span processor init/shutdown
 - `langfuse_dataset.ts` - Dataset item mapping and validation, dataset name resolution, upsert
 - `langfuse_experiment.ts` - Experiment task, evaluators, run summary and exit gate
 - `run_workflow_evals.ts` - Main CLI entry

@@ -21,14 +21,16 @@ import 'dotenv/config';
 
 import { execSync } from 'node:child_process';
 
+import { LangfuseClient } from '@langfuse/client';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+import { findMissingEnvVars } from '../shared/config.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { resolveDatasetName, resolveItemId, syncDataset } from './langfuse_dataset.js';
 import { buildRunSummary, evaluators, makeTask } from './langfuse_experiment.js';
-import { createLangfuseClient, initTracing, shutdownTracing } from './langfuse_tracing.js';
+import { initTracing, LANGFUSE_ENV_VARS, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
 import { loadTestCases, resolveTestCasesPath } from './test_cases_loader.js';
 
@@ -73,8 +75,15 @@ async function main() {
         })
         .help().argv) as CliArgs;
 
-    const langfuse = createLangfuseClient(['APIFY_TOKEN', 'OPENROUTER_API_KEY']);
-    // Non-empty: createLangfuseClient exits otherwise. Sanitized above.
+    // Fail before any test runs, listing every missing variable at once.
+    const missing = findMissingEnvVars([...LANGFUSE_ENV_VARS, 'APIFY_TOKEN', 'OPENROUTER_API_KEY']);
+    if (missing.length > 0) {
+        console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
+        process.exit(1);
+    }
+
+    const langfuse = new LangfuseClient();
+    // Non-empty: checked above. Sanitized above that.
     const apifyToken = process.env.APIFY_TOKEN as string;
     const testCasesPath = resolveTestCasesPath(argv.testCasesPath);
     const datasetName = resolveDatasetName(testCasesPath);

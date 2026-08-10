@@ -47,6 +47,14 @@ const ENV_KEYS_TO_SANITIZE = [
 ];
 
 /**
+ * Names of the given env vars that are unset or empty, so an entry point can report
+ * every missing one at once instead of failing on the first.
+ */
+export function findMissingEnvVars(keys: readonly string[]): string[] {
+    return keys.filter((key) => !process.env[key]);
+}
+
+/**
  * Redact a value for safe logging: shows first 4 and last 4 chars, masks the rest.
  * Fully masks short values (≤ 8 chars) to prevent reconstruction from the log line.
  * Returns '(empty)' for empty strings, '(unset)' for undefined/null.

@@ -6,7 +6,7 @@
  */
 
 // Re-export shared config for convenience
-export { OPENROUTER_CONFIG, sanitizeEnvValue, sanitizeProcessEnv } from '../shared/config.js';
+export { OPENROUTER_CONFIG, sanitizeProcessEnv } from '../shared/config.js';
 
 /**
  * Default model configuration for agent and judge
