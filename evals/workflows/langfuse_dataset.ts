@@ -14,9 +14,8 @@ import path from 'node:path';
 import type { LangfuseClient } from '@langfuse/client';
 import { z } from 'zod';
 
-import { WorkflowTestCaseValidator } from '../shared/types.js';
-import type { WorkflowTestCase } from '../shared/types.js';
-import { DEFAULT_TEST_CASES_PATH } from './test_cases_loader.js';
+import { DEFAULT_TEST_CASES_PATH, WorkflowTestCaseValidator } from './test_cases_loader.js';
+import type { WorkflowTestCase } from './test_cases_loader.js';
 
 /** Name of the Langfuse dataset that mirrors test_cases.json. */
 export const WORKFLOW_DATASET_NAME = 'workflow-evals';

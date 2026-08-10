@@ -28,14 +28,13 @@ describe('resolveTestCasesPath()', () => {
 });
 
 describe('loadTestCases()', () => {
-    it('loads the canonical file when no path is given', () => {
-        expect(loadTestCases().length).toBeGreaterThan(0);
+    it('loads the canonical file', () => {
+        expect(loadTestCases(DEFAULT_TEST_CASES_PATH).length).toBeGreaterThan(0);
     });
 
-    it('names the resolved path when the file is missing', () => {
-        expect(() => loadTestCases('nope.json')).toThrow(
-            `Test cases file not found: ${path.join(process.cwd(), 'nope.json')}`,
-        );
+    it('names the path when the file is missing', () => {
+        const missing = path.join(process.cwd(), 'nope.json');
+        expect(() => loadTestCases(missing)).toThrow(missing);
     });
 
     it('rejects a typoed harness knob instead of dropping it', () => {

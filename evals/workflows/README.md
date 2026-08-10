@@ -173,7 +173,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 - `llm_client.ts` - OpenRouter wrapper; records each call as a Langfuse generation with usage and cost
 - `conversation_executor.ts` - Multi-turn loop with dynamic tools and server instructions
 - `workflow_judge.ts` - Judge evaluation
-- `test_cases_loader.ts` - Load and validate test cases
+- `test_cases_loader.ts` - Test case schema, loading and validation
 - `langfuse_tracing.ts` - Required Langfuse env vars, OpenTelemetry span processor init/shutdown
 - `langfuse_dataset.ts` - Dataset item mapping and validation, dataset name resolution, upsert
 - `langfuse_experiment.ts` - Experiment task, evaluators, run summary and exit gate

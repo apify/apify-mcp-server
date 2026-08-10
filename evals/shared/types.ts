@@ -2,8 +2,6 @@
  * Shared type definitions for evaluation systems
  */
 
-import { z } from 'zod';
-
 /**
  * Base test case interface - common fields for all test types
  */
@@ -35,40 +33,6 @@ export type ToolSelectionTestCase = {
               input?: Record<string, unknown>;
           }[];
 } & BaseTestCase;
-
-/**
- * Test case for workflow evaluation (multi-turn agent conversations)
- * Used in: evals/workflows/
- *
- * Validated rather than cast because it is read from a JSON file and, once synced,
- * from a Langfuse dataset item that can be edited outside this repo.
- *
- * Strict: an unknown key is a typo'd harness knob. Stripping it silently would let
- * `failTool` sync as nothing, the forced INTERNAL_ERROR never fire, and the eval go
- * green without testing what it claims to test.
- */
-export const WorkflowTestCaseValidator = z.strictObject({
-    /** Unique test case ID */
-    id: z.string().min(1),
-    /** Category for grouping (e.g., "search-actors", "call-actor") */
-    category: z.string().min(1),
-    /** User query/prompt given to the agent */
-    query: z.string().min(1),
-    /** Requirements the judge scores the conversation against */
-    reference: z.string().min(1),
-    /** Maximum number of turns allowed (defaults to the config value) */
-    maxTurns: z.number().int().positive().optional(),
-    /** Tools to enable for this test (e.g., ["actors", "docs", "apify/rag-web-browser"]) */
-    tools: z.array(z.string()).optional(),
-    /**
-     * Tool names the harness force-fails with a synthetic INTERNAL_ERROR carrying the real
-     * report-problem nudge. Lets an eval deterministically throw a nudge-eligible error
-     * that the live server + API cannot reproduce on demand. See mcp_client.ts.
-     */
-    failTools: z.array(z.string()).optional(),
-});
-
-export type WorkflowTestCase = z.infer<typeof WorkflowTestCaseValidator>;
 
 /**
  * Test data structure wrapping test cases with version
