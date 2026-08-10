@@ -18,10 +18,9 @@ import { LangfuseClient } from '@langfuse/client';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
-import { findMissingEnvVars } from '../shared/config.js';
+import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
 import { sanitizeProcessEnv } from './config.js';
 import { resolveDatasetName, syncDataset } from './langfuse_dataset.js';
-import { LANGFUSE_ENV_VARS } from './langfuse_tracing.js';
 import { loadTestCases, resolveTestCasesPath } from './test_cases_loader.js';
 
 // Before anything reads process.env: the Langfuse SDK passes these straight to

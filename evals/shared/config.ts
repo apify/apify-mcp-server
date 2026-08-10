@@ -27,6 +27,9 @@ export function sanitizeEnvValue(value?: string): string | undefined {
     );
 }
 
+/** Environment variables the Langfuse SDK reads to authenticate. */
+export const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 'LANGFUSE_BASE_URL'] as const;
+
 /**
  * Env vars used in HTTP headers (API keys, tokens, URLs).
  *
@@ -41,9 +44,7 @@ const ENV_KEYS_TO_SANITIZE = [
     'OPENROUTER_BASE_URL',
     'PHOENIX_API_KEY',
     'PHOENIX_BASE_URL',
-    'LANGFUSE_PUBLIC_KEY',
-    'LANGFUSE_SECRET_KEY',
-    'LANGFUSE_BASE_URL',
+    ...LANGFUSE_ENV_VARS,
 ];
 
 /**

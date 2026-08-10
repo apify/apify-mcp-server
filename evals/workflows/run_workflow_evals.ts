@@ -25,14 +25,14 @@ import { LangfuseClient } from '@langfuse/client';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
-import { findMissingEnvVars } from '../shared/config.js';
+import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
 import { filterByLineRanges } from '../shared/line_range_filter.js';
 import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line_range_parser.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { resolveDatasetName, syncDataset } from './langfuse_dataset.js';
 import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_experiment.js';
-import { initTracing, LANGFUSE_ENV_VARS, shutdownTracing } from './langfuse_tracing.js';
+import { initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
 import type { WorkflowTestCase } from './test_cases_loader.js';
 import { loadTestCases, loadTestCasesWithLineNumbers, resolveTestCasesPath } from './test_cases_loader.js';

@@ -8,9 +8,6 @@
 import { LangfuseSpanProcessor } from '@langfuse/otel';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
-/** Environment variables the Langfuse SDK reads to authenticate. */
-export const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 'LANGFUSE_BASE_URL'] as const;
-
 let sdk: NodeSDK | null = null;
 
 /**
