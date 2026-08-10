@@ -192,9 +192,20 @@ async function main() {
         console.error(`❌ Run failed: ${error instanceof Error ? error.message : String(error)}`);
         exitCode = 1;
     } finally {
-        // Flush scores and spans before exit or the last batch is lost.
-        await langfuse.flush();
-        await shutdownTracing();
+        // Flush scores and spans before exit or the last batch is lost. Guarded
+        // individually: a failed export must not skip the other flush, and
+        // `void main()` has no rejection handler, so a rejection here would turn
+        // a finished run into an unhandled rejection and override its exit code.
+        try {
+            await langfuse.flush();
+        } catch (error) {
+            console.error(`⚠️ Langfuse flush failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        try {
+            await shutdownTracing();
+        } catch (error) {
+            console.error(`⚠️ Span export failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
     process.exit(exitCode);
