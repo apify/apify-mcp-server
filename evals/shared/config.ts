@@ -47,11 +47,12 @@ const ENV_KEYS_TO_SANITIZE = [
 ];
 
 /**
- * Names of the given env vars that are unset or empty, so an entry point can report
- * every missing one at once instead of failing on the first.
+ * Names of the given env vars that are unset or sanitize to empty (whitespace,
+ * control chars, quotes only), so an entry point can report every missing one at
+ * once up front instead of failing later with an opaque exporter error.
  */
 export function findMissingEnvVars(keys: readonly string[]): string[] {
-    return keys.filter((key) => !process.env[key]);
+    return keys.filter((key) => !sanitizeEnvValue(process.env[key]));
 }
 
 /**
