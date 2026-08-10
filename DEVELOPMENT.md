@@ -205,9 +205,9 @@ The flow is one way. We're the source; internal smokes guard the package's outpu
 #### Setup
 
 ```bash
-pnpm add -g @apify/mcpc
+brew install apify/tap/mcpc   # or: pnpm add -g @apify/mcpc
 pnpm run build
-mcpc --config .mcp.json stdio connect @stdio
+mcpc connect .mcp.json:stdio @stdio
 mcpc @stdio tools-list   # verify
 ```
 
