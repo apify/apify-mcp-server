@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Recover widget structuredContent stripped by Claude Desktop ([#1187](https://github.com/apify/apify-mcp-server/pull/1187)) ([94dcfe3](https://github.com/apify/apify-mcp-server/commit/94dcfe3b13e0baef94f1d0f5155f0044b02f42df)) by [@jirispilka](https://github.com/jirispilka)
 - Align Node floor to 22 and drop dead smithery.yaml ([#1210](https://github.com/apify/apify-mcp-server/pull/1210)) ([6c4ac08](https://github.com/apify/apify-mcp-server/commit/6c4ac08c6a7e3b11d075dd7d1684d05599a50728)) by [@jirispilka](https://github.com/jirispilka)
 - Normalize judge verdict casing instead of erroring the item ([#1222](https://github.com/apify/apify-mcp-server/pull/1222)) ([51baeb4](https://github.com/apify/apify-mcp-server/commit/51baeb412925154c45678b5f73dac18f2c544b7e)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Hardcode apify&#x2F;code-runtime Actor ID for full-README bypass ([#1123](https://github.com/apify/apify-mcp-server/pull/1123)) ([3647cc4](https://github.com/apify/apify-mcp-server/commit/3647cc4a219a679db43f14ff52ed613dfb65936e)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
