@@ -829,6 +829,26 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
+            itc(
+                'should return a run-not-found error when calling get-actor-log for a non-existent run',
+                { tools: ['runs'] },
+                async (client) => {
+                    // Syntactically valid but nonexistent run ID. The same literal appears in the
+                    // waitSecs-validation test below for the opposite reason: there it must NOT be
+                    // treated as missing, so the waitSecs check fires first.
+                    const nonExistentRunId = 'aaaaaaaaaaaaaaaaa';
+                    const result = await client.callTool({
+                        name: HELPER_TOOLS.ACTOR_RUNS_LOG,
+                        arguments: { runId: nonExistentRunId },
+                    });
+                    expect(result).toBeDefined();
+                    expect(result.isError).toBe(true);
+                    const content = result.content as { text: string }[];
+                    expect(content.length).toBeGreaterThan(0);
+                    expect(content[0].text).toBe(`Run with ID '${nonExistentRunId}' not found.`);
+                },
+            );
+
             // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
             // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4
             // throws -32600 "has an output schema but did not return structured content" once it has cached
