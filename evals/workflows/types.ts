@@ -3,16 +3,6 @@
  */
 
 /**
- * Represents a tool call made to the MCP server
- */
-export type McpToolCall = {
-    /** Name of the tool being called */
-    name: string;
-    /** Arguments passed to the tool */
-    arguments: Record<string, unknown>;
-};
-
-/**
  * Represents the result of an MCP tool execution
  */
 export type McpToolResult = {
@@ -26,23 +16,6 @@ export type McpToolResult = {
     error?: string;
     /** UTF-8 byte size of the serialized content the agent receives (set when the result is fed to the LLM) */
     resultBytes?: number;
-};
-
-/**
- * MCP Tool definition from the server
- */
-export type McpTool = {
-    /** Tool name */
-    name: string;
-    /** Tool description */
-    description?: string;
-    /** JSON Schema for input parameters */
-    inputSchema: {
-        type: string;
-        properties?: Record<string, unknown>;
-        required?: string[];
-        [key: string]: unknown;
-    };
 };
 
 /**
