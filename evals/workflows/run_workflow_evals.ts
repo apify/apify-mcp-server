@@ -14,16 +14,19 @@
 
 import path from 'node:path';
 
+import { startActiveObservation } from '@langfuse/tracing';
 import pLimit from 'p-limit';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+import { findMissingEnvVars } from '../shared/config.js';
 import { filterByLineRanges } from '../shared/line_range_filter.js';
 import type { LineRange } from '../shared/line_range_parser.js';
 import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line_range_parser.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
-import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config.js';
+import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { executeConversation } from './conversation_executor.js';
+import { initTracing, LANGFUSE_ENV_VARS, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
 import { McpClient } from './mcp_client.js';
 import type { EvaluationResult, TestResultRecord } from './output_formatter.js';
@@ -63,9 +66,35 @@ function logWithPrefix(testId: string, message: string): void {
 }
 
 /**
- * Run a single test case evaluation
+ * Run a single test case evaluation as one Langfuse trace, so its agent generations
+ * and MCP tool calls nest under the test case they belong to.
  */
 async function runSingleTest(
+    testCase: WorkflowTestCase,
+    index: number,
+    total: number,
+    argv: CliArgs,
+    llmClient: LlmClient,
+    apifyToken: string,
+): Promise<EvaluationResult> {
+    return startActiveObservation(
+        testCase.id,
+        async (span) => {
+            const result = await executeTestCase(testCase, index, total, argv, llmClient, apifyToken);
+            span.update({
+                input: testCase.query,
+                output: result.judgeResult,
+                metadata: { category: testCase.category, agentModel: argv.agentModel },
+                ...(result.error ? { level: 'ERROR' as const, statusMessage: result.error } : {}),
+            });
+            return result;
+        },
+        { asType: 'span' },
+    );
+}
+
+/** The evaluation itself: MCP client, agent conversation, judge. */
+async function executeTestCase(
     testCase: WorkflowTestCase,
     index: number,
     total: number,
@@ -222,19 +251,18 @@ async function main() {
     console.log('='.repeat(100));
     console.log();
 
-    // Check environment variables
-    const apifyToken = sanitizeEnvValue(process.env.APIFY_TOKEN);
-    const openrouterKey = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
+    // Sanitize before initTracing(): the Langfuse SDK reads its keys straight from
+    // process.env into HTTP headers, which throws ERR_INVALID_CHAR on control chars.
+    sanitizeProcessEnv();
 
-    if (!apifyToken) {
-        console.error('❌ Error: APIFY_TOKEN environment variable is required');
+    const missingVars = findMissingEnvVars(['APIFY_TOKEN', 'OPENROUTER_API_KEY', ...LANGFUSE_ENV_VARS]);
+    if (missingVars.length > 0) {
+        console.error(`❌ Error: missing environment variable(s): ${missingVars.join(', ')}`);
         process.exit(1);
     }
+    const apifyToken = process.env.APIFY_TOKEN!;
 
-    if (!openrouterKey) {
-        console.error('❌ Error: OPENROUTER_API_KEY environment variable is required');
-        process.exit(1);
-    }
+    initTracing();
 
     // Load test cases (with or without line numbers based on --lines flag)
     console.log('📂 Loading test cases...');
@@ -394,6 +422,9 @@ async function main() {
     const totalTests = results.length;
     const passedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'PASS').length;
     const errorTests = results.filter((r) => r.error).length;
+
+    // Flush before exiting: process.exit() drops whatever the span processor still holds.
+    await shutdownTracing();
 
     // Exit 0 only if ALL tests passed with no errors
     const allPassed = totalTests > 0 && passedTests === totalTests && errorTests === 0;
