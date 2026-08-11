@@ -182,6 +182,8 @@ Cases that share expensive setup (one seeded Actor run, say) do it via `ctx.getF
 
 Marking a case `critical: true` is a one-line edit on its existing definition — there is no second array or file to keep in sync, and internal picks up every current and future critical case automatically on its next dependency bump. Flipping a case to critical is a per-PR judgment call, not automatic — most cases stay `critical: false` (this-repo-only in practice, since internal only registers the critical subset).
 
+This is a real execution decision, not a visibility flag: internal's critical-only `registerCases` call runs as part of its release pipeline — against **staging** when a release PR opens, against **production** when it merges to `master` (real API calls, real Actor runs, billed and user-visible). Mark a case critical only if it earns that.
+
 **Tests in this repo** cover the package's MCP and library surface. They live in `tests/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
