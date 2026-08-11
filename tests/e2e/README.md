@@ -187,7 +187,7 @@ reach here and are **not** pinned by this harness — check them another way bef
 | `_meta.apifyToken` on `tools/call` | mcpc sends no custom `_meta` | `tests/integration/suite.ts` |
 | Concurrent session isolation | one session per config, opened and closed in sequence | verified manually; needs two live sessions |
 | HTTP wire level (`GET /` 405, `POST /` without session 404, `DELETE /`) | not MCP traffic | `actor.server_streamable.test.ts` |
-| `notifications/tools/list_changed` | the server no longer declares the capability | not applicable |
+| `notifications/tools/list_changed` | the server never originates one; it can only relay a proxied Actor-MCP server's | not applicable |
 
 The HTTP configs pin **per-session query-param resolution** (`?tools=`, `?ui=`, `?payment=`), not
 simultaneous isolation.

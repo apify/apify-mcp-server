@@ -190,6 +190,7 @@ interface CallToolResult {
 - `resources` — widgets + readme only, no dynamic resources
 - `prompts` — 1 helper prompt (`latest-news-on-topic`)
 - `logging` — proxy with filtering
+- The block above is the legacy (2025-11-25) era; the 2026-07-28 stateless era declares only `tools`, `resources` and `prompts` — no `tasks`, no `logging`
 
 ## Related Issues
 
