@@ -1,4 +1,4 @@
-# Workflow Evaluation System
+# Workflow evaluation system
 
 Tests AI agents performing multi-turn conversations with Apify MCP tools, evaluated by an LLM judge. Results (traces, scores, dataset, experiment runs) are recorded in **Langfuse**: the self-hosted instance at [langfuse.apify.dev](https://langfuse.apify.dev), project `MCP Workflow`.
 
@@ -16,7 +16,7 @@ dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge ->
 
 ---
 
-## Quick Start
+## Quick start
 
 **Prerequisites:**
 - Node.js installed
@@ -53,7 +53,7 @@ pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot.json (no bu
 
 ---
 
-## Technical Overview
+## Technical overview
 
 Tests AI agents executing tasks using Apify MCP server tools through multi-turn conversations evaluated by an LLM judge.
 
@@ -66,7 +66,7 @@ Tests AI agents executing tasks using Apify MCP server tools through multi-turn 
 - Configurable tool call timeout (default: 60 seconds)
 - Strict pass/fail (all tests must pass)
 
-## Critical Design Decisions
+## Critical design decisions
 
 ### 1. The Langfuse dataset is the source of truth
 
@@ -94,7 +94,7 @@ An item's `input.query` is the agent prompt, `expectedOutput` is what the judge 
 
 **Location:** `export_dataset.ts`
 
-### 2. MCP Server Isolation Per Test
+### 2. MCP server isolation per test
 
 **Decision:** Each test gets a fresh MCP server instance.
 
@@ -107,7 +107,7 @@ An item's `input.query` is the agent prompt, `expectedOutput` is what the judge 
 
 **Location:** `langfuse_experiment.ts`
 
-### 3. Dynamic Tool Fetching Per Turn
+### 3. Dynamic tool fetching per turn
 
 **Decision:** Refresh tools from MCP server after each conversation turn.
 
@@ -120,7 +120,7 @@ An item's `input.query` is the agent prompt, `expectedOutput` is what the judge 
 
 **Location:** `conversation_executor.ts`
 
-### 4. Strict Pass/Fail Gated On The Requested Count
+### 4. Strict pass/fail gated on the requested count
 
 **Decision:** Exit code 0 only when every requested item ran and scored `workflow_judge === 1`.
 
@@ -132,7 +132,7 @@ Harness failures (MCP spawn, OpenRouter, judge) are therefore left to throw rath
 
 **Location:** `langfuse_experiment.ts` (`buildRunSummary`)
 
-### 5. Judge Sees Tool Calls, Not Results
+### 5. Judge sees tool calls, not results
 
 **Decision:** Judge sees tool calls with arguments and agent responses, but NOT raw tool results.
 
@@ -150,7 +150,7 @@ AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 
 **Location:** `workflow_judge.ts`
 
-### 6. LLM Client Shared, MCP Client Isolated
+### 6. LLM client shared, MCP client isolated
 
 **Decision:** One LLM client shared across tests, MCP client isolated per test.
 
@@ -161,7 +161,7 @@ AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 
 **Location:** `run_workflow_evals.ts`
 
-### 7. Agent vs Judge Models
+### 7. Agent vs judge models
 
 **Agent:** `anthropic/claude-haiku-4.5` (fast, good at tools)<br>
 **Judge:** `deepseek/deepseek-v4-flash` (strong reasoning)
@@ -170,7 +170,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 **Location:** `config.ts`
 
-### 8. MCP Server Instructions in System Prompt
+### 8. MCP server instructions in system prompt
 
 **Decision:** Automatically append MCP server instructions to agent system prompt.
 
@@ -188,9 +188,9 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 **Location:** `mcp_client.ts`, `conversation_executor.ts`
 
-## System Components
+## System components
 
-### Core Files
+### Core files
 
 - `types.ts` - Type definitions
 - `config.ts` - Models, prompts, constants
@@ -207,7 +207,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 ## Configuration
 
-### Environment Variables (Required)
+### Environment variables (required)
 
 ```bash
 export APIFY_TOKEN="your_apify_token"           # Get from https://console.apify.com/account/integrations
@@ -239,7 +239,7 @@ Compare tokens across runs (branches, models) directly in the Langfuse experimen
 
 `--concurrency` maps to the SDK's `maxConcurrency`, which runs **sequential batches** of that size rather than a rolling window: one slow test stalls the rest of its batch.
 
-### Test Case Format
+### Test case format
 
 A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in `metadata`. `dataset_snapshot.json` holds the same fields flattened, one object per case:
 
@@ -267,9 +267,9 @@ A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in 
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
 - `failTools` - Tool names the harness force-fails with a synthetic `INTERNAL_ERROR` result carrying the real `report-problem` nudge, instead of calling the server (e.g. `["call-actor"]`). Use it to deterministically throw a nudge-eligible error that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after a failure. See `mcp_client.ts`.
 
-## Key Insights
+## Key insights
 
-### MCP Tools Are Stateful
+### MCP tools are stateful
 
 Unlike typical function calling:
 - Create persistent state (datasets, runs) on Apify platform
@@ -278,7 +278,7 @@ Unlike typical function calling:
 
 **Implication:** Test isolation critical.
 
-### Dynamic Tool Registration
+### Dynamic tool registration
 
 - a restored pre-cutover session's `add-actor` could dynamically register new Actor tools (no longer selectable for new sessions)
 - Tool list NOT static
@@ -286,7 +286,7 @@ Unlike typical function calling:
 
 **Implication:** Cannot cache tools at conversation start.
 
-### Error Propagation
+### Error propagation
 
 Tool errors passed to LLM in tool result message:
 - LLM can retry, use different tool, or explain to user
@@ -294,7 +294,7 @@ Tool errors passed to LLM in tool result message:
 
 **Rationale:** LLM should handle errors intelligently.
 
-### Conversation State
+### Conversation state
 
 OpenAI-compatible message history maintained:
 ```typescript
@@ -309,7 +309,7 @@ OpenAI-compatible message history maintained:
 
 Format must be exact for LLM context understanding.
 
-## Common Issues
+## Common issues
 
 ### Tests interfere with each other
 **Symptom:** Test 2 fails after Test 1, passes alone.<br>
