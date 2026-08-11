@@ -122,9 +122,7 @@ export class LegacyMcpServer {
 
         this.server = new Server(getServerInfo(), {
             capabilities: {
-                tools: {
-                    listChanged: true,
-                },
+                tools: {},
                 // Declare long-running task support
                 tasks: {
                     list: {},

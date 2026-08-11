@@ -13,7 +13,7 @@ Audit of `tests/integration/suite.ts` against the MCP 2025-11-25 spec and the re
 `src/mcp/server.ts:146` advertises:
 
 ```
-tools: { listChanged: true }
+tools: {}
 tasks: { list, cancel, requests.tools.call }
 resources: {}
 prompts: {}
@@ -99,7 +99,7 @@ it('should expose serverInfo, instructions and capabilities on initialize', ...)
 //   const caps = client.getServerCapabilities();
 //   const instr = client.getInstructions();
 //   assert: name=SERVER_NAME, version matches package.json, instructions length>0,
-//           caps has tools.listChanged, tasks.{list,cancel,requests.tools.call},
+//           caps has tools, tasks.{list,cancel,requests.tools.call},
 //           resources, prompts, logging declared.
 
 it('should respond to ping', ...)

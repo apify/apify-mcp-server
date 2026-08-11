@@ -13,7 +13,7 @@ PR title format follows Conventional Commits (≤70 chars). Branch `test/<slug>`
 **Scope**: Block A + Block E from the audit. Lock down what the server returns at `initialize` time and what the unhappy paths of `tools/call` and `prompts/get` look like.
 
 **Test cases (all in `tests/integration/suite.ts`):**
-1. `should expose serverInfo, instructions and declared capabilities on initialize` — assert `client.getServerVersion().name === SERVER_NAME`, version matches `package.json`, `getInstructions()` non-empty, `getServerCapabilities()` contains `tools.listChanged`, `tasks.{list,cancel,requests.tools.call}`, `resources`, `prompts`, `logging`.
+1. `should expose serverInfo, instructions and declared capabilities on initialize` — assert `client.getServerVersion().name === SERVER_NAME`, version matches `package.json`, `getInstructions()` non-empty, `getServerCapabilities()` contains `tools`, `tasks.{list,cancel,requests.tools.call}`, `resources`, `prompts`, `logging`.
 2. `should respond to ping` — `await client.ping()` does not throw.
 3. `should return JSON-RPC error for tools/call with unknown tool name` — expect rejection with code/message indicating not found.
 4. `should return InvalidParams for prompts/get with unknown name` — assert `error.code === ErrorCode.InvalidParams`.
