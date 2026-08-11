@@ -353,6 +353,44 @@ export const reportProblemToolOutputSchema = {
 };
 
 /**
+ * Schema shared by every Actor task tool. Input values are omitted on purpose (they may hold
+ * secrets)
+ * `inputFields` lists the field names that `publicConfig.inputSchemaFields` can use.
+ */
+export const actorTaskOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        taskId: { type: 'string', description: 'ID of the task' },
+        actorId: { type: 'string', description: 'ID of the Actor the task belongs to' },
+        name: { type: 'string', description: 'Name of the task' },
+        title: { type: ['string', 'null'], description: 'Human-readable title of the task' },
+        description: { type: ['string', 'null'], description: 'Short description of the task' },
+        publishedAt: {
+            type: ['string', 'null'],
+            description: 'When the task was published (ISO 8601); null when the task is not published',
+        },
+        publicConfig: {
+            type: ['object', 'null'],
+            description: 'Public display configuration of the task landing page',
+            properties: {
+                seoTitle: { type: ['string', 'null'] },
+                seoDescription: { type: ['string', 'null'] },
+                categorization: { type: ['string', 'null'] },
+                inputSchemaFields: { type: ['array', 'null'], items: { type: 'string' } },
+                datasetName: { type: ['string', 'null'] },
+                datasetView: { type: ['string', 'null'] },
+            },
+        },
+        inputFields: {
+            type: 'array',
+            items: { type: 'string' },
+            description: "Field names of the task's input; values are not returned",
+        },
+    },
+    required: ['taskId', 'actorId', 'name', 'title', 'description', 'publishedAt', 'publicConfig', 'inputFields'],
+};
+
+/**
  * Schema for get-actor-log. The log API returns plain text, so the schema wraps it in a single field.
  */
 export const getActorRunLogToolOutputSchema = {

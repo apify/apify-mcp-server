@@ -1,5 +1,5 @@
 {
-  "version": "1.9",
+  "version": "1.10",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
@@ -591,6 +591,90 @@
       "query": "What key-value stores do I have in my account?",
       "expectedTools": ["get-key-value-store-list"],
       "reference": "Browsing the user's own key-value stores. Use get-key-value-store-list."
+    },
+    {
+      "id": "get-actor-task-1",
+      "category": "get-actor-task",
+      "query": "What is the configuration of my task insta-daily?",
+      "expectedTools": ["get-actor-task"],
+      "reference": "It should call get-actor-task with the task ID 'insta-daily' to read its stored settings."
+    },
+    {
+      "id": "get-actor-task-2",
+      "category": "get-actor-task",
+      "query": "Is my task insta-daily published?",
+      "expectedTools": ["get-actor-task"],
+      "reference": "Publication state is part of the task itself. Reading it is get-actor-task, not publish-actor-task."
+    },
+    {
+      "id": "create-actor-task-1",
+      "category": "create-actor-task",
+      "query": "Save my apify/instagram-scraper settings as a task called insta-daily",
+      "expectedTools": ["create-actor-task"],
+      "reference": "It should call create-actor-task for Actor 'apify/instagram-scraper' with the name 'insta-daily'."
+    },
+    {
+      "id": "create-actor-task-2",
+      "category": "create-actor-task",
+      "query": "Create a task for apify/google-search-scraper that searches for pizza",
+      "expectedTools": ["create-actor-task"],
+      "reference": "It should call create-actor-task with the Actor ID and an input containing the search query."
+    },
+    {
+      "id": "update-actor-task-1",
+      "category": "update-actor-task",
+      "query": "Change my task insta-daily to use the beta build",
+      "expectedTools": ["update-actor-task"],
+      "reference": "It should call update-actor-task with the build option set to 'beta'."
+    },
+    {
+      "id": "update-actor-task-2",
+      "category": "update-actor-task",
+      "query": "Set the landing page title of my task insta-daily to 'Daily Instagram scraper'",
+      "expectedTools": ["update-actor-task"],
+      "reference": "The landing page title is publicConfig.seoTitle, written through update-actor-task. It does not publish the task."
+    },
+    {
+      "id": "publish-actor-task-1",
+      "category": "publish-actor-task",
+      "query": "Publish my task insta-daily",
+      "expectedTools": ["publish-actor-task"],
+      "reference": "It should call publish-actor-task with the task ID 'insta-daily'."
+    },
+    {
+      "id": "publish-actor-task-2",
+      "category": "publish-actor-task",
+      "query": "Make my task insta-daily public",
+      "expectedTools": ["publish-actor-task"],
+      "reference": "Making a task public is publishing it. Use publish-actor-task, not update-actor-task."
+    },
+    {
+      "id": "unpublish-actor-task-1",
+      "category": "unpublish-actor-task",
+      "query": "Unpublish my task insta-daily",
+      "expectedTools": ["unpublish-actor-task"],
+      "reference": "It should call unpublish-actor-task with the task ID 'insta-daily'."
+    },
+    {
+      "id": "unpublish-actor-task-2",
+      "category": "unpublish-actor-task",
+      "query": "Take my task insta-daily off its public page but keep its display settings",
+      "expectedTools": ["unpublish-actor-task"],
+      "reference": "Unpublishing preserves publicConfig, so unpublish-actor-task alone is correct. No update-actor-task call is needed to clear the settings."
+    },
+    {
+      "id": "tool-selection-actor-task-1",
+      "category": "tool-selection",
+      "query": "Set up my task insta-daily for publishing, using the overview dataset view",
+      "expectedTools": ["update-actor-task"],
+      "reference": "Setting up for publishing means writing publicConfig via update-actor-task. The task is not published until publish-actor-task is called, so publish-actor-task here is wrong."
+    },
+    {
+      "id": "tool-selection-actor-task-2",
+      "category": "tool-selection",
+      "query": "I already have a task called insta-daily, change its input to search for cats instead",
+      "expectedTools": ["update-actor-task"],
+      "reference": "The task exists, so this is update-actor-task with a new input. Creating another task with create-actor-task is wrong."
     }
   ]
 }

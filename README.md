@@ -245,6 +245,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Apify documentation**: Search the Apify documentation and fetch specific documents to provide context to the AI.
 - **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
 - **Apify storage**: Access data from your datasets and key-value stores.
+- **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 
 ### Overview of available tools
 
@@ -276,6 +277,11 @@ Legend for the **Enabled by default** column:
 | `get-key-value-store-keys`| storage | List the keys within a specific key-value store. |  |
 | `get-dataset-list` | storage | List all available datasets for the user. |  |
 | `get-key-value-store-list`| storage | List all available key-value stores for the user. |  |
+| `create-actor-task` | tasks | Create a saved Actor task (a named, reusable Actor configuration). |  |
+| `get-actor-task` | tasks | Get a saved Actor task, its publication state and public display configuration. |  |
+| `update-actor-task` | tasks | Update a task's input, run options, or public display configuration. |  |
+| `publish-actor-task` | tasks | Publish a task on its public landing page. |  |
+| `unpublish-actor-task` | tasks | Unpublish a task from its public landing page. |  |
 
 > **Note:**
 >

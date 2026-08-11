@@ -68,6 +68,18 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.storage)).toEqual(expected);
         });
 
+        it('should have correct tools in tasks category (both modes)', () => {
+            const expected = [
+                HELPER_TOOLS.ACTOR_TASK_CREATE,
+                HELPER_TOOLS.ACTOR_TASK_GET,
+                HELPER_TOOLS.ACTOR_TASK_UPDATE,
+                HELPER_TOOLS.ACTOR_TASK_PUBLISH,
+                HELPER_TOOLS.ACTOR_TASK_UNPUBLISH,
+            ];
+            expect(toolNames(defaultCategories.tasks)).toEqual(expected);
+            expect(toolNames(appsCategories.tasks)).toEqual(expected);
+        });
+
         it('should have correct tools in dev category (both modes)', () => {
             const expected = [HELPER_TOOLS.PROBLEM_REPORT];
             expect(toolNames(defaultCategories.dev)).toEqual(expected);
