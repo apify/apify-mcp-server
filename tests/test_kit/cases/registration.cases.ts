@@ -1,11 +1,11 @@
 import { expect } from 'vitest';
 
-import { defaults, HELPER_TOOLS } from '../../const.js';
-import { actorNameToToolName } from '../../tools/actor_tool_naming.js';
+import { defaults, HELPER_TOOLS } from '../../../src/const.js';
+import { actorNameToToolName } from '../../../src/tools/actor_tool_naming.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
-import { getCategoryTools } from '../../tools/index.js';
-import type { ToolCategory } from '../../types.js';
-import { getExpectedToolNamesByCategories } from '../../utils/tool_categories_helpers.js';
+import { getCategoryTools } from '../../../src/tools/index.js';
+import type { ToolCategory } from '../../../src/types.js';
+import { getExpectedToolNamesByCategories } from '../../../src/utils/tool_categories_helpers.js';
 import {
     ACTOR_NORMAL_MODE,
     AUTO_INJECTED_TOOL_NAMES,

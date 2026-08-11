@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe } from 'vitest';
 
+import type { McpClientOptions, McpSuiteClient } from '../helpers.js';
 import {
     actorsCases,
     appsCases,
@@ -9,9 +10,8 @@ import {
     storageCases,
     tasksCases,
     toolsCases,
-} from '../../src/test_kit/index.js';
-import type { CaseCtx, Transport } from '../../src/test_kit/types.js';
-import type { McpClientOptions, McpSuiteClient } from '../helpers.js';
+} from '../test_kit/index.js';
+import type { CaseCtx, Transport } from '../test_kit/types.js';
 
 export type IntegrationTestsSuiteOptions = {
     suiteName: string;

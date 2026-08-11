@@ -1,8 +1,8 @@
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
-import { HELPER_TOOLS } from '../../const.js';
-import { SKYFIRE_ENABLED_TOOLS } from '../../payments/const.js';
+import { HELPER_TOOLS } from '../../../src/const.js';
+import { SKYFIRE_ENABLED_TOOLS } from '../../../src/payments/const.js';
 import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, asLegacyClient } from '../helpers.js';
 import type { Case, CaseCtx } from '../types.js';
 

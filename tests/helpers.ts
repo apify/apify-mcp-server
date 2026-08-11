@@ -3,7 +3,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { expect } from 'vitest';
 
-import { createMcpStatelessClient, createMcpStreamableClient, type SuiteClientOptions } from '../src/test_kit/index.js';
+import { createMcpStatelessClient, createMcpStreamableClient, type SuiteClientOptions } from './test_kit/index.js';
 
 export { createMcpStatelessClient, createMcpStreamableClient };
 export type McpClientOptions = SuiteClientOptions;

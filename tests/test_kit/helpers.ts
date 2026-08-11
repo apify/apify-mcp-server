@@ -3,14 +3,14 @@ import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
 import { expect, vi } from 'vitest';
 
-import type { ApifyClient } from '../apify_client.js';
-import { defaults, HELPER_TOOLS } from '../const.js';
-import { actorNameToToolName } from '../tools/actor_tool_naming.js';
-import { getCategoryTools, getDefaultTools, toolCategoriesEnabledByDefault } from '../tools/index.js';
-import type { SERVER_MODE, ToolEntry } from '../types.js';
-import { APIFY_ACTOR_RUN_META_KEY } from '../utils/mcp.js';
-import { getExpectedToolNamesByCategories } from '../utils/tool_categories_helpers.js';
-import { AUTO_INJECTED_TOOLS } from '../utils/tools_loader.js';
+import type { ApifyClient } from '../../src/apify_client.js';
+import { defaults, HELPER_TOOLS } from '../../src/const.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
+import { getCategoryTools, getDefaultTools, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
+import type { SERVER_MODE, ToolEntry } from '../../src/types.js';
+import { APIFY_ACTOR_RUN_META_KEY } from '../../src/utils/mcp.js';
+import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
+import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
 import type { CaseCtx, SuiteClient } from './types.js';
 
 // Live fixtures from apify/mcp-server-test-actor (see DEVELOPMENT.md).

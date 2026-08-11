@@ -1,7 +1,7 @@
 import { expect } from 'vitest';
 
-import { HELPER_TOOLS, SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../const.js';
-import { RESOURCE_MIME_TYPE } from '../../resources/widgets.js';
+import { HELPER_TOOLS, SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../../src/const.js';
+import { RESOURCE_MIME_TYPE } from '../../../src/resources/widgets.js';
 import { ACTOR_NORMAL_MODE, expectWidgetToolMeta, getToolNames, withClient } from '../helpers.js';
 import type { Case } from '../types.js';
 

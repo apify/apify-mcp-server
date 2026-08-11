@@ -6,11 +6,11 @@ import log from '@apify/log';
 import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
-import { ACTOR_NORMAL_MODE } from '../../src/test_kit/helpers.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
 import { SERVER_MODE } from '../../src/types.js';
 import { AUTO_INJECTED_TOOLS, loadToolsFromInput } from '../../src/utils/tools_loader.js';
 import { expectArrayWeakEquals } from '../helpers.js';
+import { ACTOR_NORMAL_MODE } from '../test_kit/helpers.js';
 
 beforeAll(() => {
     log.setLevel(log.LEVELS.OFF);

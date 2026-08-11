@@ -169,20 +169,20 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
 
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
-  - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `src/test_kit/cases/*.cases.ts`, not here
+  - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `tests/test_kit/cases/*.cases.ts`, not here
   - Other files in this directory set up different transport dimensions (`stdio`, `2025-11-25` streamable HTTP, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
 - `tests/helpers.ts` — shared test utilities
 - `tests/const.ts` — test constants
 
 ### Test organization across repos
 
-This package is also used by the hosted server in `apify-mcp-server-internal`. Every integration case is a `Case` object (`{ name, critical, run, ... }`) defined in `src/test_kit/cases/*.cases.ts` — published behind the package's `./test-kit` export (`vitest` optional peerDependency). This repo's own `suite.ts` runs every case via `registerCases(name, allGroupCases, ctx)`; internal imports the same case arrays via `@apify/actors-mcp-server/test-kit` and calls `registerCases(name, allCases, { ...ctx, criticalOnly: true })` against its own live staging/prod deploy — non-critical cases register as `it.skip` there, so nothing needs re-registering by hand.
+This package is also used by the hosted server in `apify-mcp-server-internal`. Every integration case is a `Case` object (`{ name, critical, run, ... }`) defined in `tests/test_kit/cases/*.cases.ts` — published behind the package's `./test-kit` export (`vitest` optional peerDependency). This repo's own `suite.ts` runs every case via `registerCases(name, allGroupCases, ctx)`; internal imports the same case arrays via `@apify/actors-mcp-server/test-kit` and calls `registerCases(name, allCases, { ...ctx, criticalOnly: true })` against its own live staging/prod deploy — non-critical cases register as `it.skip` there, so nothing needs re-registering by hand.
 
-Cases that share expensive setup (one seeded Actor run, say) do it via `ctx.getFixture(fixture)` (`Fixture<T> = { key, setup(ctx) }`) instead of a vitest `beforeAll` — `setup` runs at most once per `registerCases` call (once per transport dimension), memoized by `fixture.key`, no matter how many or few of the cases sharing it actually run (e.g. under `criticalOnly`). This is what lets `storage.cases.ts`'s 13 cases built on one seeded run stay ordinary, individually-critical-eligible `Case` objects instead of a separate non-flattenable group. See `src/test_kit/register.ts` and `storage.cases.ts`'s `normalModeRunFixture`.
+Cases that share expensive setup (one seeded Actor run, say) do it via `ctx.getFixture(fixture)` (`Fixture<T> = { key, setup(ctx) }`) instead of a vitest `beforeAll` — `setup` runs at most once per `registerCases` call (once per transport dimension), memoized by `fixture.key`, no matter how many or few of the cases sharing it actually run (e.g. under `criticalOnly`). This is what lets `storage.cases.ts`'s 13 cases built on one seeded run stay ordinary, individually-critical-eligible `Case` objects instead of a separate non-flattenable group. See `tests/test_kit/register.ts` and `storage.cases.ts`'s `normalModeRunFixture`.
 
 Marking a case `critical: true` is a one-line edit on its existing definition — there is no second array or file to keep in sync, and internal picks up every current and future critical case automatically on its next dependency bump. Flipping a case to critical is a per-PR judgment call, not automatic — most cases stay `critical: false` (this-repo-only in practice, since internal only registers the critical subset).
 
-**Tests in this repo** cover the package's MCP and library surface. They live in `src/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
+**Tests in this repo** cover the package's MCP and library surface. They live in `tests/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
 - Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name capability detection, `?ui=` server-mode parsing.

@@ -1,8 +1,8 @@
 import { expect } from 'vitest';
 
-import { HELPER_TOOLS } from '../../const.js';
-import { actorNameToToolName } from '../../tools/actor_tool_naming.js';
-import { actorRunOutputSchema } from '../../tools/structured_output_schemas.js';
+import { HELPER_TOOLS } from '../../../src/const.js';
+import { actorNameToToolName } from '../../../src/tools/actor_tool_naming.js';
+import { actorRunOutputSchema } from '../../../src/tools/structured_output_schemas.js';
 import {
     ACTOR_NORMAL_MODE,
     expectNormalModeTestStructuredContent,

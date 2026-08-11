@@ -2,9 +2,9 @@ import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
-import { ApifyClient } from '../../apify_client.js';
-import { HELPER_TOOLS } from '../../const.js';
-import { actorNameToToolName } from '../../tools/actor_tool_naming.js';
+import { ApifyClient } from '../../../src/apify_client.js';
+import { HELPER_TOOLS } from '../../../src/const.js';
+import { actorNameToToolName } from '../../../src/tools/actor_tool_naming.js';
 import {
     ACTOR_NORMAL_MODE,
     assertStatusMessagePropagated,

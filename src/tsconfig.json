@@ -4,6 +4,7 @@
         "rootDir": "./",
         "outDir": "../dist",
         "noEmit": false,
+        "composite": true,
     },
     "include": [
         "./**/*"
