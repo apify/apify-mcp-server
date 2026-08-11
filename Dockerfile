@@ -14,6 +14,7 @@ COPY src/web/package.json ./src/web/
 RUN pnpm install --frozen-lockfile
 
 COPY src ./src
+COPY tests/test_kit ./tests/test_kit
 COPY tsconfig.json ./
 
 RUN pnpm run build
