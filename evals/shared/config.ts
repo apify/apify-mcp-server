@@ -70,7 +70,7 @@ function redact(value?: string | null): string {
 
 /**
  * Sanitize env vars in-place on process.env and log redacted values for CI debugging.
- * Must be called before any library reads these values.
+ * Must be called before constructing any client that reads them.
  */
 export function sanitizeProcessEnv(): void {
     for (const key of ENV_KEYS_TO_SANITIZE) {

@@ -28,8 +28,8 @@ import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
 import { sanitizeProcessEnv } from './config.js';
 import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
 
-// Before anything reads process.env: the Langfuse SDK passes these straight to
-// node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
+// Before any client is constructed below: the Langfuse SDK reads process.env itself and
+// passes it to node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
 sanitizeProcessEnv();
 
 /** Resolved from this module so cwd cannot change it. */

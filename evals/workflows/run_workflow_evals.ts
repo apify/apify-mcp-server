@@ -32,8 +32,10 @@ import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_e
 import { initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
 
-// Before anything reads process.env: the Langfuse SDK and the Apify client pass these
-// straight to node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
+// Before any client is constructed below: the Langfuse SDK and the Apify client read
+// process.env themselves and pass it to node:http, which throws ERR_INVALID_CHAR on a
+// CI secret with a newline. Imported config that reads env at load time (OPENROUTER_CONFIG)
+// runs before this and sanitizes its own values.
 sanitizeProcessEnv();
 
 type CliArgs = {
