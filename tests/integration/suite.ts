@@ -3035,6 +3035,69 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 },
             );
 
+            {
+                // `tools=` selection of the candidate Claude connector URL (apify/ai-team#229).
+                // The URL is a candidate — not yet submitted to Anthropic:
+                // https://mcp.apify.com/?tools=search-actors,search-actors-widget,fetch-actor-details,fetch-actor-details-widget,search-apify-docs,fetch-apify-docs,get-actor-run,get-actor-run-widget,get-actor-run-list,get-actor-log,abort-actor-run,get-dataset-list,get-dataset,get-dataset-items,get-key-value-store-list,get-key-value-store,get-key-value-store-record,apify/rag-web-browser&client=claude
+                // If this test fails, the server widened or reordered what that URL serves — revisit
+                // the URL, do not just edit the expected array.
+                // apify/web-fetch is not listed: it is an MCP-server Actor (webServerMcpPath + standby),
+                // so it yields hash-prefixed proxy tool names, never apify--web-fetch.
+                const candidateSelectors = [
+                    'search-actors',
+                    'search-actors-widget',
+                    'fetch-actor-details',
+                    'fetch-actor-details-widget',
+                    'search-apify-docs',
+                    'fetch-apify-docs',
+                    'get-actor-run',
+                    'get-actor-run-widget',
+                    'get-actor-run-list',
+                    'get-actor-log',
+                    'abort-actor-run',
+                    'get-dataset-list',
+                    'get-dataset',
+                    'get-dataset-items',
+                    'get-key-value-store-list',
+                    'get-key-value-store',
+                    'get-key-value-store-record',
+                    'apify/rag-web-browser',
+                ];
+
+                itc(
+                    'serves exactly the reviewed Claude connector tool surface',
+                    { serverMode: 'apps', tools: candidateSelectors },
+                    async (client) => {
+                        const names = getToolNames(await client.listTools());
+
+                        // Order matters: it is the order a reviewer of the candidate URL reads.
+                        expect(names).toEqual([
+                            'search-actors',
+                            'search-actors-widget',
+                            'fetch-actor-details',
+                            'fetch-actor-details-widget',
+                            'search-apify-docs',
+                            'fetch-apify-docs',
+                            'get-actor-run',
+                            'get-actor-run-widget',
+                            'get-actor-run-list',
+                            'get-actor-log',
+                            'abort-actor-run',
+                            'get-dataset-list',
+                            'get-dataset',
+                            'get-dataset-items',
+                            'get-key-value-store-list',
+                            'get-key-value-store',
+                            'get-key-value-store-record',
+                            'apify--rag-web-browser',
+                        ]);
+
+                        // Every auto-injected helper must be named in the URL itself, not arrive via injection.
+                        expectToolNamesToContain(candidateSelectors, AUTO_INJECTED_TOOL_NAMES);
+                    },
+                );
+            }
+
             it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)(
                 'auto mode: client advertising UI capability receives apps-mode tools with widget metadata',
                 async () => {
