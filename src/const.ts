@@ -8,9 +8,10 @@ export const ACTOR_MAX_DESCRIPTION_LENGTH = 500;
 export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of memory, free users can't run actors-mcp-server and requested Actor
 
 // apify/code-runtime's README documents an exact API contract (method names/shapes) that the
-// auto-generated summary can omit — always return its full README. Hardcoded by Actor ID
-// (not an actor.json flag) so no other Actor can opt itself out of the summary.
-export const CODE_RUNTIME_ACTOR_ID = 'Ewe0VxlktEE7SChSI';
+// auto-generated summary can omit — always return its full README. Hardcoded by Actor name
+// (not an actor.json flag) so no other Actor can opt itself out of the summary. Actor name
+// (not ID) so this stays correct across environments (staging etc. have different IDs).
+export const CODE_RUNTIME_ACTOR_NAME = 'apify/code-runtime';
 
 // Tool output
 /**

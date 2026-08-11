@@ -3,7 +3,7 @@ import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
-import { CODE_RUNTIME_ACTOR_ID } from '../../src/const.js';
+import { CODE_RUNTIME_ACTOR_NAME } from '../../src/const.js';
 import { fetchActorDetails, resolveReadmeContent, typeObjectToString } from '../../src/utils/actor_details.js';
 
 vi.mock('../../src/utils/actor_search.js', () => ({
@@ -24,8 +24,9 @@ function stubApifyClient(getActor: () => Promise<unknown>): ApifyClient {
     } as unknown as ApifyClient;
 }
 
-const OTHER_ACTOR = { id: 'someOtherActorId12345' };
-const CODE_RUNTIME_ACTOR = { id: CODE_RUNTIME_ACTOR_ID };
+const OTHER_ACTOR = { username: 'someone', name: 'some-other-actor' };
+const [CODE_RUNTIME_USERNAME, CODE_RUNTIME_NAME] = CODE_RUNTIME_ACTOR_NAME.split('/');
+const CODE_RUNTIME_ACTOR = { username: CODE_RUNTIME_USERNAME, name: CODE_RUNTIME_NAME };
 
 describe('resolveReadmeContent()', () => {
     it('prefers the summary when present for a regular Actor', () => {
