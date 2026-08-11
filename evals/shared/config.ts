@@ -40,12 +40,29 @@ export function sanitizeEnvValue(value?: string): string | undefined {
 /**
  * Env vars used in HTTP headers (API keys, tokens, URLs).
  *
- * Why in-place? The phoenix-otel OTel exporter reads PHOENIX_API_KEY directly
- * from process.env (inside getEnvApiKey()) and passes it to node:http, which
- * throws ERR_INVALID_CHAR on any control characters. We can't intercept that
- * read, so we sanitize process.env itself before any library loads.
+ * Why in-place? The phoenix-otel exporter and the Langfuse SDK both read these
+ * directly from process.env and pass them to node:http, which throws
+ * ERR_INVALID_CHAR on any control characters. We can't intercept those reads, so
+ * we sanitize process.env itself before any library loads.
  */
-const ENV_KEYS_TO_SANITIZE = ['OPENROUTER_API_KEY', 'OPENROUTER_BASE_URL', 'PHOENIX_API_KEY', 'PHOENIX_BASE_URL'];
+const ENV_KEYS_TO_SANITIZE = [
+    'APIFY_TOKEN',
+    'OPENROUTER_API_KEY',
+    'OPENROUTER_BASE_URL',
+    'PHOENIX_API_KEY',
+    'PHOENIX_BASE_URL',
+    'LANGFUSE_PUBLIC_KEY',
+    'LANGFUSE_SECRET_KEY',
+    'LANGFUSE_BASE_URL',
+];
+
+/**
+ * Names of the given env vars that are unset or empty, so an entry point can report
+ * every missing one at once instead of failing on the first.
+ */
+export function findMissingEnvVars(keys: readonly string[]): string[] {
+    return keys.filter((key) => !process.env[key]);
+}
 
 /**
  * Redact a value for safe logging: shows first 4 and last 4 chars, masks the rest.

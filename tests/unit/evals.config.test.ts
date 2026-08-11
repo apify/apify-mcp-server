@@ -45,14 +45,17 @@ describe('sanitizeProcessEnv', () => {
     afterEach(() => {
         delete process.env.PHOENIX_API_KEY;
         delete process.env.OPENROUTER_API_KEY;
+        delete process.env.LANGFUSE_SECRET_KEY;
     });
 
     it('sanitizes env vars in-place', () => {
         process.env.PHOENIX_API_KEY = 'key-with-newline\n';
         process.env.OPENROUTER_API_KEY = '  "quoted-key"\r\n';
+        process.env.LANGFUSE_SECRET_KEY = 'sk-lf-secret\n';
         sanitizeProcessEnv();
         expect(process.env.PHOENIX_API_KEY).toBe('key-with-newline');
         expect(process.env.OPENROUTER_API_KEY).toBe('quoted-key');
+        expect(process.env.LANGFUSE_SECRET_KEY).toBe('sk-lf-secret');
     });
 
     it('leaves unset vars untouched', () => {

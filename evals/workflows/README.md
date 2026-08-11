@@ -10,12 +10,16 @@ Tests AI agents performing multi-turn conversations with Apify MCP tools, evalua
 - Node.js installed
 - Apify account with API token
 - OpenRouter API key
+- Langfuse project keys (runs are traced to Langfuse)
 
 **Run evaluations:**
 ```bash
 # 1. Set environment variables
 export APIFY_TOKEN="your_apify_token"
 export OPENROUTER_API_KEY="your_openrouter_key"
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+export LANGFUSE_BASE_URL="https://langfuse.apify.dev"
 
 # 2. Build the MCP server
 pnpm run build
@@ -222,6 +226,7 @@ const conversation = await executeConversation({
 - `conversation-executor.ts` - Multi-turn loop with dynamic tools and server instructions
 - `workflow-judge.ts` - Judge evaluation
 - `test-cases-loader.ts` - Load/filter test cases
+- `langfuse-tracing.ts` - OpenTelemetry setup for the Langfuse exporter
 - `output-formatter.ts` - Results formatting
 - `run-workflow-evals.ts` - Main CLI entry
 
@@ -232,7 +237,17 @@ const conversation = await executeConversation({
 ```bash
 export APIFY_TOKEN="your_apify_token"           # Get from https://console.apify.com/account/integrations
 export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai/keys
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."          # Project settings in Langfuse
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+export LANGFUSE_BASE_URL="https://langfuse.apify.dev"
 ```
+
+### Tracing
+
+Each test case is one Langfuse trace, carrying the query, the judge verdict, and the
+category and agent model as metadata. The agent's LLM calls and MCP tool calls are not
+instrumented: the hand-rolled harness is being replaced by the Claude Agent SDK, which
+reports its own turns.
 
 ### CLI Options
 
