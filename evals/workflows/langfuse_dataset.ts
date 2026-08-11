@@ -3,9 +3,7 @@
  *
  * The dataset is the source of truth and nothing here writes to it. An item's
  * `input.query` is the agent prompt, `expectedOutput` is what the judge scores against,
- * and `metadata` carries the harness knobs (a DatasetItem offers nowhere else to put
- * them). Nothing is duplicated between the three, so editing an item in the Langfuse UI
- * changes the next run.
+ * and `metadata` carries the harness knobs.
  */
 
 import type { LangfuseClient } from '@langfuse/client';
@@ -55,9 +53,8 @@ export type WorkflowTestCase = z.infer<typeof WorkflowMetadataValidator> & {
 export type WorkflowCase = WorkflowTestCase & { item: DatasetItem };
 
 /**
- * Validate a dataset item before anything depends on its shape. The item is JSON
- * that round-tripped through Langfuse and can be edited in its UI, so an
- * unchecked cast here would surface as a TypeError mid-run, after LLM spend.
+ * Validate a dataset item before anything depends on its shape. It is UI-editable JSON,
+ * so an unchecked cast would surface as a TypeError mid-run, after LLM spend.
  */
 export function parseWorkflowItem(item: unknown): WorkflowItem {
     const parsed = WorkflowItemValidator.safeParse(item);
@@ -69,11 +66,8 @@ export function parseWorkflowItem(item: unknown): WorkflowItem {
 }
 
 /**
- * Flatten an item into a test case.
- *
- * Keys are written out one by one rather than spread, so absent knobs stay absent and
- * every export produces the same key order: the snapshot is diffed in review, and remote
- * metadata carries no field order worth inheriting.
+ * Flatten an item into a test case. Keys are written out rather than spread so absent
+ * knobs stay absent and the exported snapshot keeps a stable key order for diffing.
  */
 export function toWorkflowTestCase(item: unknown): WorkflowTestCase {
     const { id, input, expectedOutput, metadata } = parseWorkflowItem(item);
@@ -91,12 +85,8 @@ export function toWorkflowTestCase(item: unknown): WorkflowTestCase {
 /**
  * Every active case in the dataset, sorted by id.
  *
- * Archived items are dropped: `dataset.get` returns them regardless of status, and an
- * item archived in the UI must stop running. Every item is validated here rather than
- * per item mid-run, so a malformed one fails the run before any LLM spend.
- *
- * Errors are left to throw: a 401, an unknown dataset name or a wrong base URL must stop
- * the run, not be downgraded to a warning.
+ * `dataset.get` returns archived items too, and archiving in the UI is how a case is
+ * retired. Validating all items up front fails a malformed one before any LLM spend.
  */
 export async function fetchWorkflowCases(langfuse: LangfuseClient, datasetName: string): Promise<WorkflowCase[]> {
     const dataset = await langfuse.dataset.get(datasetName, { fetchItemsPageSize: 100 });

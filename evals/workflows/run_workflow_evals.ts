@@ -93,15 +93,12 @@ async function main() {
 
     let exitCode = 1;
     try {
-        // The dataset is the source of truth: a run reads it and never writes to it, so a
-        // change made in the Langfuse UI takes effect on the next run. Running on real
-        // dataset items is also what makes this a Langfuse dataset run, comparable with
-        // every other run. Use `evals:workflow:export-dataset` to commit changes back.
+        // Read-only: the dataset is the source of truth, edited in the Langfuse UI and
+        // committed back with `evals:workflow:export-dataset`.
         console.log(`📇 Fetching dataset "${datasetName}"...`);
         const cases = await fetchWorkflowCases(langfuse, datasetName);
 
-        // The shared helpers match on the flat test case fields each case carries, so
-        // there is one matching rule for every entry point that filters test cases.
+        // Shared helpers, so every entry point filters test cases by the same rule.
         let selected = cases;
         if (argv.id) selected = filterById(selected, argv.id);
         if (argv.category) selected = filterByCategory(selected, argv.category);
@@ -150,8 +147,7 @@ async function main() {
             },
         });
 
-        // Compact on purpose: CI logs only need what went wrong, and Langfuse holds the
-        // full per-item view behind the run link below.
+        // Compact on purpose: Langfuse holds the full per-item view behind the run link.
         const summary = buildRunSummary(requestedIds, result.itemResults);
         for (const failure of summary.failures) {
             console.log(`❌ ${failure.id}: ${failure.reason}`);
@@ -171,9 +167,8 @@ async function main() {
         exitCode = 1;
     } finally {
         // Flush scores and spans before exit or the last batch is lost. Guarded
-        // individually: a failed export must not skip the other flush, and
-        // `void main()` has no rejection handler, so a rejection here would turn
-        // a finished run into an unhandled rejection and override its exit code.
+        // individually: a failed export must not skip the other flush, and an
+        // unhandled rejection here would override the run's exit code.
         try {
             await langfuse.flush();
         } catch (error) {

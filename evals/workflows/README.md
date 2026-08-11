@@ -55,8 +55,6 @@ pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot.json (no bu
 
 ## Technical overview
 
-Tests AI agents executing tasks using Apify MCP server tools through multi-turn conversations evaluated by an LLM judge.
-
 **Core features:**
 - Multi-turn conversations with tool calling
 - Dynamic tool discovery during execution
@@ -70,29 +68,18 @@ Tests AI agents executing tasks using Apify MCP server tools through multi-turn 
 
 ### 1. The Langfuse dataset is the source of truth
 
-**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Test cases are edited in the Langfuse UI; `dataset_snapshot.json` is an exported copy that nothing reads at runtime.
+**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. `evals:workflow:export-dataset` writes the active items back to `dataset_snapshot.json`; there is no importer and nothing reads the snapshot at runtime.
 
 **Why:**
-- Editing an item in the Langfuse UI changes the next run. An earlier version synced a local file into the dataset before every run, which silently overwrote UI edits and made the file the real source of truth
-- `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when it is given real dataset items
-- One source of truth means no id-matching contract to maintain between a local file and a remote dataset
+- A UI edit takes effect on the next run. An earlier version synced a local file into the dataset first, which silently overwrote UI edits
+- `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when given real dataset items
+- The snapshot puts UI edits into git history and keeps a copy of the cases outside the Langfuse database. Its output is byte-stable, so an unexpected diff means the dataset changed without being committed
 
-An item's `input.query` is the agent prompt, `expectedOutput` is what the judge scores against, and `metadata` carries the harness knobs (`category`, `maxTurns`, `tools`, `failTools`). Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
+Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
 
-**Trade-off:** the dataset is mutable, so a run is only reproducible against the dataset as it was. Export makes changes reviewable in git, and Langfuse itself keeps item versions.
+**Trade-off:** the dataset is mutable, so a run is only reproducible against the dataset as it was. Langfuse keeps item versions.
 
-**Location:** `langfuse_dataset.ts`, `run_workflow_evals.ts`
-
-### 1b. The snapshot is a copy, not an input
-
-**Decision:** `evals:workflow:export-dataset` writes the active items to `dataset_snapshot.json`, sorted by id with a fixed key order. There is no importer.
-
-**Why:**
-- Puts UI edits through code review and into git history, which the Langfuse UI alone does not give
-- Keeps a copy of the cases outside Langfuse, otherwise the only copy is its database
-- Byte-stable output, so an unexpected diff means someone changed the dataset without committing it
-
-**Location:** `export_dataset.ts`
+**Location:** `langfuse_dataset.ts`, `run_workflow_evals.ts`, `export_dataset.ts`
 
 ### 2. MCP server isolation per test
 
@@ -223,17 +210,11 @@ Both entry points fail fast (before any test runs) listing every missing variabl
 
 Results are recorded in Langfuse, not to a local file. Each run:
 
-- **Reads the dataset** `workflow-evals` (override with `--dataset`), takes its active items and matches them against `--id`/`--category`. To try a variant set of cases, clone the dataset in the Langfuse UI and pass `--dataset`; runs stay recorded against the dataset they used.
-- **Runs an experiment** over the matching dataset items, run name `<git-branch>-<agent-model>-<timestamp>`, with run metadata `{ agentModel, judgeModel, toolTimeout }`. Because it runs on dataset items, it is recorded as a Langfuse **dataset run** and the console prints its direct URL.
-- **Traces** every item as one trace, whose root output is a compact summary (judge verdict, tokens) rather than the transcript. The agent's individual LLM calls and MCP tool calls are not instrumented: the hand-rolled harness is being replaced by the Claude Agent SDK, which reports its own turns.
-- **Scores** each item with two evaluators:
-  - `workflow_judge`: `1` if the judge verdict is PASS, else `0` (comment = judge reason). This is the strict gate.
-  - `total_tokens`: agent LLM tokens billed across the conversation. Omitted entirely when the provider reported no usage, so an unmeasured run cannot look like a free one.
-- **Scores the run** with `pass_rate`: passing items over the number of items requested, so runs are comparable across branches and models even when items were dropped.
-
-The console prints only failures, the `passed/requested` count, and the run link; per-item detail is in Langfuse.
-
-Compare tokens across runs (branches, models) directly in the Langfuse experiment view.
+- **Reads the dataset** `workflow-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
+- **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
+- **Traces** every item as one trace whose root output is a compact summary, not the transcript. Individual LLM and MCP tool calls are not instrumented: the Claude Agent SDK replacing this harness reports its own turns.
+- **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) is the strict gate, and `total_tokens` is the agent tokens billed, omitted when the provider reported no usage so an unmeasured run cannot look like a free one.
+- **Scores the run** with `pass_rate`: passing items over items requested, so runs stay comparable even when items were dropped.
 
 ### Concurrency
 

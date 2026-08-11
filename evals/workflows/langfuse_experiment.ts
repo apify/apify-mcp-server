@@ -18,16 +18,11 @@ import { evaluateConversation } from './workflow_judge.js';
 /**
  * Output produced by the experiment task for a single dataset item.
  *
- * A summary, not the transcript: the SDK writes whatever the task returns to the
- * item's root span, and returning every conversation would upload each tool payload
- * again and hold all transcripts in memory until the run ends.
+ * A summary, not the transcript: the SDK writes whatever the task returns to the item's
+ * root span, so returning conversations would re-upload every tool payload.
  */
 export type WorkflowTaskOutput = {
-    /**
-     * Dataset item id, so the run summary can name items. Carried here rather than read
-     * from `ExperimentItemResult.item`: the SDK types that as a union whose non-dataset
-     * branch declares no `id`, so reading it would need an unchecked cast.
-     */
+    /** Item id, carried here because `ExperimentItemResult.item` is typed as a union without one. */
     id: string;
     judgeResult: JudgeResult;
     /** Agent tokens across the conversation; undefined when the provider never reported usage. */
@@ -83,9 +78,9 @@ export type RunSummary = {
 /**
  * Score a finished experiment against the ids that were requested.
  *
- * The requested ids are the denominator on purpose. When a task throws, the SDK
- * logs it and omits the item from `itemResults`, so gating on `itemResults.length`
- * would report "7/7 passed" and exit 0 on a run where three tests never executed.
+ * The requested ids are the denominator on purpose: the SDK omits an item whose task
+ * threw, so gating on `itemResults.length` would report "7/7 passed" on a run where
+ * three tests never executed.
  */
 export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[]): RunSummary {
     const failures: { id: string; reason: string }[] = [];
@@ -124,15 +119,12 @@ export type WorkflowTaskOptions = {
 };
 
 /**
- * Build the experiment task. For each dataset item it spins up a fresh isolated
- * McpClient, runs the conversation, then the judge.
+ * Build the experiment task: per dataset item, a fresh isolated McpClient, the
+ * conversation, then the judge.
  *
- * Harness errors (MCP spawn, OpenRouter, judge) are left to throw. The SDK logs
- * them and drops the item, and `buildRunSummary` fails the run on the shortfall,
- * so a broken harness no longer masquerades as a failing eval. They are rethrown
- * prefixed with the item id first: the SDK's own log line carries none, and at
- * concurrency 4 the operator otherwise gets interleaved anonymous errors that
- * cannot be paired with the "Never completed" list.
+ * Harness errors (MCP spawn, OpenRouter, judge) are left to throw, so `buildRunSummary`
+ * fails the run on the shortfall instead of a broken harness looking like a failing eval.
+ * They are prefixed with the item id because the SDK's own log line carries none.
  */
 export function makeTask(options: WorkflowTaskOptions) {
     const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout } = options;

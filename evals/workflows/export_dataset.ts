@@ -4,10 +4,8 @@
 /**
  * Write the Langfuse dataset back to `dataset_snapshot.json`.
  *
- * The dataset is the source of truth; the snapshot is its reviewable copy. Exporting puts
- * edits made in the Langfuse UI into git history, and keeps a copy of the cases outside
- * Langfuse, which is otherwise the only place they exist. Nothing reads the snapshot at
- * runtime, so a stale one breaks nothing: commit the diff this produces.
+ * The snapshot is a reviewable copy that nothing reads at runtime: it puts UI edits into
+ * git history and keeps the cases somewhere other than the Langfuse database.
  *
  * Usage:
  *   pnpm run evals:workflow:export-dataset
