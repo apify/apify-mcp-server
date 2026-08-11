@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.14.3 - **not yet released**
 
+### 🚀 Features
+
+- Trace workflow evals to Langfuse ([#1223](https://github.com/apify/apify-mcp-server/pull/1223)) ([8280936](https://github.com/apify/apify-mcp-server/commit/8280936157946ca5954618a59deed1c46778e117)) by [@RobertCrupa](https://github.com/RobertCrupa)
+
 ### 🐛 Bug Fixes
 
 - Recover widget structuredContent stripped by Claude Desktop ([#1187](https://github.com/apify/apify-mcp-server/pull/1187)) ([94dcfe3](https://github.com/apify/apify-mcp-server/commit/94dcfe3b13e0baef94f1d0f5155f0044b02f42df)) by [@jirispilka](https://github.com/jirispilka)
