@@ -153,6 +153,31 @@ You must judge whether this agent made the correct selection.
 - Different from search-apify-docs which searches across all documentation
 - Example: "Fetch https://docs.apify.com/platform/actors/running" or "Show me the content of this docs page"
 
+**get-actor-task**: Reads a saved Actor task — its input, run options, publication state and public display configuration. Read-only.
+- Use when query asks what a task contains, how it is configured, or whether it is published
+- Example: "What is the configuration of my task insta-daily?" or "Is my task published?"
+
+**create-actor-task**: Saves an Actor configuration as a new named task.
+- Use when query asks to save/create a task for an Actor
+- Do not use when the task already exists — that is update-actor-task
+- Example: "Save my apify/instagram-scraper settings as a task called insta-daily"
+
+**update-actor-task**: Changes an existing task's input, run options, or the public display configuration (publicConfig) of its landing page. It does NOT publish the task.
+- Use when query asks to change an existing task, or to set up/prepare a task for publishing
+- A task must have publicConfig.inputSchemaFields and publicConfig.datasetView set here before it can be published
+- "Set up for publishing" or "configure the landing page" means update-actor-task, NOT publish-actor-task
+- Example: "Change my task to use the beta build" or "Set up insta-daily for publishing with the overview dataset view"
+
+**publish-actor-task**: Publishes an already-configured task on its public landing page.
+- Use when query asks to publish a task or make it public
+- Does not fill in any configuration — if the task is not ready, update-actor-task must run first
+- Example: "Publish my task insta-daily" or "Make my task public"
+
+**unpublish-actor-task**: Takes a task's public landing page down. The display configuration is preserved.
+- Use when query asks to unpublish a task or make it private again
+- Preserving the settings is automatic, so no update-actor-task call is needed alongside it
+- Example: "Unpublish insta-daily" or "Take my task off its public page but keep its settings"
+
 
 ## Keyword Length Guidelines
 

@@ -19,12 +19,13 @@ export function mockTask(overrides: Record<string, unknown> = {}) {
 export type RecordedCall = { fn: string; payload?: unknown };
 
 /**
- * ApifyClient stub covering everything the task tools use: `task().get/update/publish/unpublish()`
- * and `tasks().create()`. `publish`/`unpublish` are the client's own wrappers around an update that
+ * Fake ApifyClient covering everything the task tools use: `task().get/update/publish/unpublish()`
+ * and `tasks().create()`. Every call is recorded into `calls` so tests can assert which method ran
+ * and with what payload. `publish`/`unpublish` are the client's own wrappers around an update that
  * sets the virtual `isPublic` field — keeping that payload right is the client's contract, so the
  * tools are only checked for calling the right method.
  */
-export function stubTaskApiClient(task: unknown): {
+export function mockTaskApiClient(task: unknown): {
     apifyClient: InternalToolArgs['apifyClient'];
     calls: RecordedCall[];
 } {

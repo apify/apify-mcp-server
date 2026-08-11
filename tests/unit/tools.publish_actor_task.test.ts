@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { actorTaskOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { publishActorTask } from '../../src/tools/tasks/publish_actor_task.js';
 import type { HelperTool } from '../../src/types.js';
-import { mockTask, stubTaskApiClient } from './helpers/task_stub.js';
+import { mockTask, mockTaskApiClient } from './helpers/task_client.js';
 import {
     expectSchemaConformingStructuredContent,
     stubToolCallContext,
@@ -12,7 +12,7 @@ import {
 
 describe('publish-actor-task', () => {
     it('publishes the task and returns the publication subset only', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask());
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
         const context = stubToolCallContext({ taskId: 'task-1' }, apifyClient);
         const result = (await (publishActorTask as HelperTool).call(context)) as TextToolResult & {
             structuredContent: Record<string, unknown>;

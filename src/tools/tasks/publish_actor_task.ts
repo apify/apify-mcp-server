@@ -20,8 +20,10 @@ export const publishActorTask: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.ACTOR_TASK_PUBLISH,
     title: 'Publish Actor task',
     description: `Publish a task on its public landing page.
-The task's Actor must be public and the task must have its public display configuration set up
-(in Apify Console, on the task's Publication tab). Publishing an already published task has no effect.
+The task's Actor must be public and the task must have its public display configuration set up -
+at least \`publicConfig.inputSchemaFields\` and \`publicConfig.datasetView\`. If publishing fails
+because the task is not ready, set those with ${HELPER_TOOLS.ACTOR_TASK_UPDATE} and try again.
+Publishing an already published task has no effect.
 Requires write access to both the task and its Actor.
 Use ${HELPER_TOOLS.ACTOR_TASK_UNPUBLISH} to take the page down again.
 

@@ -5,7 +5,7 @@ import { createActorTask } from '../../src/tools/tasks/create_actor_task.js';
 import { getActorTask } from '../../src/tools/tasks/get_actor_task.js';
 import { updateActorTask } from '../../src/tools/tasks/update_actor_task.js';
 import type { HelperTool } from '../../src/types.js';
-import { mockTask, stubTaskApiClient } from './helpers/task_stub.js';
+import { mockTask, mockTaskApiClient } from './helpers/task_client.js';
 import {
     expectSchemaConformingStructuredContent,
     stubToolCallContext,
@@ -16,7 +16,7 @@ type StructuredResult = TextToolResult & { structuredContent: Record<string, unk
 
 describe('get-actor-task', () => {
     it('returns the task subset with input field names but no input values', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask());
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
         const result = (await (getActorTask as HelperTool).call(
             stubToolCallContext({ taskId: 'task-1' }, apifyClient),
         )) as StructuredResult;
@@ -44,7 +44,7 @@ describe('get-actor-task', () => {
     it('normalizes a Date publishedAt into an ISO string', async () => {
         // The client's `parseDateFields` turns `publicConfig.publishedAt` into a Date, while the raw
         // publication call leaves a string. The declared output schema promises a string either way.
-        const { apifyClient } = stubTaskApiClient(
+        const { apifyClient } = mockTaskApiClient(
             mockTask({ publicConfig: { publishedAt: new Date('2026-08-01T10:00:00.000Z') } }),
         );
         const result = (await (getActorTask as HelperTool).call(
@@ -56,7 +56,7 @@ describe('get-actor-task', () => {
     });
 
     it('reports a missing task without throwing', async () => {
-        const { apifyClient } = stubTaskApiClient(undefined);
+        const { apifyClient } = mockTaskApiClient(undefined);
         const result = (await (getActorTask as HelperTool).call(
             stubToolCallContext({ taskId: 'nope' }, apifyClient),
         )) as TextToolResult;
@@ -67,7 +67,7 @@ describe('get-actor-task', () => {
 
 describe('create-actor-task', () => {
     it('maps the flat run options into the options object', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask());
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
         await (createActorTask as HelperTool).call(
             stubToolCallContext(
                 {
@@ -97,7 +97,7 @@ describe('create-actor-task', () => {
     });
 
     it('rejects a name the API would reject', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask());
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
 
         // Too short, and an underscore is not DNS-safe — both must fail before the API call.
         for (const name of ['ab', 'my_task']) {
@@ -109,7 +109,7 @@ describe('create-actor-task', () => {
     });
 
     it('omits options entirely when no run option is given', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask());
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
         await (createActorTask as HelperTool).call(
             stubToolCallContext({ actorId: 'actor-id-1', name: 'my-task' }, apifyClient),
         );
@@ -118,7 +118,7 @@ describe('create-actor-task', () => {
     });
 
     it('passes publicConfig through so a task can be staged for publishing in one call', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask());
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
         await (createActorTask as HelperTool).call(
             stubToolCallContext(
                 {
@@ -138,7 +138,7 @@ describe('create-actor-task', () => {
     });
 
     it('sends only actId when no name is given, letting the API generate one', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask());
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
         await (createActorTask as HelperTool).call(stubToolCallContext({ actorId: 'actor-id-1' }, apifyClient));
 
         expect(calls[0].payload).toEqual({ actId: 'actor-id-1' });
@@ -147,7 +147,7 @@ describe('create-actor-task', () => {
 
 describe('update-actor-task', () => {
     it('passes publicConfig through so a task can be prepared for publishing', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask());
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
         const result = (await (updateActorTask as HelperTool).call(
             stubToolCallContext(
                 {
@@ -168,7 +168,7 @@ describe('update-actor-task', () => {
     });
 
     it('sends only the provided fields', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask());
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
         await (updateActorTask as HelperTool).call(
             stubToolCallContext({ taskId: 'task-1', title: 'Renamed' }, apifyClient),
         );

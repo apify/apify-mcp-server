@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { actorTaskOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { unpublishActorTask } from '../../src/tools/tasks/unpublish_actor_task.js';
 import type { HelperTool } from '../../src/types.js';
-import { mockTask, stubTaskApiClient } from './helpers/task_stub.js';
+import { mockTask, mockTaskApiClient } from './helpers/task_client.js';
 import {
     expectSchemaConformingStructuredContent,
     stubToolCallContext,
@@ -12,7 +12,7 @@ import {
 
 describe('unpublish-actor-task', () => {
     it('unpublishes the task and reports a null publishedAt', async () => {
-        const { apifyClient, calls } = stubTaskApiClient(mockTask({ publicConfig: { publishedAt: null } }));
+        const { apifyClient, calls } = mockTaskApiClient(mockTask({ publicConfig: { publishedAt: null } }));
         const context = stubToolCallContext({ taskId: 'task-1' }, apifyClient);
         const result = (await (unpublishActorTask as HelperTool).call(context)) as TextToolResult & {
             structuredContent: Record<string, unknown>;
