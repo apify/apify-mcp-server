@@ -84,4 +84,66 @@ describe('MCP server internals integration tests', () => {
             ...AUTO_INJECTED_TOOLS.map((t) => t.name),
         ]);
     });
+
+    describe('loadToolsFromInput()', () => {
+        it('resolves the Claude connector selection to exactly the reviewed apps-mode tools', async () => {
+            // Pins the `tools=` selection of the candidate Claude connector URL (apify/ai-team#229):
+            // https://mcp.apify.com/?tools=search-actors,search-actors-widget,fetch-actor-details,fetch-actor-details-widget,search-apify-docs,fetch-apify-docs,get-actor-run,get-actor-run-widget,get-actor-run-list,get-actor-log,abort-actor-run,get-dataset-list,get-dataset,get-dataset-items,get-key-value-store-list,get-key-value-store,get-key-value-store-record,apify/rag-web-browser,apify/web-fetch&client=claude
+            // That URL is submitted to Anthropic and frozen; the loader is not. If this test fails,
+            // the loader widened or reordered what the submitted URL serves — the URL itself has to
+            // be revisited and resubmitted. Do not just edit the expected array to make it pass.
+            const candidateSelectors = [
+                'search-actors',
+                'search-actors-widget',
+                'fetch-actor-details',
+                'fetch-actor-details-widget',
+                'search-apify-docs',
+                'fetch-apify-docs',
+                'get-actor-run',
+                'get-actor-run-widget',
+                'get-actor-run-list',
+                'get-actor-log',
+                'abort-actor-run',
+                'get-dataset-list',
+                'get-dataset',
+                'get-dataset-items',
+                'get-key-value-store-list',
+                'get-key-value-store',
+                'get-key-value-store-record',
+                'apify/rag-web-browser',
+                'apify/web-fetch',
+            ];
+
+            const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
+            const tools = await loadToolsFromInput({ tools: candidateSelectors }, apifyClient, SERVER_MODE.APPS);
+
+            // Order matters: it is the order a reviewer of the submitted URL reads.
+            expect(tools.map((tool) => tool.name)).toEqual([
+                'search-actors',
+                'search-actors-widget',
+                'fetch-actor-details',
+                'fetch-actor-details-widget',
+                'search-apify-docs',
+                'fetch-apify-docs',
+                'get-actor-run',
+                'get-actor-run-widget',
+                'get-actor-run-list',
+                'get-actor-log',
+                'abort-actor-run',
+                'get-dataset-list',
+                'get-dataset',
+                'get-dataset-items',
+                'get-key-value-store-list',
+                'get-key-value-store',
+                'get-key-value-store-record',
+                'apify--rag-web-browser',
+                'apify--web-fetch',
+            ]);
+
+            // Every auto-injected helper must be named in the URL itself, not arrive via injection.
+            for (const tool of AUTO_INJECTED_TOOLS) {
+                expect(candidateSelectors).toContain(tool.name);
+            }
+        });
+    });
 });
