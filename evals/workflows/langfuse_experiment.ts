@@ -34,19 +34,30 @@ export type WorkflowTaskOutput = {
     totalTokens?: number;
 };
 
+/**
+ * Score names as they appear in Langfuse.
+ *
+ * Emitted here and matched by name here, so a typo in either would silently drop an
+ * item from the pass count rather than fail.
+ */
+export const SCORE_NAMES = {
+    WORKFLOW_JUDGE: 'workflow_judge',
+    TOTAL_TOKENS: 'total_tokens',
+} as const;
+
 type WorkflowEvaluator = (params: { output: WorkflowTaskOutput }) => Promise<Evaluation | Evaluation[]>;
 
 /** The evaluators attached to each experiment item. */
 export const evaluators: WorkflowEvaluator[] = [
     async ({ output }) => ({
-        name: 'workflow_judge',
+        name: SCORE_NAMES.WORKFLOW_JUDGE,
         value: output.judgeResult.verdict === 'PASS' ? 1 : 0,
         comment: output.judgeResult.reason,
     }),
     // No score when the provider never reported usage. A 0 would read as a real
     // measurement and skew cross-run model comparisons in Langfuse.
     async ({ output }) =>
-        output.totalTokens === undefined ? [] : [{ name: 'total_tokens', value: output.totalTokens }],
+        output.totalTokens === undefined ? [] : [{ name: SCORE_NAMES.TOTAL_TOKENS, value: output.totalTokens }],
 ];
 
 /** Minimal view of an ExperimentItemResult: what the run gate reads. */
@@ -55,7 +66,8 @@ type ScoredItem = { output: WorkflowTaskOutput; evaluations: { name: string; val
 /** Items that scored `workflow_judge === 1`. */
 export function countPassed(itemResults: ScoredItem[]): number {
     return itemResults.filter(
-        (result) => result.evaluations.find((evaluation) => evaluation.name === 'workflow_judge')?.value === 1,
+        (result) =>
+            result.evaluations.find((evaluation) => evaluation.name === SCORE_NAMES.WORKFLOW_JUDGE)?.value === 1,
     ).length;
 }
 
@@ -79,7 +91,9 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
     const failures: { id: string; reason: string }[] = [];
 
     for (const result of itemResults) {
-        const judgeScore = result.evaluations.find((evaluation) => evaluation.name === 'workflow_judge')?.value;
+        const judgeScore = result.evaluations.find(
+            (evaluation) => evaluation.name === SCORE_NAMES.WORKFLOW_JUDGE,
+        )?.value;
         if (judgeScore === 1) continue;
         // No score means the evaluator itself threw, so judgeResult.reason is stale - it can
         // hold the judge's PASS rationale, printed under a failure marker. Say what happened.
@@ -87,7 +101,7 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
             id: result.output.id,
             reason:
                 judgeScore === undefined
-                    ? 'no workflow_judge score (the evaluator threw)'
+                    ? `no ${SCORE_NAMES.WORKFLOW_JUDGE} score (the evaluator threw)`
                     : result.output.judgeResult.reason,
         });
     }
