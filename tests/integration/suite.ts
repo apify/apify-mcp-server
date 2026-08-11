@@ -23,21 +23,11 @@ export type IntegrationTestsSuiteOptions = {
     afterEachFn?: () => Promise<void>;
 };
 
-/**
- * One suite, three transport dimensions (stdio / 2025-11-25 streamable-HTTP / 2026-07-28
- * stateless) — each `actor.server_*.test.ts` / `stdio.test.ts` entry point calls this with its
- * own `createClientFn`. Every group's cases live in `src/test_kit/cases/*.cases.ts` (published
- * behind `./test-kit` so `apify-mcp-server-internal` can import the exact same definitions);
- * `registerCases` here registers all of them (critical and non-critical) for this repo's own CI
- * run. Cases that share expensive setup (e.g. one seeded Actor run) do so via `ctx.getFixture`
- * (see `src/test_kit/types.ts`), not a vitest `beforeAll` — that lets the setup stay scoped to
- * only the cases that need it while still running once per dimension, not once per case.
- */
+/** Register all capability cases for one transport dimension. */
 export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOptions) {
     const { suiteName, createClientFn, beforeAllFn, afterAllFn, beforeEachFn, afterEachFn } = options;
 
-    // The 2026-07-28 stateless adapter declares no `tasks` capability, so `tasks/*` is
-    // method-not-found there — the Tasks cases run on the legacy dimensions only.
+    // No tasks on 2026-07-28.
     const hasTasksSupport = options.transport !== '2026-07-28';
 
     if (beforeAllFn) beforeAll(beforeAllFn);

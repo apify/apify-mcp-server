@@ -3,17 +3,10 @@ import { describe, it } from 'vitest';
 import type { Case, CaseCtx, Fixture } from './types.js';
 
 /**
- * Registers `cases` under one `describe(suiteName)` block. When `ctx.criticalOnly` is true
- * (internal running the shared subset against its live deploy), non-critical cases register via
- * `it.skip` — a native vitest primitive — so they show up as skipped in reporter output instead of
- * silently vanishing from the test count. A case's own `skipIf` (e.g. unsupported transport) is
- * honored the same way, independent of `criticalOnly`.
- *
- * `ctx.getFixture` is wired here, not by the caller — one fixture cache per `registerCases` call,
- * so a fixture's `setup` runs at most once per transport dimension no matter how many cases in
- * this array ask for it (concurrently or not: the cache stores the in-flight promise itself, so
- * a second `getFixture` call for the same key while `setup` is still running awaits that same
- * promise instead of starting a second run).
+ * Register cases under `describe(suiteName)`.
+ * - `criticalOnly`: non-critical → `it.skip`
+ * - `skipIf`: also → `it.skip`
+ * - `getFixture`: memoized once per call by `fixture.key`
  */
 export function registerCases(suiteName: string, cases: Case[], ctx: Omit<CaseCtx, 'getFixture'>): void {
     // eslint-disable-next-line vitest/valid-title -- suiteName is the caller's title string

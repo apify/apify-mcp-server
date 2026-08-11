@@ -6,19 +6,15 @@ import { SKYFIRE_ENABLED_TOOLS } from '../../payments/const.js';
 import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, asLegacyClient } from '../helpers.js';
 import type { Case, CaseCtx } from '../types.js';
 
-// Agentic payment modes (x402, skyfire) require HTTP headers — never on stdio. All but the
-// task-mode case below also work on the 2026-07-28 v2 client (plain listTools/callTool).
+// Payment modes need HTTP headers — never stdio.
 function notStdio(ctx: CaseCtx): boolean {
     return ctx.transport === 'stdio';
 }
 
-/**
- * Agentic payment modes: Skyfire and x402.
- */
+/** Skyfire and x402 payment modes. */
 export const paymentsCases: Case[] = [
     {
-        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit — payment
-        // gating is security/revenue relevant: a regression here silently drops the skyfire fee.
+        // critical: skyfire fee gating.
         name: 'should inject skyfire-pay-id parameter into all SKYFIRE_ENABLED_TOOLS when skyfireMode is enabled',
         critical: true,
         skipIf: notStdio,
@@ -65,9 +61,7 @@ export const paymentsCases: Case[] = [
         critical: false,
         skipIf: notStdio,
         run: async (ctx) => {
-            // Hardcoded list of tools expected to advertise _meta.x402 (i.e. paymentRequired: true).
-            // Kept independent of any production constant so this test pins the expected paid set
-            // and any silent drift (e.g. a tool losing paymentRequired) is caught here.
+            // Pin paid-tool set independently of production constants.
             const paidToolNames = [
                 HELPER_TOOLS.ACTOR_CALL,
                 HELPER_TOOLS.ACTOR_RUNS_GET,
@@ -126,9 +120,7 @@ export const paymentsCases: Case[] = [
         },
     },
     {
-        // `ACTOR_EXAMPLE_MCP_SERVER` is a standby MCP-server Actor; in normal mode the proxy
-        // registers its sub-tools (e.g. `*-add`), in payment mode the standby/MCP filter drops
-        // them from list-tools.
+        // Standby MCP Actor sub-tools load in normal mode, drop in payment mode.
         name: 'should filter standby MCP-server Actor from list-tools in payment mode',
         critical: false,
         skipIf: notStdio,
@@ -151,8 +143,7 @@ export const paymentsCases: Case[] = [
                 ).toHaveLength(0);
                 await client.close();
 
-                // Standard token auth — sub-tools must load normally so the regression also catches
-                // an over-eager filter that would block them outside payment mode.
+                // Outside payment mode, sub-tools must still load.
                 client = await ctx.createClientFn({ actors: [ACTOR_EXAMPLE_MCP_SERVER] });
                 const normalTools = await client.listTools();
                 expect(
@@ -186,10 +177,7 @@ export const paymentsCases: Case[] = [
         },
     },
     {
-        // Task-mode `call-actor` declares `taskSupport: 'optional'`, so it must hit the same
-        // standby guard the sync path does — otherwise the stored task result would be a generic
-        // 402 PaymentRequired rather than the precise standby rejection. Regression for #893.
-        // Needs `.experimental.tasks` (v1 SDK only) — legacy HTTP transport only, unlike its siblings.
+        // Regression #893: task-mode call-actor must hit the same standby guard (legacy HTTP only).
         name: 'should reject standby Actor in task-mode call-actor under x402 (not 402, not platform error)',
         critical: false,
         skipIf: (ctx) => ctx.transport !== '2025-11-25',
@@ -217,8 +205,7 @@ export const paymentsCases: Case[] = [
                     }
                 }
 
-                // The server MUST create a task (not short-circuit with a sync error envelope) —
-                // anything else breaks the SDK's task creation contract.
+                // Must create a task, not short-circuit with a sync error.
                 expect(
                     taskCreated,
                     'server should create a task even when the eventual result is a standby rejection',
@@ -233,8 +220,7 @@ export const paymentsCases: Case[] = [
         },
     },
     {
-        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit — payment
-        // gating is security/revenue relevant: a regression here is free access to a paid tool.
+        // critical: paid tool rejects free access.
         name: 'should return x402 payment error when calling paymentRequired tool without payment signature',
         critical: true,
         skipIf: notStdio,
@@ -250,8 +236,7 @@ export const paymentsCases: Case[] = [
                 const content = result.content as { text: string }[];
                 expect(content[0].text).toContain('x402');
 
-                // x402 MCP transport spec: 402 tool results MUST also expose the PaymentRequired
-                // payload via structuredContent (preferred over content[0].text JSON parsing).
+                // 402 results must expose PaymentRequired via structuredContent.
                 const structured = (result as { structuredContent?: Record<string, unknown> }).structuredContent;
                 expect(structured, 'x402 402 tool result should expose structuredContent').toBeDefined();
                 expect(structured?.x402Version, 'structuredContent.x402Version should be set').toBeDefined();

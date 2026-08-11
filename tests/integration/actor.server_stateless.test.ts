@@ -33,9 +33,7 @@ createIntegrationTestsSuite({
             httpServer = app.listen(httpServerPort, '127.0.0.1', () => resolve());
         });
 
-        // `mode: 'auto'` falls back to the legacy `initialize` handshake when it finds no modern
-        // server, which would let this whole dimension pass while exercising 2025-era code.
-        // getDiscoverResult() is undefined on that legacy verdict, defined on a modern one.
+        // Fail if auto-negotiation fell back to legacy initialize.
         const negotiationProbeClient = await createMcpStatelessClient(mcpUrl);
         const discoverResult = negotiationProbeClient.getDiscoverResult();
         await negotiationProbeClient.close();

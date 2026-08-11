@@ -3,57 +3,43 @@ import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.
 
 import type { SuiteClientOptions } from './mcp_client.js';
 
-/**
- * MCP SDK client generation a case is run against — the same v1/v2 client classes
- * `apify-mcp-server-internal` already builds its own authenticated clients from.
- */
+/** v1 or v2 MCP SDK client. */
 export type SuiteClient = ClientV1 | ClientV2;
 
 /**
- * Transport dimension a case is registered under. `2025-11-25` is the legacy spec (v1 SDK,
- * streamable-HTTP or stdio transport); `2026-07-28` is the modern spec (v2 SDK, stateless HTTP,
- * no `tasks` capability). `stdio` only exists in this repo's own suite — internal never runs it.
+ * Suite transport dimension.
+ * - `2025-11-25`: v1 SDK, streamable HTTP (or stdio in this repo only)
+ * - `2026-07-28`: v2 SDK, stateless HTTP, no tasks
+ * - `stdio`: this repo only
  */
 export type Transport = '2025-11-25' | 'stdio' | '2026-07-28';
 
 export interface CaseCtx {
     createClientFn: (options?: SuiteClientOptions) => Promise<SuiteClient>;
     transport: Transport;
-    /** The 2026-07-28 stateless adapter declares no `tasks` capability — false there. */
+    /** False on 2026-07-28 (no tasks capability). */
     hasTasksSupport: boolean;
-    /** true when the caller only wants `critical: true` cases registered. */
+    /** Register only `critical: true` cases. */
     criticalOnly?: boolean;
-    /**
-     * Resolves a shared `Fixture` — `fixture.setup(ctx)` runs at most once per `registerCases`
-     * call (i.e. once per transport dimension), memoized by `fixture.key`; every case that asks
-     * for the same fixture awaits the same in-flight/resolved promise. Lets several cases share
-     * one expensive setup (e.g. one seeded Actor run) without a vitest `beforeAll` — which can't
-     * express "shared by only some cases in this array" — and without paying for the setup once
-     * per case. See `register.ts`.
-     */
+    /** Memoized fixture setup — once per `registerCases` call, keyed by `fixture.key`. */
     getFixture: <T>(fixture: Fixture<T>) => Promise<T>;
 }
 
-/** A value computed once and shared across whichever cases ask for it via `ctx.getFixture`. */
+/** Value shared across cases via `ctx.getFixture`. */
 export interface Fixture<T> {
-    /** Unique across the cases array it's used in — same key resolves to the same memoized value. */
+    /** Unique key within the cases array using this fixture. */
     key: string;
     setup: (ctx: CaseCtx) => Promise<T>;
 }
 
-/**
- * One integration test case. Defined once, here (or in `./cases/*.cases.ts`), and consumed by
- * both this repo's own suite (`registerCases` with every case) and `apify-mcp-server-internal`
- * (`registerCases` with `criticalOnly: true`) — marking a case `critical: true` is the only edit
- * needed to share it; there is no second array to keep in sync.
- */
+/** One integration case. `critical: true` runs in apify-mcp-server-internal too. */
 export interface Case {
     name: string;
-    /** Deploy-health relevant: internal registers these against its own live staging/prod deploy. */
+    /** Deploy-health case for internal's live staging/prod. */
     critical: boolean;
-    /** When true, the case registers as `it.skip` instead of running (e.g. unsupported transport). */
+    /** Register as `it.skip` when true. */
     skipIf?: (ctx: CaseCtx) => boolean;
-    /** Forwarded to vitest's `it(name, { retry }, ...)` — for cases with known infra flakiness. */
+    /** Forwarded to vitest `it(name, { retry }, ...)`. */
     retry?: number;
     run: (ctx: CaseCtx) => Promise<void>;
 }

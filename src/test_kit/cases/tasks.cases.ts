@@ -13,19 +13,12 @@ import {
 } from '../helpers.js';
 import type { Case, CaseCtx } from '../types.js';
 
-// Tasks cases need the v1 SDK's `.experimental.tasks`/`.request()` API, which the 2026-07-28
-// v2 client and stdio both lack (v2 has no tasks capability; stdio isn't a dimension internal
-// runs at all) — restrict to 2025-11-25 (streamable HTTP) only, same gate every case here uses.
+// Tasks need v1 `.experimental.tasks` — legacy HTTP only.
 function onlyLegacyHttp(ctx: CaseCtx): boolean {
     return ctx.transport !== '2025-11-25';
 }
 
-/**
- * Async task protocol: long-running `tasks/call`, `tasks/get`/`tasks/list`, cancellation via
- * `notifications/cancelled` and `tasks/cancel`, and statusMessage propagation. All marked
- * `critical: true` — internal gains real async-task/notification coverage against its own live
- * deploy by importing this array, instead of hand-duplicating it.
- */
+/** Async tasks: call/get/list/cancel + statusMessage. All critical. */
 export const tasksCases: Case[] = [
     {
         name: 'should abort actor run on notifications/cancelled',
@@ -147,9 +140,7 @@ export const tasksCases: Case[] = [
                     }
                 }
                 expect(resultReceived).toBe(true);
-                // Regression guard: notifications/tasks/status must reach the client over the
-                // session-level transport (standalone SSE on streamable HTTP). If notifications
-                // are dropped, callToolStream emits no taskStatus events.
+                // Regression: taskStatus must arrive over session SSE.
                 expect(taskStatusCount).toBeGreaterThan(0);
                 expect(lastStatus).not.toBe('');
             } finally {
@@ -234,8 +225,7 @@ export const tasksCases: Case[] = [
         critical: true,
         skipIf: onlyLegacyHttp,
         retry: 3,
-        // Without the chained AbortController, the task flips to `cancelled` but the underlying
-        // Apify run keeps consuming compute until natural finish.
+        // Cancel must abort the underlying Apify run, not only the task status.
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
             try {
@@ -326,9 +316,7 @@ export const tasksCases: Case[] = [
         critical: true,
         skipIf: onlyLegacyHttp,
         retry: 1,
-        // WARNING: can be flaky on streamable HTTP transport due to timing — the Actor may
-        // complete before the progress polling interval (PROGRESS_NOTIFICATION_INTERVAL_MS)
-        // fires a statusMessage. See: https://github.com/apify/apify-mcp-server/issues/558
+        // Flaky on streamable HTTP if Actor finishes before PROGRESS_NOTIFICATION_INTERVAL_MS (#558).
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: ['actors'] })) as ClientV1;
             try {

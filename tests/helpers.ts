@@ -5,19 +5,11 @@ import { expect } from 'vitest';
 
 import { createMcpStatelessClient, createMcpStreamableClient, type SuiteClientOptions } from '../src/test_kit/index.js';
 
-// Re-exported so this repo's own suite keeps its existing names — the factories themselves
-// now live in src/test_kit/mcp_client.ts (published behind the "./test-kit" export) so
-// apify-mcp-server-internal can import the same code instead of maintaining its own copy.
 export { createMcpStatelessClient, createMcpStreamableClient };
 export type McpClientOptions = SuiteClientOptions;
-
-/**
- * Both client generations the integration suite drives: the v1 SDK client on the `stdio` and
- * `2025-11-25` dimensions, the v2 client on `2026-07-28`. One suite run exercises both.
- */
 export type McpSuiteClient = Client | StatelessClient;
 
-/** stdio spawns this repo's own dist/stdio.js — not something a hosted-deploy consumer needs. */
+/** stdio client for this repo's dist/stdio.js. */
 export async function createMcpStdioClient(options?: McpClientOptions): Promise<Client> {
     if (!options?.payment && !process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');

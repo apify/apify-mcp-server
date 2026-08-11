@@ -24,24 +24,17 @@ function onlyStdio(ctx: CaseCtx): boolean {
     return ctx.transport !== 'stdio';
 }
 
-/**
- * Tool-loading mechanics: which tools/Actors get served for a given `tools`/`actors`
- * selector combination, category expansion, retired-selector dropping, env-var loading
- * (stdio), auto-injected storage/abort ordering, and server-mode (`?ui=`) selection.
- */
+/** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
     {
-        // telemetry explicitly forced off (not relying on the suite's own default) so this case's
-        // expectation is deterministic regardless of which repo/environment registers it — see
-        // apify-mcp-server-internal's report-problem telemetry-gating investigation (#776 follow-up).
+        // telemetry off so default tool set is deterministic across environments.
         name: 'should match spec default: actors,docs,apify/rag-web-browser when no params provided (telemetry off)',
         critical: true,
         run: withClient({ telemetry: { enabled: false } }, async (client) => {
             const tools = await client.listTools();
             const names = getToolNames(tools);
 
-            // Should be equivalent to tools=actors,docs,apify/rag-web-browser
-            // Note: UI tools (search-actors-widget, fetch-actor-details-widget) are only available in apps mode
+            // Equivalent to tools=actors,docs,apify/rag-web-browser (no widgets outside apps).
             const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
             const expectedActors = [actorNameToToolName('apify/rag-web-browser')];
@@ -57,8 +50,7 @@ export const registrationCases: Case[] = [
         }),
     },
     {
-        // Same scenario, telemetry explicitly forced on - the only expected difference from the
-        // case above is report-problem's presence; everything else in the tools list is identical.
+        // telemetry on — only difference is report-problem.
         name: 'should match spec default: actors,docs,apify/rag-web-browser when no params provided (telemetry on)',
         critical: true,
         run: withClient({ telemetry: { enabled: true } }, async (client) => {
@@ -81,8 +73,7 @@ export const registrationCases: Case[] = [
         }),
     },
     {
-        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit —
-        // deploy-health relevant: confirms the default tool/Actor set actually being served.
+        // critical: default tool/Actor set.
         name: 'should list all default tools and Actors',
         critical: true,
         run: withClient(undefined, async (client) => {
@@ -97,7 +88,6 @@ export const registrationCases: Case[] = [
         }),
     },
     {
-        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit.
         name: 'loads no tools for retired selectors',
         critical: false,
         run: withClient({ tools: [...RETIRED_SELECTORS] }, async (client) => {
@@ -233,9 +223,7 @@ export const registrationCases: Case[] = [
         };
     })(),
     {
-        // A category selector ('docs') mixed with individual tool-name selectors, in one `tools`
-        // param - proves selection is precise (search-actors, part of the same "actors" concept
-        // as call-actor, must stay excluded) rather than silently widening to a whole category.
+        // category + specific tools must not widen to whole sibling category.
         name: 'should handle mixed categories and specific tools in tools param',
         critical: true,
         run: withClient({ tools: ['docs', 'fetch-actor-details', 'call-actor'] }, async (client) => {
@@ -298,9 +286,7 @@ export const registrationCases: Case[] = [
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
         }),
     },
-    // The `dev` category holds only report-problem, which is telemetry-gated (off in this suite),
-    // so it can't load standalone here; its gating is covered by unit tests. Category list is
-    // fixed at module-load time, so this enumerates cleanly into individual cases.
+    // `dev` is telemetry-gated (unit-tested); skip standalone load here.
     ...Object.keys(getCategoryTools('default'))
         .filter((category) => category !== 'dev')
         .map(
@@ -359,9 +345,7 @@ export const registrationCases: Case[] = [
         critical: false,
         skipIf: onlyStdio,
         run: async (ctx) => {
-            // Verifies env-var threading (`TOOLS=docs` → loader input) end-to-end via stdio.
-            // `docs` is chosen because it doesn't trigger auto-inject — the loader's union/dedup
-            // logic has its own unit coverage and isn't what this test should be asserting.
+            // TOOLS=docs via stdio; docs avoids auto-inject noise.
             const client = await ctx.createClientFn({ tools: ['docs'], useEnv: true });
             try {
                 const toolNames = getToolNames(await client.listTools());
@@ -421,8 +405,7 @@ export const registrationCases: Case[] = [
         },
     },
     {
-        // Uses the deprecated 'openai' alias deliberately to verify it is silently
-        // normalized to 'apps' at the CLI/env ingestion boundary (no warning emitted).
+        // Deprecated `openai` alias silently normalizes to apps.
         name: 'should use UI_MODE env var (deprecated "openai" alias) when CLI arg is not provided',
         critical: false,
         skipIf: onlyStdio,

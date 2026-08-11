@@ -19,11 +19,7 @@ interface NormalModeRun {
     runId: string;
 }
 
-/**
- * Seeds one normal-mode-test-actor run and shares it across the 13 cases below via
- * `ctx.getFixture` — computed at most once per transport dimension (see `register.ts`), not once
- * per case, regardless of how many of the 13 actually run (e.g. `criticalOnly` skips most of them).
- */
+/** One seeded normal-mode run, shared via getFixture. */
 const normalModeRunFixture: Fixture<NormalModeRun> = {
     key: 'storage.normal-mode-run',
     setup: async (ctx) => {
@@ -57,7 +53,7 @@ const normalModeRunFixture: Fixture<NormalModeRun> = {
     },
 };
 
-/** Builds a case's `run(ctx)` for a case that needs the seeded `normalModeRunFixture`. */
+/** withClient + seeded normalModeRunFixture. */
 function withNormalModeRun(
     clientOptions: Parameters<CaseCtx['createClientFn']>[0],
     testFn: (client: SuiteClient, run: NormalModeRun) => Promise<void>,
@@ -73,9 +69,7 @@ function withNormalModeRun(
     };
 }
 
-/**
- * Dataset and key-value-store read tools: `get-dataset-items`, `resources/read`, etc.
- */
+/** Dataset/KV read tools. */
 export const storageCases: Case[] = [
     {
         name: 'rejects get-key-value-store-record when required keyValueStoreId is missing',
@@ -116,10 +110,7 @@ export const storageCases: Case[] = [
             const fields = sc?.storages?.datasets?.default?.fields ?? [];
             expect(fields).toEqual(expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']));
 
-            // #911/#894: the actor emits `math.fibonacci: [..]`, which Apify reports index-expanded
-            // (`math/fibonacci/0`, `/1`, `/2`). The server must collapse those to a single
-            // `math.fibonacci` on the wire. `math.fibonacci` present proves collapse fired (not a
-            // flat-only no-op); no entry keeps an array index; no duplicates survive collapse.
+            // #911/#894: collapse index-expanded fields to `math.fibonacci`.
             expect(fields).toEqual(expect.arrayContaining(['math.fibonacci']));
             expect(fields.some((f) => /\.\d+(\.|$)/.test(f))).toBe(false);
             expect(new Set(fields).size).toBe(fields.length);
@@ -167,8 +158,7 @@ export const storageCases: Case[] = [
             const datasetId = sc?.storages?.datasets?.default?.id;
             expect(datasetId).toBeDefined();
 
-            // content[1] is the LLM-readable summary+nextStep; it must reference the datasetId
-            // and the follow-up tool name so the LLM can act on the result.
+            // summary/nextStep must name datasetId + follow-up tool.
             expect(content[1].text).toContain(datasetId);
             expect(content[1].text).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
 
@@ -332,8 +322,7 @@ export const storageCases: Case[] = [
             expect(result.isError).not.toBe(true);
             const { text } = (result.content as { text: string }[])[0];
             expect(text).toContain('properties');
-            // `math` is a nested object in the default-dataset item; its presence in the schema
-            // proves the inference walks nested shapes, not just top-level fields.
+            // Nested `math` proves schema inference walks objects.
             expect(text).toContain('math');
             const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } }).structuredContent;
             expect(sc?.summary).toContain('Schema inferred');
@@ -376,9 +365,7 @@ export const storageCases: Case[] = [
         }),
     },
     {
-        // Doesn't assert defaultKvId is in the page: on a shared account, concurrent runs can
-        // push it past the top-10 recency window between creation and the list call. Existence
-        // and readability of the store are already proven by the get-key-value-store test above.
+        // Skip recency assert — concurrent runs can push KV past top-10.
         name: 'lists unnamed key-value stores via get-key-value-store-list',
         critical: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
@@ -397,10 +384,7 @@ export const storageCases: Case[] = [
         }),
     },
     {
-        // Apify-contract canary for #880: get-dataset-items only sends the top-level prefix
-        // (e.g. `flatten=math` for fields `math.factorial.first`). If Apify's `flatten` ever
-        // stops recursing through nested levels, this 3-deep field will come back undefined and
-        // signal that we need to emit every prefix.
+        // #880 canary: flatten=math must still surface nested math.factorial.first.
         name: 'flattens 3-level nested fields via get-dataset-items',
         critical: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
@@ -426,8 +410,7 @@ export const storageCases: Case[] = [
                 uri: `https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`,
             });
             const contents = result.contents[0] as { mimeType?: string; text?: string };
-            // The proxy passes through the API's declared Content-Type, which carries a charset
-            // (e.g. `application/json; charset=utf-8`), so match the base type rather than the exact string.
+            // Content-Type may include charset — match base type only.
             expect(contents.mimeType).toContain('application/json');
             // The generic proxy returns the raw API body — a bare JSON array of items.
             const items = JSON.parse(contents.text as string) as unknown[];

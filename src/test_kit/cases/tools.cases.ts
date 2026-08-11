@@ -17,17 +17,10 @@ function onlyLegacyHttp(ctx: CaseCtx): boolean {
     return ctx.transport !== '2025-11-25';
 }
 
-/**
- * Generic MCP protocol/tool behavior not tied to a specific Actor: prompts, docs search/
- * fetch, report-problem gating, outputSchema/title/icons shape, session termination, and
- * the MCP-server-Actor passthrough family (calling another MCP server through call-actor).
- */
+/** Protocol/tool behavior: prompts, docs, report-problem, schemas, MCP passthrough. */
 export const toolsCases: Case[] = [
     {
-        // report-problem is served only when telemetry is enabled; this suite runs with telemetry
-        // off, so end-to-end it must be absent. That gating is what we can verify here without
-        // emitting telemetry. The served path (listed for non-Anthropic clients, hidden from
-        // Anthropic clients, acknowledges a submission) is covered by this repo's own unit tests.
+        // telemetry off → report-problem absent; serve/hide paths are unit-tested.
         name: 'report-problem is not served when telemetry is disabled',
         critical: false,
         run: withClient(undefined, async (client) => {
@@ -52,12 +45,7 @@ export const toolsCases: Case[] = [
         }),
     },
     {
-        // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
-        // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4
-        // throws -32600 "has an output schema but did not return structured content" once it has cached
-        // the tool validators (which happens on `listTools()` — every real client does this on connect).
-        // The happy-path test above never calls `listTools()`, so the SDK skips validation and the bug stays
-        // invisible at the integration layer. This test surfaces it.
+        // Regression #415: after listTools caches validators, MCP passthrough must return structuredContent.
         name: 'MCP server actor:tool pass-through returns structuredContent satisfying outputSchema',
         critical: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
@@ -69,9 +57,7 @@ export const toolsCases: Case[] = [
                 arguments: { actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`, input: { firstNumber: 2, secondNumber: 3 } },
             });
 
-            // structuredContent must be present and carry the keys declared `required` on
-            // `actorRunOutputSchema`. The pass-through path has no Apify run, so the fix is expected to
-            // synthesize sentinel values (e.g. `runId: 'mcp-passthrough'`) rather than real run identifiers.
+            // Passthrough has no Apify run — expect sentinel structuredContent fields.
             const sc = (callResult as { structuredContent?: Record<string, unknown> }).structuredContent;
             expect(sc).toBeDefined();
             expect(sc).toHaveProperty('runId');
@@ -81,13 +67,11 @@ export const toolsCases: Case[] = [
             expect(sc).toHaveProperty('summary');
             expect(sc).toHaveProperty('nextStep');
 
-            // The remote MCP tool's actual result must still flow through `content` — the fix must not
-            // lose the payload while satisfying the schema.
+            // Remote payload must still flow through content.
             const content = callResult.content as { text: string }[];
             expect(content).toEqual(buildExampleMcpServerAddToolContent(2, 3));
 
-            // `isError` must reflect the remote tool's status — false on the happy path. Forwarding this
-            // closes a second drop on the same line: `handleMcpToolCall` currently discards `result.isError`.
+            // isError must be forwarded from the remote tool.
             expect(callResult.isError ?? false).toBe(false);
         }),
     },

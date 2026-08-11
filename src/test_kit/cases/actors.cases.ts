@@ -21,10 +21,7 @@ import {
 } from '../helpers.js';
 import type { Case } from '../types.js';
 
-/**
- * Actor-facing behavior: search-actors, fetch-actor-details (all `output=` variants),
- * call-actor (direct + dynamic), get-actor-run, and their outputSchema validation.
- */
+/** Actor tools: search, details, call-actor, get-actor-run. */
 export const actorsCases: Case[] = [
     (() => {
         const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
@@ -81,9 +78,7 @@ export const actorsCases: Case[] = [
         };
     })(),
     {
-        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit — cheapest
-        // full-pipeline smoke test (auth + baseUrl + real Actor run), same class as the two
-        // wrong-environment regressions this session already found in the direct-ApifyClient path.
+        // critical: full-pipeline smoke (auth + real Actor run).
         name: 'should call Actor directly with required input',
         critical: true,
         run: withClient({ tools: ['actors'] }, async (client) => {
@@ -151,8 +146,7 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            // previewOutput is deprecated and ignored; the response is the canonical RunResponse
-            // regardless of the flag. Validate the metadata is intact.
+            // previewOutput is ignored; still canonical RunResponse.
             validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
             expectNormalModeTestStructuredContent(callResult);
         }),
@@ -190,8 +184,7 @@ export const actorsCases: Case[] = [
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 45 },
             });
 
-            // The canonical response doesn't inline preview items — agents fetch them via
-            // get-dataset-items using the dataset id and the fields list surfaced here.
+            // No inlined items — agents use dataset id + fields via get-dataset-items.
             validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
             expectNormalModeTestStructuredContent(callResult);
 
@@ -219,15 +212,13 @@ export const actorsCases: Case[] = [
             const sc = (
                 callResult as { structuredContent?: { storages?: { datasets?: Record<string, { id?: string }> } } }
             ).structuredContent;
-            // normal-mode-test-actor opens an aliased 'books' dataset; the run response must
-            // surface it alongside the default, enriched with its own metadata (id at minimum).
+            // Aliased `books` dataset must appear beside default.
             expect(sc?.storages?.datasets?.default?.id).toBeDefined();
             expect(sc?.storages?.datasets?.books?.id).toEqual(expect.any(String));
         }),
     },
     {
-        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit —
-        // deploy-health relevant: confirms the store search Actor-discovery path actually works.
+        // critical: store-search discovery path.
         name: 'should find Actors in store search',
         critical: true,
         run: withClient(undefined, async (client) => {
@@ -240,10 +231,7 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        // Shared with apify-mcp-server-internal via @apify/actors-mcp-server/test-kit.
-        // Upstream-contract canary: apify-core's `AGENT_SAFE_PRICING_MODELS` filter
-        // (`GET /v2/store`) is what excludes rental Actors. If that contract ever
-        // drifts, this test catches the regression on the MCP side.
+        // critical: rental Actors excluded via AGENT_SAFE_PRICING_MODELS.
         name: 'should not return rental Actors from store search',
         critical: false,
         run: withClient(undefined, async (client) => {
@@ -1027,8 +1015,7 @@ export const actorsCases: Case[] = [
         name: 'rejects get-actor-run waitSecs above 45',
         critical: false,
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
-            // runId is a real-looking value so a missing-run path can't accidentally satisfy this
-            // assertion; the failure must come from waitSecs validation, not from run lookup.
+            // Fake-but-plausible runId so failure is waitSecs validation, not missing run.
             await expect(
                 client.callTool({
                     name: HELPER_TOOLS.ACTOR_RUNS_GET,

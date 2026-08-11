@@ -13,16 +13,7 @@ import { getExpectedToolNamesByCategories } from '../utils/tool_categories_helpe
 import { AUTO_INJECTED_TOOLS } from '../utils/tools_loader.js';
 import type { CaseCtx, SuiteClient } from './types.js';
 
-/**
- * Shared by every `src/test_kit/cases/*.cases.ts` module: fixture constants, the `withClient`
- * client-lifecycle wrapper every simple case builds its `run` from, and cross-cutting assertion
- * helpers. Everything here is published behind the `./test-kit` export — `tests/integration/
- * suite.ts` (this repo's own runner) and `apify-mcp-server-internal` both import from here
- * instead of maintaining their own copies.
- */
-
-// Fixture Actors from apify/mcp-server-test-actor (see DEVELOPMENT.md); apify-mcp-server-internal
-// hardcodes these same names for its own tests against the identical live fixtures.
+// Live fixtures from apify/mcp-server-test-actor (see DEVELOPMENT.md).
 export const ACTOR_NORMAL_MODE = 'apify/normal-mode-test-actor';
 export const ACTOR_EXAMPLE_MCP_SERVER = 'apify/example-mcp-server';
 
@@ -30,14 +21,12 @@ export const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview'] as con
 export const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 export const DEFAULT_ACTOR_NAMES = defaults.actors.map((actor) => actorNameToToolName(actor));
 
-// Function to avoid circular dependency during module initialization.
+// Lazy: avoids circular import during module init.
 export function getDefaultToolNames(): string[] {
     return getExpectedToolNamesByCategories(toolCategoriesEnabledByDefault);
 }
 
-// report-problem is telemetry-gated and lives in the dev category, so getDefaultTools
-// (actors + docs) never contains it, and a telemetry-off suite would not be served it anyway.
-// Its served/hidden/acknowledge behavior is covered by this repo's own unit tests.
+// report-problem is telemetry-gated (dev category); unit tests cover serve/hide/ack.
 export function servedDefaultTools(): ToolEntry[] {
     return getDefaultTools('default');
 }
@@ -45,7 +34,7 @@ export function servedDefaultToolNames(): string[] {
     return getDefaultToolNames();
 }
 
-/** Builds a case's `run(ctx)` from client options + a testFn — creates the client, runs testFn, always closes. */
+/** Create client, run testFn, always close. */
 export function withClient(
     clientOptions: Parameters<CaseCtx['createClientFn']>[0],
     testFn: (client: SuiteClient) => Promise<void>,
@@ -60,10 +49,7 @@ export function withClient(
     };
 }
 
-/**
- * Narrows a suite client to the v1 SDK client. Only for cases gated to the legacy dimensions:
- * the v2 client has no `experimental.tasks`, no v1 `transport`, and a different `request()` shape.
- */
+/** Cast to v1 SDK client (legacy dimensions only). */
 export function asLegacyClient(client: SuiteClient): ClientV1 {
     return client as ClientV1;
 }
@@ -105,7 +91,7 @@ export function validateStructuredOutput(result: unknown, toolOutputSchema: unkn
     }
 }
 
-/** Helper to find tool by name, resolving categories for the given mode on each call. */
+/** Find tool by name for the given mode. */
 export function findToolByName(name: string, mode: SERVER_MODE): ToolEntry | undefined {
     const resolved = getCategoryTools(mode);
     for (const tools of Object.values(resolved)) {
@@ -119,10 +105,7 @@ export function validateStructuredOutputForTool(result: unknown, toolName: strin
     validateStructuredOutput(result, findToolByName(toolName, mode)?.outputSchema, toolName);
 }
 
-/**
- * Verify that structuredContent contains a non-empty readme and inputSchema.
- * Optionally checks actorInfo.fullName when expectedActorFullName is provided.
- */
+/** Assert non-empty readme + inputSchema; optional actorInfo.fullName. */
 export function expectReadmeInStructuredContent(result: unknown, expectedActorFullName?: string): void {
     const r = result as {
         structuredContent?: { actorInfo?: { fullName?: string }; readme?: string; inputSchema?: unknown };
@@ -137,7 +120,7 @@ export function expectReadmeInStructuredContent(result: unknown, expectedActorFu
     expect(r.structuredContent?.inputSchema).toBeDefined();
 }
 
-/** Validates that the listed tools have widget metadata (_meta) with MCP Apps ui.* keys. */
+/** Assert apps-mode widget tools carry MCP Apps `_meta.ui` (SEP-1865). */
 export function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
     const toolNames = [
         HELPER_TOOLS.STORE_SEARCH_WIDGET,
@@ -148,7 +131,6 @@ export function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Rec
         const tool = tools.tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
         expect(tool?._meta).toBeDefined();
-        // MCP Apps standard keys (SEP-1865)
         const ui = tool?._meta?.ui as Record<string, unknown> | undefined;
         expect(ui).toBeDefined();
         expect(ui?.resourceUri).toBeDefined();
@@ -157,10 +139,8 @@ export function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Rec
 }
 
 /**
- * Validates the canonical run response from `call-actor` against the normal-mode-test-actor.
- * The response does not inline dataset items. `itemCount` is not asserted because Apify's
- * dataset metadata propagation can lag past the server's probe window; the dataset id plus a
- * non-empty `fields` list is the reliable signal that items were written.
+ * Assert canonical normal-mode-test-actor run response.
+ * Skips `itemCount` (dataset metadata can lag); requires dataset id + fields.
  */
 export function expectNormalModeTestStructuredContent(result: unknown): void {
     const resultWithStructured = result as {
@@ -188,9 +168,7 @@ export function expectNormalModeTestStructuredContent(result: unknown): void {
     expect(sc?.summary).toBeDefined();
     expect(sc?.nextStep).toBeDefined();
 
-    // Console links are gated on a Console UI token (apify_ui_...); integration tests authenticate
-    // with an API token, so the run/storage responses must carry no apifyConsoleUrl and no Console nudge.
-    // The positive (UI-token) path is covered by unit tests — CI has no UI token to exercise it.
+    // API-token clients get no Console URLs; UI-token path is unit-tested.
     expect(sc?.apifyConsoleUrl).toBeUndefined();
     expect(sc?.storages?.datasets?.default?.apifyConsoleUrl).toBeUndefined();
     expect(sc?.storages?.keyValueStores?.default?.apifyConsoleUrl).toBeUndefined();
@@ -198,7 +176,7 @@ export function expectNormalModeTestStructuredContent(result: unknown): void {
     expect(narrative).not.toContain('Apify Console:');
 }
 
-/** Validates that the result contains Apify usage cost metadata with expected structure. */
+/** Assert Apify usage-cost `_meta` shape. */
 export function expectUsageCostMeta(result: unknown): void {
     const resultWithMeta = result as {
         _meta?: { 'com.apify/ActorRun'?: { usageTotalUsd?: number; usageUsd?: Record<string, number> } };
@@ -214,16 +192,11 @@ export function expectUsageCostMeta(result: unknown): void {
     }
 }
 
-// --- Async-task helpers (notifications/cancelled, tasks/*) ---
-
 const RUN_ABORT_WAIT_TIMEOUT_MS = 60_000;
 const RUN_ABORT_WAIT_INTERVAL_MS = 500;
 const RUN_ID_PROGRESS_TIMEOUT_MS = 10_000;
 
-/**
- * Resolves runIdPromise from the first notifications/progress message. Caller awaits it before
- * aborting/cancelling, so there's no race with the run starting and no run-list polling.
- */
+/** Capture runId from the first notifications/progress message. */
 export function captureRunIdFromProgress(): {
     onprogress: (progress: Progress) => void;
     runIdPromise: Promise<string>;
@@ -233,7 +206,7 @@ export function captureRunIdFromProgress(): {
         resolveRunId = resolve;
     });
     const onprogress = (progress: Progress) => {
-        // Progress type omits _meta, but it's there at runtime (SDK spreads full params).
+        // Progress type omits _meta; present at runtime.
         const meta = (progress as Progress & { _meta?: Record<string, unknown> })._meta;
         const runId = (meta?.[APIFY_ACTOR_RUN_META_KEY] as { runId?: string } | undefined)?.runId;
         if (runId) resolveRunId(runId);

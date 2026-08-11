@@ -5,10 +5,7 @@ import { RESOURCE_MIME_TYPE } from '../../resources/widgets.js';
 import { ACTOR_NORMAL_MODE, expectWidgetToolMeta, getToolNames, withClient } from '../helpers.js';
 import type { Case } from '../types.js';
 
-/**
- * Apps-mode widget tools: `*-widget` structuredContent shape and `_meta.ui` metadata,
- * plus auto server-mode detection from client capabilities.
- */
+/** Apps-mode widgets + auto server-mode from client capabilities. */
 export const appsCases: Case[] = [
     {
         name: 'should render widget payload via fetch-actor-details-widget in apps mode',
