@@ -4,10 +4,9 @@
 /**
  * Main CLI entry point for workflow evaluations (Langfuse backend).
  *
- * Every run syncs test_cases.json into the Langfuse dataset and executes the
- * matching dataset items as an experiment: a fresh MCP client per item, a
- * multi-turn agent conversation, then an LLM judge. Traces, scores, and the
- * dataset live in Langfuse.
+ * Every run reads its test cases from the Langfuse dataset and executes the matching
+ * items as an experiment: a fresh MCP client per item, a multi-turn agent conversation,
+ * then an LLM judge. Traces, scores, and the dataset live in Langfuse.
  *
  * Usage:
  *   pnpm run evals:workflow
@@ -26,16 +25,12 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
-import { filterByLineRanges } from '../shared/line_range_filter.js';
-import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line_range_parser.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
-import { resolveDatasetName, syncDataset } from './langfuse_dataset.js';
+import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
 import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_experiment.js';
 import { initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
-import type { WorkflowTestCase } from './test_cases_loader.js';
-import { loadTestCases, loadTestCasesWithLineNumbers, resolveTestCasesPath } from './test_cases_loader.js';
 
 // Before anything reads process.env: the Langfuse SDK and the Apify client pass these
 // straight to node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
@@ -44,8 +39,7 @@ sanitizeProcessEnv();
 type CliArgs = {
     category?: string;
     id?: string;
-    lines?: string;
-    testCasesPath?: string;
+    dataset: string;
     agentModel: string;
     judgeModel: string;
     toolTimeout: number;
@@ -67,12 +61,11 @@ async function main() {
         .options({
             category: { type: 'string', description: 'Filter by test case category (supports * wildcard)' },
             id: { type: 'string', description: 'Run test cases whose ID matches this regex' },
-            lines: {
-                alias: 'l',
+            dataset: {
                 type: 'string',
-                description: 'Filter by line range in the test cases file (e.g. "10-20,50-60,100")',
+                description: 'Langfuse dataset to run',
+                default: WORKFLOW_DATASET_NAME,
             },
-            'test-cases-path': { type: 'string', description: 'Path to test cases JSON file (own dataset)' },
             'agent-model': { type: 'string', description: 'LLM model for the agent', default: MODELS.agent },
             'judge-model': { type: 'string', description: 'LLM model for the judge', default: MODELS.judge },
             'tool-timeout': {
@@ -94,44 +87,27 @@ async function main() {
     const langfuse = new LangfuseClient();
     // Non-empty: checked above. Sanitized above that.
     const apifyToken = process.env.APIFY_TOKEN as string;
-    const testCasesPath = resolveTestCasesPath(argv.testCasesPath);
-    const datasetName = resolveDatasetName(testCasesPath);
+    const datasetName = argv.dataset;
 
     let exitCode = 1;
     try {
-        // The dataset items are the only source of truth for a run, so sync first and
-        // filter what comes back. Running on real dataset items is what makes the run
-        // a Langfuse dataset run, comparable with every other run.
-        // --lines matches on where a case sits in the local file, so it needs the spans.
-        // The whole file syncs either way: the dataset mirrors the file, not the filter.
-        let testCases: WorkflowTestCase[];
-        let matchedByLines: WorkflowTestCase[] | undefined;
-        if (argv.lines) {
-            const ranges = parseLineRanges(argv.lines);
-            validateLineRanges(ranges);
-            const loaded = loadTestCasesWithLineNumbers(testCasesPath);
-            if (checkRangesOutOfBounds(ranges, loaded.totalLines)) {
-                throw new Error(
-                    `Line range "${argv.lines}" is past the end of ${testCasesPath} (${loaded.totalLines} lines)`,
-                );
-            }
-            testCases = loaded.testCases;
-            matchedByLines = filterByLineRanges(loaded.testCases, ranges);
-        } else {
-            testCases = loadTestCases(testCasesPath);
-        }
+        // The dataset is the source of truth: a run reads it and never writes to it, so a
+        // change made in the Langfuse UI takes effect on the next run. Running on real
+        // dataset items is also what makes this a Langfuse dataset run, comparable with
+        // every other run. Use `evals:workflow:export-dataset` to commit changes back.
+        console.log(`📇 Fetching dataset "${datasetName}"...`);
+        const cases = await fetchWorkflowCases(langfuse, datasetName);
 
-        console.log(`📇 Syncing ${testCases.length} test case(s) into dataset "${datasetName}"...`);
-        const itemsByTestCaseId = await syncDataset(langfuse, datasetName, testCases);
-
-        // Match on the test cases with the shared helpers, then pick the dataset items
-        // they map to. One matching rule for every entry point that filters test cases.
-        let selected = matchedByLines ?? testCases;
+        // The shared helpers match on the flat test case fields each case carries, so
+        // there is one matching rule for every entry point that filters test cases.
+        let selected = cases;
         if (argv.id) selected = filterById(selected, argv.id);
         if (argv.category) selected = filterByCategory(selected, argv.category);
-        const data = selected.flatMap((testCase) => itemsByTestCaseId.get(testCase.id) ?? []);
+        const data = selected.map((workflowCase) => workflowCase.item);
         if (data.length === 0) {
-            throw new Error(`No test case in "${datasetName}" matches --id/--category/--lines`);
+            throw new Error(
+                `No active item in dataset "${datasetName}" (${cases.length} total) matches --id/--category`,
+            );
         }
         const requestedIds = data.map((item) => item.id);
 

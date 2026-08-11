@@ -1,52 +1,25 @@
 import type { LangfuseClient } from '@langfuse/client';
 import { describe, expect, it } from 'vitest';
 
-import {
-    type DatasetItem,
-    parseWorkflowItem,
-    resolveDatasetName,
-    syncDataset,
-    WORKFLOW_DATASET_NAME,
-} from '../../evals/workflows/langfuse_dataset.js';
-import { DEFAULT_TEST_CASES_PATH, type WorkflowTestCase } from '../../evals/workflows/test_cases_loader.js';
+import { fetchWorkflowCases, parseWorkflowItem, toWorkflowTestCase } from '../../evals/workflows/langfuse_dataset.js';
 
-const testCase: WorkflowTestCase = { id: 'search-001', category: 'search', query: 'q', reference: 'r' };
+const item = { id: 'a', input: { query: 'q' }, expectedOutput: 'r', metadata: { category: 'search' } };
 
-/** Langfuse client that records upserts and echoes them back like the real API. */
-function makeLangfuseClient() {
-    const created: Record<string, unknown>[] = [];
-    const datasets: string[] = [];
+/** Langfuse client whose dataset holds the given items, like the real API returns them. */
+function makeLangfuseClient(items: unknown[]) {
+    const requested: unknown[] = [];
     const client = {
-        api: { datasets: { create: async ({ name }: { name: string }) => void datasets.push(name) } },
         dataset: {
-            createItem: async (request: Record<string, unknown>) => {
-                created.push(request);
-                return { ...request, datasetId: 'ds-1' } as unknown as DatasetItem;
+            get: async (name: string, options?: unknown) => {
+                requested.push({ name, options });
+                return { items: items.map((entry) => ({ status: 'ACTIVE', ...(entry as object) })) };
             },
         },
     } as unknown as LangfuseClient;
-    return { client, created, datasets };
+    return { client, requested };
 }
 
-describe('resolveDatasetName()', () => {
-    it('uses the canonical dataset for the default test cases file', () => {
-        expect(resolveDatasetName(DEFAULT_TEST_CASES_PATH)).toBe(WORKFLOW_DATASET_NAME);
-    });
-
-    it('derives a separate dataset for a custom file so the shared one is never overwritten', () => {
-        expect(resolveDatasetName('/tmp/scratch.json')).toMatch(
-            new RegExp(`^${WORKFLOW_DATASET_NAME}-scratch-[0-9a-f]{8}$`),
-        );
-    });
-
-    it('keeps same-named files in different directories apart', () => {
-        expect(resolveDatasetName('/tmp/a/scratch.json')).not.toBe(resolveDatasetName('/tmp/b/scratch.json'));
-    });
-});
-
 describe('parseWorkflowItem()', () => {
-    const item = { id: 'a', input: { query: 'q' }, expectedOutput: 'r', metadata: { category: 'search' } };
-
     it('returns the fields a run reads', () => {
         expect(parseWorkflowItem(item)).toEqual(item);
     });
@@ -54,6 +27,11 @@ describe('parseWorkflowItem()', () => {
     it('keeps the optional harness knobs from metadata', () => {
         const withKnobs = { ...item, metadata: { category: 'search', maxTurns: 5, failTools: ['call-actor'] } };
         expect(parseWorkflowItem(withKnobs).metadata).toEqual(withKnobs.metadata);
+    });
+
+    it('rejects a misspelled knob instead of silently stripping it', () => {
+        const typo = { ...item, metadata: { category: 'search', failTool: ['call-actor'] } };
+        expect(() => parseWorkflowItem(typo)).toThrow(/failTool/);
     });
 
     it('throws naming the item when metadata was cleared', () => {
@@ -70,37 +48,52 @@ describe('parseWorkflowItem()', () => {
     });
 });
 
-describe('syncDataset()', () => {
-    it('upserts each test case by id, splitting query, reference and harness knobs', async () => {
-        const { client, created, datasets } = makeLangfuseClient();
-        await syncDataset(client, WORKFLOW_DATASET_NAME, [{ ...testCase, maxTurns: 3, tools: ['actors'] }]);
+describe('toWorkflowTestCase()', () => {
+    it('flattens an item into a test case', () => {
+        expect(toWorkflowTestCase(item)).toEqual({ id: 'a', category: 'search', query: 'q', reference: 'r' });
+    });
 
-        expect(datasets).toEqual([WORKFLOW_DATASET_NAME]);
-        expect(created).toEqual([
-            {
-                datasetName: WORKFLOW_DATASET_NAME,
-                id: 'search-001',
-                input: { query: 'q' },
-                expectedOutput: 'r',
-                metadata: { category: 'search', maxTurns: 3, tools: ['actors'] },
-            },
+    it('leaves out knobs the item does not set, so the snapshot stays minimal', () => {
+        expect(Object.keys(toWorkflowTestCase(item))).toEqual(['id', 'category', 'query', 'reference']);
+    });
+
+    it('writes the keys in a fixed order whatever order metadata arrives in', () => {
+        const knobs = { failTools: ['call-actor'], tools: ['actors'], category: 'search', maxTurns: 5 };
+        expect(Object.keys(toWorkflowTestCase({ ...item, metadata: knobs }))).toEqual([
+            'id',
+            'category',
+            'query',
+            'reference',
+            'maxTurns',
+            'tools',
+            'failTools',
         ]);
     });
+});
 
-    it('namespaces the ids it upserts into a scratch dataset, since ids cannot be reused across datasets', async () => {
-        const { client, created } = makeLangfuseClient();
-        const items = await syncDataset(client, 'scratch', [testCase]);
+describe('fetchWorkflowCases()', () => {
+    it('returns each active case with the item the experiment runs on', async () => {
+        const { client, requested } = makeLangfuseClient([item]);
+        const cases = await fetchWorkflowCases(client, 'workflow-evals');
 
-        expect(created[0].id).toBe('scratch:search-001');
-        // Keyed by test case id, so no caller has to re-derive the namespacing rule.
-        expect(items.get('search-001')?.id).toBe('scratch:search-001');
+        expect(requested).toEqual([{ name: 'workflow-evals', options: { fetchItemsPageSize: 100 } }]);
+        expect(cases).toHaveLength(1);
+        expect(cases[0]).toMatchObject({ id: 'a', category: 'search', query: 'q', reference: 'r' });
+        expect(cases[0].item).toMatchObject({ id: 'a', status: 'ACTIVE' });
     });
 
-    it('returns the created items so the caller never re-fetches the dataset', async () => {
-        const { client } = makeLangfuseClient();
-        const items = await syncDataset(client, WORKFLOW_DATASET_NAME, [testCase, { ...testCase, id: 'search-002' }]);
+    it('drops archived items, which dataset.get returns regardless of status', async () => {
+        const { client } = makeLangfuseClient([item, { ...item, id: 'b', status: 'ARCHIVED' }]);
+        expect((await fetchWorkflowCases(client, 'workflow-evals')).map((entry) => entry.id)).toEqual(['a']);
+    });
 
-        expect([...items.keys()]).toEqual(['search-001', 'search-002']);
-        expect([...items.values()].every((item) => item.datasetId === 'ds-1')).toBe(true);
+    it('sorts by id, so run order and the snapshot do not depend on the API', async () => {
+        const { client } = makeLangfuseClient([{ ...item, id: 'c' }, item, { ...item, id: 'b' }]);
+        expect((await fetchWorkflowCases(client, 'workflow-evals')).map((entry) => entry.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('throws on a malformed item, before the run spends anything on LLM calls', async () => {
+        const { client } = makeLangfuseClient([item, { ...item, id: 'b', metadata: {} }]);
+        await expect(fetchWorkflowCases(client, 'workflow-evals')).rejects.toThrow(/Dataset item "b"/);
     });
 });

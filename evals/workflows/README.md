@@ -28,15 +28,15 @@ pnpm run build
 pnpm run evals:workflow
 ```
 
-Run `pnpm run evals:workflow -- --help` for the full option list. `--category`, `--id` and `--lines` narrow the run, `--concurrency` defaults to 4 (each item spawns its own MCP server, so higher values use more resources), and `--tool-timeout` defaults to 60s; raise it for Actor calls that scrape a lot of data.
+Run `pnpm run evals:workflow -- --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 4 (each item spawns its own MCP server, so higher values use more resources), and `--tool-timeout` defaults to 60s; raise it for Actor calls that scrape a lot of data.
 
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
 - `1` = any test failed, any test never ran, or setup failed ❌
 
-**Sync the dataset only** (no evaluation, no build, no Apify/OpenRouter keys). Use this to seed a fresh Langfuse instance:
+**Editing test cases:** edit the items in the Langfuse UI, then commit the change here:
 ```bash
-pnpm run evals:workflow:sync-dataset
+pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot.json (no build, no Apify/OpenRouter keys)
 ```
 
 ---
@@ -56,18 +56,31 @@ Tests AI agents executing tasks using Apify MCP server tools through multi-turn 
 
 ## Critical Design Decisions
 
-### 1. The dataset item is the source of truth
+### 1. The Langfuse dataset is the source of truth
 
-**Decision:** Every run upserts `test_cases.json` into the Langfuse dataset first, then executes the matching dataset items.
+**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Test cases are edited in the Langfuse UI; `dataset_snapshot.json` is an exported copy that nothing reads at runtime.
 
 **Why:**
+- Editing an item in the Langfuse UI changes the next run. An earlier version synced a local file into the dataset before every run, which silently overwrote UI edits and made the file the real source of truth
 - `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when it is given real dataset items
 - One source of truth means no id-matching contract to maintain between a local file and a remote dataset
-- Editing an item in the Langfuse UI changes the next run, because nothing the run needs is duplicated elsewhere
 
-An item's `input.query` is the agent prompt, `expectedOutput` is what the judge scores against, and `metadata` carries the harness knobs (`category`, `maxTurns`, `tools`, `failTools`).
+An item's `input.query` is the agent prompt, `expectedOutput` is what the judge scores against, and `metadata` carries the harness knobs (`category`, `maxTurns`, `tools`, `failTools`). Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
+
+**Trade-off:** the dataset is mutable, so a run is only reproducible against the dataset as it was. Export makes changes reviewable in git, and Langfuse itself keeps item versions.
 
 **Location:** `langfuse_dataset.ts`, `run_workflow_evals.ts`
+
+### 1b. The snapshot is a copy, not an input
+
+**Decision:** `evals:workflow:export-dataset` writes the active items to `dataset_snapshot.json`, sorted by id with a fixed key order. There is no importer.
+
+**Why:**
+- Puts UI edits through code review and into git history, which the Langfuse UI alone does not give
+- Keeps a copy of the cases outside Langfuse, otherwise the only copy is its database
+- Byte-stable output, so an unexpected diff means someone changed the dataset without committing it
+
+**Location:** `export_dataset.ts`
 
 ### 2. MCP Server Isolation Per Test
 
@@ -173,12 +186,12 @@ Separation allows independent optimization for speed vs evaluation quality.
 - `llm_client.ts` - OpenRouter wrapper
 - `conversation_executor.ts` - Multi-turn loop with dynamic tools and server instructions
 - `workflow_judge.ts` - Judge evaluation
-- `test_cases_loader.ts` - Test case schema, loading and validation
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
-- `langfuse_dataset.ts` - Dataset item mapping and validation, dataset name resolution, upsert
+- `langfuse_dataset.ts` - Test case schema, dataset item mapping and validation, dataset fetch
 - `langfuse_experiment.ts` - Experiment task, evaluators, run summary and exit gate
 - `run_workflow_evals.ts` - Main CLI entry
-- `sync_dataset.ts` - Dataset-only CLI entry (`pnpm run evals:workflow:sync-dataset`)
+- `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:workflow:export-dataset`)
+- `dataset_snapshot.json` - Exported copy of the dataset, not read at runtime
 
 ## Configuration
 
@@ -198,7 +211,7 @@ Both entry points fail fast (before any test runs) listing every missing variabl
 
 Results are recorded in Langfuse, not to a local file. Each run:
 
-- **Syncs the dataset** `workflow-evals`: every test case in `test_cases.json` is upserted by `id`, so the dataset stays complete regardless of `--id`/`--category` filters. A `--test-cases-path` pointing at any file other than the canonical `test_cases.json` syncs into its own dataset (`workflow-evals-<filename>-<path-hash>`), with item ids namespaced as `<dataset>:<test-case-id>`, so a scratch file cannot overwrite the inputs of runs already recorded against the shared one. Item ids are unique per Langfuse project and cannot be reused across datasets, hence the namespacing; the path hash keeps same-named files in different directories apart.
+- **Reads the dataset** `workflow-evals` (override with `--dataset`), takes its active items and matches them against `--id`/`--category`. To try a variant set of cases, clone the dataset in the Langfuse UI and pass `--dataset`; runs stay recorded against the dataset they used.
 - **Runs an experiment** over the matching dataset items, run name `<git-branch>-<agent-model>-<timestamp>`, with run metadata `{ agentModel, judgeModel, toolTimeout }`. Because it runs on dataset items, it is recorded as a Langfuse **dataset run** and the console prints its direct URL.
 - **Traces** every item as one trace, whose root output is a compact summary (judge verdict, tokens) rather than the transcript. The agent's individual LLM calls and MCP tool calls are not instrumented: the hand-rolled harness is being replaced by the Claude Agent SDK, which reports its own turns.
 - **Scores** each item with two evaluators:
@@ -210,40 +223,25 @@ The console prints only failures, the `passed/requested` count, and the run link
 
 Compare tokens across runs (branches, models) directly in the Langfuse experiment view.
 
-### Line Range Filtering
-
-`--lines` (or `-l`) runs the test cases occupying given lines of `test_cases.json`, so you can run what a diff touched without naming ids:
-
-```bash
-pnpm run evals:workflow -- --lines 100        # the case containing line 100
-pnpm run evals:workflow -- --lines 10-20      # cases overlapping lines 10-20
-pnpm run evals:workflow -- --lines 10-20,100  # comma-separated ranges
-```
-
-A case matches if it overlaps any range. Combines with `--id` and `--category` (AND). Line spans come from the local file, which every run syncs into the dataset first, so they always describe what is about to run.
-
 ### Concurrency
 
 `--concurrency` maps to the SDK's `maxConcurrency`, which runs **sequential batches** of that size rather than a rolling window: one slow test stalls the rest of its batch.
 
 ### Test Case Format
 
-File: `test_cases.json`
+A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in `metadata`. `dataset_snapshot.json` holds the same fields flattened, one object per case:
 
 ```json
-{
-  "version": "1.0",
-  "testCases": [
-    {
-      "id": "test-001",
-      "category": "basic",
-      "query": "User prompt for agent",
-      "reference": "What agent must do to pass",
-      "maxTurns": 10,
-      "tools": ["actors", "docs"]
-    }
-  ]
-}
+[
+  {
+    "id": "test-001",
+    "category": "basic",
+    "query": "User prompt for agent",
+    "reference": "What agent must do to pass",
+    "maxTurns": 10,
+    "tools": ["actors", "docs"]
+  }
+]
 ```
 
 **Required fields:**

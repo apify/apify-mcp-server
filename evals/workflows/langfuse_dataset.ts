@@ -1,37 +1,58 @@
 /**
  * Langfuse dataset mapping for workflow evaluations.
  *
- * A dataset item is what a run executes: `input.query` is the agent prompt,
- * `expectedOutput` is what the judge scores against, and `metadata` carries the
- * harness knobs (a DatasetItem offers nowhere else to put them). Nothing is
- * duplicated between the three, so editing an item in the Langfuse UI changes
- * the next run.
+ * The dataset is the source of truth and nothing here writes to it. An item's
+ * `input.query` is the agent prompt, `expectedOutput` is what the judge scores against,
+ * and `metadata` carries the harness knobs (a DatasetItem offers nowhere else to put
+ * them). Nothing is duplicated between the three, so editing an item in the Langfuse UI
+ * changes the next run.
  */
-
-import { createHash } from 'node:crypto';
-import path from 'node:path';
 
 import type { LangfuseClient } from '@langfuse/client';
 import { z } from 'zod';
 
-import { DEFAULT_TEST_CASES_PATH, WorkflowTestCaseValidator } from './test_cases_loader.js';
-import type { WorkflowTestCase } from './test_cases_loader.js';
-
-/** Name of the Langfuse dataset that mirrors test_cases.json. */
+/** Name of the Langfuse dataset holding the workflow test cases. */
 export const WORKFLOW_DATASET_NAME = 'workflow-evals';
 
 /** Item shape returned by the client, derived so we don't depend on @langfuse/core. */
-export type DatasetItem = Awaited<ReturnType<LangfuseClient['dataset']['createItem']>>;
+export type DatasetItem = Awaited<ReturnType<LangfuseClient['dataset']['get']>>['items'][number];
+
+/**
+ * The harness knobs, which live in item metadata.
+ *
+ * Strict: items are edited in the Langfuse UI, and a silently stripped typo (e.g.
+ * `failTool`) turns off the behavior a case tests while the case still passes.
+ */
+const WorkflowMetadataValidator = z.strictObject({
+    /** Grouping key, e.g. "search-actors". What `--category` matches on. */
+    category: z.string().min(1),
+    /** Defaults to the config value */
+    maxTurns: z.number().int().positive().optional(),
+    /** Tools to enable, e.g. ["actors", "docs", "apify/rag-web-browser"] */
+    tools: z.array(z.string()).optional(),
+    /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See mcp_client.ts. */
+    failTools: z.array(z.string()).optional(),
+});
 
 const WorkflowItemValidator = z.object({
     id: z.string().min(1),
     input: z.object({ query: z.string().min(1) }),
     expectedOutput: z.string().min(1),
-    metadata: WorkflowTestCaseValidator.omit({ id: true, query: true, reference: true }),
+    metadata: WorkflowMetadataValidator,
 });
 
 /** The parts of a dataset item a run reads. */
 export type WorkflowItem = z.infer<typeof WorkflowItemValidator>;
+
+/** Flat view of an item: what the CLI filters on and what the snapshot file holds. */
+export type WorkflowTestCase = z.infer<typeof WorkflowMetadataValidator> & {
+    id: string;
+    query: string;
+    reference: string;
+};
+
+/** A dataset item plus its flat view, so the shared filter helpers apply directly. */
+export type WorkflowCase = WorkflowTestCase & { item: DatasetItem };
 
 /**
  * Validate a dataset item before anything depends on its shape. The item is JSON
@@ -48,69 +69,40 @@ export function parseWorkflowItem(item: unknown): WorkflowItem {
 }
 
 /**
- * A test cases file other than the canonical one gets its own dataset. A scratch
- * file reusing the canonical ids would otherwise overwrite the inputs of every run
- * already recorded against the shared dataset.
+ * Flatten an item into a test case.
  *
- * Takes the absolute path from `resolveTestCasesPath`: the identity of the file,
- * not the spelling of the argument, is what decides. Explicitly passing the default
- * path therefore stays on the canonical dataset, and two scratch files sharing a
- * basename in different directories get different datasets (hence the path hash).
+ * Keys are written out one by one rather than spread, so absent knobs stay absent and
+ * every export produces the same key order: the snapshot is diffed in review, and remote
+ * metadata carries no field order worth inheriting.
  */
-export function resolveDatasetName(testCasesPath: string): string {
-    if (testCasesPath === DEFAULT_TEST_CASES_PATH) return WORKFLOW_DATASET_NAME;
-    const digest = createHash('sha256').update(testCasesPath).digest('hex').slice(0, 8);
-    return `${WORKFLOW_DATASET_NAME}-${path.basename(testCasesPath, '.json')}-${digest}`;
+export function toWorkflowTestCase(item: unknown): WorkflowTestCase {
+    const { id, input, expectedOutput, metadata } = parseWorkflowItem(item);
+    return {
+        id,
+        category: metadata.category,
+        query: input.query,
+        reference: expectedOutput,
+        ...(metadata.maxTurns !== undefined && { maxTurns: metadata.maxTurns }),
+        ...(metadata.tools !== undefined && { tools: metadata.tools }),
+        ...(metadata.failTools !== undefined && { failTools: metadata.failTools }),
+    };
 }
 
 /**
- * Dataset item id for a test case id.
+ * Every active case in the dataset, sorted by id.
  *
- * Item ids are unique per project and cannot be reused across datasets, so a
- * scratch dataset carrying the canonical ids would re-parent the canonical items
- * instead of isolating anything. Non-canonical datasets namespace their items;
- * the canonical dataset keeps bare test case ids so its existing items and their
- * run history survive.
+ * Archived items are dropped: `dataset.get` returns them regardless of status, and an
+ * item archived in the UI must stop running. Every item is validated here rather than
+ * per item mid-run, so a malformed one fails the run before any LLM spend.
  *
- * Private on purpose: `syncDataset` returns items keyed by test case id, so no
- * caller has to re-derive this mapping.
+ * Errors are left to throw: a 401, an unknown dataset name or a wrong base URL must stop
+ * the run, not be downgraded to a warning.
  */
-function resolveItemId(datasetName: string, testCaseId: string): string {
-    return datasetName === WORKFLOW_DATASET_NAME ? testCaseId : `${datasetName}:${testCaseId}`;
-}
+export async function fetchWorkflowCases(langfuse: LangfuseClient, datasetName: string): Promise<WorkflowCase[]> {
+    const dataset = await langfuse.dataset.get(datasetName, { fetchItemsPageSize: 100 });
 
-/**
- * Get-or-create the dataset and upsert every test case into it, keyed by test case id.
- *
- * Returns the created items keyed by test case id. They already carry the id,
- * datasetId, input, expectedOutput and metadata that `experiment.run` needs, so the
- * caller never has to fetch the dataset back, nor reproduce the item-id rule to look
- * one up. Errors are left to throw: a 401 or a wrong base URL must stop the run, not
- * be downgraded to a warning.
- */
-export async function syncDataset(
-    langfuse: LangfuseClient,
-    datasetName: string,
-    testCases: WorkflowTestCase[],
-): Promise<Map<string, DatasetItem>> {
-    await langfuse.api.datasets.create({
-        name: datasetName,
-        description: 'Multi-turn workflow evals for the Apify MCP server (mirrors test_cases.json).',
-    });
-
-    // There is no batch item endpoint, so concurrency is the only lever here.
-    const items = await Promise.all(
-        testCases.map(async ({ id, query, reference, ...knobs }) => {
-            const item = await langfuse.dataset.createItem({
-                datasetName,
-                id: resolveItemId(datasetName, id),
-                input: { query },
-                expectedOutput: reference,
-                metadata: knobs,
-            });
-            return [id, item] as const;
-        }),
-    );
-
-    return new Map(items);
+    return dataset.items
+        .filter((item) => item.status === 'ACTIVE')
+        .map((item) => ({ ...toWorkflowTestCase(item), item }))
+        .sort((a, b) => a.id.localeCompare(b.id));
 }
