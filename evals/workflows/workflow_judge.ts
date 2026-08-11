@@ -5,6 +5,7 @@
 
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
+import { z } from 'zod';
 
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
 import type { LlmClient } from './llm_client.js';
@@ -83,22 +84,26 @@ function formatConversationForJudge(conversation: ConversationHistory): string {
 }
 
 /**
+ * Judge output as it comes back over the wire. JUDGE_RESPONSE_SCHEMA asks for a strict
+ * schema, but that is only honoured by some OpenRouter providers, so normalize the
+ * casing the judge actually reached a verdict in rather than discard the item.
+ * Structure only: an unrecognized verdict stays an error, never a guess.
+ */
+const JudgeResponseValidator = z.object({
+    verdict: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .pipe(z.enum(['PASS', 'FAIL'])),
+    reason: z.string().min(1),
+});
+
+/**
  * Parse structured JSON response from judge
  */
 function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reason: string } {
     try {
-        const parsed = JSON.parse(response) as { verdict: 'PASS' | 'FAIL'; reason: string };
-
-        // Validate the structure (should be guaranteed by schema, but double-check)
-        if (!parsed.verdict || (parsed.verdict !== 'PASS' && parsed.verdict !== 'FAIL')) {
-            throw new Error(`Invalid verdict: ${parsed.verdict}`);
-        }
-
-        if (!parsed.reason || typeof parsed.reason !== 'string') {
-            throw new Error(`Invalid reason: ${parsed.reason}`);
-        }
-
-        return parsed;
+        return JudgeResponseValidator.parse(JSON.parse(response));
     } catch (error) {
         throw new Error(
             `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}\n` +
