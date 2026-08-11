@@ -47,14 +47,14 @@ Every advertised capability MUST have a working integration path.
 | `logging/setLevel` | `legacy_server.ts:222` | **Missing** (no integration test sets a level) |
 | `notifications/message` filtered by level | `setupLoggingProxy` `legacy_server.ts:208` | **Missing** — no test asserts filtering behaves |
 | `ping` | SDK default | **Missing** (cheap; one-liner per transport) |
-| Streamable HTTP `Mcp-Session-Id` round trip | `dev_server.ts:184` | Implicit (client SDK uses it) |
-| Streamable HTTP `DELETE /` terminate | `dev_server.ts:277` | Covered (`terminateSession`) |
-| Streamable HTTP `GET /` returns 405 | `dev_server.ts:271` | **Missing** — pure HTTP assertion, no MCP client |
-| Reusing transport across requests in one session | `dev_server.ts:187` | Implicit |
+| Streamable HTTP `Mcp-Session-Id` round trip | `dev_server.ts:283` (read), `:337` (`sessionIdGenerator`) | Implicit (client SDK uses it) |
+| Streamable HTTP `DELETE /` terminate | `dev_server.ts:412` | Covered (`terminateSession`) |
+| Streamable HTTP `GET /` opens the session SSE stream (404 on unknown session) | `dev_server.ts:392` | **Missing** — pure HTTP assertion, no MCP client |
+| Reusing transport across requests in one session | `dev_server.ts:287` | Implicit |
 | Two concurrent sessions are isolated (tools, tasks, log level) | per-session `mcpServers[]` map | **Missing** — no parallel client test |
 | 401/403 when `APIFY_TOKEN` missing | implicit (Apify API) | **Missing** at transport layer |
-| Bad request: POST without session, not initialize → 404 | `dev_server.ts:244` | **Missing** |
-| SSE legacy: GET /sse → POST /message round trip | `dev_server.ts:64`, `:137` | Implicit (suite runs over SSE) |
+| Bad request: POST without session, not initialize → 400; unknown session id → 404 | `dev_server.ts:352`, `:364` | **Missing** |
+| SSE legacy: GET /sse → POST /message round trip | routes removed — `dev_server.ts` serves only `/` | Not applicable |
 | Server `instructions` text returned in `initialize` | `legacy_server.ts:178` (`getServerInstructions` `server.ts:277`) | **Missing** |
 | `ActorRun` widget structuredContent | get-actor-run | Covered |
 | `_meta.usageTotalUsd / usageUsd` | call-actor | Covered |
@@ -76,7 +76,7 @@ Ranked by blast radius if broken:
 5. **Initialize round-trip** — no test asserts `serverInfo.name`, `serverInfo.version`, `instructions`, and the declared `capabilities` block. A bad bump of capability shape breaks every client without any test catching it.
 6. **Session isolation (streamable-http)** — `mcpServers[sessionId]` is a Map; `taskStore` is shared. If two clients open sessions in parallel, A's `loadToolsFromUrl(actors=X)` must not affect B (`actors=Y`), and A's `tasks/list` must not see B's tasks. Today nothing exercises this and a regression here corrupts hosted multi-tenant traffic.
 7. **`prompts/get` error paths** — the invalid-name and invalid-args branches behind `legacy_server.ts:262` are dead code as far as tests are concerned.
-8. **Streamable-HTTP HTTP-level assertions** — `GET /` → 405 and `POST /` without `Mcp-Session-Id` and not init → 404. These are explicit branches in `dev_server.ts:244,271`. Cheap to assert, currently absent.
+8. **Streamable-HTTP HTTP-level assertions** — `GET /` → session SSE stream, 404 on unknown session, and `POST /` without `Mcp-Session-Id` and not init → 400. These are explicit branches in `dev_server.ts:352,392`. Cheap to assert, currently absent.
 
 ## Out of scope (deliberately not adding)
 

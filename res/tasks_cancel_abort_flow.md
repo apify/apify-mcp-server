@@ -71,7 +71,7 @@ sequenceDiagram
     Server->>Store: post-run isTaskCancelled check<br/>(skip result storage only)
 ```
 
-The post-run `isTaskCancelled` check (`src/mcp/server.ts`, see `isTaskCancelled`) mitigated
+The post-run `isTaskCancelled` check (`src/mcp/task_execution.ts`, see `isTaskCancelled`) mitigated
 the *result-storage* half (we don't return data for a cancelled task) but did nothing about
 the *compute-consumption* half.
 
@@ -120,10 +120,11 @@ sequenceDiagram
 ```
 
 `cancelWatcher.signal` replaces `extra.signal` at the two places where the in-flight
-execution observes cancellation (`src/mcp/server.ts`):
+execution observes cancellation (`src/mcp/task_execution.ts:265` passes it to `dispatchToolCall` as
+`signal`, which `src/mcp/tool_dispatch.ts` threads on):
 
-- internal-tool branch — `taskExtra = { ...extra, signal: cancelWatcher.signal }`
-- direct-actor-tool branch — `abortSignal: cancelWatcher.signal`
+- internal-tool branch — `signal` in the `tool.call({ … })` args (`tool_dispatch.ts:105`)
+- direct-actor-tool branch — `abortSignal: signal` (`tool_dispatch.ts:248`)
 
 Both funnel into `waitForRunWithProgress`, whose `raceAbort` reacts to the signal and calls
 `onAbort` (`abortRunOnSignal`) → `apifyClient.run(runId).abort()`.
@@ -200,7 +201,7 @@ Two extra defenses live inside `createTaskCancellationWatcher`:
 | Path | Role |
 |---|---|
 | `src/mcp/utils.ts` — `createTaskCancellationWatcher` | The polling watcher. Bridges TaskStore status → AbortSignal. |
-| `src/mcp/server.ts` — `executeToolAndUpdateTask` | Constructs the watcher per task; threads `cancelWatcher.signal` into the internal-tool (`taskExtra`) and direct-actor-tool (`abortSignal`) branches; `cancelWatcher.dispose()` in `finally`; `isTaskCancelled` post-run check. |
+| `src/mcp/task_execution.ts` — `executeToolAndUpdateTask` | Constructs the watcher per task; passes `cancelWatcher.signal` to `dispatchToolCall`, which threads it into the internal-tool (`signal`) and direct-actor-tool (`abortSignal`) branches; `cancelWatcher.dispose()` in `finally`; `isTaskCancelled` post-run check. |
 | `src/tools/core/actor_run_response.ts` — `waitForRunWithProgress`, `raceAbort`, `abortRunOnSignal` | Races platform calls against the abort signal and aborts the run via `onAbort`. |
 | `tests/unit/mcp.utils.test.ts` | Unit tests for the watcher (happy path, parent abort, dispose, transient errors, no overlap). |
 | `tests/integration/suite.ts` | E2E test: cancel mid-run, assert the Apify run reaches ABORTED. |

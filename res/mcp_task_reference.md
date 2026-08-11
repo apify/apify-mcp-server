@@ -71,7 +71,7 @@ interface TaskStore {
 
 ### How Our Server Implements Tasks
 
-**Location**: `src/mcp/server.ts` → `executeToolAndUpdateTask()`
+**Location**: `src/mcp/task_execution.ts` → `executeToolAndUpdateTask()`
 
 1. Tool call with `task` params → server creates task via `taskStore.createTask()`
 2. Returns `{ task }` immediately to client

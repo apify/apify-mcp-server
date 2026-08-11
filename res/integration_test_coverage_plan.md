@@ -29,7 +29,7 @@ PR title format follows Conventional Commits (≤70 chars). Branch `test/<slug>`
 ## PR 2 — `test: Add resources/list, templates, and read end-to-end tests`
 
 **Branch**: `test/resources-end-to-end`
-**Scope**: Block B. Today only unit tests touch `resource_service`; nothing verifies the request handlers in `server.ts:464,468,472` are wired.
+**Scope**: Block B. Today only unit tests touch `resource_service`; nothing verifies the request handlers in `legacy_server.ts:235,239,250` are wired.
 
 **Test cases (all in `tests/integration/suite.ts`):**
 1. `should list resources via resources/list` — `await client.listResources()`; assert `Array.isArray(resources)`. Run a second client with `uiMode: 'openai'`; assert at least one resource URI starts with `ui://` (widget).
@@ -84,7 +84,7 @@ In `tests/integration/suite.ts` (gated `runIf(streamable-http)`):
 ## PR 5 — `test: Add _meta.apifyToken propagation tests` (optional / lower priority)
 
 **Branch**: `test/meta-apify-token-propagation`
-**Scope**: Block H. The hosted server relies on `_meta.apifyToken` arriving in `tools/call` params (`server.ts:638`). Currently no test exercises this path; only the bearer header / env-var paths are covered.
+**Scope**: Block H. The hosted server relies on `_meta.apifyToken` arriving in `tools/call` params (`legacy_server.ts:384`). Currently no test exercises this path; only the bearer header / env-var paths are covered.
 
 **Helper change** — `tests/helpers.ts`:
 - Add an `omitToken?: boolean` flag to `McpClientOptions`. When set: `createMcpStdioClient` does not put `APIFY_TOKEN` in the spawned env, and the streamable-http variant does not send the `Authorization` header. ~10 lines.
