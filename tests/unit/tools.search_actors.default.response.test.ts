@@ -217,6 +217,12 @@ describe('search-actors without widget (searchActors)', () => {
             name: 'web-scraper-2',
             title: 'Web Scraper 2',
         } as ActorStoreList;
+        const THIRD_ACTOR = {
+            ...MOCK_STORE_ACTOR,
+            id: 'actor-id-3',
+            name: 'web-scraper-3',
+            title: 'Web Scraper 3',
+        } as ActorStoreList;
 
         async function callWithLoadedTools(loadedToolNames: string[], actors: ActorStoreList[] = [MOCK_STORE_ACTOR]) {
             vi.mocked(searchAgentSafeActors).mockResolvedValue(actors);
@@ -284,6 +290,47 @@ describe('search-actors without widget (searchActors)', () => {
 
             expect(content[0].text).toContain(SEARCH_RESULTS_RUN_GUIDANCE);
             expect(structuredContent.instructions).toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+        });
+
+        // Runnability is a per-Actor question: each result is checked against its own tool name.
+        // The next two cases share one three-result fixture and differ only in whether the middle
+        // result's dedicated tool is loaded, so they fail for any session-wide predicate (one that
+        // answers "some dedicated tool is loaded" instead of "this Actor's tool is loaded") and for
+        // any predicate keyed on a single result. `call-actor-widget` cannot take part in the
+        // guidance-present case: it makes every Actor of the session runnable, so a fixture
+        // containing it can never also contain a per-Actor miss.
+        it('appends the guidance when only the middle result has no dedicated tool', async () => {
+            const { content, structuredContent } = await callWithLoadedTools(
+                [actorNameToToolName('apify/web-scraper'), actorNameToToolName('apify/web-scraper-3')],
+                [MOCK_STORE_ACTOR, SECOND_ACTOR, THIRD_ACTOR],
+            );
+
+            expect(content[0].text).toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+            expect(structuredContent.instructions).toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+        });
+
+        it('omits the guidance once the middle result has its dedicated tool loaded too', async () => {
+            const { content, structuredContent } = await callWithLoadedTools(
+                [
+                    actorNameToToolName('apify/web-scraper'),
+                    actorNameToToolName('apify/web-scraper-3'),
+                    actorNameToToolName('apify/web-scraper-2'),
+                ],
+                [MOCK_STORE_ACTOR, SECOND_ACTOR, THIRD_ACTOR],
+            );
+
+            expect(content[0].text).not.toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+            expect(structuredContent.instructions).not.toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+        });
+
+        it('omits the guidance when call-actor-widget covers the results without a dedicated tool', async () => {
+            const { content, structuredContent } = await callWithLoadedTools(
+                [HELPER_TOOLS.ACTOR_CALL_WIDGET, actorNameToToolName('apify/web-scraper')],
+                [MOCK_STORE_ACTOR, SECOND_ACTOR, THIRD_ACTOR],
+            );
+
+            expect(content[0].text).not.toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+            expect(structuredContent.instructions).not.toContain(SEARCH_RESULTS_RUN_GUIDANCE);
         });
 
         it('omits the guidance when no Actors are found', async () => {
