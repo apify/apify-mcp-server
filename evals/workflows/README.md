@@ -2,6 +2,18 @@
 
 Tests AI agents performing multi-turn conversations with Apify MCP tools, evaluated by an LLM judge. Results (traces, scores, dataset, experiment runs) are recorded in **Langfuse**: the self-hosted instance at [langfuse.apify.dev](https://langfuse.apify.dev), project `MCP Workflow`.
 
+## The flow
+
+```
+dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge -> scores
+```
+
+1. **Dataset.** Test cases live in the Langfuse dataset `workflow-evals` and are edited in its UI. A run reads them and never writes back.
+2. **Experiment.** The run executes the active items matching `--id`/`--category` as one Langfuse experiment, `--concurrency` items at a time.
+3. **Conversation.** Each item gets a fresh MCP server and runs a multi-turn agent conversation against it.
+4. **Judge.** An LLM judge scores the finished conversation against the item's `expectedOutput`.
+5. **Scores.** The verdict lands as `workflow_judge` (the pass/fail gate) and the conversation's tokens as `total_tokens`, plus `pass_rate` on the run. The console prints failures and the run URL; per-item detail is in Langfuse.
+
 ---
 
 ## Quick Start
