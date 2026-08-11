@@ -18,6 +18,7 @@ import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
+import { ACTOR_DETAILS_RUN_GUIDANCE, canRunActor } from './actor_run_availability.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 
 /**
@@ -137,11 +138,12 @@ export function buildActorDetailsTextResponse(options: {
     actorOutputSchema?: Record<string, unknown> | null;
     mcpToolsMessage?: string;
     linkContext?: ConsoleLinkContext;
+    runGuidance?: string;
 }): {
     texts: string[];
     structuredContent: Record<string, unknown>;
 } {
-    const { details, output, actorOutputSchema, mcpToolsMessage, linkContext } = options;
+    const { details, output, actorOutputSchema, mcpToolsMessage, linkContext, runGuidance } = options;
 
     const actorUrl =
         buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
@@ -192,12 +194,18 @@ export function buildActorDetailsTextResponse(options: {
         texts.push(VERBATIM_LINKS_NUDGE);
     }
 
+    // The run guidance is the last text, after the nudge.
+    if (runGuidance) {
+        texts.push(runGuidance);
+    }
+
     const structuredContent: Record<string, unknown> = {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
         readme: resolvedReadme?.content,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
         mcpTools: output.mcpTools && mcpToolsMessage ? mcpToolsMessage : undefined,
+        instructions: runGuidance,
     };
 
     return { texts, structuredContent };
@@ -208,7 +216,7 @@ export function buildActorDetailsTextResponse(options: {
  * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
-    const { args, apifyToken, apifyClient, actorStore, paymentProvider, mcpSessionId } = toolArgs;
+    const { args, apifyToken, apifyClient, actorStore, paymentProvider, mcpSessionId, loadedToolNames } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
 
@@ -246,6 +254,9 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         actorOutputSchema,
         mcpToolsMessage,
         linkContext,
+        runGuidance: canRunActor(details.actorCardStructured.fullName, loadedToolNames)
+            ? undefined
+            : ACTOR_DETAILS_RUN_GUIDANCE,
     });
 
     return respondOk(texts, { structuredContent });

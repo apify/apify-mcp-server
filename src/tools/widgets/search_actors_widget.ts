@@ -10,6 +10,7 @@ import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
+import { canRunActor, SEARCH_RESULTS_RUN_GUIDANCE } from '../actors/actor_run_availability.js';
 import {
     buildNoActorsFoundInstructions,
     buildSearchActorsResult,
@@ -59,7 +60,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, paymentProvider } = toolArgs;
+        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames } = toolArgs;
         const parsed = searchActorsWidgetArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
@@ -97,6 +98,8 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
             widgetActors: actors.map((actor) => formatActorForWidget(actor, userPlanTier)),
         };
 
+        const hasUnrunnableActor = actorCardStructured.some((card) => !canRunActor(card.fullName, loadedToolNames));
+        const runGuidance = hasUnrunnableActor ? `\n\n${SEARCH_RESULTS_RUN_GUIDANCE}` : '';
         const texts = [
             dedent`
             # Search results:
@@ -105,7 +108,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
 
             An interactive widget has been rendered with the search results. The user can already see
             the list of Actors visually in the widget, so do NOT print or summarize the Actor list
-            in your response.
+            in your response.${runGuidance}
         `,
         ];
 

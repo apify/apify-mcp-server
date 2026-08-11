@@ -20,6 +20,7 @@ import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
+import { canRunActor, SEARCH_RESULTS_RUN_GUIDANCE } from './actor_run_availability.js';
 
 /**
  * Shared schema for search-actors arguments. Used by both the default and
@@ -166,7 +167,7 @@ export const searchActors: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, paymentProvider } = toolArgs;
+        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames } = toolArgs;
         const parsed = searchActorsBaseArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
@@ -192,12 +193,18 @@ export const searchActors: ToolEntry = Object.freeze({
         const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
         const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, linkContext);
         const verbatimLinksNudge = linkContext ? `\n${VERBATIM_LINKS_NUDGE}` : '';
+        // The guidance is the last text in the response, after the nudge. One string serves both
+        // the text channel and `structuredContent.instructions`.
+        const hasUnrunnableActor = actorCardStructured.some((card) => !canRunActor(card.fullName, loadedToolNames));
+        const footer = hasUnrunnableActor
+            ? `${buildSearchActorsFooter(verbatimLinksNudge)}\n\n${SEARCH_RESULTS_RUN_GUIDANCE}`
+            : buildSearchActorsFooter(verbatimLinksNudge);
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,
             count: actors.length,
             userTier: userPlanTier,
-            instructions: buildSearchActorsFooter(verbatimLinksNudge),
+            instructions: footer,
         };
 
         // Build header and footer with separate `dedent` calls and concatenate around
@@ -211,7 +218,6 @@ export const searchActors: ToolEntry = Object.freeze({
 
             # Actors:
         `;
-        const footer = buildSearchActorsFooter(verbatimLinksNudge);
         return respondOk(`${header}\n\n${actorCardText}\n\n${footer}`, { structuredContent });
     },
 } as const satisfies HelperTool);

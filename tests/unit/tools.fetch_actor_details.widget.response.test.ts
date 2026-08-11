@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
+import { ACTOR_DETAILS_RUN_GUIDANCE } from '../../src/tools/actors/actor_run_availability.js';
 import { fetchActorDetailsWidget } from '../../src/tools/widgets/fetch_actor_details_widget.js';
 import type { HelperTool } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
@@ -97,6 +100,48 @@ describe('fetch-actor-details-widget response', () => {
         expect(_meta?.ui?.visibility).toEqual(['model', 'app']);
         expect(_meta?.ui?.csp).toBeDefined();
         expect(_meta?.['openai/widgetDescription']).toContain('apify/web-scraper');
+    });
+
+    describe('run guidance for an Actor the session cannot run', () => {
+        async function callWithLoadedTools(loadedToolNames: string[]) {
+            vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
+            const result = await (fetchActorDetailsWidget as HelperTool).call({
+                ...stubInternalToolArgs({ actor: 'apify/web-scraper' }),
+                loadedToolNames,
+            });
+            return result as {
+                structuredContent: Record<string, unknown>;
+                content: { type: string; text: string }[];
+            };
+        }
+
+        it('omits the guidance when call-actor is loaded', async () => {
+            const { content } = await callWithLoadedTools([HELPER_TOOLS.ACTOR_CALL]);
+
+            expect(content).toHaveLength(1);
+            expect(content[0].text).not.toContain(ACTOR_DETAILS_RUN_GUIDANCE);
+        });
+
+        it('omits the guidance when only call-actor-widget is loaded', async () => {
+            const { content } = await callWithLoadedTools([HELPER_TOOLS.ACTOR_CALL_WIDGET]);
+
+            expect(content[0].text).not.toContain(ACTOR_DETAILS_RUN_GUIDANCE);
+        });
+
+        it('omits the guidance when the Actor has its own dedicated tool', async () => {
+            const { content } = await callWithLoadedTools([actorNameToToolName('apify/web-scraper')]);
+
+            expect(content[0].text).not.toContain(ACTOR_DETAILS_RUN_GUIDANCE);
+        });
+
+        it('appends the guidance to the single text item when the Actor cannot be run', async () => {
+            const { content, structuredContent } = await callWithLoadedTools([]);
+
+            expect(content).toHaveLength(1);
+            expect(content[0].text).toContain(ACTOR_DETAILS_RUN_GUIDANCE);
+            // Widget structured content stays on its closed schema — text-only guidance.
+            expect(Object.keys(structuredContent)).toEqual(['actorDetails']);
+        });
     });
 
     it('carries widget _meta on the tool definition', () => {

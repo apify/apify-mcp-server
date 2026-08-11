@@ -215,6 +215,10 @@ export const actorDetailsOutputSchema = {
             description:
                 'Markdown listing of MCP tools exposed by the Actor (only present when `output.mcpTools` is requested).',
         },
+        instructions: {
+            type: 'string',
+            description: 'Additional instructions for the LLM to follow when processing the Actor details.',
+        },
     },
 };
 

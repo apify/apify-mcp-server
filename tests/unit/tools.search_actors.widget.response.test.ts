@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
+import { SEARCH_RESULTS_RUN_GUIDANCE } from '../../src/tools/actors/actor_run_availability.js';
 import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
-import type { HelperTool } from '../../src/types.js';
+import type { ActorStoreList, HelperTool } from '../../src/types.js';
 import type { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { formatActorForWidget } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
@@ -102,6 +105,73 @@ describe('search-actors-widget response', () => {
         expect(content).toHaveLength(1);
         expect(content[0].text).toContain('No Actors were found');
         expect(_meta).toBeUndefined();
+    });
+
+    describe('run guidance for Actors the session cannot run', () => {
+        const SECOND_ACTOR = {
+            ...MOCK_STORE_ACTOR,
+            id: 'actor-id-2',
+            name: 'web-scraper-2',
+            title: 'Web Scraper 2',
+        } as ActorStoreList;
+
+        async function callWithLoadedTools(loadedToolNames: string[], actors: ActorStoreList[] = [MOCK_STORE_ACTOR]) {
+            vi.mocked(searchAgentSafeActors).mockResolvedValue(actors);
+            const result = await (searchActorsWidget as HelperTool).call({
+                ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+                loadedToolNames,
+            });
+            return result as {
+                structuredContent: Record<string, unknown>;
+                content: { type: string; text: string }[];
+            };
+        }
+
+        it('omits the guidance when call-actor is loaded', async () => {
+            const { content } = await callWithLoadedTools([HELPER_TOOLS.ACTOR_CALL]);
+
+            expect(content).toHaveLength(1);
+            expect(content[0].text).not.toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+        });
+
+        it('omits the guidance when only call-actor-widget is loaded', async () => {
+            const { content } = await callWithLoadedTools([HELPER_TOOLS.ACTOR_CALL_WIDGET]);
+
+            expect(content[0].text).not.toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+        });
+
+        it('omits the guidance when every result has its own dedicated tool', async () => {
+            const { content } = await callWithLoadedTools(
+                [actorNameToToolName('apify/web-scraper'), actorNameToToolName('apify/web-scraper-2')],
+                [MOCK_STORE_ACTOR, SECOND_ACTOR],
+            );
+
+            expect(content[0].text).not.toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+        });
+
+        it('appends the guidance to the single text item when no result can be run', async () => {
+            const { content, structuredContent } = await callWithLoadedTools([]);
+
+            expect(content).toHaveLength(1);
+            expect(content[0].text).toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+            // Widget structured content stays on its declared schema — text-only guidance.
+            expect(structuredContent.instructions).toBeUndefined();
+        });
+
+        it('appends the guidance when only some results can be run', async () => {
+            const { content } = await callWithLoadedTools(
+                [actorNameToToolName('apify/web-scraper')],
+                [MOCK_STORE_ACTOR, SECOND_ACTOR],
+            );
+
+            expect(content[0].text).toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+        });
+
+        it('omits the guidance when no Actors are found', async () => {
+            const { content } = await callWithLoadedTools([], []);
+
+            expect(content[0].text).not.toContain(SEARCH_RESULTS_RUN_GUIDANCE);
+        });
     });
 
     it('carries widget _meta on the tool definition', () => {

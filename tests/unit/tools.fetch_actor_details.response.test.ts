@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
+import { ACTOR_DETAILS_RUN_GUIDANCE } from '../../src/tools/actors/actor_run_availability.js';
 import {
     actorDetailsOutputDefaults,
     buildActorDetailsTextResponse,
@@ -156,6 +159,29 @@ describe('buildActorDetailsTextResponse()', () => {
             expect(texts.at(-1)).toBe(VERBATIM_LINKS_NUDGE);
         });
 
+        it('appends the run guidance after the verbatim-links nudge', () => {
+            const { texts, structuredContent } = buildActorDetailsTextResponse({
+                details: MOCK_DETAILS,
+                output: inputSchemaOnlyOutput,
+                linkContext,
+                runGuidance: ACTOR_DETAILS_RUN_GUIDANCE,
+            });
+
+            expect(texts.at(-1)).toBe(ACTOR_DETAILS_RUN_GUIDANCE);
+            expect(texts.at(-2)).toBe(VERBATIM_LINKS_NUDGE);
+            expect(structuredContent.instructions).toBe(ACTOR_DETAILS_RUN_GUIDANCE);
+        });
+
+        it('omits structuredContent.instructions without run guidance', () => {
+            const { structuredContent } = buildActorDetailsTextResponse({
+                details: MOCK_DETAILS,
+                output: inputSchemaOnlyOutput,
+                linkContext,
+            });
+
+            expect(structuredContent.instructions).toBeUndefined();
+        });
+
         it('keeps the public /input link and omits the nudge without a link context', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
@@ -163,7 +189,9 @@ describe('buildActorDetailsTextResponse()', () => {
             });
 
             expect(texts[0]).toContain('# [Input schema](https://apify.com/apify/example-mcp-server/input)');
-            expect(texts.at(-1)).not.toBe(VERBATIM_LINKS_NUDGE);
+            // The nudge must be absent everywhere, not merely off the last slot — the run
+            // guidance can now trail the array.
+            expect(texts).not.toContain(VERBATIM_LINKS_NUDGE);
         });
     });
 });
@@ -176,12 +204,17 @@ describe('buildFetchActorDetailsResult()', () => {
     });
 
     // pricing: false → the users/me lookup is needed only for Console UI tokens.
-    const callWithToken = async (apifyToken: string) => {
+    // `loadedToolNames` defaults to a runnable session, so these cases carry no run guidance.
+    const callWithToken = async (apifyToken: string, loadedToolNames: string[] = [HELPER_TOOLS.ACTOR_CALL]) => {
         const result = await buildFetchActorDetailsResult({
             ...stubInternalToolArgs({ actor: 'apify/example-mcp-server', output: { inputSchema: true } }),
             apifyToken,
+            loadedToolNames,
         });
-        return result as { content: { type: string; text: string }[] };
+        return result as {
+            content: { type: string; text: string }[];
+            structuredContent: Record<string, unknown>;
+        };
     };
 
     it('skips the users/me lookup for API tokens when pricing is not rendered', async () => {
@@ -203,6 +236,52 @@ describe('buildFetchActorDetailsResult()', () => {
         });
         expect(content[0].text).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');
         expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
+    });
+
+    describe('run guidance for an Actor the session cannot run', () => {
+        it('omits the guidance and the instructions key when call-actor is loaded', async () => {
+            const { content, structuredContent } = await callWithToken('apify_api_test', [HELPER_TOOLS.ACTOR_CALL]);
+
+            expect(content.map((item) => item.text)).not.toContain(ACTOR_DETAILS_RUN_GUIDANCE);
+            expect(structuredContent.instructions).toBeUndefined();
+            // Undefined values are dropped on serialization, so the wire payload is unchanged.
+            expect(Object.keys(JSON.parse(JSON.stringify(structuredContent)))).not.toContain('instructions');
+        });
+
+        it('omits the guidance when only call-actor-widget is loaded', async () => {
+            const { content, structuredContent } = await callWithToken('apify_api_test', [
+                HELPER_TOOLS.ACTOR_CALL_WIDGET,
+            ]);
+
+            expect(content.map((item) => item.text)).not.toContain(ACTOR_DETAILS_RUN_GUIDANCE);
+            expect(structuredContent.instructions).toBeUndefined();
+        });
+
+        it('omits the guidance when the Actor has its own dedicated tool', async () => {
+            const { content, structuredContent } = await callWithToken('apify_api_test', [
+                actorNameToToolName('apify/example-mcp-server'),
+            ]);
+
+            expect(content.map((item) => item.text)).not.toContain(ACTOR_DETAILS_RUN_GUIDANCE);
+            expect(structuredContent.instructions).toBeUndefined();
+        });
+
+        it('appends the guidance as the last text when the Actor cannot be run', async () => {
+            const { content, structuredContent } = await callWithToken('apify_api_test', []);
+
+            expect(content.at(-1)?.text).toBe(ACTOR_DETAILS_RUN_GUIDANCE);
+            expect(structuredContent.instructions).toBe(ACTOR_DETAILS_RUN_GUIDANCE);
+        });
+
+        it('places the guidance after the verbatim-links nudge for a Console UI token', async () => {
+            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+            const { content, structuredContent } = await callWithToken('apify_ui_test', []);
+
+            expect(content.at(-1)?.text).toBe(ACTOR_DETAILS_RUN_GUIDANCE);
+            expect(content.at(-2)?.text).toBe(VERBATIM_LINKS_NUDGE);
+            expect(structuredContent.instructions).toBe(ACTOR_DETAILS_RUN_GUIDANCE);
+        });
     });
 
     // Regression: a 401 (invalid/expired APIFY_TOKEN) must not surface as "Actor ... was not

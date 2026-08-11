@@ -9,6 +9,7 @@ import { buildActorDetailsForWidget, buildCardOptions, fetchActorDetails } from 
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
+import { ACTOR_DETAILS_RUN_GUIDANCE, canRunActor } from '../actors/actor_run_availability.js';
 import { fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
 import { actorDetailsOutputDefaults, buildActorNotFoundResponse } from '../actors/fetch_actor_details.js';
 import { actorDetailsWidgetOutputSchema } from '../structured_output_schemas.js';
@@ -64,7 +65,7 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { apifyToken, apifyClient, mcpSessionId } = toolArgs;
+        const { apifyToken, apifyClient, mcpSessionId, loadedToolNames } = toolArgs;
         const parsed = fetchActorDetailsWidgetArgsSchema.parse(toolArgs.args);
         const actorName = fixActorNameInputAndLog(parsed.actor, {
             mcpSessionId,
@@ -87,13 +88,16 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
             },
         };
 
+        const runGuidance = canRunActor(details.actorCardStructured.fullName, loadedToolNames)
+            ? ''
+            : `\n\n${ACTOR_DETAILS_RUN_GUIDANCE}`;
         const texts = [
             dedent`
             # Actor information:
             - **Actor:** ${actorName}
             - **URL:** ${actorUrl}
 
-            An interactive widget has been rendered with detailed Actor information.
+            An interactive widget has been rendered with detailed Actor information.${runGuidance}
         `,
         ];
 
