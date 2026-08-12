@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.14.3 - **not yet released**
+## [0.14.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.3) (2026-08-12)
 
 ### 🚀 Features
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - Hardcode apify&#x2F;code-runtime Actor ID for full-README bypass ([#1123](https://github.com/apify/apify-mcp-server/pull/1123)) ([3647cc4](https://github.com/apify/apify-mcp-server/commit/3647cc4a219a679db43f14ff52ed613dfb65936e)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.14.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.2) (2026-08-05)
 
 ### 🐛 Bug Fixes
