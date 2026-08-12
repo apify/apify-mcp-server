@@ -27,7 +27,7 @@ export const actorsCases: Case[] = [
         const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
         return {
             name: 'calls an Actor directly via call-actor without a separate add step',
-            critical: false,
+            isDeploymentTest: false,
             run: withClient({ tools: ['call-actor'] }, async (client) => {
                 const names = getToolNames(await client.listTools());
                 expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
@@ -48,7 +48,7 @@ export const actorsCases: Case[] = [
         const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
         return {
             name: 'should call Actor dynamically via generic call-actor tool without need to add it first',
-            critical: false,
+            isDeploymentTest: false,
             run: withClient({ tools: ['actors'] }, async (client) => {
                 const names = getToolNames(await client.listTools());
                 // actors category (already has call-actor) + auto-injected helpers.
@@ -78,9 +78,9 @@ export const actorsCases: Case[] = [
         };
     })(),
     {
-        // critical: full-pipeline smoke (auth + real Actor run).
+        // isDeploymentTest: full-pipeline smoke (auth + real Actor run).
         name: 'should call Actor directly with required input',
-        critical: true,
+        isDeploymentTest: true,
         run: withClient({ tools: ['actors'] }, async (client) => {
             // Should fail without input (AJV validation error)
             await expect(
@@ -97,7 +97,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'returns terminal RunResponse with usage cost meta when the run completes within waitSecs',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
@@ -117,7 +117,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'returns immediately with a non-terminal RunResponse when waitSecs=0',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
@@ -134,7 +134,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'accepts but ignores the deprecated previewOutput field',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
@@ -153,7 +153,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'accepts callOptions.maxItems on call-actor and runs successfully',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
@@ -177,7 +177,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'surfaces dataset fields in the canonical response (no inline preview)',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
@@ -199,7 +199,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'surfaces aliased storages from run.storageIds in the canonical response',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_CALL,
@@ -218,9 +218,9 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        // critical: store-search discovery path.
+        // isDeploymentTest: store-search discovery path.
         name: 'should find Actors in store search',
-        critical: true,
+        isDeploymentTest: true,
         run: withClient(undefined, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.STORE_SEARCH,
@@ -231,9 +231,9 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        // critical: rental Actors excluded via AGENT_SAFE_PRICING_MODELS.
+        // isDeploymentTest: rental Actors excluded via AGENT_SAFE_PRICING_MODELS.
         name: 'should not return rental Actors from store search',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.STORE_SEARCH,
@@ -248,7 +248,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return an Actor-not-found error when calling a non-existent actor via call-actor',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const nonExistentActor = 'apify/this-actor-does-not-exist';
             const result = await client.callTool({
@@ -265,7 +265,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return structured output for fetch-actor-details matching outputSchema',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
             const result = await client.callTool({ name: toolName, arguments: { actor: ACTOR_NORMAL_MODE } });
@@ -278,7 +278,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return only input schema when output={ inputSchema: true }',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -305,7 +305,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return only description and stats when specified',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -332,7 +332,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should list MCP tools when output={ mcpTools: true } for MCP server Actor',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -358,7 +358,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return graceful note when output={ mcpTools: true } for regular Actor',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -383,7 +383,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return structured output for fetch-actor-details with selective output matching outputSchema',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
@@ -414,7 +414,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
 
@@ -445,7 +445,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return only pricing when output={ pricing: true }',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -476,7 +476,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return only readme when output={ readme: true }',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -507,7 +507,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return README content (summary or full) in text and structured response for fetch-actor-details',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: 'fetch-actor-details',
@@ -534,7 +534,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should use default values when output object is not provided',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             // When output is not provided, all fields should default to their default values
             const result = await client.callTool({
@@ -552,7 +552,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return all fields when output includes all standard options',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS,
@@ -591,7 +591,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should support granular output controls for rating and metadata',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             // Test 1: Only pricing (should include pricing, NOT other sections)
             const pricingOnlyResult = await client.callTool({
@@ -731,7 +731,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should dynamically test all output options and verify section presence/absence',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             // Define all output options with their expected markers in text
             const outputOptions = [
@@ -901,7 +901,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return structured output for search-actors matching outputSchema',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const toolName = HELPER_TOOLS.STORE_SEARCH;
             const result = await client.callTool({
@@ -917,7 +917,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return structured output for get-actor-run matching outputSchema',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
             // First, start an async actor run to get a runId
             const callResult = await client.callTool({
@@ -939,7 +939,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'should return Actor details both for full Actor name and ID',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
             const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
@@ -962,7 +962,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'returns structuredContent for get-actor-run',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
             // First, start an async actor run to get a runId
             const callResult = await client.callTool({
@@ -1013,7 +1013,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'rejects get-actor-run waitSecs above 45',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
             // Fake-but-plausible runId so failure is waitSecs validation, not missing run.
             await expect(

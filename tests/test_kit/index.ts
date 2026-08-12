@@ -1,5 +1,5 @@
 /**
- * `./test-kit` export. Internal imports shared cases and runs `critical: true` against
+ * `./test-kit` export. Internal imports shared cases and runs `isDeploymentTest: true` against
  * its live deploy. `vitest` is an optional peer — only `./test-kit` consumers need it.
  */
 export { createMcpStatelessClient, createMcpStreamableClient } from './mcp_client.js';

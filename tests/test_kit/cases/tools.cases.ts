@@ -22,7 +22,7 @@ export const toolsCases: Case[] = [
     {
         // telemetry off → report-problem absent; serve/hide paths are unit-tested.
         name: 'report-problem is not served when telemetry is disabled',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
@@ -30,7 +30,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should return outputSchema, title, and icons in tools list response',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const response = await client.listTools();
 
@@ -47,7 +47,7 @@ export const toolsCases: Case[] = [
     {
         // Regression #415: after listTools caches validators, MCP passthrough must return structuredContent.
         name: 'MCP server actor:tool pass-through returns structuredContent satisfying outputSchema',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             // Populates the SDK's `_cachedToolOutputValidators` map so callTool runs schema validation.
             await client.listTools();
@@ -77,7 +77,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should search Apify documentation',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const toolName = HELPER_TOOLS.DOCS_SEARCH;
             const query = 'standby actor';
@@ -92,7 +92,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should fetch Apify documentation page',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const documentUrl = 'https://docs.apify.com/academy/getting-started/creating-actors';
             const result = await client.callTool({ name: HELPER_TOOLS.DOCS_FETCH, arguments: { url: documentUrl } });
@@ -104,7 +104,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should reject fetch-apify-docs with forbidden URL (not from allowed domains)',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const forbiddenUrl = 'https://example.com/some-page';
             const result = await client.callTool({ name: HELPER_TOOLS.DOCS_FETCH, arguments: { url: forbiddenUrl } });
@@ -121,7 +121,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should allow fetch-apify-docs from Crawlee domain (https://crawlee.dev)',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const crawleeDocsUrl = 'https://crawlee.dev/js/docs/quick-start';
             const result = await client.callTool({ name: HELPER_TOOLS.DOCS_FETCH, arguments: { url: crawleeDocsUrl } });
@@ -136,7 +136,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should return structured output for search-apify-docs matching outputSchema',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const toolName = HELPER_TOOLS.DOCS_SEARCH;
             const query = 'standby actor';
@@ -150,7 +150,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should return structured output for fetch-apify-docs matching outputSchema',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const toolName = HELPER_TOOLS.DOCS_FETCH;
             const result = await client.callTool({
@@ -166,7 +166,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should list all prompts',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const prompts = await client.listPrompts();
             expect(prompts.prompts.length).toBe(0);
@@ -175,7 +175,7 @@ export const toolsCases: Case[] = [
     {
         // Session termination is only possible for streamable HTTP transport.
         name: 'should successfully terminate streamable session',
-        critical: false,
+        isDeploymentTest: false,
         skipIf: onlyLegacyHttp,
         run: withClient(undefined, async (client) => {
             await client.listTools();
@@ -186,7 +186,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should connect to MCP server and at least one tool is available',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: [ACTOR_EXAMPLE_MCP_SERVER] }, async (client) => {
             const tools = await client.listTools();
             expect(tools.tools.length).toBeGreaterThan(0);
@@ -194,7 +194,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should serve call-actor when a dynamic-tools client selects the actors category',
-        critical: false,
+        isDeploymentTest: false,
         skipIf: onlyLegacyHttp,
         run: withClient({ clientName: 'Visual Studio Code', tools: ['actors'] }, async (client) => {
             const names = getToolNames(await client.listTools());
@@ -204,7 +204,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should serve call-actor for a dynamic-tools client with the default tool set',
-        critical: false,
+        isDeploymentTest: false,
         skipIf: onlyLegacyHttp,
         run: withClient({ clientName: 'Visual Studio Code' }, async (client) => {
             const names = getToolNames(await client.listTools());
@@ -213,7 +213,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should serve call-actor for a dynamic-tools client that selects call-actor explicitly',
-        critical: false,
+        isDeploymentTest: false,
         skipIf: onlyLegacyHttp,
         run: withClient({ clientName: 'Visual Studio Code', tools: ['call-actor'] }, async (client) => {
             const names = getToolNames(await client.listTools());
@@ -222,7 +222,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'should return error message when trying to call MCP server Actor without tool name in actor parameter',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const response = await client.callTool({
                 name: 'call-actor',

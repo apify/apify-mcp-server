@@ -18,11 +18,11 @@ function onlyLegacyHttp(ctx: CaseCtx): boolean {
     return ctx.transport !== '2025-11-25';
 }
 
-/** Async tasks: call/get/list/cancel + statusMessage. All critical. */
+/** Async tasks: call/get/list/cancel + statusMessage. All isDeploymentTest. */
 export const tasksCases: Case[] = [
     {
         name: 'should abort actor run on notifications/cancelled',
-        critical: true,
+        isDeploymentTest: true,
         skipIf: onlyLegacyHttp,
         retry: 2,
         run: async (ctx) => {
@@ -61,7 +61,7 @@ export const tasksCases: Case[] = [
     },
     {
         name: 'should abort call-actor tool on notifications/cancelled',
-        critical: true,
+        isDeploymentTest: true,
         skipIf: onlyLegacyHttp,
         retry: 1,
         run: async (ctx) => {
@@ -101,7 +101,7 @@ export const tasksCases: Case[] = [
     },
     {
         name: 'should be able to call a long running task tool call',
-        critical: true,
+        isDeploymentTest: true,
         skipIf: onlyLegacyHttp,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
@@ -150,7 +150,7 @@ export const tasksCases: Case[] = [
     },
     {
         name: 'should be able to call a long running task and list it, get the status and then separately retrieve the result',
-        critical: true,
+        isDeploymentTest: true,
         skipIf: onlyLegacyHttp,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
@@ -191,7 +191,7 @@ export const tasksCases: Case[] = [
     },
     {
         name: 'should be able to call a long running task and then cancel it midway',
-        critical: true,
+        isDeploymentTest: true,
         skipIf: onlyLegacyHttp,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
@@ -222,7 +222,7 @@ export const tasksCases: Case[] = [
     },
     {
         name: 'should abort the Apify run when tasks/cancel is sent (direct actor tool)',
-        critical: true,
+        isDeploymentTest: true,
         skipIf: onlyLegacyHttp,
         retry: 3,
         // Cancel must abort the underlying Apify run, not only the task status.
@@ -264,7 +264,7 @@ export const tasksCases: Case[] = [
     },
     {
         name: 'should support call-actor tool in task mode (internal tool with taskSupport)',
-        critical: true,
+        isDeploymentTest: true,
         skipIf: onlyLegacyHttp,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: ['actors'] })) as ClientV1;
@@ -313,7 +313,7 @@ export const tasksCases: Case[] = [
     },
     {
         name: 'should propagate statusMessage to tasks/get and tasks/list for internal tools in task mode',
-        critical: true,
+        isDeploymentTest: true,
         skipIf: onlyLegacyHttp,
         retry: 1,
         // Flaky on streamable HTTP if Actor finishes before PROGRESS_NOTIFICATION_INTERVAL_MS (#558).
@@ -342,7 +342,7 @@ export const tasksCases: Case[] = [
     },
     {
         name: 'should propagate statusMessage to tasks/get and tasks/list for actor tools in task mode',
-        critical: true,
+        isDeploymentTest: true,
         skipIf: onlyLegacyHttp,
         retry: 1,
         run: async (ctx) => {

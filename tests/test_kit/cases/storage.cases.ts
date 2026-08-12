@@ -73,7 +73,7 @@ function withNormalModeRun(
 export const storageCases: Case[] = [
     {
         name: 'rejects get-key-value-store-record when required keyValueStoreId is missing',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['storage'] }, async (client) => {
             await expect(
                 client.callTool({ name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET, arguments: { recordKey: 'INPUT' } }),
@@ -82,7 +82,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'calls normal-mode-test-actor, verifies canonical shape and dataset fields, and fetches via get-dataset-items',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors', 'storage'] }, async (client) => {
             const callResult = await client.callTool({
                 name: 'call-actor',
@@ -130,7 +130,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'calls apify/normal-mode-test-actor tool directly and retrieves sum via get-dataset-items',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['storage'], actors: [ACTOR_NORMAL_MODE] }, async (client) => {
             const result = await client.callTool({
                 name: actorNameToToolName(ACTOR_NORMAL_MODE),
@@ -182,7 +182,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'calls apify/normal-mode-test-actor tool directly and retrieves full dataset via get-dataset-items',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['storage'], actors: [ACTOR_NORMAL_MODE] }, async (client) => {
             const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
             const input = { firstNumber: 5, secondNumber: 7 };
@@ -220,7 +220,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'should return structured output for get-dataset-items matching outputSchema',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors', 'storage'] }, async (client) => {
             // First, run an actor to get a datasetId
             const callResult = await client.callTool({
@@ -264,7 +264,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'applies the default `limit` of 20 when omitted on get-dataset-items',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
             const result = await client.callTool({ name: HELPER_TOOLS.DATASET_GET_ITEMS, arguments: { datasetId } });
             expect(result.isError).not.toBe(true);
@@ -276,7 +276,7 @@ export const storageCases: Case[] = [
     },
     {
         name: "reads INPUT from the run's default KV store via get-actor-run + get-key-value-store-record",
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['runs', 'storage'] }, async (client, { runId }) => {
             const runResult = await client.callTool({ name: HELPER_TOOLS.ACTOR_RUNS_GET, arguments: { runId } });
             expect(runResult.isError).not.toBe(true);
@@ -301,7 +301,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'returns dataset metadata via get-dataset',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
             const result = await client.callTool({ name: HELPER_TOOLS.DATASET_GET, arguments: { datasetId } });
             expect(result.isError).not.toBe(true);
@@ -316,7 +316,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'infers schema from dataset items via get-dataset-schema',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
             const result = await client.callTool({ name: HELPER_TOOLS.DATASET_SCHEMA_GET, arguments: { datasetId } });
             expect(result.isError).not.toBe(true);
@@ -331,7 +331,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'returns key-value store metadata via get-key-value-store',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.KEY_VALUE_STORE_GET,
@@ -346,7 +346,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'lists keys in the run KV store via get-key-value-store-keys',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
@@ -367,7 +367,7 @@ export const storageCases: Case[] = [
     {
         // Skip recency assert — concurrent runs can push KV past top-10.
         name: 'lists unnamed key-value stores via get-key-value-store-list',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
@@ -386,7 +386,7 @@ export const storageCases: Case[] = [
     {
         // #880 canary: flatten=math must still surface nested math.factorial.first.
         name: 'flattens 3-level nested fields via get-dataset-items',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.DATASET_GET_ITEMS,
@@ -404,7 +404,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'reads dataset items via resources/read',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
             const result = await client.readResource({
                 uri: `https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`,
@@ -419,7 +419,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'reads a KV record via resources/read',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
             const result = await client.readResource({
                 uri: `https://api.apify.com/v2/key-value-stores/${defaultKvId}/records/INPUT`,
@@ -430,7 +430,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'rejects resources/read of a nonexistent dataset with a JSON-RPC error',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
             await expect(
                 client.readResource({ uri: 'https://api.apify.com/v2/datasets/this-dataset-does-not-exist-xyz/items' }),
@@ -439,7 +439,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'rejects resources/read of a non-Apify URL with a JSON-RPC error',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
             await expect(client.readResource({ uri: 'https://example.com/steal-my-token' })).rejects.toThrow(
                 /Failed to read/i,
@@ -448,7 +448,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'advertises API URL templates via resources/templates/list',
-        critical: false,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
             const { resourceTemplates } = await client.listResourceTemplates();
             const datasetItems = resourceTemplates.find((t) => t.name === 'dataset-items');

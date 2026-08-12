@@ -29,7 +29,7 @@ export const registrationCases: Case[] = [
     {
         // telemetry off so default tool set is deterministic across environments.
         name: 'should match spec default: actors,docs,apify/rag-web-browser when no params provided (telemetry off)',
-        critical: true,
+        isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: false } }, async (client) => {
             const tools = await client.listTools();
             const names = getToolNames(tools);
@@ -52,7 +52,7 @@ export const registrationCases: Case[] = [
     {
         // telemetry on — only difference is report-problem.
         name: 'should match spec default: actors,docs,apify/rag-web-browser when no params provided (telemetry on)',
-        critical: true,
+        isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: true } }, async (client) => {
             const tools = await client.listTools();
             const names = getToolNames(tools);
@@ -73,9 +73,9 @@ export const registrationCases: Case[] = [
         }),
     },
     {
-        // critical: default tool/Actor set.
+        // isDeploymentTest: default tool/Actor set.
         name: 'should list all default tools and Actors',
-        critical: true,
+        isDeploymentTest: true,
         run: withClient(undefined, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(servedDefaultTools().length + defaults.actors.length + 4);
@@ -89,7 +89,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'loads no tools for retired selectors',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: [...RETIRED_SELECTORS] }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).toHaveLength(0);
@@ -99,7 +99,7 @@ export const registrationCases: Case[] = [
         const actors = ['apify/python-example', 'apify/rag-web-browser'];
         return {
             name: 'should list two loaded Actors plus auto-injected storage and abort tools',
-            critical: false,
+            isDeploymentTest: false,
             run: withClient({ actors, serverMode: 'default' }, async (client) => {
                 const names = getToolNames(await client.listTools());
                 // Actor tools trigger auto-injected helpers (get-actor-run, storage, abort).
@@ -116,7 +116,7 @@ export const registrationCases: Case[] = [
         const actors = [ACTOR_NORMAL_MODE];
         return {
             name: 'should load only specified actors when actors param is provided (no other tools)',
-            critical: false,
+            isDeploymentTest: false,
             run: withClient({ actors, serverMode: 'default' }, async (client) => {
                 const names = getToolNames(await client.listTools());
 
@@ -138,7 +138,7 @@ export const registrationCases: Case[] = [
         const actors = [ACTOR_NORMAL_MODE];
         return {
             name: 'should return tool with execution field when listing tools with apify/normal-mode-test-actor',
-            critical: false,
+            isDeploymentTest: false,
             run: withClient({ tools: actors }, async (client) => {
                 const tools = await client.listTools();
 
@@ -153,7 +153,7 @@ export const registrationCases: Case[] = [
     })(),
     {
         name: 'should not load any tools when tools param is empty',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: [] }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).toHaveLength(0);
@@ -161,7 +161,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should not load any tools when actors param is empty',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ actors: [] }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(0);
@@ -169,7 +169,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should not load any tools when both tools and actors params are empty',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: [], actors: [] }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(0);
@@ -179,7 +179,7 @@ export const registrationCases: Case[] = [
         const actors = [ACTOR_NORMAL_MODE];
         return {
             name: 'should load only specified Actors via tools selectors when actors param omitted',
-            critical: false,
+            isDeploymentTest: false,
             run: withClient({ tools: actors, serverMode: 'default' }, async (client) => {
                 const names = getToolNames(await client.listTools());
                 // The Actor plus auto-injected storage/abort helpers.
@@ -191,7 +191,7 @@ export const registrationCases: Case[] = [
     })(),
     {
         name: 'should treat selectors with slashes as Actor names',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['docs', ACTOR_NORMAL_MODE] }, async (client) => {
             const names = getToolNames(await client.listTools());
 
@@ -208,7 +208,7 @@ export const registrationCases: Case[] = [
         const categories = ['docs'] as ToolCategory[];
         return {
             name: 'should merge actors param into tools selectors (backward compatibility)',
-            critical: false,
+            isDeploymentTest: false,
             run: withClient({ tools: categories, actors }, async (client) => {
                 const names = getToolNames(await client.listTools());
                 const docsToolNames = getExpectedToolNamesByCategories(categories);
@@ -225,7 +225,7 @@ export const registrationCases: Case[] = [
     {
         // category + specific tools must not widen to whole sibling category.
         name: 'should handle mixed categories and specific tools in tools param',
-        critical: true,
+        isDeploymentTest: true,
         run: withClient({ tools: ['docs', 'fetch-actor-details', 'call-actor'] }, async (client) => {
             const names = getToolNames(await client.listTools());
 
@@ -240,7 +240,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'loads docs while dropping retired selectors',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['docs', ...RETIRED_SELECTORS] }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).toEqual([HELPER_TOOLS.DOCS_SEARCH, HELPER_TOOLS.DOCS_FETCH]);
@@ -250,7 +250,7 @@ export const registrationCases: Case[] = [
         const categories = ['docs'] as ToolCategory[];
         return {
             name: 'should load only docs tools',
-            critical: false,
+            isDeploymentTest: false,
             run: withClient({ tools: categories, actors: [] }, async (client) => {
                 const names = getToolNames(await client.listTools());
                 const expected = getExpectedToolNamesByCategories(categories);
@@ -261,7 +261,7 @@ export const registrationCases: Case[] = [
     })(),
     {
         name: 'should load only a specific tool when tools includes a tool name',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['fetch-actor-details'], actors: [] }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).toEqual(['fetch-actor-details']);
@@ -269,7 +269,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should not load any tools when tools param is empty and actors omitted',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: [] }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(0);
@@ -277,7 +277,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should not load any internal tools when tools param is empty and use custom Actor if specified',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: [], actors: [ACTOR_NORMAL_MODE] }, async (client) => {
             const names = getToolNames(await client.listTools());
             // Actor tool triggers auto-injected helpers (get-actor-run, storage, abort).
@@ -292,7 +292,7 @@ export const registrationCases: Case[] = [
         .map(
             (category): Case => ({
                 name: `should load correct tools for ${category} category`,
-                critical: false,
+                isDeploymentTest: false,
                 run: withClient({ tools: [category as ToolCategory] }, async (client) => {
                     const loadedTools = await client.listTools();
                     const toolNames = getToolNames(loadedTools);
@@ -309,7 +309,7 @@ export const registrationCases: Case[] = [
         const categories = ['docs', 'runs', 'storage'] as ToolCategory[];
         return {
             name: 'should handle multiple tool category keys input correctly',
-            critical: false,
+            isDeploymentTest: false,
             run: withClient({ tools: categories }, async (client) => {
                 const loadedTools = await client.listTools();
                 const toolNames = getToolNames(loadedTools);
@@ -324,7 +324,7 @@ export const registrationCases: Case[] = [
     {
         // Environment variable tests - only applicable to stdio transport
         name: 'should load actors from ACTORS environment variable',
-        critical: false,
+        isDeploymentTest: false,
         skipIf: onlyStdio,
         run: async (ctx) => {
             const actors = ['apify/python-example', 'apify/rag-web-browser'];
@@ -342,7 +342,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should load tool categories from TOOLS environment variable',
-        critical: false,
+        isDeploymentTest: false,
         skipIf: onlyStdio,
         run: async (ctx) => {
             // TOOLS=docs via stdio; docs avoids auto-inject noise.
@@ -360,7 +360,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should auto-inject storage and abort tools after call-actor in expected order',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const tools = await client.listTools();
             const names = tools.tools.map((t) => t.name);
@@ -380,7 +380,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should not auto-inject storage and abort tools when no actor-touching tools are present',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const names = getToolNames(await client.listTools());
             for (const name of AUTO_INJECTED_TOOL_NAMES) expect(names).not.toContain(name);
@@ -390,7 +390,7 @@ export const registrationCases: Case[] = [
     {
         // Environment variable precedence test
         name: 'should use TELEMETRY_ENABLED env var when CLI arg is not provided',
-        critical: false,
+        isDeploymentTest: false,
         skipIf: onlyStdio,
         run: async (ctx) => {
             // When useEnv=true, telemetry.enabled option translates to env.TELEMETRY_ENABLED in child process
@@ -407,7 +407,7 @@ export const registrationCases: Case[] = [
     {
         // Deprecated `openai` alias silently normalizes to apps.
         name: 'should use UI_MODE env var (deprecated "openai" alias) when CLI arg is not provided',
-        critical: false,
+        isDeploymentTest: false,
         skipIf: onlyStdio,
         run: async (ctx) => {
             const client = await ctx.createClientFn({ useEnv: true, serverMode: 'openai' });
@@ -430,7 +430,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should enable apps mode when serverMode is apps',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ serverMode: 'apps' }, async (client) => {
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
@@ -446,7 +446,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should treat serverMode=true the same as serverMode=apps',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ serverMode: 'true' }, async (client) => {
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
@@ -460,7 +460,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should automatically include get-actor-run for default settings when call-actor is enabled',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ serverMode: 'apps' }, async (client) => {
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
@@ -472,7 +472,7 @@ export const registrationCases: Case[] = [
     },
     {
         name: 'should not include get-actor-run when only docs tools are selected',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ serverMode: 'apps', tools: ['docs'] }, async (client) => {
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);

@@ -4,7 +4,7 @@ import type { Case, CaseCtx, Fixture } from './types.js';
 
 /**
  * Register cases under `describe(suiteName)`.
- * - `criticalOnly`: non-critical → `it.skip`
+ * - `isDeploymentTestOnly`: non-deployment-test → `it.skip`
  * - `skipIf`: also → `it.skip`
  * - `getFixture`: memoized once per call by `fixture.key`
  */
@@ -25,7 +25,7 @@ export function registerCases(suiteName: string, cases: Case[], ctx: Omit<CaseCt
         };
 
         for (const c of cases) {
-            const skip = (ctx.criticalOnly && !c.critical) || (c.skipIf?.(fullCtx) ?? false);
+            const skip = (ctx.isDeploymentTestOnly && !c.isDeploymentTest) || (c.skipIf?.(fullCtx) ?? false);
             const runIt = skip ? it.skip : it;
             const runFn = async () => c.run(fullCtx);
             if (c.retry !== undefined) {

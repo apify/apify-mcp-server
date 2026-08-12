@@ -19,8 +19,8 @@ export interface CaseCtx {
     transport: Transport;
     /** False on 2026-07-28 (no tasks capability). */
     hasTasksSupport: boolean;
-    /** Register only `critical: true` cases. */
-    criticalOnly?: boolean;
+    /** Register only `isDeploymentTest: true` cases. */
+    isDeploymentTestOnly?: boolean;
     /** Memoized fixture setup — once per `registerCases` call, keyed by `fixture.key`. */
     getFixture: <T>(fixture: Fixture<T>) => Promise<T>;
 }
@@ -32,11 +32,11 @@ export interface Fixture<T> {
     setup: (ctx: CaseCtx) => Promise<T>;
 }
 
-/** One integration case. `critical: true` runs in apify-mcp-server-internal too. */
+/** One integration case. `isDeploymentTest: true` runs in apify-mcp-server-internal too. */
 export interface Case {
     name: string;
     /** Deploy-health case for internal's live staging/prod. */
-    critical: boolean;
+    isDeploymentTest: boolean;
     /** Register as `it.skip` when true. */
     skipIf?: (ctx: CaseCtx) => boolean;
     /** Forwarded to vitest `it(name, { retry }, ...)`. */

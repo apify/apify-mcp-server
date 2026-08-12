@@ -9,7 +9,7 @@ import type { Case } from '../types.js';
 export const appsCases: Case[] = [
     {
         name: 'should render widget payload via fetch-actor-details-widget in apps mode',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'], serverMode: 'apps' }, async (client) => {
             // fetch-actor-details-widget is only available in apps mode
             const result = await client.callTool({
@@ -36,7 +36,7 @@ export const appsCases: Case[] = [
     },
     {
         name: 'auto mode: client advertising UI capability receives apps-mode tools with widget metadata',
-        critical: false,
+        isDeploymentTest: false,
         skipIf: () => !SERVER_MODE_AUTO_DETECTION_ENABLED,
         // serverMode omitted → server defaults to 'auto'; client sends UI capability → server resolves to 'apps'
         run: withClient(
@@ -54,7 +54,7 @@ export const appsCases: Case[] = [
     {
         // serverMode omitted → server defaults to 'auto'; client sends no UI capability → server resolves to 'default'
         name: 'auto mode: client without UI capability receives default-mode tools without widget metadata',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
@@ -74,7 +74,7 @@ export const appsCases: Case[] = [
     },
     {
         name: 'should return required structuredContent fields for ActorSearch widget (search-actors-widget)',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'], serverMode: 'apps' }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.STORE_SEARCH_WIDGET,
@@ -103,7 +103,7 @@ export const appsCases: Case[] = [
     },
     {
         name: 'should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details-widget)',
-        critical: false,
+        isDeploymentTest: false,
         run: withClient({ tools: ['actors'], serverMode: 'apps' }, async (client) => {
             const result = await client.callTool({
                 name: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
