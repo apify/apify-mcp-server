@@ -68,6 +68,20 @@ describe('adaptSdkConversation()', () => {
         expect(metrics.resultBytes).toBe(Buffer.byteLength(JSON.stringify([{ text: 'ok' }]), 'utf8'));
     });
 
+    it('times each invocation from when its call and result were streamed', () => {
+        // One per message in toolCallStream: init, assistant, tool result, result.
+        const { toolInvocations } = adaptSdkConversation('find a maps scraper', toolCallStream, [10, 20, 50, 60]);
+
+        expect(toolInvocations[0]).toMatchObject({ startedAt: 20, endedAt: 50 });
+    });
+
+    it('leaves invocations untimed when the caller did not time the stream', () => {
+        const { toolInvocations } = adaptSdkConversation('find a maps scraper', toolCallStream);
+
+        expect(toolInvocations[0].startedAt).toBeUndefined();
+        expect(toolInvocations[0].endedAt).toBeUndefined();
+    });
+
     it('marks an errored tool result as failed and keeps the payload as the error', () => {
         const { toolInvocations } = adaptSdkConversation('find a maps scraper', [
             assistantMessage([{ type: 'tool_use', id: 'tool-1', name: 'mcp__apify__search-actors', input: {} }]),
