@@ -195,7 +195,6 @@ export const toolsCases: Case[] = [
     {
         name: 'should serve call-actor when a dynamic-tools client selects the actors category',
         isDeploymentTest: false,
-        skipIf: onlyLegacyHttp,
         run: withClient({ clientName: 'Visual Studio Code', tools: ['actors'] }, async (client) => {
             const names = getToolNames(await client.listTools());
             // call-actor is served for a dynamic-tools-capable client
@@ -205,7 +204,6 @@ export const toolsCases: Case[] = [
     {
         name: 'should serve call-actor for a dynamic-tools client with the default tool set',
         isDeploymentTest: false,
-        skipIf: onlyLegacyHttp,
         run: withClient({ clientName: 'Visual Studio Code' }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).toContain('call-actor');
@@ -214,7 +212,6 @@ export const toolsCases: Case[] = [
     {
         name: 'should serve call-actor for a dynamic-tools client that selects call-actor explicitly',
         isDeploymentTest: false,
-        skipIf: onlyLegacyHttp,
         run: withClient({ clientName: 'Visual Studio Code', tools: ['call-actor'] }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).toContain('call-actor');
