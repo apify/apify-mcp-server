@@ -45,6 +45,7 @@ describe('findMissingEnvVars', () => {
     afterEach(() => {
         delete process.env.PHOENIX_API_KEY;
         delete process.env.OPENROUTER_API_KEY;
+        delete process.env.LANGFUSE_SECRET_KEY;
     });
 
     it('reports unset and empty vars', () => {
