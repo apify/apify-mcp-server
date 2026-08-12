@@ -7,7 +7,6 @@ import { toIsoString } from '../actors/actor_run_response.js';
 const PUBLIC_CONFIG_FIELDS = [
     'seoTitle',
     'seoDescription',
-    'categorization',
     'inputSchemaFields',
     'datasetName',
     'datasetView',
@@ -32,7 +31,6 @@ export const taskNameSchema = z
 export const publicConfigSchema = z.object({
     seoTitle: z.string().optional().describe('Title shown on the public landing page and in search results.'),
     seoDescription: z.string().optional().describe('Description shown on the public landing page.'),
-    categorization: z.string().optional().describe("Use-case category ID; must be one of the Actor's categories."),
     inputSchemaFields: z
         .array(z.string())
         .optional()

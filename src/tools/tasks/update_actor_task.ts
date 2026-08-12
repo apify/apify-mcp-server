@@ -63,15 +63,23 @@ USAGE EXAMPLES:
         const { taskId, name, title, description, input, build, timeoutSecs, memoryMbytes, publicConfig } =
             updateActorTaskArgs.parse(args);
 
-        const options = { build, timeoutSecs, memoryMbytes };
-        const hasOptions = Object.values(options).some((value) => value !== undefined);
+        const optionsUpdate = {
+            ...(build !== undefined && { build }),
+            ...(timeoutSecs !== undefined && { timeoutSecs }),
+            ...(memoryMbytes !== undefined && { memoryMbytes }),
+        };
+        const hasOptions = Object.keys(optionsUpdate).length > 0;
+
+        // The API completely replaces `options` (unlike `publicConfig`, which it merges), so merge
+        // with the stored value to keep the run options that are not part of this update.
+        const storedOptions = hasOptions ? (await client.task(taskId).get())?.options : undefined;
 
         const update: TaskUpdateData = {
             ...(name && { name }),
             ...(title && { title }),
-            ...(description && { description }),
+            ...(description !== undefined && { description }),
             ...(input && { input }),
-            ...(hasOptions && { options }),
+            ...(hasOptions && { options: { ...storedOptions, ...optionsUpdate } }),
             ...(publicConfig && { publicConfig }),
         };
 

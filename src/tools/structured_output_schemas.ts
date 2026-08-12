@@ -375,7 +375,6 @@ export const actorTaskOutputSchema = {
             properties: {
                 seoTitle: { type: ['string', 'null'] },
                 seoDescription: { type: ['string', 'null'] },
-                categorization: { type: ['string', 'null'] },
                 inputSchemaFields: { type: ['array', 'null'], items: { type: 'string' } },
                 datasetName: { type: ['string', 'null'] },
                 datasetView: { type: ['string', 'null'] },

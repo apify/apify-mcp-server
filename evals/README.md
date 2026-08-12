@@ -45,12 +45,12 @@ export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
 
 pnpm install --frozen-lockfile
 pnpm run evals:create-dataset  # one-time: creates dataset from test_cases.json
-pnpm run evals:run              # runs evaluation on default dataset (v1.10)
+pnpm run evals:run              # runs evaluation on default dataset (v1.11)
 ```
 
 ### Using a specific dataset version
 
-By default, the evaluation uses the dataset version from `test_cases.json` (`v1.10`). To use a different dataset:
+By default, the evaluation uses the dataset version from `test_cases.json` (`v1.11`). To use a different dataset:
 
 ```bash
 # Create a new dataset with custom name
@@ -62,7 +62,10 @@ pnpm run evals:run -- --dataset-name mcp_server_dataset_v1.3
 
 ## Test cases
 
-**Current version: v1.10**
+**Current version: v1.11**
+
+**Changes in v1.11:**
+- Added publish recovery cases for resolved permission failures and incomplete public configuration
 
 **Changes in v1.10:**
 - Added Actor task cases: `get-actor-task`, `create-actor-task`, `update-actor-task`, `publish-actor-task`, `unpublish-actor-task`

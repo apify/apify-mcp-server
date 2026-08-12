@@ -37,7 +37,7 @@ USAGE EXAMPLES:
         title: 'Unpublish Actor task',
         readOnlyHint: false,
         destructiveHint: false,
-        idempotentHint: false,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {

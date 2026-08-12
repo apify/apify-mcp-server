@@ -173,6 +173,31 @@ describe('update-actor-task', () => {
             stubToolCallContext({ taskId: 'task-1', title: 'Renamed' }, apifyClient),
         );
 
-        expect(calls[0].payload).toEqual({ title: 'Renamed' });
+        expect(calls).toEqual([{ fn: 'update', payload: { title: 'Renamed' } }]);
+    });
+
+    it('passes an empty description to clear it', async () => {
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
+        await (updateActorTask as HelperTool).call(
+            stubToolCallContext({ taskId: 'task-1', description: '' }, apifyClient),
+        );
+
+        expect(calls).toEqual([{ fn: 'update', payload: { description: '' } }]);
+    });
+
+    it('merges run options into the stored ones so the fields not being updated survive', async () => {
+        // The API replaces `options` wholesale, so the tool must read the task first and send the
+        // merged object — otherwise updating just `build` would wipe timeoutSecs/memoryMbytes.
+        const { apifyClient, calls } = mockTaskApiClient(
+            mockTask({ options: { build: 'latest', timeoutSecs: 300, memoryMbytes: 1024 } }),
+        );
+        await (updateActorTask as HelperTool).call(
+            stubToolCallContext({ taskId: 'task-1', build: 'beta' }, apifyClient),
+        );
+
+        expect(calls).toEqual([
+            { fn: 'get' },
+            { fn: 'update', payload: { options: { build: 'beta', timeoutSecs: 300, memoryMbytes: 1024 } } },
+        ]);
     });
 });

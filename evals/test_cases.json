@@ -1,679 +1,907 @@
 {
-  "version": "1.10",
+  "version": "1.11",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
       "category": "fetch-actor-details",
       "query": "What are the details of apify/instagram-scraper?",
-      "expectedTools": ["fetch-actor-details"]
+      "expectedTools": [
+        "fetch-actor-details"
+      ]
     },
     {
       "id": "fetch-actor-details-2",
       "category": "fetch-actor-details",
       "query": "Give me the documentation for apify/rag-web-browser",
-      "expectedTools": ["fetch-actor-details"]
+      "expectedTools": [
+        "fetch-actor-details"
+      ]
     },
     {
       "id": "fetch-actor-details-3",
       "category": "fetch-actor-details",
       "query": "Scrape details of apify/google-search-scraper",
-      "expectedTools": ["fetch-actor-details"],
+      "expectedTools": [
+        "fetch-actor-details"
+      ],
       "reference": "It should call the fetch-actor-details with the actor ID 'apify/google-search-scraper' and return the actor's documentation."
     },
     {
       "id": "fetch-actor-details-4",
       "category": "fetch-actor-details",
       "query": "What can apify/instagram-scraper do?",
-      "expectedTools": ["fetch-actor-details"]
+      "expectedTools": [
+        "fetch-actor-details"
+      ]
     },
     {
       "id": "fetch-actor-details-5",
       "category": "fetch-actor-details",
       "query": "How does apify/rag-web-browser work?",
-      "expectedTools": ["fetch-actor-details"]
+      "expectedTools": [
+        "fetch-actor-details"
+      ]
     },
     {
       "id": "fetch-actor-details-6",
       "category": "fetch-actor-details",
       "query": "How much does apify/instagram-scraper cost?",
-      "expectedTools": ["fetch-actor-details"]
+      "expectedTools": [
+        "fetch-actor-details"
+      ]
     },
     {
       "id": "fetch-actor-details-7",
       "category": "fetch-actor-details",
       "query": "What parameters does apify/instagram-scraper accept?",
-      "expectedTools": ["fetch-actor-details"],
+      "expectedTools": [
+        "fetch-actor-details"
+      ],
       "reference": "It should call fetch-actor-details for apify/instagram-scraper to get its input parameters schema."
     },
     {
       "id": "fetch-actor-details-8",
       "category": "fetch-actor-details",
       "query": "Tell me about apify/social-media-hashtag-research features",
-      "expectedTools": ["fetch-actor-details"]
+      "expectedTools": [
+        "fetch-actor-details"
+      ]
     },
     {
       "id": "fetch-actor-details-9",
       "category": "fetch-actor-details",
       "query": "What's the pricing model for apify/rag-web-browser?",
-      "expectedTools": ["fetch-actor-details"]
+      "expectedTools": [
+        "fetch-actor-details"
+      ]
     },
     {
       "id": "fetch-actor-details-10",
       "category": "fetch-actor-details",
       "query": "Show me the input schema for apify/rag-web-browser",
-      "expectedTools": ["fetch-actor-details"]
+      "expectedTools": [
+        "fetch-actor-details"
+      ]
     },
     {
       "id": "search-actors-1",
       "category": "search-actors",
       "query": "What Actors can scrape Instagram posts?",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It should call 'search-actors' tool with the query: 'Instagram posts' or similar. Query explicitly asks about Actors."
     },
     {
       "id": "search-actors-2",
       "category": "search-actors",
       "query": "What are the best Instagram scrapers?",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: `Instagram`, 'Instagram scraper', or similar."
     },
     {
       "id": "search-actors-3",
       "category": "search-actors",
       "query": "Find actors for scraping social media",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'social media' or 'instagram' or 'facebook' or 'twitter' or similar."
     },
     {
       "id": "search-actors-4",
       "category": "search-actors",
       "query": "Show me Twitter scraping tools",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'Twitter scraper' or similar."
     },
     {
       "id": "search-actors-5",
       "category": "search-actors",
       "query": "What actors can scrape TikTok content?",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'TikTok' or 'TikTok scraper' or 'TikTok content' or similar."
     },
     {
       "id": "search-actors-6",
       "category": "search-actors",
       "query": "Find an Actor to get Facebook data",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'Facebook' or similar."
     },
     {
       "id": "search-actors-7",
       "category": "search-actors",
       "query": "Find actors that can scrape news articles",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'news articles' or similar. It must not use extended queries such as 'news articles scrape' or any more detailed variations."
     },
     {
       "id": "search-actors-8",
       "category": "search-actors",
       "query": "What tools can extract data from e-commerce sites?",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'e-commerce' or similar. It must not use extended queries such as 'e-commerce extract' or 'e-commerce tools' or any more detailed variations."
     },
     {
       "id": "search-actors-9",
       "category": "search-actors",
       "query": "Show me Amazon product scrapers",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'Amazon products' or similar. It must not use extended queries such as 'Amazon product scrapers' or any more detailed variations."
     },
     {
       "id": "search-actors-10",
       "category": "search-actors",
       "query": "Search for Playwright browser MCP server",
-      "expectedTools": ["search-actors"]
+      "expectedTools": [
+        "search-actors"
+      ]
     },
     {
       "id": "search-actors-11",
       "category": "search-actors",
       "query": "I need to find solution to scrape details of Amazon products",
-      "expectedTools": ["search-actors"]
+      "expectedTools": [
+        "search-actors"
+      ]
     },
     {
       "id": "search-actors-12",
       "category": "search-actors",
       "query": "Find an Actor to fetch posts from Twitter about AI",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'Twitter posts' or similar."
     },
     {
       "id": "search-actors-13",
       "category": "search-actors",
       "query": "Find an Actor to get flight information from Skyscanner",
-      "expectedTools": ["search-actors"]
+      "expectedTools": [
+        "search-actors"
+      ]
     },
     {
       "id": "search-actors-14",
       "category": "search-actors",
       "query": "Can you find actors to scrape weather data?",
-      "expectedTools": ["search-actors"]
+      "expectedTools": [
+        "search-actors"
+      ]
     },
     {
       "id": "search-actors-15",
       "category": "search-actors",
       "query": "Find actors for data extraction tasks",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "While query is general, it explicitly asks about 'actors', so search-actors is appropriate."
     },
     {
       "id": "rag-web-browser-1",
       "category": "apify--rag-web-browser",
       "query": "Get recent articles about AI from tech blogs",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "rag-web-browser-2",
       "category": "apify--rag-web-browser",
       "query": "Fetch recent articles about climate change",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "rag-web-browser-3",
       "category": "apify--rag-web-browser",
       "query": "Get the latest weather forecast for San Francisco",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "rag-web-browser-4",
       "category": "apify--rag-web-browser",
       "query": "Get data from example.com",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "rag-web-browser-5",
       "category": "apify--rag-web-browser",
       "query": "Get the latest tech industry news",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "search-vs-rag-1",
       "category": "search-actors",
       "query": "Find posts about the Rock on Instagram",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'Instagram' or 'Instagram posts' or similar. It must not use extended queries such as 'Instagram posts the Rock' or any more detailed variations."
     },
     {
       "id": "search-vs-rag-2",
       "category": "search-actors",
       "query": "Scrape Instagram posts about AI",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar. It must not use extended queries such as 'Instagram posts scraper about AI' or any more detailed variations."
     },
     {
       "id": "search-vs-rag-3",
       "category": "apify--rag-web-browser",
       "query": "Get recent AI articles on tech blogs",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "search-vs-rag-4",
       "category": "apify--rag-web-browser",
       "query": "Get current articles about AI from Wired and The Verge",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "search-vs-rag-5",
       "category": "apify--rag-web-browser",
       "query": "Get the latest weather forecast for New York",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "search-vs-rag-6",
       "category": "search-actors",
       "query": "Search for weather data scraping tools",
-      "expectedTools": ["search-actors"]
+      "expectedTools": [
+        "search-actors"
+      ]
     },
     {
       "id": "search-vs-rag-7a",
       "category": "apify--rag-web-browser",
       "query": "Get flight prices from New York to London for tomorrow",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "search-vs-rag-7b",
       "category": "search-actors",
       "query": "Find an Actor that scrapes flight data from booking sites",
-      "expectedTools": ["search-actors"]
+      "expectedTools": [
+        "search-actors"
+      ]
     },
     {
       "id": "search-vs-rag-8",
       "category": "search-actors",
       "query": "Find actors for flight data extraction",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'flight data' or 'flight booking' or similar. Must not use 'extractor' or 'extraction"
     },
     {
       "id": "search-vs-rag-9",
       "category": "apify--rag-web-browser",
       "query": "Fetch current news articles on AI",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "search-vs-rag-10",
       "category": "apify--rag-web-browser",
       "query": "Fetch AI-related news from CNN and BBC",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "search-apify-docs-1",
       "category": "search-apify-docs",
       "query": "How to build an Apify Actor",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "search-apify-docs-2",
       "category": "search-apify-docs",
       "query": "Ho to define Actor input schema, provide examples",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "search-apify-docs-3",
       "category": "search-apify-docs",
       "query": "How to use Playwright library with Apify",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "search-apify-docs-4",
       "category": "search-apify-docs",
       "query": "Is there documentation for the Apify MCP server?",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "search-apify-docs-5",
       "category": "search-apify-docs",
       "query": "How to use Apify Proxy",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "search-apify-docs-6",
       "category": "search-apify-docs",
       "query": "How to do web scraping with Crawlee in the Apify docs",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "search-apify-docs-7",
       "category": "search-apify-docs",
       "query": "Apify API integration guide",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "search-apify-docs-8",
       "category": "search-apify-docs",
       "query": "Error handling in Actors",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "call-actor-1",
       "category": "call-actor",
       "query": "Run apify/instagram-scraper to scrape #dwaynejohnson",
-      "expectedTools": ["call-actor"]
+      "expectedTools": [
+        "call-actor"
+      ]
     },
     {
       "id": "call-actor-2",
       "category": "call-actor",
       "query": "Run apidojo/tweet-scraper to scrape twitter profiles",
-      "expectedTools": ["call-actor"]
+      "expectedTools": [
+        "call-actor"
+      ]
     },
     {
       "id": "call-actor-3",
       "category": "call-actor",
       "query": "Call apify/google-search-scraper to find restaurants in London",
-      "expectedTools": ["call-actor"]
+      "expectedTools": [
+        "call-actor"
+      ]
     },
     {
       "id": "call-actor-4",
       "category": "call-actor",
       "query": "Run apify/social-media-hashtag-research for #AI",
-      "expectedTools": ["call-actor"]
+      "expectedTools": [
+        "call-actor"
+      ]
     },
     {
       "id": "call-actor-5",
       "category": "call-actor",
       "query": "Scrape iPhone15 at Amazon using apify/e-commerce-scraping-tool",
-      "expectedTools": ["call-actor"]
+      "expectedTools": [
+        "call-actor"
+      ]
     },
     {
       "id": "call-actor-6",
       "category": "call-actor",
       "query": "Call epctex/weather-scraper for New York",
-      "expectedTools": ["call-actor"]
+      "expectedTools": [
+        "call-actor"
+      ]
     },
     {
       "id": "get-dataset-items-1",
       "category": "get-dataset-items",
       "query": "Get output from my latest actor with datasetId des32s",
-      "expectedTools": ["get-dataset-items"]
+      "expectedTools": [
+        "get-dataset-items"
+      ]
     },
     {
       "id": "get-dataset-items-2",
       "category": "get-dataset-items",
       "query": "Retrieve results from dataset abc123",
-      "expectedTools": ["get-dataset-items"]
+      "expectedTools": [
+        "get-dataset-items"
+      ]
     },
     {
       "id": "get-dataset-items-3",
       "category": "get-dataset-items",
       "query": "Show me the data from my Instagram scraper run with datasetId d23d2",
-      "expectedTools": ["get-dataset-items"]
+      "expectedTools": [
+        "get-dataset-items"
+      ]
     },
     {
       "id": "get-dataset-items-4",
       "category": "get-dataset-items",
       "query": "Get the first 50 items from my datasetId abc123",
-      "expectedTools": ["get-dataset-items"]
+      "expectedTools": [
+        "get-dataset-items"
+      ]
     },
     {
       "id": "get-dataset-items-5",
       "category": "get-dataset-items",
       "query": "Retrieve all results from my web scraper with datasetID abc123",
-      "expectedTools": ["get-dataset-items"]
+      "expectedTools": [
+        "get-dataset-items"
+      ]
     },
     {
       "id": "get-dataset-items-6",
       "category": "get-dataset-items",
       "query": "Retrieve only the title and url fields from dataset UvsU",
-      "expectedTools": ["get-dataset-items"],
+      "expectedTools": [
+        "get-dataset-items"
+      ],
       "reference": "Field selection on dataset rows is handled by get-dataset-items."
     },
     {
       "id": "fetch-apify-docs-1",
       "category": "fetch-apify-docs",
       "query": "Get configuration info from: https://docs.apify.com/platform/integrations/mcp",
-      "expectedTools": ["fetch-apify-docs"]
+      "expectedTools": [
+        "fetch-apify-docs"
+      ]
     },
     {
       "id": "get-dataset-items-basic-2",
       "category": "get-dataset-items",
       "query": "Get query and markdown fields from dataset UvsU",
-      "expectedTools": ["get-dataset-items"]
+      "expectedTools": [
+        "get-dataset-items"
+      ]
     },
     {
       "id": "fetch-apify-docs-edge-1",
       "category": "fetch-apify-docs",
       "query": "Get content from: https://docs.apify.com/nonexistent-page",
-      "expectedTools": ["fetch-apify-docs"]
+      "expectedTools": [
+        "fetch-apify-docs"
+      ]
     },
     {
       "id": "misleading-query-1",
       "category": "apify--rag-web-browser",
       "query": "What's the weather like today in San Francisco?",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "misleading-query-3",
       "category": "search-apify-docs",
       "query": "How do I build my own Apify Actor from scratch?",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "ambiguous-query-1",
       "category": "search-actors",
       "query": "Find an Actor to get instagram posts",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar."
     },
     {
       "id": "ambiguous-query-3",
       "category": "ambiguous",
       "query": "Show me Apify Actor documentation",
-      "expectedTools": ["search-apify-docs"]
+      "expectedTools": [
+        "search-apify-docs"
+      ]
     },
     {
       "id": "tool-selection-confusion-1",
       "category": "search-actors",
       "query": "Find posts about AI on Instagram",
-      "expectedTools": ["search-actors"]
+      "expectedTools": [
+        "search-actors"
+      ]
     },
     {
       "id": "tool-selection-confusion-2",
       "category": "tool-selection",
       "query": "Get recent AI articles on tech blogs",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "tool-selection-confusion-3",
       "category": "tool-selection",
       "query": "Get the latest weather forecast for New York",
-      "expectedTools": ["apify--rag-web-browser"]
+      "expectedTools": [
+        "apify--rag-web-browser"
+      ]
     },
     {
       "id": "search-actors-input-args-1",
       "category": "search-actors",
       "query": "Use Apify to scrape StackOverflow for the top 10 most upvoted quicksort implementations in Python",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'StackOverflow', 'Stack overflow', 'StackOverflow questions answers' or similar. It must not use extended queries such as 'StackOverflow scraper Python' or any more detailed variations."
     },
     {
       "id": "search-actors-input-args-2",
       "category": "search-actors",
       "query": "I need to find Actor for instagram profile scraping",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'instagram profile' or 'instagram profiles'. It must not use extended queries such as 'instagram profile scraper' or any more detailed variations."
     },
     {
       "id": "search-actors-input-args-3",
       "category": "search-actors",
       "query": "I'm new to Apify, I can't really code, I need data from my project, I need tiktok comments. I'm also price sensitive",
-      "expectedTools": ["search-actors"],
+      "expectedTools": [
+        "search-actors"
+      ],
       "reference": "It must call the 'search-actors' tool with the query: 'tiktok comments' or their combination. It must not use queries with extra words such as 'tiktok comments cheap' or any more detailed variations."
     },
     {
       "id": "get-dataset-1",
       "category": "get-dataset",
       "query": "How many items are in dataset abc123?",
-      "expectedTools": ["get-dataset"],
+      "expectedTools": [
+        "get-dataset"
+      ],
       "reference": "Item count is dataset metadata. Use get-dataset, not get-dataset-items."
     },
     {
       "id": "get-dataset-2",
       "category": "get-dataset",
       "query": "Show me the metadata and stats for dataset des32s",
-      "expectedTools": ["get-dataset"],
+      "expectedTools": [
+        "get-dataset"
+      ],
       "reference": "User wants dataset details/metadata, not the items. Use get-dataset."
     },
     {
       "id": "get-dataset-3",
       "category": "get-dataset",
       "query": "What fields does dataset UvsU contain?",
-      "expectedTools": ["get-dataset"],
+      "expectedTools": [
+        "get-dataset"
+      ],
       "reference": "Listing the fields of a dataset is metadata. Use get-dataset."
     },
     {
       "id": "get-dataset-schema-1",
       "category": "get-dataset-schema",
       "query": "What is the schema of dataset abc123?",
-      "expectedTools": ["get-dataset-schema"],
+      "expectedTools": [
+        "get-dataset-schema"
+      ],
       "reference": "User asks for the schema. Use get-dataset-schema, not get-dataset or get-dataset-items."
     },
     {
       "id": "get-dataset-schema-2",
       "category": "get-dataset-schema",
       "query": "Generate a JSON schema for dataset des32s using 10 items",
-      "expectedTools": ["get-dataset-schema"],
+      "expectedTools": [
+        "get-dataset-schema"
+      ],
       "reference": "Inferring a JSON schema from a sample is get-dataset-schema."
     },
     {
       "id": "get-dataset-schema-3",
       "category": "get-dataset-schema",
       "query": "Infer the structure of the items in dataset UvsU",
-      "expectedTools": ["get-dataset-schema"],
+      "expectedTools": [
+        "get-dataset-schema"
+      ],
       "reference": "Describing the data structure/shape maps to get-dataset-schema."
     },
     {
       "id": "get-dataset-list-1",
       "category": "get-dataset-list",
       "query": "List all my datasets",
-      "expectedTools": ["get-dataset-list"],
+      "expectedTools": [
+        "get-dataset-list"
+      ],
       "reference": "Listing the user's datasets is get-dataset-list, not a specific dataset's contents."
     },
     {
       "id": "get-dataset-list-2",
       "category": "get-dataset-list",
       "query": "What datasets do I have in my account?",
-      "expectedTools": ["get-dataset-list"],
+      "expectedTools": [
+        "get-dataset-list"
+      ],
       "reference": "Browsing the user's own datasets. Use get-dataset-list."
     },
     {
       "id": "get-dataset-list-3",
       "category": "get-dataset-list",
       "query": "Show me my last 10 datasets, newest first",
-      "expectedTools": ["get-dataset-list"],
+      "expectedTools": [
+        "get-dataset-list"
+      ],
       "reference": "Paginated listing of the user's datasets. Use get-dataset-list."
     },
     {
       "id": "get-key-value-store-record-1",
       "category": "get-key-value-store-record",
       "query": "Get record INPUT from key-value store abc123",
-      "expectedTools": ["get-key-value-store-record"],
+      "expectedTools": [
+        "get-key-value-store-record"
+      ],
       "reference": "Reading a value by key is get-key-value-store-record, not get-key-value-store (metadata) or get-key-value-store-keys."
     },
     {
       "id": "get-key-value-store-record-2",
       "category": "get-key-value-store-record",
       "query": "Read the value under key OUTPUT in key-value store des32s",
-      "expectedTools": ["get-key-value-store-record"],
+      "expectedTools": [
+        "get-key-value-store-record"
+      ],
       "reference": "Fetching a specific record by key. Use get-key-value-store-record."
     },
     {
       "id": "get-key-value-store-record-3",
       "category": "get-key-value-store-record",
       "query": "Fetch the contents of key data.json from store UvsU",
-      "expectedTools": ["get-key-value-store-record"],
+      "expectedTools": [
+        "get-key-value-store-record"
+      ],
       "reference": "Retrieving the stored value for a key. Use get-key-value-store-record."
     },
     {
       "id": "get-key-value-store-keys-1",
       "category": "get-key-value-store-keys",
       "query": "List the keys in key-value store abc123",
-      "expectedTools": ["get-key-value-store-keys"],
+      "expectedTools": [
+        "get-key-value-store-keys"
+      ],
       "reference": "Discovering which keys exist in a store is get-key-value-store-keys, not get-key-value-store-record."
     },
     {
       "id": "get-key-value-store-keys-2",
       "category": "get-key-value-store-keys",
       "query": "What keys are stored in my key-value store des32s?",
-      "expectedTools": ["get-key-value-store-keys"],
+      "expectedTools": [
+        "get-key-value-store-keys"
+      ],
       "reference": "Listing the keys within one store. Use get-key-value-store-keys."
     },
     {
       "id": "get-key-value-store-1",
       "category": "get-key-value-store",
       "query": "Show me the metadata for key-value store abc123",
-      "expectedTools": ["get-key-value-store"],
+      "expectedTools": [
+        "get-key-value-store"
+      ],
       "reference": "Store details/metadata maps to get-key-value-store, not its keys or records."
     },
     {
       "id": "get-key-value-store-2",
       "category": "get-key-value-store",
       "query": "Get details about key-value store des32s",
-      "expectedTools": ["get-key-value-store"],
+      "expectedTools": [
+        "get-key-value-store"
+      ],
       "reference": "Inspecting a store's properties. Use get-key-value-store."
     },
     {
       "id": "get-key-value-store-list-1",
       "category": "get-key-value-store-list",
       "query": "List all my key-value stores",
-      "expectedTools": ["get-key-value-store-list"],
+      "expectedTools": [
+        "get-key-value-store-list"
+      ],
       "reference": "Listing the user's key-value stores is get-key-value-store-list, not a specific store."
     },
     {
       "id": "get-key-value-store-list-2",
       "category": "get-key-value-store-list",
       "query": "What key-value stores do I have in my account?",
-      "expectedTools": ["get-key-value-store-list"],
+      "expectedTools": [
+        "get-key-value-store-list"
+      ],
       "reference": "Browsing the user's own key-value stores. Use get-key-value-store-list."
     },
     {
       "id": "get-actor-task-1",
       "category": "get-actor-task",
       "query": "What is the configuration of my task insta-daily?",
-      "expectedTools": ["get-actor-task"],
+      "expectedTools": [
+        "get-actor-task"
+      ],
       "reference": "It should call get-actor-task with the task ID 'insta-daily' to read its stored settings."
     },
     {
       "id": "get-actor-task-2",
       "category": "get-actor-task",
       "query": "Is my task insta-daily published?",
-      "expectedTools": ["get-actor-task"],
+      "expectedTools": [
+        "get-actor-task"
+      ],
       "reference": "Publication state is part of the task itself. Reading it is get-actor-task, not publish-actor-task."
     },
     {
       "id": "create-actor-task-1",
       "category": "create-actor-task",
       "query": "Save my apify/instagram-scraper settings as a task called insta-daily",
-      "expectedTools": ["create-actor-task"],
+      "expectedTools": [
+        "create-actor-task"
+      ],
       "reference": "It should call create-actor-task for Actor 'apify/instagram-scraper' with the name 'insta-daily'."
     },
     {
       "id": "create-actor-task-2",
       "category": "create-actor-task",
       "query": "Create a task for apify/google-search-scraper that searches for pizza",
-      "expectedTools": ["create-actor-task"],
+      "expectedTools": [
+        "create-actor-task"
+      ],
       "reference": "It should call create-actor-task with the Actor ID and an input containing the search query."
     },
     {
       "id": "update-actor-task-1",
       "category": "update-actor-task",
       "query": "Change my task insta-daily to use the beta build",
-      "expectedTools": ["update-actor-task"],
+      "expectedTools": [
+        "update-actor-task"
+      ],
       "reference": "It should call update-actor-task with the build option set to 'beta'."
     },
     {
       "id": "update-actor-task-2",
       "category": "update-actor-task",
       "query": "Set the landing page title of my task insta-daily to 'Daily Instagram scraper'",
-      "expectedTools": ["update-actor-task"],
+      "expectedTools": [
+        "update-actor-task"
+      ],
       "reference": "The landing page title is publicConfig.seoTitle, written through update-actor-task. It does not publish the task."
     },
     {
       "id": "publish-actor-task-1",
       "category": "publish-actor-task",
       "query": "Publish my task insta-daily",
-      "expectedTools": ["publish-actor-task"],
-      "reference": "It should call publish-actor-task with the task ID 'insta-daily'."
+      "expectedTools": [
+        "publish-actor-task"
+      ],
+      "reference": "It should call publish-actor-task with the task name 'insta-daily'."
     },
     {
       "id": "publish-actor-task-2",
       "category": "publish-actor-task",
       "query": "Make my task insta-daily public",
-      "expectedTools": ["publish-actor-task"],
+      "expectedTools": [
+        "publish-actor-task"
+      ],
       "reference": "Making a task public is publishing it. Use publish-actor-task, not update-actor-task."
+    },
+    {
+      "id": "publish-actor-task-3",
+      "category": "publish-actor-task",
+      "query": "I now have write access to insta-daily and its Actor. Try publishing it again.",
+      "expectedTools": [
+        "publish-actor-task"
+      ],
+      "reference": "The earlier permission failure is resolved, so it should retry publish-actor-task with the task name 'insta-daily'.",
+      "context": "A previous publish-actor-task call for insta-daily failed because the user lacked write access to the task's Actor."
+    },
+    {
+      "id": "publish-actor-task-4",
+      "category": "publish-actor-task",
+      "query": "Fix insta-daily for publishing using the query input field and overview dataset view",
+      "expectedTools": [
+        "update-actor-task"
+      ],
+      "reference": "After publishing failed because the public configuration was incomplete, update-actor-task must set publicConfig.inputSchemaFields to ['query'] and publicConfig.datasetView to 'overview' before publish-actor-task is retried.",
+      "context": "A previous publish-actor-task call for insta-daily failed because publicConfig.inputSchemaFields and publicConfig.datasetView were not set."
     },
     {
       "id": "unpublish-actor-task-1",
       "category": "unpublish-actor-task",
       "query": "Unpublish my task insta-daily",
-      "expectedTools": ["unpublish-actor-task"],
-      "reference": "It should call unpublish-actor-task with the task ID 'insta-daily'."
+      "expectedTools": [
+        "unpublish-actor-task"
+      ],
+      "reference": "It should call unpublish-actor-task with the task name 'insta-daily'."
     },
     {
       "id": "unpublish-actor-task-2",
       "category": "unpublish-actor-task",
       "query": "Take my task insta-daily off its public page but keep its display settings",
-      "expectedTools": ["unpublish-actor-task"],
+      "expectedTools": [
+        "unpublish-actor-task"
+      ],
       "reference": "Unpublishing preserves publicConfig, so unpublish-actor-task alone is correct. No update-actor-task call is needed to clear the settings."
     },
     {
       "id": "tool-selection-actor-task-1",
       "category": "tool-selection",
       "query": "Set up my task insta-daily for publishing, using the overview dataset view",
-      "expectedTools": ["update-actor-task"],
+      "expectedTools": [
+        "update-actor-task"
+      ],
       "reference": "Setting up for publishing means writing publicConfig via update-actor-task. The task is not published until publish-actor-task is called, so publish-actor-task here is wrong."
     },
     {
       "id": "tool-selection-actor-task-2",
       "category": "tool-selection",
       "query": "I already have a task called insta-daily, change its input to search for cats instead",
-      "expectedTools": ["update-actor-task"],
+      "expectedTools": [
+        "update-actor-task"
+      ],
       "reference": "The task exists, so this is update-actor-task with a new input. Creating another task with create-actor-task is wrong."
     }
   ]
