@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.14.4 - **not yet released**
+
+### 🚀 Features
+
+- [**breaking**] Run workflow evals as Langfuse experiments ([#1224](https://github.com/apify/apify-mcp-server/pull/1224)) ([316d640](https://github.com/apify/apify-mcp-server/commit/316d6404e50af2ead4770a94a96168ae4f0bfa5d)) by [@RobertCrupa](https://github.com/RobertCrupa)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.14.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.3) (2026-08-12)
 
 ### 🚀 Features
