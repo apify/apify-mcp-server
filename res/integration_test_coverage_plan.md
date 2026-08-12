@@ -13,7 +13,7 @@ PR title format follows Conventional Commits (≤70 chars). Branch `test/<slug>`
 **Scope**: Block A + Block E from the audit. Lock down what the server returns at `initialize` time and what the unhappy paths of `tools/call` and `prompts/get` look like.
 
 **Test cases (all in `tests/integration/suite.ts`):**
-1. `should expose serverInfo, instructions and declared capabilities on initialize` — assert `client.getServerVersion().name === SERVER_NAME`, version matches `package.json`, `getInstructions()` non-empty, `getServerCapabilities()` contains `tools.listChanged`, `tasks.{list,cancel,requests.tools.call}`, `resources`, `prompts`, `logging`.
+1. `should expose serverInfo, instructions and declared capabilities on initialize` — assert `client.getServerVersion().name === SERVER_NAME`, version matches `package.json`, `getInstructions()` non-empty, `getServerCapabilities()` contains `tools`, `tasks.{list,cancel,requests.tools.call}`, `resources`, `prompts`, `logging`.
 2. `should respond to ping` — `await client.ping()` does not throw.
 3. `should return JSON-RPC error for tools/call with unknown tool name` — expect rejection with code/message indicating not found.
 4. `should return InvalidParams for prompts/get with unknown name` — assert `error.code === ErrorCode.InvalidParams`.
@@ -29,7 +29,7 @@ PR title format follows Conventional Commits (≤70 chars). Branch `test/<slug>`
 ## PR 2 — `test: Add resources/list, templates, and read end-to-end tests`
 
 **Branch**: `test/resources-end-to-end`
-**Scope**: Block B. Today only unit tests touch `resource_service`; nothing verifies the request handlers in `server.ts:464,468,472` are wired.
+**Scope**: Block B. Today only unit tests touch `resource_service`; nothing verifies the request handlers in `legacy_server.ts:235,239,250` are wired.
 
 **Test cases (all in `tests/integration/suite.ts`):**
 1. `should list resources via resources/list` — `await client.listResources()`; assert `Array.isArray(resources)`. Run a second client with `uiMode: 'openai'`; assert at least one resource URI starts with `ui://` (widget).
@@ -84,7 +84,7 @@ In `tests/integration/suite.ts` (gated `runIf(streamable-http)`):
 ## PR 5 — `test: Add _meta.apifyToken propagation tests` (optional / lower priority)
 
 **Branch**: `test/meta-apify-token-propagation`
-**Scope**: Block H. The hosted server relies on `_meta.apifyToken` arriving in `tools/call` params (`server.ts:638`). Currently no test exercises this path; only the bearer header / env-var paths are covered.
+**Scope**: Block H. The hosted server relies on `_meta.apifyToken` arriving in `tools/call` params (`legacy_server.ts:384`). Currently no test exercises this path; only the bearer header / env-var paths are covered.
 
 **Helper change** — `tests/helpers.ts`:
 - Add an `omitToken?: boolean` flag to `McpClientOptions`. When set: `createMcpStdioClient` does not put `APIFY_TOKEN` in the spawned env, and the streamable-http variant does not send the `Authorization` header. ~10 lines.

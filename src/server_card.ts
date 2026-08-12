@@ -52,7 +52,7 @@ export function getServerCard(): ServerCard {
             endpoint: '/',
         },
         capabilities: {
-            tools: { listChanged: true },
+            tools: {},
         },
         authentication: {
             required: true,

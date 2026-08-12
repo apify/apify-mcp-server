@@ -731,7 +731,7 @@ export type ServerCard = {
         endpoint: string;
     };
     capabilities: {
-        tools: { listChanged: boolean };
+        tools: Record<string, never>;
     };
     authentication: {
         required: boolean;
