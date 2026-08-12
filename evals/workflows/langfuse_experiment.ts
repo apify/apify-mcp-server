@@ -10,6 +10,7 @@ import type { Evaluation } from '@langfuse/client';
 
 import { runAgentConversation } from './claude_agent.js';
 import { parseWorkflowItem } from './langfuse_dataset.js';
+import { buildAgentObservations, emitObservations } from './langfuse_observations.js';
 import type { LlmClient } from './llm_client.js';
 import type { TranscriptEntry } from './sdk_conversation_adapter.js';
 import type { JudgeResult } from './workflow_judge.js';
@@ -138,7 +139,8 @@ export function makeTask(options: WorkflowTaskOptions) {
         const item = parseWorkflowItem(rawItem);
 
         try {
-            const { conversation, transcript } = await runAgentConversation({
+            const startedAt = Date.now();
+            const adapted = await runAgentConversation({
                 prompt: item.input.query,
                 model: agentModel,
                 apifyToken,
@@ -149,6 +151,21 @@ export function makeTask(options: WorkflowTaskOptions) {
                 mcpToolsOnly,
             });
 
+            // The agent ran in a subprocess, so its conversation reaches Langfuse only if
+            // we send it. Emitted before the judge call, so a failing judge still leaves
+            // the conversation on the trace to debug.
+            emitObservations(
+                buildAgentObservations({
+                    prompt: item.input.query,
+                    model: agentModel,
+                    mcpToolsOnly,
+                    adapted,
+                    startedAt,
+                    endedAt: Date.now(),
+                }),
+            );
+
+            const { conversation, transcript } = adapted;
             const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
 
             return {

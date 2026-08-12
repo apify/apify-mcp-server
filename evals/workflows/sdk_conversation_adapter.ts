@@ -16,6 +16,9 @@ export type ToolInvocation = {
     name: string;
     arguments: unknown;
     result: McpToolResult;
+    /** Epoch ms the call and its result were streamed, when the caller timed the stream */
+    startedAt?: number;
+    endedAt?: number;
 };
 
 /** A compact record of agent narration + thinking, logged to the item's trace (never judged). */
@@ -66,9 +69,19 @@ function blocksOf(content: unknown): ContentBlock[] {
 type PendingToolUse = {
     name: string;
     arguments: unknown;
+    startedAt?: number;
 };
 
-export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[]): AdaptedConversation {
+/**
+ * `receivedAt` holds the epoch ms each message arrived, one per entry in `messages`. The
+ * SDK stream carries no timestamps of its own, so this is the only way tool spans get a
+ * real duration instead of collapsing to the moment the tree is emitted.
+ */
+export function adaptSdkConversation(
+    userPrompt: string,
+    messages: SDKMessage[],
+    receivedAt?: readonly number[],
+): AdaptedConversation {
     const turns: ConversationTurn[] = [];
     const toolInvocations: ToolInvocation[] = [];
     const transcript: TranscriptEntry[] = [];
@@ -84,7 +97,9 @@ export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[])
     let resultErrors: string[] = [];
     let finalResultText = '';
 
-    for (const message of messages) {
+    for (const [messageIndex, message] of messages.entries()) {
+        const messageTime = receivedAt?.[messageIndex];
+
         // Ignore subagent activity so the transcript reflects the main agent.
         if ((message.type === 'assistant' || message.type === 'user') && message.parent_tool_use_id !== null) {
             continue;
@@ -109,7 +124,7 @@ export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[])
                 } else if (block.type === 'tool_use') {
                     const name = stripToolPrefix(block.name);
                     toolCalls.push({ name, arguments: (block.input ?? {}) as Record<string, unknown> });
-                    pendingToolUses.set(block.id, { name, arguments: block.input });
+                    pendingToolUses.set(block.id, { name, arguments: block.input, startedAt: messageTime });
                 }
             }
 
@@ -148,7 +163,13 @@ export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[])
                     error: success ? undefined : serialized,
                     resultBytes,
                 };
-                toolInvocations.push({ name: pending.name, arguments: pending.arguments, result });
+                toolInvocations.push({
+                    name: pending.name,
+                    arguments: pending.arguments,
+                    result,
+                    ...(pending.startedAt === undefined ? {} : { startedAt: pending.startedAt }),
+                    ...(messageTime === undefined ? {} : { endedAt: messageTime }),
+                });
             }
             continue;
         }

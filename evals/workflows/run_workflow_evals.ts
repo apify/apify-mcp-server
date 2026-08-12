@@ -148,7 +148,7 @@ async function main() {
 
         initTracing();
 
-        // Traces every agent/judge call as a generation nested under the item's trace.
+        // Traces each judge call as a generation nested under the item's trace.
         const llmClient = new LlmClient();
 
         const agentSdkVersion = resolveAgentSdkVersion();

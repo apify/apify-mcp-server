@@ -119,10 +119,14 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ad
 
     try {
         const messages: SDKMessage[] = [];
+        // Arrival times, so the tool spans have real durations. The SDK stream carries no
+        // timestamps and the messages are only folded once the run is over.
+        const receivedAt: number[] = [];
         for await (const message of query({ prompt, options: sdkOptions })) {
             messages.push(message);
+            receivedAt.push(Date.now());
         }
-        return adaptSdkConversation(prompt, messages);
+        return adaptSdkConversation(prompt, messages, receivedAt);
     } finally {
         abortController.abort();
     }
