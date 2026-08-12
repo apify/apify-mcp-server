@@ -13,9 +13,9 @@ import {
 } from '../helpers.js';
 import type { Case, CaseCtx } from '../types.js';
 
-// Tasks need v1 `.experimental.tasks` — legacy HTTP only.
-function onlyLegacyHttp(ctx: CaseCtx): boolean {
-    return ctx.transport !== '2025-11-25';
+// v2 stateless client has no .experimental.tasks; v1 (stdio + 2025-11-25) does.
+function lacksTaskSupport(ctx: CaseCtx): boolean {
+    return ctx.transport === '2026-07-28';
 }
 
 /** Async tasks: call/get/list/cancel + statusMessage. All isDeploymentTest. */
@@ -23,7 +23,7 @@ export const tasksCases: Case[] = [
     {
         name: 'should abort actor run on notifications/cancelled',
         isDeploymentTest: true,
-        skipIf: onlyLegacyHttp,
+        skipIf: lacksTaskSupport,
         retry: 2,
         run: async (ctx) => {
             const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
@@ -62,7 +62,7 @@ export const tasksCases: Case[] = [
     {
         name: 'should abort call-actor tool on notifications/cancelled',
         isDeploymentTest: true,
-        skipIf: onlyLegacyHttp,
+        skipIf: lacksTaskSupport,
         retry: 1,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: ['actors'] })) as ClientV1;
@@ -102,7 +102,7 @@ export const tasksCases: Case[] = [
     {
         name: 'should be able to call a long running task tool call',
         isDeploymentTest: true,
-        skipIf: onlyLegacyHttp,
+        skipIf: lacksTaskSupport,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
             try {
@@ -151,7 +151,7 @@ export const tasksCases: Case[] = [
     {
         name: 'should be able to call a long running task and list it, get the status and then separately retrieve the result',
         isDeploymentTest: true,
-        skipIf: onlyLegacyHttp,
+        skipIf: lacksTaskSupport,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
             try {
@@ -192,7 +192,7 @@ export const tasksCases: Case[] = [
     {
         name: 'should be able to call a long running task and then cancel it midway',
         isDeploymentTest: true,
-        skipIf: onlyLegacyHttp,
+        skipIf: lacksTaskSupport,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
             try {
@@ -223,7 +223,7 @@ export const tasksCases: Case[] = [
     {
         name: 'should abort the Apify run when tasks/cancel is sent (direct actor tool)',
         isDeploymentTest: true,
-        skipIf: onlyLegacyHttp,
+        skipIf: lacksTaskSupport,
         retry: 3,
         // Cancel must abort the underlying Apify run, not only the task status.
         run: async (ctx) => {
@@ -265,7 +265,7 @@ export const tasksCases: Case[] = [
     {
         name: 'should support call-actor tool in task mode (internal tool with taskSupport)',
         isDeploymentTest: true,
-        skipIf: onlyLegacyHttp,
+        skipIf: lacksTaskSupport,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: ['actors'] })) as ClientV1;
             try {
@@ -314,7 +314,7 @@ export const tasksCases: Case[] = [
     {
         name: 'should propagate statusMessage to tasks/get and tasks/list for internal tools in task mode',
         isDeploymentTest: true,
-        skipIf: onlyLegacyHttp,
+        skipIf: lacksTaskSupport,
         retry: 1,
         // Flaky on streamable HTTP if Actor finishes before PROGRESS_NOTIFICATION_INTERVAL_MS (#558).
         run: async (ctx) => {
@@ -343,7 +343,7 @@ export const tasksCases: Case[] = [
     {
         name: 'should propagate statusMessage to tasks/get and tasks/list for actor tools in task mode',
         isDeploymentTest: true,
-        skipIf: onlyLegacyHttp,
+        skipIf: lacksTaskSupport,
         retry: 1,
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
