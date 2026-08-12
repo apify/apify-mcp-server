@@ -2,8 +2,9 @@
  * Folds the Claude Agent SDK's message stream into what the eval reads: the judge's
  * `ConversationHistory`, the tool invocations, the transcript, and the run metrics.
  *
- * The stream is an `init` system message, one `assistant` message per model turn, `user`
- * messages carrying tool results, and a final `result` message.
+ * The stream is an `init` system message, `assistant` messages (one frame per content
+ * block, sharing `message.id` within a model turn), `user` messages carrying tool
+ * results, and a final `result` message.
  */
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
@@ -96,6 +97,13 @@ export function adaptSdkConversation(
     let resultSubtype: string | undefined;
     let resultErrors: string[] = [];
     let finalResultText = '';
+    /**
+     * The CLI splits every assistant turn into one wire frame per content block, all
+     * sharing `message.id`, so consecutive frames with the same id fold into one turn.
+     * Without this, narration that accompanies a tool call becomes its own text-only turn
+     * and leaks to the judge as an AGENT: line, and turn counts inflate.
+     */
+    let openAssistantId: string | undefined;
 
     for (const [messageIndex, message] of messages.entries()) {
         const messageTime = receivedAt?.[messageIndex];
@@ -112,6 +120,10 @@ export function adaptSdkConversation(
 
         if (message.type === 'assistant') {
             const blocks = blocksOf(message.message.content);
+            const messageId = message.message.id;
+            const merging = messageId !== undefined && messageId === openAssistantId;
+            openAssistantId = messageId;
+
             const textParts: string[] = [];
             const thinkingParts: string[] = [];
             const toolCalls: { name: string; arguments: Record<string, unknown> }[] = [];
@@ -129,19 +141,30 @@ export function adaptSdkConversation(
             }
 
             const text = textParts.join('\n').trim();
-            const turn: ConversationTurn = { toolCalls };
-            // Match the old harness: only a text-only turn exposes a finalResponse to the judge.
-            if (toolCalls.length === 0 && text) {
-                turn.finalResponse = text;
-            }
-            turns.push(turn);
-
-            const entry: TranscriptEntry = { role: 'assistant' };
-            if (text) entry.text = text;
             const thinking = thinkingParts.join('\n').trim();
-            if (thinking) entry.thinking = thinking;
-            if (toolCalls.length > 0) entry.toolCalls = toolCalls.map((toolCall) => toolCall.name);
-            transcript.push(entry);
+
+            let turn = merging ? turns[turns.length - 1] : undefined;
+            let entry = merging ? transcript[transcript.length - 1] : undefined;
+            if (!turn || !entry) {
+                turn = { toolCalls: [] };
+                turns.push(turn);
+                entry = { role: 'assistant' };
+                transcript.push(entry);
+            }
+
+            turn.toolCalls.push(...toolCalls);
+            // Match the old harness: only a text-only turn exposes a finalResponse to the judge.
+            if (text && turn.toolCalls.length === 0) {
+                turn.finalResponse = text;
+            } else if (turn.toolCalls.length > 0) {
+                delete turn.finalResponse;
+            }
+
+            if (text) entry.text = entry.text ? `${entry.text}\n${text}` : text;
+            if (thinking) entry.thinking = entry.thinking ? `${entry.thinking}\n${thinking}` : thinking;
+            if (toolCalls.length > 0) {
+                entry.toolCalls = [...(entry.toolCalls ?? []), ...toolCalls.map((toolCall) => toolCall.name)];
+            }
             continue;
         }
 
