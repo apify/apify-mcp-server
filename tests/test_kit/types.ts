@@ -1,6 +1,8 @@
 import type { Client as ClientV2 } from '@modelcontextprotocol/client';
 import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.js';
 
+import type { ApifyClient } from '@apify/actors-mcp-server/internals.js';
+
 import type { SuiteClientOptions } from './mcp_client.js';
 
 /** v1 or v2 MCP SDK client. */
@@ -21,6 +23,12 @@ export interface CaseCtx {
     isDeploymentTestOnly?: boolean;
     /** Memoized fixture setup — once per `registerCases` call, keyed by `fixture.key`. */
     getFixture: <T>(fixture: Fixture<T>) => Promise<T>;
+    /**
+     * Direct `ApifyClient` for verification calls (not the MCP client's own token).
+     * Each repo supplies its own token/baseUrl — never exposed separately so staging/local
+     * tokens can't silently hit `api.apify.com`.
+     */
+    createApifyClient: () => ApifyClient;
 }
 
 /** Value shared across cases via `ctx.getFixture`. */

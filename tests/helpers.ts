@@ -1,17 +1,12 @@
-import type { Client as StatelessClient } from '@modelcontextprotocol/client';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { expect } from 'vitest';
 
-import { createMcpStatelessClient, createMcpStreamableClient, type SuiteClientOptions } from './test_kit/index.js';
+import type { SuiteClientOptions } from './test_kit/index.js';
 import { checkToken, resolveToken } from './test_kit/mcp_client.js';
 
-export { createMcpStatelessClient, createMcpStreamableClient };
-export type McpClientOptions = SuiteClientOptions;
-export type McpSuiteClient = Client | StatelessClient;
-
 /** stdio client for this repo's dist/stdio.js. Honors the shared `options.token` contract. */
-export async function createMcpStdioClient(options?: McpClientOptions): Promise<Client> {
+export async function createMcpStdioClient(options?: SuiteClientOptions): Promise<Client> {
     checkToken(options);
     const { actors, tools, useEnv, telemetry, serverMode, payment } = options || {};
     const args = ['dist/stdio.js'];

@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 
-import { actorNameToToolName, ApifyClient, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
+import { actorNameToToolName, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
 import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
@@ -934,8 +934,8 @@ export const actorsCases: Case[] = [
     {
         name: 'should return Actor details both for full Actor name and ID',
         isDeploymentTest: false,
-        run: withClient(undefined, async (client) => {
-            const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+        run: withClient(undefined, async (client, ctx) => {
+            const apifyClient = ctx.createApifyClient();
             const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
             expect(actor).toBeDefined();
             const actorId = actor!.id as string;
@@ -949,7 +949,10 @@ export const actorsCases: Case[] = [
             expect(contentByName[0].text).toContain(ACTOR_NORMAL_MODE);
 
             // Fetch by Actor ID only
-            const resultById = await client.callTool({ name: 'fetch-actor-details', arguments: { actor: actorId } });
+            const resultById = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: actorId },
+            });
             const contentById = resultById.content as { text: string }[];
             expect(contentById[0].text).toContain(ACTOR_NORMAL_MODE);
         }),

@@ -2,7 +2,7 @@ import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
-import { actorNameToToolName, ApifyClient } from '@apify/actors-mcp-server/internals.js';
+import { actorNameToToolName } from '@apify/actors-mcp-server/internals.js';
 import { HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
@@ -30,7 +30,7 @@ export const tasksCases: Case[] = [
             // Load the Actor at connection time — add-actor's dynamic add is gone (PR 0).
             const client = (await ctx.createClientFn({ actors: [ACTOR_NORMAL_MODE] })) as ClientV1;
             try {
-                const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+                const api = ctx.createApifyClient();
                 const controller = new AbortController();
                 const { onprogress, runIdPromise } = captureRunIdFromProgress();
                 const requestPromise = client
@@ -67,7 +67,7 @@ export const tasksCases: Case[] = [
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: ['actors'] })) as ClientV1;
             try {
-                const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+                const api = ctx.createApifyClient();
                 const controller = new AbortController();
                 const { onprogress, runIdPromise } = captureRunIdFromProgress();
                 const requestPromise = client
@@ -229,7 +229,7 @@ export const tasksCases: Case[] = [
         run: async (ctx) => {
             const client = (await ctx.createClientFn({ tools: [ACTOR_NORMAL_MODE] })) as ClientV1;
             try {
-                const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+                const api = ctx.createApifyClient();
                 const { onprogress, runIdPromise } = captureRunIdFromProgress();
 
                 const stream = client.experimental.tasks.callToolStream(

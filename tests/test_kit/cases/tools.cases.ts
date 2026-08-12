@@ -1,3 +1,4 @@
+import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { expect } from 'vitest';
 
@@ -5,17 +6,13 @@ import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, HELPER_TOOLS } from '@apify/actor
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
-    asLegacyClient,
     buildExampleMcpServerAddToolContent,
     getToolNames,
+    skipUnlessLegacyHttp,
     validateStructuredOutputForTool,
     withClient,
 } from '../helpers.js';
-import type { Case, CaseCtx } from '../types.js';
-
-function skipUnlessLegacyHttp(ctx: CaseCtx): boolean {
-    return ctx.transport !== '2025-11-25';
-}
+import type { Case } from '../types.js';
 
 /** Protocol/tool behavior: prompts, docs, report-problem, schemas, MCP passthrough. */
 export const toolsCases: Case[] = [
@@ -180,7 +177,7 @@ export const toolsCases: Case[] = [
         run: withClient(undefined, async (client) => {
             await client.listTools();
             await expect(
-                (asLegacyClient(client).transport as StreamableHTTPClientTransport).terminateSession(),
+                ((client as ClientV1).transport as StreamableHTTPClientTransport).terminateSession(),
             ).resolves.toBeUndefined();
         }),
     },

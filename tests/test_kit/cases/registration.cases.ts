@@ -19,13 +19,10 @@ import {
     RETIRED_SELECTORS,
     servedDefaultTools,
     servedDefaultToolNames,
+    skipUnlessStdio,
     withClient,
 } from '../helpers.js';
-import type { Case, CaseCtx } from '../types.js';
-
-function skipUnlessStdio(ctx: CaseCtx): boolean {
-    return ctx.transport !== 'stdio';
-}
+import type { Case } from '../types.js';
 
 const TWO_TEST_ACTORS = ['apify/python-example', 'apify/rag-web-browser'];
 const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
