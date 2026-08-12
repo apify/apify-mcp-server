@@ -4,8 +4,12 @@ import { describe, expect, it } from 'vitest';
 import { adaptSdkConversation } from '../../evals/workflows/sdk_conversation_adapter.js';
 
 /** An assistant message as the SDK streams it; only the fields the adapter reads. */
-function assistantMessage(content: unknown[], parentToolUseId: string | null = null): SDKMessage {
-    return { type: 'assistant', message: { content }, parent_tool_use_id: parentToolUseId } as unknown as SDKMessage;
+function assistantMessage(content: unknown[], parentToolUseId: string | null = null, id?: string): SDKMessage {
+    return {
+        type: 'assistant',
+        message: { id, content },
+        parent_tool_use_id: parentToolUseId,
+    } as unknown as SDKMessage;
 }
 
 /** A user message carrying tool results. */
@@ -132,6 +136,47 @@ describe('adaptSdkConversation()', () => {
                 }),
             ]),
         ).toThrow(/error_during_execution.*API error: 529 overloaded/s);
+    });
+
+    it('merges the frames the CLI splits one API turn into', () => {
+        // The CLI serializes one content block per wire frame, all sharing message.id.
+        const { conversation, transcript, toolInvocations } = adaptSdkConversation(
+            'find a maps scraper',
+            [
+                assistantMessage([{ type: 'thinking', thinking: 'which tool?' }], null, 'msg-1'),
+                assistantMessage([{ type: 'text', text: 'I found the scraper, calling it now' }], null, 'msg-1'),
+                assistantMessage(
+                    [{ type: 'tool_use', id: 'tool-1', name: 'mcp__apify__search-actors', input: { search: 'maps' } }],
+                    null,
+                    'msg-1',
+                ),
+                toolResultMessage([{ type: 'tool_result', tool_use_id: 'tool-1', content: [{ text: 'ok' }] }]),
+                assistantMessage([{ type: 'text', text: 'Found 3 Actors.' }], null, 'msg-2'),
+                resultMessage(),
+            ],
+            [10, 15, 20, 50, 55, 60],
+        );
+
+        expect(conversation.turns).toHaveLength(2);
+        expect(conversation.turns[0]).toMatchObject({
+            turnNumber: 1,
+            toolCalls: [{ name: 'search-actors', arguments: { search: 'maps' } }],
+        });
+        // Narration accompanying a tool call never reaches the judge.
+        expect(conversation.turns[0].finalResponse).toBeUndefined();
+        expect(conversation.turns[0].toolResults).toHaveLength(1);
+        expect(conversation.turns[1]).toMatchObject({ turnNumber: 2, finalResponse: 'Found 3 Actors.' });
+        // The tool span still starts when its own frame arrived, not when the turn opened.
+        expect(toolInvocations[0]).toMatchObject({ startedAt: 20, endedAt: 50 });
+        expect(transcript).toEqual([
+            {
+                role: 'assistant',
+                text: 'I found the scraper, calling it now',
+                thinking: 'which tool?',
+                toolCalls: ['search-actors'],
+            },
+            { role: 'assistant', text: 'Found 3 Actors.' },
+        ]);
     });
 
     it('records narration, thinking, and tool names in the transcript', () => {
