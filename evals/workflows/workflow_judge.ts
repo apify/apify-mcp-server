@@ -123,10 +123,12 @@ export async function evaluateConversation(
     // Format conversation for judge
     const formattedConversation = formatConversationForJudge(conversation);
 
-    // Create judge prompt using reference field
-    const judgePrompt = JUDGE_PROMPT_TEMPLATE.replace('{{reference}}', reference).replace(
+    // Create judge prompt using reference field. Both values are substituted through a
+    // function so `$&`, `$'`, `` $` `` and `$$` (routine in Bash commands the agent runs)
+    // are inserted literally instead of being read as replacement patterns.
+    const judgePrompt = JUDGE_PROMPT_TEMPLATE.replace('{{reference}}', () => reference).replace(
         '{{conversation}}',
-        formattedConversation,
+        () => formattedConversation,
     );
 
     // Call judge LLM with structured output schema
