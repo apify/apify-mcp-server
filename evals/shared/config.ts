@@ -13,16 +13,6 @@ export const OPENROUTER_CONFIG = {
 };
 
 /**
- * Get required environment variables
- * Note: OPENROUTER_BASE_URL is optional (defaults to https://openrouter.ai/api/v1)
- */
-export function getRequiredEnvVars(): Record<string, string | undefined> {
-    return {
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
-    };
-}
-
-/**
  * Strips control characters, trims whitespace, and removes surrounding double quotes.
  * CI secrets often contain trailing newlines or invisible control chars that break HTTP headers.
  */
@@ -36,6 +26,9 @@ export function sanitizeEnvValue(value?: string): string | undefined {
             .replace(/^"|"$/g, '')
     );
 }
+
+/** Environment variables the Langfuse SDK reads to authenticate. */
+export const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 'LANGFUSE_BASE_URL'] as const;
 
 /**
  * Env vars used in HTTP headers (API keys, tokens, URLs).
@@ -51,17 +44,16 @@ const ENV_KEYS_TO_SANITIZE = [
     'OPENROUTER_BASE_URL',
     'PHOENIX_API_KEY',
     'PHOENIX_BASE_URL',
-    'LANGFUSE_PUBLIC_KEY',
-    'LANGFUSE_SECRET_KEY',
-    'LANGFUSE_BASE_URL',
+    ...LANGFUSE_ENV_VARS,
 ];
 
 /**
- * Names of the given env vars that are unset or empty, so an entry point can report
- * every missing one at once instead of failing on the first.
+ * Names of the given env vars that are unset or sanitize to empty (whitespace,
+ * control chars, quotes only), so an entry point can report every missing one at
+ * once up front instead of failing later with an opaque exporter error.
  */
 export function findMissingEnvVars(keys: readonly string[]): string[] {
-    return keys.filter((key) => !process.env[key]);
+    return keys.filter((key) => !sanitizeEnvValue(process.env[key]));
 }
 
 /**
@@ -78,7 +70,7 @@ function redact(value?: string | null): string {
 
 /**
  * Sanitize env vars in-place on process.env and log redacted values for CI debugging.
- * Must be called before any library reads these values.
+ * Must be called before constructing any client that reads them.
  */
 export function sanitizeProcessEnv(): void {
     for (const key of ENV_KEYS_TO_SANITIZE) {
@@ -94,22 +86,4 @@ export function sanitizeProcessEnv(): void {
             console.log(`env ${key}: ${redact(raw)}`);
         }
     }
-}
-
-/**
- * Validate that all required environment variables are present
- */
-export function validateEnvVars(): boolean {
-    const envVars = getRequiredEnvVars();
-    const missing = Object.entries(envVars)
-        .filter(([, value]) => !value)
-        .map(([key]) => key);
-
-    if (missing.length > 0) {
-        // eslint-disable-next-line no-console
-        console.error(`Missing required environment variables: ${missing.join(', ')}`);
-        return false;
-    }
-
-    return true;
 }

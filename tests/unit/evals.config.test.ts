@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/shared/config.js';
+import { findMissingEnvVars, sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/shared/config.js';
 
 describe('sanitizeEnvValue', () => {
     it('passes through undefined and null', () => {
@@ -38,6 +38,28 @@ describe('sanitizeEnvValue', () => {
     it('is idempotent', () => {
         const value = '  "sk-abc123"\r\n';
         expect(sanitizeEnvValue(sanitizeEnvValue(value))).toBe(sanitizeEnvValue(value));
+    });
+});
+
+describe('findMissingEnvVars', () => {
+    afterEach(() => {
+        delete process.env.PHOENIX_API_KEY;
+        delete process.env.OPENROUTER_API_KEY;
+        delete process.env.LANGFUSE_SECRET_KEY;
+    });
+
+    it('reports unset and empty vars', () => {
+        process.env.OPENROUTER_API_KEY = 'sk-abc123';
+        expect(findMissingEnvVars(['PHOENIX_API_KEY', 'OPENROUTER_API_KEY'])).toEqual(['PHOENIX_API_KEY']);
+    });
+
+    it('reports vars that sanitize to empty', () => {
+        process.env.PHOENIX_API_KEY = '  \n';
+        process.env.OPENROUTER_API_KEY = '""';
+        expect(findMissingEnvVars(['PHOENIX_API_KEY', 'OPENROUTER_API_KEY'])).toEqual([
+            'PHOENIX_API_KEY',
+            'OPENROUTER_API_KEY',
+        ]);
     });
 });
 

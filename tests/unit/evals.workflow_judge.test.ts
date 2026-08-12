@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import type { LlmClient } from '../../evals/workflows/llm_client.js';
-import type { WorkflowTestCase } from '../../evals/workflows/test_cases_loader.js';
 import type { ConversationHistory } from '../../evals/workflows/types.js';
 import { evaluateConversation } from '../../evals/workflows/workflow_judge.js';
 
@@ -12,12 +11,7 @@ function makeJudgeClient(content: string): LlmClient {
     } as unknown as LlmClient;
 }
 
-const testCase: WorkflowTestCase = {
-    id: 'test-1',
-    category: 'search',
-    query: 'find an actor',
-    reference: 'the agent should search',
-};
+const reference = 'the agent should search';
 
 const conversation: ConversationHistory = {
     userPrompt: 'find an actor',
@@ -30,7 +24,7 @@ const conversation: ConversationHistory = {
 describe('evaluateConversation()', () => {
     it('normalizes a lowercase verdict instead of erroring the item', async () => {
         const result = await evaluateConversation(
-            testCase,
+            reference,
             conversation,
             makeJudgeClient('{"verdict":"pass","reason":"the agent searched"}'),
         );
@@ -40,13 +34,13 @@ describe('evaluateConversation()', () => {
 
     it('rejects a verdict that is neither PASS nor FAIL', async () => {
         await expect(
-            evaluateConversation(testCase, conversation, makeJudgeClient('{"verdict":"maybe","reason":"unclear"}')),
+            evaluateConversation(reference, conversation, makeJudgeClient('{"verdict":"maybe","reason":"unclear"}')),
         ).rejects.toThrow();
     });
 
     it('keeps the verdict when the judge returns an unknown extra key', async () => {
         const result = await evaluateConversation(
-            testCase,
+            reference,
             conversation,
             makeJudgeClient('{"verdict":"PASS","reason":"the agent searched","confidence":0.9}'),
         );
