@@ -17,8 +17,6 @@ export type Transport = '2025-11-25' | 'stdio' | '2026-07-28';
 export interface CaseCtx {
     createClientFn: (options?: SuiteClientOptions) => Promise<SuiteClient>;
     transport: Transport;
-    /** False on 2026-07-28 (no tasks capability). */
-    hasTasksSupport: boolean;
     /** Register only `isDeploymentTest: true` cases. */
     isDeploymentTestOnly?: boolean;
     /** Memoized fixture setup — once per `registerCases` call, keyed by `fixture.key`. */

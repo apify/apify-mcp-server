@@ -27,9 +27,6 @@ export type IntegrationTestsSuiteOptions = {
 export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOptions) {
     const { suiteName, createClientFn, beforeAllFn, afterAllFn, beforeEachFn, afterEachFn } = options;
 
-    // No tasks on 2026-07-28.
-    const hasTasksSupport = options.transport !== '2026-07-28';
-
     if (beforeAllFn) beforeAll(beforeAllFn);
     if (afterAllFn) afterAll(afterAllFn);
     if (beforeEachFn) beforeEach(beforeEachFn);
@@ -45,7 +42,6 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             const ctx: Omit<CaseCtx, 'getFixture'> = {
                 createClientFn: createClientFn as CaseCtx['createClientFn'],
                 transport: options.transport,
-                hasTasksSupport,
             };
 
             registerCases('registration', registrationCases, ctx);
