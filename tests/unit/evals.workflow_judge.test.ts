@@ -11,6 +11,18 @@ function makeJudgeClient(content: string): LlmClient {
     } as unknown as LlmClient;
 }
 
+/** LLM client that records the prompt it was asked to judge. */
+function makePromptCapturingClient(): { client: LlmClient; prompt: () => string } {
+    let captured = '';
+    const client = {
+        callLlm: async (messages: { content: string }[]) => {
+            captured = messages[0].content;
+            return { content: '{"verdict":"PASS","reason":"ok"}' };
+        },
+    } as unknown as LlmClient;
+    return { client, prompt: () => captured };
+}
+
 const reference = 'the agent should search';
 
 const conversation: ConversationHistory = {
@@ -27,6 +39,21 @@ describe('evaluateConversation()', () => {
         );
 
         expect(result.verdict).toBe('PASS');
+    });
+
+    it('inserts $-patterns literally instead of letting them rewrite the prompt', async () => {
+        // `$'`, `$&`, `` $` `` and `$$` are replacement patterns for String.replace; a Bash
+        // command like $'\n' in the transcript must not splice the template around itself.
+        const { client, prompt } = makePromptCapturingClient();
+        await evaluateConversation(
+            'expected $& output $$',
+            { ...conversation, userPrompt: "run $'\\n' $` here" },
+            client,
+        );
+
+        expect(prompt()).toContain("run $'\\n' $` here");
+        expect(prompt()).toContain('expected $& output $$');
+        expect(prompt()).not.toContain('{{conversation}}');
     });
 
     it('rejects a verdict that is neither PASS nor FAIL', async () => {
