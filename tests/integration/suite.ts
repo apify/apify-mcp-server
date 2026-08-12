@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe } from 'vitest';
 
-import type { McpClientOptions, McpSuiteClient } from '../helpers.js';
+import { ApifyClient } from '../../src/apify_client.js';
 import {
     actorsCases,
     appsCases,
@@ -11,12 +11,13 @@ import {
     tasksCases,
     toolsCases,
 } from '../test_kit/index.js';
-import type { CaseCtx, Transport } from '../test_kit/types.js';
+import type { SuiteClientOptions } from '../test_kit/index.js';
+import type { CaseCtx, SuiteClient, Transport } from '../test_kit/types.js';
 
 export type IntegrationTestsSuiteOptions = {
     suiteName: string;
     transport: Transport;
-    createClientFn: (options?: McpClientOptions) => Promise<McpSuiteClient>;
+    createClientFn: (options?: SuiteClientOptions) => Promise<SuiteClient>;
     beforeAllFn?: () => Promise<void>;
     afterAllFn?: () => Promise<void>;
     beforeEachFn?: () => Promise<void>;
@@ -42,6 +43,11 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             const ctx: Omit<CaseCtx, 'getFixture'> = {
                 createClientFn: createClientFn as CaseCtx['createClientFn'],
                 transport: options.transport,
+                createApifyClient: () =>
+                    new ApifyClient({
+                        token: process.env.APIFY_TOKEN as string,
+                        baseUrl: process.env.APIFY_API_BASE_URL,
+                    }),
             };
 
             registerCases('registration', registrationCases, ctx);

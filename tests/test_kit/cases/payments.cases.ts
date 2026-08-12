@@ -1,15 +1,11 @@
+import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { HELPER_TOOLS, SKYFIRE_ENABLED_TOOLS } from '@apify/actors-mcp-server/internals.js';
 
-import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, asLegacyClient } from '../helpers.js';
-import type { Case, CaseCtx } from '../types.js';
-
-// Payment modes need HTTP headers — never stdio.
-function skipOnStdio(ctx: CaseCtx): boolean {
-    return ctx.transport === 'stdio';
-}
+import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, skipOnStdio } from '../helpers.js';
+import type { Case } from '../types.js';
 
 /** Skyfire and x402 payment modes. */
 export const paymentsCases: Case[] = [
@@ -184,7 +180,7 @@ export const paymentsCases: Case[] = [
         run: async (ctx) => {
             const client = await ctx.createClientFn({ payment: 'x402' });
             try {
-                const stream = asLegacyClient(client).experimental.tasks.callToolStream(
+                const stream = (client as ClientV1).experimental.tasks.callToolStream(
                     { name: 'call-actor', arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER, input: {} } },
                     CallToolResultSchema,
                     { task: { ttl: 60000 } },

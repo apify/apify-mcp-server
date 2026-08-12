@@ -6,7 +6,13 @@ export { createMcpStatelessClient, createMcpStreamableClient } from './mcp_clien
 export type { SuiteClientOptions } from './mcp_client.js';
 export { registerCases } from './register.js';
 export type { Case, CaseCtx, Fixture, SuiteClient, Transport } from './types.js';
-export { withClient } from './helpers.js';
+export {
+    expectNormalModeTestStructuredContent,
+    expectToolNamesToContain,
+    expectWidgetToolMeta,
+    getToolNames,
+    withClient,
+} from './helpers.js';
 
 export { actorsCases } from './cases/actors.cases.js';
 export { appsCases } from './cases/apps.cases.js';

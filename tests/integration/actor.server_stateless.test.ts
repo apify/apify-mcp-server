@@ -5,7 +5,7 @@ import type { Express } from 'express';
 import log from '@apify/log';
 
 import { createExpressApp } from '../../src/dev_server.js';
-import { createMcpStatelessClient } from '../helpers.js';
+import { createMcpStatelessClient } from '../test_kit/index.js';
 import { createIntegrationTestsSuite } from './suite.js';
 import { getAvailablePort } from './utils/port.js';
 

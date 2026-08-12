@@ -16,11 +16,13 @@ import {
     toolCategoriesEnabledByDefault,
 } from '@apify/actors-mcp-server/internals.js';
 
-import type { CaseCtx, SuiteClient } from './types.js';
+import type { CaseCtx, SuiteClient, Transport } from './types.js';
 
 // Live fixtures from apify/mcp-server-test-actor (see DEVELOPMENT.md).
 export const ACTOR_NORMAL_MODE = 'apify/normal-mode-test-actor';
 export const ACTOR_EXAMPLE_MCP_SERVER = 'apify/example-mcp-server';
+
+const STDIO_TRANSPORT: Transport = 'stdio';
 
 export const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview'] as const;
 export const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
@@ -54,9 +56,19 @@ export function withClient(
     };
 }
 
-/** Cast to v1 SDK client (legacy dimensions only). */
-export function asLegacyClient(client: SuiteClient): ClientV1 {
-    return client as ClientV1;
+/** Skip unless transport is legacy streamable HTTP (`2025-11-25`). */
+export function skipUnlessLegacyHttp(ctx: CaseCtx): boolean {
+    return ctx.transport !== '2025-11-25';
+}
+
+/** Skip on stdio. */
+export function skipOnStdio(ctx: CaseCtx): boolean {
+    return ctx.transport === STDIO_TRANSPORT;
+}
+
+/** Skip on every transport except stdio. */
+export function skipUnlessStdio(ctx: CaseCtx): boolean {
+    return ctx.transport !== STDIO_TRANSPORT;
 }
 
 export function getToolNames(tools: { tools: { name: string }[] }): string[] {
@@ -131,6 +143,7 @@ export function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Rec
         HELPER_TOOLS.STORE_SEARCH_WIDGET,
         HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
         HELPER_TOOLS.ACTOR_CALL_WIDGET,
+        HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET,
     ];
     for (const toolName of toolNames) {
         const tool = tools.tools.find((t) => t.name === toolName);
