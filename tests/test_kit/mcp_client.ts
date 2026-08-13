@@ -26,14 +26,14 @@ export interface SuiteClientOptions {
     token?: string | null;
 }
 
-function resolveToken(options?: SuiteClientOptions): string | undefined {
+export function resolveToken(options?: SuiteClientOptions): string | undefined {
     if (options?.token === null) return undefined;
     if (options?.token !== undefined) return options.token;
     return process.env.APIFY_TOKEN;
 }
 
 /** Require a token unless `token: null` or payment mode. */
-function checkToken(options?: SuiteClientOptions): void {
+export function checkToken(options?: SuiteClientOptions): void {
     if (options?.payment) return;
     if (options?.token === null) return;
     if (!resolveToken(options)) {

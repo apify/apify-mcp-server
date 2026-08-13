@@ -23,9 +23,14 @@ import {
 } from '../helpers.js';
 import type { Case, CaseCtx } from '../types.js';
 
-function onlyStdio(ctx: CaseCtx): boolean {
+function skipUnlessStdio(ctx: CaseCtx): boolean {
     return ctx.transport !== 'stdio';
 }
+
+const TWO_TEST_ACTORS = ['apify/python-example', 'apify/rag-web-browser'];
+const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
+const DOCS_CATEGORY = ['docs'] as ToolCategory[];
+const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
@@ -98,62 +103,53 @@ export const registrationCases: Case[] = [
             expect(names).toHaveLength(0);
         }),
     },
-    (() => {
-        const actors = ['apify/python-example', 'apify/rag-web-browser'];
-        return {
-            name: 'should list two loaded Actors plus auto-injected storage and abort tools',
-            isDeploymentTest: false,
-            run: withClient({ actors, serverMode: 'default' }, async (client) => {
-                const names = getToolNames(await client.listTools());
-                // Actor tools trigger auto-injected helpers (get-actor-run, storage, abort).
-                expect(names.length).toEqual(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
-                expectToolNamesToContain(
-                    names,
-                    actors.map((actor) => actorNameToToolName(actor)),
-                );
-                expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-            }),
-        };
-    })(),
-    (() => {
-        const actors = [ACTOR_NORMAL_MODE];
-        return {
-            name: 'should load only specified actors when actors param is provided (no other tools)',
-            isDeploymentTest: false,
-            run: withClient({ actors, serverMode: 'default' }, async (client) => {
-                const names = getToolNames(await client.listTools());
+    {
+        name: 'should list two loaded Actors plus auto-injected storage and abort tools',
+        isDeploymentTest: false,
+        run: withClient({ actors: TWO_TEST_ACTORS, serverMode: 'default' }, async (client) => {
+            const names = getToolNames(await client.listTools());
+            // Actor tools trigger auto-injected helpers (get-actor-run, storage, abort).
+            expect(names.length).toEqual(TWO_TEST_ACTORS.length + AUTO_INJECTED_TOOL_NAMES.length);
+            expectToolNamesToContain(
+                names,
+                TWO_TEST_ACTORS.map((actor) => actorNameToToolName(actor)),
+            );
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+        }),
+    },
+    {
+        name: 'should load only specified actors when actors param is provided (no other tools)',
+        isDeploymentTest: false,
+        run: withClient({ actors: SINGLE_NORMAL_MODE_ACTOR, serverMode: 'default' }, async (client) => {
+            const names = getToolNames(await client.listTools());
 
-                // Should only load the specified actor plus auto-injected storage/abort helpers
-                expect(names.length).toEqual(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
-                expect(names).toContain(actorNameToToolName(actors[0]));
-                expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+            // Should only load the specified actor plus auto-injected storage/abort helpers
+            expect(names.length).toEqual(SINGLE_NORMAL_MODE_ACTOR.length + AUTO_INJECTED_TOOL_NAMES.length);
+            expect(names).toContain(actorNameToToolName(SINGLE_NORMAL_MODE_ACTOR[0]));
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
-                // Should NOT include any default category tools
-                expect(names).not.toContain('search-actors');
-                expect(names).not.toContain('fetch-actor-details');
-                expect(names).not.toContain('call-actor');
-                expect(names).not.toContain('search-apify-docs');
-                expect(names).not.toContain('fetch-apify-docs');
-            }),
-        };
-    })(),
-    (() => {
-        const actors = [ACTOR_NORMAL_MODE];
-        return {
-            name: 'should return tool with execution field when listing tools with apify/normal-mode-test-actor',
-            isDeploymentTest: false,
-            run: withClient({ tools: actors }, async (client) => {
-                const tools = await client.listTools();
+            // Should NOT include any default category tools
+            expect(names).not.toContain('search-actors');
+            expect(names).not.toContain('fetch-actor-details');
+            expect(names).not.toContain('call-actor');
+            expect(names).not.toContain('search-apify-docs');
+            expect(names).not.toContain('fetch-apify-docs');
+        }),
+    },
+    {
+        name: 'should return tool with execution field when listing tools with apify/normal-mode-test-actor',
+        isDeploymentTest: false,
+        run: withClient({ tools: SINGLE_NORMAL_MODE_ACTOR }, async (client) => {
+            const tools = await client.listTools();
 
-                // Find the tool for apify/normal-mode-test-actor
-                const normalModeTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE));
-                expect(normalModeTool).toBeDefined();
-                expect(normalModeTool).toHaveProperty('name');
-                expect(normalModeTool).toHaveProperty('description');
-                expect(normalModeTool).toHaveProperty('inputSchema');
-            }),
-        };
-    })(),
+            // Find the tool for apify/normal-mode-test-actor
+            const normalModeTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE));
+            expect(normalModeTool).toBeDefined();
+            expect(normalModeTool).toHaveProperty('name');
+            expect(normalModeTool).toHaveProperty('description');
+            expect(normalModeTool).toHaveProperty('inputSchema');
+        }),
+    },
     {
         name: 'should not load any tools when tools param is empty',
         isDeploymentTest: false,
@@ -178,20 +174,17 @@ export const registrationCases: Case[] = [
             expect(names.length).toEqual(0);
         }),
     },
-    (() => {
-        const actors = [ACTOR_NORMAL_MODE];
-        return {
-            name: 'should load only specified Actors via tools selectors when actors param omitted',
-            isDeploymentTest: false,
-            run: withClient({ tools: actors, serverMode: 'default' }, async (client) => {
-                const names = getToolNames(await client.listTools());
-                // The Actor plus auto-injected storage/abort helpers.
-                expect(names).toHaveLength(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
-                expect(names).toContain(actorNameToToolName(actors[0]));
-                expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-            }),
-        };
-    })(),
+    {
+        name: 'should load only specified Actors via tools selectors when actors param omitted',
+        isDeploymentTest: false,
+        run: withClient({ tools: SINGLE_NORMAL_MODE_ACTOR, serverMode: 'default' }, async (client) => {
+            const names = getToolNames(await client.listTools());
+            // The Actor plus auto-injected storage/abort helpers.
+            expect(names).toHaveLength(SINGLE_NORMAL_MODE_ACTOR.length + AUTO_INJECTED_TOOL_NAMES.length);
+            expect(names).toContain(actorNameToToolName(SINGLE_NORMAL_MODE_ACTOR[0]));
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+        }),
+    },
     {
         name: 'should treat selectors with slashes as Actor names',
         isDeploymentTest: false,
@@ -206,25 +199,21 @@ export const registrationCases: Case[] = [
             expect(names).toContain(actorNameToToolName(ACTOR_NORMAL_MODE));
         }),
     },
-    (() => {
-        const actors = [ACTOR_NORMAL_MODE];
-        const categories = ['docs'] as ToolCategory[];
-        return {
-            name: 'should merge actors param into tools selectors (backward compatibility)',
-            isDeploymentTest: false,
-            run: withClient({ tools: categories, actors }, async (client) => {
-                const names = getToolNames(await client.listTools());
-                const docsToolNames = getExpectedToolNamesByCategories(categories);
-                const expected = [...docsToolNames, actorNameToToolName(actors[0])];
-                // Actor tool triggers auto-injection of storage/abort helpers.
-                expect(names).toHaveLength(expected.length + AUTO_INJECTED_TOOL_NAMES.length);
+    {
+        name: 'should merge actors param into tools selectors (backward compatibility)',
+        isDeploymentTest: false,
+        run: withClient({ tools: DOCS_CATEGORY, actors: SINGLE_NORMAL_MODE_ACTOR }, async (client) => {
+            const names = getToolNames(await client.listTools());
+            const docsToolNames = getExpectedToolNamesByCategories(DOCS_CATEGORY);
+            const expected = [...docsToolNames, actorNameToToolName(SINGLE_NORMAL_MODE_ACTOR[0])];
+            // Actor tool triggers auto-injection of storage/abort helpers.
+            expect(names).toHaveLength(expected.length + AUTO_INJECTED_TOOL_NAMES.length);
 
-                const containsExpected = expected.every((n) => names.includes(n));
-                expect(containsExpected).toBe(true);
-                expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-            }),
-        };
-    })(),
+            const containsExpected = expected.every((n) => names.includes(n));
+            expect(containsExpected).toBe(true);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+        }),
+    },
     {
         // category + specific tools must not widen to whole sibling category.
         name: 'should handle mixed categories and specific tools in tools param',
@@ -249,19 +238,16 @@ export const registrationCases: Case[] = [
             expect(names).toEqual([HELPER_TOOLS.DOCS_SEARCH, HELPER_TOOLS.DOCS_FETCH]);
         }),
     },
-    (() => {
-        const categories = ['docs'] as ToolCategory[];
-        return {
-            name: 'should load only docs tools',
-            isDeploymentTest: false,
-            run: withClient({ tools: categories, actors: [] }, async (client) => {
-                const names = getToolNames(await client.listTools());
-                const expected = getExpectedToolNamesByCategories(categories);
-                expect(names.length).toEqual(expected.length);
-                expectToolNamesToContain(names, expected);
-            }),
-        };
-    })(),
+    {
+        name: 'should load only docs tools',
+        isDeploymentTest: false,
+        run: withClient({ tools: DOCS_CATEGORY, actors: [] }, async (client) => {
+            const names = getToolNames(await client.listTools());
+            const expected = getExpectedToolNamesByCategories(DOCS_CATEGORY);
+            expect(names.length).toEqual(expected.length);
+            expectToolNamesToContain(names, expected);
+        }),
+    },
     {
         name: 'should load only a specific tool when tools includes a tool name',
         isDeploymentTest: false,
@@ -308,27 +294,24 @@ export const registrationCases: Case[] = [
                 }),
             }),
         ),
-    (() => {
-        const categories = ['docs', 'runs', 'storage'] as ToolCategory[];
-        return {
-            name: 'should handle multiple tool category keys input correctly',
-            isDeploymentTest: false,
-            run: withClient({ tools: categories }, async (client) => {
-                const loadedTools = await client.listTools();
-                const toolNames = getToolNames(loadedTools);
+    {
+        name: 'should handle multiple tool category keys input correctly',
+        isDeploymentTest: false,
+        run: withClient({ tools: DOCS_RUNS_STORAGE_CATEGORIES }, async (client) => {
+            const loadedTools = await client.listTools();
+            const toolNames = getToolNames(loadedTools);
 
-                const expectedToolNames = getExpectedToolNamesByCategories(categories);
-                expect(toolNames).toHaveLength(expectedToolNames.length);
-                const containsExpectedTools = toolNames.every((name) => expectedToolNames.includes(name));
-                expect(containsExpectedTools).toBe(true);
-            }),
-        };
-    })(),
+            const expectedToolNames = getExpectedToolNamesByCategories(DOCS_RUNS_STORAGE_CATEGORIES);
+            expect(toolNames).toHaveLength(expectedToolNames.length);
+            const containsExpectedTools = toolNames.every((name) => expectedToolNames.includes(name));
+            expect(containsExpectedTools).toBe(true);
+        }),
+    },
     {
         // Environment variable tests - only applicable to stdio transport
         name: 'should load actors from ACTORS environment variable',
         isDeploymentTest: false,
-        skipIf: onlyStdio,
+        skipIf: skipUnlessStdio,
         run: async (ctx) => {
             const actors = ['apify/python-example', 'apify/rag-web-browser'];
             const client = await ctx.createClientFn({ actors, useEnv: true });
@@ -346,7 +329,7 @@ export const registrationCases: Case[] = [
     {
         name: 'should load tool categories from TOOLS environment variable',
         isDeploymentTest: false,
-        skipIf: onlyStdio,
+        skipIf: skipUnlessStdio,
         run: async (ctx) => {
             // TOOLS=docs via stdio; docs avoids auto-inject noise.
             const client = await ctx.createClientFn({ tools: ['docs'], useEnv: true });
@@ -394,7 +377,7 @@ export const registrationCases: Case[] = [
         // Environment variable precedence test
         name: 'should use TELEMETRY_ENABLED env var when CLI arg is not provided',
         isDeploymentTest: false,
-        skipIf: onlyStdio,
+        skipIf: skipUnlessStdio,
         run: async (ctx) => {
             // When useEnv=true, telemetry.enabled option translates to env.TELEMETRY_ENABLED in child process
             const client = await ctx.createClientFn({ useEnv: true, telemetry: { enabled: false } });
@@ -411,7 +394,7 @@ export const registrationCases: Case[] = [
         // Deprecated `openai` alias silently normalizes to apps.
         name: 'should use UI_MODE env var (deprecated "openai" alias) when CLI arg is not provided',
         isDeploymentTest: false,
-        skipIf: onlyStdio,
+        skipIf: skipUnlessStdio,
         run: async (ctx) => {
             const client = await ctx.createClientFn({ useEnv: true, serverMode: 'openai' });
             try {

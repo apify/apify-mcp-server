@@ -158,7 +158,7 @@ It also runs automatically on every merge to the `master` branch.
 
 ### Test Actors
 
-Integration tests run against two purpose-built Actors defined in [apify/mcp-server-test-actor](https://github.com/apify/mcp-server-test-actor) and referenced from [`tests/const.ts`](./tests/const.ts):
+Integration tests run against two purpose-built Actors defined in [apify/mcp-server-test-actor](https://github.com/apify/mcp-server-test-actor) and referenced from [`tests/test_kit/helpers.ts`](./tests/test_kit/helpers.ts):
 
 | Actor | Constant | Purpose |
 |---|---|---|
@@ -172,7 +172,6 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
   - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `tests/test_kit/cases/*.cases.ts`, not here
   - Other files in this directory set up different transport dimensions (`stdio`, `2025-11-25` streamable HTTP, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
 - `tests/helpers.ts` — shared test utilities
-- `tests/const.ts` — test constants
 
 ### Test organization across repos
 

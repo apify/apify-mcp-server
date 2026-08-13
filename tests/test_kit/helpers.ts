@@ -42,12 +42,12 @@ export function servedDefaultToolNames(): string[] {
 /** Create client, run testFn, always close. */
 export function withClient(
     clientOptions: Parameters<CaseCtx['createClientFn']>[0],
-    testFn: (client: SuiteClient) => Promise<void>,
+    testFn: (client: SuiteClient, ctx: CaseCtx) => Promise<void>,
 ): (ctx: CaseCtx) => Promise<void> {
     return async (ctx) => {
         const client = await ctx.createClientFn(clientOptions);
         try {
-            await testFn(client);
+            await testFn(client, ctx);
         } finally {
             await client.close();
         }

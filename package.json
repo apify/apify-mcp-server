@@ -108,7 +108,7 @@
     "dev": "node scripts/dev_standby.js",
     "build": "pnpm run build:core && pnpm run build:web",
     "build:core": "tsc -b src && tsc -b tests/test_kit",
-    "build:watch": "tsc -b src -w & tsc -b tests/test_kit -w & wait",
+    "build:watch": "tsc -b src -w",
     "build:web": "pnpm --filter @apify/mcp-web-widget run build",
     "postbuild": "mkdir -p dist/web && (cp -r src/web/dist dist/web/ 2>/dev/null || :)",
     "clean": "tsc -b src --clean && tsc -b tests/test_kit --clean && rm -rf dist/web",

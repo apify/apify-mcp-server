@@ -13,7 +13,7 @@ import {
 } from '../helpers.js';
 import type { Case, CaseCtx } from '../types.js';
 
-function onlyLegacyHttp(ctx: CaseCtx): boolean {
+function skipUnlessLegacyHttp(ctx: CaseCtx): boolean {
     return ctx.transport !== '2025-11-25';
 }
 
@@ -176,7 +176,7 @@ export const toolsCases: Case[] = [
         // Session termination is only possible for streamable HTTP transport.
         name: 'should successfully terminate streamable session',
         isDeploymentTest: false,
-        skipIf: onlyLegacyHttp,
+        skipIf: skipUnlessLegacyHttp,
         run: withClient(undefined, async (client) => {
             await client.listTools();
             await expect(

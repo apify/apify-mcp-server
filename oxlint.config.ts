@@ -20,11 +20,11 @@ export default defineConfig({
         },
         {
             // Case.run() executes inside a real it() via registerCases (register.ts) — oxlint
-            // can't trace that indirection, flags below are false positives.
+            // can't trace that indirection, so expect() calls in Case.run bodies read as
+            // standalone. register.ts itself disables vitest/expect-expect per runIt() call.
             files: ['tests/test_kit/**'],
             rules: {
                 'vitest/no-standalone-expect': 'off',
-                'vitest/expect-expect': 'off',
             },
         },
     ],

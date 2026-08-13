@@ -7,7 +7,7 @@ import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, asLegacyClient } from '../
 import type { Case, CaseCtx } from '../types.js';
 
 // Payment modes need HTTP headers — never stdio.
-function notStdio(ctx: CaseCtx): boolean {
+function skipOnStdio(ctx: CaseCtx): boolean {
     return ctx.transport === 'stdio';
 }
 
@@ -17,7 +17,7 @@ export const paymentsCases: Case[] = [
         // isDeploymentTest: skyfire fee gating.
         name: 'should inject skyfire-pay-id parameter into all SKYFIRE_ENABLED_TOOLS when skyfireMode is enabled',
         isDeploymentTest: true,
-        skipIf: notStdio,
+        skipIf: skipOnStdio,
         run: async (ctx) => {
             const client = await ctx.createClientFn({ payment: 'skyfire', tools: Array.from(SKYFIRE_ENABLED_TOOLS) });
             try {
@@ -59,7 +59,7 @@ export const paymentsCases: Case[] = [
     {
         name: 'should advertise x402 metadata on all paymentRequired tools when x402 payment is enabled',
         isDeploymentTest: false,
-        skipIf: notStdio,
+        skipIf: skipOnStdio,
         run: async (ctx) => {
             // Pin paid-tool set independently of production constants.
             const paidToolNames = [
@@ -123,7 +123,7 @@ export const paymentsCases: Case[] = [
         // Standby MCP Actor sub-tools load in normal mode, drop in payment mode.
         name: 'should filter standby MCP-server Actor from list-tools in payment mode',
         isDeploymentTest: false,
-        skipIf: notStdio,
+        skipIf: skipOnStdio,
         run: async (ctx) => {
             const isProxiedAddTool = (name: string) => name.endsWith('-add');
             let client = await ctx.createClientFn({ payment: 'x402', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
@@ -158,7 +158,7 @@ export const paymentsCases: Case[] = [
     {
         name: 'should return error when calling a standby Actor via call-actor in x402 payment mode',
         isDeploymentTest: false,
-        skipIf: notStdio,
+        skipIf: skipOnStdio,
         run: async (ctx) => {
             const client = await ctx.createClientFn({ payment: 'x402' });
             try {
@@ -223,7 +223,7 @@ export const paymentsCases: Case[] = [
         // isDeploymentTest: paid tool rejects free access.
         name: 'should return x402 payment error when calling paymentRequired tool without payment signature',
         isDeploymentTest: true,
-        skipIf: notStdio,
+        skipIf: skipOnStdio,
         run: async (ctx) => {
             const client = await ctx.createClientFn({ tools: ['actors'], payment: 'x402' });
             try {

@@ -4,20 +4,20 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { expect } from 'vitest';
 
 import { createMcpStatelessClient, createMcpStreamableClient, type SuiteClientOptions } from './test_kit/index.js';
+import { checkToken, resolveToken } from './test_kit/mcp_client.js';
 
 export { createMcpStatelessClient, createMcpStreamableClient };
 export type McpClientOptions = SuiteClientOptions;
 export type McpSuiteClient = Client | StatelessClient;
 
-/** stdio client for this repo's dist/stdio.js. */
+/** stdio client for this repo's dist/stdio.js. Honors the shared `options.token` contract. */
 export async function createMcpStdioClient(options?: McpClientOptions): Promise<Client> {
-    if (!options?.payment && !process.env.APIFY_TOKEN) {
-        throw new Error('APIFY_TOKEN environment variable is not set.');
-    }
+    checkToken(options);
     const { actors, tools, useEnv, telemetry, serverMode, payment } = options || {};
     const args = ['dist/stdio.js'];
+    const token = resolveToken(options);
     const env: Record<string, string> = {
-        APIFY_TOKEN: process.env.APIFY_TOKEN as string,
+        ...(token ? { APIFY_TOKEN: token } : {}),
     };
 
     // Default telemetry to disabled for tests to avoid sending Sentry sessions and events

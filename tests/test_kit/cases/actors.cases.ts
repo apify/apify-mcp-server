@@ -24,62 +24,59 @@ import {
 } from '../helpers.js';
 import type { Case } from '../types.js';
 
+// call-actor calls Actors by name — this tool name must never appear in the tool list.
+const NORMAL_MODE_TOOL_NAME = actorNameToToolName(ACTOR_NORMAL_MODE);
+
 /** Actor tools: search, details, call-actor, get-actor-run. */
 export const actorsCases: Case[] = [
-    (() => {
-        const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
-        return {
-            name: 'calls an Actor directly via call-actor without a separate add step',
-            isDeploymentTest: false,
-            run: withClient({ tools: ['call-actor'] }, async (client) => {
-                const names = getToolNames(await client.listTools());
-                expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
-                expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
-                expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                expect(names).not.toContain(selectedToolName);
+    {
+        name: 'calls an Actor directly via call-actor without a separate add step',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['call-actor'] }, async (client) => {
+            const names = getToolNames(await client.listTools());
+            expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+            expect(names).not.toContain(NORMAL_MODE_TOOL_NAME);
 
-                // No dynamic "add" step exists — call-actor calls any Actor by name directly.
-                const result = await client.callTool({
-                    name: HELPER_TOOLS.ACTOR_CALL,
-                    arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
-                });
-                expectNormalModeTestStructuredContent(result);
-            }),
-        };
-    })(),
-    (() => {
-        const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
-        return {
-            name: 'should call Actor dynamically via generic call-actor tool without need to add it first',
-            isDeploymentTest: false,
-            run: withClient({ tools: ['actors'] }, async (client) => {
-                const names = getToolNames(await client.listTools());
-                // actors category (already has call-actor) + auto-injected helpers.
-                const numberOfTools = getCategoryTools('default').actors.length + AUTO_INJECTED_TOOL_NAMES.length;
-                expect(names).toHaveLength(numberOfTools);
-                // get-actor-run should be automatically included when call-actor is present
-                expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-                expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
-                // Check that the Actor is not in the tools list
-                expect(names).not.toContain(selectedToolName);
+            // No dynamic "add" step exists — call-actor calls any Actor by name directly.
+            const result = await client.callTool({
+                name: HELPER_TOOLS.ACTOR_CALL,
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
+            });
+            expectNormalModeTestStructuredContent(result);
+        }),
+    },
+    {
+        name: 'should call Actor dynamically via generic call-actor tool without need to add it first',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const names = getToolNames(await client.listTools());
+            // actors category (already has call-actor) + auto-injected helpers.
+            const numberOfTools = getCategoryTools('default').actors.length + AUTO_INJECTED_TOOL_NAMES.length;
+            expect(names).toHaveLength(numberOfTools);
+            // get-actor-run should be automatically included when call-actor is present
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+            // Check that the Actor is not in the tools list
+            expect(names).not.toContain(NORMAL_MODE_TOOL_NAME);
 
-                const result = await client.callTool({
-                    name: HELPER_TOOLS.ACTOR_CALL,
-                    arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
-                });
+            const result = await client.callTool({
+                name: HELPER_TOOLS.ACTOR_CALL,
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
+            });
 
-                const content = result.content as { text: string; type: string }[];
-                // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
-                expect(content[0]?.type).toBe('text');
-                const mirrored = JSON.parse(content[0].text) as { runId?: string; status?: string };
-                expect(mirrored.runId).toBeDefined();
-                expect(mirrored.status).toBe('SUCCEEDED');
+            const content = result.content as { text: string; type: string }[];
+            // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
+            expect(content[0]?.type).toBe('text');
+            const mirrored = JSON.parse(content[0].text) as { runId?: string; status?: string };
+            expect(mirrored.runId).toBeDefined();
+            expect(mirrored.status).toBe('SUCCEEDED');
 
-                // Validate structured output has run-response metadata for the normal-mode-test-actor.
-                expectNormalModeTestStructuredContent(result);
-            }),
-        };
-    })(),
+            // Validate structured output has run-response metadata for the normal-mode-test-actor.
+            expectNormalModeTestStructuredContent(result);
+        }),
+    },
     {
         // isDeploymentTest: full-pipeline smoke (auth + real Actor run).
         name: 'should call Actor directly with required input',
@@ -234,7 +231,6 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        // isDeploymentTest: rental Actors excluded via AGENT_SAFE_PRICING_MODELS.
         name: 'should not return rental Actors from store search',
         isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
