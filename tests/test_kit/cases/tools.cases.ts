@@ -1,8 +1,8 @@
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { expect } from 'vitest';
 
-import { HELPER_TOOLS } from '../../../src/const.js';
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../../src/tools/actors/call_actor.js';
+import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, HELPER_TOOLS } from '@apify/actors-mcp-server/internals.js';
+
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
     asLegacyClient,

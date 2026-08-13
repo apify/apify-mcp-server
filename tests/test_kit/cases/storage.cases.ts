@@ -1,8 +1,7 @@
 import { expect } from 'vitest';
 
-import { HELPER_TOOLS } from '../../../src/const.js';
-import { actorNameToToolName } from '../../../src/tools/actor_tool_naming.js';
-import { actorRunOutputSchema } from '../../../src/tools/structured_output_schemas.js';
+import { actorNameToToolName, actorRunOutputSchema, HELPER_TOOLS } from '@apify/actors-mcp-server/internals.js';
+
 import {
     ACTOR_NORMAL_MODE,
     expectNormalModeTestStructuredContent,

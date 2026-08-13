@@ -24,9 +24,13 @@
     "./manifest.json": "./manifest.json"
   },
   "peerDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
     "vitest": "^4.1.0"
   },
   "peerDependenciesMeta": {
+    "@modelcontextprotocol/client": {
+      "optional": true
+    },
     "vitest": {
       "optional": true
     }

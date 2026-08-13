@@ -7,7 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
-import type { TelemetryEnv, ToolCategory } from '../../src/types.js';
+import type { TelemetryEnv, ToolCategory } from '@apify/actors-mcp-server/internals.js';
 
 /** Options for the published test-kit client factories. */
 export interface SuiteClientOptions {

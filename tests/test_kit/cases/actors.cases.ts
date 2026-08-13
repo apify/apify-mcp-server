@@ -1,10 +1,13 @@
 import { expect } from 'vitest';
 
-import { ApifyClient } from '../../../src/apify_client.js';
-import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../../src/const.js';
-import { actorNameToToolName } from '../../../src/tools/actor_tool_naming.js';
-// Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
-import { getCategoryTools } from '../../../src/tools/index.js';
+import {
+    actorNameToToolName,
+    ApifyClient,
+    getCategoryTools,
+    HELPER_TOOLS,
+    MAX_LIMIT_WITH_INPUT_SCHEMA,
+} from '@apify/actors-mcp-server/internals.js';
+
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
     ACTOR_NORMAL_MODE,
