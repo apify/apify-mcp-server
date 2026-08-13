@@ -136,12 +136,22 @@ export const registrationCases: Case[] = [
     {
         name: 'should return tool with execution field when listing tools with apify/normal-mode-test-actor',
         isDeploymentTest: false,
-        run: withClient({ tools: SINGLE_NORMAL_MODE_ACTOR }, async (client) => {
+        run: withClient({ tools: SINGLE_NORMAL_MODE_ACTOR }, async (client, ctx) => {
             const tools = await client.listTools();
 
             // Find the tool for apify/normal-mode-test-actor
             const normalModeTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE));
             expect(normalModeTool).toBeDefined();
+
+            // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly).
+            // The 2026-07-28 codec strips `execution` as deleted vocabulary (no tasks capability there).
+            if (ctx.transport !== '2026-07-28') {
+                expect(normalModeTool).toHaveProperty('execution');
+                expect(normalModeTool?.execution).toBeDefined();
+            } else {
+                expect(normalModeTool).not.toHaveProperty('execution');
+            }
+
             expect(normalModeTool).toHaveProperty('name');
             expect(normalModeTool).toHaveProperty('description');
             expect(normalModeTool).toHaveProperty('inputSchema');
