@@ -172,6 +172,7 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
   - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `tests/test_kit/cases/*.cases.ts`, not here
   - Other files in this directory set up different transport dimensions (`stdio`, `2025-11-25` streamable HTTP, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
 - `tests/helpers.ts` — shared test utilities
+- `tests/test_kit/helpers.ts` — shared test constants and assertion helpers, published behind `./test-kit`
 
 ### Test organization across repos
 
