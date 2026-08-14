@@ -18,7 +18,7 @@ describe('unpublish-actor-task', () => {
             structuredContent: Record<string, unknown>;
         };
 
-        expect(calls).toEqual([{ fn: 'unpublish' }]);
+        expect(calls).toEqual([{ fn: 'unpublish', taskId: '~task-1' }]);
         expectSchemaConformingStructuredContent(result, actorTaskOutputSchema);
         expect(result.structuredContent).toMatchObject({
             taskId: 'task-1',

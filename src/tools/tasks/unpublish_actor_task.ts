@@ -9,7 +9,12 @@ import { actorTaskOutputSchema } from '../structured_output_schemas.js';
 import { setTaskPublication, taskResult } from './task_helpers.js';
 
 const unpublishActorTaskArgs = z.object({
-    taskId: z.string().min(1).describe('The ID or username~task-name of the task to unpublish.'),
+    taskId: z
+        .string()
+        .min(1)
+        .describe(
+            'The task to unpublish: its ID, its name (resolved against your own tasks), or "username/task-name" for a task owned by someone else.',
+        ),
 });
 
 /**

@@ -12,9 +12,24 @@ const PUBLIC_CONFIG_FIELDS = [
     'datasetView',
 ] as const satisfies (keyof Omit<TaskPublicConfig, 'publishedAt'>)[];
 
+/** Apify resource IDs are exactly 17 alphanumeric characters. */
+const APIFY_ID_REGEX = /^[a-zA-Z0-9]{17}$/;
+
 /**
- * Task names must be DNS-safe and 3-63 characters — mirrors `ActorTaskSchema` in apify-core, whose
- * constraints the API enforces. Validated here so the caller gets a usable message instead of a 400.
+ * The API reads an unqualified id as an ID, so a bare task name has to be prefixed with `~` to be
+ * resolved against the authenticated user's own tasks. Ids that already carry a username, in either
+ * the `username/task-name` or `username~task-name` format, and ids that are already IDs, are
+ * returned unchanged.
+ */
+export function toSafeTaskId(taskId: string): string {
+    const trimmed = taskId.trim();
+    if (trimmed.includes('/') || trimmed.includes('~')) return trimmed;
+    return APIFY_ID_REGEX.test(trimmed) ? trimmed : `~${trimmed}`;
+}
+
+/**
+ * Task names must be DNS-safe and 3-63 characters, as the API enforces. Validated here so the
+ * caller gets a usable message instead of a 400.
  */
 const TASK_NAME_REGEX = /^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])$/;
 
@@ -78,6 +93,6 @@ export function taskResult(task: Task) {
  * to repeat.
  */
 export async function setTaskPublication(client: ApifyClient, taskId: string, isPublic: boolean): Promise<Task> {
-    const taskClient = client.task(taskId);
+    const taskClient = client.task(toSafeTaskId(taskId));
     return isPublic ? taskClient.publish() : taskClient.unpublish();
 }

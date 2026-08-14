@@ -21,7 +21,7 @@ describe('get-actor-task', () => {
             stubToolCallContext({ taskId: 'task-1' }, apifyClient),
         )) as StructuredResult;
 
-        expect(calls).toEqual([{ fn: 'get' }]);
+        expect(calls).toEqual([{ fn: 'get', taskId: '~task-1' }]);
         expectSchemaConformingStructuredContent(result, actorTaskOutputSchema);
         expect(result.structuredContent).toMatchObject({
             taskId: 'task-1',
@@ -62,6 +62,22 @@ describe('get-actor-task', () => {
         )) as TextToolResult;
 
         expect(result.content[0].text).toContain('not found');
+    });
+
+    // The API reads an unqualified taskId as an ID, so a bare name must go out as `~name` or the
+    // lookup 404s. Anything that already names an owner, or is shaped like an ID, must survive
+    // untouched.
+    it.each([
+        ['a bare name', 'insta-daily', '~insta-daily'],
+        ['an already tilde-prefixed name', '~insta-daily', '~insta-daily'],
+        ['a username and name', 'janjiran/insta-daily', 'janjiran/insta-daily'],
+        ['a username and name in tilde form', 'janjiran~insta-daily', 'janjiran~insta-daily'],
+        ['a 17-character ID', 'E2jjCZBezvAZnX8Rb', 'E2jjCZBezvAZnX8Rb'],
+    ])('sends %s as "%s"', async (_label, given, expected) => {
+        const { apifyClient, calls } = mockTaskApiClient(mockTask());
+        await (getActorTask as HelperTool).call(stubToolCallContext({ taskId: given }, apifyClient));
+
+        expect(calls).toEqual([{ fn: 'get', taskId: expected }]);
     });
 });
 
@@ -161,6 +177,7 @@ describe('update-actor-task', () => {
         expect(calls).toEqual([
             {
                 fn: 'update',
+                taskId: '~task-1',
                 payload: { publicConfig: { inputSchemaFields: ['query'], datasetView: 'overview' } },
             },
         ]);
@@ -173,7 +190,7 @@ describe('update-actor-task', () => {
             stubToolCallContext({ taskId: 'task-1', title: 'Renamed' }, apifyClient),
         );
 
-        expect(calls).toEqual([{ fn: 'update', payload: { title: 'Renamed' } }]);
+        expect(calls).toEqual([{ fn: 'update', taskId: '~task-1', payload: { title: 'Renamed' } }]);
     });
 
     it('passes an empty description to clear it', async () => {
@@ -182,7 +199,7 @@ describe('update-actor-task', () => {
             stubToolCallContext({ taskId: 'task-1', description: '' }, apifyClient),
         );
 
-        expect(calls).toEqual([{ fn: 'update', payload: { description: '' } }]);
+        expect(calls).toEqual([{ fn: 'update', taskId: '~task-1', payload: { description: '' } }]);
     });
 
     it('merges run options into the stored ones so the fields not being updated survive', async () => {
@@ -196,8 +213,24 @@ describe('update-actor-task', () => {
         );
 
         expect(calls).toEqual([
-            { fn: 'get' },
-            { fn: 'update', payload: { options: { build: 'beta', timeoutSecs: 300, memoryMbytes: 1024 } } },
+            { fn: 'get', taskId: '~task-1' },
+            {
+                fn: 'update',
+                taskId: '~task-1',
+                payload: { options: { build: 'beta', timeoutSecs: 300, memoryMbytes: 1024 } },
+            },
         ]);
+    });
+
+    it('reports a missing task from the options pre-read instead of failing on the update', async () => {
+        // Only the options path reads first, so without this the update would run against a task
+        // that does not exist and surface the raw API error instead of a not-found message.
+        const { apifyClient, calls } = mockTaskApiClient(undefined);
+        const result = (await (updateActorTask as HelperTool).call(
+            stubToolCallContext({ taskId: 'nope', build: 'beta' }, apifyClient),
+        )) as TextToolResult;
+
+        expect(result.content[0].text).toContain('not found');
+        expect(calls).toEqual([{ fn: 'get', taskId: '~nope' }]);
     });
 });

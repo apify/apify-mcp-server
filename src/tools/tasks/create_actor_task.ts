@@ -66,8 +66,12 @@ USAGE EXAMPLES:
         const { actorId, name, input, title, description, build, timeoutSecs, memoryMbytes, publicConfig } =
             createActorTaskArgs.parse(args);
 
-        const options = { build, timeoutSecs, memoryMbytes };
-        const hasOptions = Object.values(options).some((value) => value !== undefined);
+        const options = {
+            ...(build !== undefined && { build }),
+            ...(timeoutSecs !== undefined && { timeoutSecs }),
+            ...(memoryMbytes !== undefined && { memoryMbytes }),
+        };
+        const hasOptions = Object.keys(options).length > 0;
 
         const task = await client.tasks().create({
             actId: actorId,

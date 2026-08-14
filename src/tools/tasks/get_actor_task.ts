@@ -6,10 +6,15 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
-import { taskResult } from './task_helpers.js';
+import { toSafeTaskId, taskResult } from './task_helpers.js';
 
 const getActorTaskArgs = z.object({
-    taskId: z.string().min(1).describe('The ID or task-name of the task to fetch.'),
+    taskId: z
+        .string()
+        .min(1)
+        .describe(
+            'The task to fetch: its ID, its name (resolved against your own tasks), or "username/task-name" for a task owned by someone else.',
+        ),
 });
 
 /**
@@ -45,7 +50,7 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getActorTaskArgs.parse(args);
-        const task = await client.task(parsed.taskId).get();
+        const task = await client.task(toSafeTaskId(parsed.taskId)).get();
         if (!task) {
             return respondUserError(`Task ${parsed.taskId} was not found.`);
         }

@@ -5,12 +5,17 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { respondOk } from '../../utils/mcp.js';
+import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
-import { publicConfigSchema, taskNameSchema, taskResult } from './task_helpers.js';
+import { publicConfigSchema, toSafeTaskId, taskNameSchema, taskResult } from './task_helpers.js';
 
 const updateActorTaskArgs = z.object({
-    taskId: z.string().min(1).describe('The ID or task-name of the task to update.'),
+    taskId: z
+        .string()
+        .min(1)
+        .describe(
+            'The task to update: its ID, its name (resolved against your own tasks), or "username/task-name" for a task owned by someone else.',
+        ),
     name: taskNameSchema.optional().describe('New name of the task: 3-63 characters, letters, digits and dashes only.'),
     title: z.string().optional().describe('New human-readable title of the task.'),
     description: z.string().optional().describe('New short description of the task.'),
@@ -63,6 +68,8 @@ USAGE EXAMPLES:
         const { taskId, name, title, description, input, build, timeoutSecs, memoryMbytes, publicConfig } =
             updateActorTaskArgs.parse(args);
 
+        const resolvedTaskId = toSafeTaskId(taskId);
+
         const optionsUpdate = {
             ...(build !== undefined && { build }),
             ...(timeoutSecs !== undefined && { timeoutSecs }),
@@ -72,18 +79,27 @@ USAGE EXAMPLES:
 
         // The API completely replaces `options` (unlike `publicConfig`, which it merges), so merge
         // with the stored value to keep the run options that are not part of this update.
-        const storedOptions = hasOptions ? (await client.task(taskId).get())?.options : undefined;
+        let storedOptions;
+        if (hasOptions) {
+            const storedTask = await client.task(resolvedTaskId).get();
+            // Report the missing task from this read rather than letting the update fail later with
+            // a rawer error.
+            if (!storedTask) {
+                return respondUserError(`Task ${taskId} was not found.`);
+            }
+            storedOptions = storedTask.options;
+        }
 
         const update: TaskUpdateData = {
             ...(name && { name }),
-            ...(title && { title }),
+            ...(title !== undefined && { title }),
             ...(description !== undefined && { description }),
             ...(input && { input }),
             ...(hasOptions && { options: { ...storedOptions, ...optionsUpdate } }),
             ...(publicConfig && { publicConfig }),
         };
 
-        const task = await client.task(taskId).update(update);
+        const task = await client.task(resolvedTaskId).update(update);
 
         const result = taskResult(task);
         const summary = `Updated task "${result.name}" (ID: ${result.taskId}).`;

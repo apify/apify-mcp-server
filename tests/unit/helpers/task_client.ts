@@ -16,7 +16,7 @@ export function mockTask(overrides: Record<string, unknown> = {}) {
 }
 
 /** A recorded resource-client method call. */
-export type RecordedCall = { fn: string; payload?: unknown };
+export type RecordedCall = { fn: string; taskId?: string; payload?: unknown };
 
 /**
  * Fake ApifyClient covering everything the task tools use: `task().get/update/publish/unpublish()`
@@ -31,21 +31,23 @@ export function mockTaskApiClient(task: unknown): {
 } {
     const calls: RecordedCall[] = [];
     const apifyClient = {
-        task: (_id: string) => ({
+        // `taskId` is recorded because the tools normalize a bare task name to `~name` before the
+        // call — the API would otherwise read the name as an ID and 404.
+        task: (taskId: string) => ({
             get: async () => {
-                calls.push({ fn: 'get' });
+                calls.push({ fn: 'get', taskId });
                 return task;
             },
             update: async (payload: unknown) => {
-                calls.push({ fn: 'update', payload });
+                calls.push({ fn: 'update', taskId, payload });
                 return task;
             },
             publish: async () => {
-                calls.push({ fn: 'publish' });
+                calls.push({ fn: 'publish', taskId });
                 return task;
             },
             unpublish: async () => {
-                calls.push({ fn: 'unpublish' });
+                calls.push({ fn: 'unpublish', taskId });
                 return task;
             },
         }),
