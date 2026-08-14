@@ -155,7 +155,7 @@ export function adaptSdkConversation(
             turn.toolCalls.push(...toolCalls);
             // Match the old harness: only a text-only turn exposes a finalResponse to the judge.
             if (text && turn.toolCalls.length === 0) {
-                turn.finalResponse = text;
+                turn.finalResponse = turn.finalResponse ? `${turn.finalResponse}\n${text}` : text;
             } else if (turn.toolCalls.length > 0) {
                 delete turn.finalResponse;
             }

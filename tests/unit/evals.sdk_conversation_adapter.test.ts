@@ -179,6 +179,17 @@ describe('adaptSdkConversation()', () => {
         ]);
     });
 
+    it('keeps every text block of a merged turn as the final response', () => {
+        const { conversation } = adaptSdkConversation('hi', [
+            assistantMessage([{ type: 'text', text: 'Part A' }], null, 'msg-1'),
+            assistantMessage([{ type: 'text', text: 'Part B' }], null, 'msg-1'),
+            resultMessage({ result: 'Part A\nPart B', num_turns: 1 }),
+        ]);
+
+        expect(conversation.turns).toHaveLength(1);
+        expect(conversation.turns[0].finalResponse).toBe('Part A\nPart B');
+    });
+
     it('records narration, thinking, and tool names in the transcript', () => {
         const { transcript } = adaptSdkConversation('hi', [
             assistantMessage([
