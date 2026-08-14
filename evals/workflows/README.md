@@ -234,7 +234,7 @@ Results are recorded in Langfuse, not to a local file. Each run:
 
 - **Reads the dataset** `workflow-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
 - **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
-- **Traces** every item as one trace. Its root output is the judge verdict plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per MCP tool call (arguments in, result out, `ERROR` when the call failed), and a generation for the judge call. See design decision 9.
+- **Traces** every item as one trace. Its root output is the judge verdict plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed), and a generation for the judge call. See design decision 9.
 - **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) is the strict gate, and `total_tokens` is the agent tokens billed, omitted when the provider reported no usage so an unmeasured run cannot look like a free one.
 - **Scores the run** with `pass_rate`: passing items over items requested, so runs stay comparable even when items were dropped.
 
