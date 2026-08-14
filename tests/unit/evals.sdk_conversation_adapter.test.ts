@@ -110,6 +110,19 @@ describe('adaptSdkConversation()', () => {
         expect(conversation.hitMaxTurns).toBe(true);
     });
 
+    it('throws on a run the SDK aborted, so it is not judged as a failing eval', () => {
+        expect(() =>
+            adaptSdkConversation('hi', [
+                assistantMessage([{ type: 'tool_use', id: 'tool-1', name: 'mcp__apify__search-actors', input: {} }]),
+                resultMessage({
+                    subtype: 'error_during_execution',
+                    result: undefined,
+                    errors: ['API error: 529 overloaded'],
+                }),
+            ]),
+        ).toThrow(/error_during_execution.*API error: 529 overloaded/s);
+    });
+
     it('records narration, thinking, and tool names in the transcript', () => {
         const { transcript } = adaptSdkConversation('hi', [
             assistantMessage([

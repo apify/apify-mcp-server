@@ -84,6 +84,7 @@ export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[])
     let totalCostUsd: number | undefined;
     let durationMs: number | undefined;
     let resultSubtype: string | undefined;
+    let resultErrors: string[] = [];
     let finalResultText = '';
 
     for (const message of messages) {
@@ -173,11 +174,21 @@ export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[])
                 completionTokens: message.usage.output_tokens,
             };
             if (message.subtype === 'success') finalResultText = message.result.trim();
+            else resultErrors = message.errors;
         }
     }
 
     const completed = resultSubtype === 'success';
     const hitMaxTurns = resultSubtype === 'error_max_turns';
+
+    // Any other error subtype (API error, context overflow, budget) is a harness failure, not
+    // a bad answer. Throw so the run fails on it instead of the judge scoring a truncated
+    // conversation it cannot tell apart from a normal one.
+    if (!completed && !hitMaxTurns) {
+        const reason = resultSubtype ?? 'the stream ended without a result message';
+        const details = resultErrors.length > 0 ? ` - ${resultErrors.join('; ')}` : '';
+        throw new Error(`Agent run failed: ${reason}${details}`);
+    }
 
     // Ensure the final answer is in the transcript exactly once. A text-only last turn
     // already carries it via finalResponse; otherwise append a terminal turn.
