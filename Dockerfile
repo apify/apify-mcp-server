@@ -14,10 +14,10 @@ COPY src/web/package.json ./src/web/
 RUN pnpm install --frozen-lockfile
 
 COPY src ./src
-COPY tests/test_kit ./tests/test_kit
 COPY tsconfig.json ./
 
-RUN pnpm run build
+# Skip tests/test_kit — dist/stdio.js never imports it.
+RUN pnpm exec tsc -b src && pnpm run build:web && pnpm run postbuild
 
 # Stage 2: Runtime image
 FROM node:24-alpine
