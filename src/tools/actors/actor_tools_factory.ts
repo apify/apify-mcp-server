@@ -20,6 +20,7 @@ import {
     type ActorStore,
     type ActorTool,
     type ApifyToken,
+    type SchemaProperties,
     type ToolEntry,
     type ToolInputSchema,
     TOOL_TYPE,
@@ -28,7 +29,7 @@ import { getActorDefinitionCached } from '../../utils/actor.js';
 import { ajv } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js';
+import { buildActorInputSchema, fixedAjvCompile, stripTruncatedEnumsForValidation } from '../actor_input_schema.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider, isActorInfoMcpServer } from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
@@ -133,12 +134,21 @@ Actor description: ${definition.description}`;
             ACTOR_MAX_MEMORY_MBYTES,
         );
 
+        // AJV must not enforce a truncated enum (#1253) — definition.input still has the full one.
+        const validationSchema = {
+            ...inputSchema,
+            properties: stripTruncatedEnumsForValidation(
+                (inputSchemaWithWaitSecs.properties ?? {}) as Record<string, SchemaProperties>,
+                definition.input?.properties ?? {},
+            ),
+        };
+
         let ajvValidate;
         try {
             // Unknown properties are silently stripped by AJV's removeAdditional option.
             // Dynamic Actor input fields are part of the Actor's own inputSchema, so they
             // are declared properties and won't be stripped.
-            ajvValidate = fixedAjvCompile(ajv, inputSchema);
+            ajvValidate = fixedAjvCompile(ajv, validationSchema);
         } catch (e) {
             // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.
             logHttpError(e, 'Failed to compile schema', {

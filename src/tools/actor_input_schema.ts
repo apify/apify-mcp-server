@@ -365,6 +365,46 @@ export function decodeDotPropertyNames(properties: Record<string, unknown>): Rec
     return decodedProperties;
 }
 
+/**
+ * True if filterAndShortenEnum() truncated the enum — compared against the non-empty raw count,
+ * not raw length, since it also drops blank entries regardless of the character cap.
+ */
+function wasEnumTruncated(displayEnum: string[], rawEnum: string[]): boolean {
+    const nonEmptyRawCount = rawEnum.filter((value) => value !== '').length;
+    return displayEnum.length < nonEmptyRawCount;
+}
+
+/**
+ * Clones properties and drops `enum`/`items.enum` wherever shortenProperties() truncated it —
+ * AJV must not enforce an incomplete list (#1253), but the schema shown to the LLM keeps it.
+ * A property missing from one side (e.g. the injected `waitSecs`) is left untouched.
+ */
+export function stripTruncatedEnumsForValidation(
+    displayProperties: Record<string, SchemaProperties>,
+    rawProperties: Record<string, SchemaProperties>,
+): Record<string, SchemaProperties> {
+    const rawEncoded = encodeDotPropertyNames(rawProperties);
+    const validationProperties = structuredClone(displayProperties);
+
+    for (const [key, property] of Object.entries(validationProperties)) {
+        const rawProperty = rawEncoded[key];
+        if (!rawProperty) continue;
+
+        if (property.enum && rawProperty.enum && wasEnumTruncated(property.enum, rawProperty.enum)) {
+            delete property.enum;
+        }
+        if (
+            property.items?.enum &&
+            rawProperty.items?.enum &&
+            wasEnumTruncated(property.items.enum, rawProperty.items.enum)
+        ) {
+            delete property.items.enum;
+        }
+    }
+
+    return validationProperties;
+}
+
 export function transformActorInputSchemaProperties(input: Readonly<ActorInputSchema>): ActorInputSchemaProperties {
     // Deep clone input to avoid mutating the original object
     const inputClone: ActorInputSchema = structuredClone(input);
