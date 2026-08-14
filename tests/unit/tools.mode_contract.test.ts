@@ -380,9 +380,11 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
         expect(schema.required).toEqual(['query']);
     });
 
-    // Regression: #637 — phantom `default: undefined` from filterSchemaProperties must not clear required.
-    it('should preserve required fields even when upstream writes `default: undefined`', () => {
-        const toolWithPhantomDefaults = {
+    // #675 phase 1: filterSchemaProperties() no longer writes phantom `default: undefined` keys,
+    // so fixZodSchemaRequired's key-presence check now treats an explicit `default: undefined`
+    // the same as a real default (the key is present) and drops the field from `required`.
+    it('drops a field from required when its schema has an explicit `default: undefined`', () => {
+        const toolWithExplicitUndefinedDefault = {
             name: 'apify--some-actor',
             description: 'Test Actor tool',
             inputSchema: {
@@ -395,9 +397,9 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
             },
         } as unknown as ToolBase;
 
-        const { inputSchema } = getToolPublicFieldOnly(toolWithPhantomDefaults, { filterWidgetMeta: false });
+        const { inputSchema } = getToolPublicFieldOnly(toolWithExplicitUndefinedDefault, { filterWidgetMeta: false });
         const schema = inputSchema as { required?: string[] };
 
-        expect(schema.required).toEqual(['query']);
+        expect(schema.required).toEqual([]);
     });
 });

@@ -749,20 +749,8 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result.sources.items).toBeDefined();
         expect(result.sources.items?.properties?.url).toBeDefined();
         // 3. filterSchemaProperties: only allowed fields present
-        // NOTE: includes phantom `default: undefined` etc. from filterSchemaProperties (#675).
-        expect(Object.keys(result['foo-dot-bar'])).toEqual(
-            expect.arrayContaining([
-                'title',
-                'description',
-                'type',
-                'default',
-                'prefill',
-                'properties',
-                'items',
-                'required',
-                'enum',
-            ]),
-        );
+        // 'foo.bar' upstream only declares title/description/type — no default, prefill, enum, etc.
+        expect(Object.keys(result['foo-dot-bar']).sort()).toEqual(['description', 'title', 'type']);
         // 4. shortenProperties: longDesc is truncated, enumProp.enum is shortened
         expect(result.longDesc.description.length).toBeLessThanOrEqual(ACTOR_MAX_DESCRIPTION_LENGTH + 3);
         if (result.enumProp.enum) {

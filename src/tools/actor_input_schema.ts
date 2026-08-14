@@ -83,11 +83,8 @@ export function buildApifySpecificProperties(
  * Filters schema properties to include only the necessary fields.
  * This is done to reduce the size of the input schema and to make it more readable.
  *
- * TODO(#675): This object literal unconditionally assigns every whitelisted key,
- * including `default: undefined`, on properties that didn't declare them upstream.
- * This creates phantom keys that broke `fixZodSchemaRequired()` via key-presence
- * checks (#637). The symptom is patched in `src/utils/ajv.ts` (value-check), but
- * this function should only emit keys whose upstream value is not `undefined`.
+ * Only copies a whitelisted key when the upstream property actually declares it, so
+ * unset fields (e.g. no `default`) aren't turned into phantom `default: undefined` keys.
  *
  * @param properties
  */
@@ -96,17 +93,18 @@ export function filterSchemaProperties(properties: { [key: string]: SchemaProper
 } {
     const filteredProperties: { [key: string]: SchemaProperties } = {};
     for (const [key, property] of Object.entries(properties)) {
-        filteredProperties[key] = {
+        const filtered: SchemaProperties = {
             title: property.title,
             description: property.description,
-            enum: property.enum,
             type: property.type,
-            default: property.default,
-            prefill: property.prefill,
-            properties: property.properties,
-            items: property.items,
-            required: property.required,
         };
+        if (property.enum !== undefined) filtered.enum = property.enum;
+        if (property.default !== undefined) filtered.default = property.default;
+        if (property.prefill !== undefined) filtered.prefill = property.prefill;
+        if (property.properties !== undefined) filtered.properties = property.properties;
+        if (property.items !== undefined) filtered.items = property.items;
+        if (property.required !== undefined) filtered.required = property.required;
+        filteredProperties[key] = filtered;
     }
     return filteredProperties;
 }
