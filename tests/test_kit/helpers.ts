@@ -3,18 +3,21 @@ import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
 import { expect, vi } from 'vitest';
 
-import type { ApifyClient, SERVER_MODE, ToolEntry } from '@apify/actors-mcp-server/internals.js';
+import type { ApifyClient } from '@apify/actors-mcp-server/internals.js';
 import {
     actorNameToToolName,
-    APIFY_ACTOR_RUN_META_KEY,
-    AUTO_INJECTED_TOOLS,
     defaults,
     getCategoryTools,
     getDefaultTools,
     getExpectedToolNamesByCategories,
+} from '@apify/actors-mcp-server/internals.js';
+import type { SERVER_MODE, ToolEntry } from '@apify/actors-mcp-server/internals/test-kit.js';
+import {
+    APIFY_ACTOR_RUN_META_KEY,
+    AUTO_INJECTED_TOOLS,
     HELPER_TOOLS,
     toolCategoriesEnabledByDefault,
-} from '@apify/actors-mcp-server/internals.js';
+} from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import type { CaseCtx, SuiteClient } from './types.js';
 

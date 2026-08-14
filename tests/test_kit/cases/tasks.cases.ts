@@ -2,7 +2,8 @@ import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
-import { actorNameToToolName, ApifyClient, HELPER_TOOLS } from '@apify/actors-mcp-server/internals.js';
+import { actorNameToToolName, ApifyClient } from '@apify/actors-mcp-server/internals.js';
+import { HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_NORMAL_MODE,

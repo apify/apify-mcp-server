@@ -4,7 +4,7 @@ import {
     HELPER_TOOLS,
     RESOURCE_MIME_TYPE,
     SERVER_MODE_AUTO_DETECTION_ENABLED,
-} from '@apify/actors-mcp-server/internals.js';
+} from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import { ACTOR_NORMAL_MODE, expectWidgetToolMeta, getToolNames, withClient } from '../helpers.js';
 import type { Case } from '../types.js';

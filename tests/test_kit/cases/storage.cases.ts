@@ -1,6 +1,7 @@
 import { expect } from 'vitest';
 
-import { actorNameToToolName, actorRunOutputSchema, HELPER_TOOLS } from '@apify/actors-mcp-server/internals.js';
+import { actorNameToToolName } from '@apify/actors-mcp-server/internals.js';
+import { actorRunOutputSchema, HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_NORMAL_MODE,

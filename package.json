@@ -20,6 +20,8 @@
     ".": "./dist/index.js",
     "./internals": "./dist/index_internals.js",
     "./internals.js": "./dist/index_internals.js",
+    "./internals/test-kit": "./dist/index_internals_test_kit.js",
+    "./internals/test-kit.js": "./dist/index_internals_test_kit.js",
     "./test-kit": "./dist/test_kit/index.js",
     "./manifest.json": "./manifest.json"
   },

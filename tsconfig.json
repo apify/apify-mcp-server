@@ -11,7 +11,8 @@
         // type-check (no build step, see AGENTS.md) doesn't need dist/ to exist first —
         // `tsc -b` project builds still work unaliased since src builds before test_kit.
         "paths": {
-            "@apify/actors-mcp-server/internals.js": ["./src/index_internals.ts"]
+            "@apify/actors-mcp-server/internals.js": ["./src/index_internals.ts"],
+            "@apify/actors-mcp-server/internals/test-kit.js": ["./src/index_internals_test_kit.ts"]
         }
     },
     "include": [

@@ -28,7 +28,8 @@ tests/
 Key entry points:
 
 - `src/index.ts` - Main library export (`ActorsMcpServer` class, plus `createStatelessServer` — the per-request registration for 2026-07-28 traffic)
-- `src/index_internals.ts` - Internal exports for testing / advanced usage
+- `src/index_internals.ts` - Internal exports for testing / advanced usage (`./internals`, consumed by apify-mcp-server-internal)
+- `src/index_internals_test_kit.ts` - Internal exports for this package's own `tests/test_kit/**` only (`./internals/test-kit`)
 - `src/stdio.ts` - Standard input/output (CLI) entry point
 - `src/dev_server.ts` - Express HTTP server for local development (`pnpm start`)
 - `src/input.ts` - Input processing and validation

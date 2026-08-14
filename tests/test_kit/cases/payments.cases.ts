@@ -1,7 +1,7 @@
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
-import { HELPER_TOOLS, SKYFIRE_ENABLED_TOOLS } from '@apify/actors-mcp-server/internals.js';
+import { HELPER_TOOLS, SKYFIRE_ENABLED_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, asLegacyClient } from '../helpers.js';
 import type { Case, CaseCtx } from '../types.js';

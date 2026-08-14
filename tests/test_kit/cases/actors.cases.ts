@@ -1,12 +1,7 @@
 import { expect } from 'vitest';
 
-import {
-    actorNameToToolName,
-    ApifyClient,
-    getCategoryTools,
-    HELPER_TOOLS,
-    MAX_LIMIT_WITH_INPUT_SCHEMA,
-} from '@apify/actors-mcp-server/internals.js';
+import { actorNameToToolName, ApifyClient, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
+import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
