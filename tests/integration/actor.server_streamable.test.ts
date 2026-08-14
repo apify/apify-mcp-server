@@ -5,7 +5,7 @@ import type { Express } from 'express';
 import log from '@apify/log';
 
 import { createExpressApp } from '../../src/dev_server.js';
-import { createMcpStreamableClient } from '../helpers.js';
+import { createMcpStreamableClient } from '../test_kit/index.js';
 import { createIntegrationTestsSuite } from './suite.js';
 import { getAvailablePort } from './utils/port.js';
 
@@ -17,7 +17,7 @@ let mcpUrl: string;
 
 createIntegrationTestsSuite({
     suiteName: 'Apify MCP Server Streamable HTTP',
-    transport: 'streamable-http',
+    transport: '2025-11-25',
     createClientFn: async (options) => await createMcpStreamableClient(mcpUrl, options),
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);
@@ -36,8 +36,7 @@ createIntegrationTestsSuite({
         });
     },
     afterAllFn: async () => {
-        // closeAllConnections first — lingering long-poll requests (default waitSecs=30) keep
-        // the keep-alive sockets open and block server.close() past vitest's 10s hookTimeout.
+        // Drain long-poll keep-alives before close (waitSecs default 30).
         httpServer.closeAllConnections?.();
         await new Promise<void>((resolve) => {
             httpServer.close(() => resolve());

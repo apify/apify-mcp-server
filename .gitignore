@@ -39,3 +39,4 @@ __pycache__/
 *.pyd
 .Python
 dev.log
+.pnpm-store

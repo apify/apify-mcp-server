@@ -28,7 +28,8 @@ tests/
 Key entry points:
 
 - `src/index.ts` - Main library export (`ActorsMcpServer` class, plus `createStatelessServer` — the per-request registration for 2026-07-28 traffic)
-- `src/index_internals.ts` - Internal exports for testing / advanced usage
+- `src/index_internals.ts` - Internal exports for testing / advanced usage (`./internals`, consumed by apify-mcp-server-internal)
+- `src/index_internals_test_kit.ts` - Internal exports for this package's own `tests/test_kit/**` only (`./internals/test-kit`)
 - `src/stdio.ts` - Standard input/output (CLI) entry point
 - `src/dev_server.ts` - Express HTTP server for local development (`pnpm start`)
 - `src/input.ts` - Input processing and validation
@@ -158,7 +159,7 @@ It also runs automatically on every merge to the `master` branch.
 
 ### Test Actors
 
-Integration tests run against two purpose-built Actors defined in [apify/mcp-server-test-actor](https://github.com/apify/mcp-server-test-actor) and referenced from [`tests/const.ts`](./tests/const.ts):
+Integration tests run against two purpose-built Actors defined in [apify/mcp-server-test-actor](https://github.com/apify/mcp-server-test-actor) and referenced from [`tests/test_kit/helpers.ts`](./tests/test_kit/helpers.ts):
 
 | Actor | Constant | Purpose |
 |---|---|---|
@@ -169,16 +170,31 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
 
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
-  - `tests/integration/suite.ts` — **main integration test suite** where all test cases should be added
-  - Other files in this directory set up different transport dimensions (stdio, streamable-http, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
+  - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `tests/test_kit/cases/*.cases.ts`, not here
+  - Other files in this directory set up different transport dimensions (`stdio`, `2025-11-25` streamable HTTP, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
 - `tests/helpers.ts` — shared test utilities
-- `tests/const.ts` — test constants
+- `tests/test_kit/helpers.ts` — shared test constants and assertion helpers, published behind `./test-kit`
 
 ### Test organization across repos
 
-This package is also used by the hosted server in `apify-mcp-server-internal`. To avoid copying test bodies across the boundary, each repo owns its own tests.
+**Why `CaseCtx` couples the two repos.** MCP contract tests (protocol, tools, prompts,
+resources) have one correct behavior regardless of who's hosting the server, so they
+live here once and internal imports them — no second copy to keep in sync. Internal
+keeps only what's genuinely deployment-specific: databases, rate limiting, auth,
+multi-node coordination. `CaseCtx` is the seam that makes sharing possible without
+merging the two codebases — it's a non-standard cross-repo dependency injection
+(each side supplies its own client/environment for the same case logic), accepted
+deliberately for this trade-off.
 
-**Tests in this repo** cover the package's MCP and library surface. They live in `tests/integration/suite.ts` and `tests/unit/`:
+This package is also used by the hosted server in `apify-mcp-server-internal`. Every integration case is a `Case` object (`{ name, isDeploymentTest, run, ... }`) defined in `tests/test_kit/cases/*.cases.ts` — published behind the package's `./test-kit` export (`vitest` optional peerDependency). This repo's own `suite.ts` runs every case via `registerCases(name, allGroupCases, ctx)`; internal imports the same case arrays via `@apify/actors-mcp-server/test-kit` and calls `registerCases(name, allCases, { ...ctx, isDeploymentTestOnly: true })` against its own live staging/prod deploy — cases with `isDeploymentTest: false` register as `it.skip` there, so nothing needs re-registering by hand.
+
+Cases that share expensive setup (one seeded Actor run, say) do it via `ctx.getFixture(fixture)` (`Fixture<T> = { key, setup(ctx) }`) instead of a vitest `beforeAll` — `setup` runs at most once per `registerCases` call (once per transport dimension), memoized by `fixture.key`, no matter how many or few of the cases sharing it actually run (e.g. under `isDeploymentTestOnly`). This is what lets `storage.cases.ts`'s 13 cases built on one seeded run stay ordinary, individually eligible-for-`isDeploymentTest` `Case` objects instead of a separate non-flattenable group. See `tests/test_kit/register.ts` and `storage.cases.ts`'s `normalModeRunFixture`.
+
+Marking a case `isDeploymentTest: true` is a one-line edit on its existing definition — there is no second array or file to keep in sync, and internal picks up every current and future deployment-test case automatically on its next dependency bump. Flipping a case to `isDeploymentTest: true` is a per-PR judgment call, not automatic — most cases stay `isDeploymentTest: false` (this-repo-only in practice, since internal only registers the `isDeploymentTest` subset).
+
+This is a real execution decision, not a visibility flag: internal's `isDeploymentTestOnly` `registerCases` call runs as part of its release pipeline — against **staging** when a release PR opens, against **production** when it merges to `master` (real API calls, real Actor runs, billed and user-visible). Mark a case `isDeploymentTest: true` only if it earns that.
+
+**Tests in this repo** cover the package's MCP and library surface. They live in `tests/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
 - Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name capability detection, `?ui=` server-mode parsing.

@@ -20,7 +20,22 @@
     ".": "./dist/index.js",
     "./internals": "./dist/index_internals.js",
     "./internals.js": "./dist/index_internals.js",
+    "./internals/test-kit": "./dist/index_internals_test_kit.js",
+    "./internals/test-kit.js": "./dist/index_internals_test_kit.js",
+    "./test-kit": "./dist/test_kit/index.js",
     "./manifest.json": "./manifest.json"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "vitest": "^4.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/client": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
   },
   "bin": {
     "actors-mcp-server": "./dist/stdio.js"
@@ -97,11 +112,11 @@
     "start": "tsx src/dev_server.ts",
     "dev": "node scripts/dev_standby.js",
     "build": "pnpm run build:core && pnpm run build:web",
-    "build:core": "tsc -b src",
+    "build:core": "tsc -b src && tsc -b tests/test_kit",
     "build:watch": "tsc -b src -w",
     "build:web": "pnpm --filter @apify/mcp-web-widget run build",
     "postbuild": "mkdir -p dist/web && (cp -r src/web/dist dist/web/ 2>/dev/null || :)",
-    "clean": "tsc -b src --clean && rm -rf dist/web",
+    "clean": "tsc -b src --clean && tsc -b tests/test_kit --clean && rm -rf dist/web",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
     "format": "oxfmt",
