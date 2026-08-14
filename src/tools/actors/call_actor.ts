@@ -14,7 +14,7 @@ import {
     FAILURE_CATEGORY,
     HELPER_TOOLS,
 } from '../../const.js';
-import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
+import { ACTOR_LOAD_ERROR_KIND, ActorInputValidationError, ActorLoadError } from '../../errors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import type { PaymentProvider } from '../../payments/types.js';
@@ -42,6 +42,7 @@ import {
 import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
+import { validateActorInputRemotely } from '../../utils/validate_actor_input.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
@@ -410,8 +411,10 @@ export async function resolveAndValidateActor(params: {
     actorName: string;
     input: Record<string, unknown>;
     toolArgs: InternalToolArgs;
+    /** Build the run will use, so remote validation checks the same build's schema. */
+    build?: string;
 }): Promise<{ error: ToolResponse } | { actor: ToolEntry }> {
-    const { actorName, input, toolArgs } = params;
+    const { actorName, input, toolArgs, build } = params;
     const { apifyClient } = toolArgs;
 
     const { tools, errors } = await getActorsAsTools([actorName], apifyClient, {
@@ -487,6 +490,28 @@ export async function resolveAndValidateActor(params: {
                 detail: validationSummary.slice(0, 200) || 'input validation failed',
                 ajvErrorDetails: ajvDetails,
             }),
+        };
+    }
+
+    try {
+        await validateActorInputRemotely({ apifyClient, actorId: actorId ?? actorName, input, build });
+    } catch (error) {
+        if (!(error instanceof ActorInputValidationError)) throw error;
+
+        log.softFail('Actor input failed platform validation', {
+            actorName,
+            mcpSessionId: toolArgs.mcpSessionId,
+            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+        });
+        return {
+            error: respondUserError(
+                [
+                    `Input validation failed for Actor '${actorName}'. Please ensure your input matches the Actor's input schema.`,
+                    `Input schema:\n${wrapJsonText(actor.inputSchema)}`,
+                    `Validation errors: ${error.message}`,
+                ],
+                { actorId, detail: error.message.slice(0, 200) },
+            ),
         };
     }
 
@@ -582,6 +607,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
             actorName: baseActorName,
             input: input as Record<string, unknown>,
             toolArgs,
+            build: callOptions?.build,
         });
         if ('error' in resolution) {
             return resolution.error;

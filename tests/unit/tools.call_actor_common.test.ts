@@ -334,6 +334,53 @@ describe('call_actor_common', () => {
                 actorId: 'actor-id-rag',
             });
         });
+
+        function toolArgsWithRemoteValidation(request: (...args: unknown[]) => Promise<unknown>): InternalToolArgs {
+            return {
+                apifyClient: { httpClient: { axios: { request } } },
+                mcpSessionId: 'session-1',
+            } as unknown as InternalToolArgs;
+        }
+
+        it('returns the actor once local AJV and remote platform validation both pass', async () => {
+            mockActorTool((() => true) as never);
+            const request = vi.fn().mockResolvedValue({ status: 200, data: { valid: true } });
+
+            const resolution = await resolveAndValidateActor({
+                actorName: 'apify/rag-web-browser',
+                input: { query: 'x' },
+                toolArgs: toolArgsWithRemoteValidation(request),
+                build: 'beta',
+            });
+
+            expect('actor' in resolution).toBe(true);
+            expect(request).toHaveBeenCalledWith(expect.objectContaining({ params: { build: 'beta' } }));
+        });
+
+        it('rejects with the platform message when local AJV passes but remote validation fails', async () => {
+            mockActorTool((() => true) as never);
+            const request = vi.fn().mockResolvedValue({
+                status: 400,
+                data: { error: { type: 'invalid-input', message: 'query: must be a non-empty string' } },
+            });
+
+            const resolution = await resolveAndValidateActor({
+                actorName: 'apify/rag-web-browser',
+                input: { query: '' },
+                toolArgs: toolArgsWithRemoteValidation(request),
+            });
+
+            const { error } = resolution as { error: TextToolResult & { toolTelemetry?: Record<string, unknown> } };
+            expect(error.isError).toBe(true);
+            const allText = (error.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain('query: must be a non-empty string');
+            expect(allText).toContain(JSON.stringify(INPUT_SCHEMA));
+            expect(error.toolTelemetry).toMatchObject({
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                actorId: 'actor-id-rag',
+            });
+        });
     });
 
     describe('handleMcpToolCall()', () => {

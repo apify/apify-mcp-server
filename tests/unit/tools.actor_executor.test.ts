@@ -1,5 +1,5 @@
 import type { ActorRun } from 'apify-client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { ActorExecutionParams } from '../../src/types.js';
@@ -98,6 +98,7 @@ function buildParams(
         spies,
         params: {
             actorFullName: ACTOR_FULL_NAME,
+            actorId: 'actor-id-1',
             input,
             apifyClient: client,
             callOptions: {},
@@ -141,6 +142,37 @@ describe('actorExecutor', () => {
             await actorExecutor.executeActorTool(params);
 
             expect(spies.waitForFinishOpts).toEqual({ waitSecs: undefined });
+            expect(spies.startInput).toEqual({ query: 'foo' });
+        });
+    });
+
+    // Direct actor tools skip `resolveAndValidateActor` — the remote check is wired here separately.
+    describe('remote input validation', () => {
+        it('rejects before starting the run when the platform confirms invalid input', async () => {
+            const { params, spies } = buildParams({ query: 'foo' });
+            const request = vi.fn().mockResolvedValue({
+                status: 400,
+                data: { error: { type: 'invalid-input', message: 'query: must be a non-empty string' } },
+            });
+            params.apifyClient = {
+                ...params.apifyClient,
+                httpClient: { axios: { request } },
+            } as unknown as typeof params.apifyClient;
+
+            await expect(actorExecutor.executeActorTool(params)).rejects.toThrow('query: must be a non-empty string');
+            expect(spies.startInput).toBeUndefined();
+        });
+
+        it('starts the run as usual when the platform confirms valid input', async () => {
+            const { params, spies } = buildParams({ query: 'foo' });
+            const request = vi.fn().mockResolvedValue({ status: 200, data: { valid: true } });
+            params.apifyClient = {
+                ...params.apifyClient,
+                httpClient: { axios: { request } },
+            } as unknown as typeof params.apifyClient;
+
+            await actorExecutor.executeActorTool(params);
+
             expect(spies.startInput).toEqual({ query: 'foo' });
         });
     });

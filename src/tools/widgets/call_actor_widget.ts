@@ -105,6 +105,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
                 actorName: baseActorName,
                 input: input as Record<string, unknown>,
                 toolArgs,
+                build: callOptions?.build,
             });
             if ('error' in resolution) {
                 return resolution.error;

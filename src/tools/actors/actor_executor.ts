@@ -3,6 +3,7 @@ import log from '@apify/log';
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { redactSkyfirePayId } from '../../utils/logging.js';
+import { validateActorInputRemotely } from '../../utils/validate_actor_input.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 
@@ -36,6 +37,13 @@ export const actorExecutor: ActorExecutor = {
             });
             return null;
         }
+
+        await validateActorInputRemotely({
+            apifyClient,
+            actorId: params.actorId,
+            input: actorInput,
+            build: params.callOptions.build,
+        });
 
         const actorRun = await apifyClient.actor(actorFullName).start(actorInput, params.callOptions);
 

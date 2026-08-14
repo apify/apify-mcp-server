@@ -15,6 +15,15 @@ export class SchemaTooLargeError extends Error {
     }
 }
 
+/**
+ * Thrown when Apify's `validate-input` endpoint confirms Actor input is invalid against its real
+ * schema. `statusCode` lets the existing HTTP-based classifiers treat it as a 4xx user error.
+ */
+export class ActorInputValidationError extends Error {
+    override readonly name = 'ActorInputValidationError';
+    readonly statusCode = 400;
+}
+
 export const ACTOR_LOAD_ERROR_KIND = {
     NOT_FOUND: 'not-found',
     LOAD_FAILED: 'load-failed',
