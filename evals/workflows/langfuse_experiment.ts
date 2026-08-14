@@ -19,8 +19,9 @@ import { evaluateConversation } from './workflow_judge.js';
 /**
  * Output produced by the experiment task for a single dataset item.
  *
- * A summary, not the transcript: the SDK writes whatever the task returns to the item's
- * root span, so returning conversations would re-upload every tool payload.
+ * The SDK writes whatever the task returns to the item's root span, so this stays a
+ * summary: the transcript carries narration and tool names, never the tool payloads,
+ * which would otherwise be re-uploaded on top of the tool spans that already hold them.
  */
 export type WorkflowTaskOutput = {
     /** Item id, carried here because `ExperimentItemResult.item` is typed as a union without one. */
