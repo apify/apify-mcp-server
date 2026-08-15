@@ -77,7 +77,7 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
   - For MCP server Actors, use format "actorName:toolName" to call specific tools.
   - Supports a \`waitSecs\` parameter (default 30, max 45):
     - \`waitSecs: 0\`: fire-and-forget — starts the run and returns immediately with a runId.
-    - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns the result.
+    - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns its current status and storage IDs (never the output rows — fetch those with \`${HELPER_TOOLS.DATASET_GET_ITEMS}\`).
 
 ### Tool disambiguation
 - **\`${HELPER_TOOLS.STORE_SEARCH}\` vs \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`:**
@@ -87,7 +87,7 @@ ${
         ? `- **Data vs widget Actor tools (when the client supports widgets):**
   - \`${HELPER_TOOLS.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HELPER_TOOLS.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.
   - \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.
-  - \`${HELPER_TOOLS.ACTOR_CALL}\` runs the Actor and returns its result (no UI); \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.
+  - \`${HELPER_TOOLS.ACTOR_CALL}\` runs the Actor and returns its run status and storage IDs (no UI); \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.
   - \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.
   - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.
 `

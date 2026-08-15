@@ -29,7 +29,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
     title: 'Get key-value store keys',
     description: dedent`
         List the keys in a key-value store — key names and basic info (e.g., size), not their values.
-        Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} to read one.
+        Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} to read one if that tool is available in this session.
         Use exclusiveStartKey and limit to paginate.
 
         USAGE:

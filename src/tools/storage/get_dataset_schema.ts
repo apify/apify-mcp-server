@@ -29,10 +29,10 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
     title: 'Get dataset schema',
     description: dedent`
         Generate a JSON schema inferred from a sample of dataset items — field names and types.
-        Not the full field list, item counts, or stats — use ${HELPER_TOOLS.DATASET_GET} for those.
+        Not the full field list, item counts, or stats — use ${HELPER_TOOLS.DATASET_GET} for those if it is available in this session.
         The schema can be used for validation, documentation, or processing.
 
-        Do not use for metadata, stats, or fetching rows — use ${HELPER_TOOLS.DATASET_GET} or ${HELPER_TOOLS.DATASET_GET_ITEMS}.
+        Do not use for metadata, stats, or fetching rows. If ${HELPER_TOOLS.DATASET_GET} is available in this session, use it for metadata and stats; if ${HELPER_TOOLS.DATASET_GET_ITEMS} is available in this session, use it for rows.
 
         USAGE:
         - Use when the user asks for a JSON schema or to infer structure/shape from a sample.

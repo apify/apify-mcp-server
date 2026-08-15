@@ -401,3 +401,73 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
         expect(schema.required).toEqual(['query']);
     });
 });
+
+/**
+ * A description must not name a tool that is absent from the same session — the model would call
+ * something `tools/list` never returned. Descriptions are module-level constants, so nothing gates
+ * them per session: `suggestTool` (storage_helpers.ts) only guards runtime response text.
+ *
+ * The one allowed form is an explicit hedge ({@link SESSION_HEDGE}), as used in call_actor.ts.
+ */
+describe('tool descriptions never name a tool absent from the session', () => {
+    const ALL_TOOL_NAMES: HelperToolName[] = Object.values(HELPER_TOOLS);
+
+    /** Prose that makes a reference to a possibly-absent tool explicit rather than misleading. */
+    const SESSION_HEDGE = 'is available in this session';
+
+    /** Minimal direct Actor tool — enough to trigger AUTO_INJECTED_TOOLS and stand in for a real one. */
+    const actorToolStub = {
+        type: 'actor',
+        name: 'apify--rag-web-browser',
+        actorId: 'test-actor-id',
+        actorFullName: 'apify/rag-web-browser',
+        description: `Fetch output rows with ${HELPER_TOOLS.DATASET_GET_ITEMS}.`,
+        inputSchema: { type: 'object', properties: {} },
+    } as unknown as ToolEntry;
+
+    const sessions: { label: string; input: Input; actorTools: ToolEntry[] }[] = [
+        { label: 'default (no selectors)', input: {}, actorTools: [actorToolStub] },
+        { label: "tools: ['docs']", input: { tools: ['docs'] }, actorTools: [] },
+        { label: "tools: ['runs']", input: { tools: ['runs'] }, actorTools: [] },
+        { label: "tools: ['storage']", input: { tools: ['storage'] }, actorTools: [] },
+        { label: "tools: ['actors']", input: { tools: ['actors'] }, actorTools: [] },
+        ...ALL_TOOL_NAMES.map((name) => ({
+            label: `tools: ['${name}']`,
+            input: { tools: [name] },
+            actorTools: [],
+        })),
+        {
+            label: 'Actor tool only',
+            input: { tools: ['apify/rag-web-browser'] },
+            actorTools: [actorToolStub],
+        },
+    ];
+
+    for (const mode of SERVER_MODES) {
+        for (const { label, input, actorTools } of sessions) {
+            it(`${label} in ${mode} mode`, () => {
+                const tools = getToolsForServerMode(input, actorTools, mode);
+                const present = new Set(tools.map((t) => t.name));
+                const absent = ALL_TOOL_NAMES.filter((name) => !present.has(name));
+
+                const violations: string[] = [];
+                for (const tool of tools) {
+                    for (const line of (tool.description ?? '').split('\n')) {
+                        if (line.includes(SESSION_HEDGE)) continue;
+                        for (const name of absent) {
+                            // Boundary guard so `get-dataset` does not match inside `get-dataset-items`,
+                            // nor `call-actor` inside `call-actor-widget`. `:` is excluded too — it
+                            // marks a remote MCP-Actor tool ("apify/actors-mcp-server:fetch-apify-docs"),
+                            // not a tool served from this session.
+                            if (new RegExp(`(?<![\\w-:])${name}(?![\\w-])`).test(line)) {
+                                violations.push(`${tool.name} names absent ${name}: ${line.trim()}`);
+                            }
+                        }
+                    }
+                }
+
+                expect(violations).toEqual([]);
+            });
+        }
+    }
+});

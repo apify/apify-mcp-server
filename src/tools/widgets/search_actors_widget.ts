@@ -33,8 +33,7 @@ const SEARCH_ACTORS_WIDGET_DESCRIPTION = dedent`
     The response renders as an interactive widget the user can view directly.
 
     For silent name resolution before running an Actor (e.g., "scrape google maps" — you need to
-    find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH}
-    instead — it returns the same data without rendering a widget.
+    find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH} if that tool is available in this session — it returns the same data without rendering a widget.
 
     Input: keywords (plus optional limit/offset). Output fields are fixed by the widget contract.
 `;

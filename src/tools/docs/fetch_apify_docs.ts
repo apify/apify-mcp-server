@@ -61,7 +61,7 @@ export const fetchApifyDocs: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.DOCS_FETCH,
     title: 'Fetch Apify docs',
     description: `Fetch the full content of an Apify or Crawlee documentation page by its URL.
-Use this after finding a relevant page with the ${HELPER_TOOLS.DOCS_SEARCH} tool.
+Use this after finding a relevant page with ${HELPER_TOOLS.DOCS_SEARCH}, if that tool is available in this session.
 
 USAGE:
 - Use when you need the complete content of a specific docs page for detailed answers.

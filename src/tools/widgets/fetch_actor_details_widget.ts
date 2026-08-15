@@ -38,8 +38,7 @@ const FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION = dedent`
     The response renders as an interactive widget the user can view directly.
 
     For silent data lookups (e.g., fetching the input schema before calling an Actor, inspecting README
-    for decision making), use ${HELPER_TOOLS.ACTOR_GET_DETAILS} instead — it returns the same data
-    without rendering a widget.
+    for decision making), use ${HELPER_TOOLS.ACTOR_GET_DETAILS} if that tool is available in this session — it returns the same data without rendering a widget.
 
     Input: the Actor ID or full name only. Output fields are fixed by the widget contract.
 `;

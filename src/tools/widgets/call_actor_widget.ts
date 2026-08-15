@@ -49,17 +49,15 @@ const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
     Use this tool ONLY when the user explicitly wants to see run progress visually
     (e.g., "run apify/rag-web-browser and show progress", "start this Actor with a progress view").
     The response renders as an interactive widget that automatically tracks run status until
-    completion — do NOT poll or call any other tool after this.
+    completion — do NOT poll the run status after this. If ${HELPER_TOOLS.DATASET_GET_ITEMS} is available in this session, use it to fetch output once the widget reports completion.
 
-    For silent async starts where no UI is needed (e.g., "start this in the background",
-    or when your next step is to fetch results via ${HELPER_TOOLS.DATASET_GET_ITEMS}), use
-    ${HELPER_TOOLS.ACTOR_CALL} instead — it returns the same runId without rendering a widget.
+    For silent starts where no UI is needed (e.g., "start this in the background"), use ${HELPER_TOOLS.ACTOR_CALL} when it is available in this session — same run, no widget.
 
     WORKFLOW:
-    1. Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema
+    1. Get the Actor's input schema with ${HELPER_TOOLS.ACTOR_GET_DETAILS}, when that tool is available in this session
     2. Call this tool with the actor name and proper input based on the schema
 
-    If the actor name is not in "username/name" format, use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first.
+    If the actor name is not in "username/name" format and ${HELPER_TOOLS.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
 
     Input: actor name and input JSON; callOptions (memory, timeout) are optional.
 `;

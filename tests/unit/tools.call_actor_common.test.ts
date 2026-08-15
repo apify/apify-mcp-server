@@ -35,7 +35,9 @@ describe('call_actor_common', () => {
         it('builds the description with public helper tools and waitSecs guidance', () => {
             const description = buildCallActorDescription();
 
-            expect(description).toContain(`Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema`);
+            expect(description).toContain(
+                `Get the Actor's input schema with ${HELPER_TOOLS.ACTOR_GET_DETAILS}, when that tool is available in this session`,
+            );
             expect(description).toContain(
                 `${HELPER_TOOLS.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`,
             );
@@ -43,6 +45,12 @@ describe('call_actor_common', () => {
             expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
             expect(description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        });
+
+        // The waitSecs: 0 path (buildStartRunSharedContent) returns id-only storages and never
+        // reaches buildRunDataset, so the field-metadata promise must stay tied to waitSecs > 0.
+        it('promises dataset field metadata only for a non-zero wait', () => {
+            expect(buildCallActorDescription()).toContain('with waitSecs > 0 also reports dataset field metadata');
         });
     });
 

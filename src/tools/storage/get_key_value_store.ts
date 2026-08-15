@@ -24,7 +24,7 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
     title: 'Get key-value store',
     description: dedent`
         Get metadata for a key-value store — a flexible store for unstructured data or files.
-        Returns store details and usage stats, not its records — use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} to list what it holds.
+        Returns store details and usage stats, not its records — use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} to list what it holds if that tool is available in this session.
 
         USAGE:
         - Use when you need to inspect a store to locate records or understand its properties.

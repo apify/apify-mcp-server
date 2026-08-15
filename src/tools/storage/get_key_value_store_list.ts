@@ -39,7 +39,7 @@ export const getKeyValueStoreList: ToolEntry = Object.freeze({
     title: 'Get user key-value stores list',
     description: dedent`
         List the key-value stores owned by the authenticated user — flexible storage for unstructured data or files.
-        Returns summaries only, not their contents — use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} to inspect one from the list.
+        Returns summaries only, not their contents — use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} to inspect one when it is available in this session.
         Actor runs automatically produce unnamed stores (set unnamed=true to include them); users can also create named stores.
         Sorted by createdAt (ascending by default); use limit, offset, and desc to paginate and sort.
 

@@ -63,7 +63,7 @@ export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server 
 
 /** Shared MCP server instructions — identical in both modes. */
 export const CALL_ACTOR_MCP_SERVER_SECTION = `For MCP server Actors:
-- Use fetch-actor-details with output={ mcpTools: true } to list available tools
+- List the available tools with ${HELPER_TOOLS.ACTOR_GET_DETAILS} and output={ mcpTools: true }, when that tool is available in this session
 - Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")`;
 
 /** Shared "two ways to run" + USAGE section — identical in both modes. */
@@ -90,7 +90,7 @@ type CallActorErrorResponseParams = {
 const WIDGET_ADDENDUM = dedent`
     WIDGET ALTERNATIVE (apps mode):
     - If the user explicitly asks to see live progress, call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead — it renders an interactive UI that tracks the run.
-    - For silent name resolution before this call, use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}, which renders UI).
+    - For silent name resolution before this call, use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}, which renders UI) when it is available in this session.
 `;
 
 function buildCallActorDescriptionSections(includeWidget: boolean): string {
@@ -98,7 +98,7 @@ function buildCallActorDescriptionSections(includeWidget: boolean): string {
         'Call any Actor from the Apify Store.',
         dedent`
             WORKFLOW:
-            1. Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema
+            1. Get the Actor's input schema with ${HELPER_TOOLS.ACTOR_GET_DETAILS}, when that tool is available in this session
             2. Call this tool with the actor name and proper input based on the schema
 
             If the actor name is not in "username/name" format and ${HELPER_TOOLS.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
@@ -106,7 +106,7 @@ function buildCallActorDescriptionSections(includeWidget: boolean): string {
         CALL_ACTOR_MCP_SERVER_SECTION,
         dedent`
             IMPORTANT:
-            - Waits up to waitSecs (default 30s) for completion; returns run status, storage IDs, and field metadata
+            - Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, and with waitSecs > 0 also reports dataset field metadata
             - Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
             - Use dedicated Actor tools when available for better experience
         `,

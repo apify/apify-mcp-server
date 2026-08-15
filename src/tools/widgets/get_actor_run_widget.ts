@@ -32,8 +32,7 @@ const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
     Use this tool ONLY when the user explicitly wants to see run progress visually
     (e.g., "show progress for run y2h7sK3Wc", "display the status of that run").
 
-    For silent data lookups (run status, dataset IDs, stats, resource IDs), use
-    ${HELPER_TOOLS.ACTOR_RUNS_GET} instead — it returns the same data without rendering a widget.
+    For silent data lookups (run status, dataset IDs, stats, resource IDs), use ${HELPER_TOOLS.ACTOR_RUNS_GET} if that tool is available in this session — it returns the same data without rendering a widget.
 `;
 
 export const getActorRunWidget: ToolEntry = Object.freeze({

@@ -28,7 +28,7 @@ function buildToolDescription(): string {
     );
 
     return `Search Apify and Crawlee documentation using full-text search.
-Do not also call ${HELPER_TOOLS.STORE_SEARCH} unless the user asks to find Actors in the Apify store.
+Do not also search the Apify Store unless the user asks to find Actors.
 
 You must explicitly select which documentation source to search using the docSource parameter:
 
@@ -37,7 +37,7 @@ ${sources}
 The results will include the URL of the documentation page (which may include an anchor),
 and a limited piece of content that matches the search query.
 
-Fetch the full content of the document using the ${HELPER_TOOLS.DOCS_FETCH} tool by providing the URL.
+Fetch the full content by URL with ${HELPER_TOOLS.DOCS_FETCH} if that tool is available in this session.
 
 ${PLATFORM_DOCS_PREFERENCE}`;
 }

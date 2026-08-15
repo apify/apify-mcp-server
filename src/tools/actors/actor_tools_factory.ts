@@ -125,7 +125,7 @@ export async function getNormalActorsAsTools(
 Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.
 Actor description: ${definition.description}`;
         if (isRag) {
-            description += RAG_WEB_BROWSER_ADDITIONAL_DESC;
+            description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
         }
 
         const memoryMbytes = Math.min(

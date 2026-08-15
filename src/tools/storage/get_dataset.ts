@@ -26,14 +26,14 @@ export const getDataset: ToolEntry = Object.freeze({
     title: 'Get dataset',
     description: dedent`
         Get metadata for a dataset — a collection of structured data produced by an Actor run.
-        Returns the field list and item counts, not the row data — use ${HELPER_TOOLS.DATASET_GET_ITEMS} for the data, ${HELPER_TOOLS.DATASET_SCHEMA_GET} for inferred field types.
-        Do not use when the user asks to retrieve, show, or get results/data/rows — use ${HELPER_TOOLS.DATASET_GET_ITEMS}.
+        Returns the field list and item counts, not the row data. If ${HELPER_TOOLS.DATASET_GET_ITEMS} is available in this session, use it for rows; if ${HELPER_TOOLS.DATASET_SCHEMA_GET} is available in this session, use it for inferred field types.
+        Do not use when the user asks to retrieve, show, or get results/data/rows — use ${HELPER_TOOLS.DATASET_GET_ITEMS} if it is available in this session.
         stats.inflatedBytes (when present) is the approximate uncompressed byte size — use it with itemCount to pick a safe limit and fields before fetching.
         Note: itemCount updates may be delayed by up to ~5 seconds.
 
         USAGE:
         - Use when you need dataset metadata: item count, stats, or the field list.
-        - Call this tool alone — do not also call ${HELPER_TOOLS.DATASET_SCHEMA_GET}.
+        - Call this tool alone — do not also call ${HELPER_TOOLS.DATASET_SCHEMA_GET} if it is available in this session.
 
         USAGE EXAMPLES:
         - user_input: Show info for dataset xyz123

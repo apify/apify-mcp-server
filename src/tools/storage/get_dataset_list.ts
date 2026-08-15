@@ -39,7 +39,7 @@ export const getDatasetList: ToolEntry = Object.freeze({
     title: 'Get user datasets list',
     description: dedent`
         List the datasets owned by the authenticated user — collections of structured data produced by Actor runs.
-        Returns summaries only, not their contents — use ${HELPER_TOOLS.DATASET_GET} to inspect one from the list.
+        Returns summaries only, not their contents — use ${HELPER_TOOLS.DATASET_GET} to inspect one when it is available in this session.
         Actor runs automatically produce unnamed datasets (set unnamed=true to include them); users can also create named datasets.
         Each dataset's stats.inflatedBytes is its approximate uncompressed byte size — use it with itemCount to gauge size before fetching.
         Sorted by createdAt (ascending by default); use limit (max 20), offset, and desc to paginate and sort.
