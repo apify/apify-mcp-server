@@ -21,7 +21,8 @@ ajv.removeKeyword('format');
  * breaks AJV compilation.
  *
  * Uses a value-check (`field.default !== undefined`) instead of key-presence (`'default' in field`)
- * because `filterSchemaProperties()` assigns phantom `default: undefined` on every property (#675).
+ * so a future regression that reintroduces phantom `default: undefined` keys cannot clear
+ * required fields again (#637). `filterSchemaProperties` no longer emits those phantoms.
  *
  * @see https://github.com/apify/apify-mcp-server/issues/637
  */

@@ -8,6 +8,7 @@ import {
     decodeDotPropertyNames,
     encodeDotPropertyNames,
     filterAndShortenEnum,
+    filterSchemaProperties,
     fixedAjvCompile,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
@@ -748,21 +749,14 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result.proxy.properties?.useApifyProxy).toBeDefined();
         expect(result.sources.items).toBeDefined();
         expect(result.sources.items?.properties?.url).toBeDefined();
-        // 3. filterSchemaProperties: only allowed fields present
-        // NOTE: includes phantom `default: undefined` etc. from filterSchemaProperties (#675).
-        expect(Object.keys(result['foo-dot-bar'])).toEqual(
-            expect.arrayContaining([
-                'title',
-                'description',
-                'type',
-                'default',
-                'prefill',
-                'properties',
-                'items',
-                'required',
-                'enum',
-            ]),
-        );
+        // 3. filterSchemaProperties: only defined allowed fields (no phantom undefined keys)
+        expect(Object.keys(result['foo-dot-bar']).sort()).toEqual(['description', 'title', 'type']);
+        expect(result['foo-dot-bar']).not.toHaveProperty('default');
+        expect(result['foo-dot-bar']).not.toHaveProperty('prefill');
+        expect(result['foo-dot-bar']).not.toHaveProperty('enum');
+        // UI-only `editor` is stripped from proxy / sources after filtering
+        expect(result.proxy).not.toHaveProperty('editor');
+        expect(result.sources).not.toHaveProperty('editor');
         // 4. shortenProperties: longDesc is truncated, enumProp.enum is shortened
         expect(result.longDesc.description.length).toBeLessThanOrEqual(ACTOR_MAX_DESCRIPTION_LENGTH + 3);
         if (result.enumProp.enum) {
@@ -857,6 +851,125 @@ describe('transformActorInputSchemaProperties', () => {
         // Verify that other transformations were applied
         expect(result.placeIds.title).toBe('🗃 Place IDs');
         expect(result.placeIds.description).toBe(input.properties.placeIds.description);
+    });
+});
+
+describe('filterSchemaProperties()', () => {
+    it('preserves JSON Schema validation keywords and omits undefined optionals', () => {
+        const filtered = filterSchemaProperties({
+            maxResults: {
+                type: 'integer',
+                title: 'Max results',
+                description: 'Cap',
+                minimum: 1,
+                maximum: 100,
+                default: 10,
+            },
+            query: {
+                type: 'string',
+                title: 'Query',
+                description: 'Search',
+                minLength: 1,
+                maxLength: 200,
+                pattern: '^[a-z]+$',
+            },
+            tags: {
+                type: 'array',
+                title: 'Tags',
+                description: 'Tags',
+                minItems: 1,
+                maxItems: 5,
+                uniqueItems: true,
+                items: { type: 'string', title: 'Tag', description: 'One tag' },
+            },
+        });
+
+        expect(filtered.maxResults).toEqual({
+            type: 'integer',
+            title: 'Max results',
+            description: 'Cap',
+            minimum: 1,
+            maximum: 100,
+            default: 10,
+        });
+        expect(filtered.maxResults).not.toHaveProperty('prefill');
+        expect(filtered.query).toMatchObject({
+            minLength: 1,
+            maxLength: 200,
+            pattern: '^[a-z]+$',
+        });
+        expect(filtered.tags).toMatchObject({
+            minItems: 1,
+            maxItems: 5,
+            uniqueItems: true,
+        });
+        expect(filtered.tags).not.toHaveProperty('editor');
+    });
+
+    it('keeps exclusive bounds when declared', () => {
+        const filtered = filterSchemaProperties({
+            score: {
+                type: 'number',
+                title: 'Score',
+                description: '0–1 exclusive',
+                exclusiveMinimum: 0,
+                exclusiveMaximum: 1,
+            },
+        });
+        expect(filtered.score.exclusiveMinimum).toBe(0);
+        expect(filtered.score.exclusiveMaximum).toBe(1);
+    });
+});
+
+describe('transformActorInputSchemaProperties — validation keywords', () => {
+    it('survives the full transform pipeline and is enforced by AJV', () => {
+        const properties = transformActorInputSchemaProperties({
+            type: 'object',
+            properties: {
+                maxResults: {
+                    type: 'integer',
+                    title: 'Max results',
+                    description: 'Cap',
+                    minimum: 1,
+                    maximum: 10,
+                    default: 5,
+                },
+                name: {
+                    type: 'string',
+                    title: 'Name',
+                    description: 'Name',
+                    minLength: 2,
+                    maxLength: 8,
+                },
+                urls: {
+                    type: 'array',
+                    title: 'URLs',
+                    description: 'URL list',
+                    minItems: 1,
+                    maxItems: 3,
+                    items: { type: 'string', title: 'URL', description: 'One URL' },
+                },
+            },
+        });
+
+        expect(properties.maxResults.minimum).toBe(1);
+        expect(properties.maxResults.maximum).toBe(10);
+        expect(properties.name.minLength).toBe(2);
+        expect(properties.name.maxLength).toBe(8);
+        expect(properties.urls.minItems).toBe(1);
+        expect(properties.urls.maxItems).toBe(3);
+
+        const validate = fixedAjvCompile(ajv, {
+            type: 'object',
+            properties,
+            required: [],
+        });
+
+        expect(validate({ maxResults: 5, name: 'ab', urls: ['https://a'] })).toBe(true);
+        expect(validate({ maxResults: 11, name: 'ab', urls: ['https://a'] })).toBe(false);
+        expect(validate({ maxResults: 5, name: 'a', urls: ['https://a'] })).toBe(false);
+        expect(validate({ maxResults: 5, name: 'ab', urls: [] })).toBe(false);
+        expect(validate({ maxResults: 5, name: 'ab', urls: ['a', 'b', 'c', 'd'] })).toBe(false);
     });
 });
 

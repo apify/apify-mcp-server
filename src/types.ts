@@ -36,6 +36,20 @@ export type SchemaProperties = {
 
     properties?: Record<string, SchemaProperties>;
     required?: string[];
+
+    // JSON Schema validation keywords from Actor input schemas. Kept through
+    // filterSchemaProperties so AJV and tools/list honor Actor-declared bounds.
+    minimum?: number;
+    maximum?: number;
+    exclusiveMinimum?: number;
+    exclusiveMaximum?: number;
+    minLength?: number;
+    maxLength?: number;
+    minItems?: number;
+    maxItems?: number;
+    uniqueItems?: boolean;
+    // Advertised to clients; AJV drops `pattern` at compile time (ReDoS guard in ajv.ts).
+    pattern?: string;
 };
 
 export type ActorInputSchema = {
