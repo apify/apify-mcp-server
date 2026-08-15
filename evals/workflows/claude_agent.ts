@@ -16,8 +16,8 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 
 import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
 import { MAX_CONVERSATION_TURNS, MCP_SERVER_NAME, stripToolPrefix } from './config.js';
-import type { AdaptedConversation } from './sdk_conversation_adapter.js';
-import { adaptSdkConversation } from './sdk_conversation_adapter.js';
+import type { AgentRun } from './sdk_run.js';
+import { buildAgentRun } from './sdk_run.js';
 
 export type AgentRunOptions = {
     prompt: string;
@@ -25,7 +25,7 @@ export type AgentRunOptions = {
     apifyToken: string;
     /** Tools to enable on the MCP server, e.g. ["actors", "docs"]. Server default when omitted. */
     tools?: string[];
-    /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See denyToolsHook(). */
+    /** Tools the harness force-fails with a `PreToolUse` deny. See denyToolsHook(). */
     failTools?: string[];
     maxTurns?: number;
     toolTimeoutSeconds: number;
@@ -74,8 +74,11 @@ export function denyToolsHook(failTools: string[]): HookCallbackMatcher[] {
     ];
 }
 
-/** Run one test case to completion and fold the whole SDK stream into the judge's shape. */
-export async function runAgentConversation(options: AgentRunOptions): Promise<AdaptedConversation> {
+/** The raw SDK stream, for the judge, plus the accounting summarized off it. */
+export type AgentConversation = { messages: SDKMessage[]; run: AgentRun };
+
+/** Run one test case to completion, returning its message stream and run summary. */
+export async function runAgentConversation(options: AgentRunOptions): Promise<AgentConversation> {
     const { prompt, model, apifyToken, tools, failTools, maxTurns, toolTimeoutSeconds, mcpToolsOnly } = options;
 
     const serverArgs = [STDIO_BIN_PATH];
@@ -122,7 +125,7 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ad
         for await (const message of query({ prompt, options: sdkOptions })) {
             messages.push(message);
         }
-        return adaptSdkConversation(prompt, messages);
+        return { messages, run: buildAgentRun(messages) };
     } finally {
         abortController.abort();
     }

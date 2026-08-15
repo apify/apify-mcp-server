@@ -11,7 +11,7 @@ import type { Evaluation } from '@langfuse/client';
 import { runAgentConversation } from './claude_agent.js';
 import { parseWorkflowItem } from './langfuse_dataset.js';
 import type { LlmClient } from './llm_client.js';
-import type { TranscriptEntry } from './sdk_conversation_adapter.js';
+import type { TranscriptEntry } from './sdk_run.js';
 import type { JudgeResult } from './workflow_judge.js';
 import { evaluateConversation } from './workflow_judge.js';
 
@@ -138,7 +138,7 @@ export function makeTask(options: WorkflowTaskOptions) {
         const item = parseWorkflowItem(rawItem);
 
         try {
-            const { conversation, transcript } = await runAgentConversation({
+            const { messages, run } = await runAgentConversation({
                 prompt: item.input.query,
                 model: agentModel,
                 apifyToken,
@@ -149,13 +149,19 @@ export function makeTask(options: WorkflowTaskOptions) {
                 mcpToolsOnly,
             });
 
-            const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
+            const judgeResult = await evaluateConversation(
+                item.expectedOutput,
+                item.input.query,
+                messages,
+                llmClient,
+                judgeModel,
+            );
 
             return {
                 id: item.id,
                 judgeResult,
-                totalTokens: conversation.totalTokens,
-                transcript,
+                totalTokens: run.totalTokens,
+                transcript: run.transcript,
             };
         } catch (error) {
             throw new Error(`Item "${item.id}": ${error instanceof Error ? error.message : String(error)}`, {

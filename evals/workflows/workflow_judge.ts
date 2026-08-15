@@ -3,13 +3,14 @@
  * Uses structured output (JSON schema) for robust parsing
  */
 
+import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 import { z } from 'zod';
 
-import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
+import { JUDGE_PROMPT_TEMPLATE, MODELS, stripToolPrefix } from './config.js';
 import type { LlmClient } from './llm_client.js';
-import type { ConversationHistory } from './types.js';
+import { isMainAgentMessage, readBlocks, readText } from './sdk_messages.js';
 
 /**
  * Judge evaluation result
@@ -52,32 +53,41 @@ const JUDGE_RESPONSE_SCHEMA: ResponseFormatJSONSchema = {
 };
 
 /**
- * Format conversation for judge evaluation
- * Judge sees: tool calls + arguments + final responses (NOT tool results)
+ * Format the SDK message stream for the judge.
+ *
+ * Judge sees: tool calls + arguments + final responses (NOT tool results). One block per
+ * assistant message; narration that accompanies a tool call is withheld, so the judge reads
+ * the agent's actions and its answer, never its reasoning about them. The final answer comes
+ * from the `result` message unless the last assistant message already carried it alone.
  */
-function formatConversationForJudge(conversation: ConversationHistory): string {
-    const lines: string[] = [];
+export function formatSdkStreamForJudge(userPrompt: string, messages: SDKMessage[]): string {
+    const lines: string[] = [`USER: ${userPrompt}`, ''];
+    // The answer the last assistant message stands on its own; '' when it called tools.
+    let trailingAnswer = '';
+    let finalResult = '';
 
-    // User prompt
-    lines.push(`USER: ${conversation.userPrompt}`);
-    lines.push('');
+    for (const message of messages) {
+        if (message.type === 'result') {
+            if (message.subtype === 'success') finalResult = message.result.trim();
+            continue;
+        }
+        if (message.type !== 'assistant' || !isMainAgentMessage(message)) continue;
 
-    // Each turn
-    for (const turn of conversation.turns) {
-        // Show tool calls (if any)
-        if (turn.toolCalls.length > 0) {
-            for (const toolCall of turn.toolCalls) {
-                lines.push(`AGENT: [Called tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.arguments)}]`);
-            }
+        const blocks = readBlocks(message.message.content);
+        const toolUses = blocks.filter((block) => block.type === 'tool_use');
+
+        for (const block of toolUses) {
+            const args = JSON.stringify((block.input ?? {}) as Record<string, unknown>);
+            lines.push(`AGENT: [Called tool: ${stripToolPrefix(block.name)} with args: ${args}]`);
         }
 
-        // Show final response (if present)
-        if (turn.finalResponse) {
-            lines.push(`AGENT: ${turn.finalResponse}`);
-        }
-
+        trailingAnswer = toolUses.length > 0 ? '' : readText(blocks);
+        if (trailingAnswer) lines.push(`AGENT: ${trailingAnswer}`);
         lines.push('');
     }
+
+    // Append the result text unless the last assistant message already is it.
+    if (finalResult && !trailingAnswer) lines.push(`AGENT: ${finalResult}`, '');
 
     return lines.join('\n').trim();
 }
@@ -116,12 +126,12 @@ function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reaso
  */
 export async function evaluateConversation(
     reference: string,
-    conversation: ConversationHistory,
+    userPrompt: string,
+    messages: SDKMessage[],
     llmClient: LlmClient,
     judgeModel: string = MODELS.judge,
 ): Promise<JudgeResult> {
-    // Format conversation for judge
-    const formattedConversation = formatConversationForJudge(conversation);
+    const formattedConversation = formatSdkStreamForJudge(userPrompt, messages);
 
     // Create judge prompt using reference field
     const judgePrompt = JUDGE_PROMPT_TEMPLATE.replace('{{reference}}', reference).replace(

@@ -110,7 +110,7 @@ The server is registered with `alwaysLoad: true`. Left at the default, its tools
 
 **Trade-off:** the harness is a moving target - a Claude Code release can shift results, so `agentSdkVersion` is recorded in the run metadata.
 
-**Location:** `claude_agent.ts`, `sdk_conversation_adapter.ts`
+**Location:** `claude_agent.ts`, `sdk_run.ts`
 
 ### 4. Strict pass/fail gated on the requested count
 
@@ -161,26 +161,26 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 **Location:** `config.ts`
 
-### 8. The SDK message stream is folded back into the old conversation shape
+### 8. The judge reads the SDK message stream directly
 
-**Decision:** `sdk_conversation_adapter.ts` rebuilds `ConversationHistory` from the SDK's message stream instead of the judge reading SDK messages.
+**Decision:** `formatSdkStreamForJudge()` formats the SDK's messages for the judge. There is no intermediate conversation object.
 
 **Why:**
-- The judge, its input format, and the scores stay unchanged, so verdicts remain comparable with earlier experiments
+- The judge's input format is unchanged, so verdicts remain comparable with earlier experiments
 - MCP tool names are stripped of their `mcp__apify__` prefix, so the judge sees `search-actors` as before
-- Subagent messages (via the `Task` tool) are excluded, so the transcript reflects the main agent
+- Subagent messages (via the `Task` tool) are excluded, so the judge reads the main agent
 - Cached prompt tokens are counted into `total_tokens`; the API reports them separately and a cached run would otherwise look nearly free
 
-**Location:** `sdk_conversation_adapter.ts`
+**Location:** `workflow_judge.ts`, `sdk_messages.ts`
 
 ## System components
 
 ### Core files
 
-- `types.ts` - Type definitions
 - `config.ts` - Models, prompts, constants
 - `claude_agent.ts` - The agent under test: Claude Agent SDK options, MCP server registration, failure injection
-- `sdk_conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
+- `sdk_messages.ts` - SDK content-block shapes shared by the judge and the run summary
+- `sdk_run.ts` - Summarizes one SDK run: token usage, paired tool invocations, debug transcript
 - `llm_client.ts` - OpenRouter wrapper (judge)
 - `workflow_judge.ts` - Judge evaluation
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
@@ -275,7 +275,7 @@ Tool errors passed to LLM in tool result message:
 
 ### Conversation state
 
-Claude Code owns the message history. The harness only sees the SDK's message stream and folds it back into `ConversationHistory` for the judge.
+Claude Code owns the message history. The harness only sees the SDK's message stream, which it formats for the judge and summarizes for the scores.
 
 ## Common issues
 
