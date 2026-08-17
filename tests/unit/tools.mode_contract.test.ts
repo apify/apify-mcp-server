@@ -404,17 +404,12 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
 
 /**
  * A description must not name a tool that is absent from the same session — the model would call
- * something `tools/list` never returned. Descriptions are module-level constants, so nothing gates
- * them per session: `suggestTool` (storage_helpers.ts) only guards runtime response text.
- *
- * The one allowed form is an explicit hedge ({@link SESSION_HEDGE}), as used in call_actor.ts.
+ * something `tools/list` never returned. Cross-tool references are gated per session via
+ * `buildDescription` + `ctx.hasTool(...)` and rendered at the tools/list boundary
+ * (`getToolPublicFieldOnly` with `presentTools`). This renders every session shape the same way
+ * the list handlers do and checks the result.
  */
 describe('tool descriptions never name a tool absent from the session', () => {
-    const ALL_TOOL_NAMES: HelperToolName[] = Object.values(HELPER_TOOLS);
-
-    /** Prose that makes a reference to a possibly-absent tool explicit rather than misleading. */
-    const SESSION_HEDGE = 'is available in this session';
-
     /** Minimal direct Actor tool — enough to trigger AUTO_INJECTED_TOOLS and stand in for a real one. */
     const actorToolStub = {
         type: 'actor',
@@ -424,6 +419,7 @@ describe('tool descriptions never name a tool absent from the session', () => {
         description: `Fetch output rows with ${HELPER_TOOLS.DATASET_GET_ITEMS}.`,
         inputSchema: { type: 'object', properties: {} },
     } as unknown as ToolEntry;
+    const ALL_TOOL_NAMES: string[] = [...Object.values(HELPER_TOOLS), actorToolStub.name];
 
     const sessions: { label: string; input: Input; actorTools: ToolEntry[] }[] = [
         { label: 'default (no selectors)', input: {}, actorTools: [actorToolStub] },
@@ -441,6 +437,22 @@ describe('tool descriptions never name a tool absent from the session', () => {
             input: { tools: ['apify/rag-web-browser'] },
             actorTools: [actorToolStub],
         },
+        // Mixed cross-category selectors — arbitrary combinations must render correctly too.
+        {
+            label: "tools: ['call-actor', 'get-dataset']",
+            input: { tools: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.DATASET_GET] },
+            actorTools: [],
+        },
+        {
+            label: "tools: ['search-actors', 'fetch-apify-docs']",
+            input: { tools: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.DOCS_FETCH] },
+            actorTools: [],
+        },
+        {
+            label: "tools: ['docs', 'get-key-value-store-keys']",
+            input: { tools: ['docs', HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET] },
+            actorTools: [],
+        },
     ];
 
     for (const mode of SERVER_MODES) {
@@ -452,8 +464,11 @@ describe('tool descriptions never name a tool absent from the session', () => {
 
                 const violations: string[] = [];
                 for (const tool of tools) {
-                    for (const line of (tool.description ?? '').split('\n')) {
-                        if (line.includes(SESSION_HEDGE)) continue;
+                    const { description } = getToolPublicFieldOnly(tool, { presentTools: present });
+                    for (const line of (description ?? '').split('\n')) {
+                        if (line.includes('available in this session')) {
+                            violations.push(`${tool.name} still hedges instead of rendering: ${line.trim()}`);
+                        }
                         for (const name of absent) {
                             // Boundary guard so `get-dataset` does not match inside `get-dataset-items`,
                             // nor `call-actor` inside `call-actor-widget`. `:` is excluded too — it

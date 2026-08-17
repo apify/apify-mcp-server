@@ -35,12 +35,8 @@ describe('call_actor_common', () => {
         it('builds the description with public helper tools and waitSecs guidance', () => {
             const description = buildCallActorDescription();
 
-            expect(description).toContain(
-                `Get the Actor's input schema with ${HELPER_TOOLS.ACTOR_GET_DETAILS}, when that tool is available in this session`,
-            );
-            expect(description).toContain(
-                `${HELPER_TOOLS.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`,
-            );
+            expect(description).toContain(`Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema`);
+            expect(description).toContain(`use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first`);
             expect(description).toContain('waitSecs');
             expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');

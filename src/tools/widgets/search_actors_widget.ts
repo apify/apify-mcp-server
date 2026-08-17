@@ -3,8 +3,8 @@ import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { formatActorForWidget } from '../../utils/actor_card.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -25,24 +25,24 @@ import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
  */
 const searchActorsWidgetArgsSchema = searchActorsBaseArgsSchema.strict();
 
-const SEARCH_ACTORS_WIDGET_DESCRIPTION = dedent`
-    Render an interactive UI element (widget) displaying Apify Store search results for the user.
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return dedent`
+        Render an interactive UI element (widget) displaying Apify Store search results for the user.
 
-    Use this tool ONLY when the user explicitly wants to browse or discover Actors visually
-    (e.g., "find me scrapers for Instagram", "show me Amazon Actors", "what tools exist for Twitter").
-    The response renders as an interactive widget the user can view directly.
-
-    For silent name resolution before running an Actor (e.g., "scrape google maps" — you need to
-    find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH} if that tool is available in this session — it returns the same data without rendering a widget.
-
-    Input: keywords (plus optional limit/offset). Output fields are fixed by the widget contract.
-`;
+        Use this tool ONLY when the user explicitly wants to browse or discover Actors visually
+        (e.g., "find me scrapers for Instagram", "show me Amazon Actors", "what tools exist for Twitter").
+        The response renders as an interactive widget the user can view directly.
+        ${hasTool(HELPER_TOOLS.STORE_SEARCH) ? `\nFor silent name resolution before running an Actor (e.g., "scrape google maps" — you need to find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH} instead — it returns the same data without rendering a widget.\n` : ''}
+        Input: keywords (plus optional limit/offset). Output fields are fixed by the widget contract.
+    `;
+}
 
 export const searchActorsWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.STORE_SEARCH_WIDGET,
     title: 'Search Actors (widget)',
-    description: SEARCH_ACTORS_WIDGET_DESCRIPTION,
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(searchActorsWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchWidgetOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsWidgetArgsSchema)),

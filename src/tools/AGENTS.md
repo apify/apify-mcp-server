@@ -42,9 +42,11 @@ Exception: the `AUTO_INJECTED_TOOLS` (`../utils/tools_loader.ts`) — `get-actor
 `get-dataset-items`, `get-key-value-store-record`, `abort-actor-run` — land in sessions that never
 loaded their own category, so their disambiguation line must describe what they return instead of
 naming a sibling — a name the client never received in `tools/list` invites a call to a tool that
-does not exist. The same rule applies to any description: only name a tool guaranteed to be present,
-or hedge it with "is available in this session". Enforced by
-`tests/unit/tools.mode_contract.test.ts`.
+does not exist. Any other cross-tool reference must be gated per session: define a
+`buildDescription(ctx)` on the entry (see `ToolDescriptionContext` in `../types.ts`), wrap the
+reference in `ctx.hasTool(...)`, and set `description` to the `ALL_TOOLS_PRESENT` render. Rendering
+happens once, at the tools/list boundary (`getToolPublicFieldOnly` in `../utils/tools.ts`). Enforced
+by `tests/unit/tools.mode_contract.test.ts`.
 
 ## Related, owned elsewhere (don't restate)
 

@@ -82,6 +82,17 @@ export type ActorDefinitionWithInfo = {
 };
 
 /**
+ * Session context a {@link ToolBase.buildDescription} renders against.
+ */
+export type ToolDescriptionContext = {
+    /** Whether the named tool is served in the same tools/list as this tool. */
+    hasTool: (name: string) => boolean;
+};
+
+/** Renders every cross-tool reference as present — for building `description` at module load. */
+export const ALL_TOOLS_PRESENT: ToolDescriptionContext = { hasTool: () => true };
+
+/**
  * Base type for all tools in the MCP server.
  * Extends the MCP SDK's Tool schema, which requires inputSchema to have type: "object".
  * Adds ajvValidate for runtime validation.
@@ -91,6 +102,12 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
     ajvValidate: ValidateFunction;
     /** Whether this tool requires payment validation before execution */
     paymentRequired?: boolean;
+    /**
+     * Session-exact description builder for descriptions that reference sibling tools.
+     * `description` must hold the {@link ALL_TOOLS_PRESENT} render for consumers without a
+     * session tool set. Resolved at the tools/list boundary in `getToolPublicFieldOnly`.
+     */
+    buildDescription?: (ctx: ToolDescriptionContext) => string;
 };
 
 /**

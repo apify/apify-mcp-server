@@ -3,8 +3,8 @@ import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { respondAborted } from '../../utils/mcp.js';
@@ -23,23 +23,25 @@ const getActorRunWidgetArgsSchema = z
     })
     .strict();
 
-const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
-    Render an interactive UI element (widget) that displays live progress and status of an Actor run.
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return dedent`
+        Render an interactive UI element (widget) that displays live progress and status of an Actor run.
 
-    The tool returns immediately after rendering the widget — it never blocks waiting for the run.
-    The widget itself polls run status and updates in place until the run reaches a terminal state.
+        The tool returns immediately after rendering the widget — it never blocks waiting for the run.
+        The widget itself polls run status and updates in place until the run reaches a terminal state.
 
-    Use this tool ONLY when the user explicitly wants to see run progress visually
-    (e.g., "show progress for run y2h7sK3Wc", "display the status of that run").
-
-    For silent data lookups (run status, dataset IDs, stats, resource IDs), use ${HELPER_TOOLS.ACTOR_RUNS_GET} if that tool is available in this session — it returns the same data without rendering a widget.
-`;
+        Use this tool ONLY when the user explicitly wants to see run progress visually
+        (e.g., "show progress for run y2h7sK3Wc", "display the status of that run").
+        ${hasTool(HELPER_TOOLS.ACTOR_RUNS_GET) ? `\nFor silent data lookups (run status, dataset IDs, stats, resource IDs), use ${HELPER_TOOLS.ACTOR_RUNS_GET} instead — it returns the same data without rendering a widget.` : ''}
+    `;
+}
 
 export const getActorRunWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET,
     title: 'Get Actor run (widget)',
-    description: GET_ACTOR_RUN_WIDGET_DESCRIPTION,
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunWidgetArgsSchema)),

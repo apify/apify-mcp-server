@@ -8,10 +8,11 @@ import type {
     HelperTool,
     InternalToolArgs,
     StructuredActorCard,
+    ToolDescriptionContext,
     ToolEntry,
     ToolInputSchema,
 } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { DEFAULT_CARD_OPTIONS, formatActorToActorCard, formatActorToStructuredCard } from '../../utils/actor_card.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -62,7 +63,8 @@ export const searchActorsBaseArgsSchema = z.object({
     offset: z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
 });
 
-const SEARCH_ACTORS_DESCRIPTION = `Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return `Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
 This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
 
 Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers)
@@ -84,8 +86,7 @@ Usage:
 
 Important limitations: This tool does not return full Actor documentation or detailed usage instructions - only summary information.
 Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without another tool call.
-For complete Actor details (per-field descriptions, defaults, README), use ${HELPER_TOOLS.ACTOR_GET_DETAILS} if that tool is available in this session.
-The search is limited to publicly available Actors and excludes rental and restricted Actors.
+${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `For complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.\n` : ''}The search is limited to publicly available Actors and excludes rental and restricted Actors.
 
 Returns list of Actor cards with the following info:
 - **Title:** Markdown header linked to the Store page, followed by the full Actor name in code format
@@ -98,6 +99,7 @@ Returns list of Actor cards with the following info:
 - **Categories:** Formatted or "Uncategorized"
 - **Last modified:** Date (if available)
 - **Input fields:** Inline list of input field names and types (e.g. \`url: string, maxResults?: number\`); \`?\` marks optional fields, \`... (+N more)\` marks a truncated list`;
+}
 
 export type SearchActorsResult = {
     actorCardText: string;
@@ -152,7 +154,8 @@ export const searchActors: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.STORE_SEARCH,
     title: 'Search Actors',
-    description: SEARCH_ACTORS_DESCRIPTION,
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),

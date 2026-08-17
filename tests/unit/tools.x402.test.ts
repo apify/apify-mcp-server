@@ -5,6 +5,7 @@
 import Ajv from 'ajv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import type { PaymentMeta, RequestHeaders } from '../../src/payments/types.js';
 import {
     X402_PAYMENT_REQUIRED_OUTPUT_SCHEMA,
@@ -12,9 +13,10 @@ import {
     type X402PaymentRequirements,
 } from '../../src/payments/x402.js';
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import type { HelperTool } from '../../src/types.js';
+import type { HelperTool, ToolDescriptionContext } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { respondRaw } from '../../src/utils/mcp.js';
+import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -215,6 +217,22 @@ describe('decorateToolSchema()', () => {
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
 
         expect(decorated.description).toContain('x402 payment');
+    });
+
+    it('preserves x402 instructions when rendering a session description', () => {
+        const buildDescription = ({ hasTool }: ToolDescriptionContext) =>
+            `Paid tool${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? ` with ${HELPER_TOOLS.ACTOR_GET_DETAILS}` : ''}`;
+        const decorated = new X402PaymentProvider().decorateToolSchema(
+            makePaidTool({
+                description: buildDescription({ hasTool: () => true }),
+                buildDescription,
+            }),
+        );
+
+        const { description } = getToolPublicFieldOnly(decorated, { presentTools: new Set([decorated.name]) });
+
+        expect(description).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        expect(description).toContain('x402 payment');
     });
 
     it('is idempotent — second decoration does not change _meta.x402 or duplicate instructions', () => {
