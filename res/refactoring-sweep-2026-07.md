@@ -1,18 +1,8 @@
-# Refactoring sweep — July 2026
+# Refactoring sweep — July 2026 — backlog
 
-Full-codebase sweep (src, tests, tooling, configs) for defects and refactoring
-opportunities. Line numbers are as of 2026-07-08 — verify before use.
-
-Filed as issues (do not duplicate here):
-
-- **#1064** — defects: helper-tool `inputSchema` required/default bug, `smithery.yaml`
-  broken entry path, Node-floor drift, payment-client bypass, hardcoded store URL.
-- **#1065** — `defineHelperTool` factory + `mockApifyClient()` + context-stub merge.
-- **#1066** — quick wins: `getTaskOrThrow`, loader mode-gate dedup, `resolveWidgets`
-  memoization, `catchNotFound`, search-actors strings, `injectMcpSessionId`, widget
-  boolean split, dead Python tooling, vitest timeout split.
-- **#658** (umbrella) — sync/task tool-call dispatch dedup; sub-issues #1061, #684,
-  #1062, #1063, #974.
+What's left of the 2026-07-08 full-codebase sweep. Everything the sweep filed as an issue is
+closed (#1064, #1065, #1066, #658); what follows was never filed. Line numbers and sizes are as
+of the sweep — verify before use.
 
 ## Backlog — not filed, pull when there's appetite
 
@@ -47,7 +37,7 @@ The canonical structuredContent + `respondOk` mirror is hand-assembled in
 
 ### `call_actor.ts` core extraction (M)
 
-Lines 47–543 are helpers exported mainly for `widgets/call_actor_widget.ts`
+Most of the file is helpers exported mainly for `widgets/call_actor_widget.ts`
 (`callActorPreExecute`, `resolveAndValidateActor`, `buildCallActorErrorResponse`,
 `callOptionsSchema`); the tool entry itself is ~30 lines at the tail. Move the shared
 engine to `actors/call_actor_core.ts`; the widget then depends on an explicit core module
@@ -55,7 +45,7 @@ instead of reaching into a sibling tool file.
 
 ### `actor_run_response.ts` split (M/L)
 
-875 lines, four banner-separated jobs: field normalization + response types;
+893 lines, four banner-separated jobs: field normalization + response types;
 status→summary/nextStep templates (~210 lines, the most-edited part); storage
 fetch/enrichment; wait/orchestration (`raceAbort`, `waitForRunWithProgress`). Mechanical
 4-file split; watch storage tools importing `normalizeDatasetFields`.
@@ -74,8 +64,7 @@ method; needs internal-repo coordination per export.
 One lifecycle ("auto → resolved on initialize, buffer tool loads until then") tracked by
 five mutable fields (`serverModeOption`, `serverMode`, `serverModeResolved`,
 `pendingToolsAfterModeResolved`, `clientSupportsUi`) mutated from four places; invariants
-comment-enforced. Extract a `ServerModeResolver` owning option/resolved/buffer. Land the
-#1066 loader-dedup first — it shrinks this.
+comment-enforced. Extract a `ServerModeResolver` owning option/resolved/buffer.
 
 ### `pricing_info.ts` formatter consolidation (M, deliberately deprioritized)
 
@@ -106,13 +95,5 @@ Likely heavy barrel imports (`tools/index.js`, server construction) pulled by mo
 - **`TTLLRUCache.set()`** does a redundant get-then-remove before add; module-global cache
   singletons in `state.ts` have no reset hook (stale ~30 min across hot-reloads).
 - **`structured_output_schemas.ts`**: `apifyConsoleUrl` property object hand-written 4×,
-  `userTier` enum 3× — extract consts (or fold into the #1065 factory work).
+  `userTier` enum 3× — extract consts.
 
-## Checked and healthy — no action
-
-- Zod+AJV double validation is consistent by design (every tool compiles the same schema).
-- `legacyToolNameToNew` shim is small, documented, load-bearing.
-- content/structuredContent mirroring is intentional for mixed MCP clients.
-- Lint suppressions are not piling up (16 across 9 files, scattered).
-- `scripts/` (check-agents-links, check_widgets, dev_standby) are solid.
-- `evals/workflows` TS code is live and unit-tested (unlike the Python side — #1066).

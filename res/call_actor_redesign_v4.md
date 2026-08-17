@@ -2,8 +2,8 @@
 
 The V4 redesign shipped via PRs #823 and #825. **Code is the source of truth** — this file
 keeps only the locked decisions and the "why" behind them. For the implementation see
-`src/tools/core/actor_run_response.ts` (response shape + status templates),
-`src/tools/core/call_actor_common.ts` (`waitSecs`, sync/task modes), and
+`src/tools/actors/actor_run_response.ts` (response shape + status templates),
+`src/tools/actors/actor_executor.ts` (`waitSecs`, sync/task modes), and
 `src/tools/structured_output_schemas.ts` (the structured schema).
 
 ## What it is
@@ -23,7 +23,7 @@ fetches data via `get-dataset-items` / `get-key-value-store-record`.
 | **R1** | Emit `notifications/tasks/status` on every task state change. No heartbeat (task `tools/call` returns immediately; SDK clients poll `tasks/get`). |
 | **R4** | Keep the public name `call-actor`; the `run-actor` rename is a separate, deferred migration. |
 | **Q2** | `get-actor-run` returns the same canonical shape. |
-| **Q3** | `get-dataset-items`, `get-key-value-store-record`, `abort-actor-run` are auto-injected in actor workflows. `get-actor-output` deprecated, ordered after `get-dataset-items`. |
+| **Q3** | `get-dataset-items`, `get-key-value-store-record`, `abort-actor-run` are auto-injected in actor workflows. (`get-actor-output`, deprecated here, has since been removed.) |
 | **Q4** | Server translates Apify slash-notation to dot-notation; `get-dataset-items` auto-flattens parents referenced in dot-notation `fields`. Explicit `flatten` is a diagnostic override. |
 | **Q5** | `isError: false` for any observed terminal run status (`SUCCEEDED`/`FAILED`/`ABORTED`/`TIMED-OUT`); task lands in `completed`. Task `failed` is reserved for tool-side failures (auth, validation, network). |
 | **Q6** | Storage tools stay single-purpose: `get-dataset-items` requires `datasetId`, `get-key-value-store-record` requires `keyValueStoreId`. Both IDs are surfaced in `storages.*.default.id` and interpolated into `nextStep`. |

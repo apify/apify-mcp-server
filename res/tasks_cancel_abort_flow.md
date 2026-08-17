@@ -26,7 +26,7 @@ compute until natural completion — "I cancelled, but my Apify bill kept tickin
 
 ## Where the actor is actually aborted
 
-In `src/tools/core/actor_run_response.ts`, `abortRunOnSignal(runId, client)` calls:
+In `src/tools/actors/actor_run_response.ts`, `abortRunOnSignal(runId, client)` calls:
 
 ```ts
 await client.run(runId).abort({ gracefully: false });
@@ -183,7 +183,7 @@ end-to-end.
 ## Race-condition guards in `waitForRunWithProgress`
 
 The abort can arrive before there is a `runId` to abort, or after the run already finished.
-Guards in `waitForRunWithProgress` (`src/tools/core/actor_run_response.ts`):
+Guards in `waitForRunWithProgress` (`src/tools/actors/actor_run_response.ts`):
 
 - **Already aborted on entry**: if `abortSignal.aborted`, invoke `onAbort` and return `aborted` without fetching.
 - **Race each platform call**: `raceAbort(run.get(), abortSignal)` and `raceAbort(run.waitForFinish(), abortSignal)` so a mid-call cancel returns promptly instead of blocking on the HTTP fetch (the client SDK does not accept an `AbortSignal` directly).
@@ -202,7 +202,7 @@ Two extra defenses live inside `createTaskCancellationWatcher`:
 |---|---|
 | `src/mcp/utils.ts` — `createTaskCancellationWatcher` | The polling watcher. Bridges TaskStore status → AbortSignal. |
 | `src/mcp/task_execution.ts` — `executeToolAndUpdateTask` | Constructs the watcher per task; passes `cancelWatcher.signal` to `dispatchToolCall`, which threads it into the internal-tool (`signal`) and direct-actor-tool (`abortSignal`) branches; `cancelWatcher.dispose()` in `finally`; `isTaskCancelled` post-run check. |
-| `src/tools/core/actor_run_response.ts` — `waitForRunWithProgress`, `raceAbort`, `abortRunOnSignal` | Races platform calls against the abort signal and aborts the run via `onAbort`. |
+| `src/tools/actors/actor_run_response.ts` — `waitForRunWithProgress`, `raceAbort`, `abortRunOnSignal` | Races platform calls against the abort signal and aborts the run via `onAbort`. |
 | `tests/unit/mcp.utils.test.ts` | Unit tests for the watcher (happy path, parent abort, dispose, transient errors, no overlap). |
-| `tests/integration/suite.ts` | E2E test: cancel mid-run, assert the Apify run reaches ABORTED. |
+| `tests/test_kit/cases/tasks.cases.ts` | Integration cases: cancel mid-run, assert the Apify run reaches ABORTED. |
 | internal repo `test/multinode/slow-multi-node-actor-cancellation.test.ts` | Cross-node regression test for the polling path. |
