@@ -1016,12 +1016,13 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         const pub = getToolPublicFieldOnly(tool, { filterWidgetMeta: false });
         const schema = pub.inputSchema as {
             required?: string[];
-            properties?: Record<string, { description?: string }>;
+            properties?: Record<string, { description?: string; prefill?: unknown }>;
         };
 
         expect(schema.required).toEqual(['query']);
         expect(schema.properties?.query?.description).toMatch(/^\*\*REQUIRED\*\*/);
         expect(schema.properties?.maxResults?.description).not.toMatch(/^\*\*REQUIRED\*\*/);
+        expect(schema.properties?.query?.prefill).toBe('web browser for RAG pipelines');
     });
 });
 

@@ -65,10 +65,8 @@ describe('compileSchema', () => {
 });
 
 describe('fixZodSchemaRequired', () => {
-    // #675 phase 1: fixZodSchemaRequired uses a key-presence check. Since filterSchemaProperties()
-    // no longer writes phantom `default: undefined` keys, a `default` key being present at all
-    // (even with an `undefined` value) means the field is treated as having a default.
-    it('drops a field from required when its `default` key is present, even with an `undefined` value', () => {
+    // Regression: #637 — `default: undefined`, from any producer, must not clear required fields.
+    it('keeps required fields whose `default` is explicitly undefined', () => {
         const result = fixZodSchemaRequired({
             type: 'object',
             properties: {
@@ -78,7 +76,7 @@ describe('fixZodSchemaRequired', () => {
             required: ['query', 'maxResults'],
         });
 
-        expect(result.required).toEqual([]);
+        expect(result.required).toEqual(['query']);
     });
 
     it('removes fields with a real default from the `required` array (properties are left intact)', () => {

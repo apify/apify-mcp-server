@@ -93,18 +93,17 @@ export function filterSchemaProperties(properties: { [key: string]: SchemaProper
 } {
     const filteredProperties: { [key: string]: SchemaProperties } = {};
     for (const [key, property] of Object.entries(properties)) {
-        const filtered: SchemaProperties = {
+        filteredProperties[key] = {
             title: property.title,
             description: property.description,
             type: property.type,
+            ...(property.enum !== undefined && { enum: property.enum }),
+            ...(property.default !== undefined && { default: property.default }),
+            ...(property.prefill !== undefined && { prefill: property.prefill }),
+            ...(property.properties !== undefined && { properties: property.properties }),
+            ...(property.items !== undefined && { items: property.items }),
+            ...(property.required !== undefined && { required: property.required }),
         };
-        if (property.enum !== undefined) filtered.enum = property.enum;
-        if (property.default !== undefined) filtered.default = property.default;
-        if (property.prefill !== undefined) filtered.prefill = property.prefill;
-        if (property.properties !== undefined) filtered.properties = property.properties;
-        if (property.items !== undefined) filtered.items = property.items;
-        if (property.required !== undefined) filtered.required = property.required;
-        filteredProperties[key] = filtered;
     }
     return filteredProperties;
 }

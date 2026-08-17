@@ -20,6 +20,11 @@ ajv.removeKeyword('format');
  * has the same issue: it lists `.default()` fields as required and emits `$schema` that
  * breaks AJV compilation.
  *
+ * Uses a value-check (`field.default !== undefined`), not key-presence (`'default' in field`):
+ * `default: undefined` must mean "no default" regardless of producer. `filterSchemaProperties()`
+ * no longer emits it (#675), but hand-built schemas and future call sites still can — apify-core's
+ * equivalent (`getAjvValidator`, `input_schema.both.ts`) applies the same value-check rule.
+ *
  * @see https://github.com/apify/apify-mcp-server/issues/637
  */
 export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<string, unknown> {
@@ -31,7 +36,7 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
         cleaned.required = (cleaned.required as string[]).filter((fieldName) => {
             const fieldSchema = properties[fieldName];
             if (typeof fieldSchema !== 'object' || fieldSchema === null) return true;
-            return !('default' in fieldSchema);
+            return (fieldSchema as { default?: unknown }).default === undefined;
         });
     }
 
