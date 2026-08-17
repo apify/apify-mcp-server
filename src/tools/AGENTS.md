@@ -17,7 +17,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the actor-tools factory, the direct
     actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
-    prunes an Actor's definition, `getActorDefinition`), and `actor_run_response.ts`.
+    prunes an Actor's definition, `getActorDefinition`), and `actor_run_response.ts` —
+    the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
+    and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
+    action) pair, never inline dataset items or KV bodies.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `docs/` — search and fetch Apify docs.

@@ -88,7 +88,7 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** — project structure, setup, build system, hot-reload workflow, two-phase tool loading, manual MCP testing.
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** — naming and coding standards (single source of truth).
-- **[res/](./res/index.md)** — ad-hoc notes: architecture analyses, refactor plans, protocol references. **May be obsolete** — verify against current code before trusting.
+- **[res/](./res/index.md)** — ephemeral working notes only (in-flight checklists, dated experiment records). Not a reference: durable facts live in `AGENTS.md`, decision rationale in the docstring of the code that owns it.
 
 ## Keep AGENTS.md current
 
