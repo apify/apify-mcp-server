@@ -16,13 +16,14 @@ const PUBLIC_CONFIG_FIELDS = [
 const APIFY_ID_REGEX = /^[a-zA-Z0-9]{17}$/;
 
 /**
- * The API reads an unqualified id as an ID, so a bare task name has to be prefixed with `~` to be
- * resolved against the authenticated user's own tasks. Ids that already carry a username, in either
- * the `username/task-name` or `username~task-name` format, and ids that are already IDs, are
- * returned unchanged.
+ * The API reads an unqualified id as an ID, so a bare resource name has to be prefixed with `~` to be
+ * resolved against the authenticated user's own resources. Ids that already carry a username, in either
+ * the `username/name` or `username~name` format, and ids that are already IDs, are returned unchanged.
+ *
+ * Applies to both tasks and the Actor a task is created for, which the API resolves the same way.
  */
-export function toSafeTaskId(taskId: string): string {
-    const trimmed = taskId.trim();
+export function toSafeResourceId(idOrName: string): string {
+    const trimmed = idOrName.trim();
     if (trimmed.includes('/') || trimmed.includes('~')) return trimmed;
     return APIFY_ID_REGEX.test(trimmed) ? trimmed : `~${trimmed}`;
 }
@@ -93,6 +94,6 @@ export function taskResult(task: Task) {
  * to repeat.
  */
 export async function setTaskPublication(client: ApifyClient, taskId: string, isPublic: boolean): Promise<Task> {
-    const taskClient = client.task(toSafeTaskId(taskId));
+    const taskClient = client.task(toSafeResourceId(taskId));
     return isPublic ? taskClient.publish() : taskClient.unpublish();
 }

@@ -24,14 +24,20 @@ export const publishActorTask: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_TASK_PUBLISH,
     title: 'Publish Actor task',
-    description: `Publish a task on its public landing page.
+    description: `Publish a saved task as a public landing page for a specific Actor use case.
+The page shows what the task does, selected input values, and the expected output. Published tasks appear
+in the Actor's Examples tab and can be discovered by users, search engines, and AI agents. This can help
+users understand and try the Actor and can increase its runs. Publish only tasks that represent a useful,
+reliable, and specific use case. Not every saved task needs to be public.
+
 The task's Actor must be public and the task must have its public display configuration set up -
 at least \`publicConfig.inputSchemaFields\` and \`publicConfig.datasetView\`. If publishing fails
-because the task is not ready, set those with ${HELPER_TOOLS.ACTOR_TASK_UPDATE} and try again.
+because the task is not ready, set those with ${HELPER_TOOLS.ACTOR_TASK_UPDATE}, if that tool is
+available in the session, and try again.
 At most 50 tasks can be published per Actor.
 Publishing an already published task has no effect.
 Requires write access to both the task and its Actor.
-Use ${HELPER_TOOLS.ACTOR_TASK_UNPUBLISH} to take the page down again.
+Use ${HELPER_TOOLS.ACTOR_TASK_UNPUBLISH}, if available in the session, to take the page down again.
 
 USAGE:
 - Use when the user wants to publish a saved task on its public landing page.

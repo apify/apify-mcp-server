@@ -6,7 +6,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
-import { toSafeTaskId, taskResult } from './task_helpers.js';
+import { toSafeResourceId, taskResult } from './task_helpers.js';
 
 const getActorTaskArgs = z.object({
     taskId: z
@@ -27,7 +27,7 @@ export const getActorTask: ToolEntry = Object.freeze({
     description: `Get a saved Actor task — the Actor it runs, its name, title, description, and run options.
 Input values are not returned (they may contain secrets), only the input field names.
 Also reports whether the task is published on a public landing page, and its display configuration if so.
-Use ${HELPER_TOOLS.ACTOR_TASK_UPDATE} to change the task.
+Use ${HELPER_TOOLS.ACTOR_TASK_UPDATE}, if that tool is available in the session, to change the task.
 
 USAGE:
 - Use when you need a task's current settings.
@@ -50,7 +50,7 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getActorTaskArgs.parse(args);
-        const task = await client.task(toSafeTaskId(parsed.taskId)).get();
+        const task = await client.task(toSafeResourceId(parsed.taskId)).get();
         if (!task) {
             return respondUserError(`Task ${parsed.taskId} was not found.`);
         }

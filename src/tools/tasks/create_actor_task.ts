@@ -7,10 +7,15 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
-import { publicConfigSchema, taskNameSchema, taskResult } from './task_helpers.js';
+import { publicConfigSchema, taskNameSchema, taskResult, toSafeResourceId } from './task_helpers.js';
 
 const createActorTaskArgs = z.object({
-    actorId: z.string().min(1).describe('The ID or username~actor-name of the Actor to create the task for.'),
+    actorId: z
+        .string()
+        .min(1)
+        .describe(
+            'The Actor to create the task for: its ID, its name (resolved against your own Actors), or "username/actor-name" for an Actor owned by someone else.',
+        ),
     name: taskNameSchema
         .optional()
         .describe(
@@ -41,16 +46,19 @@ export const createActorTask: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_TASK_CREATE,
     title: 'Create Actor task',
-    description: `Create a saved Actor task — a named, reusable Actor configuration (input plus run options).
-The public display configuration (\`publicConfig\`) can be set here or later with ${HELPER_TOOLS.ACTOR_TASK_UPDATE};
-either way the task is not published until you call ${HELPER_TOOLS.ACTOR_TASK_PUBLISH}.
+    description: `Create a saved Actor task — a named, reusable configuration of an Actor that stores its
+input and run options such as the build, memory, and timeout. Tasks are useful for repeated or scheduled
+jobs, because the user does not have to configure the Actor again for every run.
+
+Creating a task does not make it public. The public display configuration (\`publicConfig\`) can be set
+here or later with ${HELPER_TOOLS.ACTOR_TASK_UPDATE}, if that tool is available in the session; either
+way the task stays private until it is published with ${HELPER_TOOLS.ACTOR_TASK_PUBLISH}.
 
 USAGE:
 - Use when the user wants to save an Actor configuration for repeated use.
 
 USAGE EXAMPLES:
-- user_input: Save this instagram-scraper config as a task called daily-posts
-- user_input: Create a task for apify/rag-web-browser with my query`,
+- user_input: Save this instagram-scraper config as a task called daily-posts`,
     inputSchema: z.toJSONSchema(createActorTaskArgs) as ToolInputSchema,
     outputSchema: actorTaskOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(createActorTaskArgs)),
@@ -74,7 +82,7 @@ USAGE EXAMPLES:
         const hasOptions = Object.keys(options).length > 0;
 
         const task = await client.tasks().create({
-            actId: actorId,
+            actId: toSafeResourceId(actorId),
             ...(name && { name }),
             ...(input && { input }),
             ...(title && { title }),

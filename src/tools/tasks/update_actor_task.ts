@@ -7,7 +7,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
-import { publicConfigSchema, toSafeTaskId, taskNameSchema, taskResult } from './task_helpers.js';
+import { publicConfigSchema, toSafeResourceId, taskNameSchema, taskResult } from './task_helpers.js';
 
 const updateActorTaskArgs = z.object({
     taskId: z
@@ -42,7 +42,7 @@ export const updateActorTask: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.ACTOR_TASK_UPDATE,
     title: 'Update Actor task',
     description: `Update a saved Actor task: its input, run options, or the public display configuration (\`publicConfig\`) of its landing page.
-This does not publish or unpublish the task — use ${HELPER_TOOLS.ACTOR_TASK_PUBLISH} and ${HELPER_TOOLS.ACTOR_TASK_UNPUBLISH} for that.
+This does not publish or unpublish the task — use ${HELPER_TOOLS.ACTOR_TASK_PUBLISH} and ${HELPER_TOOLS.ACTOR_TASK_UNPUBLISH} for that, if those tools are available in the session.
 To publish a task, \`publicConfig.inputSchemaFields\` (at least one field name from the task input) and
 \`publicConfig.datasetView\` must be set here first. Updating \`publicConfig\` requires write access to the task's Actor.
 
@@ -68,7 +68,7 @@ USAGE EXAMPLES:
         const { taskId, name, title, description, input, build, timeoutSecs, memoryMbytes, publicConfig } =
             updateActorTaskArgs.parse(args);
 
-        const resolvedTaskId = toSafeTaskId(taskId);
+        const resolvedTaskId = toSafeResourceId(taskId);
 
         const optionsUpdate = {
             ...(build !== undefined && { build }),

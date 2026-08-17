@@ -102,7 +102,7 @@ describe('create-actor-task', () => {
             {
                 fn: 'create',
                 payload: {
-                    actId: 'actor-id-1',
+                    actId: '~actor-id-1',
                     name: 'my-task',
                     input: { query: 'cats' },
                     title: 'My task',
@@ -130,7 +130,7 @@ describe('create-actor-task', () => {
             stubToolCallContext({ actorId: 'actor-id-1', name: 'my-task' }, apifyClient),
         );
 
-        expect(calls[0].payload).toEqual({ actId: 'actor-id-1', name: 'my-task' });
+        expect(calls[0].payload).toEqual({ actId: '~actor-id-1', name: 'my-task' });
     });
 
     it('passes publicConfig through so a task can be staged for publishing in one call', async () => {
@@ -147,7 +147,7 @@ describe('create-actor-task', () => {
         );
 
         expect(calls[0].payload).toEqual({
-            actId: 'actor-id-1',
+            actId: '~actor-id-1',
             name: 'my-task',
             publicConfig: { inputSchemaFields: ['query'], datasetView: 'overview' },
         });
@@ -157,7 +157,7 @@ describe('create-actor-task', () => {
         const { apifyClient, calls } = mockTaskApiClient(mockTask());
         await (createActorTask as HelperTool).call(stubToolCallContext({ actorId: 'actor-id-1' }, apifyClient));
 
-        expect(calls[0].payload).toEqual({ actId: 'actor-id-1' });
+        expect(calls[0].payload).toEqual({ actId: '~actor-id-1' });
     });
 });
 

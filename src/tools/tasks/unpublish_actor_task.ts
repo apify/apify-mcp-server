@@ -26,7 +26,8 @@ export const unpublishActorTask: ToolEntry = Object.freeze({
     title: 'Unpublish Actor task',
     description: `Unpublish a task from its public landing page.
 The public display configuration is preserved, so the task can be published again later
-with ${HELPER_TOOLS.ACTOR_TASK_PUBLISH}. Unpublishing a task that is not published does nothing.
+with ${HELPER_TOOLS.ACTOR_TASK_PUBLISH}, if that tool is available in the session. Unpublishing a task
+that is not published does nothing.
 Requires write access to both the task and its Actor.
 
 USAGE:
