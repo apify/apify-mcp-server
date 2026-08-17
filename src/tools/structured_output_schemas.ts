@@ -353,8 +353,7 @@ export const reportProblemToolOutputSchema = {
 };
 
 /**
- * Schema shared by every Actor task tool. Input values are omitted on purpose (they may hold secrets)
- * `inputFields` lists the field names that `publicConfig.inputSchemaFields` can use.
+ * Schema shared by every Actor task tool. Input values are omitted on purpose (they may hold secrets) `inputFields` lists the field names that `publicConfig.inputSchemaFields` can use.
  */
 export const actorTaskOutputSchema = {
     type: 'object' as const,
