@@ -15,10 +15,7 @@ const reference = 'the agent should search';
 
 const conversation: ConversationHistory = {
     userPrompt: 'find an actor',
-    turns: [{ turnNumber: 1, toolCalls: [], toolResults: [], finalResponse: 'done' }],
-    completed: true,
-    hitMaxTurns: false,
-    totalTurns: 1,
+    turns: [{ toolCalls: [], finalResponse: 'done' }],
 };
 
 describe('evaluateConversation()', () => {

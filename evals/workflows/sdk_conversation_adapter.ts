@@ -1,11 +1,12 @@
 /**
- * Adapts the Claude Agent SDK's message stream into the eval's `ConversationHistory`.
+ * Folds the Claude Agent SDK's message stream into what the eval reads: the judge's
+ * `ConversationHistory`, the paired tool calls, the transcript, and the run metrics.
  *
  * The Agent SDK yields a stream of `SDKMessage`s (an `init` system message, one
  * `assistant` message per model turn, `user` messages carrying tool results, and a
  * final `result` message). The judge and the experiment scores were built against the
- * old hand-rolled loop's `ConversationHistory`, so this module reconstructs that exact
- * shape - leaving `types.ts`, `workflow_judge.ts`, and the evaluators untouched.
+ * old hand-rolled loop's `ConversationHistory`, so the judge's view is reconstructed
+ * unchanged - leaving `workflow_judge.ts` and the evaluators untouched.
  */
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
@@ -64,9 +65,8 @@ function blocksOf(content: unknown): ContentBlock[] {
     return Array.isArray(content) ? (content as ContentBlock[]) : [];
 }
 
-/** Where a pending tool_use lives so its result can be attached to the right turn. */
+/** A tool_use waiting on its result, so the two can be paired into one invocation. */
 type PendingToolUse = {
-    turnIndex: number;
     name: string;
     arguments: unknown;
 };
@@ -103,7 +103,6 @@ export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[])
             const textParts: string[] = [];
             const thinkingParts: string[] = [];
             const toolCalls: { name: string; arguments: Record<string, unknown> }[] = [];
-            const turnIndex = turns.length;
 
             for (const block of blocks) {
                 if (block.type === 'text') {
@@ -113,12 +112,12 @@ export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[])
                 } else if (block.type === 'tool_use') {
                     const name = stripToolPrefix(block.name);
                     toolCalls.push({ name, arguments: (block.input ?? {}) as Record<string, unknown> });
-                    pendingToolUses.set(block.id, { turnIndex, name, arguments: block.input });
+                    pendingToolUses.set(block.id, { name, arguments: block.input });
                 }
             }
 
             const text = textParts.join('\n').trim();
-            const turn: ConversationTurn = { turnNumber: turnIndex + 1, toolCalls, toolResults: [] };
+            const turn: ConversationTurn = { toolCalls };
             // Match the old harness: only a text-only turn exposes a finalResponse to the judge.
             if (toolCalls.length === 0 && text) {
                 turn.finalResponse = text;
@@ -152,7 +151,6 @@ export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[])
                     error: success ? undefined : serialized,
                     resultBytes,
                 };
-                turns[pending.turnIndex]?.toolResults.push(result);
                 toolInvocations.push({ name: pending.name, arguments: pending.arguments, result });
             }
             continue;
@@ -194,25 +192,18 @@ export function adaptSdkConversation(userPrompt: string, messages: SDKMessage[])
     // already carries it via finalResponse; otherwise append a terminal turn.
     const lastTurn = turns[turns.length - 1];
     if (completed && finalResultText && (!lastTurn || lastTurn.toolCalls.length > 0 || !lastTurn.finalResponse)) {
-        turns.push({ turnNumber: turns.length + 1, toolCalls: [], toolResults: [], finalResponse: finalResultText });
+        turns.push({ toolCalls: [], finalResponse: finalResultText });
     }
-
-    const totalTurns = numTurns ?? turns.length;
 
     const conversation: ConversationHistory = {
         userPrompt,
         turns,
-        completed,
-        hitMaxTurns,
-        totalTurns,
-        promptTokens: usage?.promptTokens,
-        completionTokens: usage?.completionTokens,
         totalTokens: usage ? usage.promptTokens + usage.completionTokens : undefined,
     };
 
     const metrics: ConversationMetrics = {
         resultBytes: totalResultBytes,
-        turns: totalTurns,
+        turns: numTurns ?? turns.length,
         promptTokens: usage?.promptTokens,
         completionTokens: usage?.completionTokens,
         totalCostUsd,

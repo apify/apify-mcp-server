@@ -41,12 +41,10 @@ describe('adaptSdkConversation()', () => {
         const { conversation } = adaptSdkConversation('find a maps scraper', toolCallStream);
 
         expect(conversation.turns[0]).toMatchObject({
-            turnNumber: 1,
             toolCalls: [{ name: 'search-actors', arguments: { search: 'maps' } }],
         });
         expect(conversation.turns[0].finalResponse).toBeUndefined();
         expect(conversation.turns.at(-1)).toMatchObject({ toolCalls: [], finalResponse: 'Found 3 Actors.' });
-        expect(conversation.completed).toBe(true);
     });
 
     it('keeps a text-only final turn as the single final response, ignoring subagents', () => {
@@ -62,12 +60,11 @@ describe('adaptSdkConversation()', () => {
     });
 
     it('pairs tool results with their call and sizes them', () => {
-        const { toolInvocations, conversation, metrics } = adaptSdkConversation('find a maps scraper', toolCallStream);
+        const { toolInvocations, metrics } = adaptSdkConversation('find a maps scraper', toolCallStream);
 
         expect(toolInvocations).toHaveLength(1);
         expect(toolInvocations[0]).toMatchObject({ name: 'search-actors', arguments: { search: 'maps' } });
         expect(toolInvocations[0].result.success).toBe(true);
-        expect(conversation.turns[0].toolResults).toHaveLength(1);
         expect(metrics.resultBytes).toBe(Buffer.byteLength(JSON.stringify([{ text: 'ok' }]), 'utf8'));
     });
 
@@ -100,14 +97,14 @@ describe('adaptSdkConversation()', () => {
         expect(conversation.totalTokens).toBe(20_320);
     });
 
-    it('flags a run that ran out of turns as incomplete', () => {
+    it('appends no final answer when the run ran out of turns', () => {
         const { conversation } = adaptSdkConversation('hi', [
             assistantMessage([{ type: 'tool_use', id: 'tool-1', name: 'mcp__apify__search-actors', input: {} }]),
             resultMessage({ subtype: 'error_max_turns', result: undefined }),
         ]);
 
-        expect(conversation.completed).toBe(false);
-        expect(conversation.hitMaxTurns).toBe(true);
+        expect(conversation.turns).toHaveLength(1);
+        expect(conversation.turns.at(-1)?.finalResponse).toBeUndefined();
     });
 
     it('throws on a run the SDK aborted, so it is not judged as a failing eval', () => {
