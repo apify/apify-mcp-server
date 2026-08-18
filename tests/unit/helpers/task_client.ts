@@ -25,7 +25,11 @@ export type RecordedCall = { fn: string; taskId?: string; payload?: unknown };
  * sets the virtual `isPublic` field — keeping that payload right is the client's contract, so the
  * tools are only checked for calling the right method.
  */
-export function mockTaskApiClient(task: unknown): {
+export function mockTaskApiClient(
+    task: unknown,
+    /** When set, `create` and `update` reject with it instead of resolving — for error-mapping tests. */
+    writeError?: unknown,
+): {
     apifyClient: InternalToolArgs['apifyClient'];
     calls: RecordedCall[];
 } {
@@ -40,6 +44,7 @@ export function mockTaskApiClient(task: unknown): {
             },
             update: async (payload: unknown) => {
                 calls.push({ fn: 'update', taskId, payload });
+                if (writeError) throw writeError;
                 return task;
             },
             publish: async () => {
@@ -54,6 +59,7 @@ export function mockTaskApiClient(task: unknown): {
         tasks: () => ({
             create: async (payload: unknown) => {
                 calls.push({ fn: 'create', payload });
+                if (writeError) throw writeError;
                 return task;
             },
         }),
