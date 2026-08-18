@@ -9,14 +9,10 @@ import {
 } from '../../evals/workflows/langfuse_experiment.js';
 import type { LlmClient } from '../../evals/workflows/llm_client.js';
 
-// The task builds its own McpClient, which would otherwise spawn the real server.
-vi.mock('../../evals/workflows/mcp_client.js', () => ({
-    McpClient: class {
-        async start(): Promise<void> {
-            throw new Error('spawn ENOENT');
-        }
-
-        async cleanup(): Promise<void> {}
+// The task runs the Claude Agent SDK, which would otherwise spawn the real agent + server.
+vi.mock('../../evals/workflows/claude_agent.js', () => ({
+    runAgentConversation: async () => {
+        throw new Error('spawn ENOENT');
     },
 }));
 
@@ -25,6 +21,7 @@ function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOu
         id: 'search-001',
         judgeResult: { verdict: 'PASS', reason: 'looks good', rawResponse: '' },
         totalTokens: 1234,
+        transcript: [],
         ...overrides,
     };
 }
@@ -65,6 +62,7 @@ describe('makeTask()', () => {
             agentModel: 'agent',
             judgeModel: 'judge',
             toolTimeout: 1,
+            mcpToolsOnly: false,
         });
 
         await expect(

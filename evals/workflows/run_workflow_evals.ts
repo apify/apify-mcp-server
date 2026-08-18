@@ -5,14 +5,16 @@
  * Main CLI entry point for workflow evaluations (Langfuse backend).
  *
  * Every run reads its test cases from the Langfuse dataset and executes the matching
- * items as an experiment: a fresh MCP client per item, a multi-turn agent conversation,
- * then an LLM judge. Traces, scores, and the dataset live in Langfuse.
+ * items as an experiment: a Claude Code agent (Claude Agent SDK) driving its own freshly
+ * spawned Apify MCP server, then an LLM judge. Traces, scores, and the dataset live in
+ * Langfuse.
  *
  * Usage:
  *   pnpm run evals:workflow
  *   pnpm run evals:workflow -- --category search
  *   pnpm run evals:workflow -- --id search-google-maps
  *   pnpm run evals:workflow -- --concurrency 8
+ *   pnpm run evals:workflow -- --mcp-tools-only   # drop Claude Code's built-in tools
  */
 
 // Must be the first import: config modules read process.env at load time.
@@ -24,8 +26,10 @@ import { LangfuseClient } from '@langfuse/client';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+import { readJsonFile } from '../../src/utils/generic.js';
 import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
+import { assertStdioBinExists } from './claude_agent.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
 import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_experiment.js';
@@ -46,6 +50,7 @@ type CliArgs = {
     judgeModel: string;
     toolTimeout: number;
     concurrency: number;
+    mcpToolsOnly: boolean;
 };
 
 /** Current git branch, or 'unknown' if it can't be resolved. */
@@ -57,9 +62,22 @@ function getGitBranch(): string {
     }
 }
 
+/**
+ * Version of the Agent SDK, recorded in run metadata: the harness is a moving target and
+ * a release can shift results. Read from the exact pin in package.json.
+ */
+function resolveAgentSdkVersion(): string {
+    const manifest = readJsonFile<{ devDependencies: Record<string, string> }>(import.meta.url, '../../package.json');
+    return manifest.devDependencies['@anthropic-ai/claude-agent-sdk'] ?? 'unknown';
+}
+
 async function main() {
+    // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores
+    // every flag behind it. Drop it so both call styles work.
+    const args = hideBin(process.argv).filter((arg) => arg !== '--');
+
     // yargs infers the kebab-case key, not the camelCase alias, hence the cast.
-    const argv = (await yargs(hideBin(process.argv))
+    const argv = (await yargs(args)
         .options({
             category: { type: 'string', description: 'Filter by test case category (supports * wildcard)' },
             id: { type: 'string', description: 'Run test cases whose ID matches this regex' },
@@ -76,13 +94,31 @@ async function main() {
                 default: DEFAULT_TOOL_TIMEOUT_SECONDS,
             },
             concurrency: { alias: 'c', type: 'number', description: 'Items to run in parallel', default: 4 },
+            'mcp-tools-only': {
+                type: 'boolean',
+                description: "Drop Claude Code's built-in tools, leaving only the Apify MCP server's",
+                default: false,
+            },
         })
         .help().argv) as CliArgs;
 
     // Fail before any test runs, listing every missing variable at once.
-    const missing = findMissingEnvVars([...LANGFUSE_ENV_VARS, 'APIFY_TOKEN', 'OPENROUTER_API_KEY']);
+    const missing = findMissingEnvVars([
+        ...LANGFUSE_ENV_VARS,
+        'APIFY_TOKEN',
+        'OPENROUTER_API_KEY',
+        'ANTHROPIC_API_KEY',
+    ]);
     if (missing.length > 0) {
         console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
+        process.exit(1);
+    }
+
+    // The Agent SDK spawns the MCP server from the built binary; fail early with the fix.
+    try {
+        assertStdioBinExists();
+    } catch (error) {
+        console.error(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
     }
 
@@ -115,8 +151,13 @@ async function main() {
         // Traces every agent/judge call as a generation nested under the item's trace.
         const llmClient = new LlmClient();
 
+        const agentSdkVersion = resolveAgentSdkVersion();
         const runName = `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`;
-        console.log(`▶️  Running experiment "${runName}" over ${data.length} item(s), concurrency ${argv.concurrency}`);
+        console.log(
+            `▶️  Running experiment "${runName}" over ${data.length} item(s), concurrency ${argv.concurrency} ` +
+                `(agent: ${argv.agentModel} via Claude Agent SDK ${agentSdkVersion}` +
+                `${argv.mcpToolsOnly ? ', MCP tools only' : ', +built-in tools'})`,
+        );
 
         const result = await langfuse.experiment.run({
             name: datasetName,
@@ -129,6 +170,7 @@ async function main() {
                 agentModel: argv.agentModel,
                 judgeModel: argv.judgeModel,
                 toolTimeout: argv.toolTimeout,
+                mcpToolsOnly: argv.mcpToolsOnly,
             }),
             evaluators,
             runEvaluators: [
@@ -144,6 +186,8 @@ async function main() {
                 agentModel: argv.agentModel,
                 judgeModel: argv.judgeModel,
                 toolTimeout: argv.toolTimeout,
+                mcpToolsOnly: argv.mcpToolsOnly,
+                agentSdkVersion,
             },
         });
 

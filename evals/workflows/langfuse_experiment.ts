@@ -1,17 +1,17 @@
 /**
  * Experiment task, evaluators, and run gate for the Langfuse workflow-evals port.
  *
- * The task runs a fresh agent conversation per dataset item (MCP state is isolated
- * per item) and two evaluators score it: the LLM judge (the pass/fail gate) and
- * total tokens.
+ * The task runs a fresh Claude Code agent conversation per dataset item (the Agent SDK
+ * spawns its own MCP server, so state is isolated per item) and two evaluators score it:
+ * the LLM judge (the pass/fail gate) and total tokens.
  */
 
 import type { Evaluation } from '@langfuse/client';
 
-import { executeConversation } from './conversation_executor.js';
+import { runAgentConversation } from './claude_agent.js';
 import { parseWorkflowItem } from './langfuse_dataset.js';
 import type { LlmClient } from './llm_client.js';
-import { McpClient } from './mcp_client.js';
+import type { TranscriptEntry } from './sdk_conversation_adapter.js';
 import type { JudgeResult } from './workflow_judge.js';
 import { evaluateConversation } from './workflow_judge.js';
 
@@ -27,6 +27,8 @@ export type WorkflowTaskOutput = {
     judgeResult: JudgeResult;
     /** Agent tokens across the conversation; undefined when the provider never reported usage. */
     totalTokens?: number;
+    /** Agent narration, thinking, and tool names per turn. Debug view only, never judged. */
+    transcript: TranscriptEntry[];
 };
 
 /**
@@ -116,33 +118,35 @@ export type WorkflowTaskOptions = {
     agentModel: string;
     judgeModel: string;
     toolTimeout: number;
+    /** Restrict the agent to MCP tools only, dropping Claude Code's built-in toolset. */
+    mcpToolsOnly: boolean;
 };
 
 /**
- * Build the experiment task: per dataset item, a fresh isolated McpClient, the
- * conversation, then the judge.
+ * Build the experiment task: per dataset item, a Claude Code agent run against its own
+ * freshly spawned MCP server, then the judge.
  *
- * Harness errors (MCP spawn, OpenRouter, judge) are left to throw, so `buildRunSummary`
- * fails the run on the shortfall instead of a broken harness looking like a failing eval.
- * They are prefixed with the item id because the SDK's own log line carries none.
+ * Harness errors (MCP spawn, Anthropic API, OpenRouter, judge) are left to throw, so
+ * `buildRunSummary` fails the run on the shortfall instead of a broken harness looking
+ * like a failing eval. They are prefixed with the item id because the SDK's own log line
+ * carries none.
  */
 export function makeTask(options: WorkflowTaskOptions) {
-    const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout } = options;
+    const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout, mcpToolsOnly } = options;
 
     return async (rawItem: unknown): Promise<WorkflowTaskOutput> => {
         const item = parseWorkflowItem(rawItem);
-        const mcpClient = new McpClient(toolTimeout, item.metadata.failTools);
 
         try {
-            await mcpClient.start(apifyToken, item.metadata.tools);
-
-            const conversation = await executeConversation({
-                userPrompt: item.input.query,
-                mcpClient,
-                llmClient,
-                maxTurns: item.metadata.maxTurns,
+            const { conversation, transcript } = await runAgentConversation({
+                prompt: item.input.query,
                 model: agentModel,
-                serverInstructions: mcpClient.getInstructions(),
+                apifyToken,
+                tools: item.metadata.tools,
+                failTools: item.metadata.failTools,
+                maxTurns: item.metadata.maxTurns,
+                toolTimeoutSeconds: toolTimeout,
+                mcpToolsOnly,
             });
 
             const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
@@ -151,17 +155,11 @@ export function makeTask(options: WorkflowTaskOptions) {
                 id: item.id,
                 judgeResult,
                 totalTokens: conversation.totalTokens,
+                transcript,
             };
         } catch (error) {
             throw new Error(`Item "${item.id}": ${error instanceof Error ? error.message : String(error)}`, {
                 cause: error,
-            });
-        } finally {
-            // cleanup() races a 2s close then SIGKILLs, but it can still reject, and a
-            // rejection here would replace the item's real result. Log and move on.
-            await mcpClient.cleanup().catch((error) => {
-                // eslint-disable-next-line no-console
-                console.warn(`⚠️  MCP cleanup failed for "${item.id}": ${error}`);
             });
         }
     };
