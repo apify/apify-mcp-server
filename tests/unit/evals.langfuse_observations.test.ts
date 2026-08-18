@@ -1,7 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { startObservation } from '@langfuse/tracing';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type AgentObservationParams, buildAgentObservations } from '../../evals/workflows/langfuse_observations.js';
+import {
+    type AgentObservationParams,
+    buildAgentObservations,
+    emitObservations,
+} from '../../evals/workflows/langfuse_observations.js';
 import type { AdaptedConversation } from '../../evals/workflows/sdk_conversation_adapter.js';
+
+vi.mock('@langfuse/tracing', () => ({ startObservation: vi.fn() }));
+
+const startObservationMock = startObservation as unknown as Mock;
 
 const START = Date.parse('2026-08-12T10:00:00.000Z');
 const END = START + 5_000;
@@ -179,5 +189,39 @@ describe('buildAgentObservations()', () => {
             level: 'WARNING',
             statusMessage: 'hit the turn limit',
         });
+    });
+});
+
+describe('emitObservations()', () => {
+    /** Records which spans were ended, in order, and lets a named span fail to start. */
+    function stubObservations(failingName?: string): string[] {
+        const ended: string[] = [];
+        startObservationMock.mockImplementation((name: string) => {
+            if (name === failingName) throw new Error('attribute serialization failed');
+            return {
+                otelSpan: { spanContext: () => ({ traceId: 't', spanId: name, traceFlags: 1 }) },
+                end: () => ended.push(name),
+            };
+        });
+        return ended;
+    }
+
+    beforeEach(() => {
+        startObservationMock.mockReset();
+    });
+
+    it('emits the agent span with its generation and tool children', () => {
+        const ended = stubObservations();
+
+        emitObservations(buildAgentObservations(makeParams()));
+
+        expect(ended).toEqual(['claude-haiku-4-5', 'search-actors', 'agent']);
+    });
+
+    it('ends the parent span even when a child fails to start, so no span is left dangling', () => {
+        const ended = stubObservations('search-actors');
+
+        expect(() => emitObservations(buildAgentObservations(makeParams()))).toThrow('attribute serialization failed');
+        expect(ended).toEqual(['claude-haiku-4-5', 'agent']);
     });
 });

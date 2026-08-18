@@ -176,9 +176,13 @@ export function emitObservations(node: ObservationNode, parentSpanContext?: Span
         observation = startObservation(node.name, node.attributes, { ...options, asType: 'tool' });
     }
 
-    for (const child of node.children) {
-        emitObservations(child, observation.otelSpan.spanContext());
+    // Ended in a finally: a child that throws while building its span would otherwise leave
+    // the parent open, and an unended span never reaches Langfuse.
+    try {
+        for (const child of node.children) {
+            emitObservations(child, observation.otelSpan.spanContext());
+        }
+    } finally {
+        observation.end(node.endTime);
     }
-
-    observation.end(node.endTime);
 }
