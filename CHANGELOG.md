@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 - [**breaking**] Run workflow evals as Langfuse experiments ([#1224](https://github.com/apify/apify-mcp-server/pull/1224)) ([316d640](https://github.com/apify/apify-mcp-server/commit/316d6404e50af2ead4770a94a96168ae4f0bfa5d)) by [@RobertCrupa](https://github.com/RobertCrupa)
 - **evals:** Run workflow evals on the Claude Agent SDK ([#1238](https://github.com/apify/apify-mcp-server/pull/1238)) ([de46c3e](https://github.com/apify/apify-mcp-server/commit/de46c3eff0af721192b3fd5fca80e044e9aef81b)) by [@RobertCrupa](https://github.com/RobertCrupa)
 
+### 🐛 Bug Fixes
+
+- Stop filterSchemaProperties from writing phantom default&#x2F;prefill keys ([#1257](https://github.com/apify/apify-mcp-server/pull/1257)) ([db7a7ce](https://github.com/apify/apify-mcp-server/commit/db7a7cea53b8f9e0a9e149c7fd40048f05cd23ac)) by [@MQ37](https://github.com/MQ37), closes [#1266](https://github.com/apify/apify-mcp-server/issues/1266)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.14.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.3) (2026-08-12)
