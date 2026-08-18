@@ -22,27 +22,20 @@ export type McpToolResult = {
  * A single turn in the conversation (agent action)
  */
 export type ConversationTurn = {
-    /** Tool calls made in this turn (if any) */
     toolCalls: {
         name: string;
         arguments: Record<string, unknown>;
     }[];
-    /** Final text response from agent (if no more tool calls) */
+    /** Agent text, set only on a turn that made no tool calls */
     finalResponse?: string;
 };
 
 /**
- * The conversation as the judge and the scores read it - nothing else.
- *
- * Everything the SDK stream reports beyond this (tool results, per-turn numbering, turn
- * count, prompt/completion split, the result subtype) is on `ToolInvocation`,
- * `ConversationMetrics`, or handled where the stream is read.
+ * The conversation as the judge and the scores read it
  */
 export type ConversationHistory = {
-    /** Initial user prompt */
     userPrompt: string;
-    /** All turns in the conversation */
     turns: ConversationTurn[];
-    /** Total tokens billed across all agent LLM calls (prompt + completion); scored in Langfuse */
+    /** Agent tokens across the conversation (prompt + completion); scored in Langfuse */
     totalTokens?: number;
 };

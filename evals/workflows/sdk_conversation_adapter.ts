@@ -1,12 +1,9 @@
 /**
  * Folds the Claude Agent SDK's message stream into what the eval reads: the judge's
- * `ConversationHistory`, the paired tool calls, the transcript, and the run metrics.
+ * `ConversationHistory`, the tool invocations, the transcript, and the run metrics.
  *
- * The Agent SDK yields a stream of `SDKMessage`s (an `init` system message, one
- * `assistant` message per model turn, `user` messages carrying tool results, and a
- * final `result` message). The judge and the experiment scores were built against the
- * old hand-rolled loop's `ConversationHistory`, so the judge's view is reconstructed
- * unchanged - leaving `workflow_judge.ts` and the evaluators untouched.
+ * The stream is an `init` system message, one `assistant` message per model turn, `user`
+ * messages carrying tool results, and a final `result` message.
  */
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
@@ -65,7 +62,7 @@ function blocksOf(content: unknown): ContentBlock[] {
     return Array.isArray(content) ? (content as ContentBlock[]) : [];
 }
 
-/** A tool_use waiting on its result, so the two can be paired into one invocation. */
+/** A tool_use awaiting its result, so the two can be paired. */
 type PendingToolUse = {
     name: string;
     arguments: unknown;
