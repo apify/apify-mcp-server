@@ -64,7 +64,7 @@ function finalResponseOf(adapted: AdaptedConversation): string | undefined {
  * which would drop the whole span rather than just the payload - and a tool that returns
  * megabytes is exactly the one worth seeing in the trace.
  */
-const MAX_TOOL_OUTPUT_BYTES = 128_000;
+const MAX_TOOL_OUTPUT_BYTES = 512_000;
 
 /**
  * One tool call: arguments in, result out, failures raised to ERROR so they stand out.

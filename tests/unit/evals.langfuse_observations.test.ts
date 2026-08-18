@@ -168,16 +168,16 @@ describe('buildAgentObservations()', () => {
                     result: {
                         toolName: 'get-dataset-items',
                         success: true,
-                        result: [{ text: 'x'.repeat(300_000) }],
-                        resultBytes: 300_000,
+                        result: [{ text: 'x'.repeat(600_000) }],
+                        resultBytes: 600_000,
                     },
                 },
             ],
         });
         const toolNode = buildAgentObservations(makeParams({ adapted })).children[1];
 
-        expect(toolNode.attributes.output).toBe('[output omitted: 300000 bytes]');
-        expect(toolNode.attributes.metadata).toMatchObject({ resultBytes: 300_000, outputOmitted: true });
+        expect(toolNode.attributes.output).toBe('[output omitted: 600000 bytes]');
+        expect(toolNode.attributes.metadata).toMatchObject({ resultBytes: 600_000, outputOmitted: true });
     });
 
     it('raises a failed tool call to ERROR, leaving the payload to the output alone', () => {
