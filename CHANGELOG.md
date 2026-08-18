@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - [**breaking**] Run workflow evals as Langfuse experiments ([#1224](https://github.com/apify/apify-mcp-server/pull/1224)) ([316d640](https://github.com/apify/apify-mcp-server/commit/316d6404e50af2ead4770a94a96168ae4f0bfa5d)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- **evals:** Run workflow evals on the Claude Agent SDK ([#1238](https://github.com/apify/apify-mcp-server/pull/1238)) ([de46c3e](https://github.com/apify/apify-mcp-server/commit/de46c3eff0af721192b3fd5fca80e044e9aef81b)) by [@RobertCrupa](https://github.com/RobertCrupa)
 
 
 <!-- git-cliff-unreleased-end -->
