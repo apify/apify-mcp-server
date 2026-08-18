@@ -32,7 +32,15 @@ function makeAdapted(overrides: Partial<AdaptedConversation> = {}): AdaptedConve
                 endedAt: START + 2_000,
             },
         ],
-        metrics: { resultBytes: 16, turns: 2, promptTokens: 100, completionTokens: 20, totalCostUsd: 0.01 },
+        metrics: {
+            resultBytes: 16,
+            turns: 2,
+            promptTokens: 100,
+            completionTokens: 20,
+            cacheReadTokens: 60,
+            cacheCreationTokens: 30,
+            totalCostUsd: 0.01,
+        },
         claudeCodeVersion: '2.0.0',
         transcript: [],
         ...overrides,
@@ -74,9 +82,24 @@ describe('buildAgentObservations()', () => {
         expect(usage).toMatchObject({ name: 'claude-haiku-4-5', asType: 'generation' });
         expect(usage.attributes).toMatchObject({
             model: 'claude-haiku-4-5',
-            usageDetails: { input: 100, output: 20, total: 120 },
+            usageDetails: {
+                input: 10,
+                cache_read_input_tokens: 60,
+                cache_creation_input_tokens: 30,
+                output: 20,
+                total: 120,
+            },
             costDetails: { total: 0.01 },
         });
+    });
+
+    it('reports the whole prompt as fresh input when the provider reported no caching', () => {
+        const adapted = makeAdapted({
+            metrics: { resultBytes: 16, turns: 2, promptTokens: 100, completionTokens: 20 },
+        });
+        const [usage] = buildAgentObservations(makeParams({ adapted })).children;
+
+        expect(usage.attributes.usageDetails).toEqual({ input: 100, output: 20, total: 120 });
     });
 
     it('windows the generation to the final model turn, so the tool spans sort before it', () => {

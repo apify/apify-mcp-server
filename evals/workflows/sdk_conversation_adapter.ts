@@ -36,6 +36,9 @@ export type ConversationMetrics = {
     turns: number;
     promptTokens?: number;
     completionTokens?: number;
+    /** The share of promptTokens the API billed as cache reads / cache writes. */
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
     totalCostUsd?: number;
     durationMs?: number;
 };
@@ -117,7 +120,9 @@ export function adaptSdkConversation(
     let finalTurnStartedAt: number | undefined;
 
     let numTurns: number | undefined;
-    let usage: { promptTokens: number; completionTokens: number } | undefined;
+    let usage:
+        | { promptTokens: number; completionTokens: number; cacheReadTokens: number; cacheCreationTokens: number }
+        | undefined;
     let totalCostUsd: number | undefined;
     let durationMs: number | undefined;
     let resultSubtype: string | undefined;
@@ -232,12 +237,13 @@ export function adaptSdkConversation(
             // Cache reads and writes are prompt tokens the API reports separately. Left out,
             // a cached run reports a handful of prompt tokens and the total_tokens score stops
             // reflecting what the tool output actually costs.
+            const cacheReadTokens = message.usage.cache_read_input_tokens ?? 0;
+            const cacheCreationTokens = message.usage.cache_creation_input_tokens ?? 0;
             usage = {
-                promptTokens:
-                    message.usage.input_tokens +
-                    (message.usage.cache_read_input_tokens ?? 0) +
-                    (message.usage.cache_creation_input_tokens ?? 0),
+                promptTokens: message.usage.input_tokens + cacheReadTokens + cacheCreationTokens,
                 completionTokens: message.usage.output_tokens,
+                cacheReadTokens,
+                cacheCreationTokens,
             };
             if (message.subtype === 'success') finalResultText = message.result.trim();
             else resultErrors = message.errors;
@@ -274,6 +280,8 @@ export function adaptSdkConversation(
         turns: numTurns ?? turns.length,
         promptTokens: usage?.promptTokens,
         completionTokens: usage?.completionTokens,
+        cacheReadTokens: usage?.cacheReadTokens,
+        cacheCreationTokens: usage?.cacheCreationTokens,
         totalCostUsd,
         durationMs,
     };

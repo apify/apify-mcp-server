@@ -170,7 +170,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 - `ConversationHistory` carries only what the judge and the scores read; tool results and metrics live on `ToolInvocation` and `ConversationMetrics`
 - MCP tool names are stripped of their `mcp__apify__` prefix, so the judge sees `search-actors` as before
 - Subagent messages (via the `Task` tool) are excluded, so the transcript reflects the main agent
-- Cached prompt tokens are counted into `total_tokens`; the API reports them separately and a cached run would otherwise look nearly free
+- Cached prompt tokens are counted into `total_tokens`; the API reports them separately and a cached run would otherwise look nearly free. The trace's generation splits them out (`input`, `cache_read_input_tokens`, `cache_creation_input_tokens`): the SDK reports usage for the whole run, so a multi-turn run re-reads the cached system prompt and tool definitions every turn and the total is mostly cache traffic
 
 **Location:** `sdk_conversation_adapter.ts`
 
