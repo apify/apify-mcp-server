@@ -11,14 +11,9 @@ function makeAdapted(overrides: Partial<AdaptedConversation> = {}): AdaptedConve
         conversation: {
             userPrompt: 'find a maps scraper',
             turns: [
-                { turnNumber: 1, toolCalls: [{ name: 'search-actors', arguments: {} }], toolResults: [] },
-                { turnNumber: 2, toolCalls: [], toolResults: [], finalResponse: 'Found 3 Actors.' },
+                { toolCalls: [{ name: 'search-actors', arguments: {} }] },
+                { toolCalls: [], finalResponse: 'Found 3 Actors.' },
             ],
-            completed: true,
-            hitMaxTurns: false,
-            totalTurns: 2,
-            promptTokens: 100,
-            completionTokens: 20,
             totalTokens: 120,
         },
         hitMaxTurns: false,

@@ -222,13 +222,12 @@ describe('adaptSdkConversation()', () => {
 
         expect(conversation.turns).toHaveLength(2);
         expect(conversation.turns[0]).toMatchObject({
-            turnNumber: 1,
             toolCalls: [{ name: 'search-actors', arguments: { search: 'maps' } }],
         });
         // Narration accompanying a tool call never reaches the judge.
         expect(conversation.turns[0].finalResponse).toBeUndefined();
-        expect(conversation.turns[0].toolResults).toHaveLength(1);
-        expect(conversation.turns[1]).toMatchObject({ turnNumber: 2, finalResponse: 'Found 3 Actors.' });
+        expect(toolInvocations).toHaveLength(1);
+        expect(conversation.turns[1]).toMatchObject({ finalResponse: 'Found 3 Actors.' });
         // The tool span still starts when its own frame arrived, not when the turn opened.
         expect(toolInvocations[0]).toMatchObject({ startedAt: 20, endedAt: 50 });
         expect(transcript).toEqual([
