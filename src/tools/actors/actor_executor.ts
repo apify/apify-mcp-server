@@ -1,8 +1,12 @@
 import log from '@apify/log';
 
+import { FAILURE_CATEGORY } from '../../const.js';
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
+import { isActorInputValidationError } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
+import { wrapJsonText } from '../../utils/encode_text.js';
 import { redactSkyfirePayId } from '../../utils/logging.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 
@@ -37,7 +41,28 @@ export const actorExecutor: ActorExecutor = {
             return null;
         }
 
-        const actorRun = await apifyClient.actor(actorFullName).start(actorInput, params.callOptions);
+        let actorRun;
+        try {
+            actorRun = await apifyClient.actor(actorFullName).start(actorInput, params.callOptions);
+        } catch (error) {
+            // The server's own AJV gate validates a derived/shortened schema copy (see
+            // buildActorInputSchema); the platform validates the real one and can reject input
+            // AJV passed. Only intercept that confirmed case — anything else rethrows unchanged.
+            if (!isActorInputValidationError(error)) throw error;
+            log.softFail('Actor input failed platform validation', {
+                actorName: actorFullName,
+                mcpSessionId,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            });
+            return respondUserError(
+                [
+                    `Failed to call Actor '${actorFullName}': ${error.message}`,
+                    `Please ensure the input is correct and matches the Actor's input schema.`,
+                    ...(params.inputSchema ? [`Input schema:\n${wrapJsonText(params.inputSchema)}`] : []),
+                ],
+                { actorId: params.actorId, detail: error.message.slice(0, 200) },
+            ) as ActorExecutionResult;
+        }
 
         log.debug('Started Actor run (direct actor tool)', {
             actorName: actorFullName,
