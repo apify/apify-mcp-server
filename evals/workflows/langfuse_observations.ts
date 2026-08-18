@@ -80,8 +80,13 @@ function toolNode(invocation: ToolInvocation): ObservationNode {
 
 /**
  * The generation that carries the run's cost. Langfuse rolls tokens and cost up from
- * generations only, and the SDK reports usage once for the whole run rather than per
- * turn, so one generation spanning the run is the finest honest granularity.
+ * generations only, and the SDK reports usage once for the whole run rather than per turn,
+ * so the run's aggregate sits on this one generation.
+ *
+ * Windowed to the final model turn, not the whole run: the UI orders siblings by start
+ * time, so a generation spanning the tool calls sorts ahead of them and reads as though
+ * the model answered before calling anything. `usageScope` marks that the numbers still
+ * cover the whole run.
  */
 function usageNode(params: AgentObservationParams): ObservationNode {
     const { metrics } = params.adapted;
@@ -104,9 +109,9 @@ function usageNode(params: AgentObservationParams): ObservationNode {
                   }
                 : {}),
             ...(metrics.totalCostUsd === undefined ? {} : { costDetails: { total: metrics.totalCostUsd } }),
-            metadata: { turns: metrics.turns },
+            metadata: { turns: metrics.turns, usageScope: 'run' },
         },
-        startTime: new Date(params.startedAt),
+        startTime: new Date(params.adapted.finalTurnStartedAt ?? params.startedAt),
         endTime: new Date(params.endedAt),
         children: [],
     };

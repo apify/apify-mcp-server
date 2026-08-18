@@ -181,14 +181,15 @@ Separation allows independent optimization for speed vs evaluation quality.
 ```
 experiment-item-run     Langfuse SDK, holds the scores
 |- agent                the prompt in, the final answer out
-|  |- <agent model>     generation: the run's aggregate tokens and cost
+|  |- <agent model>     generation: the run's aggregate tokens and cost, windowed to the last turn
 |  |- <tool name>       one span per tool call: arguments in, result out
 |- <judge model>        generation, emitted by llm_client.ts
 ```
 
 **Why:**
 - The agent runs in the Claude Code subprocess, so nothing it does is instrumented for us. Left alone, an item's trace holds a single span and the conversation is invisible in the UI
-- Tokens and cost only roll up to the trace from a **generation**. The SDK reports usage once for the whole run, not per turn, so one generation spanning the run is the finest honest granularity
+- Tokens and cost only roll up to the trace from a **generation**. The SDK reports usage once for the whole run, not per turn, so the run's aggregate sits on a single generation
+- That generation is windowed to the final model turn, not the whole run. The UI orders siblings by start time, so a generation spanning the tool calls sorts ahead of them and reads as though the model answered before calling anything. Its `usageScope: run` metadata marks that the numbers still cover the whole run
 - Tool spans are timed from when the SDK delivered the call and its result (`claude_agent.ts` stamps every message as it arrives). Without those stamps every span would collapse to the moment the tree is emitted, after the run
 
 **Trade-off:** the tree is emitted after the fact, so a crashed run leaves no spans, and the agent's individual model turns are not separate generations.
