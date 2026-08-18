@@ -4,8 +4,8 @@ import log from '@apify/log';
 
 import { ALLOWED_DOC_DOMAINS, HELPER_TOOLS } from '../../const.js';
 import { fetchApifyDocsCache } from '../../state.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
@@ -56,20 +56,24 @@ Please verify the URL is correct and accessible. \
 You can search for available documentation pages using the ${HELPER_TOOLS.DOCS_SEARCH} tool.`;
 }
 
-export const fetchApifyDocs: ToolEntry = Object.freeze({
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.DOCS_FETCH,
-    title: 'Fetch Apify docs',
-    description: `Fetch the full content of an Apify or Crawlee documentation page by its URL.
-Use this after finding a relevant page with the ${HELPER_TOOLS.DOCS_SEARCH} tool.
-
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return `Fetch the full content of an Apify or Crawlee documentation page by its URL.
+${hasTool(HELPER_TOOLS.DOCS_SEARCH) ? `Use this after finding a relevant page with the ${HELPER_TOOLS.DOCS_SEARCH} tool.\n` : ''}
 USAGE:
 - Use when you need the complete content of a specific docs page for detailed answers.
 
 USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/platform/actors/running#builds
 - user_input: Fetch https://docs.apify.com/academy
-- user_input: Fetch https://crawlee.dev/docs/guides/basic-concepts`,
+- user_input: Fetch https://crawlee.dev/docs/guides/basic-concepts`;
+}
+
+export const fetchApifyDocs: ToolEntry = Object.freeze({
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.DOCS_FETCH,
+    title: 'Fetch Apify docs',
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: fetchApifyDocsToolInputSchema,
     outputSchema: fetchApifyDocsToolOutputSchema,
     ajvValidate: compileSchema(fetchApifyDocsToolInputSchema),

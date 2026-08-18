@@ -17,4 +17,11 @@ describe('getServerInstructions()', () => {
     it('omits report-problem by default', () => {
         expect(getServerInstructions()).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
     });
+
+    it('describes a capped wait as returning the current run status', () => {
+        const instructions = getServerInstructions();
+
+        expect(instructions).toContain('returns its current status and storage IDs');
+        expect(instructions).not.toContain('returns its final status and storage IDs');
+    });
 });

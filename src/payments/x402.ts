@@ -2,7 +2,7 @@ import log from '@apify/log';
 
 import { getApifyAPIBaseUrl } from '../apify_client.js';
 import type { ToolEntry } from '../types.js';
-import { cloneToolEntry } from '../utils/tools.js';
+import { appendToolDescription, cloneToolEntry } from '../utils/tools.js';
 import { PAYMENT_PROTOCOL_HEADER } from './const.js';
 import type { PaymentHeaders, PaymentMeta, PaymentProvider, RequestHeaders } from './types.js';
 
@@ -258,10 +258,7 @@ export class X402PaymentProvider implements PaymentProvider {
             };
         }
 
-        // Append x402 instructions to description (idempotent)
-        if (cloned.description && !cloned.description.includes(X402_TOOL_INSTRUCTIONS)) {
-            cloned.description += `\n\n${X402_TOOL_INSTRUCTIONS}`;
-        }
+        appendToolDescription(cloned, X402_TOOL_INSTRUCTIONS);
 
         // A paid tool's output is a sum type: its declared success shape OR a 402
         // PaymentRequired object (carried in `structuredContent` per the x402 MCP spec).

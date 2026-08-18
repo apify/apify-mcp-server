@@ -380,3 +380,88 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
         expect(schema.required).toEqual(['query']);
     });
 });
+
+/**
+ * A description must not name a tool that is absent from the same session — the model would call
+ * something `tools/list` never returned. Cross-tool references are gated per session via
+ * `buildDescription` + `ctx.hasTool(...)` and rendered at the tools/list boundary
+ * (`getToolPublicFieldOnly` with `presentTools`). This renders every session shape the same way
+ * the list handlers do and checks the result.
+ */
+describe('tool descriptions never name a tool absent from the session', () => {
+    /** Minimal direct Actor tool — enough to trigger AUTO_INJECTED_TOOLS and stand in for a real one. */
+    const actorToolStub = {
+        type: 'actor',
+        name: 'apify--rag-web-browser',
+        actorId: 'test-actor-id',
+        actorFullName: 'apify/rag-web-browser',
+        description: `Fetch output rows with ${HELPER_TOOLS.DATASET_GET_ITEMS}.`,
+        inputSchema: { type: 'object', properties: {} },
+    } as unknown as ToolEntry;
+    const ALL_TOOL_NAMES: string[] = [...Object.values(HELPER_TOOLS), actorToolStub.name];
+
+    const sessions: { label: string; input: Input; actorTools: ToolEntry[] }[] = [
+        { label: 'default (no selectors)', input: {}, actorTools: [actorToolStub] },
+        { label: "tools: ['docs']", input: { tools: ['docs'] }, actorTools: [] },
+        { label: "tools: ['runs']", input: { tools: ['runs'] }, actorTools: [] },
+        { label: "tools: ['storage']", input: { tools: ['storage'] }, actorTools: [] },
+        { label: "tools: ['actors']", input: { tools: ['actors'] }, actorTools: [] },
+        ...ALL_TOOL_NAMES.map((name) => ({
+            label: `tools: ['${name}']`,
+            input: { tools: [name] },
+            actorTools: [],
+        })),
+        {
+            label: 'Actor tool only',
+            input: { tools: ['apify/rag-web-browser'] },
+            actorTools: [actorToolStub],
+        },
+        // Mixed cross-category selectors — arbitrary combinations must render correctly too.
+        {
+            label: "tools: ['call-actor', 'get-dataset']",
+            input: { tools: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.DATASET_GET] },
+            actorTools: [],
+        },
+        {
+            label: "tools: ['search-actors', 'fetch-apify-docs']",
+            input: { tools: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.DOCS_FETCH] },
+            actorTools: [],
+        },
+        {
+            label: "tools: ['docs', 'get-key-value-store-keys']",
+            input: { tools: ['docs', HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET] },
+            actorTools: [],
+        },
+    ];
+
+    for (const mode of SERVER_MODES) {
+        for (const { label, input, actorTools } of sessions) {
+            it(`${label} in ${mode} mode`, () => {
+                const tools = getToolsForServerMode(input, actorTools, mode);
+                const present = new Set(tools.map((t) => t.name));
+                const absent = ALL_TOOL_NAMES.filter((name) => !present.has(name));
+
+                const violations: string[] = [];
+                for (const tool of tools) {
+                    const { description } = getToolPublicFieldOnly(tool, { presentTools: present });
+                    for (const line of (description ?? '').split('\n')) {
+                        if (line.includes('available in this session')) {
+                            violations.push(`${tool.name} still hedges instead of rendering: ${line.trim()}`);
+                        }
+                        for (const name of absent) {
+                            // Boundary guard so `get-dataset` does not match inside `get-dataset-items`,
+                            // nor `call-actor` inside `call-actor-widget`. `:` is excluded too — it
+                            // marks a remote MCP-Actor tool ("apify/actors-mcp-server:fetch-apify-docs"),
+                            // not a tool served from this session.
+                            if (new RegExp(`(?<![\\w-:])${name}(?![\\w-])`).test(line)) {
+                                violations.push(`${tool.name} names absent ${name}: ${line.trim()}`);
+                            }
+                        }
+                    }
+                }
+
+                expect(violations).toEqual([]);
+            });
+        }
+    }
+});

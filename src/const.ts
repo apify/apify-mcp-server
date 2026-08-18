@@ -93,7 +93,7 @@ export const APIFY_AI_CLIENT_NAME = 'apify-console-ai-chat';
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
 export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool when user wants to GET or RETRIEVE actual data immediately (one-time data retrieval).
-This tool directly fetches and returns data - it does NOT just find tools.
+This tool scrapes the data itself - it does NOT just find tools.
 
 Examples of when to use:
 - User wants current/immediate data (e.g., "Get flight prices for tomorrow", "What's the weather today?")

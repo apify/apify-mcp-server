@@ -18,8 +18,15 @@ import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import type { PaymentProvider } from '../../payments/types.js';
-import type { ActorInfo, ApifyToken, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type {
+    ActorInfo,
+    ApifyToken,
+    InternalToolArgs,
+    ToolDescriptionContext,
+    ToolEntry,
+    ToolInputSchema,
+} from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import {
@@ -62,18 +69,22 @@ const RAG_WEB_BROWSER_TOOL = actorNameToToolName('apify/rag-web-browser');
 export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server Actor, you must specify the tool name in the actor parameter as "{actorName}:{toolName}" in the "actor" input property.`;
 
 /** Shared MCP server instructions — identical in both modes. */
-export const CALL_ACTOR_MCP_SERVER_SECTION = `For MCP server Actors:
-- Use fetch-actor-details with output={ mcpTools: true } to list available tools
-- Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")`;
+export function buildCallActorMcpServerSection({ hasTool }: ToolDescriptionContext): string {
+    return `For MCP server Actors:
+${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `- Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ mcpTools: true } to list available tools\n` : ''}- Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")`;
+}
 
 /** Shared "two ways to run" + USAGE section — identical in both modes. */
-export const CALL_ACTOR_USAGE_SECTION = `There are two ways to run Actors:
-1. Dedicated Actor tools (e.g., ${RAG_WEB_BROWSER_TOOL}): These are pre-configured tools, offering a simpler and more direct experience.
+function buildCallActorUsageSection({ hasTool }: ToolDescriptionContext): string {
+    const actorToolExample = hasTool(RAG_WEB_BROWSER_TOOL) ? ` (e.g., ${RAG_WEB_BROWSER_TOOL})` : '';
+    return `There are two ways to run Actors:
+1. Dedicated Actor tools${actorToolExample}: These are pre-configured tools, offering a simpler and more direct experience.
 2. Generic call-actor tool (${HELPER_TOOLS.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
 
 USAGE:
-- Always use dedicated tools when available (e.g., ${RAG_WEB_BROWSER_TOOL})
+- Always use dedicated tools when available${actorToolExample}
 - Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.`;
+}
 
 /** Shared examples section — identical in both modes. */
 export const CALL_ACTOR_EXAMPLES_SECTION = `EXAMPLES:
@@ -84,54 +95,81 @@ type CallActorErrorResponseParams = {
     error: unknown;
     actorId?: string;
     mcpSessionId?: string;
-    actorGetDetailsTool: typeof HELPER_TOOLS.ACTOR_GET_DETAILS;
+    /** Names of all currently loaded tools — gates which recovery tools this error may name. */
+    loadedToolNames: readonly string[];
 };
 
-const WIDGET_ADDENDUM = dedent`
-    WIDGET ALTERNATIVE (apps mode):
-    - If the user explicitly asks to see live progress, call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead — it renders an interactive UI that tracks the run.
-    - For silent name resolution before this call, use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}, which renders UI).
-`;
+/** Names only the recovery tools actually loaded in this session — omits the sentence if none are. */
+function buildActorNotFoundHint(loadedToolNames: readonly string[]): string {
+    const hints = [
+        loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
+            ? `search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`
+            : '',
+        loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
+            ? `get Actor details using ${HELPER_TOOLS.ACTOR_GET_DETAILS}`
+            : '',
+    ].filter(Boolean);
+    return hints.length ? `You can ${hints.join(', or ')}.` : '';
+}
 
-function buildCallActorDescriptionSections(includeWidget: boolean): string {
+// call-actor-widget needs no hasTool gate: apps mode appends it whenever call-actor is served.
+function buildWidgetAddendum({ hasTool }: ToolDescriptionContext): string {
+    return dedent`
+        WIDGET ALTERNATIVE (apps mode):
+        - If the user explicitly asks to see live progress, call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead — it renders an interactive UI that tracks the run.
+        ${hasTool(HELPER_TOOLS.STORE_SEARCH) ? `- For silent name resolution before this call, use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}, which renders UI).` : ''}
+    `;
+}
+
+function buildCallActorDescriptionSections(includeWidget: boolean, ctx: ToolDescriptionContext): string {
+    const { hasTool } = ctx;
+    const workflowSection = [
+        'WORKFLOW:',
+        ...(hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
+            ? [
+                  `1. Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema`,
+                  '2. Call this tool with the actor name and proper input based on the schema',
+              ]
+            : ['Call this tool with the actor name and proper input matching the Actor input schema.']),
+        ...(hasTool(HELPER_TOOLS.STORE_SEARCH)
+            ? [
+                  '',
+                  `If the actor name is not in "username/name" format, use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first.`,
+              ]
+            : []),
+    ].join('\n');
     const sections: string[] = [
         'Call any Actor from the Apify Store.',
-        dedent`
-            WORKFLOW:
-            1. Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema
-            2. Call this tool with the actor name and proper input based on the schema
-
-            If the actor name is not in "username/name" format and ${HELPER_TOOLS.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
-        `,
-        CALL_ACTOR_MCP_SERVER_SECTION,
+        workflowSection,
+        buildCallActorMcpServerSection(ctx),
         dedent`
             IMPORTANT:
-            - Waits up to waitSecs (default 30s) for completion; returns run status, storage IDs, and field metadata
+            - Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, and with waitSecs > 0 also reports dataset field metadata
             - Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
             - Use dedicated Actor tools when available for better experience
         `,
-        CALL_ACTOR_USAGE_SECTION,
+        buildCallActorUsageSection(ctx),
         dedent`
             - Use \`waitSecs\` (0–45) to control how long to wait. Default 30s returns results for fast actors. Use \`waitSecs: 0\` to start and return immediately for long-running actors.
         `,
         CALL_ACTOR_EXAMPLES_SECTION,
     ];
 
-    if (includeWidget) sections.push(WIDGET_ADDENDUM);
+    if (includeWidget) sections.push(buildWidgetAddendum(ctx));
 
     return sections.join('\n\n');
 }
 
-export function buildCallActorDescription(): string {
-    return buildCallActorDescriptionSections(false);
+export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOLS_PRESENT): string {
+    return buildCallActorDescriptionSections(false, ctx);
 }
 
-export function buildCallActorAppsDescription(): string {
-    return buildCallActorDescriptionSections(true);
+export function buildCallActorAppsDescription(ctx: ToolDescriptionContext = ALL_TOOLS_PRESENT): string {
+    return buildCallActorDescriptionSections(true, ctx);
 }
 
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ToolResponse {
-    const { actorName, error, actorId, mcpSessionId, actorGetDetailsTool } = params;
+    const { actorName, error, actorId, mcpSessionId, loadedToolNames } = params;
 
     if (isPermissionApprovalError(error)) {
         logHttpError(error, 'Failed to call Actor — permission approval required', {
@@ -178,9 +216,8 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         [
             `Failed to call Actor '${actorName}': ${errMsg}`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
-            // "if available" — search-actors may not be loaded in apps-mode partial tool selections.
-            `If ${HELPER_TOOLS.STORE_SEARCH} is available in this session, you can use it to search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
-        ],
+            buildActorNotFoundHint(loadedToolNames),
+        ].filter(Boolean),
         { error, detail: errMsg.slice(0, 200), actorId },
     );
 }
@@ -639,7 +676,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
             error,
             actorId: resolvedActorId,
             mcpSessionId: toolArgs.mcpSessionId,
-            actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+            loadedToolNames: toolArgs.loadedToolNames,
         });
     }
 }
@@ -648,12 +685,13 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
  * Single call-actor definition shared by both modes — only the description differs
  * (apps mode appends a widget addendum).
  */
-function createCallActorTool(description: string): ToolEntry {
+function createCallActorTool(buildDescription: (ctx: ToolDescriptionContext) => string): ToolEntry {
     return Object.freeze({
         type: TOOL_TYPE.INTERNAL,
         name: HELPER_TOOLS.ACTOR_CALL,
         title: 'Call Actor',
-        description,
+        description: buildDescription(ALL_TOOLS_PRESENT),
+        buildDescription,
         inputSchema: callActorInputSchema,
         outputSchema: actorRunOutputSchema,
         ajvValidate: callActorAjvValidate,
@@ -673,10 +711,10 @@ function createCallActorTool(description: string): ToolEntry {
 }
 
 /** Default mode call-actor tool. */
-export const callActorDefault: ToolEntry = createCallActorTool(buildCallActorDescription());
+export const callActorDefault: ToolEntry = createCallActorTool(buildCallActorDescription);
 
 /**
  * Apps mode call-actor tool.
  * Renders no widget; for a live progress UI, use the call-actor-widget sibling.
  */
-export const callActorApps: ToolEntry = createCallActorTool(buildCallActorAppsDescription());
+export const callActorApps: ToolEntry = createCallActorTool(buildCallActorAppsDescription);
