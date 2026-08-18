@@ -65,7 +65,7 @@ describe('compileSchema', () => {
 });
 
 describe('fixZodSchemaRequired', () => {
-    // Regression: #637 — phantom `default: undefined` must not clear required fields.
+    // Regression: #637 — `default: undefined`, from any producer, must not clear required fields.
     it('keeps required fields whose `default` is explicitly undefined', () => {
         const result = fixZodSchemaRequired({
             type: 'object',

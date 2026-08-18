@@ -379,25 +379,4 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
 
         expect(schema.required).toEqual(['query']);
     });
-
-    // Regression: #637 — phantom `default: undefined` from filterSchemaProperties must not clear required.
-    it('should preserve required fields even when upstream writes `default: undefined`', () => {
-        const toolWithPhantomDefaults = {
-            name: 'apify--some-actor',
-            description: 'Test Actor tool',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    query: { type: 'string', description: 'Search query', default: undefined },
-                    maxResults: { type: 'integer', description: 'Limit', default: 3 },
-                },
-                required: ['query'],
-            },
-        } as unknown as ToolBase;
-
-        const { inputSchema } = getToolPublicFieldOnly(toolWithPhantomDefaults, { filterWidgetMeta: false });
-        const schema = inputSchema as { required?: string[] };
-
-        expect(schema.required).toEqual(['query']);
-    });
 });
