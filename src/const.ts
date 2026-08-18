@@ -221,6 +221,7 @@ export const FAILURE_CATEGORY = {
 export const APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED = 'full-permission-actor-not-approved';
 export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
+export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;
