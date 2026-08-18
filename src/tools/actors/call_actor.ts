@@ -95,8 +95,22 @@ type CallActorErrorResponseParams = {
     error: unknown;
     actorId?: string;
     mcpSessionId?: string;
-    actorGetDetailsTool: typeof HELPER_TOOLS.ACTOR_GET_DETAILS;
+    /** Names of all currently loaded tools — gates which recovery tools this error may name. */
+    loadedToolNames: readonly string[];
 };
+
+/** Names only the recovery tools actually loaded in this session — omits the sentence if none are. */
+function buildActorNotFoundHint(loadedToolNames: readonly string[]): string {
+    const hints = [
+        loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
+            ? `search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`
+            : '',
+        loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
+            ? `get Actor details using ${HELPER_TOOLS.ACTOR_GET_DETAILS}`
+            : '',
+    ].filter(Boolean);
+    return hints.length ? `You can ${hints.join(', or ')}.` : '';
+}
 
 // call-actor-widget needs no hasTool gate: apps mode appends it whenever call-actor is served.
 function buildWidgetAddendum({ hasTool }: ToolDescriptionContext): string {
@@ -155,7 +169,7 @@ export function buildCallActorAppsDescription(ctx: ToolDescriptionContext = ALL_
 }
 
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ToolResponse {
-    const { actorName, error, actorId, mcpSessionId, actorGetDetailsTool } = params;
+    const { actorName, error, actorId, mcpSessionId, loadedToolNames } = params;
 
     if (isPermissionApprovalError(error)) {
         logHttpError(error, 'Failed to call Actor — permission approval required', {
@@ -202,9 +216,8 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         [
             `Failed to call Actor '${actorName}': ${errMsg}`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
-            // "if available" — search-actors may not be loaded in apps-mode partial tool selections.
-            `If ${HELPER_TOOLS.STORE_SEARCH} is available in this session, you can use it to search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
-        ],
+            buildActorNotFoundHint(loadedToolNames),
+        ].filter(Boolean),
         { error, detail: errMsg.slice(0, 200), actorId },
     );
 }
@@ -663,7 +676,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
             error,
             actorId: resolvedActorId,
             mcpSessionId: toolArgs.mcpSessionId,
-            actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+            loadedToolNames: toolArgs.loadedToolNames,
         });
     }
 }

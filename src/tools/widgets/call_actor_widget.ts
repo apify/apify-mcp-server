@@ -141,7 +141,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
                 error,
                 actorId: resolvedActorId,
                 mcpSessionId: toolArgs.mcpSessionId,
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: toolArgs.loadedToolNames,
             });
         }
     },

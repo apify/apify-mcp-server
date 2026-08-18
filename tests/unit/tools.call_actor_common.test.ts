@@ -70,13 +70,13 @@ describe('call_actor_common', () => {
                 error,
                 actorId: 'actor-123',
                 mcpSessionId: 'session-123',
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             expect(response.isError).toBe(true);
             const allText = (response.content ?? []).map(textOf).join('\n');
-            expect(allText).toContain(`If ${HELPER_TOOLS.STORE_SEARCH} is available in this session`);
-            expect(allText).toContain(`using: ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
+            expect(allText).toContain(`search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`);
+            expect(allText).toContain(`get Actor details using ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
@@ -109,7 +109,7 @@ describe('call_actor_common', () => {
                 actorName: 'apify/some-actor',
                 error,
                 actorId: 'actor-456',
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             expect(response.isError).toBe(true);
@@ -130,12 +130,12 @@ describe('call_actor_common', () => {
             const response = buildCallActorErrorResponse({
                 actorName: 'apify/rag-web-browser',
                 error: new Error('boom'),
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             const allText = (response.content ?? []).map(textOf).join('\n');
-            expect(allText).toContain(`If ${HELPER_TOOLS.STORE_SEARCH} is available in this session`);
-            expect(allText).toContain(`using: ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
+            expect(allText).toContain(`search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`);
+            expect(allText).toContain(`get Actor details using ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
                     toolStatus: TOOL_STATUS.FAILED,
@@ -143,6 +143,30 @@ describe('call_actor_common', () => {
                     failureDetail: 'boom',
                 }),
             );
+        });
+
+        it('omits the recovery hint entirely when neither tool is loaded in this session', () => {
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/rag-web-browser',
+                error: new Error('boom'),
+                loadedToolNames: [],
+            });
+
+            const allText = (response.content ?? []).map(textOf).join('\n');
+            expect(allText).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+            expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        });
+
+        it('names only the loaded recovery tool when the session has a partial tool set', () => {
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/rag-web-browser',
+                error: new Error('boom'),
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH],
+            });
+
+            const allText = (response.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain(`search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`);
+            expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         });
 
         it('returns memory-quota recovery hint for HTTP 402 memory-limit errors', () => {
@@ -164,7 +188,7 @@ describe('call_actor_common', () => {
                 actorName: 'compass/crawler-google-places',
                 error,
                 actorId: 'actor-789',
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             expect(response.isError).toBe(true);
@@ -206,7 +230,7 @@ describe('call_actor_common', () => {
                 actorName: 'apify/instagram-scraper',
                 error,
                 actorId: 'actor-999',
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             expect(response.isError).toBe(true);
