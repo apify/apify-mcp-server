@@ -76,6 +76,21 @@ function blocksOf(content: unknown): ContentBlock[] {
     return Array.isArray(content) ? (content as ContentBlock[]) : [];
 }
 
+/**
+ * Error text as the model saw it. A failed result is usually a string or text blocks;
+ * `JSON.stringify` on those would quote and escape them, which is what Langfuse then shows
+ * as one `\n`-riddled line instead of a readable message.
+ */
+function errorTextOf(content: unknown): string {
+    if (typeof content === 'string') return content;
+
+    const texts = blocksOf(content)
+        .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
+        .map((block) => block.text);
+
+    return texts.length > 0 ? texts.join('\n') : JSON.stringify(content ?? null, null, 4);
+}
+
 /** A tool_use awaiting its result, so the two can be paired. */
 type PendingToolUse = {
     name: string;
@@ -195,7 +210,7 @@ export function adaptSdkConversation(
                     toolName: pending.name,
                     success,
                     result: success ? block.content : undefined,
-                    error: success ? undefined : serialized,
+                    error: success ? undefined : errorTextOf(block.content),
                     resultBytes,
                 };
                 toolInvocations.push({

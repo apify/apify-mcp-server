@@ -59,7 +59,11 @@ function finalResponseOf(adapted: AdaptedConversation): string | undefined {
     return adapted.conversation.turns.at(-1)?.finalResponse;
 }
 
-/** One tool call: arguments in, result out, failures raised to ERROR so they stand out. */
+/**
+ * One tool call: arguments in, result out, failures raised to ERROR so they stand out.
+ * The error text is left to `output` alone: Langfuse renders `statusMessage` in its own box
+ * above the output preview, so setting it shows the same message twice.
+ */
 function toolNode(invocation: ToolInvocation): ObservationNode {
     const { result } = invocation;
 
@@ -70,7 +74,7 @@ function toolNode(invocation: ToolInvocation): ObservationNode {
             input: invocation.arguments,
             output: result.success ? result.result : result.error,
             metadata: { resultBytes: result.resultBytes },
-            ...(result.success ? {} : { level: 'ERROR', statusMessage: result.error }),
+            ...(result.success ? {} : { level: 'ERROR' }),
         },
         ...(invocation.startedAt === undefined ? {} : { startTime: new Date(invocation.startedAt) }),
         ...(invocation.endedAt === undefined ? {} : { endTime: new Date(invocation.endedAt) }),
