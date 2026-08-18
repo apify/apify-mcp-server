@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Stop filterSchemaProperties from writing phantom default&#x2F;prefill keys ([#1257](https://github.com/apify/apify-mcp-server/pull/1257)) ([db7a7ce](https://github.com/apify/apify-mcp-server/commit/db7a7cea53b8f9e0a9e149c7fd40048f05cd23ac)) by [@MQ37](https://github.com/MQ37), closes [#1266](https://github.com/apify/apify-mcp-server/issues/1266)
+- Correct tool descriptions naming absent tools or wrong output ([#1261](https://github.com/apify/apify-mcp-server/pull/1261)) ([c5d3928](https://github.com/apify/apify-mcp-server/commit/c5d3928b1cb9e0f4b9891ad015411c6472c26e70)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
