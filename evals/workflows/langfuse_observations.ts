@@ -165,14 +165,16 @@ export function buildAgentObservations(params: AgentObservationParams): Observat
  */
 export function emitObservations(node: ObservationNode, parentSpanContext?: SpanContext): void {
     const options = { startTime: node.startTime, parentSpanContext };
-    // Switched rather than passed through: startObservation is overloaded per type and
+    // Branched rather than passed through: startObservation is overloaded per type and
     // only a literal asType picks the matching overload.
-    const observation =
-        node.asType === 'agent'
-            ? startObservation(node.name, node.attributes, { ...options, asType: 'agent' })
-            : node.asType === 'generation'
-              ? startObservation(node.name, node.attributes, { ...options, asType: 'generation' })
-              : startObservation(node.name, node.attributes, { ...options, asType: 'tool' });
+    let observation;
+    if (node.asType === 'agent') {
+        observation = startObservation(node.name, node.attributes, { ...options, asType: 'agent' });
+    } else if (node.asType === 'generation') {
+        observation = startObservation(node.name, node.attributes, { ...options, asType: 'generation' });
+    } else {
+        observation = startObservation(node.name, node.attributes, { ...options, asType: 'tool' });
+    }
 
     for (const child of node.children) {
         emitObservations(child, observation.otelSpan.spanContext());
