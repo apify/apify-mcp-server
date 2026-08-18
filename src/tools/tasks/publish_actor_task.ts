@@ -31,9 +31,9 @@ users understand and try the Actor and can increase its runs. Publish only tasks
 reliable, and specific use case. Not every saved task needs to be public.
 
 The task's Actor must be public and the task must have its public display configuration set up -
-at least \`publicConfig.inputSchemaFields\` and \`publicConfig.datasetView\`. If publishing fails
-because the task is not ready, set those with ${HELPER_TOOLS.ACTOR_TASK_UPDATE}, if that tool is
-available in the session, and try again.
+at least \`publicConfig.inputSchemaFields\` and \`publicConfig.datasetView\`. If publishing fails,
+follow the API reason; update these fields with ${HELPER_TOOLS.ACTOR_TASK_UPDATE}, if available in the
+session, only when the reason identifies them.
 At most 50 tasks can be published per Actor.
 Publishing an already published task has no effect.
 Requires write access to both the task and its Actor.

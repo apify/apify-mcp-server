@@ -1,7 +1,5 @@
-import { ApifyApiError } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
-import { APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK } from '../../src/const.js';
 import { actorTaskOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { createActorTask } from '../../src/tools/tasks/create_actor_task.js';
 import { getActorTask } from '../../src/tools/tasks/get_actor_task.js';
@@ -10,18 +8,11 @@ import type { HelperTool } from '../../src/types.js';
 import { mockTask, mockTaskApiClient } from './helpers/task_client.js';
 import {
     expectSchemaConformingStructuredContent,
-    expectSoftFailInvalidInput,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
 
 type StructuredResult = TextToolResult & { structuredContent: Record<string, unknown> };
-
-/** `ApifyApiError`'s constructor needs a real HTTP response, so build the shape the predicate reads. */
-function cannotPublishError(message: string) {
-    const type = APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK;
-    return Object.assign(Object.create(ApifyApiError.prototype), { message, type, statusCode: 400 });
-}
 
 describe('get-actor-task', () => {
     it('returns the task subset with input field names but no input values', async () => {
@@ -168,24 +159,6 @@ describe('create-actor-task', () => {
 
         expect(calls[0].payload).toEqual({ actId: '~actor-id-1' });
     });
-
-    it('reports a rejected publicConfig with the API reason and the recovery path', async () => {
-        const { apifyClient } = mockTaskApiClient(
-            mockTask(),
-            cannotPublishError("Cannot publish Actor task: Dataset view doesn't exist"),
-        );
-        const result = await (createActorTask as HelperTool).call(
-            stubToolCallContext(
-                { actorId: 'actor-id-1', name: 'my-task', publicConfig: { datasetView: 'nope' } },
-                apifyClient,
-            ),
-        );
-        const { content } = result as TextToolResult;
-
-        expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain("Dataset view doesn't exist");
-        expect(content[1].text).toContain('Ask the user');
-    });
 });
 
 describe('update-actor-task', () => {
@@ -259,30 +232,5 @@ describe('update-actor-task', () => {
 
         expect(result.content[0].text).toContain('not found');
         expect(calls).toEqual([{ fn: 'get', taskId: '~nope' }]);
-    });
-
-    it('reports a rejected publicConfig with the API reason and the recovery path', async () => {
-        const { apifyClient } = mockTaskApiClient(
-            mockTask(),
-            cannotPublishError('Cannot publish Actor task: SEO description is required'),
-        );
-        const result = await (updateActorTask as HelperTool).call(
-            stubToolCallContext({ taskId: 'task-1', publicConfig: { datasetView: 'overview' } }, apifyClient),
-        );
-        const { content } = result as TextToolResult;
-
-        expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain('SEO description is required');
-        expect(content[1].text).toContain('validated on write');
-    });
-
-    it('rethrows an error that is not a publicConfig rejection', async () => {
-        const { apifyClient } = mockTaskApiClient(mockTask(), new Error('network down'));
-
-        await expect(
-            (updateActorTask as HelperTool).call(
-                stubToolCallContext({ taskId: 'task-1', title: 'Renamed' }, apifyClient),
-            ),
-        ).rejects.toThrow('network down');
     });
 });

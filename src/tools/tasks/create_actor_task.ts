@@ -1,20 +1,13 @@
-import type { Task, TaskCreateData } from 'apify-client';
+import type { TaskCreateData } from 'apify-client';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { isCannotPublishTaskError } from '../../utils/apify_errors.js';
 import { respondOk } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
-import {
-    publicConfigSchema,
-    respondPublicConfigRejected,
-    taskNameSchema,
-    taskResult,
-    toSafeResourceId,
-} from './task_helpers.js';
+import { publicConfigSchema, taskNameSchema, taskResult, toSafeResourceId } from './task_helpers.js';
 
 const createActorTaskArgs = z.object({
     actorId: z
@@ -88,7 +81,7 @@ USAGE EXAMPLES:
         };
         const hasOptions = Object.keys(options).length > 0;
 
-        const createData = {
+        const task = await client.tasks().create({
             actId: toSafeResourceId(actorId),
             ...(name && { name }),
             ...(input && { input }),
@@ -96,15 +89,7 @@ USAGE EXAMPLES:
             ...(description && { description }),
             ...(hasOptions && { options }),
             ...(publicConfig && { publicConfig }),
-        } satisfies TaskCreateData;
-
-        let task: Task;
-        try {
-            task = await client.tasks().create(createData);
-        } catch (error) {
-            if (isCannotPublishTaskError(error)) return respondPublicConfigRejected(error);
-            throw error;
-        }
+        } satisfies TaskCreateData);
 
         const result = taskResult(task);
         const summary = `Created task "${result.name}" (ID: ${result.taskId}) for Actor ${result.actorId}.`;

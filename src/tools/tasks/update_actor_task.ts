@@ -1,20 +1,13 @@
-import type { Task, TaskUpdateData } from 'apify-client';
+import type { TaskUpdateData } from 'apify-client';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { isCannotPublishTaskError } from '../../utils/apify_errors.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
-import {
-    publicConfigSchema,
-    respondPublicConfigRejected,
-    taskNameSchema,
-    taskResult,
-    toSafeResourceId,
-} from './task_helpers.js';
+import { publicConfigSchema, toSafeResourceId, taskNameSchema, taskResult } from './task_helpers.js';
 
 const updateActorTaskArgs = z.object({
     taskId: z
@@ -106,13 +99,7 @@ USAGE EXAMPLES:
             ...(publicConfig && { publicConfig }),
         };
 
-        let task: Task;
-        try {
-            task = await client.task(resolvedTaskId).update(update);
-        } catch (error) {
-            if (isCannotPublishTaskError(error)) return respondPublicConfigRejected(error);
-            throw error;
-        }
+        const task = await client.task(resolvedTaskId).update(update);
 
         const result = taskResult(task);
         const summary = `Updated task "${result.name}" (ID: ${result.taskId}).`;

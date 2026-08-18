@@ -1,9 +1,7 @@
-import type { ApifyApiError, Task, TaskPublicConfig } from 'apify-client';
+import type { Task, TaskPublicConfig } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { FAILURE_CATEGORY } from '../../const.js';
-import { respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { toIsoString } from '../actors/actor_run_response.js';
 
 const PUBLIC_CONFIG_FIELDS = [
@@ -59,7 +57,9 @@ export const publicConfigSchema = z.object({
     datasetView: z
         .string()
         .optional()
-        .describe("View key from the Actor's dataset schema. Required to publish; ask the user, no tool lists them."),
+        .describe(
+            "View key from the Actor's dataset schema. Required to publish; ask the user, no tool lists dataset views.",
+        ),
 });
 
 /**
@@ -89,14 +89,6 @@ export function taskResult(task: Task) {
         publicConfig,
         inputFields: task.input && !Array.isArray(task.input) ? Object.keys(task.input) : [],
     };
-}
-
-/** Keeps the API's reason and adds the recovery path: no tool here can list an Actor's dataset views. */
-export function respondPublicConfigRejected(error: ApifyApiError): ToolResponse {
-    return respondUserError(
-        [error.message, '`publicConfig` is validated on write, not at publish. Ask the user for a valid value.'],
-        { category: FAILURE_CATEGORY.INVALID_INPUT, httpStatus: error.statusCode },
-    );
 }
 
 /**

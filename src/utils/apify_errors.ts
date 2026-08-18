@@ -21,7 +21,7 @@ export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
 }
 
-/** True when the API rejects a task's `publicConfig`. It validates on every write, not only on publish. */
+/** True when the API rejects a supplied `publicConfig` field or a request to publish the task. */
 export function isCannotPublishTaskError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK;
 }
