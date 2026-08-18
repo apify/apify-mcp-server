@@ -95,7 +95,40 @@ describe('adaptSdkConversation()', () => {
             resultMessage(),
         ]);
 
-        expect(toolInvocations[0].result).toMatchObject({ success: false, error: '"internal error"' });
+        expect(toolInvocations[0].result).toMatchObject({ success: false, error: 'internal error' });
+    });
+
+    it('keeps an errored text block readable instead of JSON-escaping it', () => {
+        const { toolInvocations } = adaptSdkConversation('call the browser', [
+            assistantMessage([{ type: 'tool_use', id: 'tool-1', name: 'mcp__apify__call-actor', input: {} }]),
+            toolResultMessage([
+                {
+                    type: 'tool_result',
+                    tool_use_id: 'tool-1',
+                    content: [
+                        { type: 'text', text: "Input validation failed.\nErrors: must have required property 'query'" },
+                    ],
+                    is_error: true,
+                },
+            ]),
+            resultMessage(),
+        ]);
+
+        expect(toolInvocations[0].result.error).toBe(
+            "Input validation failed.\nErrors: must have required property 'query'",
+        );
+    });
+
+    it('falls back to pretty JSON for an error payload that is not text', () => {
+        const { toolInvocations } = adaptSdkConversation('call the browser', [
+            assistantMessage([{ type: 'tool_use', id: 'tool-1', name: 'mcp__apify__call-actor', input: {} }]),
+            toolResultMessage([
+                { type: 'tool_result', tool_use_id: 'tool-1', content: { code: 'invalid-input' }, is_error: true },
+            ]),
+            resultMessage(),
+        ]);
+
+        expect(toolInvocations[0].result.error).toBe('{\n    "code": "invalid-input"\n}');
     });
 
     it('counts cached prompt tokens, which the API reports separately', () => {

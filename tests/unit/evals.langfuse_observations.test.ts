@@ -117,7 +117,7 @@ describe('buildAgentObservations()', () => {
         expect(toolNode.attributes.level).toBeUndefined();
     });
 
-    it('raises a failed tool call to ERROR with the payload as the status', () => {
+    it('raises a failed tool call to ERROR, leaving the payload to the output alone', () => {
         const adapted = makeAdapted({
             toolInvocations: [
                 {
@@ -131,9 +131,10 @@ describe('buildAgentObservations()', () => {
 
         expect(toolNode.attributes).toMatchObject({
             level: 'ERROR',
-            statusMessage: 'internal error',
             output: 'internal error',
         });
+        // The UI already renders output; a copy in statusMessage only repeats it.
+        expect(toolNode.attributes.statusMessage).toBeUndefined();
     });
 
     it('leaves the span times open when the stream was not timed', () => {
