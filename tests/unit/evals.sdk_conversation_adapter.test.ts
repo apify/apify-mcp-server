@@ -125,6 +125,36 @@ describe('adaptSdkConversation()', () => {
         expect(conversation.turns.at(-1)?.finalResponse).toBeUndefined();
     });
 
+    it('stamps when the final model turn opened, so the generation can be windowed to it', () => {
+        const { finalTurnStartedAt } = adaptSdkConversation(
+            'find a maps scraper',
+            [
+                assistantMessage(
+                    [{ type: 'tool_use', id: 'tool-1', name: 'mcp__apify__search-actors', input: {} }],
+                    null,
+                    'msg-1',
+                ),
+                toolResultMessage([{ type: 'tool_result', tool_use_id: 'tool-1', content: [{ text: 'ok' }] }]),
+                assistantMessage([{ type: 'thinking', thinking: 'that is the one' }], null, 'msg-2'),
+                assistantMessage([{ type: 'text', text: 'Found 3 Actors.' }], null, 'msg-2'),
+                resultMessage(),
+            ],
+            [10, 20, 30, 35, 40],
+        );
+
+        // The first frame of the last turn, not the frame the answer text arrived in.
+        expect(finalTurnStartedAt).toBe(30);
+    });
+
+    it('leaves the final turn unstamped when the caller did not time the stream', () => {
+        const { finalTurnStartedAt } = adaptSdkConversation('hi', [
+            assistantMessage([{ type: 'text', text: 'done' }]),
+            resultMessage({ num_turns: 1 }),
+        ]);
+
+        expect(finalTurnStartedAt).toBeUndefined();
+    });
+
     it('throws on a run the SDK aborted, so it is not judged as a failing eval', () => {
         expect(() =>
             adaptSdkConversation('hi', [

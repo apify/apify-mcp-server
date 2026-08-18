@@ -49,6 +49,11 @@ export type AdaptedConversation = {
      * only non-success outcome that gets this far: every other subtype throws below.
      */
     hitMaxTurns: boolean;
+    /**
+     * Epoch ms the final model turn opened, when the caller timed the stream. The usage
+     * generation is windowed to it rather than to the whole run.
+     */
+    finalTurnStartedAt?: number;
     /** Claude Code runtime version from the `init` message. */
     claudeCodeVersion?: string;
     /** Agent narration + thinking, for the item's trace. Not shown to the judge. */
@@ -94,6 +99,7 @@ export function adaptSdkConversation(
     const pendingToolUses = new Map<string, PendingToolUse>();
     let totalResultBytes = 0;
     let claudeCodeVersion: string | undefined;
+    let finalTurnStartedAt: number | undefined;
 
     let numTurns: number | undefined;
     let usage: { promptTokens: number; completionTokens: number } | undefined;
@@ -155,6 +161,7 @@ export function adaptSdkConversation(
                 turns.push(turn);
                 entry = { role: 'assistant' };
                 transcript.push(entry);
+                finalTurnStartedAt = messageTime;
             }
 
             turn.toolCalls.push(...toolCalls);
@@ -256,5 +263,13 @@ export function adaptSdkConversation(
         durationMs,
     };
 
-    return { conversation, toolInvocations, metrics, hitMaxTurns, claudeCodeVersion, transcript };
+    return {
+        conversation,
+        toolInvocations,
+        metrics,
+        hitMaxTurns,
+        finalTurnStartedAt,
+        claudeCodeVersion,
+        transcript,
+    };
 }

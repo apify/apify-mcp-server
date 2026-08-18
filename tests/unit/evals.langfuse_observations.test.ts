@@ -22,6 +22,7 @@ function makeAdapted(overrides: Partial<AdaptedConversation> = {}): AdaptedConve
             totalTokens: 120,
         },
         hitMaxTurns: false,
+        finalTurnStartedAt: START + 3_000,
         toolInvocations: [
             {
                 name: 'search-actors',
@@ -76,6 +77,19 @@ describe('buildAgentObservations()', () => {
             usageDetails: { input: 100, output: 20, total: 120 },
             costDetails: { total: 0.01 },
         });
+    });
+
+    it('windows the generation to the final model turn, so the tool spans sort before it', () => {
+        const [usage] = buildAgentObservations(makeParams()).children;
+
+        expect(usage).toMatchObject({ startTime: new Date(START + 3_000), endTime: new Date(END) });
+    });
+
+    it('falls back to the run start when the final turn was never stamped', () => {
+        const adapted = makeAdapted({ finalTurnStartedAt: undefined });
+        const [usage] = buildAgentObservations(makeParams({ adapted })).children;
+
+        expect(usage.startTime).toEqual(new Date(START));
     });
 
     it('omits usage when the provider reported none, so an unmeasured run cannot read as free', () => {
