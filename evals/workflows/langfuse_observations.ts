@@ -89,8 +89,9 @@ function toolNode(invocation: ToolInvocation): ObservationNode {
  *
  * Windowed to the final model turn, not the whole run: the UI orders siblings by start
  * time, so a generation spanning the tool calls sorts ahead of them and reads as though
- * the model answered before calling anything. `usageScope` marks that the numbers still
- * cover the whole run.
+ * the model answered before calling anything. A run that ran out of turns ends on a
+ * tool-calling turn, so the window is held past the last tool result to keep the ordering.
+ * `usageScope` marks that the numbers still cover the whole run.
  */
 function usageNode(params: AgentObservationParams): ObservationNode {
     const { metrics } = params.adapted;
@@ -123,7 +124,12 @@ function usageNode(params: AgentObservationParams): ObservationNode {
             ...(metrics.totalCostUsd === undefined ? {} : { costDetails: { total: metrics.totalCostUsd } }),
             metadata: { turns: metrics.turns, usageScope: 'run' },
         },
-        startTime: new Date(params.adapted.finalTurnStartedAt ?? params.startedAt),
+        startTime: new Date(
+            Math.max(
+                params.adapted.finalTurnStartedAt ?? params.startedAt,
+                ...params.adapted.toolInvocations.map((invocation) => invocation.endedAt ?? 0),
+            ),
+        ),
         endTime: new Date(params.endedAt),
         children: [],
     };

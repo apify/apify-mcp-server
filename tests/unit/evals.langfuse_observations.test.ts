@@ -113,8 +113,22 @@ describe('buildAgentObservations()', () => {
         expect(usage).toMatchObject({ startTime: new Date(START + 3_000), endTime: new Date(END) });
     });
 
-    it('falls back to the run start when the final turn was never stamped', () => {
-        const adapted = makeAdapted({ finalTurnStartedAt: undefined });
+    it('pushes the generation past the last tool result when the final turn called tools', () => {
+        // A run that hit the turn limit ends on a tool-calling turn, so the final turn opens
+        // before its own tool spans.
+        const adapted = makeAdapted({ hitMaxTurns: true, finalTurnStartedAt: START + 1_000 });
+        const [usage] = buildAgentObservations(makeParams({ adapted })).children;
+
+        expect(usage.startTime).toEqual(new Date(START + 2_000));
+    });
+
+    it('falls back to the run start when the stream was never timed', () => {
+        const adapted = makeAdapted({
+            finalTurnStartedAt: undefined,
+            toolInvocations: [
+                { name: 'search-actors', arguments: {}, result: { toolName: 'search-actors', success: true } },
+            ],
+        });
         const [usage] = buildAgentObservations(makeParams({ adapted })).children;
 
         expect(usage.startTime).toEqual(new Date(START));
