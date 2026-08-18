@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
     buildRunSummary,
@@ -10,10 +10,25 @@ import {
 import type { LlmClient } from '../../evals/workflows/llm_client.js';
 
 // The task runs the Claude Agent SDK, which would otherwise spawn the real agent + server.
-vi.mock('../../evals/workflows/claude_agent.js', () => ({
-    runAgentConversation: async () => {
+const mocks = vi.hoisted(() => ({
+    runAgentConversation: vi.fn(async (): Promise<unknown> => {
         throw new Error('spawn ENOENT');
-    },
+    }),
+    emitObservations: vi.fn(),
+    evaluateConversation: vi.fn(async () => ({ verdict: 'PASS', reason: 'looks good', rawResponse: '' })),
+}));
+
+vi.mock('../../evals/workflows/claude_agent.js', () => ({
+    runAgentConversation: mocks.runAgentConversation,
+}));
+
+vi.mock('../../evals/workflows/langfuse_observations.js', () => ({
+    buildAgentObservations: () => ({}),
+    emitObservations: mocks.emitObservations,
+}));
+
+vi.mock('../../evals/workflows/workflow_judge.js', () => ({
+    evaluateConversation: mocks.evaluateConversation,
 }));
 
 function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOutput {
@@ -55,8 +70,15 @@ describe('evaluators', () => {
 });
 
 describe('makeTask()', () => {
-    it('names the item in a harness error, which the SDK log line omits', async () => {
-        const task = makeTask({
+    const makeItem = () => ({
+        id: 'search-001',
+        input: { query: 'q' },
+        expectedOutput: 'r',
+        metadata: { category: 'search' },
+    });
+
+    const makeWorkflowTask = () =>
+        makeTask({
             llmClient: {} as LlmClient,
             apifyToken: 'token',
             agentModel: 'agent',
@@ -65,9 +87,30 @@ describe('makeTask()', () => {
             mcpToolsOnly: false,
         });
 
-        await expect(
-            task({ id: 'search-001', input: { query: 'q' }, expectedOutput: 'r', metadata: { category: 'search' } }),
-        ).rejects.toThrow('Item "search-001": spawn ENOENT');
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mocks.runAgentConversation.mockRejectedValue(new Error('spawn ENOENT'));
+    });
+
+    it('names the item in a harness error, which the SDK log line omits', async () => {
+        await expect(makeWorkflowTask()(makeItem())).rejects.toThrow('Item "search-001": spawn ENOENT');
+    });
+
+    it('still scores the item when emitting the agent trace throws', async () => {
+        mocks.runAgentConversation.mockResolvedValue({
+            conversation: { turns: [], totalTokens: 1234 },
+            transcript: [],
+        });
+        mocks.emitObservations.mockImplementation(() => {
+            throw new Error('span export failed');
+        });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await expect(makeWorkflowTask()(makeItem())).resolves.toMatchObject({
+            id: 'search-001',
+            judgeResult: { verdict: 'PASS' },
+            totalTokens: 1234,
+        });
     });
 });
 
