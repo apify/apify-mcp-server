@@ -60,20 +60,33 @@ function finalResponseOf(adapted: AdaptedConversation): string | undefined {
 }
 
 /**
+ * Above this the result is left off the span. Langfuse rejects oversized ingestion events,
+ * which would drop the whole span rather than just the payload - and a tool that returns
+ * megabytes is exactly the one worth seeing in the trace.
+ */
+const MAX_TOOL_OUTPUT_BYTES = 128_000;
+
+/**
  * One tool call: arguments in, result out, failures raised to ERROR so they stand out.
  * The error text is left to `output` alone: Langfuse renders `statusMessage` in its own box
  * above the output preview, so setting it shows the same message twice.
  */
 function toolNode(invocation: ToolInvocation): ObservationNode {
     const { result } = invocation;
+    const omitted = result.success && (result.resultBytes ?? 0) > MAX_TOOL_OUTPUT_BYTES;
+
+    let output;
+    if (!result.success) output = result.error;
+    else if (omitted) output = `[output omitted: ${result.resultBytes} bytes]`;
+    else output = result.result;
 
     return {
         name: invocation.name,
         asType: 'tool',
         attributes: {
             input: invocation.arguments,
-            output: result.success ? result.result : result.error,
-            metadata: { resultBytes: result.resultBytes },
+            output,
+            metadata: { resultBytes: result.resultBytes, ...(omitted ? { outputOmitted: true } : {}) },
             ...(result.success ? {} : { level: 'ERROR' }),
         },
         ...(invocation.startedAt === undefined ? {} : { startTime: new Date(invocation.startedAt) }),
