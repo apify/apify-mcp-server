@@ -21,6 +21,7 @@ function makeAdapted(overrides: Partial<AdaptedConversation> = {}): AdaptedConve
             completionTokens: 20,
             totalTokens: 120,
         },
+        hitMaxTurns: false,
         toolInvocations: [
             {
                 name: 'search-actors',
@@ -139,8 +140,7 @@ describe('buildAgentObservations()', () => {
 
     it('flags a run that hit the turn limit as a warning', () => {
         const adapted = makeAdapted();
-        adapted.conversation.completed = false;
-        adapted.conversation.hitMaxTurns = true;
+        adapted.hitMaxTurns = true;
 
         expect(buildAgentObservations(makeParams({ adapted })).attributes).toMatchObject({
             level: 'WARNING',

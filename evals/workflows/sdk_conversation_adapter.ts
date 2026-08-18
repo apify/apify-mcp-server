@@ -44,6 +44,11 @@ export type AdaptedConversation = {
     conversation: ConversationHistory;
     toolInvocations: ToolInvocation[];
     metrics: ConversationMetrics;
+    /**
+     * Whether the run stopped on the turn limit instead of reaching a final answer. The
+     * only non-success outcome that gets this far: every other subtype throws below.
+     */
+    hitMaxTurns: boolean;
     /** Claude Code runtime version from the `init` message. */
     claudeCodeVersion?: string;
     /** Agent narration + thinking, for the item's trace. Not shown to the judge. */
@@ -251,5 +256,5 @@ export function adaptSdkConversation(
         durationMs,
     };
 
-    return { conversation, toolInvocations, metrics, claudeCodeVersion, transcript };
+    return { conversation, toolInvocations, metrics, hitMaxTurns, claudeCodeVersion, transcript };
 }

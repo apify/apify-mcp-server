@@ -115,7 +115,7 @@ function usageNode(params: AgentObservationParams): ObservationNode {
 /** Build the item's agent subtree. Pure: nothing is sent until emitObservations runs. */
 export function buildAgentObservations(params: AgentObservationParams): ObservationNode {
     const { adapted } = params;
-    const { conversation, metrics } = adapted;
+    const { metrics } = adapted;
 
     return {
         name: 'agent',
@@ -130,16 +130,11 @@ export function buildAgentObservations(params: AgentObservationParams): Observat
                 turns: metrics.turns,
                 toolCalls: adapted.toolInvocations.length,
                 resultBytes: metrics.resultBytes,
-                hitMaxTurns: conversation.hitMaxTurns,
+                hitMaxTurns: adapted.hitMaxTurns,
             },
-            // A run that never reached a final answer is not an error here: the judge still
-            // scores it. Flag it so it is findable in the UI.
-            ...(conversation.completed
-                ? {}
-                : {
-                      level: 'WARNING',
-                      statusMessage: conversation.hitMaxTurns ? 'hit the turn limit' : 'did not complete',
-                  }),
+            // A run that ran out of turns is not an error here: the judge still scores it.
+            // Flag it so it is findable in the UI.
+            ...(adapted.hitMaxTurns ? { level: 'WARNING', statusMessage: 'hit the turn limit' } : {}),
         },
         startTime: new Date(params.startedAt),
         endTime: new Date(params.endedAt),
