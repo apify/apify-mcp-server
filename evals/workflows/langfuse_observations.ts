@@ -94,7 +94,8 @@ function toolNode(invocation: ToolInvocation): ObservationNode {
  */
 function usageNode(params: AgentObservationParams): ObservationNode {
     const { metrics } = params.adapted;
-    const hasTokens = metrics.promptTokens !== undefined && metrics.completionTokens !== undefined;
+    const { promptTokens, completionTokens } = metrics;
+    const hasTokens = promptTokens !== undefined && completionTokens !== undefined;
     const cacheRead = metrics.cacheReadTokens ?? 0;
     const cacheCreation = metrics.cacheCreationTokens ?? 0;
 
@@ -111,11 +112,11 @@ function usageNode(params: AgentObservationParams): ObservationNode {
                       // the cached system prompt and tool definitions every turn, so the total is
                       // mostly cache traffic and reads as a huge prompt when it is not shown apart.
                       usageDetails: {
-                          input: metrics.promptTokens! - cacheRead - cacheCreation,
+                          input: promptTokens - cacheRead - cacheCreation,
                           ...(cacheRead === 0 ? {} : { cache_read_input_tokens: cacheRead }),
                           ...(cacheCreation === 0 ? {} : { cache_creation_input_tokens: cacheCreation }),
-                          output: metrics.completionTokens!,
-                          total: metrics.promptTokens! + metrics.completionTokens!,
+                          output: completionTokens,
+                          total: promptTokens + completionTokens,
                       },
                   }
                 : {}),
