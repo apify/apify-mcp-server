@@ -155,7 +155,9 @@ export function makeTask(options: WorkflowTaskOptions) {
             // The agent ran in a subprocess, so its conversation reaches Langfuse only if
             // we send it. Emitted before the judge call, so a failing judge still leaves
             // the conversation on the trace to debug. Guarded separately from the run
-            // itself: losing the trace costs debuggability, not the item's result.
+            // itself: losing the trace costs debuggability, not the item's result. Only
+            // catches building the spans - the export happens later, in the span
+            // processor's batch flush, and never reaches here.
             try {
                 emitObservations(
                     buildAgentObservations({
