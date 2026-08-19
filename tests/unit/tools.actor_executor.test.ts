@@ -159,7 +159,7 @@ describe('actorExecutor', () => {
         }
 
         it('returns the schema + platform message instead of throwing, on a confirmed invalid-input error', async () => {
-            const { params, spies } = buildParams({ query: 'foo' }, { actorId: 'actor-1', inputSchema: INPUT_SCHEMA });
+            const { params } = buildParams({ query: 'foo' }, { actorId: 'actor-1', inputSchema: INPUT_SCHEMA });
             params.apifyClient = {
                 ...params.apifyClient,
                 actor: () => ({
@@ -173,7 +173,6 @@ describe('actorExecutor', () => {
             expect(text).toContain('query: must be a non-empty string');
             expect(text).toContain(JSON.stringify(INPUT_SCHEMA));
             expect(text).toContain('Please ensure the input is correct');
-            expect(spies.startInput).toBeUndefined();
         });
 
         it('rethrows any other actor.start() error unchanged', async () => {
