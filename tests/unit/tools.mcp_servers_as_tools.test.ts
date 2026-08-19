@@ -49,5 +49,11 @@ describe('getMCPServersAsTools', () => {
         expect(tools).toEqual([goodTool]);
         expect(getActorMCPServerURL).toHaveBeenCalledTimes(2);
         expect(connectMCPClient).toHaveBeenCalledTimes(1);
+        expect(getMCPServerTools).toHaveBeenCalledWith(
+            'good',
+            expect.anything(),
+            'https://good.apify.actor/mcp',
+            'user/good',
+        );
     });
 });

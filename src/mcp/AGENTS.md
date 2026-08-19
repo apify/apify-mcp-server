@@ -34,7 +34,7 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
   preparation; `executeSyncToolCall()` runs synchronous calls.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
-- `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(url, toolName)`.
+- `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
@@ -65,9 +65,11 @@ Two MCP protocol revisions are served, each by its own adapter:
   proxied Actor-MCP tools: `proxy.ts` `getProxyMCPServerToolName`). Never widen the
   cap — downstream clients depend on it.
 - **Proxy server IDs are keyed by URL, not Actor ID.** `getMCPServerID(url)` is
-  `sha256(url)` sliced to `SERVER_ID_LENGTH`. One Actor can expose both an SSE and a
-  streamable endpoint; keying by URL keeps those distinct. Keying by Actor ID would
-  collapse them and cross transports.
+  `sha256(url)` sliced to `SERVER_ID_LENGTH`, and keys the `serverId` field and the MCP SDK
+  client name. One Actor can expose both an SSE and a streamable endpoint; keying by URL keeps
+  those distinct. Keying by Actor ID would collapse them and cross transports. Exposed proxied
+  *tool names* are not URL-keyed — they are `{actorToolName}--{originToolName}`
+  (`getProxyMCPServerToolName`), the same `{username}--{actor-name}` prefix direct Actor tools use.
 - **Transport negotiation is streamable-first, SSE-fallback** (`client.ts`): try
   streamable HTTP, fall back to SSE on a protocol failure — but a connection
   **timeout** returns `null` with no SSE fallback (a timeout means unreachable, not

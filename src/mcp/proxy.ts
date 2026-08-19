@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 import { fixedAjvCompile } from '../tools/actor_input_schema.js';
+import { actorNameToToolName } from '../tools/actor_tool_naming.js';
 import type { ActorMcpTool, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { ajv } from '../utils/ajv.js';
@@ -20,13 +21,13 @@ export function getMCPServerID(url: string): string {
 }
 
 /**
- * Prefixes the tool name with the server ID hash. Over-length names get a hash suffix
- * (same pattern as actor tool names) so bare truncation cannot collide two different
- * origin tool names into one exposed name.
+ * Prefixes the tool name with the Actor tool name, so proxied tools read the same way
+ * direct Actor tools do. Over-length names get a hash suffix (same pattern as actor tool
+ * names) so bare truncation cannot collide two different origin tool names into one
+ * exposed name.
  */
-export function getProxyMCPServerToolName(url: string, toolName: string): string {
-    const prefix = getMCPServerID(url);
-    const fullName = `${prefix}-${toolName}`;
+export function getProxyMCPServerToolName(actorFullName: string, toolName: string): string {
+    const fullName = `${actorNameToToolName(actorFullName)}--${toolName}`;
 
     if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
         return fullName;
@@ -36,7 +37,12 @@ export function getProxyMCPServerToolName(url: string, toolName: string): string
     return `${fullName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
 }
 
-export async function getMCPServerTools(actorID: string, client: Client, serverUrl: string): Promise<ToolEntry[]> {
+export async function getMCPServerTools(
+    actorID: string,
+    client: Client,
+    serverUrl: string,
+    actorFullName: string,
+): Promise<ToolEntry[]> {
     const { tools } = await client.listTools();
 
     return tools.map(
@@ -46,7 +52,7 @@ export async function getMCPServerTools(actorID: string, client: Client, serverU
             serverId: getMCPServerID(serverUrl),
             serverUrl,
             originToolName: tool.name,
-            name: getProxyMCPServerToolName(serverUrl, tool.name),
+            name: getProxyMCPServerToolName(actorFullName, tool.name),
             description: tool.description || '',
             inputSchema: tool.inputSchema,
             ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
