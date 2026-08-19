@@ -49,6 +49,17 @@ describe('getMCPServersAsTools', () => {
         expect(tools).toEqual([goodTool]);
         expect(getActorMCPServerURL).toHaveBeenCalledTimes(2);
         expect(connectMCPClient).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes the Actor full name to getMCPServerTools', async () => {
+        getActorMCPServerURL.mockImplementation(
+            async (realActorId: string) => `https://${realActorId}.apify.actor/mcp`,
+        );
+        connectMCPClient.mockResolvedValue({ close: vi.fn() });
+        getMCPServerTools.mockResolvedValue([]);
+
+        await getMCPServersAsTools([makeActorInfo('good', '/mcp')], 'token-123');
+
         expect(getMCPServerTools).toHaveBeenCalledWith(
             'good',
             expect.anything(),
