@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.15.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Return not-found error from get-actor-log for missing runs ([#1234](https://github.com/apify/apify-mcp-server/pull/1234)) ([702ab5e](https://github.com/apify/apify-mcp-server/commit/702ab5efa9887fefa308304175eda3da3552441f)) by [@jirispilka](https://github.com/jirispilka), closes [#1193](https://github.com/apify/apify-mcp-server/issues/1193)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.15.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.0) (2026-08-19)
 
 ### 🚀 Features
