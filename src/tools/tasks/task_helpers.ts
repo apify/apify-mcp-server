@@ -28,6 +28,22 @@ export function toSafeResourceId(idOrName: string): string {
     return APIFY_ID_REGEX.test(trimmed) ? trimmed : `~${trimmed}`;
 }
 
+/** A bare 17-alnum value is shape-identical to an ID and to a legal task name. */
+export function isAmbiguousResourceId(idOrName: string): boolean {
+    const trimmed = idOrName.trim();
+    return !trimmed.includes('/') && !trimmed.includes('~') && APIFY_ID_REGEX.test(trimmed);
+}
+
+/**
+ * Fetches a task by ID, name, or `username/name`. An ambiguous value cannot be resolved by
+ * inspection, so it is read as an ID first and, on a miss, retried as the caller's own task name.
+ */
+export async function getTaskByIdOrName(client: ApifyClient, idOrName: string): Promise<Task | undefined> {
+    const task = await client.task(toSafeResourceId(idOrName)).get();
+    if (task || !isAmbiguousResourceId(idOrName)) return task;
+    return client.task(`~${idOrName.trim()}`).get();
+}
+
 /**
  * Task names must be DNS-safe and 3-63 characters, as the API enforces. Validated here so the
  * caller gets a usable message instead of a 400.
@@ -96,6 +112,9 @@ export function taskResult(task: Task) {
  * to repeat.
  */
 export async function setTaskPublication(client: ApifyClient, taskId: string, isPublic: boolean): Promise<Task> {
-    const taskClient = client.task(toSafeResourceId(taskId));
+    // An ambiguous value is resolved to the real ID by lookup; on a miss it falls through to the
+    // ID reading so the publish call raises the API's own not-found error.
+    const resolvedId = isAmbiguousResourceId(taskId) ? (await getTaskByIdOrName(client, taskId))?.id : undefined;
+    const taskClient = client.task(resolvedId ?? toSafeResourceId(taskId));
     return isPublic ? taskClient.publish() : taskClient.unpublish();
 }

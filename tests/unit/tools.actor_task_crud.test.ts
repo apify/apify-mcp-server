@@ -79,6 +79,37 @@ describe('get-actor-task', () => {
 
         expect(calls).toEqual([{ fn: 'get', taskId: expected }]);
     });
+
+    it('retries a 17-character value as a name when the ID lookup misses', async () => {
+        // A bare 17-alnum value is shape-identical to an ID and to a legal task name, so a miss
+        // under the ID reading must fall back to the name reading instead of reporting not-found.
+        const stored = mockTask({ id: 'realtaskid1234567', name: 'zzmcpcprobeseven1' });
+        const { apifyClient, calls } = mockTaskApiClient((taskId: string) =>
+            taskId === '~zzmcpcprobeseven1' ? stored : undefined,
+        );
+        const result = (await (getActorTask as HelperTool).call(
+            stubToolCallContext({ taskId: 'zzmcpcprobeseven1' }, apifyClient),
+        )) as StructuredResult;
+
+        expect(calls).toEqual([
+            { fn: 'get', taskId: 'zzmcpcprobeseven1' },
+            { fn: 'get', taskId: '~zzmcpcprobeseven1' },
+        ]);
+        expect(result.structuredContent).toMatchObject({ taskId: 'realtaskid1234567', name: 'zzmcpcprobeseven1' });
+    });
+
+    it('reports a missing task only after both the ID and the name lookup miss', async () => {
+        const { apifyClient, calls } = mockTaskApiClient(() => undefined);
+        const result = (await (getActorTask as HelperTool).call(
+            stubToolCallContext({ taskId: 'zzmcpcprobeseven1' }, apifyClient),
+        )) as TextToolResult;
+
+        expect(calls).toEqual([
+            { fn: 'get', taskId: 'zzmcpcprobeseven1' },
+            { fn: 'get', taskId: '~zzmcpcprobeseven1' },
+        ]);
+        expect(result.content[0].text).toContain('not found');
+    });
 });
 
 describe('create-actor-task', () => {
@@ -215,10 +246,29 @@ describe('update-actor-task', () => {
         expect(calls).toEqual([
             { fn: 'get', taskId: '~task-1' },
             {
+                // The pre-read pins the task, so the update goes out under its real ID.
                 fn: 'update',
-                taskId: '~task-1',
+                taskId: 'task-1',
                 payload: { options: { build: 'beta', timeoutSecs: 300, memoryMbytes: 1024 } },
             },
+        ]);
+    });
+
+    it('resolves a 17-character name to its ID before updating', async () => {
+        // Without the lookup the update would go out with the name read as an ID and 404 even
+        // though the task exists.
+        const stored = mockTask({ id: 'realtaskid1234567', name: 'zzmcpcprobeseven1' });
+        const { apifyClient, calls } = mockTaskApiClient((taskId: string) =>
+            taskId === 'zzmcpcprobeseven1' ? undefined : stored,
+        );
+        await (updateActorTask as HelperTool).call(
+            stubToolCallContext({ taskId: 'zzmcpcprobeseven1', title: 'Renamed' }, apifyClient),
+        );
+
+        expect(calls).toEqual([
+            { fn: 'get', taskId: 'zzmcpcprobeseven1' },
+            { fn: 'get', taskId: '~zzmcpcprobeseven1' },
+            { fn: 'update', taskId: 'realtaskid1234567', payload: { title: 'Renamed' } },
         ]);
     });
 

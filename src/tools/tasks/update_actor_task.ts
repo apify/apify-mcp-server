@@ -7,7 +7,14 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
-import { publicConfigSchema, toSafeResourceId, taskNameSchema, taskResult } from './task_helpers.js';
+import {
+    getTaskByIdOrName,
+    isAmbiguousResourceId,
+    publicConfigSchema,
+    taskNameSchema,
+    taskResult,
+    toSafeResourceId,
+} from './task_helpers.js';
 
 const updateActorTaskArgs = z.object({
     taskId: z
@@ -68,8 +75,6 @@ USAGE EXAMPLES:
         const { taskId, name, title, description, input, build, timeoutSecs, memoryMbytes, publicConfig } =
             updateActorTaskArgs.parse(args);
 
-        const resolvedTaskId = toSafeResourceId(taskId);
-
         const optionsUpdate = {
             ...(build !== undefined && { build }),
             ...(timeoutSecs !== undefined && { timeoutSecs }),
@@ -77,16 +82,19 @@ USAGE EXAMPLES:
         };
         const hasOptions = Object.keys(optionsUpdate).length > 0;
 
-        // The API completely replaces `options` (unlike `publicConfig`, which it merges), so merge
-        // with the stored value to keep the run options that are not part of this update.
+        // The pre-read serves two cases: the API completely replaces `options` (unlike
+        // `publicConfig`, which it merges), so an options update must merge with the stored value;
+        // and an ambiguous taskId (an ID-shaped name) must be resolved to the real ID by lookup.
+        let resolvedTaskId = toSafeResourceId(taskId);
         let storedOptions;
-        if (hasOptions) {
-            const storedTask = await client.task(resolvedTaskId).get();
+        if (hasOptions || isAmbiguousResourceId(taskId)) {
+            const storedTask = await getTaskByIdOrName(client, taskId);
             // Report the missing task from this read rather than letting the update fail later with
             // a rawer error.
             if (!storedTask) {
                 return respondUserError(`Task ${taskId} was not found.`);
             }
+            resolvedTaskId = storedTask.id;
             storedOptions = storedTask.options;
         }
 

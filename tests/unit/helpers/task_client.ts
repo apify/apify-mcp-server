@@ -25,30 +25,33 @@ export type RecordedCall = { fn: string; taskId?: string; payload?: unknown };
  * sets the virtual `isPublic` field — keeping that payload right is the client's contract, so the
  * tools are only checked for calling the right method.
  */
-export function mockTaskApiClient(task: unknown): {
+export function mockTaskApiClient(task: unknown | ((taskId: string) => unknown)): {
     apifyClient: InternalToolArgs['apifyClient'];
     calls: RecordedCall[];
 } {
     const calls: RecordedCall[] = [];
+    // The function form maps a taskId to the task the API would return, so tests can make a
+    // lookup miss under one id and hit under another (the ID-vs-name fallback).
+    const resolve = (taskId: string) => (typeof task === 'function' ? task(taskId) : task);
     const apifyClient = {
         // `taskId` is recorded because the tools normalize a bare task name to `~name` before the
         // call — the API would otherwise read the name as an ID and 404.
         task: (taskId: string) => ({
             get: async () => {
                 calls.push({ fn: 'get', taskId });
-                return task;
+                return resolve(taskId);
             },
             update: async (payload: unknown) => {
                 calls.push({ fn: 'update', taskId, payload });
-                return task;
+                return resolve(taskId);
             },
             publish: async () => {
                 calls.push({ fn: 'publish', taskId });
-                return task;
+                return resolve(taskId);
             },
             unpublish: async () => {
                 calls.push({ fn: 'unpublish', taskId });
-                return task;
+                return resolve(taskId);
             },
         }),
         tasks: () => ({

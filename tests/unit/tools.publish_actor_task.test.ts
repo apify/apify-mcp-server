@@ -38,4 +38,20 @@ describe('publish-actor-task', () => {
         expect(dump).not.toContain('secret-input-value');
         expect(dump).not.toContain('user-secret');
     });
+
+    it('resolves a 17-character name to its ID before publishing', async () => {
+        // A bare 17-alnum value is shape-identical to an ID; publishing under the wrong reading
+        // would 404 even though the task exists.
+        const stored = mockTask({ id: 'realtaskid1234567', name: 'zzmcpcprobeseven1' });
+        const { apifyClient, calls } = mockTaskApiClient((taskId: string) =>
+            taskId === 'zzmcpcprobeseven1' ? undefined : stored,
+        );
+        await (publishActorTask as HelperTool).call(stubToolCallContext({ taskId: 'zzmcpcprobeseven1' }, apifyClient));
+
+        expect(calls).toEqual([
+            { fn: 'get', taskId: 'zzmcpcprobeseven1' },
+            { fn: 'get', taskId: '~zzmcpcprobeseven1' },
+            { fn: 'publish', taskId: 'realtaskid1234567' },
+        ]);
+    });
 });
