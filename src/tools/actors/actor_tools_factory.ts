@@ -272,12 +272,12 @@ export function fixActorNameInput(actorName: string): string {
 }
 
 /**
- * Result type for {@link getActorsAsTools}: every requested name produces
+ * Result type for {@link fetchActorsAsTools}: every requested name produces
  * either a successful load (contributing to `tools` — a single Actor can fan
  * out into multiple tools for MCP-server Actors) or an `ActorLoadError`
  * describing why the load failed.
  *
- * Bulk callers (`getActors`, server load-helpers) typically only read
+ * Bulk callers (`getActorsFromInput`, server load-helpers) typically only read
  * `tools`. The single-Actor caller (`call-actor`) reads `errors[0]` to surface
  * the precise reason back to the agent.
  */
@@ -300,7 +300,7 @@ export type ActorsAsToolsResult = {
  * tool call. Filtering at list time keeps the advertised tool surface
  * honest so agents never discover a tool that can only fail later.
  */
-export async function getActorsAsTools(
+export async function fetchActorsAsTools(
     actorIdsOrNames: string[],
     apifyClient: ApifyClient,
     options?: {

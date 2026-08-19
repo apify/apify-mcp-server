@@ -6,15 +6,15 @@ import { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { Input } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
-import { getActors } from '../../src/utils/tools_loader.js';
+import { getActorsFromInput } from '../../src/utils/tools_loader.js';
 
-// Stub getActors so a load runs without a network fetch to the Apify platform.
+// Stub getActorsFromInput so a load runs without a network fetch to the Apify platform.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
-    return { ...actual, getActors: vi.fn() };
+    return { ...actual, getActorsFromInput: vi.fn() };
 });
 
-vi.mocked(getActors).mockResolvedValue([]);
+vi.mocked(getActorsFromInput).mockResolvedValue([]);
 
 /** `toolSources` is private and has no reader yet; read it directly to assert it stays bounded. */
 function toolSourceKeys(server: ActorsMcpServer): string[] {

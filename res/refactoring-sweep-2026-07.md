@@ -63,7 +63,7 @@ fetch/enrichment; wait/orchestration (`raceAbort`, `waitForRunWithProgress`). Me
 ### `internals.js` export narrowing (M/L, cross-repo)
 
 `index_internals.ts` exports raw tool-catalog functions the hosted repo consumes directly
-(`getDefaultTools`, `getCategoryTools`, `getActorsAsTools`, `processParamsGetTools`,
+(`getDefaultTools`, `getCategoryTools`, `fetchActorsAsTools`, `processParamsGetTools`,
 `getToolPublicFieldOnly`, …) against the stated "expose methods on `ActorsMcpServer`"
 policy, plus deprecated aliases awaiting internal migration (`addActor as addTool`,
 `redactSkyfirePayId` — see #604, `HelperTools`). Convert one export at a time to a server

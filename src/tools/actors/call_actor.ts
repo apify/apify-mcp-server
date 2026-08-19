@@ -58,7 +58,7 @@ import {
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
 } from './actor_run_response.js';
-import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
+import { fetchActorsAsTools, fixActorNameInputAndLog } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -451,7 +451,7 @@ export async function resolveAndValidateActor(params: {
     const { actorName, input, toolArgs } = params;
     const { apifyClient } = toolArgs;
 
-    const { tools, errors } = await getActorsAsTools([actorName], apifyClient, {
+    const { tools, errors } = await fetchActorsAsTools([actorName], apifyClient, {
         mcpSessionId: toolArgs.mcpSessionId,
     });
 
@@ -539,7 +539,7 @@ export async function resolveAndValidateActor(params: {
  *
  * Returns either an early response (error or MCP tool result) or the parsed context for mode-specific execution.
  *
- * Applies the same `actor` string normalization as `getActorsAsTools` **before** MCP URL lookup and routing so
+ * Applies the same `actor` string normalization as `fetchActorsAsTools` **before** MCP URL lookup and routing so
  * clients cannot pass a clean-enough id for definition fetch but a dirty id to `apifyClient.actor()` (see Mezmo:
  * e.g. trailing `` ` `` on `apify/rag-web-browser`).
  */

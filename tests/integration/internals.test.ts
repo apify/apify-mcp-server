@@ -6,7 +6,7 @@ import log from '@apify/log';
 import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
-import { getActorsAsTools } from '../../src/tools/index.js';
+import { fetchActorsAsTools } from '../../src/tools/index.js';
 import { SERVER_MODE } from '../../src/types.js';
 import { AUTO_INJECTED_TOOLS, loadToolsFromInput } from '../../src/utils/tools_loader.js';
 import { expectArrayWeakEquals } from '../helpers.js';
@@ -33,7 +33,7 @@ describe('MCP server internals integration tests', () => {
         );
         actorsMcpServer.upsertTools(initialTools);
 
-        const { tools: newTool } = await getActorsAsTools([ACTOR_NORMAL_MODE], apifyClient);
+        const { tools: newTool } = await fetchActorsAsTools([ACTOR_NORMAL_MODE], apifyClient);
         actorsMcpServer.upsertTools(newTool);
 
         const names = actorsMcpServer.listAllToolNames();
@@ -67,7 +67,7 @@ describe('MCP server internals integration tests', () => {
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
         // Simulate a session that already has an actor tool loaded, bypassing the loader.
-        const { tools } = await getActorsAsTools([ACTOR_NORMAL_MODE], apifyClient);
+        const { tools } = await fetchActorsAsTools([ACTOR_NORMAL_MODE], apifyClient);
         actorsMcpServer.upsertTools(tools);
         const names = actorsMcpServer.listAllToolNames();
         expectArrayWeakEquals([ACTOR_NORMAL_MODE], names);

@@ -12,17 +12,17 @@ import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget
 import type { ServerModeOption } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
-import { getActors } from '../../src/utils/tools_loader.js';
+import { getActorsFromInput } from '../../src/utils/tools_loader.js';
 import { getRequestHandler } from './helpers/mcp_server.js';
 
-// Stub getActors so tests can produce a non-empty actorTools array without a network
+// Stub getActorsFromInput so tests can produce a non-empty actorTools array without a network
 // fetch to the Apify platform. getToolsForServerMode / toolNamesToInput stay real.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
-    return { ...actual, getActors: vi.fn() };
+    return { ...actual, getActorsFromInput: vi.fn() };
 });
 
-const getActorsMock = vi.mocked(getActors);
+const getActorsFromInputMock = vi.mocked(getActorsFromInput);
 
 function makeInitializeRequest(supportsUi: boolean): InitializeRequest {
     const extensions = supportsUi ? { 'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] } } : {};
@@ -56,9 +56,9 @@ async function dispatchInitialize(server: ActorsMcpServer, request: InitializeRe
 describe('ActorsMcpServer initialize handler', () => {
     const servers: ActorsMcpServer[] = [];
 
-    // Default: no actor tools resolved, matching the real getActors() behavior for
+    // Default: no actor tools resolved, matching the real getActorsFromInput() behavior for
     // inputs that only reference HELPER_TOOLS names (used by the pre-existing tests below).
-    getActorsMock.mockResolvedValue([]);
+    getActorsFromInputMock.mockResolvedValue([]);
 
     afterEach(async () => {
         while (servers.length > 0) {
@@ -66,8 +66,8 @@ describe('ActorsMcpServer initialize handler', () => {
             server?.tools.clear();
             await server?.close();
         }
-        getActorsMock.mockReset();
-        getActorsMock.mockResolvedValue([]);
+        getActorsFromInputMock.mockReset();
+        getActorsFromInputMock.mockResolvedValue([]);
     });
 
     const track = (server: ActorsMcpServer): ActorsMcpServer => {

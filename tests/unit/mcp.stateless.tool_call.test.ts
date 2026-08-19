@@ -18,7 +18,7 @@ import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import { respondRaw } from '../../src/utils/mcp.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
-import { getActors } from '../../src/utils/tools_loader.js';
+import { getActorsFromInput } from '../../src/utils/tools_loader.js';
 import {
     getRequestHandler,
     makeArgsRecorderTool,
@@ -32,7 +32,7 @@ import {
 
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
-    return { ...actual, getActors: vi.fn() };
+    return { ...actual, getActorsFromInput: vi.fn() };
 });
 
 // Capturing ApifyClient construction is how the request-origin tag is observed; it is a static
@@ -51,7 +51,7 @@ vi.mock('../../src/apify_client.js', async (importOriginal) => {
     };
 });
 
-const getActorsMock = vi.mocked(getActors);
+const getActorsFromInputMock = vi.mocked(getActorsFromInput);
 
 function makeActorTool(): ToolEntry {
     return {
@@ -136,7 +136,7 @@ function softFailsStartingWith(
 }
 
 async function loadSource(server: ActorsMcpServer, actorTools: ToolEntry[], input: Input = { tools: [] }) {
-    getActorsMock.mockResolvedValue(actorTools);
+    getActorsFromInputMock.mockResolvedValue(actorTools);
     await server.loadToolsFromInput(input, {} as never);
 }
 
@@ -191,8 +191,8 @@ describe('createStatelessServer() tools/call', () => {
     });
 
     afterEach(() => {
-        getActorsMock.mockReset();
-        getActorsMock.mockResolvedValue([]);
+        getActorsFromInputMock.mockReset();
+        getActorsFromInputMock.mockResolvedValue([]);
         vi.restoreAllMocks();
     });
 
