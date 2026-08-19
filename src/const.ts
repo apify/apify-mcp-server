@@ -182,6 +182,26 @@ export const DOCS_SNIPPET_HIGHLIGHT_TAG = '\uE000';
 
 export const ALLOWED_DOC_DOMAINS = ['https://docs.apify.com', 'https://crawlee.dev'] as const;
 
+/** Actor usernames treated as official Apify (drives `isOfficialApify` on the Actor card). */
+export const OFFICIAL_APIFY_USERNAMES: ReadonlySet<string> = new Set([
+    'agentify',
+    'apify',
+    'apifyatevents',
+    'clockworks',
+    'compass',
+    'e-commerce',
+    'h_reviews',
+    'hooli',
+    'junglee',
+    'lukaskrivka',
+    'maxcopell',
+    'misceres',
+    'streamers',
+    'tri_angle',
+    'vdrmota',
+    'voyager',
+]);
+
 export const APIFY_STORE_URL = 'https://apify.com';
 /** Apify Console origin (production). */
 export const CONSOLE_BASE_URL = 'https://console.apify.com';

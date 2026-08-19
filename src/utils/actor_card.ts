@@ -1,4 +1,4 @@
-import { APIFY_STORE_URL, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../const.js';
+import { APIFY_STORE_URL, MAX_INPUT_FIELDS_IN_ACTOR_CARD, OFFICIAL_APIFY_USERNAMES } from '../const.js';
 import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { buildConsoleActorUrl } from './console_link.js';
 import {
@@ -172,7 +172,7 @@ function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptio
     if (options.includeMetadata) {
         data.developer = {
             username: actor.username,
-            isOfficialApify: actor.username === 'apify',
+            isOfficialApify: OFFICIAL_APIFY_USERNAMES.has(actor.username),
             url: `${APIFY_STORE_URL}/${actor.username}`,
         };
         data.categories = formatCategories('categories' in actor ? actor.categories : undefined);
