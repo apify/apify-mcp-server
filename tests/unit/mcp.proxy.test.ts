@@ -131,4 +131,35 @@ describe('getProxyMCPServerToolName()', () => {
         expect(name).toBe('alizarin--government-research-mcp-server---unified-data-acc-bd1a');
         expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
     });
+
+    it('omits the username segment when the Actor full name has no slash', () => {
+        expect(getProxyMCPServerToolName('competitive-intelligence-mcp-server', 'search')).toBe(
+            'competitive-intelligence-mcp-server--search',
+        );
+    });
+
+    it('skips the username cap when there is no username to cap', () => {
+        const uncappedFullName = 'competitive-intelligence-mcp-server--a-very-long-tool-name-that-forces-truncation';
+        const hash = createHash('sha256').update(uncappedFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
+        const name = getProxyMCPServerToolName(
+            'competitive-intelligence-mcp-server',
+            'a-very-long-tool-name-that-forces-truncation',
+        );
+
+        // No username segment to cap, so tail truncation is the only tier left.
+        expect(name).toBe('competitive-intelligence-mcp-server--a-very-long-tool-name--acb9');
+        expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
+        expect(name.endsWith(`-${hash}`)).toBe(true);
+    });
+
+    it('leaves the username segment empty when the capped username is all dashes', () => {
+        const actorName = 'some-actor-name-that-is-long-enough-to-need-a-cap-xx';
+        const name = getProxyMCPServerToolName(`--------/${actorName}`, 'toolname');
+
+        // Same shape an empty username segment already gets: '/actor' + 'tool' -> '--actor--tool'.
+        expect(name).toBe('--some-actor-name-that-is-long-enough-to-need-a-cap-xx--too-2890');
+        expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
+        // The hash covers the uncapped username, so a longer dash run still reads distinct.
+        expect(name).not.toBe(getProxyMCPServerToolName(`----------/${actorName}`, 'toolname'));
+    });
 });

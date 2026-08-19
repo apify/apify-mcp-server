@@ -63,9 +63,11 @@ Two MCP protocol revisions are served, each by its own adapter:
   `MAX_TOOL_NAME_LENGTH`; only over-length names get a `TOOL_NAME_HASH_LENGTH` hash
   suffix (Actor tools: `../tools/actor_tool_naming.ts`; proxied Actor-MCP tools:
   `proxy.ts` `getProxyMCPServerToolName`). An over-length **proxied** name caps the
-  username to `MAX_TOOL_NAME_AUTHOR_LENGTH` before truncating the tail, so the origin
-  tool name survives (`alizarin_refrigerator-owner/competitive-intelligence-mcp-server`
-  + `search` → `alizarin--competitive-intelligence-mcp-server--search-0b0d`). That cap is
+  username to `MAX_TOOL_NAME_AUTHOR_LENGTH` first, so the tail-truncation budget goes to
+  the tool name (`alizarin_refrigerator-owner/competitive-intelligence-mcp-server`
+  + `search` → `alizarin--competitive-intelligence-mcp-server--search-0b0d`); a long
+  enough tool name still truncates (`get-company-profile` →
+  `alizarin--competitive-intelligence-mcp-server--get-company--fd6c`). That cap is
   a constant, not fitted per name — every tool of one Actor must keep a byte-identical
   prefix. Direct Actor tool names (`actorNameToToolName`) are not username-capped.
   Same-name collisions get no hash — the de-dup pass in `getToolsForServerMode`
