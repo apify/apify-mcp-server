@@ -2,8 +2,8 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { storageListOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageListSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
@@ -30,16 +30,10 @@ const getUserKeyValueStoresListArgs = z.object({
         .default(false),
 });
 
-/**
- * https://docs.apify.com/api/v2/key-value-stores-get
- */
-export const getKeyValueStoreList: ToolEntry = Object.freeze({
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
-    title: 'Get user key-value stores list',
-    description: dedent`
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return dedent`
         List the key-value stores owned by the authenticated user — flexible storage for unstructured data or files.
-        Returns summaries only, not their contents — use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} to inspect one from the list.
+        Returns summaries only, not their contents${hasTool(HELPER_TOOLS.KEY_VALUE_STORE_GET) ? ` — use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} to inspect one from the list` : ''}.
         Actor runs automatically produce unnamed stores (set unnamed=true to include them); users can also create named stores.
         Sorted by createdAt (ascending by default); use limit, offset, and desc to paginate and sort.
 
@@ -48,7 +42,18 @@ export const getKeyValueStoreList: ToolEntry = Object.freeze({
 
         USAGE EXAMPLES:
         - user_input: List my last 10 key-value stores (newest first)
-        - user_input: List unnamed key-value stores`,
+        - user_input: List unnamed key-value stores`;
+}
+
+/**
+ * https://docs.apify.com/api/v2/key-value-stores-get
+ */
+export const getKeyValueStoreList: ToolEntry = Object.freeze({
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+    title: 'Get user key-value stores list',
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(getUserKeyValueStoresListArgs) as ToolInputSchema,
     outputSchema: storageListOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getUserKeyValueStoresListArgs)),

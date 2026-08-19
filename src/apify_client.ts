@@ -53,7 +53,8 @@ export class ApifyClient extends _ApifyClient {
         super({
             // token null case is handled, we can assert type here
             ...(clientOptions as ApifyClientOptions),
-            baseUrl: getApifyAPIBaseUrl(),
+            // Explicit baseUrl wins over env default.
+            baseUrl: clientOptions.baseUrl ?? getApifyAPIBaseUrl(),
             userAgentSuffix: USER_AGENT_ORIGIN,
             requestInterceptors: [(config) => ({ ...config, headers: { ...config.headers, ...staticHeaders } })],
         });

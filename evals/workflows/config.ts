@@ -1,12 +1,23 @@
 /**
- * Configuration for workflow evaluation system
- * Includes model settings and prompts specific to workflow evaluations
+ * Configuration for workflow evaluation system.
  *
- * Note: Temperature is set to 0.15 for deterministic results (see llm-client.ts)
+ * The agent's system prompt and tools come from the SDK's `claude_code` presets, so
+ * nothing here defines them. The judge runs on OpenRouter (temperature 0.15, see
+ * llm_client.ts).
  */
 
 // Re-export shared config for convenience
-export { OPENROUTER_CONFIG, sanitizeEnvValue, sanitizeProcessEnv, validateEnvVars } from '../shared/config.js';
+export { OPENROUTER_CONFIG, sanitizeProcessEnv } from '../shared/config.js';
+
+/** Name the Claude Agent SDK registers the Apify MCP server under. */
+export const MCP_SERVER_NAME = 'apify';
+
+const MCP_TOOL_PREFIX = `mcp__${MCP_SERVER_NAME}__`;
+
+/** Strip the SDK's `mcp__<server>__` prefix; built-in tool names pass through unchanged. */
+export function stripToolPrefix(name: string): string {
+    return name.startsWith(MCP_TOOL_PREFIX) ? name.slice(MCP_TOOL_PREFIX.length) : name;
+}
 
 /**
  * Default model configuration for agent and judge
@@ -15,32 +26,17 @@ export { OPENROUTER_CONFIG, sanitizeEnvValue, sanitizeProcessEnv, validateEnvVar
  *   --judge-model <model>
  */
 export const MODELS = {
-    // Agent model - the AI that performs tasks using tools
-    agent: 'anthropic/claude-haiku-4.5',
+    // Agent model - an Anthropic model ID for the Claude Agent SDK. A weaker model on
+    // purpose: it is a more sensitive probe of tool descriptions.
+    agent: 'claude-haiku-4-5',
 
     // Judge model - evaluates conversation quality
     judge: 'deepseek/deepseek-v4-flash',
 };
 
 /**
- * System prompt for the agent
- * Note: MCP server instructions are automatically appended to this prompt if provided by the server
- */
-export const AGENT_SYSTEM_PROMPT = `You are a helpful AI assistant with access to Apify tools for web scraping and automation.
-
-Your goal is to help users accomplish their tasks using the available tools.
-
-Guidelines:
-- Use tools when needed to complete user requests
-- Provide clear, concise responses
-- If you need more information, ask the user
-- After using tools, summarize the results for the user
-- Be direct and efficient
-
-Available tools will be provided to you automatically.`;
-
-/**
- * Maximum number of conversation turns before timeout
+ * Maximum number of conversation turns before the agent query stops
+ * (mapped onto the Agent SDK's `maxTurns` option).
  */
 export const MAX_CONVERSATION_TURNS = 10;
 

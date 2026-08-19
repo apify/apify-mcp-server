@@ -40,7 +40,8 @@ behavior on purpose. Baselining there mixes intentional changes into every diff 
 
 - Not wired into CI. Run by hand before releasing the migration.
 - Does not replace `tests/integration/suite.ts`. That stays the permanent, assertive suite.
-- Does not cover v2 / `2026-07-28`. mcpc cannot negotiate it (see #1132). This pins v1 only.
+- Does not cover v2 / `2026-07-28`. This pins v1 only. (mcpc could not negotiate v2 when this was
+  written — see #1132; since 0.6.0 it can, and `connect --protocol-version` pins one exact version.)
 - No new permanent assertions. If a probe reveals a gap worth keeping, that is a separate PR
   against `suite.ts`.
 
@@ -67,7 +68,7 @@ pnpm run build
 `../v1-base/dist/stdio.js` and `dist/stdio.js` respectively. mcpc cannot take server args inline —
 they must come from named `.mcp.json` entries — so the file is generated from `configs.tsv`.
 
-mcpc is a devDependency (`@apify/mcpc@^0.2.0`); invoke as `pnpm exec mcpc`.
+mcpc is a devDependency (`@apify/mcpc@^0.6.0`); invoke as `pnpm exec mcpc`.
 
 ---
 

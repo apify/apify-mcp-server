@@ -2,403 +2,230 @@
 /* eslint-disable no-console */
 /* eslint-disable import/extensions */
 /**
- * Main CLI entry point for workflow evaluations
+ * Main CLI entry point for workflow evaluations (Langfuse backend).
+ *
+ * Every run reads its test cases from the Langfuse dataset and executes the matching
+ * items as an experiment: a Claude Code agent (Claude Agent SDK) driving its own freshly
+ * spawned Apify MCP server, then an LLM judge. Traces, scores, and the dataset live in
+ * Langfuse.
  *
  * Usage:
  *   pnpm run evals:workflow
- *   pnpm run evals:workflow -- --category basic
- *   pnpm run evals:workflow -- --id test-001
- *   pnpm run evals:workflow -- --verbose
- *   pnpm run evals:workflow -- --concurrency 10
+ *   pnpm run evals:workflow -- --category search
+ *   pnpm run evals:workflow -- --id search-google-maps
+ *   pnpm run evals:workflow -- --concurrency 8
+ *   pnpm run evals:workflow -- --mcp-tools-only   # drop Claude Code's built-in tools
  */
 
-import path from 'node:path';
+// Must be the first import: config modules read process.env at load time.
+import 'dotenv/config';
 
-import pLimit from 'p-limit';
+import { execSync } from 'node:child_process';
+
+import { LangfuseClient } from '@langfuse/client';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
-import { filterByLineRanges } from '../shared/line_range_filter.js';
-import type { LineRange } from '../shared/line_range_parser.js';
-import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line_range_parser.js';
-import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config.js';
-import { executeConversation } from './conversation_executor.js';
+import { readJsonFile } from '../../src/utils/generic.js';
+import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
+import { filterByCategory, filterById } from '../shared/test_case_loader.js';
+import { assertStdioBinExists } from './claude_agent.js';
+import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
+import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
+import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_experiment.js';
+import { initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
-import { McpClient } from './mcp_client.js';
-import type { EvaluationResult, TestResultRecord } from './output_formatter.js';
-import { formatDetailedResult, formatResultsTable } from './output_formatter.js';
-import {
-    findBaselineRecord,
-    loadResultsDatabase,
-    saveResultsDatabase,
-    updateResultsWithEvaluations,
-} from './results_writer.js';
-import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test_cases_loader.js';
-import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test_cases_loader.js';
-import { evaluateConversation } from './workflow_judge.js';
+
+// Before any client is constructed below: the Langfuse SDK and the Apify client read
+// process.env themselves and pass it to node:http, which throws ERR_INVALID_CHAR on a
+// CI secret with a newline. Imported config that reads env at load time (OPENROUTER_CONFIG)
+// runs before this and sanitizes its own values.
+sanitizeProcessEnv();
 
 type CliArgs = {
     category?: string;
     id?: string;
-    lines?: string;
-    verbose?: boolean;
-    testCasesPath?: string;
-    agentModel?: string;
-    judgeModel?: string;
-    toolTimeout?: number;
-    concurrency?: number;
-    output?: boolean;
-    baseline?: string;
+    dataset: string;
+    agentModel: string;
+    judgeModel: string;
+    toolTimeout: number;
+    concurrency: number;
+    mcpToolsOnly: boolean;
 };
 
-/**
- * Helper function to log messages with test ID prefix
- */
-function logWithPrefix(testId: string, message: string): void {
-    const lines = message.split('\n');
-    for (const line of lines) {
-        console.log(`[${testId}] ${line}`);
+/** Current git branch, or 'unknown' if it can't be resolved. */
+function getGitBranch(): string {
+    try {
+        return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim() || 'unknown';
+    } catch {
+        return 'unknown';
     }
 }
 
 /**
- * Run a single test case evaluation
+ * Version of the Agent SDK, recorded in run metadata: the harness is a moving target and
+ * a release can shift results. Read from the exact pin in package.json.
  */
-async function runSingleTest(
-    testCase: WorkflowTestCase,
-    index: number,
-    total: number,
-    argv: CliArgs,
-    llmClient: LlmClient,
-    apifyToken: string,
-): Promise<EvaluationResult> {
-    const testId = testCase.id;
-
-    logWithPrefix(testId, `[${index + 1}/${total}] Running...`);
-
-    // Create FRESH MCP instance per test for isolation
-    const mcpClient = new McpClient(argv.toolTimeout, testCase.failTools);
-    const startTime = Date.now();
-    let result: EvaluationResult;
-
-    try {
-        // Start MCP server with test-specific tools (if configured)
-        await mcpClient.start(apifyToken, testCase.tools);
-
-        // Get server instructions (if provided)
-        const serverInstructions = mcpClient.getInstructions();
-
-        // Execute conversation (tools fetched dynamically inside)
-        const conversation = await executeConversation({
-            userPrompt: testCase.query,
-            mcpClient,
-            llmClient,
-            maxTurns: testCase.maxTurns,
-            model: argv.agentModel,
-            serverInstructions,
-        });
-
-        // Judge conversation
-        const judgeResult = await evaluateConversation(testCase, conversation, llmClient, argv.judgeModel);
-
-        const durationMs = Date.now() - startTime;
-
-        result = {
-            testCase,
-            conversation,
-            judgeResult,
-            durationMs,
-        };
-
-        logWithPrefix(
-            testId,
-            `  ${judgeResult.verdict === 'PASS' ? '✅' : '❌'} ${judgeResult.verdict} (${durationMs}ms)`,
-        );
-    } catch (error) {
-        const durationMs = Date.now() - startTime;
-
-        result = {
-            testCase,
-            conversation: {
-                userPrompt: testCase.query,
-                turns: [],
-                completed: false,
-                hitMaxTurns: false,
-                totalTurns: 0,
-            },
-            judgeResult: {
-                verdict: 'FAIL',
-                reason: 'Error during execution',
-                rawResponse: '',
-            },
-            durationMs,
-            error: error instanceof Error ? error.message : String(error),
-        };
-
-        logWithPrefix(testId, `  🔥 ERROR (${durationMs}ms)`);
-    } finally {
-        // ALWAYS cleanup MCP client for this test
-        try {
-            await mcpClient.cleanup();
-        } catch (cleanupError) {
-            logWithPrefix(testId, `  ⚠️  Cleanup failed: ${cleanupError}`);
-        }
-    }
-
-    // Show detailed output if verbose
-    if (argv.verbose) {
-        logWithPrefix(testId, '');
-        logWithPrefix(testId, formatDetailedResult(result));
-    }
-
-    return result;
+function resolveAgentSdkVersion(): string {
+    const manifest = readJsonFile<{ devDependencies: Record<string, string> }>(import.meta.url, '../../package.json');
+    return manifest.devDependencies['@anthropic-ai/claude-agent-sdk'] ?? 'unknown';
 }
 
 async function main() {
-    // Parse CLI arguments
-    const argv = (await yargs(hideBin(process.argv))
-        .option('category', {
-            type: 'string',
-            description: 'Filter by test case category',
-        })
-        .option('id', {
-            type: 'string',
-            description: 'Run specific test case by ID',
-        })
-        .option('lines', {
-            alias: 'l',
-            type: 'string',
-            description:
-                'Filter by line range in test-cases.json ' +
-                '(format: "start-end" or single line, comma-separated, e.g., "10-20,50-60,100")',
-        })
-        .option('verbose', {
-            type: 'boolean',
-            description: 'Show detailed output for each test',
-            default: false,
-        })
-        .option('test-cases-path', {
-            type: 'string',
-            description: 'Path to test cases JSON file',
-        })
-        .option('agent-model', {
-            type: 'string',
-            description: `LLM model for the agent (default: ${MODELS.agent})`,
-            default: MODELS.agent,
-        })
-        .option('judge-model', {
-            type: 'string',
-            description: `LLM model for the judge (default: ${MODELS.judge})`,
-            default: MODELS.judge,
-        })
-        .option('tool-timeout', {
-            type: 'number',
-            description: `Tool call timeout in seconds (default: ${DEFAULT_TOOL_TIMEOUT_SECONDS})`,
-            default: DEFAULT_TOOL_TIMEOUT_SECONDS,
-        })
-        .option('concurrency', {
-            alias: 'c',
-            type: 'number',
-            description: 'Number of tests to run in parallel (default: 4)',
-            default: 4,
-        })
-        .option('output', {
-            alias: 'o',
-            type: 'boolean',
-            description: 'Save test results to JSON file (evals/workflows/results.json)',
-            default: false,
-        })
-        .option('baseline', {
-            type: 'string',
-            description:
-                'Results JSON file to compare against; prints byte/token deltas per test ' +
-                '(default: evals/workflows/results.json)',
+    // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores
+    // every flag behind it. Drop it so both call styles work.
+    const args = hideBin(process.argv).filter((arg) => arg !== '--');
+
+    // yargs infers the kebab-case key, not the camelCase alias, hence the cast.
+    const argv = (await yargs(args)
+        .options({
+            category: { type: 'string', description: 'Filter by test case category (supports * wildcard)' },
+            id: { type: 'string', description: 'Run test cases whose ID matches this regex' },
+            dataset: {
+                type: 'string',
+                description: 'Langfuse dataset to run',
+                default: WORKFLOW_DATASET_NAME,
+            },
+            'agent-model': { type: 'string', description: 'LLM model for the agent', default: MODELS.agent },
+            'judge-model': { type: 'string', description: 'LLM model for the judge', default: MODELS.judge },
+            'tool-timeout': {
+                type: 'number',
+                description: 'Tool call timeout in seconds',
+                default: DEFAULT_TOOL_TIMEOUT_SECONDS,
+            },
+            concurrency: { alias: 'c', type: 'number', description: 'Items to run in parallel', default: 4 },
+            'mcp-tools-only': {
+                type: 'boolean',
+                description: "Drop Claude Code's built-in tools, leaving only the Apify MCP server's",
+                default: false,
+            },
         })
         .help().argv) as CliArgs;
 
-    console.log('='.repeat(100));
-    console.log('Workflow Evaluation Runner');
-    console.log('='.repeat(100));
-    console.log();
-
-    // Check environment variables
-    const apifyToken = sanitizeEnvValue(process.env.APIFY_TOKEN);
-    const openrouterKey = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
-
-    if (!apifyToken) {
-        console.error('❌ Error: APIFY_TOKEN environment variable is required');
+    // Fail before any test runs, listing every missing variable at once.
+    const missing = findMissingEnvVars([
+        ...LANGFUSE_ENV_VARS,
+        'APIFY_TOKEN',
+        'OPENROUTER_API_KEY',
+        'ANTHROPIC_API_KEY',
+    ]);
+    if (missing.length > 0) {
+        console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
         process.exit(1);
     }
 
-    if (!openrouterKey) {
-        console.error('❌ Error: OPENROUTER_API_KEY environment variable is required');
-        process.exit(1);
-    }
-
-    // Load test cases (with or without line numbers based on --lines flag)
-    console.log('📂 Loading test cases...');
-    let testCases: WorkflowTestCase[] | WorkflowTestCaseWithLineNumbers[];
-    let totalLines: number | undefined;
-
+    // The Agent SDK spawns the MCP server from the built binary; fail early with the fix.
     try {
-        if (argv.lines) {
-            // Load with line number metadata
-            const result = loadTestCasesWithLineNumbers(argv.testCasesPath);
-            testCases = result.testCases;
-            totalLines = result.totalLines;
-        } else {
-            // Normal load (no line tracking overhead)
-            testCases = loadTestCases(argv.testCasesPath);
-        }
+        assertStdioBinExists();
     } catch (error) {
-        console.error(`❌ Failed to load test cases: ${error}`);
+        console.error(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
     }
 
-    // Parse and validate line ranges (if provided)
-    let lineRanges: LineRange[] | undefined;
-    if (argv.lines) {
-        try {
-            lineRanges = parseLineRanges(argv.lines);
-            validateLineRanges(lineRanges);
+    const langfuse = new LangfuseClient();
+    // Non-empty: checked above. Sanitized above that.
+    const apifyToken = process.env.APIFY_TOKEN as string;
+    const datasetName = argv.dataset;
 
-            // Check if ranges are out of bounds
-            if (checkRangesOutOfBounds(lineRanges, totalLines!)) {
-                console.error(`❌ Error: Line range out of bounds`);
-                console.error(`   Test cases file has ${totalLines} lines`);
-                console.error(`   Requested ranges: ${argv.lines}`);
-                console.log('');
-                process.exit(1);
-            }
-        } catch (error) {
-            console.error(`❌ Failed to parse line ranges: ${error}`);
-            console.log('');
-            console.log('Usage: --lines <range>');
-            console.log('  Single line:      --lines 100');
-            console.log('  Range:            --lines 10-20');
-            console.log('  Multiple ranges:  --lines 10-20,50-60,100');
-            console.log('');
-            process.exit(1);
-        }
-    }
-
-    // Apply filters (AND logic)
-    let filteredTestCases = testCases;
-
-    // Filter by line ranges first (if provided)
-    if (lineRanges && testCases.length > 0 && '_lineStart' in testCases[0]) {
-        filteredTestCases = filterByLineRanges(
-            filteredTestCases as WorkflowTestCaseWithLineNumbers[],
-            lineRanges,
-        ) as WorkflowTestCase[];
-        console.log(`🔍 Filtered by line ranges ${argv.lines}: ${filteredTestCases.length} test case(s)`);
-    }
-
-    // Then apply ID/category filters
-    filteredTestCases = filterTestCases(filteredTestCases, {
-        id: argv.id,
-        category: argv.category,
-    });
-
-    if (filteredTestCases.length === 0) {
-        console.log('⚠️  No test cases found matching the filters.');
-        if (!argv.lines) {
-            console.log('');
-            console.log('Available test cases:');
-            for (const tc of testCases) {
-                console.log(`  - ${tc.id} (${tc.category}): ${tc.query}`);
-            }
-        }
-        process.exit(0);
-    }
-
-    console.log(`✅ Loaded ${filteredTestCases.length} test case(s)`);
-    console.log();
-
-    // Load baseline for byte/token deltas (read before --output overwrites results.json).
-    // Matched by agent model + test ID; the judge model is ignored because bytes/tokens
-    // come from the agent, so a baseline recorded with a different judge still compares.
-    const baselinePath = argv.baseline ?? path.join(process.cwd(), 'evals/workflows/results.json');
-    const baselineByTestId = new Map<string, TestResultRecord>();
-    let baselineWithMetrics = 0;
+    let exitCode = 1;
     try {
-        const baselineDb = loadResultsDatabase(baselinePath);
-        for (const testCase of filteredTestCases) {
-            const record = findBaselineRecord(baselineDb, argv.agentModel!, testCase.id);
-            if (!record) continue;
-            baselineByTestId.set(testCase.id, record);
-            // Records written before these metrics existed lack the fields at runtime.
-            if (record.resultBytes !== undefined || record.totalTokens !== undefined) {
-                baselineWithMetrics++;
-            }
-        }
-        // Explain the baseline state so a missing delta is never a silent mystery.
-        if (baselineWithMetrics > 0) {
-            console.log(`📐 Baseline: ${baselineWithMetrics} matching result(s) with metrics from ${baselinePath}`);
-        } else if (baselineByTestId.size > 0) {
-            console.log(
-                `📐 Baseline: ${baselineByTestId.size} matching result(s) in ${baselinePath}, but none record bytes/tokens yet. ` +
-                    `Re-run once with --output to capture them, then deltas appear next run.`,
-            );
-        } else {
-            console.log(
-                `📐 No baseline for agent model ${argv.agentModel} in ${baselinePath}. ` +
-                    `Run once with --output to record one (deltas need a prior --output run with the same agent model).`,
+        // Read-only: the dataset is the source of truth, edited in the Langfuse UI and
+        // committed back with `evals:workflow:export-dataset`.
+        console.log(`📇 Fetching dataset "${datasetName}"...`);
+        const cases = await fetchWorkflowCases(langfuse, datasetName);
+
+        // Shared helpers, so every entry point filters test cases by the same rule.
+        let selected = cases;
+        if (argv.id) selected = filterById(selected, argv.id);
+        if (argv.category) selected = filterByCategory(selected, argv.category);
+        const data = selected.map((workflowCase) => workflowCase.item);
+        if (data.length === 0) {
+            throw new Error(
+                `No active item in dataset "${datasetName}" (${cases.length} total) matches --id/--category`,
             );
         }
-        console.log();
-    } catch (error) {
-        console.error(`⚠️  Could not load baseline from ${baselinePath}: ${error}`);
-        console.log();
-    }
+        const requestedIds = data.map((item) => item.id);
 
-    // Initialize LLM client (shared across all tests - stateless)
-    const llmClient = new LlmClient();
+        initTracing();
 
-    // Run evaluations
-    console.log(`▶️  Running ${filteredTestCases.length} evaluation(s) with concurrency ${argv.concurrency}...`);
-    console.log();
+        // Traces every agent/judge call as a generation nested under the item's trace.
+        const llmClient = new LlmClient();
 
-    // Create concurrency limiter
-    const limit = pLimit(argv.concurrency!);
+        const agentSdkVersion = resolveAgentSdkVersion();
+        const runName = `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`;
+        console.log(
+            `▶️  Running experiment "${runName}" over ${data.length} item(s), concurrency ${argv.concurrency} ` +
+                `(agent: ${argv.agentModel} via Claude Agent SDK ${agentSdkVersion}` +
+                `${argv.mcpToolsOnly ? ', MCP tools only' : ', +built-in tools'})`,
+        );
 
-    // Execute tests in parallel with concurrency control
-    const resultPromises = filteredTestCases.map(async (testCase, index) => {
-        return limit(async () => {
-            return runSingleTest(testCase, index, filteredTestCases.length, argv, llmClient, apifyToken);
+        const result = await langfuse.experiment.run({
+            name: datasetName,
+            runName,
+            description: 'Multi-turn workflow evals for the Apify MCP server.',
+            data,
+            task: makeTask({
+                llmClient,
+                apifyToken,
+                agentModel: argv.agentModel,
+                judgeModel: argv.judgeModel,
+                toolTimeout: argv.toolTimeout,
+                mcpToolsOnly: argv.mcpToolsOnly,
+            }),
+            evaluators,
+            runEvaluators: [
+                // Denominator is the requested count, not itemResults.length, so items the
+                // SDK dropped pull the rate down instead of vanishing from it.
+                async ({ itemResults }) => ({
+                    name: 'pass_rate',
+                    value: countPassed(itemResults) / requestedIds.length,
+                }),
+            ],
+            maxConcurrency: argv.concurrency,
+            metadata: {
+                agentModel: argv.agentModel,
+                judgeModel: argv.judgeModel,
+                toolTimeout: argv.toolTimeout,
+                mcpToolsOnly: argv.mcpToolsOnly,
+                agentSdkVersion,
+            },
         });
-    });
 
-    // Wait for all tests to complete
-    const results = await Promise.all(resultPromises);
+        // Compact on purpose: Langfuse holds the full per-item view behind the run link.
+        const summary = buildRunSummary(requestedIds, result.itemResults);
+        for (const failure of summary.failures) {
+            console.log(`❌ ${failure.id}: ${failure.reason}`);
+        }
+        if (summary.droppedIds.length > 0) {
+            console.error(`🔥 Never completed (task threw, see errors above): ${summary.droppedIds.join(', ')}`);
+        }
 
-    // Save results to file if --output flag is present
-    if (argv.output) {
-        const resultsPath = path.join(process.cwd(), 'evals/workflows/results.json');
+        console.log(`📊 ${summary.passedCount}/${requestedIds.length} passed`);
+        console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" (view in Langfuse)`}`);
+
+        // 0 only when every requested item ran and passed: a dropped item leaves
+        // passedCount short of the request, so this covers it too.
+        exitCode = summary.passedCount === requestedIds.length ? 0 : 1;
+    } catch (error) {
+        console.error(`❌ Run failed: ${error instanceof Error ? error.message : String(error)}`);
+        exitCode = 1;
+    } finally {
+        // Flush scores and spans before exit or the last batch is lost. Guarded
+        // individually: a failed export must not skip the other flush, and an
+        // unhandled rejection here would override the run's exit code.
         try {
-            const database = loadResultsDatabase(resultsPath);
-            const updatedDatabase = updateResultsWithEvaluations(database, results, argv.agentModel!, argv.judgeModel!);
-            saveResultsDatabase(resultsPath, updatedDatabase);
-            console.log(`✅ Results saved to: ${resultsPath}`);
-            console.log();
+            await langfuse.flush();
         } catch (error) {
-            console.error(`❌ Failed to save results: ${error}`);
-            console.error('   Results will still be displayed but not persisted.');
-            console.log();
+            console.error(`⚠️ Langfuse flush failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        try {
+            await shutdownTracing();
+        } catch (error) {
+            console.error(`⚠️ Span export failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
-    // Display results (with byte/token deltas when a baseline matched)
-    console.log(formatResultsTable(results, baselineByTestId.size > 0 ? baselineByTestId : undefined));
-
-    // Exit with appropriate code - ALL tests must pass
-    const totalTests = results.length;
-    const passedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'PASS').length;
-    const errorTests = results.filter((r) => r.error).length;
-
-    // Exit 0 only if ALL tests passed with no errors
-    const allPassed = totalTests > 0 && passedTests === totalTests && errorTests === 0;
-    process.exit(allPassed ? 0 : 1);
+    process.exit(exitCode);
 }
 
 void main();

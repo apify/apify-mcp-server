@@ -3,8 +3,8 @@ import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { buildActorDetailsForWidget, buildCardOptions, fetchActorDetails } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
@@ -30,25 +30,24 @@ const fetchActorDetailsWidgetArgsSchema = z
     })
     .strict();
 
-const FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION = dedent`
-    Render an interactive UI element (widget) displaying detailed Actor information for the user.
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return dedent`
+        Render an interactive UI element (widget) displaying detailed Actor information for the user.
 
-    Use this tool ONLY when the user explicitly wants to see or browse Actor details
-    (e.g., "show me apify/rag-web-browser", "tell me about this Actor", "what does apify/web-scraper look like").
-    The response renders as an interactive widget the user can view directly.
-
-    For silent data lookups (e.g., fetching the input schema before calling an Actor, inspecting README
-    for decision making), use ${HELPER_TOOLS.ACTOR_GET_DETAILS} instead — it returns the same data
-    without rendering a widget.
-
-    Input: the Actor ID or full name only. Output fields are fixed by the widget contract.
-`;
+        Use this tool ONLY when the user explicitly wants to see or browse Actor details
+        (e.g., "show me apify/rag-web-browser", "tell me about this Actor", "what does apify/web-scraper look like").
+        The response renders as an interactive widget the user can view directly.
+        ${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `\nFor silent data lookups (e.g., fetching the input schema before calling an Actor, inspecting README for decision making), use ${HELPER_TOOLS.ACTOR_GET_DETAILS} instead — it returns the same data without rendering a widget.\n` : ''}
+        Input: the Actor ID or full name only. Output fields are fixed by the widget contract.
+    `;
+}
 
 export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
     title: 'Fetch Actor details (widget)',
-    description: FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION,
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(fetchActorDetailsWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsWidgetOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsWidgetArgsSchema)),

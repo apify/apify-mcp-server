@@ -9,8 +9,8 @@ import { ActorsMcpServer } from '../../src/index.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
 import { SERVER_MODE } from '../../src/types.js';
 import { AUTO_INJECTED_TOOLS, loadToolsFromInput } from '../../src/utils/tools_loader.js';
-import { ACTOR_NORMAL_MODE } from '../const.js';
 import { expectArrayWeakEquals } from '../helpers.js';
+import { ACTOR_NORMAL_MODE } from '../test_kit/helpers.js';
 
 beforeAll(() => {
     log.setLevel(log.LEVELS.OFF);

@@ -1,0 +1,14 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "./",
+        "outDir": "../../dist/test_kit",
+        "noEmit": false
+    },
+    "references": [
+        { "path": "../../src" }
+    ],
+    "include": [
+        "./**/*"
+    ]
+}

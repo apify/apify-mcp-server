@@ -9,6 +9,12 @@ export const ACTOR_MAX_DESCRIPTION_LENGTH = 500;
 // the MCP server and the requested Actor running at once (e.g. an 8 GB Actor leaves no room).
 export const ACTOR_MAX_MEMORY_MBYTES = 4_096;
 
+// apify/code-runtime's README documents an exact API contract (method names/shapes) that the
+// auto-generated summary can omit — always return its full README. Hardcoded by Actor name
+// (not an actor.json flag) so no other Actor can opt itself out of the summary. Actor name
+// (not ID) so this stays correct across environments (staging etc. have different IDs).
+export const CODE_RUNTIME_ACTOR_NAME = 'apify/code-runtime';
+
 // Tool output
 /**
  * Content larger than this is linked out instead of inlined, since inlining it would blow up the context
@@ -87,7 +93,7 @@ export const APIFY_AI_CLIENT_NAME = 'apify-console-ai-chat';
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
 export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool when user wants to GET or RETRIEVE actual data immediately (one-time data retrieval).
-This tool directly fetches and returns data - it does NOT just find tools.
+This tool scrapes the data itself - it does NOT just find tools.
 
 Examples of when to use:
 - User wants current/immediate data (e.g., "Get flight prices for tomorrow", "What's the weather today?")

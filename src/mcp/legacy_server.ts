@@ -122,9 +122,7 @@ export class LegacyMcpServer {
 
         this.server = new Server(getServerInfo(), {
             capabilities: {
-                tools: {
-                    listChanged: true,
-                },
+                tools: {},
                 // Declare long-running task support
                 tasks: {
                     list: {},
@@ -364,10 +362,12 @@ export class LegacyMcpServer {
     private setupToolHandlers(): void {
         // Handles the request to list tools.
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+            const presentTools = new Set(this.host.tools.keys());
             const tools = Array.from(this.host.tools.values()).map((tool) =>
                 getToolPublicFieldOnly(tool, {
                     mode: this.host.serverMode,
                     filterWidgetMeta: true,
+                    presentTools,
                 }),
             );
             return { tools };

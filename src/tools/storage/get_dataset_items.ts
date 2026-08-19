@@ -68,8 +68,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
     title: 'Get dataset items',
     description: dedent`
         Get items (rows) from a dataset — the output/results produced by an Actor run.
-        Not metadata or schema — use ${HELPER_TOOLS.DATASET_GET} for counts and the field list, ${HELPER_TOOLS.DATASET_SCHEMA_GET} for a JSON schema from a sample.
-        When the user provides a datasetId and asks to retrieve results, output, data, or rows, call this tool directly — do not call ${HELPER_TOOLS.DATASET_GET} first.
+        Returns the rows themselves, not dataset metadata, counts, or a schema.
+        When the user provides a datasetId and asks to retrieve results, output, data, or rows, call this tool directly.
         Default limit is ${DEFAULT_DATASET_ITEMS_LIMIT}. Use clean=true to skip empty items and hidden fields.
 
         USAGE:
