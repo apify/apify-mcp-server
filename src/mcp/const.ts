@@ -1,7 +1,7 @@
 export const MCP_STREAMABLE_ENDPOINT = '/mcp';
 
 export const MAX_TOOL_NAME_LENGTH = 64;
-export const MAX_TOOL_NAME_AUTHOR_LENGTH = 8;
+export const MAX_TOOL_NAME_USERNAME_LENGTH = 8;
 export const TOOL_NAME_HASH_LENGTH = 4;
 export const SERVER_ID_LENGTH = 8;
 export const EXTERNAL_TOOL_CALL_TIMEOUT_MSEC = 120_000; // 2 minutes

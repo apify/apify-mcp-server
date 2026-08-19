@@ -63,7 +63,7 @@ Two MCP protocol revisions are served, each by its own adapter:
   `MAX_TOOL_NAME_LENGTH`; only over-length names get a `TOOL_NAME_HASH_LENGTH` hash
   suffix (Actor tools: `../tools/actor_tool_naming.ts`; proxied Actor-MCP tools:
   `proxy.ts` `getProxyMCPServerToolName`). An over-length **proxied** name caps the
-  username to `MAX_TOOL_NAME_AUTHOR_LENGTH` first, so the tail-truncation budget goes to
+  username to `MAX_TOOL_NAME_USERNAME_LENGTH` first, so the tail-truncation budget goes to
   the tool name (`alizarin_refrigerator-owner/competitive-intelligence-mcp-server`
   + `search` → `alizarin--competitive-intelligence-mcp-server--search-0b0d`); a long
   enough tool name still truncates (`get-company-profile` →

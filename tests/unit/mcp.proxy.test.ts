@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import {
-    MAX_TOOL_NAME_AUTHOR_LENGTH,
     MAX_TOOL_NAME_LENGTH,
+    MAX_TOOL_NAME_USERNAME_LENGTH,
     SERVER_ID_LENGTH,
     TOOL_NAME_HASH_LENGTH,
 } from '../../src/mcp/const.js';
@@ -55,7 +55,7 @@ describe('getProxyMCPServerToolName()', () => {
         expect(b.length).toBe(MAX_TOOL_NAME_LENGTH);
     });
 
-    it('caps the author when the assembled name exceeds the limit', () => {
+    it('caps the username when the assembled name exceeds the limit', () => {
         const actorFullName = 'alizarin_refrigerator-owner/competitive-intelligence-mcp-server';
 
         expect(getProxyMCPServerToolName(actorFullName, 'search')).toBe(
@@ -79,7 +79,7 @@ describe('getProxyMCPServerToolName()', () => {
         }
     });
 
-    it('truncates the tool name only when capping the author is not enough', () => {
+    it('truncates the tool name only when capping the username is not enough', () => {
         const uncappedFullName =
             'alizarin_refrigerator-owner--competitive-intelligence-mcp-server--get-company-profile';
         const hash = createHash('sha256').update(uncappedFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
@@ -90,19 +90,19 @@ describe('getProxyMCPServerToolName()', () => {
 
         expect(name).toBe('alizarin--competitive-intelligence-mcp-server--get-company--fd6c');
         expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
-        // The hash covers the name assembled from the uncapped author, whichever tier produced the result.
+        // The hash covers the name assembled from the uncapped username, whichever tier produced the result.
         expect(name.endsWith(`-${hash}`)).toBe(true);
     });
 
-    it('reads the author from the Actor full name, not from the first "--"', () => {
+    it('reads the username from the Actor full name, not from the first "--"', () => {
         const name = getProxyMCPServerToolName(
             'doshikevin361/commet--apify-1',
             'a-very-long-tool-name-that-forces-truncation-of-the-assembled-name',
         );
 
         expect(name).toBe('doshikev--commet--apify-1--a-very-long-tool-name-that-force-cbb1');
-        expect(name.split('--')[0]).toBe('doshikevin361'.slice(0, MAX_TOOL_NAME_AUTHOR_LENGTH));
-        // Actor names legally contain '--', so this one must survive whole right after the capped author.
+        expect(name.split('--')[0]).toBe('doshikevin361'.slice(0, MAX_TOOL_NAME_USERNAME_LENGTH));
+        // Actor names legally contain '--', so this one must survive whole right after the capped username.
         expect(name.startsWith('doshikev--commet--apify-1--')).toBe(true);
     });
 
@@ -110,13 +110,13 @@ describe('getProxyMCPServerToolName()', () => {
         expect(getProxyMCPServerToolName('jiri.spilka/competitive-intelligence-mcp-server', 'get-company')).toBe(
             'jiri-dot--competitive-intelligence-mcp-server--get-company-d373',
         );
-        // Capping the raw username first would leave 'ab-dot-cdefg' — 12 chars, over the author cap.
+        // Capping the raw username first would leave 'ab-dot-cdefg' — 12 chars, over the username cap.
         expect(
             getProxyMCPServerToolName('ab.cdefgh/some-actor-name-that-is-long-enough-to-push-past-the-cap', 'add'),
         ).toBe('ab-dot-c--some-actor-name-that-is-long-enough-to-push-past--4f1b');
     });
 
-    it('trims a trailing dash off the capped author', () => {
+    it('trims a trailing dash off the capped username', () => {
         expect(getProxyMCPServerToolName('dev.tools-collective/competitive-intelligence-mcp-server', 'search')).toBe(
             'dev-dot--competitive-intelligence-mcp-server--search-3c76',
         );
