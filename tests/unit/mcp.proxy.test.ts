@@ -24,18 +24,16 @@ describe('getProxyMCPServerToolName()', () => {
     });
 
     it('sanitizes a dotted username the same way Actor tool names do', () => {
-        expect(getProxyMCPServerToolName('jiri.spilka/my-mcp-server', 'add')).toBe(
-            'jiri-dot-spilka--my-mcp-server--add',
-        );
+        expect(getProxyMCPServerToolName('the.unc/my-mcp-server', 'add')).toBe('the-dot-unc--my-mcp-server--add');
     });
 
     it('hash-suffixes over-length names instead of bare truncation', () => {
         const originToolName = 'search-actors-and-fetch-full-details-for-each-result';
-        const fullName = `apify--actors-mcp-server--${originToolName}`;
+        const fullName = `apify--my-mcp-server--${originToolName}`;
         const hash = createHash('sha256').update(fullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
-        const name = getProxyMCPServerToolName('apify/actors-mcp-server', originToolName);
+        const name = getProxyMCPServerToolName('apify/my-mcp-server', originToolName);
 
-        expect(name).toBe('apify--actors-mcp-server--search-actors-and-fetch-full-deta-5a82');
+        expect(name).toBe('apify--my-mcp-server--search-actors-and-fetch-full-details--c5b2');
         expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
         expect(name.endsWith(`-${hash}`)).toBe(true);
         // Bare slice would drop the distinguishing suffix and collide; hash must survive.
@@ -44,8 +42,8 @@ describe('getProxyMCPServerToolName()', () => {
 
     it('keeps two over-length origin names distinct after capping', () => {
         const sharedPrefix = `shared-prefix-${'y'.repeat(80)}`;
-        const a = getProxyMCPServerToolName('apify/actors-mcp-server', `${sharedPrefix}-alpha`);
-        const b = getProxyMCPServerToolName('apify/actors-mcp-server', `${sharedPrefix}-beta`);
+        const a = getProxyMCPServerToolName('apify/my-mcp-server', `${sharedPrefix}-alpha`);
+        const b = getProxyMCPServerToolName('apify/my-mcp-server', `${sharedPrefix}-beta`);
 
         expect(a).not.toBe(b);
         expect(a.length).toBe(MAX_TOOL_NAME_LENGTH);

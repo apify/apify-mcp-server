@@ -833,10 +833,7 @@ describe('ACTOR_MCP dispatch by exposed tool name', () => {
     afterEach(() => vi.restoreAllMocks());
 
     it('calls the remote with the origin tool name, not the prefixed exposed name', async () => {
-        // #1277 renamed the exposed name to `{username}--{actor-name}--{toolName}`. Dispatch must keep
-        // sending `originToolName` upstream — routing on `tool.name` would hand the remote a prefixed
-        // name it has never heard of. The entry comes from the real `getMCPServerTools`, so the exposed
-        // name is produced by the naming code rather than hardcoded in a fixture.
+        // The remote receives originToolName; tool.name is the prefixed exposed name.
         const serverUrl = 'https://example-mcp-server.apify.actor/mcp';
         const callTool = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'sum of 1 and 2 is 3' }] });
         const stubClient = {
