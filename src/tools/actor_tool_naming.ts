@@ -22,16 +22,28 @@ export function isActorBlockedUnderPaymentProvider(actorInfo: ActorInfo): boolea
     return !!actorInfo.actor.actorStandby?.isEnabled;
 }
 
-export function actorNameToToolName(actorFullName: string): string {
+/**
+ * Splits an Actor full name into its dot-escaped username and its Actor name.
+ *
+ * `escapedUsername` is null when the input has no slash — there is no username segment then,
+ * so callers must not build a `{username}--{actor-name}` name out of it.
+ */
+export function parseActorFullName(actorFullName: string): { escapedUsername: string | null; actorName: string } {
     const slashIndex = actorFullName.indexOf('/');
     if (slashIndex === -1) {
         log.warning(`Actor name "${actorFullName}" does not contain a slash — expected format "username/actor-name"`);
+        return { escapedUsername: null, actorName: actorFullName };
     }
 
-    const username = slashIndex !== -1 ? actorFullName.slice(0, slashIndex) : '';
-    const actorName = slashIndex !== -1 ? actorFullName.slice(slashIndex + 1) : actorFullName;
-    const safeUsername = username.replace(/\./g, '-dot-');
-    const fullName = slashIndex !== -1 ? `${safeUsername}--${actorName}` : actorName;
+    return {
+        escapedUsername: actorFullName.slice(0, slashIndex).replace(/\./g, '-dot-'),
+        actorName: actorFullName.slice(slashIndex + 1),
+    };
+}
+
+export function actorNameToToolName(actorFullName: string): string {
+    const { escapedUsername, actorName } = parseActorFullName(actorFullName);
+    const fullName = escapedUsername === null ? actorName : `${escapedUsername}--${actorName}`;
 
     if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
         return fullName;
