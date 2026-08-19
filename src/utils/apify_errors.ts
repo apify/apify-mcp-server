@@ -1,6 +1,7 @@
 import { ApifyApiError } from 'apify-client';
 
 import {
+    APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
     APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
@@ -18,6 +19,11 @@ export function isPermissionApprovalError(error: unknown): error is ApifyApiErro
 /** True when an Actor run is rejected because the account memory quota is exceeded. */
 export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
+}
+
+/** True when the API rejects a supplied `publicConfig` field or a request to publish the task. */
+export function isCannotPublishTaskError(error: unknown): error is ApifyApiError {
+    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK;
 }
 
 /**
