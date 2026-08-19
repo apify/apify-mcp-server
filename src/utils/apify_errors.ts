@@ -23,8 +23,7 @@ export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
 
 /**
  * True when the platform rejected `actor.start()` because the input fails the Actor's real
- * input schema — validated server-side against the full schema, unlike our own AJV gate which
- * validates a derived/shortened copy.
+ * schema — a stricter, server-side check than our own AJV gate's derived/shortened copy.
  */
 export function isActorInputValidationError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_INVALID_INPUT;

@@ -215,9 +215,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         });
     }
 
-    // The platform validates start() input against the Actor's real schema — a stricter check
-    // than our own AJV gate, which validates a derived/shortened copy. Point at the input and its
-    // schema, not the generic "verify the Actor name" fallback below — the Actor was found fine.
+    // Checked before the generic fallback below: the Actor was found fine, only its input wasn't.
     if (isActorInputValidationError(error)) {
         return respondUserError(
             [

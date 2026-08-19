@@ -45,9 +45,7 @@ export const actorExecutor: ActorExecutor = {
         try {
             actorRun = await apifyClient.actor(actorFullName).start(actorInput, params.callOptions);
         } catch (error) {
-            // The server's own AJV gate validates a derived/shortened schema copy (see
-            // buildActorInputSchema); the platform validates the real one and can reject input
-            // AJV passed. Only intercept that confirmed case — anything else rethrows unchanged.
+            // Platform can reject input our own AJV gate passed (see isActorInputValidationError).
             if (!isActorInputValidationError(error)) throw error;
             log.softFail('Actor input failed platform validation', {
                 actorName: actorFullName,
