@@ -1009,7 +1009,7 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'should return a run-not-found error when calling get-actor-log for a non-existent run',
+        name: 'returns a run-not-found error from get-actor-log for a non-existent run',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
             // Syntactically valid but nonexistent run ID. The same literal appears in the
