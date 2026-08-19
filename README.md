@@ -196,7 +196,7 @@ Configure the Skyfire MCP server and the Apify MCP Server in your client. Add `p
 {
   "mcpServers": {
     "skyfire": {
-      "url": "https://mcp.skyfire.xyz/mcp",
+      "url": "https://api.skyfire.xyz/mcp/sse",
       "headers": {
         "skyfire-api-key": "<YOUR_SKYFIRE_API_KEY>"
       }
