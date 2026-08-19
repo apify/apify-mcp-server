@@ -79,6 +79,15 @@ describe('getProxyMCPServerToolName()', () => {
         }
     });
 
+    it('caps only the names that exceed the limit, so a straddling Actor has two prefixes', () => {
+        const actorFullName = 'longusername1/my-mcp-server';
+
+        expect(getProxyMCPServerToolName(actorFullName, 'add')).toBe('longusername1--my-mcp-server--add');
+        expect(getProxyMCPServerToolName(actorFullName, 'a-tool-name-long-enough-to-push-past-the-limit-xxxx')).toBe(
+            'longuser--my-mcp-server--a-tool-name-long-enough-to-push-pa-fa1b',
+        );
+    });
+
     it('truncates the tool name only when capping the username is not enough', () => {
         const uncappedFullName =
             'alizarin_refrigerator-owner--competitive-intelligence-mcp-server--get-company-profile';

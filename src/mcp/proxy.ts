@@ -33,22 +33,14 @@ export function getMCPServerID(url: string): string {
  *
  * Over the limit the username is capped to `MAX_TOOL_NAME_USERNAME_LENGTH` first, because plain
  * tail truncation eats the tool name — the half a model needs to pick a tool. The cap is a
- * constant and not fitted to each name: all tools of one Actor must keep a byte-identical
- * prefix, and a per-name cap would give one Actor a different prefix per tool.
+ * constant and not fitted to each name: an Actor's over-length names all keep a byte-identical
+ * prefix, and a per-name cap would give each of them a different one.
  */
 export function getProxyMCPServerToolName(actorFullName: string, toolName: string): string {
     const { escapedUsername, actorName } = parseActorFullName(actorFullName);
     const actorAndToolName = `${actorName}--${toolName}`;
     // No slash in the Actor full name means no username segment: nothing to prefix, nothing to cap.
-    const { prefix, cappedPrefix } =
-        escapedUsername === null
-            ? { prefix: '', cappedPrefix: '' }
-            : {
-                  prefix: `${escapedUsername}--`,
-                  // Any trailing dashes come off the cap — they would run into the '--' segment separator.
-                  cappedPrefix: `${escapedUsername.slice(0, MAX_TOOL_NAME_USERNAME_LENGTH).replace(/-+$/, '')}--`,
-              };
-    const fullName = `${prefix}${actorAndToolName}`;
+    const fullName = escapedUsername === null ? actorAndToolName : `${escapedUsername}--${actorAndToolName}`;
 
     if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
         return fullName;
@@ -56,7 +48,11 @@ export function getProxyMCPServerToolName(actorFullName: string, toolName: strin
 
     // Hashed over the uncapped name, so the suffix is the same whichever of the two returns below wins.
     const hash = createHash('sha256').update(fullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
-    const cappedName = `${cappedPrefix}${actorAndToolName}`;
+    // Any trailing dashes come off the cap — they would run into the '--' segment separator.
+    const cappedName =
+        escapedUsername === null
+            ? fullName
+            : `${escapedUsername.slice(0, MAX_TOOL_NAME_USERNAME_LENGTH).replace(/-+$/, '')}--${actorAndToolName}`;
     const cappedNameWithHash = `${cappedName}-${hash}`;
 
     if (cappedNameWithHash.length <= MAX_TOOL_NAME_LENGTH) {

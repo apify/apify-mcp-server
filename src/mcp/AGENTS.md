@@ -68,8 +68,9 @@ Two MCP protocol revisions are served, each by its own adapter:
   + `search` → `alizarin--competitive-intelligence-mcp-server--search-0b0d`); a long
   enough tool name still truncates (`get-company-profile` →
   `alizarin--competitive-intelligence-mcp-server--get-company--fd6c`). That cap is
-  a constant, not fitted per name — every tool of one Actor must keep a byte-identical
-  prefix. Direct Actor tool names (`actorNameToToolName`) are not username-capped.
+  a constant, not fitted per name — an Actor's over-length names all keep a byte-identical
+  prefix (its names that fit keep the full username, so an Actor straddling the limit has
+  both). Direct Actor tool names (`actorNameToToolName`) are not username-capped.
   Same-name collisions get no hash — the de-dup pass in `getToolsForServerMode`
   (`../utils/tools_loader.ts`) filters on a `Set` of seen names, dropping later
   duplicates; first one wins. Never widen the cap — downstream clients depend on it.
