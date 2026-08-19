@@ -398,11 +398,11 @@ Existing URLs and commands using `?actors=...` or `--actors` continue to work un
 
 ### Prompts
 
-The server provides a set of predefined example prompts to help you get started interacting with Apify through MCP. For example, there is a `GetLatestNewsOnTopic` prompt that allows you to easily retrieve the latest news on a specific topic using the [RAG Web Browser](https://apify.com/apify/rag-web-browser) Actor.
+The server advertises the `prompts` capability, but no prompts are currently registered — `prompts/list` returns an empty list.
 
 ### Resources
 
-The server does not yet provide any resources.
+Your Apify data is not enumerated in `resources/list` — reads are on demand: pass any Apify API GET URL (`https://api.apify.com/v2/...`) to `resources/read` and the server injects the session's Apify token and returns the response body. `resources/templates/list` enumerates the common shapes — dataset items, key-value store records and keys, run metadata, run log — with their paging parameters. Responses inline up to 256 KB; anything larger returns a short notice with a download URL instead of the body. API reads require an Apify token, so a payment-only session (x402 or Skyfire) gets a JSON-RPC error for them.
 
 ## 💬 Usage examples
 
