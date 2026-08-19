@@ -8,6 +8,7 @@ import log from '@apify/log';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import * as mcpClient from '../../src/mcp/client.js';
 import type { McpClientContext } from '../../src/mcp/client_context.js';
+import { getMCPServerTools } from '../../src/mcp/proxy.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
 import * as telemetry from '../../src/telemetry.js';
@@ -824,6 +825,61 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
                     { signal: { aborted: false }, sendNotification: vi.fn() },
                 ),
             ).rejects.toMatchObject({ code: 402 });
+        });
+    });
+});
+
+describe('ACTOR_MCP dispatch by exposed tool name', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('calls the remote with the origin tool name, not the prefixed exposed name', async () => {
+        // #1277 renamed the exposed name to `{username}--{actor-name}--{toolName}`. Dispatch must keep
+        // sending `originToolName` upstream — routing on `tool.name` would hand the remote a prefixed
+        // name it has never heard of. The entry comes from the real `getMCPServerTools`, so the exposed
+        // name is produced by the naming code rather than hardcoded in a fixture.
+        const serverUrl = 'https://example-mcp-server.apify.actor/mcp';
+        const callTool = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'sum of 1 and 2 is 3' }] });
+        const stubClient = {
+            listTools: vi.fn().mockResolvedValue({
+                tools: [
+                    {
+                        name: 'add',
+                        description: 'Adds two numbers',
+                        inputSchema: {
+                            type: 'object',
+                            properties: { a: { type: 'number' }, b: { type: 'number' } },
+                        },
+                    },
+                ],
+            }),
+            callTool,
+            close: vi.fn().mockResolvedValue(undefined),
+            setNotificationHandler: vi.fn(),
+        } as unknown as Client;
+
+        const tools = await getMCPServerTools('iei3c51wbi7ekwgsg', stubClient, serverUrl, 'apify/example-mcp-server');
+        expect(tools.map((entry) => entry.name)).toEqual(['apify--example-mcp-server--add']);
+
+        await withServer(async (server) => {
+            const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(stubClient);
+            server.upsertTools(tools);
+            const handler = getRequestHandler(server, 'tools/call');
+            const result = await handler(
+                {
+                    method: 'tools/call',
+                    params: {
+                        name: 'apify--example-mcp-server--add',
+                        arguments: { a: 1, b: 2 },
+                        _meta: { mcpSessionId: 's1' },
+                    },
+                },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            );
+
+            expect(connectSpy.mock.calls[0][0]).toBe(serverUrl);
+            expect(callTool).toHaveBeenCalledTimes(1);
+            expect(callTool.mock.calls[0][0]).toMatchObject({ name: 'add', arguments: { a: 1, b: 2 } });
+            expect(result).toEqual({ content: [{ type: 'text', text: 'sum of 1 and 2 is 3' }] });
         });
     });
 });
