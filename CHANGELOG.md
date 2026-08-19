@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.15.1 - **not yet released**
 
+### 🚀 Features
+
+- Add actor tasks ([#1235](https://github.com/apify/apify-mcp-server/pull/1235)) ([8d3da8d](https://github.com/apify/apify-mcp-server/commit/8d3da8d5ecf8b5859a603ac85a3738fc59e6f5da)) by [@Janjiran](https://github.com/Janjiran), closes [#29471](https://github.com/apify/apify-mcp-server/issues/29471)
+
 ### 🐛 Bug Fixes
 
 - Return not-found error from get-actor-log for missing runs ([#1234](https://github.com/apify/apify-mcp-server/pull/1234)) ([702ab5e](https://github.com/apify/apify-mcp-server/commit/702ab5efa9887fefa308304175eda3da3552441f)) by [@jirispilka](https://github.com/jirispilka), closes [#1193](https://github.com/apify/apify-mcp-server/issues/1193)
