@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.14.4 - **not yet released**
+## [0.15.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.0) (2026-08-19)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - Correct tool descriptions naming absent tools or wrong output ([#1261](https://github.com/apify/apify-mcp-server/pull/1261)) ([c5d3928](https://github.com/apify/apify-mcp-server/commit/c5d3928b1cb9e0f4b9891ad015411c6472c26e70)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.14.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.3) (2026-08-12)
 
 ### 🚀 Features
