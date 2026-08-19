@@ -1,6 +1,10 @@
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import type { ServerNotification, TaskStatusNotification } from '@modelcontextprotocol/sdk/types.js';
+import type {
+    ProgressNotification,
+    ServerNotification,
+    TaskStatusNotification,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
@@ -24,6 +28,12 @@ import {
     isTaskNotFoundError,
     storeTaskResultOrSkipIfExpired,
 } from './utils.js';
+
+/** Sends notifications/progress via the session transport (like emitTaskStatusNotification below) —
+ *  the creating request's stream is already closed by the time task execution runs. */
+function sendTaskProgressNotification(server: Server): (notification: ProgressNotification) => Promise<void> {
+    return async (notification) => server.notification(notification);
+}
 
 /** Send notifications/tasks/status for taskId. Routes via session transport (no relatedRequestId).
  *  Swallows errors — notifications are advisory. */
@@ -241,7 +251,7 @@ export async function executeToolAndUpdateTask(params: {
         const progressTracker =
             tool.type === TOOL_TYPE.ACTOR_MCP
                 ? null
-                : createProgressTracker(progressToken, sendNotification, taskId, onStatusMessage);
+                : createProgressTracker(progressToken, sendTaskProgressNotification(server), taskId, onStatusMessage);
         const dispatchResult = await dispatchToolCall({
             tool,
             toolArgs,

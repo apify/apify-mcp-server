@@ -35,23 +35,6 @@ export type ToolSelectionTestCase = {
 } & BaseTestCase;
 
 /**
- * Test case for workflow evaluation (multi-turn agent conversations)
- * Used in: evals/workflows/
- */
-export type WorkflowTestCase = {
-    /** Maximum number of turns allowed (optional, defaults to config value) */
-    maxTurns?: number;
-    /** Tools to enable for this test (optional, e.g., ["actors", "docs", "apify/rag-web-browser"]) */
-    tools?: string[];
-    /**
-     * Tool names the harness force-fails with a synthetic INTERNAL_ERROR carrying the real
-     * report-problem nudge (optional). Lets an eval deterministically throw a nudge-eligible error
-     * that the live server + API cannot reproduce on demand. See mcp_client.ts.
-     */
-    failTools?: string[];
-} & BaseTestCase;
-
-/**
  * Test data structure wrapping test cases with version
  */
 export type TestData = {

@@ -7,7 +7,7 @@ The current MCP resources implementation is intentionally minimal and uses the l
 ## Current Architecture Overview
 
 ### MCP Server Structure
-- **ActorsMcpServer** (`src/mcp/server.ts`) wraps the low-level MCP `Server`.
+- **ActorsMcpServer** (`src/mcp/server.ts`) delegates v1 protocol work to **LegacyMcpServer** (`src/mcp/legacy_server.ts`), which wraps the low-level MCP `Server`.
 - Resources are declared in capabilities (empty object) to prevent failures in clients that expect resource support.
 - Resource handling is implemented via `setRequestHandler` for:
   - `ListResourcesRequestSchema`
@@ -35,7 +35,7 @@ No templates are currently provided. `ListResourceTemplatesRequestSchema` always
 - **Keep resource handling explicit**: Resource listing and reading must be handled via request handlers.
 - **No new resources in this phase**: Only existing resources are in scope (Skyfire usage guide and UI widgets).
 
-The `setupResourceHandlers` wiring lives in `src/mcp/server.ts` and delegates list/read to
+The `setupResourceHandlers` wiring lives in `src/mcp/legacy_server.ts:232` and delegates list/read to
 `src/resources/resource_service.ts`.
 
 ## Not implemented

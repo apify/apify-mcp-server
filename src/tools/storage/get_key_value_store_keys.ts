@@ -2,8 +2,8 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
@@ -20,6 +20,19 @@ const getKeyValueStoreKeysArgs = z.object({
     limit: z.number().max(10).optional().describe('Number of keys to be returned. Maximum is 10.'),
 });
 
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return dedent`
+        List the keys in a key-value store — key names and basic info (e.g., size), not their values.
+        ${hasTool(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET) ? `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} to read one.\n` : ''}Use exclusiveStartKey and limit to paginate.
+
+        USAGE:
+        - Use when you need to discover what records exist in a store.
+
+        USAGE EXAMPLES:
+        - user_input: List first 10 keys in store username~my-store
+        - user_input: Continue listing keys in store a123 from key data.json`;
+}
+
 /**
  * https://docs.apify.com/api/v2/key-value-store-keys-get
  */
@@ -27,17 +40,8 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
     title: 'Get key-value store keys',
-    description: dedent`
-        List the keys in a key-value store — key names and basic info (e.g., size), not their values.
-        Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} to read one.
-        Use exclusiveStartKey and limit to paginate.
-
-        USAGE:
-        - Use when you need to discover what records exist in a store.
-
-        USAGE EXAMPLES:
-        - user_input: List first 10 keys in store username~my-store
-        - user_input: Continue listing keys in store a123 from key data.json`,
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
     outputSchema: keyValueStoreKeysOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreKeysArgs)),

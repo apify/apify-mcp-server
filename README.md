@@ -118,7 +118,7 @@ Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, 
 You can pay for Actor runs without an Apify API token using **AGI**, **direct x402**, or **Skyfire**.
 
 - **AGI** ([agi.apify.com](https://agi.apify.com)) mints a prepaid Apify API token in exchange for an x402 or MPP payment. Use the token like a normal API token against `mcp.apify.com` and `api.apify.com` — works for any Actor, not just Pay Per Event ones. **Recommended** for new integrations; see [AGI (recommended)](#-agi-recommended) below.
-- **Direct x402** pays with USDC on [Base](https://base.org) per request and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
+- **Direct x402** pays with USDC on [Base](https://base.org) per request and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcpc) (`brew install apify/tap/mcpc` or `npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
 - **Skyfire** pays with PAY tokens and requires a Skyfire account with a funded wallet. It does not require a special MCP client; the entire payment flow is handled directly through the MCP tool call parameters.
 
 > ℹ️ **Scope:** Both direct x402 and Skyfire are limited to Pay Per Event Actors, don't support Standby Actors, and settle per run instead of minting a token.
@@ -163,8 +163,8 @@ mcpc x402 init
 # Import an existing wallet
 mcpc x402 import <private-key>
 
-# Show the wallet address so you can fund it with USDC on Base (https://base.org)
-mcpc x402 info
+# Show the wallet address and a funding QR code, so you can fund it with USDC on Base (https://base.org)
+mcpc x402
 ```
 
 Connect to the server with x402 enabled:
@@ -554,14 +554,14 @@ For full details on data collection, usage, sharing, and retention, see [Apify L
 
 # 🤝 Contributing
 
-We welcome contributions to improve the Apify MCP Server! Here's how you can help:
+We welcome bug reports, feature requests, and documentation fixes. **Send us the problem, not the patch** — a precise issue with a reproduction is more useful than a pull request.
 
-- **🐛 Report issues**: Find a bug or have a feature request? [Open an issue](https://github.com/apify/apify-mcp-server/issues).
-- **🔧 Submit pull requests**: Fork the repo and submit pull requests with enhancements or fixes.
-- **📚 Documentation**: Improvements to docs and examples are always welcome.
-- **💡 Share use cases**: Contribute examples to help other users.
+- **🐛 Report a bug**: [Open an issue](https://github.com/apify/apify-mcp-server/issues) with a reproduction. The most useful thing you can send us.
+- **💡 Propose a feature**: [Open an issue](https://github.com/apify/apify-mcp-server/issues) — the problem and who hits it, not the implementation.
+- **🔧 Code**: Work only on a maintainer-invited issue. An open issue is not an invitation to pick it up; unsolicited pull requests are closed.
+- **📚 Documentation**: Typos, broken links, and wrong commands go straight to a PR.
 
-For major changes, please open an issue first to discuss your proposal and ensure it aligns with the project's goals.
+Full rules, including [AI-assisted contributions](./CONTRIBUTING.md#ai-assisted-contributions): [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 # 📚 Learn more
 

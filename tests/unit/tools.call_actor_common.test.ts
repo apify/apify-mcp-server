@@ -1,3 +1,4 @@
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,11 +9,14 @@ import {
     HELPER_TOOLS,
     TOOL_STATUS,
 } from '../../src/const.js';
+import * as mcpClient from '../../src/mcp/client.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import {
     buildCallActorAppsDescription,
     buildCallActorDescription,
     buildCallActorErrorResponse,
     callActorArgs,
+    handleMcpToolCall,
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
@@ -32,13 +36,17 @@ describe('call_actor_common', () => {
             const description = buildCallActorDescription();
 
             expect(description).toContain(`Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema`);
-            expect(description).toContain(
-                `${HELPER_TOOLS.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`,
-            );
+            expect(description).toContain(`use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first`);
             expect(description).toContain('waitSecs');
             expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
             expect(description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        });
+
+        // The waitSecs: 0 path (buildStartRunSharedContent) returns id-only storages and never
+        // reaches buildRunDataset, so the field-metadata promise must stay tied to waitSecs > 0.
+        it('promises dataset field metadata only for a non-zero wait', () => {
+            expect(buildCallActorDescription()).toContain('with waitSecs > 0 also reports dataset field metadata');
         });
     });
 
@@ -62,13 +70,13 @@ describe('call_actor_common', () => {
                 error,
                 actorId: 'actor-123',
                 mcpSessionId: 'session-123',
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             expect(response.isError).toBe(true);
             const allText = (response.content ?? []).map(textOf).join('\n');
-            expect(allText).toContain(`If ${HELPER_TOOLS.STORE_SEARCH} is available in this session`);
-            expect(allText).toContain(`using: ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
+            expect(allText).toContain(`search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`);
+            expect(allText).toContain(`get Actor details using ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
@@ -101,7 +109,7 @@ describe('call_actor_common', () => {
                 actorName: 'apify/some-actor',
                 error,
                 actorId: 'actor-456',
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             expect(response.isError).toBe(true);
@@ -122,12 +130,12 @@ describe('call_actor_common', () => {
             const response = buildCallActorErrorResponse({
                 actorName: 'apify/rag-web-browser',
                 error: new Error('boom'),
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             const allText = (response.content ?? []).map(textOf).join('\n');
-            expect(allText).toContain(`If ${HELPER_TOOLS.STORE_SEARCH} is available in this session`);
-            expect(allText).toContain(`using: ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
+            expect(allText).toContain(`search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`);
+            expect(allText).toContain(`get Actor details using ${HELPER_TOOLS.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
                     toolStatus: TOOL_STATUS.FAILED,
@@ -135,6 +143,30 @@ describe('call_actor_common', () => {
                     failureDetail: 'boom',
                 }),
             );
+        });
+
+        it('omits the recovery hint entirely when neither tool is loaded in this session', () => {
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/rag-web-browser',
+                error: new Error('boom'),
+                loadedToolNames: [],
+            });
+
+            const allText = (response.content ?? []).map(textOf).join('\n');
+            expect(allText).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+            expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        });
+
+        it('names only the loaded recovery tool when the session has a partial tool set', () => {
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/rag-web-browser',
+                error: new Error('boom'),
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH],
+            });
+
+            const allText = (response.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain(`search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`);
+            expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         });
 
         it('returns memory-quota recovery hint for HTTP 402 memory-limit errors', () => {
@@ -156,7 +188,7 @@ describe('call_actor_common', () => {
                 actorName: 'compass/crawler-google-places',
                 error,
                 actorId: 'actor-789',
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             expect(response.isError).toBe(true);
@@ -198,7 +230,7 @@ describe('call_actor_common', () => {
                 actorName: 'apify/instagram-scraper',
                 error,
                 actorId: 'actor-999',
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
             expect(response.isError).toBe(true);
@@ -329,6 +361,82 @@ describe('call_actor_common', () => {
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                 actorId: 'actor-id-rag',
             });
+        });
+    });
+
+    describe('handleMcpToolCall()', () => {
+        beforeEach(() => {
+            vi.restoreAllMocks();
+        });
+
+        it('forwards signal and timeout into client.callTool options', async () => {
+            const callTool = vi.fn().mockResolvedValue({
+                content: [{ type: 'text', text: 'remote ok' }],
+                isError: false,
+            });
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
+                callTool,
+                close: vi.fn().mockResolvedValue(undefined),
+            } as unknown as Client);
+
+            const controller = new AbortController();
+            const result = await handleMcpToolCall({
+                baseActorName: 'apify/mcp-demo',
+                mcpToolName: 'search',
+                input: { q: 'x' },
+                isActorMcpServer: true,
+                mcpServerUrl: 'https://example.invalid/mcp',
+                apifyToken: 'token',
+                signal: controller.signal,
+            });
+
+            expect(result?.isError).not.toBe(true);
+            expect(callTool).toHaveBeenCalledTimes(1);
+            const options = callTool.mock.calls[0][2] as { signal?: AbortSignal; timeout?: number };
+            expect(options.signal).toBe(controller.signal);
+            expect(options.timeout).toBe(EXTERNAL_TOOL_CALL_TIMEOUT_MSEC);
+        });
+
+        it('returns aborted when the signal is already aborted before the remote call', async () => {
+            const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
+            const controller = new AbortController();
+            controller.abort();
+
+            const result = await handleMcpToolCall({
+                baseActorName: 'apify/mcp-demo',
+                mcpToolName: 'search',
+                input: { q: 'x' },
+                isActorMcpServer: true,
+                mcpServerUrl: 'https://example.invalid/mcp',
+                apifyToken: 'token',
+                signal: controller.signal,
+            });
+
+            expect(result).toEqual({});
+            expect(connectSpy).not.toHaveBeenCalled();
+        });
+
+        it('returns aborted when the remote call rejects after the signal aborts', async () => {
+            const controller = new AbortController();
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
+                callTool: vi.fn().mockImplementation(async () => {
+                    controller.abort();
+                    throw new Error('aborted');
+                }),
+                close: vi.fn().mockResolvedValue(undefined),
+            } as unknown as Client);
+
+            const result = await handleMcpToolCall({
+                baseActorName: 'apify/mcp-demo',
+                mcpToolName: 'search',
+                input: { q: 'x' },
+                isActorMcpServer: true,
+                mcpServerUrl: 'https://example.invalid/mcp',
+                apifyToken: 'token',
+                signal: controller.signal,
+            });
+
+            expect(result).toEqual({});
         });
     });
 });

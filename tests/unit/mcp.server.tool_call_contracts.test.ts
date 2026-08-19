@@ -702,6 +702,79 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
         expect(properties.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
     });
 
+    it('forwards the abort signal into the remote Actor-MCP callTool options', async () => {
+        // Without `signal` in callTool options, cancel/disconnect cannot stop the remote call before
+        // EXTERNAL_TOOL_CALL_TIMEOUT_MSEC — ACTOR/INTERNAL already abort; ACTOR_MCP must match.
+        await withServer(async (server) => {
+            silenceLogs();
+            const callTool = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+            const stubClient = {
+                callTool,
+                close: vi.fn().mockResolvedValue(undefined),
+                setNotificationHandler: vi.fn(),
+            } as unknown as Client;
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(stubClient);
+
+            const controller = new AbortController();
+            server.upsertTools([makeActorMcpTool()]);
+            const handler = getRequestHandler(server, 'tools/call');
+            await handler(
+                {
+                    method: 'tools/call',
+                    params: { name: 'test-actor-mcp-tool', arguments: {}, _meta: { mcpSessionId: 's1' } },
+                },
+                { signal: controller.signal, sendNotification: vi.fn() },
+            );
+
+            expect(callTool).toHaveBeenCalledTimes(1);
+            const options = callTool.mock.calls[0][2] as { signal?: AbortSignal; timeout?: number };
+            expect(options.signal).toBe(controller.signal);
+            expect(options.timeout).toBeGreaterThan(0);
+        });
+    });
+
+    it('reports a cancelled Actor-MCP call as ABORTED with no result body and no failure log', async () => {
+        // A cancel is not an execution failure. Falling through to buildExecutionDiagnostics/logHttpError
+        // files it as INTERNAL_ERROR and logs it — at error level when the abort lands during connect,
+        // where the SDK throws a bare DOMException that no logHttpError branch matches.
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        const logSpy = vi.spyOn(logging, 'logHttpError').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                silenceLogs();
+                const controller = new AbortController();
+                const callTool = vi.fn().mockImplementation(async () => {
+                    controller.abort();
+                    throw new McpError(ErrorCode.RequestTimeout, 'Request cancelled');
+                });
+                vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
+                    callTool,
+                    close: vi.fn().mockResolvedValue(undefined),
+                    setNotificationHandler: vi.fn(),
+                } as unknown as Client);
+
+                server.upsertTools([makeActorMcpTool()]);
+                const handler = getRequestHandler(server, 'tools/call');
+                const result = await handler(
+                    {
+                        method: 'tools/call',
+                        params: { name: 'test-actor-mcp-tool', arguments: {}, _meta: { mcpSessionId: 's1' } },
+                    },
+                    { signal: controller.signal, sendNotification: vi.fn() },
+                );
+
+                // An empty `result` surfaces as `{ content: [] }` — CallToolResultSchema defaults `content`.
+                expect(result).toEqual({ content: [] });
+                expect(logSpy).not.toHaveBeenCalled();
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+        expect(trackSpy.mock.calls).toHaveLength(1);
+        // ABORTED already held before this guard existed (buildExecutionDiagnostics derives it from
+        // `isAborted`); pinned here so the status can't regress alongside the body and log.
+        expect(trackSpy.mock.calls[0][2].tool_status).toBe(TOOL_STATUS.ABORTED);
+    });
+
     it('re-throws an escaped McpError as a JSON-RPC error, not an isError tool result', async () => {
         // Escaped McpErrors must remain JSON-RPC errors, including 402-coded errors.
         await withServer(async (server) => {

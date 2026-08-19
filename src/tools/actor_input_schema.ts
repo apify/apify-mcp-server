@@ -83,11 +83,8 @@ export function buildApifySpecificProperties(
  * Filters schema properties to include only the necessary fields.
  * This is done to reduce the size of the input schema and to make it more readable.
  *
- * TODO(#675): This object literal unconditionally assigns every whitelisted key,
- * including `default: undefined`, on properties that didn't declare them upstream.
- * This creates phantom keys that broke `fixZodSchemaRequired()` via key-presence
- * checks (#637). The symptom is patched in `src/utils/ajv.ts` (value-check), but
- * this function should only emit keys whose upstream value is not `undefined`.
+ * Only copies a whitelisted key when the upstream property actually declares it, so
+ * unset fields (e.g. no `default`) aren't turned into phantom `default: undefined` keys.
  *
  * @param properties
  */
@@ -99,13 +96,13 @@ export function filterSchemaProperties(properties: { [key: string]: SchemaProper
         filteredProperties[key] = {
             title: property.title,
             description: property.description,
-            enum: property.enum,
             type: property.type,
-            default: property.default,
-            prefill: property.prefill,
-            properties: property.properties,
-            items: property.items,
-            required: property.required,
+            ...(property.enum !== undefined && { enum: property.enum }),
+            ...(property.default !== undefined && { default: property.default }),
+            ...(property.prefill !== undefined && { prefill: property.prefill }),
+            ...(property.properties !== undefined && { properties: property.properties }),
+            ...(property.items !== undefined && { items: property.items }),
+            ...(property.required !== undefined && { required: property.required }),
         };
     }
     return filteredProperties;

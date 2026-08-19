@@ -2,8 +2,8 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { storageListOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageListSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
@@ -30,16 +30,10 @@ const getUserDatasetsListArgs = z.object({
         .default(false),
 });
 
-/**
- * https://docs.apify.com/api/v2/datasets-get
- */
-export const getDatasetList: ToolEntry = Object.freeze({
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.DATASET_LIST_GET,
-    title: 'Get user datasets list',
-    description: dedent`
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return dedent`
         List the datasets owned by the authenticated user — collections of structured data produced by Actor runs.
-        Returns summaries only, not their contents — use ${HELPER_TOOLS.DATASET_GET} to inspect one from the list.
+        Returns summaries only, not their contents${hasTool(HELPER_TOOLS.DATASET_GET) ? ` — use ${HELPER_TOOLS.DATASET_GET} to inspect one from the list` : ''}.
         Actor runs automatically produce unnamed datasets (set unnamed=true to include them); users can also create named datasets.
         Each dataset's stats.inflatedBytes is its approximate uncompressed byte size — use it with itemCount to gauge size before fetching.
         Sorted by createdAt (ascending by default); use limit (max 20), offset, and desc to paginate and sort.
@@ -49,7 +43,18 @@ export const getDatasetList: ToolEntry = Object.freeze({
 
         USAGE EXAMPLES:
         - user_input: List my last 10 datasets (newest first)
-        - user_input: List unnamed datasets`,
+        - user_input: List unnamed datasets`;
+}
+
+/**
+ * https://docs.apify.com/api/v2/datasets-get
+ */
+export const getDatasetList: ToolEntry = Object.freeze({
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.DATASET_LIST_GET,
+    title: 'Get user datasets list',
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(getUserDatasetsListArgs) as ToolInputSchema,
     outputSchema: storageListOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getUserDatasetsListArgs)),

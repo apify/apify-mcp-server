@@ -2,6 +2,7 @@ import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 
 import type { ApifyClient } from '../apify_client.js';
+import { APIFY_ACTOR_RUN_META_KEY } from './mcp.js';
 
 // Kept at/above Apify Console's own run-polling interval (MIN_OBSERVER_INTERVAL_MILLIS = 3000)
 // so we don't poll the API more aggressively than the Console does.
@@ -34,6 +35,7 @@ export class ProgressTracker {
     private lastEmittedMessage?: string;
     private taskId?: string;
     private onStatusMessage?: (message: string) => Promise<void>;
+    private runId?: string;
 
     constructor(options: {
         progressToken?: string | number;
@@ -45,6 +47,11 @@ export class ProgressTracker {
         this.sendNotification = options.sendNotification;
         this.taskId = options.taskId;
         this.onStatusMessage = options.onStatusMessage;
+    }
+
+    /** Attaches a runId so every subsequent notifications/progress carries it. */
+    setRunId(runId: string): void {
+        this.runId = runId;
     }
 
     async updateProgress(message?: string): Promise<void> {
@@ -65,15 +72,15 @@ export class ProgressTracker {
                         progressToken: this.progressToken,
                         progress: this.currentProgress,
                         ...(message && { message }),
-                    },
-                    // Per MCP spec: progress notifications during task execution should include related-task metadata
-                    ...(this.taskId && {
-                        _meta: {
-                            [RELATED_TASK_META_KEY]: {
-                                taskId: this.taskId,
+                        // _meta must live in params — JSONRPCNotificationSchema is .strict(), a
+                        // top-level _meta drops the whole message as "Unknown message type".
+                        ...((this.taskId || this.runId) && {
+                            _meta: {
+                                ...(this.taskId && { [RELATED_TASK_META_KEY]: { taskId: this.taskId } }),
+                                ...(this.runId && { [APIFY_ACTOR_RUN_META_KEY]: { runId: this.runId } }),
                             },
-                        },
-                    }),
+                        }),
+                    },
                 };
 
                 await this.sendNotification(notification);

@@ -1,6 +1,6 @@
 # Integration test coverage audit
 
-Audit of `tests/integration/suite.ts` against the MCP 2025-11-25 spec and the request handlers actually wired in `src/mcp/server.ts` and `src/dev_server.ts`. Goal: identify protocol-level gaps that block confident deploys, without duplicating SDK or unit tests.
+Audit of `tests/integration/suite.ts` against the MCP 2025-11-25 spec and the request handlers actually wired in `src/mcp/legacy_server.ts` and `src/dev_server.ts`. Goal: identify protocol-level gaps that block confident deploys, without duplicating SDK or unit tests.
 
 ## Scope rule
 
@@ -10,10 +10,10 @@ Audit of `tests/integration/suite.ts` against the MCP 2025-11-25 spec and the re
 
 ## What we declare in `initialize`
 
-`src/mcp/server.ts:146` advertises:
+`src/mcp/legacy_server.ts:124` advertises:
 
 ```
-tools: { listChanged: true }
+tools: {}
 tasks: { list, cancel, requests.tools.call }
 resources: {}
 prompts: {}
@@ -26,41 +26,41 @@ Every advertised capability MUST have a working integration path.
 
 | Capability / surface | Handler | Integration test |
 |---|---|---|
-| `initialize` → `serverInfo`, `instructions`, `capabilities`, `protocolVersion` | SDK + `setupCapabilityNegotiation` `server.ts:208` | **Missing** |
-| `tools/list` | `server.ts:619` | Covered (~30 cases) |
-| `tools/list` `_meta` (MCP Apps `ui.*`) | `server.ts:619` + `expectWidgetToolMeta` | Covered (uiMode openai) |
-| `tools/call` happy path | `server.ts:633` | Covered |
-| `tools/call` AJV validation error | `server.ts:633` | One case (`'must have required property input'`) |
-| `tools/call` unknown tool name → JSON-RPC error | `server.ts:633` | **Missing** |
+| `initialize` → `serverInfo`, `instructions`, `capabilities`, `protocolVersion` | SDK + `legacy_server.ts:171` (delegates to `applyInitialize` `server.ts:248`) | **Missing** |
+| `tools/list` | `legacy_server.ts:364` | Covered (~30 cases) |
+| `tools/list` `_meta` (MCP Apps `ui.*`) | `legacy_server.ts:364` + `expectWidgetToolMeta` | Covered (uiMode openai) |
+| `tools/call` happy path | `legacy_server.ts:378` | Covered |
+| `tools/call` AJV validation error | `legacy_server.ts:378` | One case (`'must have required property input'`) |
+| `tools/call` unknown tool name → JSON-RPC error | `legacy_server.ts:378` | **Missing** |
 | `tools/call` returning `isError: true` content | several | One case (`fetch-apify-docs` forbidden URL) |
 | `notifications/tools/list_changed` | No MCP tool mutates the tool list | Not applicable |
 | `notifications/cancelled` for `tools/call` | SDK abort wiring | Covered (streamable-http only) |
-| `notifications/progress` (`progressToken` on call) | `server.ts:637` + `createProgressTracker` | **Missing** — server emits, no test asserts client receives them |
-| `tasks/list` / `tasks/get` / `tasks/cancel` / `tasks/result` | `server.ts:524` | Covered (sync stream, list+get+result, cancel, statusMessage) |
-| `resources/list` | `server.ts:464` | **Missing in integration** (only unit) |
-| `resources/read` | `server.ts:468` | **Missing in integration** |
-| `resources/templates/list` | `server.ts:472` | **Missing in integration** |
-| `prompts/list` | `server.ts:484` | One case (count > 0) |
-| `prompts/get` happy path | `server.ts:491` | One case (`GetLatestNewsOnTopic`) |
-| `prompts/get` invalid name → InvalidParams | `server.ts:495` | **Missing** |
-| `prompts/get` invalid args (AJV) → InvalidParams | `server.ts:500` | **Missing** |
-| `logging/setLevel` | `server.ts:447` | **Missing** (no integration test sets a level) |
-| `notifications/message` filtered by level | `setupLoggingProxy` `server.ts:~430` | **Missing** — no test asserts filtering behaves |
+| `notifications/progress` (`progressToken` on call) | `legacy_server.ts:383` + `createProgressTracker` | **Missing** — server emits, no test asserts client receives them |
+| `tasks/list` / `tasks/get` / `tasks/cancel` / `tasks/result` | `legacy_server.ts:291` | Covered (sync stream, list+get+result, cancel, statusMessage) |
+| `resources/list` | `legacy_server.ts:235` | **Missing in integration** (only unit) |
+| `resources/read` | `legacy_server.ts:239` | **Missing in integration** |
+| `resources/templates/list` | `legacy_server.ts:250` | **Missing in integration** |
+| `prompts/list` | `legacy_server.ts:261` | One case (count > 0) |
+| `prompts/get` happy path | `legacy_server.ts:262` | One case (`GetLatestNewsOnTopic`) |
+| `prompts/get` invalid name → InvalidParams | `legacy_server.ts:262` | **Missing** |
+| `prompts/get` invalid args (AJV) → InvalidParams | `legacy_server.ts:262` | **Missing** |
+| `logging/setLevel` | `legacy_server.ts:222` | **Missing** (no integration test sets a level) |
+| `notifications/message` filtered by level | `setupLoggingProxy` `legacy_server.ts:208` | **Missing** — no test asserts filtering behaves |
 | `ping` | SDK default | **Missing** (cheap; one-liner per transport) |
-| Streamable HTTP `Mcp-Session-Id` round trip | `dev_server.ts:184` | Implicit (client SDK uses it) |
-| Streamable HTTP `DELETE /` terminate | `dev_server.ts:277` | Covered (`terminateSession`) |
-| Streamable HTTP `GET /` returns 405 | `dev_server.ts:271` | **Missing** — pure HTTP assertion, no MCP client |
-| Reusing transport across requests in one session | `dev_server.ts:187` | Implicit |
+| Streamable HTTP `Mcp-Session-Id` round trip | `dev_server.ts:283` (read), `:337` (`sessionIdGenerator`) | Implicit (client SDK uses it) |
+| Streamable HTTP `DELETE /` terminate | `dev_server.ts:412` | Covered (`terminateSession`) |
+| Streamable HTTP `GET /` opens the session SSE stream (404 on unknown session) | `dev_server.ts:392` | **Missing** — pure HTTP assertion, no MCP client |
+| Reusing transport across requests in one session | `dev_server.ts:287` | Implicit |
 | Two concurrent sessions are isolated (tools, tasks, log level) | per-session `mcpServers[]` map | **Missing** — no parallel client test |
 | 401/403 when `APIFY_TOKEN` missing | implicit (Apify API) | **Missing** at transport layer |
-| Bad request: POST without session, not initialize → 404 | `dev_server.ts:244` | **Missing** |
-| SSE legacy: GET /sse → POST /message round trip | `dev_server.ts:64`, `:137` | Implicit (suite runs over SSE) |
-| Server `instructions` text returned in `initialize` | `server.ts:168` (`getServerInstructions`) | **Missing** |
+| Bad request: POST without session, not initialize → 400; unknown session id → 404 | `dev_server.ts:352`, `:364` | **Missing** |
+| SSE legacy: GET /sse → POST /message round trip | routes removed — `dev_server.ts` serves only `/` | Not applicable |
+| Server `instructions` text returned in `initialize` | `legacy_server.ts:178` (`getServerInstructions` `server.ts:277`) | **Missing** |
 | `ActorRun` widget structuredContent | get-actor-run | Covered |
 | `_meta.usageTotalUsd / usageUsd` | call-actor | Covered |
 | Actorized MCP proxy (server-as-tool) | `mcp/proxy.ts` | Covered (add + call) |
 | call-actor `actor:tool` syntax routing | `mcp/proxy.ts` | Covered |
-| `apifyToken` propagation via `_meta.apifyToken` | `server.ts:638` | **Missing** (only `Authorization` header path is tested) |
+| `apifyToken` propagation via `_meta.apifyToken` | `legacy_server.ts:384` | **Missing** (only `Authorization` header path is tested) |
 | Payment x402 / skyfire flag injection | covered | Covered (streamable-http only) |
 | OpenAI / `ui=true` / `ui=openai` mode wiring | covered | Covered |
 | Telemetry env-var precedence | covered | Covered |
@@ -75,8 +75,8 @@ Ranked by blast radius if broken:
 4. **`tools/call` unknown name** — should return JSON-RPC `MethodNotFound`/`InvalidParams`, not 500. Currently untested; an exception path change would slip through.
 5. **Initialize round-trip** — no test asserts `serverInfo.name`, `serverInfo.version`, `instructions`, and the declared `capabilities` block. A bad bump of capability shape breaks every client without any test catching it.
 6. **Session isolation (streamable-http)** — `mcpServers[sessionId]` is a Map; `taskStore` is shared. If two clients open sessions in parallel, A's `loadToolsFromUrl(actors=X)` must not affect B (`actors=Y`), and A's `tasks/list` must not see B's tasks. Today nothing exercises this and a regression here corrupts hosted multi-tenant traffic.
-7. **`prompts/get` error paths** — invalid name and invalid args branches in `server.ts:495`/`:500` are dead code as far as tests are concerned.
-8. **Streamable-HTTP HTTP-level assertions** — `GET /` → 405 and `POST /` without `Mcp-Session-Id` and not init → 404. These are explicit branches in `dev_server.ts:244,271`. Cheap to assert, currently absent.
+7. **`prompts/get` error paths** — the invalid-name and invalid-args branches behind `legacy_server.ts:262` are dead code as far as tests are concerned.
+8. **Streamable-HTTP HTTP-level assertions** — `GET /` → session SSE stream, 404 on unknown session, and `POST /` without `Mcp-Session-Id` and not init → 400. These are explicit branches in `dev_server.ts:352,392`. Cheap to assert, currently absent.
 
 ## Out of scope (deliberately not adding)
 
@@ -99,7 +99,7 @@ it('should expose serverInfo, instructions and capabilities on initialize', ...)
 //   const caps = client.getServerCapabilities();
 //   const instr = client.getInstructions();
 //   assert: name=SERVER_NAME, version matches package.json, instructions length>0,
-//           caps has tools.listChanged, tasks.{list,cancel,requests.tools.call},
+//           caps has tools, tasks.{list,cancel,requests.tools.call},
 //           resources, prompts, logging declared.
 
 it('should respond to ping', ...)

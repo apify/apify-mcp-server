@@ -59,28 +59,3 @@ export function filterById<T extends BaseTestCase>(testCases: T[], idPattern: st
     const regex = new RegExp(idPattern);
     return testCases.filter((testCase) => regex.test(testCase.id));
 }
-
-/**
- * Filter test cases by ID or category
- * Generic filter function for workflow evaluations
- *
- * @param testCases - Array of test cases to filter
- * @param options - Filter options (id and/or category)
- * @returns Filtered test cases
- */
-export function filterTestCases<T extends BaseTestCase>(
-    testCases: T[],
-    options: { id?: string; category?: string },
-): T[] {
-    let filtered = testCases;
-
-    if (options.id) {
-        filtered = filterById(filtered, options.id);
-    }
-
-    if (options.category) {
-        filtered = filterByCategory(filtered, options.category);
-    }
-
-    return filtered;
-}

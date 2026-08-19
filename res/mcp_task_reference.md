@@ -71,7 +71,7 @@ interface TaskStore {
 
 ### How Our Server Implements Tasks
 
-**Location**: `src/mcp/server.ts` → `executeToolAndUpdateTask()`
+**Location**: `src/mcp/task_execution.ts` → `executeToolAndUpdateTask()`
 
 1. Tool call with `task` params → server creates task via `taskStore.createTask()`
 2. Returns `{ task }` immediately to client
@@ -177,7 +177,7 @@ interface CallToolResult {
 
 ```typescript
 {
-    tools: { listChanged: true },
+    tools: {},
     tasks: { list: {}, cancel: {}, requests: { tools: { call: {} } } },
     resources: {},
     prompts: {},
@@ -185,11 +185,12 @@ interface CallToolResult {
 }
 ```
 
-- `tools.listChanged` — retained in the advertised legacy capability; no MCP tool mutates the tool list
+- `tools` — declared with no sub-capabilities; no MCP tool mutates the tool list
 - `tasks` — full implementation (create, get, result, cancel, list)
 - `resources` — widgets + readme only, no dynamic resources
 - `prompts` — 1 helper prompt (`latest-news-on-topic`)
 - `logging` — proxy with filtering
+- The block above is the legacy (2025-11-25) era; the 2026-07-28 stateless era declares only `tools`, `resources` and `prompts` — no `tasks`, no `logging`
 
 ## Related Issues
 

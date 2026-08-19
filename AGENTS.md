@@ -2,6 +2,8 @@
 
 TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.ts`) and **HTTP Streamable** (`dev_server.ts`).
 
+**Before implementing**: work from an issue that is assigned or explicitly agreed. An open issue is not an invitation — many are stale or unrefined, and the fix isn't settled. If nobody asked for this change, open an issue instead of a PR (docs fixes excepted). Disclose AI use in the PR; never add a model as co-author. See [CONTRIBUTING.md](./CONTRIBUTING.md#before-you-write-code).
+
 ### Communication style — MANDATORY
 
 **This applies to ALL written output: code comments, commit messages, PR descriptions, issue specs**
@@ -45,7 +47,7 @@ After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (def
 - **Integration tests**: `pnpm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
 - **Conformance tests**: `pnpm run test:conformance` (needs `APIFY_TOKEN`) builds and runs both protocol eras locally. `_integration_tests.yaml` calls `_conformance_tests.yaml` for the same `2026-07-28` and `2025-11-25` coverage in CI. Both eras always run; the command exits with the first non-zero code. Scenarios excluded from each era's gate are listed with reasons in `scripts/conformance_expected_failures_2026_07_28.yaml` and `scripts/conformance_expected_failures_2025_11_25.yaml`.
 - **Package manager**: this repo uses **pnpm 11+**. `devEngines.packageManager` is pinned with `onFail: "error"`, so npm / yarn refuse to run inside the checkout — use `pnpm install` only.
-- `tests/integration/suite.ts` is the main suite, reused by the stdio, streamable-http and `2026-07-28` (stateless HTTP) transport dimensions. Add new integration cases there, NOT in separate files.
+- `tests/integration/suite.ts` wires the `stdio`, `2025-11-25` (streamable HTTP) and `2026-07-28` (stateless HTTP) transport dimensions into one shared suite. Add new integration cases to the matching capability array in `tests/test_kit/cases/*.cases.ts` (registration, tools, actors, apps, tasks, storage, payments) — each is a plain `Case[]` (`{ name, isDeploymentTest, run, ... }`), registered via `registerCases(name, cases, ctx)`. Mark a case `isDeploymentTest: true` only if it's worth running against `apify-mcp-server-internal`'s live staging and production deploys — the flag doesn't just share the case, it makes internal execute it for real on every release (see [DEVELOPMENT.md](./DEVELOPMENT.md#test-organization-across-repos)). Shared assertion helpers live in `tests/test_kit/helpers.ts`. Cases that share expensive setup (e.g. one seeded Actor run, see `storage.cases.ts`'s `normalModeRunFixture`) do so via `ctx.getFixture(fixture)`, memoized once per transport dimension — not a vitest `beforeAll`, so any subset of cases can share it while staying flat `Case` objects.
 - Follow existing test patterns (names, structure) — check neighboring files.
 - **Test naming**: `describe('fnName()')`, plain-verb `it()` names (no `should` prefix). Group with nested `describe()` per method when a factory/class exposes several.
 

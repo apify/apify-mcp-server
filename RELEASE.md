@@ -5,6 +5,8 @@ There are two release tracks:
 1. **The npm package `@apify/actors-mcp-server`** (this repo) — documented below.
 2. **The hosted server at [mcp.apify.com](https://mcp.apify.com)** — lives in the hosted-server repo (`apify/apify-mcp-server-internal`); see its `RELEASE.md`. A package release here automatically opens a dependency-bump PR there, which starts that track.
 
+Apify employees: [How to release the Apify MCP server](https://app.notion.com/p/apify/How-to-release-the-Apify-MCP-server-3b3f39950a22802fabafea844105e85d) (Notion, internal) walks through both tracks end to end.
+
 Versioning is [SemVer](https://semver.org/). Conventional Commits drive automatic bumps (`feat:` → minor, `fix:` → patch, `!` → major).
 
 ## Release the npm package

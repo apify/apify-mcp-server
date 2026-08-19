@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.14.1",
+  "version": "0.14.4",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -20,7 +20,22 @@
     ".": "./dist/index.js",
     "./internals": "./dist/index_internals.js",
     "./internals.js": "./dist/index_internals.js",
+    "./internals/test-kit": "./dist/index_internals_test_kit.js",
+    "./internals/test-kit.js": "./dist/index_internals_test_kit.js",
+    "./test-kit": "./dist/test_kit/index.js",
     "./manifest.json": "./manifest.json"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "vitest": "^4.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/client": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
   },
   "bin": {
     "actors-mcp-server": "./dist/stdio.js"
@@ -69,13 +84,18 @@
   },
   "devDependencies": {
     "@ai-sdk/openai": "^3.0.52",
-    "@apify/mcpc": "^0.5.0",
+    "@anthropic-ai/claude-agent-sdk": "0.3.206",
+    "@apify/mcpc": "^0.6.0",
     "@apify/oxlint-config": "^0.2.10",
     "@apify/tsconfig": "^0.1.2",
     "@arizeai/phoenix-client": "^6.6.0",
     "@arizeai/phoenix-evals": "^1.0.2",
+    "@langfuse/client": "5.9.1",
+    "@langfuse/otel": "5.9.1",
+    "@langfuse/tracing": "5.9.1",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/conformance": "0.2.0-alpha.9",
+    "@opentelemetry/sdk-node": "0.220.0",
     "@sentry/cli": "^3.2.0",
     "@types/express": "^4.0.0",
     "@types/yargs": "^17.0.33",
@@ -85,7 +105,6 @@
     "oxfmt": "0.51.0",
     "oxlint": "^1.64.0",
     "oxlint-tsgolint": "0.22.1",
-    "p-limit": "^7.3.0",
     "tsx": "^4.20.6",
     "typescript": "^5.3.3",
     "vitest": "^4.1.0"
@@ -94,11 +113,11 @@
     "start": "tsx src/dev_server.ts",
     "dev": "node scripts/dev_standby.js",
     "build": "pnpm run build:core && pnpm run build:web",
-    "build:core": "tsc -b src",
+    "build:core": "tsc -b src && tsc -b tests/test_kit",
     "build:watch": "tsc -b src -w",
     "build:web": "pnpm --filter @apify/mcp-web-widget run build",
     "postbuild": "mkdir -p dist/web && (cp -r src/web/dist dist/web/ 2>/dev/null || :)",
-    "clean": "tsc -b src --clean && rm -rf dist/web",
+    "clean": "tsc -b src --clean && tsc -b tests/test_kit --clean && rm -rf dist/web",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
     "format": "oxfmt",
@@ -122,7 +141,8 @@
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:create-dataset": "tsx evals/create_dataset.ts",
     "evals:run": "tsx evals/run_evaluation.ts",
-    "evals:workflow": "pnpm run build && tsx evals/workflows/run_workflow_evals.ts"
+    "evals:workflow": "pnpm run build && tsx evals/workflows/run_workflow_evals.ts",
+    "evals:workflow:export-dataset": "tsx evals/workflows/export_dataset.ts"
   },
   "author": "Apify",
   "license": "MIT"

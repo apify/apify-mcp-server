@@ -61,6 +61,12 @@ describe('call-actor-widget response', () => {
         vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [MOCK_ACTOR_TOOL], errors: [] });
     });
 
+    // This tool always starts the run and returns — it never waits, so it must not copy
+    // call-actor's waitSecs > 0 field-metadata promise (asserted in tools.call_actor_common.test.ts).
+    it('does not promise field metadata for silent background starts', () => {
+        expect(callActorWidget.description).not.toMatch(/also reports dataset\s+field metadata/);
+    });
+
     it('starts the run and returns runId + widget _meta on the response', async () => {
         const startSpy = vi.fn().mockResolvedValue(MOCK_RUN);
         const apifyClient = stubApifyClient(startSpy);

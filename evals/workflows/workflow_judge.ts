@@ -5,8 +5,8 @@
 
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
+import { z } from 'zod';
 
-import type { WorkflowTestCase } from '../shared/types.js';
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
 import type { LlmClient } from './llm_client.js';
 import type { ConversationHistory } from './types.js';
@@ -83,22 +83,26 @@ function formatConversationForJudge(conversation: ConversationHistory): string {
 }
 
 /**
+ * Judge output as it comes back over the wire. JUDGE_RESPONSE_SCHEMA asks for a strict
+ * schema, but that is only honoured by some OpenRouter providers, so normalize the
+ * casing the judge actually reached a verdict in rather than discard the item.
+ * Structure only: an unrecognized verdict stays an error, never a guess.
+ */
+const JudgeResponseValidator = z.object({
+    verdict: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .pipe(z.enum(['PASS', 'FAIL'])),
+    reason: z.string().min(1),
+});
+
+/**
  * Parse structured JSON response from judge
  */
 function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reason: string } {
     try {
-        const parsed = JSON.parse(response) as { verdict: 'PASS' | 'FAIL'; reason: string };
-
-        // Validate the structure (should be guaranteed by schema, but double-check)
-        if (!parsed.verdict || (parsed.verdict !== 'PASS' && parsed.verdict !== 'FAIL')) {
-            throw new Error(`Invalid verdict: ${parsed.verdict}`);
-        }
-
-        if (!parsed.reason || typeof parsed.reason !== 'string') {
-            throw new Error(`Invalid reason: ${parsed.reason}`);
-        }
-
-        return parsed;
+        return JudgeResponseValidator.parse(JSON.parse(response));
     } catch (error) {
         throw new Error(
             `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}\n` +
@@ -111,7 +115,7 @@ function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reaso
  * Evaluate a conversation using the judge LLM
  */
 export async function evaluateConversation(
-    testCase: WorkflowTestCase,
+    reference: string,
     conversation: ConversationHistory,
     llmClient: LlmClient,
     judgeModel: string = MODELS.judge,
@@ -120,7 +124,7 @@ export async function evaluateConversation(
     const formattedConversation = formatConversationForJudge(conversation);
 
     // Create judge prompt using reference field
-    const judgePrompt = JUDGE_PROMPT_TEMPLATE.replace('{{reference}}', testCase.reference || '').replace(
+    const judgePrompt = JUDGE_PROMPT_TEMPLATE.replace('{{reference}}', reference).replace(
         '{{conversation}}',
         formattedConversation,
     );

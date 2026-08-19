@@ -21,7 +21,7 @@ import {
     OPENROUTER_CONFIG,
 } from './config.js';
 import { transformToolsToOpenAIFormat } from './shared/openai_tools.js';
-import { loadTestCases as loadTestCasesShared, filterByCategory, filterById } from './shared/test_case_loader.js';
+import { loadTestCases as loadTestCasesShared } from './shared/test_case_loader.js';
 import type { ToolSelectionTestCase, TestData } from './shared/types.js';
 
 // Re-export types for backwards compatibility

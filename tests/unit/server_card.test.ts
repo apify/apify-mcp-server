@@ -32,10 +32,10 @@ describe('getServerCard', () => {
         expect(card.transport.endpoint).toBe('/');
     });
 
-    it('should declare tools capability with listChanged', () => {
+    it('declares the tools capability with no sub-capabilities', () => {
         const card = getServerCard();
 
-        expect(card.capabilities.tools.listChanged).toBe(true);
+        expect(card.capabilities.tools).toEqual({});
     });
 
     it('should require authentication with bearer and oauth2 schemes', () => {

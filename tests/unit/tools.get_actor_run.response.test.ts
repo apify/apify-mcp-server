@@ -562,6 +562,7 @@ describe('get-actor-run default response', () => {
             stop: () => {
                 stopCount += 1;
             },
+            setRunId: () => {},
         };
 
         const baseArgs = stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client);

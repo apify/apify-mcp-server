@@ -31,7 +31,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
     title: 'Get key-value store record',
     description: dedent`
         Get the value stored under a specific key in a key-value store — a single record, not a listing of all keys.
-        Use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} first if you don't know the key name.
+        Requires the exact key name.
         The response preserves the original Content-Encoding; most clients handle decompression automatically.
 
         USAGE:
