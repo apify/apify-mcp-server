@@ -57,7 +57,9 @@ export const publicConfigSchema = z.object({
     datasetView: z
         .string()
         .optional()
-        .describe("View key from the Actor's dataset schema. Required to publish the task."),
+        .describe(
+            "View key from the Actor's dataset schema. Required to publish; ask the user, no tool lists dataset views.",
+        ),
 });
 
 /**
