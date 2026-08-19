@@ -10,7 +10,8 @@ import {
 } from '../../src/utils/pricing_info.js';
 
 // Fixtures: shape mirrors the Apify API raw data (see src/utils/pricing_info.ts types).
-// These reproduce the examples in res/pricing_output_contract.md.
+// E1–E8 below are the worked-example oracle for the two output modes: complete
+// (fetch-actor-details) and simplified (search-actors).
 
 // E1/E2/E3: compass/crawler-google-places — PAY_PER_EVENT, multi-tier "Scraped place" event,
 // flat "Actor start" event.

@@ -548,6 +548,11 @@ function buildTimedOutSummaryNextStep(
 
 /**
  * Build {summary, nextStep} per status. Returns one primary action — never two.
+ *
+ * Every observed terminal status — including FAILED, ABORTED and TIMED-OUT — is a successful
+ * observation, so responses stay `isError: false` and the MCP task lands in `completed`. Task
+ * `failed` is reserved for tool-side failures (auth, validation, network): the agent learning
+ * that a run failed is a normal result, not a protocol error.
  */
 export function buildStatusSummaryNextStep(params: {
     run: ActorRun;
