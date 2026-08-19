@@ -59,10 +59,12 @@ Two MCP protocol revisions are served, each by its own adapter:
   instance field it touches is the identity-independent widget-resolution memo). Never resolve a
   stateless request by writing to the shared facade — concurrent requests would contaminate
   each other.
-- **Tool names: capped + hash-deduped.** Names are capped at `MAX_TOOL_NAME_LENGTH`;
-  over-length or colliding names get a `TOOL_NAME_HASH_LENGTH` hash suffix so the
-  exposed set stays unique within the limit (Actor tools: `../tools/actor_tool_naming.ts`;
-  proxied Actor-MCP tools: `proxy.ts` `getProxyMCPServerToolName`). Never widen the
+- **Tool names: length-capped, not collision-hashed.** Names are capped at
+  `MAX_TOOL_NAME_LENGTH`; only over-length names get a `TOOL_NAME_HASH_LENGTH` hash
+  suffix (Actor tools: `../tools/actor_tool_naming.ts`; proxied Actor-MCP tools:
+  `proxy.ts` `getProxyMCPServerToolName`). Same-name collisions get no hash — the
+  de-dup pass in `getToolsForServerMode` (`../utils/tools_loader.ts`) filters on a
+  `Set` of seen names, dropping later duplicates; first one wins. Never widen the
   cap — downstream clients depend on it.
 - **Proxy server IDs are keyed by URL, not Actor ID.** `getMCPServerID(url)` is
   `sha256(url)` sliced to `SERVER_ID_LENGTH`, and keys the `serverId` field and the MCP SDK
