@@ -2,8 +2,8 @@ import type { TaskUpdateData } from 'apify-client';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
@@ -41,15 +41,12 @@ const updateActorTaskArgs = z.object({
         ),
 });
 
-/**
- * https://docs.apify.com/api/v2/actor-task-put
- */
-export const updateActorTask: ToolEntry = Object.freeze({
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.ACTOR_TASK_UPDATE,
-    title: 'Update Actor task',
-    description: `Update a saved Actor task: its input, run options, or the public display configuration (\`publicConfig\`) of its landing page.
-This does not publish or unpublish the task — use ${HELPER_TOOLS.ACTOR_TASK_PUBLISH} and ${HELPER_TOOLS.ACTOR_TASK_UNPUBLISH} for that, if those tools are available in the session.
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    const publicationTools = [HELPER_TOOLS.ACTOR_TASK_PUBLISH, HELPER_TOOLS.ACTOR_TASK_UNPUBLISH].filter((name) =>
+        hasTool(name),
+    );
+    return `Update a saved Actor task: its input, run options, or the public display configuration (\`publicConfig\`) of its landing page.
+This does not publish or unpublish the task${publicationTools.length ? ` — use ${publicationTools.join(' and ')} for that` : ''}.
 To publish a task, \`publicConfig.inputSchemaFields\` (at least one field name from the task input) and
 \`publicConfig.datasetView\` must be set here first. Updating \`publicConfig\` requires write access to the task's Actor.
 
@@ -59,7 +56,18 @@ USAGE:
 
 USAGE EXAMPLES:
 - user_input: Change my task my-task to use the beta build
-- user_input: Set up my-task for publishing with the overview dataset view`,
+- user_input: Set up my-task for publishing with the overview dataset view`;
+}
+
+/**
+ * https://docs.apify.com/api/v2/actor-task-put
+ */
+export const updateActorTask: ToolEntry = Object.freeze({
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.ACTOR_TASK_UPDATE,
+    title: 'Update Actor task',
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(updateActorTaskArgs) as ToolInputSchema,
     outputSchema: actorTaskOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(updateActorTaskArgs)),

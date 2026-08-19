@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
@@ -17,18 +17,11 @@ const getActorTaskArgs = z.object({
         ),
 });
 
-/**
- * https://docs.apify.com/api/v2/actor-task-get
- */
-export const getActorTask: ToolEntry = Object.freeze({
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.ACTOR_TASK_GET,
-    title: 'Get Actor task',
-    description: `Get a saved Actor task — the Actor it runs, its name, title, description, and run options.
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return `Get a saved Actor task — the Actor it runs, its name, title, description, and run options.
 Input values are not returned (they may contain secrets), only the input field names.
 Also reports whether the task is published on a public landing page, and its display configuration if so.
-Use ${HELPER_TOOLS.ACTOR_TASK_UPDATE}, if that tool is available in the session, to change the task.
-
+${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? `Use ${HELPER_TOOLS.ACTOR_TASK_UPDATE} to change the task.\n` : ''}
 USAGE:
 - Use when you need a task's current settings.
 - Use to check whether a task is published.
@@ -36,7 +29,18 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show me my task my-example-task
 - user_input: What Actor does task E2jjCZBezvAZnX8Rb run?
-- user_input: Is task E2jjCZBezvAZnX8Rb published?`,
+- user_input: Is task E2jjCZBezvAZnX8Rb published?`;
+}
+
+/**
+ * https://docs.apify.com/api/v2/actor-task-get
+ */
+export const getActorTask: ToolEntry = Object.freeze({
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.ACTOR_TASK_GET,
+    title: 'Get Actor task',
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(getActorTaskArgs) as ToolInputSchema,
     outputSchema: actorTaskOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorTaskArgs)),

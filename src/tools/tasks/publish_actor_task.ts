@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
@@ -17,6 +17,28 @@ const publishActorTaskArgs = z.object({
         ),
 });
 
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return `Publish a saved task as a public landing page for a specific Actor use case.
+The page shows what the task does, selected input values, and the expected output. Published tasks appear
+in the Actor's Examples tab and can be discovered by users, search engines, and AI agents. This can help
+users understand and try the Actor and can increase its runs. Publish only tasks that represent a useful,
+reliable, and specific use case. Not every saved task needs to be public.
+
+The task's Actor must be public and the task must have its public display configuration set up -
+at least \`publicConfig.inputSchemaFields\` and \`publicConfig.datasetView\`. If publishing fails, \
+follow the API reason${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? `; update these fields with ${HELPER_TOOLS.ACTOR_TASK_UPDATE} only when the reason identifies them` : ''}.
+At most 50 tasks can be published per Actor.
+Publishing an already published task has no effect.
+Requires write access to both the task and its Actor.
+${hasTool(HELPER_TOOLS.ACTOR_TASK_UNPUBLISH) ? `Use ${HELPER_TOOLS.ACTOR_TASK_UNPUBLISH} to take the page down again.\n` : ''}
+USAGE:
+- Use when the user wants to publish a saved task on its public landing page.
+
+USAGE EXAMPLES:
+- user_input: Publish my task my-task
+- user_input: Publish task E2jjCZBezvAZnX8Rb`;
+}
+
 /**
  * https://docs.apify.com/api/v2/actor-task-put
  */
@@ -24,27 +46,8 @@ export const publishActorTask: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_TASK_PUBLISH,
     title: 'Publish Actor task',
-    description: `Publish a saved task as a public landing page for a specific Actor use case.
-The page shows what the task does, selected input values, and the expected output. Published tasks appear
-in the Actor's Examples tab and can be discovered by users, search engines, and AI agents. This can help
-users understand and try the Actor and can increase its runs. Publish only tasks that represent a useful,
-reliable, and specific use case. Not every saved task needs to be public.
-
-The task's Actor must be public and the task must have its public display configuration set up -
-at least \`publicConfig.inputSchemaFields\` and \`publicConfig.datasetView\`. If publishing fails,
-follow the API reason; update these fields with ${HELPER_TOOLS.ACTOR_TASK_UPDATE}, if available in the
-session, only when the reason identifies them.
-At most 50 tasks can be published per Actor.
-Publishing an already published task has no effect.
-Requires write access to both the task and its Actor.
-Use ${HELPER_TOOLS.ACTOR_TASK_UNPUBLISH}, if available in the session, to take the page down again.
-
-USAGE:
-- Use when the user wants to publish a saved task on its public landing page.
-
-USAGE EXAMPLES:
-- user_input: Publish my task my-task
-- user_input: Publish task E2jjCZBezvAZnX8Rb`,
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(publishActorTaskArgs) as ToolInputSchema,
     outputSchema: actorTaskOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(publishActorTaskArgs)),

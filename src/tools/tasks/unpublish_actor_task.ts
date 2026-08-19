@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { actorTaskOutputSchema } from '../structured_output_schemas.js';
@@ -17,16 +17,10 @@ const unpublishActorTaskArgs = z.object({
         ),
 });
 
-/**
- * https://docs.apify.com/api/v2/actor-task-put
- */
-export const unpublishActorTask: ToolEntry = Object.freeze({
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.ACTOR_TASK_UNPUBLISH,
-    title: 'Unpublish Actor task',
-    description: `Unpublish a task from its public landing page.
-The public display configuration is preserved, so the task can be published again later
-with ${HELPER_TOOLS.ACTOR_TASK_PUBLISH}, if that tool is available in the session. Unpublishing a task
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return `Unpublish a task from its public landing page.
+The public display configuration is preserved, so the task can be published again \
+later${hasTool(HELPER_TOOLS.ACTOR_TASK_PUBLISH) ? ` with ${HELPER_TOOLS.ACTOR_TASK_PUBLISH}` : ''}. Unpublishing a task
 that is not published does nothing.
 Requires write access to both the task and its Actor.
 
@@ -35,7 +29,18 @@ USAGE:
 
 USAGE EXAMPLES:
 - user_input: Unpublish my task my-task
-- user_input: Unpublish task E2jjCZBezvAZnX8Rb`,
+- user_input: Unpublish task E2jjCZBezvAZnX8Rb`;
+}
+
+/**
+ * https://docs.apify.com/api/v2/actor-task-put
+ */
+export const unpublishActorTask: ToolEntry = Object.freeze({
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.ACTOR_TASK_UNPUBLISH,
+    title: 'Unpublish Actor task',
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(unpublishActorTaskArgs) as ToolInputSchema,
     outputSchema: actorTaskOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(unpublishActorTaskArgs)),
