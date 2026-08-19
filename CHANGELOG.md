@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add actor tasks ([#1235](https://github.com/apify/apify-mcp-server/pull/1235)) ([8d3da8d](https://github.com/apify/apify-mcp-server/commit/8d3da8d5ecf8b5859a603ac85a3738fc59e6f5da)) by [@Janjiran](https://github.com/Janjiran), closes [#29471](https://github.com/apify/apify-mcp-server/issues/29471)
+- Extend official Apify usernames beyond apify ([#1285](https://github.com/apify/apify-mcp-server/pull/1285)) ([68ebec3](https://github.com/apify/apify-mcp-server/commit/68ebec318bc2fe4d86a88845027ceb10d4fdaf2b)) by [@MQ37](https://github.com/MQ37)
 
 ### 🐛 Bug Fixes
 
