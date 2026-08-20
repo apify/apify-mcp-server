@@ -225,7 +225,7 @@ export async function getMCPServersAsTools(
                 // Skip this Actor, connectMCPClient will log the error
                 return [];
             }
-            return await getMCPServerTools(actorId, client, mcpServerUrl);
+            return await getMCPServerTools(actorId, client, mcpServerUrl, actorInfo.definition.actorFullName);
         } catch (error) {
             logHttpError(error, 'Failed to load tools from MCP server', {
                 actorFullName: actorInfo.definition.actorFullName,

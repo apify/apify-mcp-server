@@ -121,7 +121,7 @@ export const paymentsCases: Case[] = [
         isDeploymentTest: false,
         skipIf: skipOnStdio,
         run: async (ctx) => {
-            const isProxiedAddTool = (name: string) => name.endsWith('-add');
+            const isProxiedAddTool = (name: string) => name === 'apify--example-mcp-server--add';
             let client = await ctx.createClientFn({ payment: 'x402', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
             try {
                 const x402Tools = await client.listTools();
