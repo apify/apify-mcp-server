@@ -832,8 +832,7 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
 describe('ACTOR_MCP dispatch by exposed tool name', () => {
     afterEach(() => vi.restoreAllMocks());
 
-    it('calls the remote with the origin tool name, not the prefixed exposed name', async () => {
-        // The remote receives originToolName; tool.name is the prefixed exposed name.
+    it('calls the remote with the origin tool name', async () => {
         const serverUrl = 'https://example-mcp-server.apify.actor/mcp';
         const callTool = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'sum of 1 and 2 is 3' }] });
         const stubClient = {

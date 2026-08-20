@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,7 +9,7 @@ import {
     SERVER_ID_LENGTH,
     TOOL_NAME_HASH_LENGTH,
 } from '../../src/mcp/const.js';
-import { getMCPServerID, getProxyMCPServerToolName } from '../../src/mcp/proxy.js';
+import { getMCPServerID, getMCPServerTools, getProxyMCPServerToolName } from '../../src/mcp/proxy.js';
 
 describe('getMCPServerID()', () => {
     it('returns a stable SERVER_ID_LENGTH hex prefix of sha256(url)', () => {
@@ -56,119 +57,155 @@ describe('getProxyMCPServerToolName()', () => {
     });
 
     it('caps the username when the assembled name exceeds the limit', () => {
-        const actorFullName = 'alizarin_refrigerator-owner/competitive-intelligence-mcp-server';
+        const actorFullName = 'crawler_enthusiast/web-scraping-dataset-tools-mcp-server';
 
         expect(getProxyMCPServerToolName(actorFullName, 'search')).toBe(
-            'alizarin--competitive-intelligence-mcp-server--search-0b0d',
+            'crawler_--web-scraping-dataset-tools-mcp-server--search-e41a',
         );
         expect(getProxyMCPServerToolName(actorFullName, 'analyze')).toBe(
-            'alizarin--competitive-intelligence-mcp-server--analyze-3ab5',
+            'crawler_--web-scraping-dataset-tools-mcp-server--analyze-ed60',
         );
     });
 
     it("keeps one identical prefix across an Actor's over-length tool names", () => {
-        const actorFullName = 'alizarin_refrigerator-owner/competitive-intelligence-mcp-server';
+        const actorFullName = 'crawler_enthusiast/web-scraping-dataset-tools-mcp-server';
         const names = ['search', 'analyze', 'get-company-profile'].map((toolName) =>
             getProxyMCPServerToolName(actorFullName, toolName),
         );
 
-        // A constant cap gives one Actor one prefix; a shrink-to-fit cap would give these three tools three.
         for (const name of names) {
-            expect(name.startsWith('alizarin--competitive-intelligence-mcp-server--')).toBe(true);
+            expect(name.startsWith('crawler_--web-scraping-dataset-tools-mcp-server--')).toBe(true);
             expect(name.length).toBeLessThanOrEqual(MAX_TOOL_NAME_LENGTH);
         }
     });
 
-    it('caps only the names that exceed the limit, so a straddling Actor has two prefixes', () => {
-        const actorFullName = 'longusername1/my-mcp-server';
-
-        expect(getProxyMCPServerToolName(actorFullName, 'add')).toBe('longusername1--my-mcp-server--add');
-        expect(getProxyMCPServerToolName(actorFullName, 'a-tool-name-long-enough-to-push-past-the-limit-xxxx')).toBe(
-            'longuser--my-mcp-server--a-tool-name-long-enough-to-push-pa-fa1b',
-        );
-    });
-
     it('truncates the tool name only when capping the username is not enough', () => {
-        const uncappedFullName =
-            'alizarin_refrigerator-owner--competitive-intelligence-mcp-server--get-company-profile';
+        const uncappedFullName = 'crawler_enthusiast--web-scraping-dataset-tools-mcp-server--get-company-profile';
         const hash = createHash('sha256').update(uncappedFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
         const name = getProxyMCPServerToolName(
-            'alizarin_refrigerator-owner/competitive-intelligence-mcp-server',
+            'crawler_enthusiast/web-scraping-dataset-tools-mcp-server',
             'get-company-profile',
         );
 
-        expect(name).toBe('alizarin--competitive-intelligence-mcp-server--get-company--fd6c');
+        expect(name).toBe('crawler_--web-scraping-dataset-tools-mcp-server--get-compan-b992');
         expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
-        // The hash covers the name assembled from the uncapped username, whichever tier produced the result.
         expect(name.endsWith(`-${hash}`)).toBe(true);
     });
 
     it('reads the username from the Actor full name, not from the first "--"', () => {
         const name = getProxyMCPServerToolName(
-            'doshikevin361/commet--apify-1',
+            'crawler_enthusiast/dataset--exporter-mcp-server',
             'a-very-long-tool-name-that-forces-truncation-of-the-assembled-name',
         );
 
-        expect(name).toBe('doshikev--commet--apify-1--a-very-long-tool-name-that-force-cbb1');
-        expect(name.split('--')[0]).toBe('doshikevin361'.slice(0, MAX_TOOL_NAME_USERNAME_LENGTH));
-        // Actor names legally contain '--', so this one must survive whole right after the capped username.
-        expect(name.startsWith('doshikev--commet--apify-1--')).toBe(true);
+        expect(name).toBe('crawler_--dataset--exporter-mcp-server--a-very-long-tool-na-fc26');
+        expect(name.split('--')[0]).toBe('crawler_enthusiast'.slice(0, MAX_TOOL_NAME_USERNAME_LENGTH));
+        expect(name.startsWith('crawler_--dataset--exporter-mcp-server--')).toBe(true);
     });
 
     it('escapes a dotted username before capping it', () => {
-        expect(getProxyMCPServerToolName('jiri.spilka/competitive-intelligence-mcp-server', 'get-company')).toBe(
-            'jiri-dot--competitive-intelligence-mcp-server--get-company-d373',
+        expect(getProxyMCPServerToolName('actor.fan/web-scraping-dataset-tools-mcp-server', 'get-company')).toBe(
+            'actor-do--web-scraping-dataset-tools-mcp-server--get-compan-4ecf',
         );
-        // Capping the raw username first would leave 'ab-dot-cdefg' — 12 chars, over the username cap.
+        // Escaping after capping would exceed the username cap.
         expect(
-            getProxyMCPServerToolName('ab.cdefgh/some-actor-name-that-is-long-enough-to-push-past-the-cap', 'add'),
-        ).toBe('ab-dot-c--some-actor-name-that-is-long-enough-to-push-past--4f1b');
+            getProxyMCPServerToolName('actor.fan/web-scraping-dataset-tools-mcp-server---structured-output', 'add'),
+        ).toBe('actor-do--web-scraping-dataset-tools-mcp-server---structure-09ce');
     });
 
     it('trims a trailing dash off the capped username', () => {
-        expect(getProxyMCPServerToolName('dev.tools-collective/competitive-intelligence-mcp-server', 'search')).toBe(
-            'dev-dot--competitive-intelligence-mcp-server--search-3c76',
+        expect(getProxyMCPServerToolName('web.scraper-club/web-scraping-dataset-tools-mcp-server', 'search')).toBe(
+            'web-dot--web-scraping-dataset-tools-mcp-server--search-750f',
         );
     });
 
     it('truncates and hashes once for an Actor whose name alone exceeds the limit', () => {
         const name = getProxyMCPServerToolName(
-            'alizarin_refrigerator-owner/government-research-mcp-server---unified-data-access',
+            'crawler_enthusiast/web-scraping-dataset-tools-mcp-server---structured-output',
             'search',
         );
 
-        expect(name).toBe('alizarin--government-research-mcp-server---unified-data-acc-bd1a');
+        expect(name).toBe('crawler_--web-scraping-dataset-tools-mcp-server---structure-59fe');
         expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
     });
 
     it('omits the username segment when the Actor full name has no slash', () => {
-        expect(getProxyMCPServerToolName('competitive-intelligence-mcp-server', 'search')).toBe(
-            'competitive-intelligence-mcp-server--search',
+        expect(getProxyMCPServerToolName('web-scraping-dataset-tools-mcp-server', 'search')).toBe(
+            'web-scraping-dataset-tools-mcp-server--search',
         );
     });
 
     it('skips the username cap when there is no username to cap', () => {
-        const uncappedFullName = 'competitive-intelligence-mcp-server--a-very-long-tool-name-that-forces-truncation';
+        const uncappedFullName = 'web-scraping-dataset-tools-mcp-server--a-very-long-tool-name-that-forces-truncation';
         const hash = createHash('sha256').update(uncappedFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
         const name = getProxyMCPServerToolName(
-            'competitive-intelligence-mcp-server',
+            'web-scraping-dataset-tools-mcp-server',
             'a-very-long-tool-name-that-forces-truncation',
         );
 
-        // No username segment to cap, so tail truncation is the only tier left.
-        expect(name).toBe('competitive-intelligence-mcp-server--a-very-long-tool-name--acb9');
+        expect(name).toBe('web-scraping-dataset-tools-mcp-server--a-very-long-tool-nam-2f2b');
         expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
         expect(name.endsWith(`-${hash}`)).toBe(true);
     });
 
     it('leaves the username segment empty when the capped username is all dashes', () => {
-        const actorName = 'some-actor-name-that-is-long-enough-to-need-a-cap-xx';
+        const actorName = 'web-scraping-dataset-tools-mcp-server---structured-data';
         const name = getProxyMCPServerToolName(`--------/${actorName}`, 'toolname');
 
-        // Same shape an empty username segment already gets: '/actor' + 'tool' -> '--actor--tool'.
-        expect(name).toBe('--some-actor-name-that-is-long-enough-to-need-a-cap-xx--too-2890');
+        expect(name).toBe('--web-scraping-dataset-tools-mcp-server---structured-data---9d1e');
         expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
-        // The hash covers the uncapped username, so a longer dash run still reads distinct.
         expect(name).not.toBe(getProxyMCPServerToolName(`----------/${actorName}`, 'toolname'));
+    });
+});
+
+describe('getMCPServerTools()', () => {
+    it('keeps the full username when every tool name fits', async () => {
+        const client = {
+            listTools: async () => ({
+                tools: [
+                    { name: 'add', description: 'Adds two numbers', inputSchema: { type: 'object' } },
+                    { name: 'subtract', description: 'Subtracts two numbers', inputSchema: { type: 'object' } },
+                ],
+            }),
+        } as unknown as Client;
+
+        const tools = await getMCPServerTools(
+            'actor-id',
+            client,
+            'https://example-mcp-server.apify.actor/mcp',
+            'longusername1/my-mcp-server',
+        );
+
+        expect(tools.map(({ name }) => name)).toEqual([
+            'longusername1--my-mcp-server--add',
+            'longusername1--my-mcp-server--subtract',
+        ]);
+    });
+
+    it("caps the username for every tool when one tool's name exceeds the limit", async () => {
+        const client = {
+            listTools: async () => ({
+                tools: [
+                    { name: 'add', description: 'Adds two numbers', inputSchema: { type: 'object' } },
+                    {
+                        name: 'a-tool-name-long-enough-to-push-past-the-limit-xxxx',
+                        description: 'Runs a long operation',
+                        inputSchema: { type: 'object' },
+                    },
+                ],
+            }),
+        } as unknown as Client;
+
+        const tools = await getMCPServerTools(
+            'actor-id',
+            client,
+            'https://example-mcp-server.apify.actor/mcp',
+            'longusername1/my-mcp-server',
+        );
+
+        expect(tools.map(({ name }) => name)).toEqual([
+            'longuser--my-mcp-server--add',
+            'longuser--my-mcp-server--a-tool-name-long-enough-to-push-pa-fa1b',
+        ]);
     });
 });

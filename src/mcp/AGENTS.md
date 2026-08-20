@@ -59,29 +59,13 @@ Two MCP protocol revisions are served, each by its own adapter:
   instance field it touches is the identity-independent widget-resolution memo). Never resolve a
   stateless request by writing to the shared facade — concurrent requests would contaminate
   each other.
-- **Tool names: length-capped, not collision-hashed.** Names are capped at
-  `MAX_TOOL_NAME_LENGTH`; only over-length names get a `TOOL_NAME_HASH_LENGTH` hash
-  suffix (Actor tools: `../tools/actor_tool_naming.ts`; proxied Actor-MCP tools:
-  `proxy.ts` `getProxyMCPServerToolName`). An over-length **proxied** name caps the
-  username to `MAX_TOOL_NAME_USERNAME_LENGTH` first, so the tail-truncation budget goes to
-  the tool name (`alizarin_refrigerator-owner/competitive-intelligence-mcp-server`
-  + `search` → `alizarin--competitive-intelligence-mcp-server--search-0b0d`); a long
-  enough tool name still truncates (`get-company-profile` →
-  `alizarin--competitive-intelligence-mcp-server--get-company--fd6c`). That cap is
-  a constant, not fitted per name — an Actor's over-length names all keep a byte-identical
-  prefix (its names that fit keep the full username, so an Actor straddling the limit has
-  both). Direct Actor tool names (`actorNameToToolName`) are not username-capped.
-  Same-name collisions get no hash — the de-dup pass in `getToolsForServerMode`
-  (`../utils/tools_loader.ts`) filters on a `Set` of seen names, dropping later
-  duplicates; first one wins. Never widen the cap — downstream clients depend on it.
-- **Proxy server IDs are keyed by URL, not Actor ID.** `getMCPServerID(url)` is
-  `sha256(url)` sliced to `SERVER_ID_LENGTH`, and keys the `serverId` field and the MCP SDK
-  client name. One Actor can expose both an SSE and a streamable endpoint; keying by URL keeps
-  those distinct. Keying by Actor ID would collapse them and cross transports. Exposed proxied
-  *tool names* are not URL-keyed — they are `{username}--{actor-name}--{originToolName}`
-  (`getProxyMCPServerToolName`). That matches the `{username}--{actor-name}` prefix direct Actor
-  tools use only while the name fits `MAX_TOOL_NAME_LENGTH`; over it the proxied prefix carries a
-  capped username (see the tool-name bullet above), which direct Actor tool names do not.
+- **Tool names are capped at `MAX_TOOL_NAME_LENGTH`.** Over-length names get a
+  `TOOL_NAME_HASH_LENGTH` hash suffix. If any proxied name exceeds the cap, all sibling tools cap
+  their username to `MAX_TOOL_NAME_USERNAME_LENGTH`; direct Actor tools do not. Collisions remain
+  first-wins in `getToolsForServerMode`. Never widen the cap — clients depend on it.
+- **Proxy server IDs are URL-keyed.** `getMCPServerID(url)` keys `serverId` and the MCP client name.
+  This keeps one Actor's SSE and streamable endpoints distinct. Exposed tool names instead use
+  `{username}--{actor-name}--{originToolName}`, with the username cap above.
 - **Transport negotiation is streamable-first, SSE-fallback** (`client.ts`): try
   streamable HTTP, fall back to SSE on a protocol failure — but a connection
   **timeout** returns `null` with no SSE fallback (a timeout means unreachable, not

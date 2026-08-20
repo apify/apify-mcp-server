@@ -25,34 +25,27 @@ export function getMCPServerID(url: string): string {
     return serverHashDigest.slice(0, SERVER_ID_LENGTH);
 }
 
-/**
- * Prefixes the tool name with the Actor's `{username}--{actor-name}`, so proxied tools read
- * the same way direct Actor tools do. Over-length names get a hash suffix (same pattern as
- * actor tool names) so bare truncation cannot collide two different origin tool names into
- * one exposed name.
- *
- * Over the limit the username is capped to `MAX_TOOL_NAME_USERNAME_LENGTH` first, because plain
- * tail truncation eats the tool name — the half a model needs to pick a tool. The cap is a
- * constant and not fitted to each name: an Actor's over-length names all keep a byte-identical
- * prefix, and a per-name cap would give each of them a different one.
- */
-export function getProxyMCPServerToolName(actorFullName: string, toolName: string): string {
+/** Formats a proxied tool name; `shouldCapUsername` keeps sibling prefixes equal. */
+export function getProxyMCPServerToolName(actorFullName: string, toolName: string, shouldCapUsername = false): string {
     const { escapedUsername, actorName } = parseActorFullName(actorFullName);
     const actorAndToolName = `${actorName}--${toolName}`;
-    // No slash in the Actor full name means no username segment: nothing to prefix, nothing to cap.
     const fullName = escapedUsername === null ? actorAndToolName : `${escapedUsername}--${actorAndToolName}`;
 
-    if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
+    if (!shouldCapUsername && fullName.length <= MAX_TOOL_NAME_LENGTH) {
         return fullName;
     }
 
-    // Hashed over the uncapped name, so the suffix is the same whichever of the two returns below wins.
-    const hash = createHash('sha256').update(fullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
-    // Any trailing dashes come off the cap — they would run into the '--' segment separator.
+    // Avoid merging a trailing dash with the '--' separator.
     const cappedName =
         escapedUsername === null
             ? fullName
             : `${escapedUsername.slice(0, MAX_TOOL_NAME_USERNAME_LENGTH).replace(/-+$/, '')}--${actorAndToolName}`;
+
+    if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
+        return cappedName;
+    }
+
+    const hash = createHash('sha256').update(fullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
     const cappedNameWithHash = `${cappedName}-${hash}`;
 
     if (cappedNameWithHash.length <= MAX_TOOL_NAME_LENGTH) {
@@ -69,6 +62,11 @@ export async function getMCPServerTools(
     actorFullName: string,
 ): Promise<ToolEntry[]> {
     const { tools } = await client.listTools();
+    const { escapedUsername, actorName } = parseActorFullName(actorFullName);
+    // Keep sibling prefixes equal; see apify/apify-mcp-server#1277.
+    const shouldCapUsername =
+        escapedUsername !== null &&
+        tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
     return tools.map(
         (tool): ActorMcpTool => ({
@@ -77,7 +75,7 @@ export async function getMCPServerTools(
             serverId: getMCPServerID(serverUrl),
             serverUrl,
             originToolName: tool.name,
-            name: getProxyMCPServerToolName(actorFullName, tool.name),
+            name: getProxyMCPServerToolName(actorFullName, tool.name, shouldCapUsername),
             description: tool.description || '',
             inputSchema: tool.inputSchema,
             ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),

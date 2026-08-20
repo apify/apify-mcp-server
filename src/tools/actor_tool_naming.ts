@@ -22,12 +22,7 @@ export function isActorBlockedUnderPaymentProvider(actorInfo: ActorInfo): boolea
     return !!actorInfo.actor.actorStandby?.isEnabled;
 }
 
-/**
- * Splits an Actor full name into its dot-escaped username and its Actor name.
- *
- * `escapedUsername` is null when the input has no slash — there is no username segment then,
- * so callers must not build a `{username}--{actor-name}` name out of it.
- */
+/** Splits an Actor full name; a missing slash yields a null username. */
 export function parseActorFullName(actorFullName: string): { escapedUsername: string | null; actorName: string } {
     const slashIndex = actorFullName.indexOf('/');
     if (slashIndex === -1) {
