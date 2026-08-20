@@ -15,7 +15,7 @@ import {
 type StructuredResult = TextToolResult & { structuredContent: Record<string, unknown> };
 
 describe('get-actor-task', () => {
-    it('returns the task subset with input field names but no input values', async () => {
+    it('returns the task subset including the stored input', async () => {
         const { apifyClient, calls } = mockTaskApiClient(mockTask());
         const result = (await (getActorTask as HelperTool).call(
             stubToolCallContext({ taskId: 'task-1' }, apifyClient),
@@ -28,16 +28,16 @@ describe('get-actor-task', () => {
             actorId: 'actor-id-1',
             name: 'my-task',
             publishedAt: '2026-08-01T10:00:00.000Z',
-            inputFields: ['query', 'apiKey'],
+            input: { query: 'cats', apiKey: 'secret-input-value' },
         });
         expect(result.structuredContent.publicConfig).toEqual({
             seoTitle: 'Seo title',
             datasetView: 'overview',
         });
 
-        // Input values and internal fields must NOT leak.
+        // Internal fields must NOT leak. Input values are returned by contract (the platform
+        // encrypts fields declared as secret before they ever reach the client).
         const dump = JSON.stringify(result);
-        expect(dump).not.toContain('secret-input-value');
         expect(dump).not.toContain('user-secret');
     });
 

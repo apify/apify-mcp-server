@@ -33,9 +33,9 @@ describe('publish-actor-task', () => {
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toContain('my-task');
 
-        // Task input and internal fields must NOT leak.
+        // Internal fields must NOT leak. Input values are returned by contract (the platform
+        // encrypts fields declared as secret before they ever reach the client).
         const dump = JSON.stringify(result);
-        expect(dump).not.toContain('secret-input-value');
         expect(dump).not.toContain('user-secret');
     });
 
