@@ -43,7 +43,6 @@ export async function getMCPServerTools(actorID: string, client: Client, serverU
         (tool): ActorMcpTool => ({
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
-            serverId: getMCPServerID(serverUrl),
             serverUrl,
             originToolName: tool.name,
             name: getProxyMCPServerToolName(serverUrl, tool.name),
