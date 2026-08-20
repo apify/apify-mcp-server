@@ -1,4 +1,5 @@
 import type { ContentBlock } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -13,7 +14,8 @@ import {
     HELPER_TOOLS,
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
-import { callRemoteMcpTool } from '../../mcp/remote_tool_call.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
+import { withRemoteMcpClient } from '../../mcp/remote_tool_call.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import type {
     ActorInfo,
@@ -379,14 +381,17 @@ export async function handleMcpToolCall(params: {
         return respondAborted();
     }
 
-    const outcome = await callRemoteMcpTool({
-        serverUrl: mcpServerUrl as string,
-        toolName: mcpToolName,
-        args: input,
+    const outcome = await withRemoteMcpClient(
+        mcpServerUrl as string,
         apifyToken,
         mcpSessionId,
         signal,
-    });
+        async (client) =>
+            client.callTool({ name: mcpToolName, arguments: input }, CallToolResultSchema, {
+                timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
+                signal,
+            }),
+    );
 
     switch (outcome.outcome) {
         case 'connect-failed':
@@ -407,9 +412,9 @@ export async function handleMcpToolCall(params: {
             // Apify run, so synthesize a sentinel `RunResponse` matching the schema's `required` keys;
             // the remote tool's payload still flows through `content`. Also forward `isError` so a
             // failing remote tool surfaces as a failure here.
-            const isErrorFromRemote = outcome.result.isError === true;
+            const isErrorFromRemote = outcome.value.isError === true;
             return respondRaw({
-                content: outcome.result.content as ContentBlock[],
+                content: outcome.value.content as ContentBlock[],
                 isError: isErrorFromRemote,
                 structuredContent: {
                     runId: 'mcp-passthrough',

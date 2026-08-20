@@ -1,6 +1,5 @@
-import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { ServerNotification } from '@modelcontextprotocol/sdk/types.js';
-import { ServerNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, ServerNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 
 import log from '@apify/log';
@@ -17,7 +16,8 @@ import { respondErrorNoTelemetry } from '../utils/mcp.js';
 import type { createProgressTracker } from '../utils/progress.js';
 import { applyToolTelemetry, buildExecutionDiagnostics } from '../utils/tool_status.js';
 import { buildActorFields } from '../utils/tools.js';
-import { callRemoteMcpTool } from './remote_tool_call.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
+import { withRemoteMcpClient } from './remote_tool_call.js';
 
 /**
  * Runs a validated tool call through the single tool-type dispatch switch and returns the raw
@@ -132,19 +132,12 @@ export async function dispatchToolCall(params: {
             // already answered, so forwarding against its progressToken would misroute.
             const shouldForward = shouldForwardNotifications && progressToken !== undefined && progressToken !== null;
 
-            const outcome = await callRemoteMcpTool({
-                serverUrl: tool.serverUrl,
-                toolName: tool.originToolName,
-                args: toolArgs,
+            const outcome = await withRemoteMcpClient(
+                tool.serverUrl,
                 apifyToken,
                 mcpSessionId,
                 signal,
-                // Without forwarding there is no route back for remote progress — don't hand the
-                // remote a token nobody listens to.
-                meta: shouldForward ? { progressToken } : undefined,
-                // Runs only once a connection actually exists, matching where this logging and
-                // notification setup ran before extraction (never on a connect failure).
-                onConnected: (client: Client) => {
+                async (client) => {
                     if (shouldForward) {
                         for (const schema of ServerNotificationSchema.options) {
                             const method = schema.shape.method.value;
@@ -163,8 +156,19 @@ export async function dispatchToolCall(params: {
                         mcpSessionId,
                         input: logSafeArgs,
                     });
+                    return client.callTool(
+                        {
+                            name: tool.originToolName,
+                            arguments: toolArgs,
+                            // Without forwarding there is no route back for remote progress — don't
+                            // hand the remote a token nobody listens to.
+                            ...(shouldForward ? { _meta: { progressToken } } : {}),
+                        },
+                        CallToolResultSchema,
+                        { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal },
+                    );
                 },
-            });
+            );
 
             switch (outcome.outcome) {
                 case 'connect-failed': {
@@ -212,14 +216,14 @@ export async function dispatchToolCall(params: {
                     // (e.g. invalid query) or a genuine server failure. We can't distinguish without
                     // parsing the error text. Defaulting to INTERNAL_ERROR for now; revisit when
                     // actor-mcp gets deeper telemetry treatment.
-                    if ('isError' in outcome.result && outcome.result.isError) {
+                    if ('isError' in outcome.value && outcome.value.isError) {
                         toolStatus = TOOL_STATUS.SOFT_FAIL;
                         callDiagnostics = {
                             failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
                             ...buildActorFields(actorName, actorId),
                         };
                     }
-                    result = { ...outcome.result };
+                    result = { ...outcome.value };
                     break;
                 }
             }

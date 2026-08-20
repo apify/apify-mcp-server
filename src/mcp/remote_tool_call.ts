@@ -1,46 +1,33 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { CallToolResult, CompatibilityCallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import { connectMCPClient } from './client.js';
-import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 
-/** Outcome of {@link callRemoteMcpTool} — closed union every caller must handle. `result` keeps
- * `Client.callTool`'s real union return type (content or legacy `toolResult` shape) since callers
- * only read individual fields off it, never the whole object. */
-export type RemoteMcpCallOutcome =
+/** Outcome of {@link withRemoteMcpClient} — closed union every caller must handle. */
+export type RemoteMcpCallOutcome<T> =
     | { outcome: 'connect-failed' }
     | { outcome: 'aborted' }
     | { outcome: 'error'; error: unknown }
-    | { outcome: 'success'; result: CallToolResult | CompatibilityCallToolResult };
+    | { outcome: 'success'; value: T };
 
-/** Connect-call-close round trip for one remote tool, shared by `tool_dispatch.ts`'s `ACTOR_MCP`
- * case and `call_actor.ts`'s MCP passthrough. `onConnected` fires after connect but before
- * `callTool`, so a caller can register notification handlers first. */
-export async function callRemoteMcpTool(params: {
-    serverUrl: string;
-    toolName: string;
-    args: Record<string, unknown>;
-    apifyToken: string;
-    mcpSessionId: string | undefined;
-    signal: AbortSignal;
-    meta?: Record<string, unknown>;
-    onConnected?: (client: Client) => void;
-}): Promise<RemoteMcpCallOutcome> {
-    const { serverUrl, toolName, args, apifyToken, mcpSessionId, signal, meta, onConnected } = params;
+/**
+ * Connect-call-close round trip, shared by `tool_dispatch.ts`'s `ACTOR_MCP` case and
+ * `call_actor.ts`'s MCP passthrough — the only two sites that call a remote tool (not just list
+ * them). `run` receives the connected client and does the actual `callTool`; kept out of
+ * `client.ts`: a `vi.spyOn` on `connectMCPClient` only intercepts a cross-module import, not a
+ * same-module call from inside `client.ts` itself.
+ */
+export async function withRemoteMcpClient<T>(
+    serverUrl: string,
+    apifyToken: string,
+    mcpSessionId: string | undefined,
+    signal: AbortSignal,
+    run: (client: Client) => Promise<T>,
+): Promise<RemoteMcpCallOutcome<T>> {
     let client: Client | null = null;
     try {
         client = await connectMCPClient(serverUrl, apifyToken, mcpSessionId);
         if (!client) return { outcome: 'connect-failed' };
-
-        onConnected?.(client);
-
-        const result = await client.callTool(
-            { name: toolName, arguments: args, ...(meta ? { _meta: meta } : {}) },
-            CallToolResultSchema,
-            { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal },
-        );
-        return { outcome: 'success', result };
+        return { outcome: 'success', value: await run(client) };
     } catch (error) {
         if (signal.aborted) {
             // Yield a macrotask first: the SDK sends notifications/cancelled fire-and-forget on
