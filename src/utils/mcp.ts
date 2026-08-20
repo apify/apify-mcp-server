@@ -2,7 +2,7 @@ import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/typ
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
 import type { AjvErrorDetails, ApifyRequestParams, FailureCategory, ToolTelemetryContext } from '../types.js';
-import { ACTOR_RUN_LIMIT_MESSAGE, isActorRunLimitError } from './apify_errors.js';
+import { ACTOR_RUN_LIMIT_MESSAGE, isActorRunLimitError, isCannotPublishTaskError } from './apify_errors.js';
 import { wrapJsonText } from './encode_text.js';
 import { getHttpStatusCode } from './logging.js';
 import { classifyFailureCategory, getToolStatusFromError } from './tool_status.js';
@@ -286,6 +286,14 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
     const msg = error instanceof Error ? error.message : String(error);
     if (isActorRunLimitError(error)) {
         return `Error calling tool "${toolName}": ${msg}. ${ACTOR_RUN_LIMIT_MESSAGE}`;
+    }
+    if (isCannotPublishTaskError(error)) {
+        return (
+            `Error calling tool "${toolName}": ${msg}.\n\n` +
+            'The API validates supplied `publicConfig` fields on create and update, and all publication ' +
+            'requirements on publish. Fix the stated requirement before retrying. If `datasetView` is invalid, ' +
+            'ask the user for its key; no tool can list dataset views.'
+        );
     }
     const hint = getHttpErrorHint(getHttpStatusCode(error)) ?? 'Verify the tool name and input parameters.';
     return `Error calling tool "${toolName}": ${msg}. ${hint}`;

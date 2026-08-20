@@ -40,7 +40,9 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
 - `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, and Actor tools.
 - `tool_call_telemetry.ts` — shared tool-call telemetry preparation and logging.
-- `task_execution.ts` — legacy long-running task execution and status notifications.
+- `task_execution.ts` — legacy long-running task execution and status notifications. `tasks/cancel`
+  reaches the Actor run through `createTaskCancellationWatcher` (`utils.ts`), which polls the
+  TaskStore rather than chaining the request's `extra.signal` — see its docstring for why.
 - `const.ts` — the invariant constants below (the single source for these values).
 
 ## Gotchas & invariants

@@ -1009,6 +1009,25 @@ export const actorsCases: Case[] = [
         }),
     },
     {
+        name: 'returns a run-not-found error from get-actor-log for a non-existent run',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
+            // Syntactically valid but nonexistent run ID. The same literal appears in the
+            // waitSecs-validation test below for the opposite reason: there it must NOT be
+            // treated as missing, so the waitSecs check fires first.
+            const nonExistentRunId = 'aaaaaaaaaaaaaaaaa';
+            const result = await client.callTool({
+                name: HELPER_TOOLS.ACTOR_RUNS_LOG,
+                arguments: { runId: nonExistentRunId },
+            });
+            expect(result).toBeDefined();
+            expect(result.isError).toBe(true);
+            const content = result.content as { text: string }[];
+            expect(content.length).toBeGreaterThan(0);
+            expect(content[0].text).toBe(`Run with ID '${nonExistentRunId}' not found.`);
+        }),
+    },
+    {
         name: 'rejects get-actor-run waitSecs above 45',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {

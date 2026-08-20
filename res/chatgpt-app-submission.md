@@ -1,7 +1,7 @@
 # ChatGPT MCP Apps Submission
 
 Status: **In Progress**
-Last updated: 2026-03-12
+Last updated: 2026-08-17
 
 ## Prerequisites
 
@@ -9,8 +9,8 @@ Last updated: 2026-03-12
 - [ ] Owner role confirmed for submitting org member
 - [x] MCP server publicly accessible at `https://mcp.apify.com/`
 - [x] Not using local/testing endpoint
-- [x] Content Security Policy (CSP) defined (`src/resources/widgets.ts:15-26`)
-- [x] Authentication configured — Bearer token + OAuth2 (`src/server_card.ts:30-33`)
+- [x] Content Security Policy (CSP) defined (`WIDGET_CSP` / `OPENAI_WIDGET_CSP` in `src/resources/widgets.ts`)
+- [x] Authentication configured — Bearer token + OAuth2 (`authentication.schemes` in `getServerCard`, `src/server_card.ts`)
 
 ## Submission Form Fields
 
@@ -29,11 +29,15 @@ Last updated: 2026-03-12
 
 ## Code Changes Needed
 
-- [ ] Add explicit `destructiveHint: false` to ~19 read-only tools that currently omit it (should be explicit per OpenAI guidelines). Affected tools: all `get_*`, `search_*`, `fetch_*` in `src/tools/common/` and `src/tools/core/`.
+None open. The one item here — explicit `destructiveHint: false` on the read-only tools — shipped;
+every tool below sets it.
 
 ## Tool Hint Annotations Audit
 
 Per [OpenAI guidelines](https://developers.openai.com/apps-sdk/deploy/submission), tool annotations must match actual behavior.
+
+Tool names are those in `HELPER_TOOLS` (`src/const.ts`); `*-widget` siblings carry the same hints as
+their base tool.
 
 ### Correctly annotated (no changes needed)
 
@@ -42,32 +46,29 @@ Per [OpenAI guidelines](https://developers.openai.com/apps-sdk/deploy/submission
 | `call-actor` (both modes) | false | true | true | Runs Actors that can modify external state |
 | Dynamic Actor tools | false | true | true | Same as call-actor |
 | `abort-actor-run` | false | true | false | Irreversible abort within Apify platform |
-| `get-html-skeleton` | true | — | true | Reads from arbitrary external URLs via Actor |
-| `search-actors` | true | — | false | Searches Apify Store (read-only) |
-| `fetch-actor-details` | true | — | false | Reads Actor metadata |
-| `get-actor-run` | true | — | false | Reads run status |
-| `get-actor-output` | true | — | false | Reads dataset items |
-| `get-dataset-items` | true | — | false | Reads dataset items |
-| `get-dataset` | true | — | false | Reads dataset metadata |
-| `get-dataset-schema` | true | — | false | Reads items for schema |
-| `get-actor-run-log` | true | — | false | Reads run logs |
-| `get-key-value-store-record` | true | — | false | Reads stored records |
-| `get-key-value-store` | true | — | false | Reads store metadata |
-| `get-key-value-store-keys` | true | — | false | Lists keys |
-| `get-user-runs-list` | true | — | false | Lists runs |
-| `get-user-datasets-list` | true | — | false | Lists datasets |
-| `get-user-key-value-stores-list` | true | — | false | Lists stores |
-| `search-apify-docs` | true | — | false | Searches documentation |
-| `fetch-apify-docs` | true | — | false | Fetches documentation |
-
-> **Note:** "—" in destructiveHint means the field is currently omitted and needs to be explicitly set to `false`.
+| `search-actors` | true | false | false | Searches Apify Store (read-only) |
+| `fetch-actor-details` | true | false | false | Reads Actor metadata |
+| `get-actor-run` | true | false | false | Reads run status |
+| `get-actor-run-list` | true | false | false | Lists runs |
+| `get-actor-log` | true | false | false | Reads run logs |
+| `get-dataset-items` | true | false | false | Reads dataset items |
+| `get-dataset` | true | false | false | Reads dataset metadata |
+| `get-dataset-schema` | true | false | false | Reads items for schema |
+| `get-dataset-list` | true | false | false | Lists datasets |
+| `get-key-value-store-record` | true | false | false | Reads stored records |
+| `get-key-value-store` | true | false | false | Reads store metadata |
+| `get-key-value-store-keys` | true | false | false | Lists keys |
+| `get-key-value-store-list` | true | false | false | Lists stores |
+| `search-apify-docs` | true | false | false | Searches documentation |
+| `fetch-apify-docs` | true | false | false | Fetches documentation |
+| `report-problem` | false | false | false | Files a problem report; not loaded for Anthropic clients |
 
 ## Privacy / PII Audit
 
 - [x] No unnecessary PII in tool responses — tools return public resource IDs (runId, datasetId), not internal/private data
 - [x] No session/trace/request IDs leaked — `mcpSessionId` is logging-only, never in tool responses
 - [x] API tokens never exposed in responses — used internally only
-- [x] Skyfire tokens redacted in logs (`src/utils/logging.ts:56-80`)
+- [x] Skyfire tokens redacted in logs (`redactSkyfirePayId`, `src/utils/logging.ts`)
 - [ ] Verify privacy policy explicitly covers all data categories returned by tools (run metadata, dataset items, Actor details)
 
 ## Widgets
@@ -104,7 +105,7 @@ Need to prepare test prompts with expected responses. Suggested cases:
 ### Test 4: Get run results
 - **Prompt:** "Show me the results from my last run"
 - **Expected:** Dataset items displayed
-- **Tools invoked:** `get-user-runs-list`, `get-actor-output`
+- **Tools invoked:** `get-actor-run-list`, `get-dataset-items`
 
 ### Test 5: Abort a run
 - **Prompt:** "Stop the currently running Actor"
@@ -125,8 +126,8 @@ Watch out for these during testing:
 
 - Server runs as Apify Actor with Streamable HTTP transport
 - Public URL: `https://mcp.apify.com/`
-- Package: `@apify/actors-mcp-server` (v0.9.8)
+- Package: `@apify/actors-mcp-server` (v0.14.4)
 - Server card: SEP-1649 compliant
 - Widget metadata: MCP Apps standard (SEP-1865)
-- ChatGPT connects with `ui=openai` server mode
+- ChatGPT connects with `ui=apps` server mode (`ui=openai` is a deprecated alias, still accepted)
 - `stripWidgetMeta()` removes `openai/*` and `ui` keys in non-OpenAI mode

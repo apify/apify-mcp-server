@@ -2,8 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.14.4 - **not yet released**
+## [0.15.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.1) (2026-08-20)
+
+### 🚀 Features
+
+- Add actor tasks ([#1235](https://github.com/apify/apify-mcp-server/pull/1235)) ([8d3da8d](https://github.com/apify/apify-mcp-server/commit/8d3da8d5ecf8b5859a603ac85a3738fc59e6f5da)) by [@Janjiran](https://github.com/Janjiran), closes [#29471](https://github.com/apify/apify-mcp-server/issues/29471)
+- Extend official Apify usernames beyond apify ([#1285](https://github.com/apify/apify-mcp-server/pull/1285)) ([68ebec3](https://github.com/apify/apify-mcp-server/commit/68ebec318bc2fe4d86a88845027ceb10d4fdaf2b)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Return not-found error from get-actor-log for missing runs ([#1234](https://github.com/apify/apify-mcp-server/pull/1234)) ([702ab5e](https://github.com/apify/apify-mcp-server/commit/702ab5efa9887fefa308304175eda3da3552441f)) by [@jirispilka](https://github.com/jirispilka), closes [#1193](https://github.com/apify/apify-mcp-server/issues/1193)
+
+
+## [0.15.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.0) (2026-08-19)
 
 ### 🚀 Features
 
@@ -16,7 +27,6 @@ All notable changes to this project will be documented in this file.
 - Correct tool descriptions naming absent tools or wrong output ([#1261](https://github.com/apify/apify-mcp-server/pull/1261)) ([c5d3928](https://github.com/apify/apify-mcp-server/commit/c5d3928b1cb9e0f4b9891ad015411c6472c26e70)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.14.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.14.3) (2026-08-12)
 
 ### 🚀 Features

@@ -1,7 +1,13 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ApifyApiError } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
-import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
+import {
+    APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    TOOL_STATUS,
+} from '../../src/const.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from '../../src/mcp/tool_call_error_mapper.js';
 import type { CallDiagnostics } from '../../src/types.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
@@ -15,6 +21,15 @@ import {
 const TOOL_NAME = 'test-tool';
 const ACTOR_NAME = 'apify/web-scraper';
 const ACTOR_ID = 'abc123';
+
+/** `ApifyApiError`'s constructor needs a real HTTP response, so build the shape the predicate reads. */
+function cannotPublishTaskError(message: string): ApifyApiError {
+    return Object.assign(Object.create(ApifyApiError.prototype), {
+        message,
+        type: APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
+        statusCode: 400,
+    });
+}
 
 type Case = {
     label: string;
@@ -115,6 +130,28 @@ describe('buildToolCallErrorResult()', () => {
             }
         });
     }
+
+    it('maps a task publication rejection to an actionable soft failure', () => {
+        const result = buildToolCallErrorResult(
+            cannotPublishTaskError("Cannot publish Actor task: Dataset view doesn't exist"),
+            {
+                toolName: HELPER_TOOLS.ACTOR_TASK_PUBLISH,
+                actorName: undefined,
+                actorId: undefined,
+                isAborted: false,
+            },
+        );
+
+        expect(result.kind).toBe(TOOL_CALL_ERROR_KIND.EXECUTION);
+        expect(result.toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
+        expect(result.callDiagnostics).toMatchObject({
+            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_http_status: 400,
+        });
+        expect('userText' in result && result.userText).toContain(
+            `Error calling tool "${HELPER_TOOLS.ACTOR_TASK_PUBLISH}":`,
+        );
+    });
 
     it('returns ABORTED toolStatus for an aborted execution error', () => {
         const result = buildToolCallErrorResult(new Error('boom'), {

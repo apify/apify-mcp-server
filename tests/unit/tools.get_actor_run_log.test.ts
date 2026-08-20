@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
 import { getActorRunLog } from '../../src/tools/runs/get_actor_run_log.js';
 import { getActorRunLogToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -105,12 +107,46 @@ describe('get-actor-log', () => {
     });
 
     it('returns conforming structuredContent for an empty log', async () => {
-        getMock.mockResolvedValue(undefined);
+        getMock.mockResolvedValue('');
 
         const result = await callTool({ runId: 'run-1', lines: 10 });
 
         expect(result.content[0].text).toBe('');
         expect(result.structuredContent).toEqual({ log: '' });
         expectSchemaConformingStructuredContent(result, getActorRunLogToolOutputSchema);
+    });
+
+    it('returns a not-found error when the run does not exist', async () => {
+        getMock.mockResolvedValue(undefined);
+
+        const result = await (getActorRunLog as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', lines: 10 }, stubClient),
+        );
+        const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toBe("Run with ID 'run-1' not found.");
+        expect(structuredContent).toBeUndefined();
+    });
+
+    it('returns the same not-found error text as get-actor-run for the same missing run', async () => {
+        const client = {
+            run: (_id: string) => ({
+                get: async () => undefined,
+                log: () => ({ get: getMock }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+        getMock.mockResolvedValue(undefined);
+
+        const logResult = (await (getActorRunLog as HelperTool).call(
+            stubToolCallContext({ runId: 'missing-run', lines: 10 }, client),
+        )) as TextToolResult;
+        const runResult = (await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'missing-run', waitSecs: 0 }, client),
+        )) as TextToolResult;
+
+        expect(logResult.isError).toBe(true);
+        expect(runResult.isError).toBe(true);
+        expect(logResult.content[0].text).toBe(runResult.content[0].text);
     });
 });
