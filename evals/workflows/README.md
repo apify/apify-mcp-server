@@ -344,6 +344,14 @@ Claude Code owns the message history. The harness only sees the SDK's message st
 - Check the server is registered with `alwaysLoad: true`, or its tools sit behind tool search
 - Run with `--mcp-tools-only` to confirm the case passes when the built-ins are gone
 
+### Agent claims the Apify MCP server is "still connecting" (remote/sandboxed environments)
+**Symptom:** A transcript shows the agent reading a system notice that MCP servers are still
+connecting, concluding the Apify tools are unavailable, and falling back to a built-in tool.<br>
+**Cause:** In sandboxed remote Claude Code environments the MCP handshake can race the first
+turn; a fast model sometimes doesn't wait or retry. On a local machine the CLI completes the
+handshake before the first turn, so this doesn't reproduce there.<br>
+**Solution:** Retry the item once; a repeat failure on a local machine is real.
+
 ### Judge too strict/lenient
 **Symptom:** Incorrect verdicts.<br>
 **Solution:** Tune `JUDGE_PROMPT_TEMPLATE` in `config.ts`.
