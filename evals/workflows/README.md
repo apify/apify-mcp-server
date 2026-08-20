@@ -11,8 +11,8 @@ dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge ->
 1. **Dataset.** Test cases live in the Langfuse dataset `workflow-evals` and are edited in its UI. A run reads them and never writes back.
 2. **Experiment.** The run executes the active items matching `--id`/`--category` as one Langfuse experiment, `--concurrency` items at a time.
 3. **Conversation.** Each item runs a Claude Code agent (Claude Agent SDK) that spawns its own fresh Apify MCP server and drives it to answer the query.
-4. **Judge.** An LLM judge scores the finished conversation against the item's `expectedOutput`.
-5. **Scores.** The verdict lands as `workflow_judge` (the pass/fail gate) and the conversation's tokens as `total_tokens`, plus `pass_rate` on the run. The console prints failures and the run URL; per-item detail is in Langfuse.
+4. **Judge.** An LLM judge scores the finished conversation against the item's `expectedOutput` on six fixed dimensions. `toolSelection` is decided in code instead when the item sets `expectedTools`.
+5. **Scores.** `workflow_judge` (the pass/fail gate) plus one `rubric_*` score per dimension and the conversation's tokens as `total_tokens`; `pass_rate` and a per-dimension `pass_rate_*` on the run. The console prints one line per item with the six verdicts, then the run URL; the reasons are in Langfuse.
 
 ---
 
@@ -53,13 +53,19 @@ Run `pnpm run evals:workflow --help` for the full option list. `--category` and 
 pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot.json (no build, no Apify/OpenRouter keys)
 ```
 
+**The rubric dataset:** `expectedTools` (design decision 5) lives on `workflow-evals-rubric`, a copy of `workflow-evals` seeded by `pnpm run evals:workflow:clone-dataset` (`--dry-run` prints the plan), and committed as `dataset_snapshot.workflow-evals-rubric.json`:
+```bash
+pnpm run evals:workflow -- --dataset workflow-evals-rubric
+```
+Its item ids carry a `-rubric` suffix, because Langfuse item ids are unique per project across datasets and a copy cannot reuse them - so `--id` patterns match either dataset. `workflow-evals` is untouched and still runs, with every `toolSelection` verdict coming from the judge.
+
 ---
 
 ## Technical overview
 
 **Core features:**
 - Multi-turn conversations run by the real Claude Code harness (system prompt, built-in tools, MCP handling)
-- LLM-based evaluation against requirements
+- Six-dimension LLM rubric, with tool selection checked in code where the case can express it
 - Isolated agent + MCP server per test
 - Configurable tool call timeout (default: 60 seconds)
 - Deterministic tool-failure injection (`failTools`)
@@ -122,25 +128,34 @@ The server is registered with `alwaysLoad: true`. Left at the default, its tools
 
 Harness failures (MCP spawn, OpenRouter, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
 
+The gate reads `taskCompletion` alone. The other five rubric dimensions never affect the exit code: these evals are run by hand on a PR and read by a human, and nothing in CI runs them.
+
 **Location:** `langfuse_experiment.ts` (`buildRunSummary`)
 
-### 5. Judge sees tool calls, not results
+### 5. Six dimensions, and code wins where it can
 
-**Decision:** Judge sees tool calls with arguments and agent responses, but NOT raw tool results.
+**Decision:** The judge scores six fixed dimensions instead of one verdict - `toolSelection`, `argumentCorrectness`, `resultUtilization`, `taskCompletion`, `errorRecovery`, `planEfficiency` - and sees each tool call's result, truncated to 2000 chars. `toolSelection` is replaced by a deterministic set comparison against the item's `expectedTools` whenever that field is set; the judge's own answer for it is then dropped.
 
 **Why:**
-- Evaluates agent behavior (tool selection, arguments)
-- Tool results are often very long and noisy
-- Agent should summarize results, judge evaluates the summary
+- One verdict says a test regressed, not which capability regressed. A run where the agent still answers correctly but now takes four detours to get there should show up as a `planEfficiency` failure, not as a pass
+- `resultUtilization` and `errorRecovery` cannot be scored from tool calls alone: whether the agent ignored an error or misreported a payload is only visible next to what the tool returned. Truncation keeps one large `get-dataset-items` result from drowning the conversation it is meant to explain
+- Where correct tool selection is a fixed set, a code comparison is a fact and the judge's answer is a probability. Same dedupe-sort-compare semantics as `toolsExactMatch` in `evals/run_evaluation.ts`, so order and repeat calls are ignored while a missing or extra tool fails
+- Claude Code's built-in tools are excluded from that comparison: the agent reaches for `TodoWrite` or `Read` on its own initiative, which says nothing about how it picked ours. The judge still sees those calls and scores them under `planEfficiency`
+
+`overallVerdict` is the `taskCompletion` verdict, not an aggregate of the six, so the gate keeps meaning what it always meant and `workflow_judge` stays comparable with runs from before the rubric. The other five dimensions are diagnostic: nothing gates on them, and nothing in CI reads them.
 
 **Judge input format:**
 ```
 USER: Find actors for Google Maps
-AGENT: [Called tool: search-actors with args: {"keywords":"google maps","limit":5}]
+AGENT: [Called tool: search-actors with args: {"search":"google maps","limit":5}]
+TOOL RESULT (search-actors): [{"name":"compass/crawler-google-places",...}] [truncated at 2000 chars, 8431 total]
 AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 ```
+A failed call shows as `TOOL ERROR (<tool>): <message>` - the message the agent was given, which is what `errorRecovery` is scored on.
 
-**Location:** `workflow_judge.ts`
+**Trade-off:** six verdicts per item is six chances for the judge to be noisy, and the prompt is much larger (the judge's 1M context absorbs it). Only the cases whose requirements pin one path set `expectedTools`; the rest leave `toolSelection` judged, so that dimension is the least trustworthy of the six.
+
+**Location:** `workflow_judge.ts`, `deterministic_checks.ts`, `config.ts` (`JUDGE_PROMPT_TEMPLATE`)
 
 ### 6. Judge client shared, agent isolated
 
@@ -167,7 +182,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 **Why:**
 - The judge, its input format, and the scores stay unchanged, so verdicts remain comparable with earlier experiments
-- `ConversationHistory` carries only what the judge and the scores read; tool results and metrics live on `ToolInvocation` and `ConversationMetrics`
+- `ConversationHistory` carries what the judge and the scores read: each tool call now carries its paired result and whether it went to our server, which the rubric needs. Metrics stay on `ConversationMetrics`, and `ToolInvocation` still carries the untruncated payloads for the trace
 - MCP tool names are stripped of their `mcp__apify__` prefix, so the judge sees `search-actors` as before
 - Subagent messages (via the `Task` tool) are excluded, so the transcript reflects the main agent
 - Cached prompt tokens are counted into `total_tokens`; the API reports them separately and a cached run would otherwise look nearly free. The trace's generation splits them out (`input`, `cache_read_input_tokens`, `cache_creation_input_tokens`): the SDK reports usage for the whole run, so a multi-turn run re-reads the cached system prompt and tool definitions every turn and the total is mostly cache traffic
@@ -206,13 +221,15 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `sdk_conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
 - `llm_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
 - `langfuse_observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
-- `workflow_judge.ts` - Judge evaluation
+- `workflow_judge.ts` - Judge evaluation: the rubric prompt, its schema, and the merge with the deterministic check
+- `deterministic_checks.ts` - Code-based rubric checks (`expectedTools` vs. the tools actually called)
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
 - `langfuse_dataset.ts` - Test case schema, dataset item mapping and validation, dataset fetch
 - `langfuse_experiment.ts` - Experiment task, evaluators, run summary and exit gate
 - `run_workflow_evals.ts` - Main CLI entry
 - `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:workflow:export-dataset`)
-- `dataset_snapshot.json` - Exported copy of the dataset, not read at runtime
+- `clone_dataset.ts` - One-off: copy a dataset into a new one, adding `expectedTools` (`pnpm run evals:workflow:clone-dataset`)
+- `dataset_snapshot.json` - Exported copy of `workflow-evals`, not read at runtime. Any other dataset exports to `dataset_snapshot.<name>.json`
 
 ## Configuration
 
@@ -236,8 +253,8 @@ Results are recorded in Langfuse, not to a local file. Each run:
 - **Reads the dataset** `workflow-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
 - **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
 - **Traces** every item as one trace. Its root output is the judge verdict plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed), and a generation for the judge call. See design decision 9.
-- **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) is the strict gate, and `total_tokens` is the agent tokens billed, omitted when the provider reported no usage so an unmeasured run cannot look like a free one.
-- **Scores the run** with `pass_rate`: passing items over items requested, so runs stay comparable even when items were dropped.
+- **Scores** each item: `workflow_judge` (`1` when `taskCompletion` passed, comment = its reason) is the strict gate; `rubric_tool_selection`, `rubric_argument_correctness`, `rubric_result_utilization`, `rubric_task_completion`, `rubric_error_recovery` and `rubric_plan_efficiency` carry the six dimensions with their reasons as comments; and `total_tokens` is the agent tokens billed, omitted when the provider reported no usage so an unmeasured run cannot look like a free one. `rubric_task_completion` repeats `workflow_judge` on purpose - the gate keeps its own name and history.
+- **Scores the run** with `pass_rate` and one `pass_rate_<dimension>` per dimension: passing items over items requested, so runs stay comparable even when items were dropped. Comparing two runs dimension by dimension is what the Langfuse run-comparison view is for; the console prints the current run's numbers only.
 
 ### Concurrency
 
@@ -255,7 +272,8 @@ A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in 
     "query": "User prompt for agent",
     "reference": "What agent must do to pass",
     "maxTurns": 10,
-    "tools": ["actors", "docs"]
+    "tools": ["actors", "docs"],
+    "expectedTools": ["search-actors", "call-actor"]
   }
 ]
 ```
@@ -269,6 +287,7 @@ A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in 
 **Optional:**
 - `maxTurns` - Override default (10)
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
+- `expectedTools` - The MCP tools that constitute correct tool selection, e.g. `["call-actor", "get-dataset-items"]`. Compared as a set (order and repeat calls ignored, a missing or extra tool fails), and Claude Code's built-in tools are left out of the comparison. When set, the rubric's `toolSelection` dimension is decided in code rather than by the judge - so set it only on a case whose requirements pin one path, and leave it off a case that has to discover an Actor first. See design decision 5.
 - `failTools` - Tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny, the one hook that survives `bypassPermissions`, so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `claude_agent.ts`.
 
 ## Key insights

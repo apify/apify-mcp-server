@@ -19,6 +19,11 @@ export function stripToolPrefix(name: string): string {
     return name.startsWith(MCP_TOOL_PREFIX) ? name.slice(MCP_TOOL_PREFIX.length) : name;
 }
 
+/** Whether an SDK tool name belongs to the Apify MCP server rather than a Claude Code built-in. */
+export function isMcpToolName(name: string): boolean {
+    return name.startsWith(MCP_TOOL_PREFIX);
+}
+
 /**
  * Default model configuration for agent and judge
  * These can be overridden via CLI arguments:
@@ -53,30 +58,41 @@ export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
  * Judge prompt template for evaluating conversations
  * Uses structured output (JSON schema) - no format instructions needed
  *
+ * Six fixed dimensions, so a failing run says which capability regressed instead of
+ * returning one opaque verdict. `toolSelection` is overridden by a deterministic check
+ * when the test case sets `expectedTools`; the judge still scores it, because most cases
+ * leave that field unset on purpose.
+ *
  * Variables:
  * - {{reference}}: The requirements the agent should meet
- * - {{conversation}}: The formatted conversation to evaluate
+ * - {{conversation}}: The formatted conversation to evaluate, including tool results
  */
-export const JUDGE_PROMPT_TEMPLATE = `You are evaluating whether an AI agent successfully completed a user's task using available tools.
+export const JUDGE_PROMPT_TEMPLATE = `You are evaluating how an AI agent used its tools to carry out a user's task.
+
+Score each of these 6 dimensions independently. Do not let a strong result on one
+dimension excuse a weak one on another: an agent that reaches the right answer down a
+wasteful path fails planEfficiency and passes taskCompletion.
+
+1. toolSelection: Did the agent call the appropriate tool(s) - no missing calls, no
+   unnecessary ones? A different tool than the requirements name is fine if it
+   accomplishes the same goal. [For some test cases this dimension is replaced by a
+   deterministic check after your response; score it anyway.]
+2. argumentCorrectness: Were the arguments semantically correct and complete for the task
+   (right IDs, filters, limits, values)? Judge the meaning, not the schema: an argument
+   the tool accepted can still be the wrong value.
+3. resultUtilization: Did the agent read and use what each tool actually returned? FAIL if
+   it ignored an error, misreported data, or claimed anything the results do not support.
+4. taskCompletion: Did the final response fully satisfy the requirements below?
+5. errorRecovery: When a call failed or returned something unexpected, did the agent
+   respond sensibly - retry, use an alternative, or explain the blocker to the user -
+   rather than stall or invent the answer? PASS when nothing failed.
+6. planEfficiency: Was the path reasonably direct? Minor inefficiencies are acceptable;
+   FAIL on repeated identical calls, abandoned detours, or turns spent going nowhere.
 
 TASK REQUIREMENTS:
 {{reference}}
 
-AGENT CONVERSATION:
+AGENT CONVERSATION (tool results are truncated):
 {{conversation}}
 
-Your task is to evaluate if the agent met ALL the requirements listed above.
-
-Evaluation criteria:
-1. Did the agent use appropriate tools to accomplish the task?
-2. Were the tool calls made with correct arguments?
-3. Did the agent provide a clear, helpful final response to the user?
-4. Did the agent fully address all requirements?
-
-Important notes:
-- Focus on whether requirements were met, not on writing style
-- The agent may use different tools than expected if they accomplish the same goal
-- Tool results are not shown (only tool calls and agent responses)
-- Minor inefficiencies are acceptable if the task was completed
-
-Provide your evaluation with a verdict (PASS or FAIL) and a brief explanation (1-2 sentences).`;
+For every dimension give a verdict (PASS or FAIL) and a one-sentence reason.`;

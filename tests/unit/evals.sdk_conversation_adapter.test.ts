@@ -63,6 +63,25 @@ describe('adaptSdkConversation()', () => {
         expect(transcript).toEqual([{ role: 'assistant', text: 'Found 3 Actors.' }]);
     });
 
+    it('attaches the result to the call on the conversation, which is what the judge reads', () => {
+        const { conversation } = adaptSdkConversation('find a maps scraper', toolCallStream);
+
+        expect(conversation.turns[0].toolCalls[0]).toMatchObject({
+            isMcpTool: true,
+            result: { toolName: 'search-actors', success: true, result: [{ text: 'ok' }] },
+        });
+    });
+
+    it('marks a built-in tool call as not belonging to the MCP server', () => {
+        const { conversation } = adaptSdkConversation('read a file', [
+            assistantMessage([{ type: 'tool_use', id: 'tool-1', name: 'Read', input: { file_path: '/tmp/x' } }]),
+            toolResultMessage([{ type: 'tool_result', tool_use_id: 'tool-1', content: 'contents' }]),
+            resultMessage(),
+        ]);
+
+        expect(conversation.turns[0].toolCalls[0]).toMatchObject({ name: 'Read', isMcpTool: false });
+    });
+
     it('pairs tool results with their call and sizes them', () => {
         const { toolInvocations, metrics } = adaptSdkConversation('find a maps scraper', toolCallStream);
 

@@ -32,7 +32,14 @@ import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { assertStdioBinExists } from './claude_agent.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
-import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_experiment.js';
+import {
+    buildDimensionRunScores,
+    buildRunSummary,
+    countPassed,
+    evaluators,
+    formatRubricGlyphs,
+    makeTask,
+} from './langfuse_experiment.js';
 import { initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
 
@@ -188,6 +195,7 @@ async function main() {
                     name: 'pass_rate',
                     value: countPassed(itemResults) / requestedIds.length,
                 }),
+                async ({ itemResults }) => buildDimensionRunScores(requestedIds.length, itemResults),
             ],
             maxConcurrency: argv.concurrency,
             metadata: {
@@ -201,14 +209,26 @@ async function main() {
 
         // Compact on purpose: Langfuse holds the full per-item view behind the run link.
         const summary = buildRunSummary(requestedIds, result.itemResults);
+
+        // One line per item: the overall verdict plus the six dimensions. The reasons are
+        // in Langfuse, on each dimension's score.
+        const idWidth = Math.max(...summary.rubrics.map((entry) => entry.id.length), 0);
+        for (const entry of summary.rubrics) {
+            const marker = entry.overallVerdict === 'PASS' ? '✅' : '❌';
+            console.log(`${marker} ${entry.id.padEnd(idWidth)}  ${formatRubricGlyphs(entry.rubric)}`);
+        }
+
         for (const failure of summary.failures) {
-            console.log(`❌ ${failure.id}: ${failure.reason}`);
+            console.log(`   ${failure.id}: ${failure.reason}`);
         }
         if (summary.droppedIds.length > 0) {
             console.error(`🔥 Never completed (task threw, see errors above): ${summary.droppedIds.join(', ')}`);
         }
 
         console.log(`📊 ${summary.passedCount}/${requestedIds.length} passed`);
+        for (const [dimension, passes] of Object.entries(summary.dimensionPassCounts)) {
+            console.log(`   ${dimension.padEnd(20)} ${passes}/${summary.scoredCount}`);
+        }
         console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" (view in Langfuse)`}`);
 
         // 0 only when every requested item ran and passed: a dropped item leaves

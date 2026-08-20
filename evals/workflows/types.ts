@@ -19,13 +19,23 @@ export type McpToolResult = {
 };
 
 /**
+ * One tool call the agent made, paired with what came back.
+ */
+export type ConversationToolCall = {
+    /** Tool name, with the SDK's `mcp__<server>__` prefix stripped */
+    name: string;
+    arguments: Record<string, unknown>;
+    /** Whether the call went to the Apify MCP server rather than a Claude Code built-in tool */
+    isMcpTool: boolean;
+    /** What the tool returned, set once the SDK streamed the result back */
+    result?: McpToolResult;
+};
+
+/**
  * A single turn in the conversation (agent action)
  */
 export type ConversationTurn = {
-    toolCalls: {
-        name: string;
-        arguments: Record<string, unknown>;
-    }[];
+    toolCalls: ConversationToolCall[];
     /** Agent text, set only on a turn that made no tool calls */
     finalResponse?: string;
 };

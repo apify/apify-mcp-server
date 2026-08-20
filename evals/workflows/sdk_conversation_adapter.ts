@@ -9,8 +9,8 @@
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
-import { stripToolPrefix } from './config.js';
-import type { ConversationHistory, ConversationTurn, McpToolResult } from './types.js';
+import { isMcpToolName, stripToolPrefix } from './config.js';
+import type { ConversationHistory, ConversationToolCall, ConversationTurn, McpToolResult } from './types.js';
 
 /** One paired tool call + result, logged as a tool span under the item's trace. */
 export type ToolInvocation = {
@@ -99,6 +99,8 @@ type PendingToolUse = {
     name: string;
     arguments: unknown;
     startedAt?: number;
+    /** The entry on the turn, so the result lands on the conversation the judge reads. */
+    call: ConversationToolCall;
 };
 
 /**
@@ -157,7 +159,7 @@ export function adaptSdkConversation(
 
             const textParts: string[] = [];
             const thinkingParts: string[] = [];
-            const toolCalls: { name: string; arguments: Record<string, unknown> }[] = [];
+            const toolCalls: ConversationToolCall[] = [];
 
             for (const block of blocks) {
                 if (block.type === 'text') {
@@ -166,8 +168,13 @@ export function adaptSdkConversation(
                     thinkingParts.push(block.thinking);
                 } else if (block.type === 'tool_use') {
                     const name = stripToolPrefix(block.name);
-                    toolCalls.push({ name, arguments: (block.input ?? {}) as Record<string, unknown> });
-                    pendingToolUses.set(block.id, { name, arguments: block.input, startedAt: messageTime });
+                    const call: ConversationToolCall = {
+                        name,
+                        arguments: (block.input ?? {}) as Record<string, unknown>,
+                        isMcpTool: isMcpToolName(block.name),
+                    };
+                    toolCalls.push(call);
+                    pendingToolUses.set(block.id, { name, arguments: block.input, startedAt: messageTime, call });
                 }
             }
 
@@ -218,6 +225,9 @@ export function adaptSdkConversation(
                     error: success ? undefined : errorTextOf(block.content),
                     resultBytes,
                 };
+                // The judge reads the conversation, not the invocations, so the result is
+                // attached to the call that produced it as well.
+                pending.call.result = result;
                 toolInvocations.push({
                     name: pending.name,
                     arguments: pending.arguments,

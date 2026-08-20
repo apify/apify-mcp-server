@@ -30,11 +30,23 @@ import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js
 // passes it to node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
 sanitizeProcessEnv();
 
-/** Resolved from this module so cwd cannot change it. */
-const SNAPSHOT_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dataset_snapshot.json');
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Snapshot file for a dataset. Resolved from this module so cwd cannot change it, and
+ * named after the dataset unless it is the default one, whose file name predates
+ * `--dataset` and stays put so its history is continuous.
+ */
+export function snapshotPathFor(datasetName: string): string {
+    const fileName =
+        datasetName === WORKFLOW_DATASET_NAME ? 'dataset_snapshot.json' : `dataset_snapshot.${datasetName}.json`;
+    return path.join(MODULE_DIR, fileName);
+}
 
 async function main() {
-    const argv = (await yargs(hideBin(process.argv))
+    // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores every
+    // flag behind it - silently exporting the default dataset over the wrong snapshot.
+    const argv = (await yargs(hideBin(process.argv).filter((arg) => arg !== '--'))
         .options({
             dataset: { type: 'string', description: 'Langfuse dataset to export', default: WORKFLOW_DATASET_NAME },
         })
@@ -51,8 +63,9 @@ async function main() {
     // Drop the raw item: the snapshot holds test cases, not Langfuse bookkeeping.
     const testCases = cases.map(({ item, ...testCase }) => testCase);
 
-    fs.writeFileSync(SNAPSHOT_PATH, `${JSON.stringify(testCases, null, 2)}\n`);
-    console.log(`✅ Wrote ${testCases.length} case(s) from "${argv.dataset}" to ${SNAPSHOT_PATH}`);
+    const snapshotPath = snapshotPathFor(argv.dataset);
+    fs.writeFileSync(snapshotPath, `${JSON.stringify(testCases, null, 2)}\n`);
+    console.log(`✅ Wrote ${testCases.length} case(s) from "${argv.dataset}" to ${snapshotPath}`);
 }
 
 void main();

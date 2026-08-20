@@ -21,7 +21,7 @@ function makeAdapted(overrides: Partial<AdaptedConversation> = {}): AdaptedConve
         conversation: {
             userPrompt: 'find a maps scraper',
             turns: [
-                { toolCalls: [{ name: 'search-actors', arguments: {} }] },
+                { toolCalls: [{ name: 'search-actors', arguments: {}, isMcpTool: true }] },
                 { toolCalls: [], finalResponse: 'Found 3 Actors.' },
             ],
             totalTokens: 120,

@@ -30,6 +30,14 @@ const WorkflowMetadataValidator = z.strictObject({
     tools: z.array(z.string()).optional(),
     /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See mcp_client.ts. */
     failTools: z.array(z.string()).optional(),
+    /**
+     * The MCP tools that constitute correct tool selection for this case, e.g.
+     * ["call-actor", "get-dataset-items"]. Compared as a set, so order and repeat calls
+     * do not matter but a missing or extra tool fails. When set, the rubric's
+     * `toolSelection` dimension is decided in code instead of by the judge. Left unset on
+     * a case with more than one valid path.
+     */
+    expectedTools: z.array(z.string().min(1)).optional(),
 });
 
 const WorkflowItemValidator = z.object({
@@ -79,6 +87,7 @@ export function toWorkflowTestCase(item: unknown): WorkflowTestCase {
         ...(metadata.maxTurns !== undefined && { maxTurns: metadata.maxTurns }),
         ...(metadata.tools !== undefined && { tools: metadata.tools }),
         ...(metadata.failTools !== undefined && { failTools: metadata.failTools }),
+        ...(metadata.expectedTools !== undefined && { expectedTools: metadata.expectedTools }),
     };
 }
 

@@ -2,8 +2,9 @@
  * Experiment task, evaluators, and run gate for the Langfuse workflow-evals port.
  *
  * The task runs a fresh Claude Code agent conversation per dataset item (the Agent SDK
- * spawns its own MCP server, so state is isolated per item) and two evaluators score it:
- * the LLM judge (the pass/fail gate) and total tokens.
+ * spawns its own MCP server, so state is isolated per item) and the evaluators score it:
+ * the judge's overall verdict (the pass/fail gate), one score per rubric dimension, and
+ * total tokens.
  */
 
 import type { Evaluation } from '@langfuse/client';
@@ -13,8 +14,8 @@ import { parseWorkflowItem } from './langfuse_dataset.js';
 import { buildAgentObservations, emitObservations } from './langfuse_observations.js';
 import type { LlmClient } from './llm_client.js';
 import type { TranscriptEntry } from './sdk_conversation_adapter.js';
-import type { JudgeResult } from './workflow_judge.js';
-import { evaluateConversation } from './workflow_judge.js';
+import type { Dimension, JudgeResult, RubricResult } from './workflow_judge.js';
+import { DIMENSIONS, evaluateConversation } from './workflow_judge.js';
 
 /**
  * Output produced by the experiment task for a single dataset item.
@@ -44,15 +45,37 @@ export const SCORE_NAMES = {
     TOTAL_TOKENS: 'total_tokens',
 } as const;
 
+/**
+ * Score name per rubric dimension.
+ *
+ * `rubric_task_completion` repeats `workflow_judge` by design: the gate keeps its own
+ * name and its own history, so runs from before the rubric stay comparable.
+ */
+export const DIMENSION_SCORE_NAMES: Record<Dimension, string> = {
+    toolSelection: 'rubric_tool_selection',
+    argumentCorrectness: 'rubric_argument_correctness',
+    resultUtilization: 'rubric_result_utilization',
+    taskCompletion: 'rubric_task_completion',
+    errorRecovery: 'rubric_error_recovery',
+    planEfficiency: 'rubric_plan_efficiency',
+};
+
 type WorkflowEvaluator = (params: { output: WorkflowTaskOutput }) => Promise<Evaluation | Evaluation[]>;
 
 /** The evaluators attached to each experiment item. */
 export const evaluators: WorkflowEvaluator[] = [
     async ({ output }) => ({
         name: SCORE_NAMES.WORKFLOW_JUDGE,
-        value: output.judgeResult.verdict === 'PASS' ? 1 : 0,
-        comment: output.judgeResult.reason,
+        value: output.judgeResult.overallVerdict === 'PASS' ? 1 : 0,
+        comment: output.judgeResult.rubric.taskCompletion.reason,
     }),
+    // One score per dimension, so Langfuse can chart which capability moved between runs
+    // rather than only whether the item passed.
+    async ({ output }) =>
+        DIMENSIONS.map((dimension) => {
+            const { verdict, reason } = output.judgeResult.rubric[dimension];
+            return { name: DIMENSION_SCORE_NAMES[dimension], value: verdict === 'PASS' ? 1 : 0, comment: reason };
+        }),
     // No score when the provider never reported usage. A 0 would read as a real
     // measurement and skew cross-run model comparisons in Langfuse.
     async ({ output }) =>
@@ -77,7 +100,59 @@ export type RunSummary = {
     failures: { id: string; reason: string }[];
     /** Requested ids with no result at all: the task threw and the SDK skipped the item. */
     droppedIds: string[];
+    /** Every completed item's rubric, in result order, for the per-test console line. */
+    rubrics: { id: string; overallVerdict: 'PASS' | 'FAIL'; rubric: RubricResult }[];
+    /** Passing items per dimension, over the items that completed. */
+    dimensionPassCounts: Record<Dimension, number>;
+    /** Items the dimension counts are out of: completed items, not requested ones. */
+    scoredCount: number;
 };
+
+/** Passing items per dimension across the completed items. */
+export function countDimensionPasses(itemResults: ScoredItem[]): Record<Dimension, number> {
+    const counts = Object.fromEntries(DIMENSIONS.map((dimension) => [dimension, 0])) as Record<Dimension, number>;
+
+    for (const result of itemResults) {
+        for (const dimension of DIMENSIONS) {
+            if (result.output.judgeResult.rubric[dimension].verdict === 'PASS') counts[dimension] += 1;
+        }
+    }
+
+    return counts;
+}
+
+/** Short label per dimension for the compact console line. */
+const DIMENSION_LABELS: Record<Dimension, string> = {
+    toolSelection: 'tool',
+    argumentCorrectness: 'args',
+    resultUtilization: 'result',
+    taskCompletion: 'complete',
+    errorRecovery: 'recover',
+    planEfficiency: 'eff',
+};
+
+/** All six verdicts on one line, e.g. `tool✓ args✓ result✗ complete✓ recover✓ eff✓`. */
+export function formatRubricGlyphs(rubric: RubricResult): string {
+    return DIMENSIONS.map(
+        (dimension) => `${DIMENSION_LABELS[dimension]}${rubric[dimension].verdict === 'PASS' ? '✓' : '✗'}`,
+    ).join(' ');
+}
+
+/**
+ * Run-level pass rate per dimension, so a run carries its own rubric profile and Langfuse
+ * can diff two runs dimension by dimension.
+ *
+ * Denominator is the requested count, matching `pass_rate`: an item the SDK dropped pulls
+ * every dimension down rather than vanishing from the rate.
+ */
+export function buildDimensionRunScores(requestedCount: number, itemResults: ScoredItem[]): Evaluation[] {
+    const counts = countDimensionPasses(itemResults);
+
+    return DIMENSIONS.map((dimension) => ({
+        name: `pass_rate_${DIMENSION_SCORE_NAMES[dimension].replace(/^rubric_/, '')}`,
+        value: counts[dimension] / requestedCount,
+    }));
+}
 
 /**
  * Score a finished experiment against the ids that were requested.
@@ -101,7 +176,7 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
             reason:
                 judgeScore === undefined
                     ? `no ${SCORE_NAMES.WORKFLOW_JUDGE} score (the evaluator threw)`
-                    : result.output.judgeResult.reason,
+                    : result.output.judgeResult.rubric.taskCompletion.reason,
         });
     }
 
@@ -111,6 +186,13 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
         passedCount: countPassed(itemResults),
         failures,
         droppedIds: requestedIds.filter((id) => !completedIds.has(id)),
+        rubrics: itemResults.map((result) => ({
+            id: result.output.id,
+            overallVerdict: result.output.judgeResult.overallVerdict,
+            rubric: result.output.judgeResult.rubric,
+        })),
+        dimensionPassCounts: countDimensionPasses(itemResults),
+        scoredCount: itemResults.length,
     };
 }
 
@@ -177,7 +259,13 @@ export function makeTask(options: WorkflowTaskOptions) {
             }
 
             const { conversation, transcript } = adapted;
-            const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
+            const judgeResult = await evaluateConversation({
+                reference: item.expectedOutput,
+                expectedTools: item.metadata.expectedTools,
+                conversation,
+                llmClient,
+                judgeModel,
+            });
 
             return {
                 id: item.id,
