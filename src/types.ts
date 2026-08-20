@@ -260,6 +260,17 @@ export type ActorInfo = {
     actor: ActorOutdated;
 };
 
+/**
+ * How an Actor is exposed as a tool, resolved once from its definition by `resolveActorToolType`.
+ * `mcpServerUrl` is a plain `string` exactly when `toolType` is {@link TOOL_TYPE.ACTOR_MCP}, so
+ * callers connect without a cast. `toolType: null` means the Actor has no tool representation.
+ * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
+ * messages built from it read the same whether the Actor was addressed by ID or by name.
+ */
+export type ActorToolResolutionResult =
+    | { toolType: typeof TOOL_TYPE.ACTOR_MCP; mcpServerUrl: string; actorFullName: string }
+    | { toolType: typeof TOOL_TYPE.ACTOR | null; mcpServerUrl: null; actorFullName: string };
+
 export type ActorStoreList = ActorStoreListOutdated & {
     actorReviewCount?: number;
     actorReviewRating?: number;

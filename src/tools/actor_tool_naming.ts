@@ -4,12 +4,31 @@ import log from '@apify/log';
 
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { ActorInfo } from '../types.js';
+import { TOOL_TYPE } from '../types.js';
 
-/*
- * Checks if the given ActorInfo represents an MCP server Actor.
+/**
+ * The single rule for how an Actor is exposed as a tool. Tool loading and `call-actor` routing both
+ * read it, so the two can never disagree.
+ *
+ * | standby  | `webServerMcpPath` | input schema | result                              |
+ * |----------|--------------------|--------------|-------------------------------------|
+ * | disabled | absent             | any          | `ACTOR` (run tool)                  |
+ * | disabled | present            | any          | `ACTOR` — the leftover path is ignored |
+ * | enabled  | present            | any          | `ACTOR_MCP` (proxied MCP tools only) |
+ * | enabled  | absent             | non-empty    | `ACTOR` (run tool)                  |
+ * | enabled  | absent             | empty        | `null`                              |
+ *
+ * `null` is not a fourth `TOOL_TYPE` member: it is the absence of a tool. A standby-only Actor with an
+ * empty input schema has nothing to run and no MCP server to proxy, so it gets no tool at all.
+ *
+ * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
+ * or `input.properties` has zero keys. Nothing else counts — a non-empty `required` with no properties
+ * still reads as empty.
  */
-export function isActorInfoMcpServer(actorInfo: ActorInfo): boolean {
-    return !!(actorInfo.webServerMcpPath && actorInfo.actor.actorStandby?.isEnabled);
+export function resolveActorToolType(actorInfo: ActorInfo): typeof TOOL_TYPE.ACTOR | typeof TOOL_TYPE.ACTOR_MCP | null {
+    if (!actorInfo.actor.actorStandby?.isEnabled) return TOOL_TYPE.ACTOR;
+    if (actorInfo.webServerMcpPath) return TOOL_TYPE.ACTOR_MCP;
+    return Object.keys(actorInfo.definition.input?.properties ?? {}).length > 0 ? TOOL_TYPE.ACTOR : null;
 }
 
 /**

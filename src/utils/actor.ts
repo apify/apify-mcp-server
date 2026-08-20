@@ -1,8 +1,10 @@
 import type { ApifyClient } from '../apify_client.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { actorDefinitionCache } from '../state.js';
+import { resolveActorToolType } from '../tools/actor_tool_naming.js';
 import { getActorDefinition } from '../tools/actors/actor_definition.js';
-import type { ActorDefinitionWithInfo } from '../types.js';
+import type { ActorDefinitionWithInfo, ActorToolResolutionResult } from '../types.js';
+import { TOOL_TYPE } from '../types.js';
 import { getUserInfoCached } from './userid_cache.js';
 
 /**
@@ -44,13 +46,43 @@ export async function getActorDefinitionCached(
 }
 
 /**
- * Resolve the Actor's MCP server URL, or `false` if it isn't an MCP server. The URL is a pure function of
+ * Resolve how an Actor is exposed as a tool at call time, by name. The only place `resolveActorToolType`
+ * is consulted outside the tool-loading factory, so `call-actor` routing and tool loading share one rule.
+ *
+ * Returns `null` when there is no definition to classify (unknown Actor). The URL is a pure function of
  * the definition (`getActorMCPServerURL` does no I/O), so this rides the authorization-gated
  * `getActorDefinitionCached` instead of a separate cache that would leak a private Actor's URL across tenants.
  */
+export async function getActorToolResolutionCached(
+    actorIdOrName: string,
+    apifyClient: ApifyClient,
+): Promise<ActorToolResolutionResult | null> {
+    const cached = await getActorDefinitionCached(actorIdOrName, apifyClient);
+    if (!cached) return null;
+
+    const webServerMcpPath = getActorMCPServerPath(cached.definition);
+    const toolType = resolveActorToolType({
+        definition: cached.definition,
+        actor: cached.info,
+        webServerMcpPath,
+    });
+    const { actorFullName } = cached.definition;
+    // `resolveActorToolType` returns ACTOR_MCP only when `webServerMcpPath` is set; testing the path
+    // here narrows it to `string`, so the URL is built without a cast.
+    if (toolType === TOOL_TYPE.ACTOR_MCP && webServerMcpPath) {
+        return {
+            toolType,
+            mcpServerUrl: await getActorMCPServerURL(cached.definition.id, webServerMcpPath),
+            actorFullName,
+        };
+    }
+    return { toolType: toolType === TOOL_TYPE.ACTOR ? toolType : null, mcpServerUrl: null, actorFullName };
+}
+
+/**
+ * Resolve the Actor's MCP server URL, or `false` if it isn't an MCP server.
+ */
 export async function getActorMcpUrlCached(actorIdOrName: string, apifyClient: ApifyClient): Promise<string | false> {
-    const definition = (await getActorDefinitionCached(actorIdOrName, apifyClient))?.definition;
-    const mcpPath = definition && getActorMCPServerPath(definition);
-    if (!mcpPath) return false;
-    return getActorMCPServerURL(definition.id, mcpPath);
+    const resolution = await getActorToolResolutionCached(actorIdOrName, apifyClient);
+    return resolution?.toolType === TOOL_TYPE.ACTOR_MCP ? resolution.mcpServerUrl : false;
 }

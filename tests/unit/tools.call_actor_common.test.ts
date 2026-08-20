@@ -9,6 +9,7 @@ import {
     HELPER_TOOLS,
     TOOL_STATUS,
 } from '../../src/const.js';
+import { ActorLoadError } from '../../src/errors.js';
 import * as mcpClient from '../../src/mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import {
@@ -122,6 +123,54 @@ describe('call_actor_common', () => {
                     failureCategory: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
                     failureHttpStatus: 403,
                     actorId: 'actor-456',
+                }),
+            );
+        });
+
+        it('forwards the standby payment error message verbatim as a user error', () => {
+            const error = ActorLoadError.standbyPaymentNotSupported('apify/rag-web-browser');
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/rag-web-browser',
+                error,
+                actorId: 'actor-standby-payment',
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
+            });
+
+            expect(response.isError).toBe(true);
+            expect((response.content ?? []).map(textOf).join('\n')).toBe(error.message);
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    failureDetail: error.kind,
+                    actorId: 'actor-standby-payment',
+                }),
+            );
+        });
+
+        // Only the two standby kinds take the user-error branch. LOAD_FAILED masks a backend fault,
+        // so it must stay on the generic server-error path and keep its INTERNAL_ERROR telemetry.
+        it('keeps a LOAD_FAILED Actor load failure on the generic server-error path', () => {
+            const error = ActorLoadError.loadFailed('apify/rag-web-browser');
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/rag-web-browser',
+                error,
+                actorId: 'actor-load-failed',
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
+            });
+
+            expect(response.isError).toBe(true);
+            const allText = (response.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain(`Failed to call Actor 'apify/rag-web-browser': ${error.message}`);
+            expect(allText).not.toBe(error.message);
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.FAILED,
+                    failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+                    failureDetail: error.message,
+                    actorId: 'actor-load-failed',
                 }),
             );
         });
@@ -384,8 +433,11 @@ describe('call_actor_common', () => {
                 baseActorName: 'apify/mcp-demo',
                 mcpToolName: 'search',
                 input: { q: 'x' },
-                isActorMcpServer: true,
-                mcpServerUrl: 'https://example.invalid/mcp',
+                resolution: {
+                    toolType: TOOL_TYPE.ACTOR_MCP,
+                    mcpServerUrl: 'https://example.invalid/mcp',
+                    actorFullName: 'apify/mcp-demo',
+                },
                 apifyToken: 'token',
                 signal: controller.signal,
             });
@@ -406,8 +458,11 @@ describe('call_actor_common', () => {
                 baseActorName: 'apify/mcp-demo',
                 mcpToolName: 'search',
                 input: { q: 'x' },
-                isActorMcpServer: true,
-                mcpServerUrl: 'https://example.invalid/mcp',
+                resolution: {
+                    toolType: TOOL_TYPE.ACTOR_MCP,
+                    mcpServerUrl: 'https://example.invalid/mcp',
+                    actorFullName: 'apify/mcp-demo',
+                },
                 apifyToken: 'token',
                 signal: controller.signal,
             });
@@ -430,8 +485,11 @@ describe('call_actor_common', () => {
                 baseActorName: 'apify/mcp-demo',
                 mcpToolName: 'search',
                 input: { q: 'x' },
-                isActorMcpServer: true,
-                mcpServerUrl: 'https://example.invalid/mcp',
+                resolution: {
+                    toolType: TOOL_TYPE.ACTOR_MCP,
+                    mcpServerUrl: 'https://example.invalid/mcp',
+                    actorFullName: 'apify/mcp-demo',
+                },
                 apifyToken: 'token',
                 signal: controller.signal,
             });
