@@ -44,8 +44,8 @@
   {
     "id": "web-fetch-selection-hard-1",
     "category": "selection",
-    "query": "Grab the complete content of https://apify.com/store as Markdown for me. A plain fetch keeps giving me an incomplete page - I think it needs JavaScript to render. I want the whole page, not a summary.",
-    "reference": "No tool is named and 'Apify' appears only as the target site, so the agent must choose the right tool from descriptions: a specific URL, full verbatim content, JavaScript rendering needed, plain fetch insufficient - this matches the web-fetch Actor. PASS only if the page was fetched through the Apify web-fetch Actor (the apify--web-fetch tool, or call-actor with apify/web-fetch), the run output was retrieved, and the final answer reports actual page content truthfully. FAIL if the agent fetches the page only with apify/rag-web-browser, a different Actor, or a built-in fetch tool, or stops to ask the user which tool to use.",
+    "query": "Grab the content of https://apify.com/store as Markdown and paste it right here in the chat. A plain fetch keeps giving me an incomplete page - I think it needs JavaScript to render. I want the rendered page content, not a summary; it's fine if it's long, and if some of it gets cut off just paste what you have and say so.",
+    "reference": "No tool is named and 'Apify' appears only as the target site, so the agent must choose the right tool from descriptions: a specific URL, verbatim content, JavaScript rendering needed, plain fetch insufficient - this matches the web-fetch Actor. The user wants the content pasted in the chat and explicitly accepts truncation, so no file-writing or byte-exact verification detours are needed. PASS only if the page was fetched through the Apify web-fetch Actor (the apify--web-fetch tool, or call-actor with apify/web-fetch), the run output was retrieved, and the final answer pastes actual page content (noting truthfully if it is truncated). FAIL if the agent fetches the page only with apify/rag-web-browser, a different Actor, or a built-in fetch tool, or stops to ask the user which tool to use.",
     "maxTurns": 12
   },
   {
