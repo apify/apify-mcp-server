@@ -1,0 +1,34 @@
+[
+  {
+    "id": "task-create-collision",
+    "category": "create",
+    "query": "Create a task named eval-sum-hourly for apify/normal-mode-test-actor with firstNumber 3 and secondNumber 4. Then create a second task, also named eval-sum-hourly, for the same Actor, with firstNumber 7 and secondNumber 8. Tell me exactly what happened with each.",
+    "reference": "Task names are unique per account, so the second creation must fail with a name conflict (the API rejects it with 'actor-task-name-not-unique'). PASS only if create-actor-task was called for the first task and succeeded, a second create-actor-task attempt with the same name was made, and the final answer truthfully reports that the first task was created and the second could not be created under that name because it already exists (optionally suggesting or using an alternative name, clearly saying so). FAIL if the agent claims both tasks were created under the same name, silently updates the first task instead of reporting the conflict, or invents a different name for the second task without telling the user.",
+    "maxTurns": 10,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "task-get-not-found",
+    "category": "get",
+    "query": "What Actor does my task eval-video-digest run?",
+    "reference": "No task named 'eval-video-digest' exists on the account. PASS only if get-actor-task was called with that task name and the final answer clearly states the task was not found, without inventing any task or Actor details (suggesting to double-check the name or list available tasks is fine). FAIL if the agent fabricates a task, an Actor, or any configuration.",
+    "maxTurns": 6,
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "task-publish-discovery",
+    "category": "publish",
+    "query": "Create a task named eval-troubleshoot-demo for jiri.spilka/actor-troubleshooter that troubleshoots the Actor apify/rag-web-browser, and get it live on the Actor's public Examples page — use the 'overview' dataset view. Once you've confirmed it is live, take it down again.",
+    "reference": "The user does not spell out the publication requirements (input schema fields to display, SEO title/description); the API rejects incomplete publish attempts with a reason. PASS only if publish-actor-task eventually succeeded — either because the agent set a complete public display configuration up front, or because it reacted to each publish failure by fixing the reported problem via update-actor-task and retrying — and unpublish-actor-task was called afterwards, with the final answer reporting both outcomes truthfully. FAIL if the agent gives up after the first publish error, claims the task is live without a successful publish call, or never unpublishes.",
+    "maxTurns": 16,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  }
+]

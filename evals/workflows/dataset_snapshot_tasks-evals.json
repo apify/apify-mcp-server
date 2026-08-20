@@ -1,0 +1,78 @@
+[
+  {
+    "id": "task-chain-hard-1",
+    "category": "chain",
+    "query": "I keep running the troubleshooter Actor from jiri.spilka on apify/rag-web-browser over and over; the only input I ever set is the Actor ID, apify/rag-web-browser. Turn that into something I can rerun with one click (call it eval-rag-checkup). I'd also like to see how it would look as an example on the Actor's public page — put it up using the 'overview' dataset view, confirm it's actually live, and then take it down again.",
+    "reference": "Phrased without any tool or feature names: the agent must map (1) 'rerun with one click' to a saved task, (2) 'put it up on the Actor's public page' to publishing, and (3) 'take it down' to unpublishing. The input is fully specified (actorId apify/rag-web-browser), so there is nothing to ask the user about, and the tool documentation states every publication requirement, so the whole flow completes without a single failed tool call. PASS only if create-actor-task was called for jiri.spilka/actor-troubleshooter with the name 'eval-rag-checkup' and an input targeting apify/rag-web-browser, the public display configuration (inputSchemaFields, datasetView 'overview', an SEO description) was set at creation or via update-actor-task before publishing, publish-actor-task succeeded, unpublish-actor-task was called afterwards, and the final answer reports the whole sequence truthfully. FAIL if the agent stops to ask the user instead of acting, skips any of the three steps, or claims a step succeeded without the corresponding successful tool call.",
+    "maxTurns": 18,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "task-chain-medium-1",
+    "category": "chain",
+    "query": "Set up the Google Maps scraper to search for hotels in Prague and save that configuration under the name eval-prague-hotels so I can rerun it weekly. Don't run it now.",
+    "reference": "The agent must discover a Google Maps scraper on the Apify Store, work out what input it needs, and save a reusable task. PASS only if create-actor-task was called with a Google Maps scraper Actor, the name 'eval-prague-hotels', and an input that searches for hotels in Prague, and the final answer confirms the task was saved. FAIL if the agent runs the scraper (call-actor) instead of, or in addition to, saving the task, or invents input fields without checking the Actor's input schema (fetch-actor-details or equivalent must have been consulted).",
+    "maxTurns": 12,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "task-create-easy-1",
+    "category": "create",
+    "query": "Create a task called eval-sum-daily for the apify/normal-mode-test-actor Actor that runs it with firstNumber 5 and secondNumber 7.",
+    "reference": "The agent must create a saved task named 'eval-sum-daily' for apify/normal-mode-test-actor. PASS only if create-actor-task was called with that Actor and an input containing firstNumber 5 and secondNumber 7, and the final answer confirms the task was created (mentioning its name or task ID). The agent must not run the Actor itself.",
+    "maxTurns": 8,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "task-get-easy-1",
+    "category": "get",
+    "query": "What Actor does my task eval-sum-nightly run, and what input is it configured with?",
+    "reference": "The agent must look up the saved task 'eval-sum-nightly'. PASS only if get-actor-task was called with that task name or its ID, and the final answer names the Actor it runs (apify/normal-mode-test-actor or its ID) and reports the configured input values: firstNumber 1 and secondNumber 2. FAIL if the values reported do not match, or if the agent claims the values are unavailable (the tool returns the stored input).",
+    "maxTurns": 6,
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "task-publish-medium-1",
+    "category": "publish",
+    "query": "Create a task named eval-troubleshoot-rag-browser for jiri.spilka/actor-troubleshooter, set up to troubleshoot the Actor apify/rag-web-browser (its actorId input). Publish it as a public example: on the public page show the actorId field, use the dataset view 'overview', and give it the title 'Troubleshoot rag-web-browser' with a short SEO description. Once you have confirmed it is published, unpublish it again.",
+    "reference": "The agent must create the task with the public display configuration (inputSchemaFields containing actorId, datasetView 'overview', an seoTitle and an seoDescription) set at creation or added via update-actor-task, then publish it, then unpublish it. PASS only if publish-actor-task was called with the task's name or ID, unpublish-actor-task was called afterwards, and the final answer reports both the publish and the unpublish outcome. FAIL if publish or unpublish was never called, or if the agent claims the task was published without a successful publish call.",
+    "maxTurns": 14,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "task-update-easy-1",
+    "category": "update",
+    "query": "Create a task named eval-sum-weekly for apify/normal-mode-test-actor with firstNumber 1 and secondNumber 2. Then change the task so firstNumber is 10 instead, and confirm the change.",
+    "reference": "The agent must first create the task 'eval-sum-weekly' with create-actor-task, then modify it. PASS only if update-actor-task was called with the task's name or ID and an input containing firstNumber 10, and the final answer confirms the change (the tool response returns the updated input, so the agent can and should confirm firstNumber is now 10). FAIL if the agent only creates a new task with the new input instead of updating the existing one, or reports values that do not match the update.",
+    "maxTurns": 10,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "task-update-medium-1",
+    "category": "update",
+    "query": "Create a task named eval-sum-monthly for apify/normal-mode-test-actor with firstNumber 2 and secondNumber 3. Then make it run with 1024 MB of memory and a 300-second timeout, and rename it to eval-sum-quarterly.",
+    "reference": "The agent must create the task and then change its run options and name. PASS only if create-actor-task was called first, then update-actor-task was called with the task's name or ID, memoryMbytes 1024, timeoutSecs 300, and the new name 'eval-sum-quarterly', and the final answer confirms the changes. Combining the option changes and the rename into one or two update calls are both acceptable. FAIL if the agent creates a second task instead of updating, or claims changes it never made.",
+    "maxTurns": 10,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  }
+]

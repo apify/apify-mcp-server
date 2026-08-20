@@ -31,7 +31,16 @@ import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js
 sanitizeProcessEnv();
 
 /** Resolved from this module so cwd cannot change it. */
-const SNAPSHOT_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dataset_snapshot.json');
+const SNAPSHOT_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+/** The default dataset keeps its historical filename; other datasets get their own file. */
+function snapshotPath(dataset: string): string {
+    const fileName =
+        dataset === WORKFLOW_DATASET_NAME
+            ? 'dataset_snapshot.json'
+            : `dataset_snapshot_${dataset.replace(/[^a-zA-Z0-9-]/g, '_')}.json`;
+    return path.join(SNAPSHOT_DIR, fileName);
+}
 
 async function main() {
     const argv = (await yargs(hideBin(process.argv))
@@ -51,8 +60,9 @@ async function main() {
     // Drop the raw item: the snapshot holds test cases, not Langfuse bookkeeping.
     const testCases = cases.map(({ item, ...testCase }) => testCase);
 
-    fs.writeFileSync(SNAPSHOT_PATH, `${JSON.stringify(testCases, null, 2)}\n`);
-    console.log(`✅ Wrote ${testCases.length} case(s) from "${argv.dataset}" to ${SNAPSHOT_PATH}`);
+    const outPath = snapshotPath(argv.dataset);
+    fs.writeFileSync(outPath, `${JSON.stringify(testCases, null, 2)}\n`);
+    console.log(`✅ Wrote ${testCases.length} case(s) from "${argv.dataset}" to ${outPath}`);
 }
 
 void main();

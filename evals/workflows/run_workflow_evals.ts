@@ -51,6 +51,8 @@ type CliArgs = {
     toolTimeout: number;
     concurrency: number;
     mcpToolsOnly: boolean;
+    subscription: boolean;
+    allowToolErrors: boolean;
 };
 
 /** Current git branch, or 'unknown' if it can't be resolved. */
@@ -93,10 +95,22 @@ async function main() {
                 description: 'Tool call timeout in seconds',
                 default: DEFAULT_TOOL_TIMEOUT_SECONDS,
             },
-            concurrency: { alias: 'c', type: 'number', description: 'Items to run in parallel', default: 4 },
+            concurrency: { alias: 'c', type: 'number', description: 'Items to run in parallel', default: 8 },
             'mcp-tools-only': {
                 type: 'boolean',
                 description: "Drop Claude Code's built-in tools, leaving only the Apify MCP server's",
+                default: false,
+            },
+            subscription: {
+                type: 'boolean',
+                description: 'Run the agent on the local Claude Code login (subscription) instead of ANTHROPIC_API_KEY',
+                default: false,
+            },
+            'allow-tool-errors': {
+                type: 'boolean',
+                description:
+                    'Do not fail items on failed tool calls. Only for error-handling suites ' +
+                    '(cases that provoke errors on purpose); the default gate requires zero tool errors.',
                 default: false,
             },
         })
@@ -115,11 +129,17 @@ async function main() {
         ...LANGFUSE_ENV_VARS,
         'APIFY_TOKEN',
         'OPENROUTER_API_KEY',
-        'ANTHROPIC_API_KEY',
+        ...(argv.subscription ? [] : ['ANTHROPIC_API_KEY']),
     ]);
     if (missing.length > 0) {
         console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
         process.exit(1);
+    }
+
+    // The Agent SDK's Claude Code subprocess falls back to the local login only when no
+    // API key is in its environment, which it inherits from this process.
+    if (argv.subscription) {
+        delete process.env.ANTHROPIC_API_KEY;
     }
 
     // The Agent SDK spawns the MCP server from the built binary; fail early with the fix.
@@ -186,7 +206,7 @@ async function main() {
                 // SDK dropped pull the rate down instead of vanishing from it.
                 async ({ itemResults }) => ({
                     name: 'pass_rate',
-                    value: countPassed(itemResults) / requestedIds.length,
+                    value: countPassed(itemResults, argv.allowToolErrors) / requestedIds.length,
                 }),
             ],
             maxConcurrency: argv.concurrency,
@@ -196,11 +216,13 @@ async function main() {
                 toolTimeout: argv.toolTimeout,
                 mcpToolsOnly: argv.mcpToolsOnly,
                 agentSdkVersion,
+                agentAuth: argv.subscription ? 'subscription' : 'api-key',
+                allowToolErrors: argv.allowToolErrors,
             },
         });
 
         // Compact on purpose: Langfuse holds the full per-item view behind the run link.
-        const summary = buildRunSummary(requestedIds, result.itemResults);
+        const summary = buildRunSummary(requestedIds, result.itemResults, argv.allowToolErrors);
         for (const failure of summary.failures) {
             console.log(`❌ ${failure.id}: ${failure.reason}`);
         }

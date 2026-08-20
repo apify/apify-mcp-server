@@ -42,7 +42,26 @@ pnpm run build
 pnpm run evals:workflow
 ```
 
-Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 4 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), and `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain.
+Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 4 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, and `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API).
+
+### Proper suites vs error-handling suites
+
+By default the gate requires zero failed tool calls: an item whose agent hit any tool error fails even
+on a judge PASS, and every item carries a `tool_errors` score (count, with the failing calls in the
+comment). Cases that provoke errors on purpose (error recovery, not-found lookups, name collisions)
+live in a separate `*-errors` dataset and run with `--allow-tool-errors`, which drops only the
+zero-error condition. Never mix the two: an error-provoking case inside a proper suite either fails the
+run or forces error tolerance onto cases that must stay clean. Failures injected by `failTools` are
+exempt automatically (the harness caused them itself).
+
+Failed read-only probes count too: an agent that guesses an Actor slug and eats a not-found fails the
+gate even when it recovers and the judge passes it. The clean path for a loose Actor reference is
+`search-actors`, and the gate is what keeps the tool descriptions strong enough that agents take it.
+
+The task-tool suites are `tasks-evals` (proper) and `tasks-evals-errors` (error handling). They use
+fixed `eval-*` task names, which are unique per account. `pnpm run evals:workflow:tasks-fixtures`
+deletes leftover `eval-*` tasks from previous runs and seeds the permanent fixture task; run it when a
+previous run left debris.
 
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
@@ -52,6 +71,7 @@ Run `pnpm run evals:workflow --help` for the full option list. `--category` and 
 ```bash
 pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot.json (no build, no Apify/OpenRouter keys)
 ```
+`--dataset <name>` exports another dataset to its own `dataset_snapshot_<name>.json` (e.g. `tasks-evals`).
 
 ---
 
@@ -236,7 +256,7 @@ Results are recorded in Langfuse, not to a local file. Each run:
 - **Reads the dataset** `workflow-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
 - **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
 - **Traces** every item as one trace. Its root output is the judge verdict plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed), and a generation for the judge call. See design decision 9.
-- **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) is the strict gate, and `total_tokens` is the agent tokens billed, omitted when the provider reported no usage so an unmeasured run cannot look like a free one.
+- **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) is the strict gate, `total_tokens` is the agent tokens billed (omitted when the provider reported no usage so an unmeasured run cannot look like a free one), and `tool_errors` counts failed tool calls (comment lists them; `0` on a clean item). Without `--allow-tool-errors`, an item passes only on judge PASS **and** `tool_errors == 0`.
 - **Scores the run** with `pass_rate`: passing items over items requested, so runs stay comparable even when items were dropped.
 
 ### Concurrency
