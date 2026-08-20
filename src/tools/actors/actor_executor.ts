@@ -2,9 +2,8 @@ import log from '@apify/log';
 
 import { FAILURE_CATEGORY } from '../../const.js';
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
-import { isActorInputValidationError } from '../../utils/apify_errors.js';
+import { buildInvalidInputTexts, isActorInputValidationError } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
-import { wrapJsonText } from '../../utils/encode_text.js';
 import { redactSkyfirePayId } from '../../utils/logging.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
@@ -52,14 +51,10 @@ export const actorExecutor: ActorExecutor = {
                 mcpSessionId,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
             });
-            return respondUserError(
-                [
-                    `Failed to call Actor '${actorFullName}': ${error.message}`,
-                    `Please ensure the input is correct and matches the Actor's input schema.`,
-                    ...(params.inputSchema ? [`Input schema:\n${wrapJsonText(params.inputSchema)}`] : []),
-                ],
-                { actorId: params.actorId, detail: error.message.slice(0, 200) },
-            ) as ActorExecutionResult;
+            return respondUserError(buildInvalidInputTexts(actorFullName, error.message, params.inputSchema), {
+                actorId: params.actorId,
+                detail: error.message.slice(0, 200),
+            }) as ActorExecutionResult;
         }
 
         log.debug('Started Actor run (direct actor tool)', {

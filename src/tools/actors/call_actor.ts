@@ -31,6 +31,7 @@ import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/acto
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
+    buildInvalidInputTexts,
     isActorInputValidationError,
     isActorRunLimitError,
     isMemoryQuotaError,
@@ -217,14 +218,10 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
 
     // Checked before the generic fallback below: the Actor was found fine, only its input wasn't.
     if (isActorInputValidationError(error)) {
-        return respondUserError(
-            [
-                `Failed to call Actor '${actorName}': ${errMsg}`,
-                `Please ensure the input is correct and matches the Actor's input schema.`,
-                ...(inputSchema ? [`Input schema:\n${wrapJsonText(inputSchema)}`] : []),
-            ],
-            { actorId, detail: errMsg.slice(0, 200) },
-        );
+        return respondUserError(buildInvalidInputTexts(actorName, errMsg, inputSchema), {
+            actorId,
+            detail: errMsg.slice(0, 200),
+        });
     }
 
     return respondServerError(
