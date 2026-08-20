@@ -66,7 +66,7 @@ describe('getProxyMCPServerToolName()', () => {
         );
     });
 
-    it('keeps one identical prefix across every tool of the same Actor', () => {
+    it("keeps one identical prefix across an Actor's over-length tool names", () => {
         const actorFullName = 'alizarin_refrigerator-owner/competitive-intelligence-mcp-server';
         const names = ['search', 'analyze', 'get-company-profile'].map((toolName) =>
             getProxyMCPServerToolName(actorFullName, toolName),
