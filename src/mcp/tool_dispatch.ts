@@ -132,15 +132,6 @@ export async function dispatchToolCall(params: {
             // already answered, so forwarding against its progressToken would misroute.
             const shouldForward = shouldForwardNotifications && progressToken !== undefined && progressToken !== null;
 
-            log.info(`Calling Actor-MCP${logContext?.messageSuffix ?? ''}`, {
-                ...logContext?.fields,
-                toolName: tool.name,
-                actorMcpToolName: tool.originToolName,
-                actorId: tool.actorId,
-                mcpSessionId,
-                input: logSafeArgs,
-            });
-
             const outcome = await callRemoteMcpTool({
                 serverUrl: tool.serverUrl,
                 toolName: tool.originToolName,
@@ -151,18 +142,28 @@ export async function dispatchToolCall(params: {
                 // Without forwarding there is no route back for remote progress — don't hand the
                 // remote a token nobody listens to.
                 meta: shouldForward ? { progressToken } : undefined,
-                onConnected: shouldForward
-                    ? (client: Client) => {
-                          for (const schema of ServerNotificationSchema.options) {
-                              const method = schema.shape.method.value;
-                              // Forward notifications from the proxy client to the server
-                              client.setNotificationHandler(schema, async (notification) => {
-                                  log.debug('Sending MCP notification', { method, mcpSessionId, notification });
-                                  await sendNotification(notification);
-                              });
-                          }
-                      }
-                    : undefined,
+                // Runs only once a connection actually exists, matching where this logging and
+                // notification setup ran before extraction (never on a connect failure).
+                onConnected: (client: Client) => {
+                    if (shouldForward) {
+                        for (const schema of ServerNotificationSchema.options) {
+                            const method = schema.shape.method.value;
+                            // Forward notifications from the proxy client to the server
+                            client.setNotificationHandler(schema, async (notification) => {
+                                log.debug('Sending MCP notification', { method, mcpSessionId, notification });
+                                await sendNotification(notification);
+                            });
+                        }
+                    }
+                    log.info(`Calling Actor-MCP${logContext?.messageSuffix ?? ''}`, {
+                        ...logContext?.fields,
+                        toolName: tool.name,
+                        actorMcpToolName: tool.originToolName,
+                        actorId: tool.actorId,
+                        mcpSessionId,
+                        input: logSafeArgs,
+                    });
+                },
             });
 
             switch (outcome.outcome) {
