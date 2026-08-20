@@ -31,6 +31,13 @@ export type WorkflowTaskOutput = {
     totalTokens?: number;
     /** Agent narration, thinking, and tool names per turn. Debug view only, never judged. */
     transcript: TranscriptEntry[];
+    /**
+     * Failed tool calls, excluding failures the harness injected itself via `failTools`.
+     * The default run gate requires this to be empty: a proper eval case must complete
+     * without tool errors, and cases that provoke errors on purpose live in a separate
+     * dataset run with --allow-tool-errors.
+     */
+    toolErrors: { tool: string; error: string }[];
 };
 
 /**
@@ -42,6 +49,7 @@ export type WorkflowTaskOutput = {
 export const SCORE_NAMES = {
     WORKFLOW_JUDGE: 'workflow_judge',
     TOTAL_TOKENS: 'total_tokens',
+    TOOL_ERRORS: 'tool_errors',
 } as const;
 
 type WorkflowEvaluator = (params: { output: WorkflowTaskOutput }) => Promise<Evaluation | Evaluation[]>;
@@ -57,17 +65,29 @@ export const evaluators: WorkflowEvaluator[] = [
     // measurement and skew cross-run model comparisons in Langfuse.
     async ({ output }) =>
         output.totalTokens === undefined ? [] : [{ name: SCORE_NAMES.TOTAL_TOKENS, value: output.totalTokens }],
+    // Always emitted, so a clean item shows an explicit 0 rather than nothing.
+    async ({ output }) => ({
+        name: SCORE_NAMES.TOOL_ERRORS,
+        value: output.toolErrors.length,
+        ...(output.toolErrors.length > 0
+            ? { comment: output.toolErrors.map(({ tool, error }) => `${tool}: ${error}`).join('\n') }
+            : {}),
+    }),
 ];
 
 /** Minimal view of an ExperimentItemResult: what the run gate reads. */
 type ScoredItem = { output: WorkflowTaskOutput; evaluations: { name: string; value?: unknown }[] };
 
-/** Items that scored `workflow_judge === 1`. */
-export function countPassed(itemResults: ScoredItem[]): number {
-    return itemResults.filter(
-        (result) =>
-            result.evaluations.find((evaluation) => evaluation.name === SCORE_NAMES.WORKFLOW_JUDGE)?.value === 1,
-    ).length;
+/** Whether one item passes the gate: judge PASS, plus no tool errors unless the run allows them. */
+function itemPassed(result: ScoredItem, allowToolErrors: boolean): boolean {
+    const judgePassed =
+        result.evaluations.find((evaluation) => evaluation.name === SCORE_NAMES.WORKFLOW_JUDGE)?.value === 1;
+    return judgePassed && (allowToolErrors || result.output.toolErrors.length === 0);
+}
+
+/** Items that pass the gate. */
+export function countPassed(itemResults: ScoredItem[], allowToolErrors: boolean): number {
+    return itemResults.filter((result) => itemPassed(result, allowToolErrors)).length;
 }
 
 export type RunSummary = {
@@ -86,29 +106,38 @@ export type RunSummary = {
  * threw, so gating on `itemResults.length` would report "7/7 passed" on a run where
  * three tests never executed.
  */
-export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[]): RunSummary {
+export function buildRunSummary(
+    requestedIds: string[],
+    itemResults: ScoredItem[],
+    allowToolErrors: boolean,
+): RunSummary {
     const failures: { id: string; reason: string }[] = [];
 
     for (const result of itemResults) {
+        if (itemPassed(result, allowToolErrors)) continue;
         const judgeScore = result.evaluations.find(
             (evaluation) => evaluation.name === SCORE_NAMES.WORKFLOW_JUDGE,
         )?.value;
-        if (judgeScore === 1) continue;
         // No score means the evaluator itself threw, so judgeResult.reason is stale - it can
         // hold the judge's PASS rationale, printed under a failure marker. Say what happened.
-        failures.push({
-            id: result.output.id,
-            reason:
-                judgeScore === undefined
-                    ? `no ${SCORE_NAMES.WORKFLOW_JUDGE} score (the evaluator threw)`
-                    : result.output.judgeResult.reason,
-        });
+        let reason;
+        if (judgeScore === undefined) {
+            reason = `no ${SCORE_NAMES.WORKFLOW_JUDGE} score (the evaluator threw)`;
+        } else if (judgeScore === 1) {
+            const { toolErrors } = result.output;
+            reason = `judge passed, but ${toolErrors.length} tool error(s): ${toolErrors
+                .map(({ tool, error }) => `${tool}: ${error.split('\n')[0]}`)
+                .join('; ')}`;
+        } else {
+            reason = result.output.judgeResult.reason;
+        }
+        failures.push({ id: result.output.id, reason });
     }
 
     const completedIds = new Set(itemResults.map((result) => result.output.id));
 
     return {
-        passedCount: countPassed(itemResults),
+        passedCount: countPassed(itemResults, allowToolErrors),
         failures,
         droppedIds: requestedIds.filter((id) => !completedIds.has(id)),
     };
@@ -179,11 +208,21 @@ export function makeTask(options: WorkflowTaskOptions) {
             const { conversation, transcript } = adapted;
             const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
 
+            // Failures of tools the harness force-failed itself are not errors of the run.
+            const injected = new Set(item.metadata.failTools ?? []);
+            const toolErrors = adapted.toolInvocations
+                .filter((invocation) => !invocation.result.success && !injected.has(invocation.name))
+                .map((invocation) => ({
+                    tool: invocation.name,
+                    error: invocation.result.success ? '' : (invocation.result.error ?? 'unknown error'),
+                }));
+
             return {
                 id: item.id,
                 judgeResult,
                 totalTokens: conversation.totalTokens,
                 transcript,
+                toolErrors,
             };
         } catch (error) {
             throw new Error(`Item "${item.id}": ${error instanceof Error ? error.message : String(error)}`, {
