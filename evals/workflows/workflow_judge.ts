@@ -8,7 +8,7 @@ import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 import { z } from 'zod';
 
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
-import type { LlmClient } from './llm_client.js';
+import type { JudgeLlmClient } from './llm_client.js';
 import type { ConversationHistory } from './types.js';
 
 /**
@@ -117,7 +117,7 @@ function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reaso
 export async function evaluateConversation(
     reference: string,
     conversation: ConversationHistory,
-    llmClient: LlmClient,
+    llmClient: JudgeLlmClient,
     judgeModel: string = MODELS.judge,
 ): Promise<JudgeResult> {
     // Format conversation for judge

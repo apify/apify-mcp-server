@@ -11,7 +11,7 @@ import type { Evaluation } from '@langfuse/client';
 import { runAgentConversation } from './claude_agent.js';
 import { parseWorkflowItem } from './langfuse_dataset.js';
 import { buildAgentObservations, emitObservations } from './langfuse_observations.js';
-import type { LlmClient } from './llm_client.js';
+import type { JudgeLlmClient } from './llm_client.js';
 import type { TranscriptEntry } from './sdk_conversation_adapter.js';
 import type { JudgeResult } from './workflow_judge.js';
 import { evaluateConversation } from './workflow_judge.js';
@@ -144,7 +144,7 @@ export function buildRunSummary(
 }
 
 export type WorkflowTaskOptions = {
-    llmClient: LlmClient;
+    llmClient: JudgeLlmClient;
     apifyToken: string;
     agentModel: string;
     judgeModel: string;
