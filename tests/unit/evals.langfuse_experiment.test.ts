@@ -107,7 +107,25 @@ describe('makeTask()', () => {
     });
 
     it('names the item in a harness error, which the SDK log line omits', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
         await expect(makeWorkflowTask()(makeItem())).rejects.toThrow('Item "search-001": spawn ENOENT');
+        // Both attempts failed: the transient-failure retry ran and did not mask the error.
+        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries the agent run once on a transient failure', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        mocks.runAgentConversation.mockRejectedValueOnce(new Error('Connection error.')).mockResolvedValueOnce({
+            conversation: { turns: [], totalTokens: 1234 },
+            transcript: [],
+            toolInvocations: [],
+        });
+
+        await expect(makeWorkflowTask()(makeItem())).resolves.toMatchObject({
+            id: 'search-001',
+            judgeResult: { verdict: 'PASS' },
+        });
+        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
     });
 
     it('still scores the item when emitting the agent trace throws', async () => {

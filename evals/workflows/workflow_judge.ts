@@ -131,28 +131,31 @@ export async function evaluateConversation(
         () => formattedConversation,
     );
 
-    // Call judge LLM with structured output schema
-    const response = await llmClient.callLlm(
-        [{ role: 'user', content: judgePrompt }],
-        judgeModel,
-        undefined, // No tools
-        JUDGE_RESPONSE_SCHEMA, // Use structured output
-    );
-
-    const rawResponse = response.content || '';
-
-    // Parse response
-    try {
-        const { verdict, reason } = parseJudgeResponse(rawResponse);
-        return {
-            verdict,
-            reason,
-            rawResponse,
-        };
-    } catch (error) {
-        throw new Error(
-            `Failed to parse judge response: ${error instanceof Error ? error.message : String(error)}\n` +
-                `Raw response: ${rawResponse}`,
+    // Some OpenRouter providers occasionally ignore the JSON schema and answer in plain
+    // text (e.g. "PASS: ..."). One fresh judge call recovers those without rerunning the
+    // far more expensive agent conversation; a second malformed answer still throws.
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        const response = await llmClient.callLlm(
+            [{ role: 'user', content: judgePrompt }],
+            judgeModel,
+            undefined, // No tools
+            JUDGE_RESPONSE_SCHEMA, // Use structured output
         );
+        const rawResponse = response.content || '';
+
+        try {
+            const { verdict, reason } = parseJudgeResponse(rawResponse);
+            return {
+                verdict,
+                reason,
+                rawResponse,
+            };
+        } catch (error) {
+            lastError = error;
+        }
     }
+    throw new Error(
+        `Failed to parse judge response after 2 attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+    );
 }

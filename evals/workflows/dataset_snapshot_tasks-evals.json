@@ -67,8 +67,8 @@
   {
     "id": "task-update-medium-1",
     "category": "update",
-    "query": "Create a task named eval-sum-monthly for apify/normal-mode-test-actor with firstNumber 2 and secondNumber 3. Then make it run with 1024 MB of memory and a 300-second timeout, and rename it to eval-sum-quarterly.",
-    "reference": "The agent must create the task and then change its run options and name. PASS only if create-actor-task was called first, then update-actor-task was called with the task's name or ID, memoryMbytes 1024, timeoutSecs 300, and the new name 'eval-sum-quarterly', and the final answer confirms the changes. Combining the option changes and the rename into one or two update calls are both acceptable. FAIL if the agent creates a second task instead of updating, or claims changes it never made.",
+    "query": "Create a task named eval-sum-monthly for apify/normal-mode-test-actor with firstNumber 2 and secondNumber 3, leaving the run options at their defaults. Then change it to run with 1024 MB of memory and a 300-second timeout, and rename it to eval-sum-quarterly.",
+    "reference": "The agent must create the task without custom run options, then change the existing task. PASS only if create-actor-task was called without memoryMbytes or timeoutSecs, then update-actor-task was called with the task's name or ID, memoryMbytes 1024, timeoutSecs 300, and the new name 'eval-sum-quarterly', and the final answer confirms the changes. Combining the option changes and the rename into one or two update calls are both acceptable. FAIL if the run options were set at creation (the user asked for defaults first), set via call-actor or a one-off run, or if a second task was created instead of updating the existing one.",
     "maxTurns": 10,
     "tools": [
       "tasks",

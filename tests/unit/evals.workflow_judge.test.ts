@@ -71,4 +71,30 @@ describe('evaluateConversation()', () => {
 
         expect(result.verdict).toBe('PASS');
     });
+
+    it('retries once when the judge answers in plain text instead of JSON', async () => {
+        const responses = ['PASS: looks good but not JSON', '{"verdict":"PASS","reason":"ok"}'];
+        let calls = 0;
+        const client = {
+            callLlm: async () => ({ content: responses[calls++] }),
+        } as unknown as LlmClient;
+
+        const result = await evaluateConversation(reference, conversation, client);
+
+        expect(result.verdict).toBe('PASS');
+        expect(calls).toBe(2);
+    });
+
+    it('throws after two malformed judge answers', async () => {
+        let calls = 0;
+        const client = {
+            callLlm: async () => {
+                calls++;
+                return { content: 'not json at all' };
+            },
+        } as unknown as LlmClient;
+
+        await expect(evaluateConversation(reference, conversation, client)).rejects.toThrow('after 2 attempts');
+        expect(calls).toBe(2);
+    });
 });

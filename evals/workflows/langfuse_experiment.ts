@@ -169,8 +169,7 @@ export function makeTask(options: WorkflowTaskOptions) {
         const item = parseWorkflowItem(rawItem);
 
         try {
-            const startedAt = Date.now();
-            const adapted = await runAgentConversation({
+            const runOptions = {
                 prompt: item.input.query,
                 model: agentModel,
                 apifyToken,
@@ -179,7 +178,21 @@ export function makeTask(options: WorkflowTaskOptions) {
                 maxTurns: item.metadata.maxTurns,
                 toolTimeoutSeconds: toolTimeout,
                 mcpToolsOnly,
-            });
+            };
+            let startedAt = Date.now();
+            let adapted;
+            try {
+                adapted = await runAgentConversation(runOptions);
+            } catch (error) {
+                // Transient SDK/API failures ("Connection error.") drop the whole item from
+                // the run. One retry absorbs them; a persistent failure still throws below.
+                // eslint-disable-next-line no-console
+                console.error(
+                    `⚠️ Item "${item.id}": agent run failed (${error instanceof Error ? error.message : String(error)}), retrying once`,
+                );
+                startedAt = Date.now();
+                adapted = await runAgentConversation(runOptions);
+            }
 
             // The agent ran in a subprocess, so its conversation reaches Langfuse only if
             // we send it. Emitted before the judge call, so a failing judge still leaves
