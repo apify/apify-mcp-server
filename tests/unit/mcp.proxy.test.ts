@@ -129,6 +129,17 @@ describe('getProxyMCPServerToolName()', () => {
         expect(name.length).toBe(MAX_TOOL_NAME_LENGTH);
     });
 
+    it('hashes a sibling-capped name so two capped usernames stay distinct', () => {
+        const actorName = 'web-scraping-dataset-tools-mcp-server';
+        const a = getProxyMCPServerToolName(`crawler_alpha/${actorName}`, 'list', true);
+        const b = getProxyMCPServerToolName(`crawler_bravo/${actorName}`, 'list', true);
+
+        // Both names fit the limit uncapped, so only the hash keeps them apart once capped.
+        expect(a).not.toBe(b);
+        expect(a.startsWith(`crawler_--${actorName}--list-`)).toBe(true);
+        expect(b.startsWith(`crawler_--${actorName}--list-`)).toBe(true);
+    });
+
     it('omits the username segment when the Actor full name has no slash', () => {
         expect(getProxyMCPServerToolName('web-scraping-dataset-tools-mcp-server', 'search')).toBe(
             'web-scraping-dataset-tools-mcp-server--search',
@@ -204,7 +215,7 @@ describe('getMCPServerTools()', () => {
         );
 
         expect(tools.map(({ name }) => name)).toEqual([
-            'longuser--my-mcp-server--add',
+            'longuser--my-mcp-server--add-34ee',
             'longuser--my-mcp-server--a-tool-name-long-enough-to-push-pa-fa1b',
         ]);
     });

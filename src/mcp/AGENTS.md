@@ -59,9 +59,10 @@ Two MCP protocol revisions are served, each by its own adapter:
   instance field it touches is the identity-independent widget-resolution memo). Never resolve a
   stateless request by writing to the shared facade — concurrent requests would contaminate
   each other.
-- **Tool names are capped at `MAX_TOOL_NAME_LENGTH`.** Over-length names get a
-  `TOOL_NAME_HASH_LENGTH` hash suffix. If any proxied name exceeds the cap, all sibling tools cap
-  their username to `MAX_TOOL_NAME_USERNAME_LENGTH`; direct Actor tools do not. Collisions remain
+- **Tool names are capped at `MAX_TOOL_NAME_LENGTH`.** Every name the cap truncates — username,
+  tail, or both — carries a `TOOL_NAME_HASH_LENGTH` suffix hashed from the uncapped name;
+  truncation alone collides. If any proxied name exceeds the cap, all sibling tools cap their
+  username to `MAX_TOOL_NAME_USERNAME_LENGTH`; direct Actor tools do not. Collisions remain
   first-wins in `getToolsForServerMode`. Never widen the cap — clients depend on it.
 - **Proxy server IDs are URL-keyed.** `getMCPServerID(url)` keys `serverId` and the MCP client name.
   This keeps one Actor's SSE and streamable endpoints distinct. Exposed tool names instead use

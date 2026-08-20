@@ -41,16 +41,9 @@ export function getProxyMCPServerToolName(actorFullName: string, toolName: strin
             ? fullName
             : `${escapedUsername.slice(0, MAX_TOOL_NAME_USERNAME_LENGTH).replace(/-+$/, '')}--${actorAndToolName}`;
 
-    if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
-        return cappedName;
-    }
-
+    // Both truncations are lossy, so every capped name carries the hash of the uncapped one —
+    // otherwise two usernames sharing the first MAX_TOOL_NAME_USERNAME_LENGTH characters collide.
     const hash = createHash('sha256').update(fullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
-    const cappedNameWithHash = `${cappedName}-${hash}`;
-
-    if (cappedNameWithHash.length <= MAX_TOOL_NAME_LENGTH) {
-        return cappedNameWithHash;
-    }
 
     return `${cappedName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
 }
