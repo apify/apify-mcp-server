@@ -107,8 +107,25 @@ Examples of when to use:
 
 This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.`;
 
+export const WEB_FETCH = 'apify/web-fetch';
+/**
+ * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
+ * no references to any specific client or its built-in tools, so the same text works
+ * for every MCP client. Tune only based on eval results (`web-fetch-evals` dataset).
+ */
+export const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific URL and return its complete content (one URL per call).
+It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
+The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
+
+Examples of when to use:
+- User provides a URL and wants its content, its data or links, or an answer that requires reading that page
+- A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
+- Verbatim page content is needed, e.g. for quoting, extraction, or archiving
+
+This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.`;
+
 export const defaults = {
-    actors: [RAG_WEB_BROWSER],
+    actors: [RAG_WEB_BROWSER, WEB_FETCH],
 };
 
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */

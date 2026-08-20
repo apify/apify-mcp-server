@@ -63,6 +63,17 @@ fixed `eval-*` task names, which are unique per account. `pnpm run evals:workflo
 deletes leftover `eval-*` tasks from previous runs and seeds the permanent fixture task; run it when a
 previous run left debris.
 
+The web-fetch suites are `web-fetch-evals` (proper) and `web-fetch-evals-errors` (error handling),
+covering the `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting,
+tool selection among the defaults, and multi-fetch chains. They create no named account state, so
+there is no fixtures script. The cases fetch live third-party pages (example.com, httpbin.org,
+w3.org), so a failure can also mean the page changed — check the page before blaming the tool.
+Platform behavior the cases are built on (probed 2026-08-20): an HTTP 4xx/5xx from the target page
+still ends the run SUCCEEDED with `fetch.httpStatusCode` in the item; an unreachable domain either
+fails the run ("Could not connect…") or succeeds with an empty 502 item, depending on unblocker
+routing; JSON content fails `text`/`markdown` formats with a status message telling the agent to add
+`raw`; `ftp://` fails with "Unsupported URL protocol".
+
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
 - `1` = any test failed, any test never ran, or setup failed ❌

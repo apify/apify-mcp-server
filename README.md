@@ -60,6 +60,7 @@ For example, it can:
 - Use [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) to scrape Google Search Engine Results Pages (SERPs).
 - Use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments.
 - Use [RAG Web Browser](https://apify.com/apify/rag-web-browser) to search the web, scrape the top N URLs, and return their content.
+- Use [Web Fetch](https://apify.com/apify/web-fetch) to fetch any URL and return its content as Markdown, plain text, HTML, or links — with JavaScript rendering and anti-bot protection.
 
 **Video tutorial: Integrate 8,000+ Apify Actors and Agents with Claude**
 
@@ -218,7 +219,7 @@ Since Apify Store is large and growing rapidly, the MCP server provides a way to
 ### Actors
 
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
-By default, the server is pre-configured with one Actor, `apify/rag-web-browser`, and several helper tools.
+By default, the server is pre-configured with two Actors, `apify/rag-web-browser` and `apify/web-fetch`, and several helper tools.
 The MCP server loads an Actor's input schema and creates a corresponding MCP tool.
 This allows the AI agent to know exactly what arguments to pass to the Actor and what to expect in return.
 
@@ -268,6 +269,7 @@ Legend for the **Enabled by default** column:
 | `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
+| [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to fetch a URL and return its content. | ✅ |
 | `report-problem` | dev | Report a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
 | `get-actor-run-list` | runs | Get a list of an Actor's runs, filterable by status. |  |
 | `get-actor-log` | runs | Retrieve the logs for a specific Actor run. |  |
@@ -306,6 +308,7 @@ When no query parameters are provided, the MCP server loads the following `tools
 - `actors`
 - `docs`
 - `apify/rag-web-browser`
+- `apify/web-fetch`
 
 If the tools parameter is specified, only the listed tools or categories will be enabled – no default tools will be included.
 
@@ -320,7 +323,7 @@ If the tools parameter is specified, only the listed tools or categories will be
 The hosted server can be configured using query parameters in the URL. For example, to load the default tools, use:
 
 ```
-https://mcp.apify.com?tools=actors,docs,apify/rag-web-browser
+https://mcp.apify.com?tools=actors,docs,apify/rag-web-browser,apify/web-fetch
 ```
 
 
@@ -395,7 +398,7 @@ The v2 configuration preserves backward compatibility with v1 usage. Notes:
   - Internally they are merged into `tools` selectors.
   - Examples: `?actors=apify/rag-web-browser` ≡ `?tools=apify/rag-web-browser`; `--actors apify/rag-web-browser` ≡ `--tools apify/rag-web-browser`.
 - `enableAddingActors` (URL), `enable-adding-actors` (CLI), and the legacy `enableActorAutoLoading` alias have been removed. To call Actors dynamically, use `tools=call-actor` (included by default via the `actors` category). Any lingering raw value is ignored.
-- Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, and `apify/rag-web-browser`.
+- Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, `apify/rag-web-browser`, and `apify/web-fetch`.
   - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).
 - `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
 - `tools=add-actor`, `tools=experimental`, and `tools=preview` are retired: they are ignored and load no tools. Use `tools=call-actor` (or the default `actors` category) instead.
