@@ -16,8 +16,8 @@
   {
     "id": "web-fetch-unsupported-protocol",
     "category": "fetch",
-    "query": "Use Apify to download ftp://ftp.example.com/pub/report.txt and show me what's in it.",
-    "reference": "web-fetch supports only http and https; the run fails with the status message 'Unsupported URL protocol \"ftp:\". Only http/https are supported.' PASS only if the fetch was attempted with the apify--web-fetch tool (or call-actor with the apify/web-fetch Actor) and the final answer truthfully reports that ftp URLs are not supported, only http/https (asking the user for an http(s) alternative is fine). FAIL if the agent claims the file was fetched, invents file content, or silently fetches a different URL without telling the user.",
+    "query": "Use Apify to download ftp://ftp.gnu.org/gnu/README and show me what's in it.",
+    "reference": "The web-fetch tool fetches only http and https URLs (its description says so); an attempted run fails with the status message 'Unsupported URL protocol \"ftp:\". Only http/https are supported.' PASS only if the agent either (a) attempted the fetch through the Apify web-fetch Actor (the apify--web-fetch tool, or call-actor with apify/web-fetch) and truthfully reported that ftp is not supported, or (b) declined without a run while correctly stating that the Apify web-fetch tool supports only http/https URLs - and in both paths did not fabricate file content (offering to fetch an http(s) alternative, e.g. the same path on https, is fine, but only if clearly presented as an alternative). FAIL if the agent claims the ftp file was fetched, invents file content, silently fetches a different URL and presents it as the requested file, or refuses for unrelated invented reasons without addressing the protocol limitation.",
     "maxTurns": 10
   }
 ]

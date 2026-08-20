@@ -439,16 +439,20 @@ type KvSummary =
 /**
  * `buildRunKeyValueStore` omits `keyCount` on truncation; surface that as "at least N keys"
  * instead of silently substituting `keys.length`.
+ *
+ * The INPUT record (every run's own input echoed back by the platform) never counts: it is
+ * not run output, and advertising it steers agents into get-key-value-store-record detours
+ * when the real output sits in the dataset. `structuredContent.keys` still carries it.
  */
 function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     const kvId = keyValueStore?.id;
     const keys = keyValueStore?.keys ?? [];
-    if (!kvId || keys.length === 0) {
+    const outputKeys = keys.filter((key) => key !== 'INPUT');
+    if (!kvId || outputKeys.length === 0) {
         return { hasKv: false, summarySuffix: '' };
     }
-    const reportedKeyCount = keyValueStore.keyCount;
-    const kvTruncated = reportedKeyCount === undefined && keys.length === KV_KEYS_LIMIT;
-    const n = reportedKeyCount ?? keys.length;
+    const kvTruncated = keyValueStore.keyCount === undefined && keys.length === KV_KEYS_LIMIT;
+    const n = outputKeys.length;
     const keyCountLabel = kvTruncated ? `at least ${KV_KEYS_LIMIT} keys` : `${n} ${n === 1 ? 'key' : 'keys'}`;
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }

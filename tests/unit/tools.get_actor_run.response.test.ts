@@ -862,6 +862,26 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).not.toContain('get-key-value-store-record');
     });
 
+    it('SUCCEEDED with a KV store holding only the INPUT record omits the KV suffix', () => {
+        const inputOnlyKv: RunKeyValueStore = { id: 'kv-1', keys: ['INPUT'], keyCount: 1 };
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+            keyValueStore: inputOnlyKv,
+        });
+        expect(t.summary).not.toContain('Key-value store');
+    });
+
+    it('SUCCEEDED does not count the INPUT record among KV keys', () => {
+        const kvWithInput: RunKeyValueStore = { id: 'kv-1', keys: ['INPUT', 'OUTPUT'], keyCount: 2 };
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetWithItems,
+            keyValueStore: kvWithInput,
+        });
+        expect(t.summary).toContain('Key-value store has 1 key');
+    });
+
     it('SUCCEEDED with truncated key-value store reports partial count, not exact 50', () => {
         const truncatedKv: RunKeyValueStore = {
             id: 'kv-1',

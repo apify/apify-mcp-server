@@ -105,7 +105,8 @@ Examples of when to use:
 - User needs to fetch specific content now (e.g., "Fetch news articles from CNN", "Get product info from Amazon")
 - User has time indicators like "today", "current", "latest", "recent", "now"
 
-This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.`;
+This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.
+When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.`;
 
 export const WEB_FETCH = 'apify/web-fetch';
 /**
@@ -113,7 +114,7 @@ export const WEB_FETCH = 'apify/web-fetch';
  * no references to any specific client or its built-in tools, so the same text works
  * for every MCP client. Tune only based on eval results (`web-fetch-evals` dataset).
  */
-export const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific URL and return its complete content (one URL per call).
+export const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
 It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
 The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
 
