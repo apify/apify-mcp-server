@@ -40,7 +40,9 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
 - `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, and Actor tools.
 - `tool_call_telemetry.ts` — shared tool-call telemetry preparation and logging.
-- `task_execution.ts` — legacy long-running task execution and status notifications.
+- `task_execution.ts` — legacy long-running task execution and status notifications. `tasks/cancel`
+  reaches the Actor run through `createTaskCancellationWatcher` (`utils.ts`), which polls the
+  TaskStore rather than chaining the request's `extra.signal` — see its docstring for why.
 - `const.ts` — the invariant constants below (the single source for these values).
 
 ## Gotchas & invariants
@@ -63,10 +65,15 @@ Two MCP protocol revisions are served, each by its own adapter:
   tail, or both — carries a `TOOL_NAME_HASH_LENGTH` suffix hashed from the uncapped name;
   truncation alone collides. If any proxied name exceeds the cap, all sibling tools cap their
   username to `MAX_TOOL_NAME_USERNAME_LENGTH`; direct Actor tools do not. Collisions remain
-  first-wins in `getToolsForServerMode`. Never widen the cap — clients depend on it.
-- **Proxy server IDs are URL-keyed.** `getMCPServerID(url)` keys `serverId` and the MCP client name.
-  This keeps one Actor's SSE and streamable endpoints distinct. Exposed tool names instead use
-  `{username}--{actor-name}--{originToolName}`, with the username cap above.
+  first-wins in `getToolsForServerMode`. Never widen the cap — clients depend on it
+  (Actor tools: `../tools/actor_tool_naming.ts`; proxied Actor-MCP tools: `proxy.ts`
+  `getProxyMCPServerToolName`).
+- **Proxy server IDs are keyed by URL, not Actor ID.** `getMCPServerID(url)` is
+  `sha256(url)` sliced to `SERVER_ID_LENGTH`; its one consumer is the MCP SDK client
+  name (`client.ts`). One Actor can expose both an SSE and a streamable endpoint; keying
+  by URL keeps those distinct. Keying by Actor ID would collapse them and cross transports.
+  Exposed tool names do not use it — they are `{username}--{actor-name}--{originToolName}`,
+  with the username cap above.
 - **Transport negotiation is streamable-first, SSE-fallback** (`client.ts`): try
   streamable HTTP, fall back to SSE on a protocol failure — but a connection
   **timeout** returns `null` with no SSE fallback (a timeout means unreachable, not

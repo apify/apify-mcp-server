@@ -74,7 +74,6 @@ function makeActorMcpTool(): ToolEntry {
         ajvValidate: compileSchema({ type: 'object', properties: {} }),
         originToolName: 'origin-tool',
         actorId: 'test/actor',
-        serverId: 'server-id',
         serverUrl: 'https://example.invalid/mcp',
     } as ToolEntry;
 }

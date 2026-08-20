@@ -245,6 +245,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Apify documentation**: Search the Apify documentation and fetch specific documents to provide context to the AI.
 - **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
 - **Apify storage**: Access data from your datasets and key-value stores.
+- **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 
 ### Overview of available tools
 
@@ -276,6 +277,11 @@ Legend for the **Enabled by default** column:
 | `get-key-value-store-keys`| storage | List the keys within a specific key-value store. |  |
 | `get-dataset-list` | storage | List all available datasets for the user. |  |
 | `get-key-value-store-list`| storage | List all available key-value stores for the user. |  |
+| `create-actor-task` | tasks | Create a saved Actor task (a named, reusable Actor configuration). |  |
+| `get-actor-task` | tasks | Get a saved Actor task, its publication state and public display configuration. |  |
+| `update-actor-task` | tasks | Update a task's input, run options, or public display configuration. |  |
+| `publish-actor-task` | tasks | Publish a task on its public landing page. |  |
+| `unpublish-actor-task` | tasks | Unpublish a task from its public landing page. |  |
 
 > **Note:**
 >
@@ -398,11 +404,11 @@ Existing URLs and commands using `?actors=...` or `--actors` continue to work un
 
 ### Prompts
 
-The server provides a set of predefined example prompts to help you get started interacting with Apify through MCP. For example, there is a `GetLatestNewsOnTopic` prompt that allows you to easily retrieve the latest news on a specific topic using the [RAG Web Browser](https://apify.com/apify/rag-web-browser) Actor.
+The server advertises the `prompts` capability, but no prompts are currently registered — `prompts/list` returns an empty list.
 
 ### Resources
 
-The server does not yet provide any resources.
+Your Apify data is not enumerated in `resources/list` — reads are on demand: pass any Apify API GET URL (`https://api.apify.com/v2/...`) to `resources/read` and the server injects the session's Apify token and returns the response body. `resources/templates/list` enumerates the common shapes — dataset items, key-value store records and keys, run metadata, run log — with their paging parameters. Responses inline up to 256 KB; anything larger returns a short notice with a download URL instead of the body. API reads require an Apify token, so a payment-only session (x402 or Skyfire) gets a JSON-RPC error for them.
 
 ## 💬 Usage examples
 

@@ -49,6 +49,11 @@ export const HELPER_TOOLS = {
     ACTOR_RUNS_GET_WIDGET: 'get-actor-run-widget',
     ACTOR_RUNS_LOG: 'get-actor-log',
     ACTOR_RUN_LIST_GET: 'get-actor-run-list',
+    ACTOR_TASK_GET: 'get-actor-task',
+    ACTOR_TASK_CREATE: 'create-actor-task',
+    ACTOR_TASK_UPDATE: 'update-actor-task',
+    ACTOR_TASK_PUBLISH: 'publish-actor-task',
+    ACTOR_TASK_UNPUBLISH: 'unpublish-actor-task',
     DATASET_GET: 'get-dataset',
     DATASET_LIST_GET: 'get-dataset-list',
     DATASET_GET_ITEMS: 'get-dataset-items',
@@ -177,6 +182,26 @@ export const DOCS_SNIPPET_HIGHLIGHT_TAG = '\uE000';
 
 export const ALLOWED_DOC_DOMAINS = ['https://docs.apify.com', 'https://crawlee.dev'] as const;
 
+/** Actor usernames treated as official Apify (drives `isOfficialApify` on the Actor card). */
+export const OFFICIAL_APIFY_USERNAMES: ReadonlySet<string> = new Set([
+    'agentify',
+    'apify',
+    'apifyatevents',
+    'clockworks',
+    'compass',
+    'e-commerce',
+    'h_reviews',
+    'hooli',
+    'junglee',
+    'lukaskrivka',
+    'maxcopell',
+    'misceres',
+    'streamers',
+    'tri_angle',
+    'vdrmota',
+    'voyager',
+]);
+
 export const APIFY_STORE_URL = 'https://apify.com';
 /** Apify Console origin (production). */
 export const CONSOLE_BASE_URL = 'https://console.apify.com';
@@ -221,6 +246,7 @@ export const FAILURE_CATEGORY = {
 export const APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED = 'full-permission-actor-not-approved';
 export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
+export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

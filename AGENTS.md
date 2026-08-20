@@ -21,7 +21,7 @@ TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.
 
 ## Git: branch names, commits, PR titles
 
-Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connection-timeout`). Commit/PR title: `type: Description` (e.g. `fix: Handle connection errors`). Types: `feat`, `fix`, `chore`, `refactor`, `docs`. Append `!` for breaking changes. PR title ≤70 chars.
+Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connection-timeout`). Commit/PR title: `type: Description` (e.g. `fix: Handle connection errors`). Types: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`. Append `!` for breaking changes. PR title ≤70 chars.
 
 Use `git mv` (not `mv` + `rm`) when renaming files so git records a rename rather than delete+create.
 
@@ -88,7 +88,7 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** — project structure, setup, build system, hot-reload workflow, two-phase tool loading, manual MCP testing.
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** — naming and coding standards (single source of truth).
-- **[res/](./res/index.md)** — ad-hoc notes: architecture analyses, refactor plans, protocol references. **May be obsolete** — verify against current code before trusting.
+- **[res/](./res/index.md)** — ephemeral working notes only (in-flight checklists, dated experiment records). Not a reference: durable facts live in `AGENTS.md`, decision rationale in the docstring of the code that owns it.
 
 ## Keep AGENTS.md current
 

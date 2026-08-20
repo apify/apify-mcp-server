@@ -4,7 +4,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { respondOk } from '../../utils/mcp.js';
+import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { getActorRunLogToolOutputSchema } from '../structured_output_schemas.js';
 
 const GetRunLogArgs = z.object({
@@ -47,7 +47,13 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
-        const v = (await client.run(parsed.runId).log().get()) ?? '';
+        const v = await client.run(parsed.runId).log().get();
+        // The log endpoint 404s only when the run itself is missing; an existing run with no
+        // output yet returns an empty string. So `undefined` here means "run not found" — do not
+        // coalesce it back to '' (#1193).
+        if (v === undefined) {
+            return respondUserError(`Run with ID '${parsed.runId}' not found.`);
+        }
         // Logs from the API end with a newline; drop it so the tail slice counts only content lines.
         const lines = v.replace(/\n$/, '').split('\n');
         const text = lines.slice(-parsed.lines).join('\n');

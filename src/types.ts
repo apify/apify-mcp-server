@@ -208,11 +208,6 @@ export type ActorMcpTool = ToolBase & {
     originToolName: string;
     /** ID of the Actorized MCP server - for example, apify/actors-mcp-server */
     actorId: string;
-    /**
-     * ID of the Actorized MCP server the tool is associated with.
-     * serverId is generated unique ID based on the serverUrl.
-     */
-    serverId: string;
     /** Connection URL of the Actorized MCP server */
     serverUrl: string;
 };

@@ -40,6 +40,11 @@ import { getKeyValueStore } from './storage/get_key_value_store.js';
 import { getKeyValueStoreKeys } from './storage/get_key_value_store_keys.js';
 import { getKeyValueStoreList } from './storage/get_key_value_store_list.js';
 import { getKeyValueStoreRecord } from './storage/get_key_value_store_record.js';
+import { createActorTask } from './tasks/create_actor_task.js';
+import { getActorTask } from './tasks/get_actor_task.js';
+import { publishActorTask } from './tasks/publish_actor_task.js';
+import { unpublishActorTask } from './tasks/unpublish_actor_task.js';
+import { updateActorTask } from './tasks/update_actor_task.js';
 import { callActorWidget } from './widgets/call_actor_widget.js';
 import { fetchActorDetailsWidget } from './widgets/fetch_actor_details_widget.js';
 import { getActorRunWidget } from './widgets/get_actor_run_widget.js';
@@ -82,6 +87,7 @@ export const toolCategories = {
         getDatasetList,
         getKeyValueStoreList,
     ],
+    tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     dev: [reportProblem],
 } satisfies Record<string, CategoryToolEntry[]>;
 
