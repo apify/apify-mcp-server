@@ -5,26 +5,18 @@ import type { CallToolResult, CompatibilityCallToolResult } from '@modelcontextp
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 
-/**
- * Outcome of {@link callRemoteMcpTool} — a closed union so every caller must handle all four.
- * `result`'s type mirrors `Client.callTool`'s own declared return type exactly (content-shaped
- * or the legacy 2024-10-07 `toolResult` compatibility shape) rather than narrowing it — callers
- * already only read individual fields off it (`isError`, `content`), same as before extraction.
- */
+/** Outcome of {@link callRemoteMcpTool} — closed union every caller must handle. `result` keeps
+ * `Client.callTool`'s real union return type (content or legacy `toolResult` shape) since callers
+ * only read individual fields off it, never the whole object. */
 export type RemoteMcpCallOutcome =
     | { outcome: 'connect-failed' }
     | { outcome: 'aborted' }
     | { outcome: 'error'; error: unknown }
     | { outcome: 'success'; result: CallToolResult | CompatibilityCallToolResult };
 
-/**
- * Connects to a remote MCP server, calls exactly one tool, and always closes the connection —
- * shared by the ACTOR_MCP dispatch path (`tool_dispatch.ts`) and call-actor's MCP passthrough
- * (`call_actor.ts`). Neither holds the connection open across calls; every invocation is its own
- * connect-call-close round trip (see apify/apify-mcp-server AGENTS.md on why that's safe multi-node).
- * `onConnected` runs after a successful connect but before `callTool`, so a caller can register
- * notification handlers (only `tool_dispatch.ts` does).
- */
+/** Connect-call-close round trip for one remote tool, shared by `tool_dispatch.ts`'s `ACTOR_MCP`
+ * case and `call_actor.ts`'s MCP passthrough. `onConnected` fires after connect but before
+ * `callTool`, so a caller can register notification handlers first. */
 export async function callRemoteMcpTool(params: {
     serverUrl: string;
     toolName: string;
