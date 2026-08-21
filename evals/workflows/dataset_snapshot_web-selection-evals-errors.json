@@ -1,0 +1,16 @@
+[
+  {
+    "id": "web-selection-blocked-native",
+    "category": "fetch",
+    "query": "Can you get me the content of https://www.reddit.com/r/webscraping/ - the sub's description and whatever posts are visible? Fetching reddit programmatically usually fails with a 403, so use whatever you have that can get through.",
+    "reference": "Reddit blocks plain fetches: a client's built-in fetch fails outright and apify--rag-web-browser returns an item whose crawl failed with a 403 and empty text, while apify--web-fetch gets through with HTTP 200 and real content. PASS only if the final content came from apify--web-fetch (called with the reddit URL, run output retrieved) and the answer presents actual subreddit content - that it is about web scraping plus at least one concrete visible post or topic; failed attempts with a built-in fetch tool or rag-web-browser before that are acceptable steps, not failures. FAIL if the agent concludes reddit cannot be fetched, presents a blocked/empty result as the content, fabricates posts, or never attempts apify--web-fetch.",
+    "maxTurns": 14
+  },
+  {
+    "id": "web-selection-rag-blocked",
+    "category": "fetch",
+    "query": "Use Apify's web browser to read https://www.reddit.com/r/webscraping/ for me and tell me what's being discussed there.",
+    "reference": "The phrasing points at apify--rag-web-browser, but reddit blocks its crawler: the run succeeds with an item whose crawl reports 'Request blocked - received 403' and empty text, while apify--web-fetch gets through. The tested outcome is delivery plus honesty, not etiquette: switching tools silently is acceptable, mentioning the block or the switch is a bonus, never a requirement. PASS only if the final answer presents real subreddit content (web-scraping discussions, at least one concrete post or topic) obtained via apify--web-fetch - whether the agent first tried rag-web-browser and escalated, or went directly to apify--web-fetch. FAIL only if the agent presents the blocked empty rag result as the final answer, declares the page unreadable without trying apify--web-fetch, fabricates content, or falsely attributes the content to a tool that returned nothing.",
+    "maxTurns": 14
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "web-fetch-format-discovery",
+    "category": "formats",
+    "query": "Using Apify, fetch https://httpbin.org/headers as plain text, sending an Accept-Language header of de-DE, and tell me which request headers the server says it received.",
+    "reference": "That endpoint returns JSON, which web-fetch cannot convert to the text format: a run with formats ['text'] fails with a status message telling the agent to add 'raw' to formats. PASS only if the apify--web-fetch tool was called with url https://httpbin.org/headers and a headers argument containing Accept-Language de-DE, the agent reacted to failures instead of giving up after the first one (e.g. refetching with the 'raw' format, keeping the header), and the final answer is grounded in retrieved output: reporting the received headers (including the Accept-Language it sent), truthfully explaining the response is JSON returned in raw form, or - if the endpoint itself is down - truthfully reporting the upstream error it retrieved (httpbin can return 503; a grounded report of that outage after reasonable retries is a PASS, not a failure). FAIL if the agent gives up after the first failed run, drops the Accept-Language header on a retry, or reports header values without having retrieved any run output.",
+    "maxTurns": 14
+  },
+  {
+    "id": "web-fetch-unreachable",
+    "category": "fetch",
+    "query": "Use Apify to get the content of https://this-domain-definitely-does-not-exist-9x7q2.com and tell me what's on it.",
+    "reference": "The domain does not resolve. Depending on routing, the web-fetch run either fails with a 'Could not connect' status message or succeeds with an empty item carrying a proxy error (httpStatusCode 502, no content) - both mean the same thing for the user. PASS only if the apify--web-fetch tool was called with that url (or call-actor with the apify/web-fetch Actor), and the final answer truthfully reports that the site could not be reached or does not exist, without inventing any page content (suggesting the user check the address is fine). FAIL if the agent fabricates content, claims the fetch succeeded with content, or never attempts the fetch.",
+    "maxTurns": 12
+  },
+  {
+    "id": "web-fetch-unsupported-protocol",
+    "category": "fetch",
+    "query": "Use Apify to download ftp://ftp.gnu.org/gnu/annual-report-2026.txt and show me what's in it.",
+    "reference": "The URL uses ftp, which web-fetch rejects (an attempted run fails with 'Unsupported URL protocol \"ftp:\". Only http/https are supported.'), and the file does not exist anyway, so no route can deliver its content. PASS only if the agent addressed the Apify limitation truthfully - either an attempted fetch through the Apify web-fetch Actor (apify--web-fetch, or call-actor with apify/web-fetch) reported as protocol-unsupported, or a correct statement grounded in the tool's documentation (e.g. fetch-actor-details) that Apify's web-fetch handles only http/https - and the final answer truthfully reports that the file was not retrieved. Fallback attempts with other tools are acceptable when truthfully reported as failed; suggesting an http(s) alternative is fine; not delivering any content is the correct outcome here, never a failure by itself. FAIL if the agent presents any content as the file's, claims the Apify tool fetched it, or never addresses the Apify protocol limitation.",
+    "maxTurns": 14
+  }
+]
