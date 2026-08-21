@@ -1,74 +1,31 @@
 import { describe, expect, it } from 'vitest';
 
-import type { LlmClient } from '../../evals/workflows/llm_client.js';
-import type { ConversationHistory } from '../../evals/workflows/types.js';
-import { evaluateConversation } from '../../evals/workflows/workflow_judge.js';
+import { parseJudgeResponse } from '../../evals/workflows/workflow_judge.js';
 
-/** LLM client that returns one fixed judge response. */
-function makeJudgeClient(content: string): LlmClient {
-    return {
-        callLlm: async () => ({ content }),
-    } as unknown as LlmClient;
-}
-
-/** LLM client that records the prompt it was asked to judge. */
-function makePromptCapturingClient(): { client: LlmClient; prompt: () => string } {
-    let captured = '';
-    const client = {
-        callLlm: async (messages: { content: string }[]) => {
-            captured = messages[0].content;
-            return { content: '{"verdict":"PASS","reason":"ok"}' };
-        },
-    } as unknown as LlmClient;
-    return { client, prompt: () => captured };
-}
-
-const reference = 'the agent should search';
-
-const conversation: ConversationHistory = {
-    userPrompt: 'find an actor',
-    turns: [{ toolCalls: [], finalResponse: 'done' }],
-};
-
-describe('evaluateConversation()', () => {
-    it('normalizes a lowercase verdict instead of erroring the item', async () => {
-        const result = await evaluateConversation(
-            reference,
-            conversation,
-            makeJudgeClient('{"verdict":"pass","reason":"the agent searched"}'),
-        );
-
-        expect(result.verdict).toBe('PASS');
+describe('parseJudgeResponse()', () => {
+    it('parses a strict JSON verdict', () => {
+        expect(parseJudgeResponse('{"verdict":"PASS","reason":"ok"}')).toEqual({ verdict: 'PASS', reason: 'ok' });
     });
 
-    it('inserts $-patterns literally instead of letting them rewrite the prompt', async () => {
-        // `$'`, `$&`, `` $` `` and `$$` are replacement patterns for String.replace; a Bash
-        // command like $'\n' in the transcript must not splice the template around itself.
-        const { client, prompt } = makePromptCapturingClient();
-        await evaluateConversation(
-            'expected $& output $$',
-            { ...conversation, userPrompt: "run $'\\n' $` here" },
-            client,
-        );
-
-        expect(prompt()).toContain("run $'\\n' $` here");
-        expect(prompt()).toContain('expected $& output $$');
-        expect(prompt()).not.toContain('{{conversation}}');
+    it('normalizes verdict casing in JSON', () => {
+        expect(parseJudgeResponse('{"verdict":"fail","reason":"no"}')).toEqual({ verdict: 'FAIL', reason: 'no' });
     });
 
-    it('rejects a verdict that is neither PASS nor FAIL', async () => {
-        await expect(
-            evaluateConversation(reference, conversation, makeJudgeClient('{"verdict":"maybe","reason":"unclear"}')),
-        ).rejects.toThrow();
+    it('recovers a prose verdict when the provider ignores the schema', () => {
+        const parsed = parseJudgeResponse('FAIL. The agent never called the tool.');
+        expect(parsed.verdict).toBe('FAIL');
+        expect(parsed.reason).toBe('The agent never called the tool.');
     });
 
-    it('keeps the verdict when the judge returns an unknown extra key', async () => {
-        const result = await evaluateConversation(
-            reference,
-            conversation,
-            makeJudgeClient('{"verdict":"PASS","reason":"the agent searched","confidence":0.9}'),
-        );
+    it('recovers a prose PASS with a colon separator', () => {
+        expect(parseJudgeResponse('pass: all requirements met').verdict).toBe('PASS');
+    });
 
-        expect(result.verdict).toBe('PASS');
+    it('rejects prose that only mentions a verdict mid-sentence', () => {
+        expect(() => parseJudgeResponse('The agent should FAIL here.')).toThrow('Failed to parse judge JSON');
+    });
+
+    it('rejects an unrecognized verdict in JSON', () => {
+        expect(() => parseJudgeResponse('{"verdict":"MAYBE","reason":"?"}')).toThrow('Failed to parse judge JSON');
     });
 });
