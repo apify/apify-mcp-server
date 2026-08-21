@@ -72,10 +72,18 @@ Publishing requires all three of `publicConfig.inputSchemaFields`, `datasetView`
 (probed against the API), and the API reports the missing ones **non-exhaustively** — which is why
 `task-publish-discovery` budgets turns for several fix-and-retry rounds rather than one.
 
-`task-chain-hard-1` is the calibration edge: roughly 6 runs in 8 on `claude-haiku-4-5`, with the
-residual failure being the agent guessing an Actor slug instead of resolving it with `search-actors`.
-That is the gate working as designed, not a harness flake — the judge passes those runs and only the
-zero-error gate catches them. Treat a change in that ratio as the signal; one red run is not one.
+`task-chain-hard-1` is the calibration edge, and it is calibrated: `claude-sonnet-4-5` passes it 3/3,
+`claude-haiku-4-5` about 5 runs in 8. Every Haiku failure is the same one — it constructs
+`jiri.spilka/troubleshooter` from the loose reference in the query instead of resolving the real
+`actor-troubleshooter` with `search-actors`, eats the not-found, then recovers. The judge passes those
+runs; only the zero-error gate catches them, which is exactly what that gate is for.
+
+Do not try to close that gap by rewording descriptions. Both `create-actor-task` and
+`fetch-actor-details` already say, explicitly, to resolve a loose name with `search-actors` rather than
+guess, and `fetch-actor-details`' not-found response repeats it. Adding the `fetch-actor-details`
+wording was measured at 5/8 against ~7/10 without it — no change. Treat a shift in the ratio as the
+signal, not a single red run, and read a persistent drop as a description problem only after checking
+it still passes on Sonnet.
 
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
