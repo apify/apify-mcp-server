@@ -15,6 +15,8 @@
  *   pnpm run evals:workflow -- --id search-google-maps
  *   pnpm run evals:workflow -- --concurrency 8
  *   pnpm run evals:workflow -- --mcp-tools-only   # drop Claude Code's built-in tools
+ *   pnpm run evals:workflow -- --subscription     # bill the local Claude Code login, not the API
+ *   pnpm run evals:workflow -- --dataset tasks-evals-errors --allow-tool-errors
  */
 
 // Must be the first import: config modules read process.env at load time.

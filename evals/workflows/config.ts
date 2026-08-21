@@ -14,14 +14,14 @@ export const MCP_SERVER_NAME = 'apify';
 
 const MCP_TOOL_PREFIX = `mcp__${MCP_SERVER_NAME}__`;
 
-/** Strip the SDK's `mcp__<server>__` prefix; built-in tool names pass through unchanged. */
-export function stripToolPrefix(name: string): string {
-    return name.startsWith(MCP_TOOL_PREFIX) ? name.slice(MCP_TOOL_PREFIX.length) : name;
-}
-
 /** Whether the SDK tool name belongs to the Apify MCP server rather than Claude Code's built-ins. */
 export function isMcpToolName(name: string): boolean {
     return name.startsWith(MCP_TOOL_PREFIX);
+}
+
+/** Strip the SDK's `mcp__<server>__` prefix; built-in tool names pass through unchanged. */
+export function stripToolPrefix(name: string): string {
+    return isMcpToolName(name) ? name.slice(MCP_TOOL_PREFIX.length) : name;
 }
 
 /**

@@ -14,7 +14,7 @@
  *     |- agent                the prompt in, the final answer out
  *     |  |- <agent model>     generation: the run's aggregate tokens and cost
  *     |  |- <tool name>       one span per tool call: arguments in, result out
- *     |- <judge model>        generation, emitted by llm_client.ts
+ *     |- <judge model>        generation, emitted by llm_client.ts (two on a judge parse retry)
  *
  * Building the tree is kept separate from emitting it so the payload shaping is testable
  * without an OpenTelemetry provider.

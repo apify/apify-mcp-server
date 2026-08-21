@@ -107,9 +107,9 @@ function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reaso
     try {
         return JudgeResponseValidator.parse(JSON.parse(response));
     } catch (error) {
+        // No raw response here: the retry loop's final throw already carries it.
         throw new Error(
-            `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}\n` +
-                `Raw response: ${response}`,
+            `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}`,
         );
     }
 }

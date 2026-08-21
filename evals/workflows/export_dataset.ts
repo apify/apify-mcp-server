@@ -39,7 +39,10 @@ function snapshotPath(dataset: string): string {
 }
 
 async function main() {
-    const argv = (await yargs(hideBin(process.argv))
+    // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores
+    // every flag behind it. Drop it so both call styles work.
+    const args = hideBin(process.argv).filter((arg) => arg !== '--');
+    const argv = (await yargs(args)
         .options({
             dataset: { type: 'string', description: 'Langfuse dataset to export', default: WORKFLOW_DATASET_NAME },
         })

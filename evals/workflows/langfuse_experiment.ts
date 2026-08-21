@@ -94,7 +94,7 @@ export function countPassed(itemResults: ScoredItem[], allowToolErrors: boolean)
 export type RunSummary = {
     /** Items that passed the gate. */
     passedCount: number;
-    /** Items that completed but did not pass, with the judge's reason. */
+    /** Items that completed but did not pass, with the reason. */
     failures: { id: string; reason: string }[];
     /** Requested ids with no result at all: the task threw and the SDK skipped the item. */
     droppedIds: string[];
@@ -224,7 +224,8 @@ export function makeTask(options: WorkflowTaskOptions) {
             // Server tools only: a failed Claude Code built-in (Bash, WebFetch) says nothing
             // about the server under test. Failures of tools the harness force-failed itself
             // are not errors of the run either. First line only: the full text already sits
-            // on the tool span.
+            // on the tool span. Known blind spot: the adapter drops subagent activity, so a
+            // server tool failing inside a Task-spawned subagent never reaches this gate.
             const injected = new Set(item.metadata.failTools ?? []);
             const toolErrors = adapted.toolInvocations
                 .filter(
