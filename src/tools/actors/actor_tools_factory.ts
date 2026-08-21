@@ -23,6 +23,7 @@ import {
     type ApifyToken,
     type ToolEntry,
     type ToolInputSchema,
+    ACTOR_TOOL_MODE,
     TOOL_TYPE,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
@@ -30,7 +31,7 @@ import { ajv } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js';
-import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolType } from '../actor_tool_naming.js';
+import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolMode } from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
 
@@ -365,14 +366,13 @@ export async function getActorsAsTools(
     const actorMCPServersInfo: ActorInfo[] = [];
     const normalActorsInfo: ActorInfo[] = [];
     for (const actorInfo of nonNullActors) {
-        const toolType = resolveActorToolType(actorInfo);
-        if (paymentProvider && isActorBlockedUnderPaymentProvider(actorInfo)) {
+        if (paymentProvider && isActorBlockedUnderPaymentProvider(actorInfo.actor)) {
             errors.push(ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName));
             continue;
         }
-        // `null` means the Actor has no tool representation. Bulk loaders drop the returned error,
-        // so log it here to retain a server-side trace.
-        if (toolType === null) {
+
+        const toolMode = resolveActorToolMode(actorInfo);
+        if (toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
             const error = ActorLoadError.standbyWithoutMcpNotSupported(actorInfo.definition.actorFullName);
             log.softFail('Skipping standby Actor with no MCP server and an empty input schema', {
                 actorName: actorInfo.definition.actorFullName,
@@ -383,7 +383,7 @@ export async function getActorsAsTools(
             errors.push(error);
             continue;
         }
-        if (toolType === TOOL_TYPE.ACTOR_MCP) actorMCPServersInfo.push(actorInfo);
+        if (toolMode === ACTOR_TOOL_MODE.MCP) actorMCPServersInfo.push(actorInfo);
         else normalActorsInfo.push(actorInfo);
     }
 

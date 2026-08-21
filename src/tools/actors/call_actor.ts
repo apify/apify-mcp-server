@@ -19,7 +19,6 @@ import { connectMCPClient } from '../../mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import type {
-    ActorInfo,
     ActorToolResolutionResult,
     ApifyToken,
     InternalToolArgs,
@@ -27,7 +26,7 @@ import type {
     ToolEntry,
     ToolInputSchema,
 } from '../../types.js';
-import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
+import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached, getActorToolResolutionCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import {
@@ -344,15 +343,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
         return null;
     }
 
-    // Stub for isActorBlockedUnderPaymentProvider, which only reads `actor` — the hardcoded null
-    // `webServerMcpPath` would make `resolveActorToolType` misclassify standby MCP Actors.
-    const actorInfo: ActorInfo = {
-        definition: actorDefinitionWithInfo.definition,
-        actor: actorDefinitionWithInfo.info,
-        webServerMcpPath: null,
-    };
-
-    if (!isActorBlockedUnderPaymentProvider(actorInfo)) {
+    if (!isActorBlockedUnderPaymentProvider(actorDefinitionWithInfo.info)) {
         return null;
     }
 
@@ -402,7 +393,7 @@ export async function handleMcpToolCall(params: {
 }): Promise<ToolResponse | null> {
     const { baseActorName, mcpToolName, input, resolution, apifyToken, mcpSessionId, signal } = params;
 
-    if (resolution?.toolType !== TOOL_TYPE.ACTOR_MCP) {
+    if (resolution?.toolMode !== ACTOR_TOOL_MODE.MCP) {
         return respondServerError(`Actor '${resolution?.actorFullName ?? baseActorName}' is not an MCP server.`);
     }
 
@@ -602,7 +593,7 @@ export async function callActorPreExecute(
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const resolution = await getActorToolResolutionCached(baseActorName, apifyClientForDefinition);
 
-    if (resolution?.toolType === null) {
+    if (resolution?.toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
         return {
             earlyResponse: respondStandbyRejection(
                 ActorLoadError.standbyWithoutMcpNotSupported(resolution.actorFullName),
@@ -611,7 +602,7 @@ export async function callActorPreExecute(
         };
     }
 
-    const isActorMcpServer = resolution?.toolType === TOOL_TYPE.ACTOR_MCP;
+    const isActorMcpServer = resolution?.toolMode === ACTOR_TOOL_MODE.MCP;
 
     // Handle the case where LLM does not respect instructions when calling MCP server Actors
     // and does not provide the tool name.

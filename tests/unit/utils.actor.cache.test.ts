@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
 import type { ActorDefinitionWithInfo } from '../../src/types.js';
+import { ACTOR_TOOL_MODE } from '../../src/types.js';
 
 vi.mock('../../src/tools/actors/actor_definition.js', () => ({ getActorDefinition: vi.fn() }));
 vi.mock('../../src/utils/userid_cache.js', () => ({ getUserInfoCached: vi.fn() }));
 
 import { actorDefinitionCache } from '../../src/state.js';
 import { getActorDefinition } from '../../src/tools/actors/actor_definition.js';
-import { getActorDefinitionCached, getActorMcpUrlCached, getActorToolResolutionCached } from '../../src/utils/actor.js';
+import { getActorDefinitionCached, getActorToolResolutionCached } from '../../src/utils/actor.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 
 const getActorDefinitionMock = vi.mocked(getActorDefinition);
@@ -96,7 +97,7 @@ describe('getActorDefinitionCached — tenant isolation', () => {
     });
 });
 
-describe('getActorMcpUrlCached — tenant isolation', () => {
+describe('getActorToolResolutionCached()', () => {
     it('derives the MCP URL from a cached Actor the caller may see', async () => {
         seedCache('acme/mcp-public', true, 'owner-6', {
             id: 'actorpub',
@@ -104,13 +105,17 @@ describe('getActorMcpUrlCached — tenant isolation', () => {
             isStandbyEnabled: true,
         });
 
-        const result = await getActorMcpUrlCached('acme/mcp-public', client);
+        const result = await getActorToolResolutionCached('acme/mcp-public', client);
 
-        expect(result).toBe('https://actorpub.apify.actor/mcp');
+        expect(result).toEqual({
+            toolMode: ACTOR_TOOL_MODE.MCP,
+            mcpServerUrl: 'https://actorpub.apify.actor/mcp',
+            actorFullName: 'acme/mcp-public',
+        });
         expect(getActorDefinitionMock).not.toHaveBeenCalled();
     });
 
-    it('does NOT leak a cached private Actor MCP URL to a non-owner — re-fetches and returns false', async () => {
+    it('does NOT leak a cached private Actor MCP URL to a non-owner', async () => {
         seedCache('acme/mcp-private', false, 'owner-7', {
             id: 'actorpriv',
             webServerMcpPath: '/mcp',
@@ -119,48 +124,36 @@ describe('getActorMcpUrlCached — tenant isolation', () => {
         getUserInfoCachedMock.mockResolvedValue({ userId: 'intruder', userPlanTier: 'FREE', isOrganization: false });
         getActorDefinitionMock.mockResolvedValue(null); // intruder's own fetch is unauthorized
 
-        const result = await getActorMcpUrlCached('acme/mcp-private', client);
+        const result = await getActorToolResolutionCached('acme/mcp-private', client);
 
-        expect(result).toBe(false);
+        expect(result).toBeNull();
         expect(getActorDefinitionMock).toHaveBeenCalledWith('acme/mcp-private', client);
     });
 
-    it('returns false for a non-existent Actor without throwing', async () => {
+    it('returns null for a non-existent Actor', async () => {
         getActorDefinitionMock.mockResolvedValue(null);
 
-        await expect(getActorMcpUrlCached('acme/missing', client)).resolves.toBe(false);
+        await expect(getActorToolResolutionCached('acme/missing', client)).resolves.toBeNull();
     });
-});
 
-describe('getActorMcpUrlCached — tool-type rule', () => {
-    it('returns false when standby is disabled despite a leftover webServerMcpPath', async () => {
+    it('returns RUN when standby is disabled despite a leftover webServerMcpPath', async () => {
         seedCache('acme/stale-path', true, 'owner-8', { id: 'actorstale', webServerMcpPath: '/mcp' });
 
-        await expect(getActorMcpUrlCached('acme/stale-path', client)).resolves.toBe(false);
+        await expect(getActorToolResolutionCached('acme/stale-path', client)).resolves.toEqual({
+            toolMode: ACTOR_TOOL_MODE.RUN,
+            mcpServerUrl: null,
+            actorFullName: 'acme/stale-path',
+        });
     });
 
-    it('returns false for a standby Actor with no MCP server and an empty input schema', async () => {
-        seedCache('acme/standby-empty-url', true, 'owner-9', { id: 'actorsbe', isStandbyEnabled: true });
-
-        await expect(getActorMcpUrlCached('acme/standby-empty-url', client)).resolves.toBe(false);
-    });
-});
-
-describe('getActorToolResolutionCached()', () => {
     it('reports the canonical Actor full name when the Actor is addressed by its ID', async () => {
         const entry = seedCache('acme/standby-empty-by-id', true, 'owner-15', { isStandbyEnabled: true });
         actorDefinitionCache.set('aBcD1234', entry);
 
         await expect(getActorToolResolutionCached('aBcD1234', client)).resolves.toEqual({
-            toolType: null,
+            toolMode: ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
             mcpServerUrl: null,
             actorFullName: 'acme/standby-empty-by-id',
         });
-    });
-
-    it('returns null for an Actor with no cached or fetchable definition', async () => {
-        getActorDefinitionMock.mockResolvedValue(null);
-
-        await expect(getActorToolResolutionCached('acme/missing-resolution', client)).resolves.toBeNull();
     });
 });

@@ -4,31 +4,31 @@ import log from '@apify/log';
 
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { ActorInfo } from '../types.js';
-import { TOOL_TYPE } from '../types.js';
+import { ACTOR_TOOL_MODE } from '../types.js';
 
 /**
  * The single rule for how an Actor is exposed as a tool. Tool loading and `call-actor` routing both
  * read it, so the two can never disagree.
  *
- * | standby  | `webServerMcpPath` | input schema | result                              |
- * |----------|--------------------|--------------|-------------------------------------|
- * | disabled | absent             | any          | `ACTOR` (run tool)                  |
- * | disabled | present            | any          | `ACTOR` — the leftover path is ignored |
- * | enabled  | present            | any          | `ACTOR_MCP` (proxied MCP tools only) |
- * | enabled  | absent             | non-empty    | `ACTOR` (run tool)                  |
- * | enabled  | absent             | empty        | `null`                              |
- *
- * `null` is not a fourth `TOOL_TYPE` member: it is the absence of a tool. A standby-only Actor with an
- * empty input schema has nothing to run and no MCP server to proxy, so it gets no tool at all.
+ * | standby  | `webServerMcpPath` | input schema | result                |
+ * |----------|--------------------|--------------|-----------------------|
+ * | disabled | absent             | any          | `RUN`                 |
+ * | disabled | present            | any          | `RUN`                 |
+ * | enabled  | present            | any          | `MCP`                 |
+ * | enabled  | absent             | non-empty    | `RUN`                 |
+ * | enabled  | absent             | empty        | `STANDBY_WITHOUT_MCP` |
  *
  * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
  * or `input.properties` has zero keys. Nothing else counts — a non-empty `required` with no properties
  * still reads as empty.
  */
-export function resolveActorToolType(actorInfo: ActorInfo): typeof TOOL_TYPE.ACTOR | typeof TOOL_TYPE.ACTOR_MCP | null {
-    if (!actorInfo.actor.actorStandby?.isEnabled) return TOOL_TYPE.ACTOR;
-    if (actorInfo.webServerMcpPath) return TOOL_TYPE.ACTOR_MCP;
-    return Object.keys(actorInfo.definition.input?.properties ?? {}).length > 0 ? TOOL_TYPE.ACTOR : null;
+export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
+    const isStandbyEnabled = actorInfo.actor.actorStandby?.isEnabled === true;
+    if (isStandbyEnabled && actorInfo.webServerMcpPath) return ACTOR_TOOL_MODE.MCP;
+    if (isStandbyEnabled && Object.keys(actorInfo.definition.input?.properties ?? {}).length === 0) {
+        return ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP;
+    }
+    return ACTOR_TOOL_MODE.RUN;
 }
 
 /**
@@ -37,8 +37,8 @@ export function resolveActorToolType(actorInfo: ActorInfo): typeof TOOL_TYPE.ACT
  * List-time filtering in `getActorsAsTools` and the call-time guard in
  * `checkPaymentProviderStandbyConflict` must use this — not MCP URL presence alone.
  */
-export function isActorBlockedUnderPaymentProvider(actorInfo: ActorInfo): boolean {
-    return !!actorInfo.actor.actorStandby?.isEnabled;
+export function isActorBlockedUnderPaymentProvider(actor: Pick<ActorInfo['actor'], 'actorStandby'>): boolean {
+    return actor.actorStandby?.isEnabled === true;
 }
 
 /** Splits an Actor full name; a missing slash yields a null username. */

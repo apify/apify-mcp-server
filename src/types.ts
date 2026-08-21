@@ -133,6 +133,14 @@ export const TOOL_TYPE = {
  */
 export type TOOL_TYPE = (typeof TOOL_TYPE)[keyof typeof TOOL_TYPE];
 
+/** How an Actor definition maps to the tool surface. */
+export const ACTOR_TOOL_MODE = {
+    RUN: 'RUN',
+    MCP: 'MCP',
+    STANDBY_WITHOUT_MCP: 'STANDBY_WITHOUT_MCP',
+} as const;
+export type ACTOR_TOOL_MODE = (typeof ACTOR_TOOL_MODE)[keyof typeof ACTOR_TOOL_MODE];
+
 /**
  * Type for Actor-based tools - tools that wrap Apify Actors.
  * Type discriminator: {@link TOOL_TYPE.ACTOR}
@@ -261,15 +269,19 @@ export type ActorInfo = {
 };
 
 /**
- * How an Actor is exposed as a tool, resolved once from its definition by `resolveActorToolType`.
- * `mcpServerUrl` is a plain `string` exactly when `toolType` is {@link TOOL_TYPE.ACTOR_MCP}, so
- * callers connect without a cast. `toolType: null` means the Actor has no tool representation.
+ * How an Actor is exposed as a tool, resolved once from its definition by `resolveActorToolMode`.
+ * `mcpServerUrl` is a plain `string` exactly when `toolMode` is {@link ACTOR_TOOL_MODE.MCP}, so
+ * callers connect without a cast.
  * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
  * messages built from it read the same whether the Actor was addressed by ID or by name.
  */
 export type ActorToolResolutionResult =
-    | { toolType: typeof TOOL_TYPE.ACTOR_MCP; mcpServerUrl: string; actorFullName: string }
-    | { toolType: typeof TOOL_TYPE.ACTOR | null; mcpServerUrl: null; actorFullName: string };
+    | { toolMode: typeof ACTOR_TOOL_MODE.MCP; mcpServerUrl: string; actorFullName: string }
+    | {
+          toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP;
+          mcpServerUrl: null;
+          actorFullName: string;
+      };
 
 export type ActorStoreList = ActorStoreListOutdated & {
     actorReviewCount?: number;

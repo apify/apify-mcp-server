@@ -21,7 +21,7 @@ import {
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
-import { TOOL_TYPE } from '../../src/types.js';
+import { ACTOR_TOOL_MODE, TOOL_TYPE } from '../../src/types.js';
 import { textOf, type TextToolResult } from './helpers/tool_context.js';
 
 vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
@@ -434,7 +434,7 @@ describe('call_actor_common', () => {
                 mcpToolName: 'search',
                 input: { q: 'x' },
                 resolution: {
-                    toolType: TOOL_TYPE.ACTOR_MCP,
+                    toolMode: ACTOR_TOOL_MODE.MCP,
                     mcpServerUrl: 'https://example.invalid/mcp',
                     actorFullName: 'apify/mcp-demo',
                 },
@@ -459,7 +459,7 @@ describe('call_actor_common', () => {
                 mcpToolName: 'search',
                 input: { q: 'x' },
                 resolution: {
-                    toolType: TOOL_TYPE.ACTOR_MCP,
+                    toolMode: ACTOR_TOOL_MODE.MCP,
                     mcpServerUrl: 'https://example.invalid/mcp',
                     actorFullName: 'apify/mcp-demo',
                 },
@@ -486,7 +486,7 @@ describe('call_actor_common', () => {
                 mcpToolName: 'search',
                 input: { q: 'x' },
                 resolution: {
-                    toolType: TOOL_TYPE.ACTOR_MCP,
+                    toolMode: ACTOR_TOOL_MODE.MCP,
                     mcpServerUrl: 'https://example.invalid/mcp',
                     actorFullName: 'apify/mcp-demo',
                 },
