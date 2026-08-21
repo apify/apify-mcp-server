@@ -9,10 +9,7 @@ export type RemoteMcpCallOutcome<T> =
     | { outcome: 'error'; error: unknown }
     | { outcome: 'success'; value: T };
 
-/**
- * Connect, run the callback with the live client, always close. Not in `client.ts`:
- * `vi.spyOn(connectMCPClient)` only intercepts a cross-module import, not a same-module call.
- */
+/** Connect, run the callback with the live client, always close. */
 export async function withRemoteMcpClient<T>(
     serverUrl: string,
     apifyToken: string,
