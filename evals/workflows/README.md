@@ -170,9 +170,31 @@ Separation allows independent optimization for speed vs evaluation quality.
 - `ConversationHistory` carries only what the judge and the scores read; tool results and metrics live on `ToolInvocation` and `ConversationMetrics`
 - MCP tool names are stripped of their `mcp__apify__` prefix, so the judge sees `search-actors` as before
 - Subagent messages (via the `Task` tool) are excluded, so the transcript reflects the main agent
-- Cached prompt tokens are counted into `total_tokens`; the API reports them separately and a cached run would otherwise look nearly free
+- Cached prompt tokens are counted into `total_tokens`; the API reports them separately and a cached run would otherwise look nearly free. The trace's generation splits them out (`input`, `cache_read_input_tokens`, `cache_creation_input_tokens`): the SDK reports usage for the whole run, so a multi-turn run re-reads the cached system prompt and tool definitions every turn and the total is mostly cache traffic
 
 **Location:** `sdk_conversation_adapter.ts`
+
+### 9. The agent's conversation is traced by hand
+
+**Decision:** After each agent run, `langfuse_observations.ts` emits the item's span tree from the adapted SDK stream; `llm_client.ts` traces the judge call itself.
+
+```
+experiment-item-run     Langfuse SDK, holds the scores
+|- agent                the prompt in, the final answer out
+|  |- <agent model>     generation: the run's aggregate tokens and cost, windowed to the last turn
+|  |- <tool name>       one span per tool call: arguments in, result out
+|- <judge model>        generation, emitted by llm_client.ts
+```
+
+**Why:**
+- The agent runs in the Claude Code subprocess, so nothing it does is instrumented for us. Left alone, an item's trace holds a single span and the conversation is invisible in the UI
+- Tokens and cost only roll up to the trace from a **generation**. The SDK reports usage once for the whole run, not per turn, so the run's aggregate sits on a single generation
+- That generation is windowed to the final model turn, not the whole run. The UI orders siblings by start time, so a generation spanning the tool calls sorts ahead of them and reads as though the model answered before calling anything. Its `usageScope: run` metadata marks that the numbers still cover the whole run
+- Tool spans are timed from when the SDK delivered the call and its result (`claude_agent.ts` stamps every message as it arrives). Without those stamps every span would collapse to the moment the tree is emitted, after the run
+
+**Trade-off:** the tree is emitted after the fact, so a crashed run leaves no spans, and the agent's individual model turns are not separate generations.
+
+**Location:** `langfuse_observations.ts`, `claude_agent.ts`, `llm_client.ts`
 
 ## System components
 
@@ -182,7 +204,8 @@ Separation allows independent optimization for speed vs evaluation quality.
 - `config.ts` - Models, prompts, constants
 - `claude_agent.ts` - The agent under test: Claude Agent SDK options, MCP server registration, failure injection
 - `sdk_conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
-- `llm_client.ts` - OpenRouter wrapper (judge)
+- `llm_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
+- `langfuse_observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
 - `workflow_judge.ts` - Judge evaluation
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
 - `langfuse_dataset.ts` - Test case schema, dataset item mapping and validation, dataset fetch
@@ -212,7 +235,7 @@ Results are recorded in Langfuse, not to a local file. Each run:
 
 - **Reads the dataset** `workflow-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
 - **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
-- **Traces** every item as one trace whose root output is the judge verdict plus the agent's narration, thinking, and tool names - not the tool payloads. Individual LLM and MCP tool calls are not instrumented: they happen inside the Claude Code subprocess.
+- **Traces** every item as one trace. Its root output is the judge verdict plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed), and a generation for the judge call. See design decision 9.
 - **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) is the strict gate, and `total_tokens` is the agent tokens billed, omitted when the provider reported no usage so an unmeasured run cannot look like a free one.
 - **Scores the run** with `pass_rate`: passing items over items requested, so runs stay comparable even when items were dropped.
 
@@ -246,7 +269,7 @@ A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in 
 **Optional:**
 - `maxTurns` - Override default (10)
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
-- `failTools` - Tool names the harness force-fails with a synthetic `INTERNAL_ERROR` result carrying the real `report-problem` nudge, instead of calling the server (e.g. `["call-actor"]`). Use it to deterministically throw a nudge-eligible error that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after a failure. Injected as a `PreToolUse` deny, the one hook that survives `bypassPermissions`. See `claude_agent.ts`.
+- `failTools` - Tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny, the one hook that survives `bypassPermissions`, so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `claude_agent.ts`.
 
 ## Key insights
 

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.15.2 - **not yet released**
 
+### 🚀 Features
+
+- Prefix MCP-proxied tool names with Actor tool name ([#1279](https://github.com/apify/apify-mcp-server/pull/1279)) ([145460d](https://github.com/apify/apify-mcp-server/commit/145460d8363acd43e09cc49922a3d3464a6e3c8d)) by [@jirispilka](https://github.com/jirispilka), closes [#1277](https://github.com/apify/apify-mcp-server/issues/1277)
+- **evals:** Trace the agent conversation to Langfuse ([#1239](https://github.com/apify/apify-mcp-server/pull/1239)) ([0396e67](https://github.com/apify/apify-mcp-server/commit/0396e67f679011838927661b315231c6d3dd188a)) by [@RobertCrupa](https://github.com/RobertCrupa)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.15.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.1) (2026-08-20)

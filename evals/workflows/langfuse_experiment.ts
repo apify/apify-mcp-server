@@ -10,6 +10,7 @@ import type { Evaluation } from '@langfuse/client';
 
 import { runAgentConversation } from './claude_agent.js';
 import { parseWorkflowItem } from './langfuse_dataset.js';
+import { buildAgentObservations, emitObservations } from './langfuse_observations.js';
 import type { LlmClient } from './llm_client.js';
 import type { TranscriptEntry } from './sdk_conversation_adapter.js';
 import type { JudgeResult } from './workflow_judge.js';
@@ -18,8 +19,9 @@ import { evaluateConversation } from './workflow_judge.js';
 /**
  * Output produced by the experiment task for a single dataset item.
  *
- * A summary, not the transcript: the SDK writes whatever the task returns to the item's
- * root span, so returning conversations would re-upload every tool payload.
+ * The SDK writes whatever the task returns to the item's root span, so this stays a
+ * summary: the transcript carries narration and tool names, never the tool payloads,
+ * which would otherwise be re-uploaded on top of the tool spans that already hold them.
  */
 export type WorkflowTaskOutput = {
     /** Item id, carried here because `ExperimentItemResult.item` is typed as a union without one. */
@@ -138,7 +140,8 @@ export function makeTask(options: WorkflowTaskOptions) {
         const item = parseWorkflowItem(rawItem);
 
         try {
-            const { conversation, transcript } = await runAgentConversation({
+            const startedAt = Date.now();
+            const adapted = await runAgentConversation({
                 prompt: item.input.query,
                 model: agentModel,
                 apifyToken,
@@ -149,6 +152,31 @@ export function makeTask(options: WorkflowTaskOptions) {
                 mcpToolsOnly,
             });
 
+            // The agent ran in a subprocess, so its conversation reaches Langfuse only if
+            // we send it. Emitted before the judge call, so a failing judge still leaves
+            // the conversation on the trace to debug. Guarded separately from the run
+            // itself: losing the trace costs debuggability, not the item's result. Only
+            // catches building the spans - the export happens later, in the span
+            // processor's batch flush, and never reaches here.
+            try {
+                emitObservations(
+                    buildAgentObservations({
+                        prompt: item.input.query,
+                        model: agentModel,
+                        mcpToolsOnly,
+                        adapted,
+                        startedAt,
+                        endedAt: Date.now(),
+                    }),
+                );
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error(
+                    `⚠️ Item "${item.id}": emitting the agent trace failed: ${error instanceof Error ? error.message : String(error)}`,
+                );
+            }
+
+            const { conversation, transcript } = adapted;
             const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
 
             return {

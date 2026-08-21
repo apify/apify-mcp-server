@@ -100,6 +100,14 @@ async function main() {
                 default: false,
             },
         })
+        // Langfuse batches items with `i += concurrency`, so 0 loops forever and NaN never
+        // starts, reporting every item as "never completed". Reject both up front.
+        .check((parsed) => {
+            if (!Number.isInteger(parsed.concurrency) || parsed.concurrency < 1) {
+                throw new Error(`--concurrency must be a positive integer, got "${parsed.concurrency}"`);
+            }
+            return true;
+        })
         .help().argv) as CliArgs;
 
     // Fail before any test runs, listing every missing variable at once.
@@ -148,7 +156,7 @@ async function main() {
 
         initTracing();
 
-        // Traces every agent/judge call as a generation nested under the item's trace.
+        // Traces each judge call as a generation nested under the item's trace.
         const llmClient = new LlmClient();
 
         const agentSdkVersion = resolveAgentSdkVersion();
