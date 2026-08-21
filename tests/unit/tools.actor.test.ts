@@ -84,79 +84,40 @@ function makeActorInfo(opts: {
 const NON_EMPTY_INPUT = { type: 'object', properties: { url: { type: 'string' } } };
 
 describe('resolveActorToolMode()', () => {
-    it('returns RUN when standby is disabled and no MCP path is set', () => {
-        expect(resolveActorToolMode(makeActorInfo({ input: NON_EMPTY_INPUT }))).toBe(ACTOR_TOOL_MODE.RUN);
-    });
-
-    it('returns RUN when standby is disabled despite a leftover MCP path', () => {
-        expect(resolveActorToolMode(makeActorInfo({ webServerMcpPath: '/mcp', input: NON_EMPTY_INPUT }))).toBe(
-            ACTOR_TOOL_MODE.RUN,
-        );
-    });
-
-    it('returns RUN when standby is disabled and the input schema is empty', () => {
-        expect(resolveActorToolMode(makeActorInfo({}))).toBe(ACTOR_TOOL_MODE.RUN);
-    });
-
-    it('returns MCP when standby is enabled and an MCP path is set', () => {
-        expect(resolveActorToolMode(makeActorInfo({ isStandbyEnabled: true, webServerMcpPath: '/mcp' }))).toBe(
-            ACTOR_TOOL_MODE.MCP,
-        );
-    });
-
-    it('returns RUN when standby is enabled without an MCP path but the input schema is non-empty', () => {
-        expect(resolveActorToolMode(makeActorInfo({ isStandbyEnabled: true, input: NON_EMPTY_INPUT }))).toBe(
-            ACTOR_TOOL_MODE.RUN,
-        );
-    });
-
-    it('returns STANDBY_WITHOUT_MCP when standby is enabled without an MCP path and the input schema is empty', () => {
-        expect(resolveActorToolMode(makeActorInfo({ isStandbyEnabled: true }))).toBe(
+    // One row per cell of the decision table in `resolveActorToolMode`'s docstring, plus the
+    // edge cases that define what counts as an empty input schema.
+    it.each([
+        ['standby disabled, no MCP path', {}, ACTOR_TOOL_MODE.RUN],
+        ['standby disabled, leftover MCP path', { webServerMcpPath: '/mcp' }, ACTOR_TOOL_MODE.RUN],
+        ['standby disabled, empty input schema', { input: undefined }, ACTOR_TOOL_MODE.RUN],
+        ['standby enabled, MCP path', { isStandbyEnabled: true, webServerMcpPath: '/mcp' }, ACTOR_TOOL_MODE.MCP],
+        ['standby enabled, no MCP path, non-empty input', { isStandbyEnabled: true }, ACTOR_TOOL_MODE.RUN],
+        [
+            'missing input counts as empty',
+            { isStandbyEnabled: true, input: undefined },
             ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
-        );
-    });
-
-    describe('empty input schema', () => {
-        it('treats a missing input as empty', () => {
-            expect(resolveActorToolMode(makeActorInfo({ isStandbyEnabled: true, input: undefined }))).toBe(
-                ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
-            );
-        });
-
-        it('treats an input without properties as empty', () => {
-            expect(resolveActorToolMode(makeActorInfo({ isStandbyEnabled: true, input: { type: 'object' } }))).toBe(
-                ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
-            );
-        });
-
-        it('treats zero properties as empty', () => {
-            expect(
-                resolveActorToolMode(
-                    makeActorInfo({ isStandbyEnabled: true, input: { type: 'object', properties: {} } }),
-                ),
-            ).toBe(ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP);
-        });
-
-        it('treats a non-empty required list with no properties as empty', () => {
-            expect(
-                resolveActorToolMode(
-                    makeActorInfo({
-                        isStandbyEnabled: true,
-                        input: { type: 'object', properties: {}, required: ['url'] },
-                    }),
-                ),
-            ).toBe(ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP);
-        });
-
-        it('treats a non-object input carrying properties as non-empty', () => {
-            expect(
-                resolveActorToolMode(
-                    makeActorInfo({
-                        isStandbyEnabled: true,
-                        input: { type: 'string', properties: { url: { type: 'string' } } },
-                    }),
-                ),
-            ).toBe(ACTOR_TOOL_MODE.RUN);
-        });
+        ],
+        [
+            'input without properties counts as empty',
+            { isStandbyEnabled: true, input: { type: 'object' } },
+            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+        ],
+        [
+            'zero properties counts as empty',
+            { isStandbyEnabled: true, input: { type: 'object', properties: {} } },
+            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+        ],
+        [
+            'required without properties still counts as empty',
+            { isStandbyEnabled: true, input: { type: 'object', properties: {}, required: ['url'] } },
+            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+        ],
+        [
+            'non-object input carrying properties counts as non-empty',
+            { isStandbyEnabled: true, input: { type: 'string', properties: { url: { type: 'string' } } } },
+            ACTOR_TOOL_MODE.RUN,
+        ],
+    ] as const)('resolves %s to %s', (_label, opts, expected) => {
+        expect(resolveActorToolMode(makeActorInfo({ input: NON_EMPTY_INPUT, ...opts }))).toBe(expected);
     });
 });

@@ -77,6 +77,16 @@ function firstText(response: ToolResponse): string {
     return textOf((response as TextToolResult).content[0]);
 }
 
+/** Asserts the pre-execution stopped early, and returns the response it answered with. */
+function earlyResponseOf(result: Awaited<ReturnType<typeof preExecute>>): ToolResponse {
+    expect('earlyResponse' in result).toBe(true);
+    return (result as { earlyResponse: ToolResponse }).earlyResponse;
+}
+
+function earlyText(result: Awaited<ReturnType<typeof preExecute>>): string {
+    return firstText(earlyResponseOf(result));
+}
+
 beforeEach(() => {
     seedActor(RUN_ONLY, { input: NON_EMPTY_INPUT });
     seedActor(RUN_ONLY_STALE_PATH, { webServerMcpPath: '/mcp', input: NON_EMPTY_INPUT });
@@ -88,26 +98,15 @@ beforeEach(() => {
 });
 
 describe('Actor run/standby mode decision table', () => {
-    describe('tools/list surface', () => {
-        it('loads a run tool for a run-only Actor', async () => {
-            expect(await loadedToolNames(RUN_ONLY)).toEqual(['acme--run-only']);
-        });
-
-        it('loads a run tool for a run-only Actor carrying a leftover webServerMcpPath', async () => {
-            expect(await loadedToolNames(RUN_ONLY_STALE_PATH)).toEqual(['acme--run-only-stale-path']);
-        });
-
-        it('loads only proxied MCP tools for a standby Actor exposing an MCP server', async () => {
-            expect(await loadedToolNames(STANDBY_MCP)).toEqual(['acme--standby-mcp--add']);
-        });
-
-        it('loads a run tool for a standby Actor with no MCP server but a non-empty input schema', async () => {
-            expect(await loadedToolNames(STANDBY_INPUT)).toEqual(['acme--standby-input']);
-        });
-
-        it('loads no tool for a standby Actor with no MCP server and an empty input schema', async () => {
-            expect(await loadedToolNames(STANDBY_EMPTY)).toEqual([]);
-        });
+    // One row per cell of the decision table: which tools the Actor contributes to tools/list.
+    it.each([
+        ['a run-only Actor', RUN_ONLY, ['acme--run-only']],
+        ['a run-only Actor carrying a leftover webServerMcpPath', RUN_ONLY_STALE_PATH, ['acme--run-only-stale-path']],
+        ['a standby Actor exposing an MCP server (proxied tools only)', STANDBY_MCP, ['acme--standby-mcp--add']],
+        ['a standby Actor with no MCP server but a non-empty input schema', STANDBY_INPUT, ['acme--standby-input']],
+        ['a standby Actor with no MCP server and an empty input schema', STANDBY_EMPTY, []],
+    ])('tools/list surface for %s', async (_label, actor, expected) => {
+        expect(await loadedToolNames(actor)).toEqual(expected);
     });
 
     describe('call-actor routing', () => {
@@ -120,10 +119,7 @@ describe('Actor run/standby mode decision table', () => {
         it('answers "is not an MCP server" for the actor:tool shape on a run-only Actor with a leftover path', async () => {
             const result = await preExecute(`${RUN_ONLY_STALE_PATH}:add`);
 
-            expect('earlyResponse' in result).toBe(true);
-            expect(firstText((result as { earlyResponse: ToolResponse }).earlyResponse)).toContain(
-                'is not an MCP server',
-            );
+            expect(earlyText(result)).toContain('is not an MCP server');
         });
 
         it('runs a standby Actor with no MCP server but a non-empty input schema', async () => {
@@ -135,17 +131,13 @@ describe('Actor run/standby mode decision table', () => {
         it('rejects the actor:tool shape for a standby Actor with no MCP server but a non-empty input schema', async () => {
             const result = await preExecute(`${STANDBY_INPUT}:add`);
 
-            expect('earlyResponse' in result).toBe(true);
-            expect(firstText((result as { earlyResponse: ToolResponse }).earlyResponse)).toContain(
-                'is not an MCP server',
-            );
+            expect(earlyText(result)).toContain('is not an MCP server');
         });
 
         it('demands a tool name for a bare call on a standby Actor exposing an MCP server', async () => {
             const result = await preExecute(STANDBY_MCP);
 
-            expect('earlyResponse' in result).toBe(true);
-            expect(firstText((result as { earlyResponse: ToolResponse }).earlyResponse)).toContain('tool name');
+            expect(earlyText(result)).toContain('tool name');
         });
 
         it('proxies an MCP tool call on a standby Actor exposing an MCP server', async () => {
@@ -165,21 +157,19 @@ describe('Actor run/standby mode decision table', () => {
             const bare = await callActor(STANDBY_EMPTY);
             const withToolName = await preExecute(`${STANDBY_EMPTY}:add`);
 
-            expect('earlyResponse' in withToolName).toBe(true);
-            const withToolNameText = firstText((withToolName as { earlyResponse: ToolResponse }).earlyResponse);
+            const withToolNameText = earlyText(withToolName);
 
             expect(firstText(bare)).toBe(withToolNameText);
             expect(withToolNameText).toContain('standby mode without an MCP server');
             expect(bare.isError).toBe(true);
-            expect((withToolName as { earlyResponse: ToolResponse }).earlyResponse.isError).toBe(true);
+            expect(earlyResponseOf(withToolName).isError).toBe(true);
         });
 
         it('answers with the canonical Actor name for both call shapes when addressed by Actor ID', async () => {
             const bare = await callActor(STANDBY_EMPTY_ID);
             const withToolName = await preExecute(`${STANDBY_EMPTY_ID}:add`);
 
-            expect('earlyResponse' in withToolName).toBe(true);
-            const withToolNameText = firstText((withToolName as { earlyResponse: ToolResponse }).earlyResponse);
+            const withToolNameText = earlyText(withToolName);
 
             expect(firstText(bare)).toBe(withToolNameText);
             expect(withToolNameText).toContain(STANDBY_EMPTY);
@@ -190,7 +180,7 @@ describe('Actor run/standby mode decision table', () => {
             const result = await preExecute(`${RUN_ONLY_ID}:add`);
 
             expect('earlyResponse' in result).toBe(true);
-            const text = firstText((result as { earlyResponse: ToolResponse }).earlyResponse);
+            const text = earlyText(result);
             expect(text).toContain(RUN_ONLY);
             expect(text).not.toContain(RUN_ONLY_ID);
         });
@@ -199,8 +189,8 @@ describe('Actor run/standby mode decision table', () => {
             const unsupported = await preExecute(`${STANDBY_EMPTY}:add`);
             const runOnly = await preExecute(`${RUN_ONLY_STALE_PATH}:add`);
 
-            const unsupportedText = firstText((unsupported as { earlyResponse: ToolResponse }).earlyResponse);
-            const runOnlyText = firstText((runOnly as { earlyResponse: ToolResponse }).earlyResponse);
+            const unsupportedText = earlyText(unsupported);
+            const runOnlyText = earlyText(runOnly);
 
             expect(unsupportedText).not.toBe(runOnlyText);
             expect(unsupportedText).not.toContain('is not an MCP server');

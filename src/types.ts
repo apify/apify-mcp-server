@@ -263,25 +263,22 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
  * Type representing the Actor information needed in order to turn it into an MCP server tool.
  */
 export type ActorInfo = {
-    webServerMcpPath: string | null; // To determined if the Actor is an MCP server
+    webServerMcpPath: string | null; // Declared MCP endpoint; only means MCP when standby is on — see `resolveActorToolMode`
     definition: ActorDefinitionPruned;
     actor: ActorOutdated;
 };
 
 /**
  * How an Actor is exposed as a tool, resolved once from its definition by `resolveActorToolMode`.
- * `mcpServerUrl` is a plain `string` exactly when `toolMode` is {@link ACTOR_TOOL_MODE.MCP}, so
- * callers connect without a cast.
+ * `mcpServerUrl` is present exactly when `toolMode` is {@link ACTOR_TOOL_MODE.MCP}, so callers
+ * connect without a cast and an un-narrowed read is a compile error.
  * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
  * messages built from it read the same whether the Actor was addressed by ID or by name.
  */
-export type ActorToolResolutionResult =
-    | { toolMode: typeof ACTOR_TOOL_MODE.MCP; mcpServerUrl: string; actorFullName: string }
-    | {
-          toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP;
-          mcpServerUrl: null;
-          actorFullName: string;
-      };
+export type ActorToolResolutionResult = { actorFullName: string } & (
+    | { toolMode: typeof ACTOR_TOOL_MODE.MCP; mcpServerUrl: string }
+    | { toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP }
+);
 
 export type ActorStoreList = ActorStoreListOutdated & {
     actorReviewCount?: number;

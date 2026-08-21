@@ -75,5 +75,5 @@ export async function getActorToolResolutionCached(
             actorFullName,
         };
     }
-    return { toolMode, mcpServerUrl: null, actorFullName };
+    return { toolMode, actorFullName };
 }

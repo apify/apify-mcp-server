@@ -141,7 +141,6 @@ describe('getActorToolResolutionCached()', () => {
 
         await expect(getActorToolResolutionCached('acme/stale-path', client)).resolves.toEqual({
             toolMode: ACTOR_TOOL_MODE.RUN,
-            mcpServerUrl: null,
             actorFullName: 'acme/stale-path',
         });
     });
@@ -152,7 +151,6 @@ describe('getActorToolResolutionCached()', () => {
 
         await expect(getActorToolResolutionCached('aBcD1234', client)).resolves.toEqual({
             toolMode: ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
-            mcpServerUrl: null,
             actorFullName: 'acme/standby-empty-by-id',
         });
     });

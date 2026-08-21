@@ -18,14 +18,7 @@ import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import type { PaymentProvider } from '../../payments/types.js';
-import type {
-    ActorToolResolutionResult,
-    ApifyToken,
-    InternalToolArgs,
-    ToolDescriptionContext,
-    ToolEntry,
-    ToolInputSchema,
-} from '../../types.js';
+import type { ApifyToken, InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached, getActorToolResolutionCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -175,13 +168,14 @@ export function buildCallActorAppsDescription(ctx: ToolDescriptionContext = ALL_
  */
 function respondStandbyRejection(
     error: ActorLoadError,
-    opts: { mcpSessionId?: string; actorId?: string },
+    opts: { mcpSessionId?: string; actorId?: string; paymentProviderId?: string },
 ): ToolResponse {
     log.softFail('Rejecting call-actor for unsupported standby Actor', {
         // The error's canonical Actor name, so both call shapes log the same value even when the
-        // caller addressed the Actor by ID.
+        // caller addressed the Actor by ID. `actorLoadErrorKind` distinguishes which cell rejected it.
         actorName: error.actorName,
         mcpSessionId: opts.mcpSessionId,
+        paymentProviderId: opts.paymentProviderId,
         actorLoadErrorKind: error.kind,
         failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
     });
@@ -349,15 +343,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
 
     // Canonical name, not the caller's identifier — it may be an Actor ID or carry a `:toolName` suffix.
     const error = ActorLoadError.standbyPaymentNotSupported(actorDefinitionWithInfo.definition.actorFullName);
-    log.softFail('Rejecting call-actor for standby Actor under third-party payment provider', {
-        actorName: error.actorName,
-        paymentProviderId: paymentProvider.id,
-        mcpSessionId,
-        actorLoadErrorKind: error.kind,
-        failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-    });
-
-    return respondUserError(error.message, { detail: error.kind });
+    return respondStandbyRejection(error, { mcpSessionId, paymentProviderId: paymentProvider.id });
 }
 
 /**
@@ -379,23 +365,19 @@ export function resolveActorContext(actorName: string): {
 }
 
 /**
- * Handles the MCP tool call flow (when actorName contains ":toolName").
- * Returns a response if handled, or null if this is not an MCP tool call.
+ * Proxies the MCP tool call flow (when actorName contains ":toolName"). The caller routes here only
+ * for {@link ACTOR_TOOL_MODE.MCP} Actors, so `mcpServerUrl` is always known good.
  */
 export async function handleMcpToolCall(params: {
     baseActorName: string;
     mcpToolName: string;
     input: Record<string, unknown>;
-    resolution: ActorToolResolutionResult | null;
+    mcpServerUrl: string;
     apifyToken: string;
     mcpSessionId?: string;
     signal: AbortSignal;
-}): Promise<ToolResponse | null> {
-    const { baseActorName, mcpToolName, input, resolution, apifyToken, mcpSessionId, signal } = params;
-
-    if (resolution?.toolMode !== ACTOR_TOOL_MODE.MCP) {
-        return respondServerError(`Actor '${resolution?.actorFullName ?? baseActorName}' is not an MCP server.`);
-    }
+}): Promise<ToolResponse> {
+    const { baseActorName, mcpToolName, input, mcpServerUrl, apifyToken, mcpSessionId, signal } = params;
 
     if (!input) {
         return respondServerError(
@@ -409,9 +391,9 @@ export async function handleMcpToolCall(params: {
 
     let client: Client | null = null;
     try {
-        client = await connectMCPClient(resolution.mcpServerUrl, apifyToken, mcpSessionId);
+        client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
         if (!client) {
-            return respondServerError(`Failed to connect to MCP server ${resolution.mcpServerUrl}`);
+            return respondServerError(`Failed to connect to MCP server ${mcpServerUrl}`);
         }
 
         const result = await client.callTool(
@@ -613,20 +595,26 @@ export async function callActorPreExecute(
         };
     }
 
-    // Handle MCP tool calls
+    // A `:toolName` suffix only means anything for an MCP-server Actor; every other mode is a dead end.
     if (mcpToolName) {
-        const mcpResult = await handleMcpToolCall({
-            baseActorName,
-            mcpToolName,
-            input: parsed.input as Record<string, unknown>,
-            resolution,
-            apifyToken,
-            mcpSessionId,
-            signal: toolArgs.signal,
-        });
-        if (mcpResult) {
-            return { earlyResponse: mcpResult };
+        if (resolution?.toolMode !== ACTOR_TOOL_MODE.MCP) {
+            return {
+                earlyResponse: respondServerError(
+                    `Actor '${resolution?.actorFullName ?? baseActorName}' is not an MCP server.`,
+                ),
+            };
         }
+        return {
+            earlyResponse: await handleMcpToolCall({
+                baseActorName,
+                mcpToolName,
+                input: parsed.input as Record<string, unknown>,
+                mcpServerUrl: resolution.mcpServerUrl,
+                apifyToken,
+                mcpSessionId,
+                signal: toolArgs.signal,
+            }),
+        };
     }
 
     return { parsed, baseActorName, mcpToolName };

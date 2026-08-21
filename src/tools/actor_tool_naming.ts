@@ -12,8 +12,7 @@ import { ACTOR_TOOL_MODE } from '../types.js';
  *
  * | standby  | `webServerMcpPath` | input schema | result                |
  * |----------|--------------------|--------------|-----------------------|
- * | disabled | absent             | any          | `RUN`                 |
- * | disabled | present            | any          | `RUN`                 |
+ * | disabled | any (path ignored) | any          | `RUN`                 |
  * | enabled  | present            | any          | `MCP`                 |
  * | enabled  | absent             | non-empty    | `RUN`                 |
  * | enabled  | absent             | empty        | `STANDBY_WITHOUT_MCP` |
@@ -23,9 +22,9 @@ import { ACTOR_TOOL_MODE } from '../types.js';
  * still reads as empty.
  */
 export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
-    const isStandbyEnabled = actorInfo.actor.actorStandby?.isEnabled === true;
-    if (isStandbyEnabled && actorInfo.webServerMcpPath) return ACTOR_TOOL_MODE.MCP;
-    if (isStandbyEnabled && Object.keys(actorInfo.definition.input?.properties ?? {}).length === 0) {
+    if (actorInfo.actor.actorStandby?.isEnabled !== true) return ACTOR_TOOL_MODE.RUN;
+    if (actorInfo.webServerMcpPath) return ACTOR_TOOL_MODE.MCP;
+    if (Object.keys(actorInfo.definition.input?.properties ?? {}).length === 0) {
         return ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP;
     }
     return ACTOR_TOOL_MODE.RUN;
