@@ -59,7 +59,12 @@ export const taskNameSchema = z
         'Task name may contain only letters, digits and dashes, and cannot start or end with a dash',
     );
 
-/** Writable public display configuration, shared by the create and update tools. */
+/**
+ * Writable public display configuration, shared by the create and update tools.
+ *
+ * The SEO length caps mirror the API's own, which it enforces on every `publicConfig` write and not
+ * just at publish time, so rejecting here costs the user nothing.
+ */
 export const publicConfigSchema = z.object({
     seoTitle: z
         .string()
@@ -70,7 +75,7 @@ export const publicConfigSchema = z.object({
         .string()
         .max(160)
         .optional()
-        .describe('Description shown on the public landing page. At most 160 characters.'),
+        .describe('Description shown on the public landing page. Required to publish. At most 160 characters.'),
     inputSchemaFields: z
         .array(z.string())
         .optional()
@@ -87,11 +92,9 @@ export const publicConfigSchema = z.object({
 });
 
 /**
- * The task subset returned by every task tool: identity, publication state, and the display
- * config. `input` is returned verbatim, as the API, CLI, and apify-client return it — input
- * fields the Actor's schema declares as secret arrive as `ENCRYPTED_VALUE:` placeholders,
- * never plaintext, so no extra redaction happens here. Its keys are what
- * `publicConfig.inputSchemaFields` can reference.
+ * The task subset returned by every task tool: identity, publication state, display config, and the
+ * input verbatim — secret fields arrive from the API as `ENCRYPTED_VALUE:` placeholders, so nothing
+ * is redacted here.
  */
 export function taskResult(task: Task) {
     const publicConfig = task.publicConfig
