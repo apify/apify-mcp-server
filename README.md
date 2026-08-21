@@ -340,7 +340,7 @@ This setup exposes only the specified Actor (`apify/my-actor`) as a tool. No oth
 The CLI can be configured using command-line flags. For example, to load the same tools as in the hosted server configuration, use:
 
 ```bash
-npx @apify/actors-mcp-server --tools actors,docs,apify/rag-web-browser
+npx @apify/actors-mcp-server --tools actors,docs,apify/rag-web-browser,apify/web-fetch
 ```
 
 The minimal configuration is similar to the hosted server configuration:
@@ -527,9 +527,9 @@ Example: `https://mcp.apify.com?tools=search-actors`.
 Apify MCP is split across two repositories: this repository for core MCP logic and the private `apify-mcp-server-internal` for the hosted server.
 Changes must be synchronized between both.
 
-To create a canary release, add the `beta` tag to your PR branch.
+To create a canary release, add the `beta` label to your pull request.
 This publishes the package to [pkg.pr.new](https://pkg.pr.new/) for staging and testing before merging.
-See [the workflow file](.github/workflows/pre_release.yaml) for details.
+See [the workflow file](.github/workflows/on_pull_request_label.yaml) for details.
 
 ## 🐋 Docker Hub integration
 The Apify MCP Server is also available on [Docker Hub](https://hub.docker.com/mcp/server/apify-mcp-server/overview), registered via the [mcp-registry](https://github.com/docker/mcp-registry) repository. The entry in `servers/apify-mcp-server/server.yaml` should be deployed automatically by the Docker Hub MCP registry (deployment frequency is unknown). **Before making major changes to the `stdio` server version, test it locally to ensure the Docker build passes.** To test, change the `source.branch` to your PR branch and run `task build -- apify-mcp-server`. For more details, see [CONTRIBUTING.md](https://github.com/docker/mcp-registry/blob/main/CONTRIBUTING.md).
