@@ -1,8 +1,11 @@
 import type { ActorRun } from 'apify-client';
-import { describe, expect, it } from 'vitest';
+import { ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
+import { describe, expect, it, vi } from 'vitest';
 
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { ActorExecutionParams } from '../../src/types.js';
+import { textOf } from './helpers/tool_context.js';
 
 /**
  * The executor's three migration-specific responsibilities:
@@ -142,6 +145,44 @@ describe('actorExecutor', () => {
 
             expect(spies.waitForFinishOpts).toEqual({ waitSecs: undefined });
             expect(spies.startInput).toEqual({ query: 'foo' });
+        });
+    });
+
+    describe('platform input-validation error', () => {
+        const INPUT_SCHEMA = { type: 'object', properties: { query: { type: 'string' } } } as const;
+
+        function invalidInputError(message: string): ApifyApiError {
+            return new ApifyApiError(
+                { data: { error: { type: 'invalid-input', message } }, status: 400 } as AxiosResponse,
+                1,
+            );
+        }
+
+        it('returns the schema + platform message instead of throwing, on a confirmed invalid-input error', async () => {
+            const { params } = buildParams({ query: 'foo' }, { actorId: 'actor-1', inputSchema: INPUT_SCHEMA });
+            params.apifyClient = {
+                ...params.apifyClient,
+                actor: () => ({
+                    start: vi.fn().mockRejectedValue(invalidInputError('query: must be a non-empty string')),
+                }),
+            } as unknown as ActorExecutionParams['apifyClient'];
+
+            const result = await actorExecutor.executeActorTool(params);
+
+            const text = (result?.content ?? []).map(textOf).join('\n');
+            expect(text).toContain('query: must be a non-empty string');
+            expect(text).toContain(JSON.stringify(INPUT_SCHEMA));
+            expect(text).toContain('Please ensure the input is correct');
+        });
+
+        it('rethrows any other actor.start() error unchanged', async () => {
+            const { params } = buildParams({ query: 'foo' });
+            params.apifyClient = {
+                ...params.apifyClient,
+                actor: () => ({ start: vi.fn().mockRejectedValue(new Error('socket hang up')) }),
+            } as unknown as ActorExecutionParams['apifyClient'];
+
+            await expect(actorExecutor.executeActorTool(params)).rejects.toThrow('socket hang up');
         });
     });
 
