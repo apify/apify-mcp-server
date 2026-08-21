@@ -8,7 +8,7 @@ import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 import { z } from 'zod';
 
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
-import type { LlmClient } from './llm_client.js';
+import type { JudgeLlmClient } from './llm_client.js';
 import type { ConversationHistory } from './types.js';
 
 /**
@@ -101,12 +101,26 @@ const JudgeResponseValidator = z.object({
 });
 
 /**
- * Parse structured JSON response from judge
+ * Some providers answer in prose that still opens with the verdict ("FAIL. The agent ...").
+ * Recover the verdict and use the rest as the reason before spending a retry call on it.
+ * Anything not opening with PASS/FAIL stays unparsed.
  */
-function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reason: string } {
+const PROSE_VERDICT_PATTERN = /^\s*(PASS|FAIL)\b[.:!-]?\s*(.*)$/is;
+
+/**
+ * Parse the judge response: strict JSON first, prose-verdict fallback second.
+ */
+export function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reason: string } {
     try {
         return JudgeResponseValidator.parse(JSON.parse(response));
     } catch (error) {
+        const prose = PROSE_VERDICT_PATTERN.exec(response);
+        if (prose) {
+            return {
+                verdict: prose[1].toUpperCase() as 'PASS' | 'FAIL',
+                reason: prose[2].trim() || 'no reason given',
+            };
+        }
         // No raw response here: the retry loop's final throw already carries it.
         throw new Error(
             `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}`,
@@ -120,7 +134,7 @@ function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reaso
 export async function evaluateConversation(
     reference: string,
     conversation: ConversationHistory,
-    llmClient: LlmClient,
+    llmClient: JudgeLlmClient,
     judgeModel: string = MODELS.judge,
 ): Promise<JudgeResult> {
     // Format conversation for judge
