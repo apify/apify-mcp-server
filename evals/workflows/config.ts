@@ -37,6 +37,9 @@ export const MODELS = {
 
     // Judge model - evaluates conversation quality
     judge: 'deepseek/deepseek-v4-flash',
+
+    // Judge model when the judge runs on the Claude Agent SDK (--claude-judge).
+    claudeJudge: 'claude-sonnet-5',
 };
 
 /**

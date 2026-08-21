@@ -41,6 +41,12 @@ export type LlmResponse = {
 const TEMPERATURE = 0.15;
 
 /**
+ * What the judge needs from an LLM client. Implemented by {@link LlmClient} (OpenRouter)
+ * and `ClaudeLlmClient` (Claude Agent SDK, `--claude-judge`).
+ */
+export type JudgeLlmClient = Pick<LlmClient, 'callLlm'>;
+
+/**
  * LLM client for chat completions with optional tool support
  */
 export class LlmClient {
