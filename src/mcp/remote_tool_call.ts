@@ -2,7 +2,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 import { connectMCPClient } from './client.js';
 
-/** Outcome of {@link withRemoteMcpClient} — closed union every caller must handle. */
+/** Closed outcome union for {@link withRemoteMcpClient}. */
 export type RemoteMcpCallOutcome<T> =
     | { outcome: 'connect-failed' }
     | { outcome: 'aborted' }
@@ -10,11 +10,8 @@ export type RemoteMcpCallOutcome<T> =
     | { outcome: 'success'; value: T };
 
 /**
- * Connect-call-close round trip, shared by `tool_dispatch.ts`'s `ACTOR_MCP` case and
- * `call_actor.ts`'s MCP passthrough — the only two sites that call a remote tool (not just list
- * them). `run` receives the connected client and does the actual `callTool`; kept out of
- * `client.ts`: a `vi.spyOn` on `connectMCPClient` only intercepts a cross-module import, not a
- * same-module call from inside `client.ts` itself.
+ * Connect, run the callback with the live client, always close. Not in `client.ts`:
+ * `vi.spyOn(connectMCPClient)` only intercepts a cross-module import, not a same-module call.
  */
 export async function withRemoteMcpClient<T>(
     serverUrl: string,
@@ -30,8 +27,7 @@ export async function withRemoteMcpClient<T>(
         return { outcome: 'success', value: await run(client) };
     } catch (error) {
         if (signal.aborted) {
-            // Yield a macrotask first: the SDK sends notifications/cancelled fire-and-forget on
-            // the transport's AbortController, which the finally's close() would abort before it flushes.
+            // Yield a macrotask so the SDK's fire-and-forget notifications/cancelled flushes before close() aborts it.
             await new Promise((resolve) => setImmediate(resolve));
             return { outcome: 'aborted' };
         }

@@ -184,8 +184,7 @@ export async function dispatchToolCall(params: {
                     break;
                 }
                 case 'aborted': {
-                    // A cancelled request gets no response, and a cancel is not a failure — so no
-                    // error body, no failure_* fields, no error log (mirrors the ACTOR branch below).
+                    // Cancel isn't failure: no response body, no failure_* fields, no error log (mirrors ACTOR below).
                     toolStatus = TOOL_STATUS.ABORTED;
                     result = {};
                     break;

@@ -34,10 +34,9 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
   preparation; `executeSyncToolCall()` runs synchronous calls.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
-- `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip, shared by
-  `tool_dispatch.ts`'s `ACTOR_MCP` case and `call_actor.ts`'s MCP passthrough; each caller's own
-  callback does the actual `callTool`. Kept out of `client.ts`: a `vi.spyOn` on `connectMCPClient`
-  only intercepts a cross-module import, not a same-module call from inside `client.ts` itself.
+- `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
+  `tool_dispatch.ts` and `call_actor.ts`'s remote tool calls. Kept out of `client.ts`:
+  `vi.spyOn(connectMCPClient)` only intercepts a cross-module import.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
