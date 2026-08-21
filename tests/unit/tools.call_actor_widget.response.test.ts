@@ -117,7 +117,8 @@ describe('call-actor-widget response', () => {
 
         expect(_meta?.ui?.resourceUri).toBe(WIDGET_URIS.ACTOR_RUN);
         expect(_meta?.ui?.visibility).toEqual(['model', 'app']);
-        expect(_meta?.ui?.csp).toBeDefined();
+        // csp lives on the UI resource _meta, not the tool (SEP-1865: McpUiToolMeta types csp as never)
+        expect(_meta?.ui?.csp).toBeUndefined();
         expect(_meta?.['openai/widgetDescription']).toContain('apify/rag-web-browser');
     });
 
@@ -126,7 +127,8 @@ describe('call-actor-widget response', () => {
         const meta = tool._meta as { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown } };
         expect(meta.ui?.resourceUri).toBe(WIDGET_URIS.ACTOR_RUN);
         expect(meta.ui?.visibility).toEqual(['model', 'app']);
-        expect(meta.ui?.csp).toBeDefined();
+        // csp lives on the UI resource _meta, not the tool (SEP-1865: McpUiToolMeta types csp as never)
+        expect(meta.ui?.csp).toBeUndefined();
     });
 
     it('declares a strict input schema that silently strips stray keys like async/previewOutput', () => {
