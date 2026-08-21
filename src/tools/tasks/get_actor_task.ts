@@ -62,7 +62,7 @@ export const getActorTask: ToolEntry = Object.freeze({
         const result = taskResult(task);
         const summary = `Task "${result.name}" (ID: ${result.taskId}) runs Actor ${result.actorId}${
             result.publishedAt ? '; published' : ''
-        }. The stored input is in the result; secret fields are encrypted placeholders.`;
+        }.`;
         return respondOk([JSON.stringify(result), summary], { structuredContent: result });
     },
 } as const);

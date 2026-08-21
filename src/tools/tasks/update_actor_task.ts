@@ -119,7 +119,7 @@ export const updateActorTask: ToolEntry = Object.freeze({
         const task = await client.task(resolvedTaskId).update(update);
 
         const result = taskResult(task);
-        const summary = `Updated task "${result.name}" (ID: ${result.taskId}). The returned input reflects the update.`;
+        const summary = `Updated task "${result.name}" (ID: ${result.taskId}).`;
         return respondOk([JSON.stringify(result), summary], { structuredContent: result });
     },
 } as const);
