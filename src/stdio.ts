@@ -92,10 +92,10 @@ const argv = yargs(hideBin(process.argv))
     })
     .options('tools', {
         type: 'string',
-        describe: `Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: --tools actors,docs,apify/rag-web-browser. Can also be set via TOOLS environment variable.
+        describe: `Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: --tools actors,docs,apify/rag-web-browser,apify/web-fetch. Can also be set via TOOLS environment variable.
 
 For more details visit https://mcp.apify.com`,
-        example: 'actors,docs,apify/rag-web-browser',
+        example: 'actors,docs,apify/rag-web-browser,apify/web-fetch',
     })
     .option('telemetry-enabled', {
         type: 'boolean',
