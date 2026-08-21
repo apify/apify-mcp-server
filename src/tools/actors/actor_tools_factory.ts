@@ -8,6 +8,9 @@ import {
     HELPER_TOOLS,
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
+    WEB_FETCH,
+    WEB_FETCH_ADDITIONAL_DESC,
+    WEB_FETCH_URL_SCHEME_NOTE,
 } from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
@@ -121,11 +124,22 @@ export async function getNormalActorsAsTools(
             waitSecs: WAIT_SECS_INPUT_PROPERTY,
         };
 
+        // Scheme note on the parameter itself: that is what an agent reads while writing the
+        // url argument, where a tool-description tail gets skimmed past.
+        if (definition.actorFullName === WEB_FETCH) {
+            const urlProperty = inputSchemaWithWaitSecs.properties.url as { description?: string } | undefined;
+            if (urlProperty?.description) {
+                urlProperty.description += WEB_FETCH_URL_SCHEME_NOTE;
+            }
+        }
+
         let description = `This tool calls the Actor "${definition.actorFullName}" and retrieves its output results.
 Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.
 Actor description: ${definition.description}`;
         if (isRag) {
             description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
+        } else if (definition.actorFullName === WEB_FETCH) {
+            description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
         }
 
         const memoryMbytes = Math.min(

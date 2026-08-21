@@ -181,6 +181,26 @@ describe('Structured Output Schemas', () => {
             expect(tool.outputSchema).toBe(actorRunOutputSchema);
         });
 
+        it("appends the http(s)-only scheme note to web-fetch's url parameter", async () => {
+            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/web-fetch')]);
+
+            const tool = tools[0] as ActorTool;
+            const inputProps = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+            const urlField = inputProps.url as { description?: string } | undefined;
+            expect(urlField?.description).toContain('The URL to process');
+            expect(urlField?.description).toContain('http(s) URLs only');
+            expect(urlField?.description).toContain('rather than substituting');
+        });
+
+        it("leaves other Actors' url parameters untouched", async () => {
+            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
+
+            const tool = tools[0] as ActorTool;
+            const inputProps = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+            const urlField = inputProps.url as { description?: string } | undefined;
+            expect(urlField?.description).toBe('The URL to process');
+        });
+
         it('injects waitSecs as an optional integer (0–45) into the input schema', async () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
 
