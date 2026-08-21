@@ -257,6 +257,28 @@ describe('getToolCallErrorUserText()', () => {
         expect(text).toContain('check APIFY_TOKEN');
         expect(text).not.toContain('—');
     });
+
+    it('names the API error type so the model can report the exact failure', () => {
+        const error = new ApifyApiError(
+            {
+                data: { error: { type: 'actor-task-name-not-unique', message: 'Task name is not unique' } },
+                status: 400,
+            } as never,
+            1,
+        );
+        const text = getToolCallErrorUserText('create-actor-task', error);
+        expect(text).toContain('Task name is not unique');
+        expect(text).toContain('API error type: actor-task-name-not-unique');
+    });
+
+    // Only an `ApifyApiError` carries an API error type. A plain Error with a `type` field is not
+    // one (node-fetch sets `type: 'system'`), so the suffix must stay off.
+    it('omits the API error type for an error that is not an ApifyApiError', () => {
+        const error = Object.assign(new Error('Request failed'), { type: 'system' });
+        const text = getToolCallErrorUserText('create-actor-task', error);
+        expect(text).toContain('Request failed');
+        expect(text).not.toContain('API error type');
+    });
 });
 
 describe('computeToolResponseBytes()', () => {
