@@ -4,7 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
 import { CODE_RUNTIME_ACTOR_NAME } from '../../src/const.js';
-import { fetchActorDetails, resolveReadmeContent, typeObjectToString } from '../../src/utils/actor_details.js';
+import { actorDefinitionCache } from '../../src/state.js';
+import type { ActorDefinitionWithInfo } from '../../src/types.js';
+import {
+    fetchActorDetails,
+    getMcpToolsMessage,
+    resolveReadmeContent,
+    typeObjectToString,
+} from '../../src/utils/actor_details.js';
 
 vi.mock('../../src/utils/actor_search.js', () => ({
     searchActorsByKeywords: vi.fn().mockResolvedValue([]),
@@ -172,5 +179,23 @@ describe('fetchActorDetails()', () => {
         const client = stubApifyClient(() => Promise.reject(apifyApiError(401, 'Authentication token is not valid')));
 
         await expect(fetchActorDetails(client, 'apify/instagram-scraper')).rejects.toMatchObject({ statusCode: 401 });
+    });
+});
+
+describe('getMcpToolsMessage()', () => {
+    it('reports a run-only Actor with a leftover webServerMcpPath as not an MCP server', async () => {
+        const actorName = 'acme/stale-mcp-path';
+        actorDefinitionCache.set(actorName, {
+            definition: { id: 'staleactor', actorFullName: actorName, webServerMcpPath: '/mcp' },
+            info: { id: 'staleactor', isPublic: true, userId: 'owner' },
+        } as unknown as ActorDefinitionWithInfo);
+
+        const message = await getMcpToolsMessage(
+            actorName,
+            stubApifyClient(async () => ({})),
+            'token',
+        );
+
+        expect(message).toBe('Note: This Actor is not an MCP server and does not expose MCP tools.');
     });
 });

@@ -4,12 +4,30 @@ import log from '@apify/log';
 
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { ActorInfo } from '../types.js';
+import { ACTOR_TOOL_MODE } from '../types.js';
 
-/*
- * Checks if the given ActorInfo represents an MCP server Actor.
+/**
+ * The single rule for how an Actor is exposed as a tool. Tool loading and `call-actor` routing both
+ * read it, so the two can never disagree.
+ *
+ * | standby  | `webServerMcpPath` | input schema | result                |
+ * |----------|--------------------|--------------|-----------------------|
+ * | disabled | any (path ignored) | any          | `RUN`                 |
+ * | enabled  | present            | any          | `MCP`                 |
+ * | enabled  | absent             | non-empty    | `RUN`                 |
+ * | enabled  | absent             | empty        | `STANDBY_WITHOUT_MCP` |
+ *
+ * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
+ * or `input.properties` has zero keys. Nothing else counts — a non-empty `required` with no properties
+ * still reads as empty.
  */
-export function isActorInfoMcpServer(actorInfo: ActorInfo): boolean {
-    return !!(actorInfo.webServerMcpPath && actorInfo.actor.actorStandby?.isEnabled);
+export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
+    if (actorInfo.actor.actorStandby?.isEnabled !== true) return ACTOR_TOOL_MODE.RUN;
+    if (actorInfo.webServerMcpPath) return ACTOR_TOOL_MODE.MCP;
+    if (Object.keys(actorInfo.definition.input?.properties ?? {}).length === 0) {
+        return ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP;
+    }
+    return ACTOR_TOOL_MODE.RUN;
 }
 
 /**
@@ -18,8 +36,8 @@ export function isActorInfoMcpServer(actorInfo: ActorInfo): boolean {
  * List-time filtering in `getActorsAsTools` and the call-time guard in
  * `checkPaymentProviderStandbyConflict` must use this — not MCP URL presence alone.
  */
-export function isActorBlockedUnderPaymentProvider(actorInfo: ActorInfo): boolean {
-    return !!actorInfo.actor.actorStandby?.isEnabled;
+export function isActorBlockedUnderPaymentProvider(actor: Pick<ActorInfo['actor'], 'actorStandby'>): boolean {
+    return actor.actorStandby?.isEnabled === true;
 }
 
 /** Splits an Actor full name; a missing slash yields a null username. */
