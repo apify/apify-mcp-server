@@ -1,14 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { LlmClient } from '../../evals/workflows/llm_client.js';
 import type { ConversationHistory } from '../../evals/workflows/types.js';
 import { evaluateConversation } from '../../evals/workflows/workflow_judge.js';
 
-/** LLM client that returns one fixed judge response. */
-function makeJudgeClient(content: string): LlmClient {
-    return {
-        callLlm: async () => ({ content }),
-    } as unknown as LlmClient;
+/** LLM client that returns the given judge responses in order, repeating the last one. */
+function makeJudgeClient(...responses: string[]): LlmClient & { callLlm: ReturnType<typeof vi.fn> } {
+    let call = 0;
+    const callLlm = vi.fn(async () => ({ content: responses[Math.min(call++, responses.length - 1)] }));
+    return { callLlm } as unknown as LlmClient & { callLlm: ReturnType<typeof vi.fn> };
 }
 
 /** LLM client that records the prompt it was asked to judge. */
@@ -73,28 +73,18 @@ describe('evaluateConversation()', () => {
     });
 
     it('retries once when the judge answers in plain text instead of JSON', async () => {
-        const responses = ['PASS: looks good but not JSON', '{"verdict":"PASS","reason":"ok"}'];
-        let calls = 0;
-        const client = {
-            callLlm: async () => ({ content: responses[calls++] }),
-        } as unknown as LlmClient;
+        const client = makeJudgeClient('PASS: looks good but not JSON', '{"verdict":"PASS","reason":"ok"}');
 
         const result = await evaluateConversation(reference, conversation, client);
 
         expect(result.verdict).toBe('PASS');
-        expect(calls).toBe(2);
+        expect(client.callLlm).toHaveBeenCalledTimes(2);
     });
 
     it('throws after two malformed judge answers', async () => {
-        let calls = 0;
-        const client = {
-            callLlm: async () => {
-                calls++;
-                return { content: 'not json at all' };
-            },
-        } as unknown as LlmClient;
+        const client = makeJudgeClient('not json at all');
 
         await expect(evaluateConversation(reference, conversation, client)).rejects.toThrow('after 2 attempts');
-        expect(calls).toBe(2);
+        expect(client.callLlm).toHaveBeenCalledTimes(2);
     });
 });

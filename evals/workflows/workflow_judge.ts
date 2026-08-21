@@ -23,6 +23,9 @@ export type JudgeResult = {
     rawResponse: string;
 };
 
+/** Judge calls per item before the parse failure is fatal. */
+const JUDGE_PARSE_ATTEMPTS = 2;
+
 /**
  * JSON schema for structured judge output
  * Guarantees the LLM returns valid JSON matching this schema
@@ -135,27 +138,27 @@ export async function evaluateConversation(
     // text (e.g. "PASS: ..."). One fresh judge call recovers those without rerunning the
     // far more expensive agent conversation; a second malformed answer still throws.
     let lastError: unknown;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    let lastRawResponse = '';
+    for (let attempt = 1; attempt <= JUDGE_PARSE_ATTEMPTS; attempt++) {
         const response = await llmClient.callLlm(
             [{ role: 'user', content: judgePrompt }],
             judgeModel,
             undefined, // No tools
-            JUDGE_RESPONSE_SCHEMA, // Use structured output
+            JUDGE_RESPONSE_SCHEMA,
         );
-        const rawResponse = response.content || '';
+        lastRawResponse = response.content || '';
 
         try {
-            const { verdict, reason } = parseJudgeResponse(rawResponse);
-            return {
-                verdict,
-                reason,
-                rawResponse,
-            };
+            return { ...parseJudgeResponse(lastRawResponse), rawResponse: lastRawResponse };
         } catch (error) {
             lastError = error;
         }
     }
+    // The raw answer is the only evidence of what the judge actually said; without it the
+    // failure is undebuggable.
     throw new Error(
-        `Failed to parse judge response after 2 attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+        `Failed to parse judge response after ${JUDGE_PARSE_ATTEMPTS} attempts: ` +
+            `${lastError instanceof Error ? lastError.message : String(lastError)}\n` +
+            `Last raw response: ${lastRawResponse}`,
     );
 }

@@ -2,7 +2,7 @@
 /* eslint-disable no-console */
 /* eslint-disable import/extensions */
 /**
- * Write the Langfuse dataset back to `dataset_snapshot.json`.
+ * Write the Langfuse dataset back to `dataset_snapshot_<dataset>.json`.
  *
  * The snapshot is a reviewable copy that nothing reads at runtime: it puts UI edits into
  * git history and keeps the cases somewhere other than the Langfuse database.
@@ -33,13 +33,9 @@ sanitizeProcessEnv();
 /** Resolved from this module so cwd cannot change it. */
 const SNAPSHOT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
-/** The default dataset keeps its historical filename; other datasets get their own file. */
+/** One file per dataset, named after it. */
 function snapshotPath(dataset: string): string {
-    const fileName =
-        dataset === WORKFLOW_DATASET_NAME
-            ? 'dataset_snapshot.json'
-            : `dataset_snapshot_${dataset.replace(/[^a-zA-Z0-9-]/g, '_')}.json`;
-    return path.join(SNAPSHOT_DIR, fileName);
+    return path.join(SNAPSHOT_DIR, `dataset_snapshot_${dataset.replace(/[^a-zA-Z0-9-]/g, '_')}.json`);
 }
 
 async function main() {

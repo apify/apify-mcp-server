@@ -19,6 +19,11 @@ export function stripToolPrefix(name: string): string {
     return name.startsWith(MCP_TOOL_PREFIX) ? name.slice(MCP_TOOL_PREFIX.length) : name;
 }
 
+/** Whether the SDK tool name belongs to the Apify MCP server rather than Claude Code's built-ins. */
+export function isMcpToolName(name: string): boolean {
+    return name.startsWith(MCP_TOOL_PREFIX);
+}
+
 /**
  * Default model configuration for agent and judge
  * These can be overridden via CLI arguments:

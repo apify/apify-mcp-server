@@ -9,7 +9,7 @@
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
-import { stripToolPrefix } from './config.js';
+import { isMcpToolName, stripToolPrefix } from './config.js';
 import type { ConversationHistory, ConversationTurn, McpToolResult } from './types.js';
 
 /** One paired tool call + result, logged as a tool span under the item's trace. */
@@ -17,6 +17,8 @@ export type ToolInvocation = {
     name: string;
     arguments: unknown;
     result: McpToolResult;
+    /** False for Claude Code's built-in tools, whose failures are not failures of the server. */
+    isMcpTool: boolean;
     /** Epoch ms the call and its result were streamed, when the caller timed the stream */
     startedAt?: number;
     endedAt?: number;
@@ -98,6 +100,7 @@ function errorTextOf(content: unknown): string {
 type PendingToolUse = {
     name: string;
     arguments: unknown;
+    isMcpTool: boolean;
     startedAt?: number;
 };
 
@@ -167,7 +170,12 @@ export function adaptSdkConversation(
                 } else if (block.type === 'tool_use') {
                     const name = stripToolPrefix(block.name);
                     toolCalls.push({ name, arguments: (block.input ?? {}) as Record<string, unknown> });
-                    pendingToolUses.set(block.id, { name, arguments: block.input, startedAt: messageTime });
+                    pendingToolUses.set(block.id, {
+                        name,
+                        arguments: block.input,
+                        isMcpTool: isMcpToolName(block.name),
+                        startedAt: messageTime,
+                    });
                 }
             }
 
@@ -222,6 +230,7 @@ export function adaptSdkConversation(
                     name: pending.name,
                     arguments: pending.arguments,
                     result,
+                    isMcpTool: pending.isMcpTool,
                     ...(pending.startedAt === undefined ? {} : { startedAt: pending.startedAt }),
                     ...(messageTime === undefined ? {} : { endedAt: messageTime }),
                 });
