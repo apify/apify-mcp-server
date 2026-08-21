@@ -32,6 +32,7 @@ import { readJsonFile } from '../../src/utils/generic.js';
 import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { assertStdioBinExists } from './claude_agent.js';
+import { ClaudeLlmClient } from './claude_judge_client.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
 import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_experiment.js';
@@ -49,11 +50,12 @@ type CliArgs = {
     id?: string;
     dataset: string;
     agentModel: string;
-    judgeModel: string;
+    judgeModel?: string;
     toolTimeout: number;
     concurrency: number;
     mcpToolsOnly: boolean;
     subscription: boolean;
+    claudeJudge: boolean;
     allowToolErrors: boolean;
 };
 
@@ -91,7 +93,10 @@ async function main() {
                 default: WORKFLOW_DATASET_NAME,
             },
             'agent-model': { type: 'string', description: 'LLM model for the agent', default: MODELS.agent },
-            'judge-model': { type: 'string', description: 'LLM model for the judge', default: MODELS.judge },
+            'judge-model': {
+                type: 'string',
+                description: `LLM model for the judge (default: ${MODELS.judge}, or ${MODELS.claudeJudge} with --claude-judge)`,
+            },
             'tool-timeout': {
                 type: 'number',
                 description: 'Tool call timeout in seconds',
@@ -106,6 +111,13 @@ async function main() {
             subscription: {
                 type: 'boolean',
                 description: 'Run the agent on the local Claude Code login (subscription) instead of ANTHROPIC_API_KEY',
+                default: false,
+            },
+            'claude-judge': {
+                type: 'boolean',
+                description:
+                    'Run the judge on the Claude Agent SDK (local Claude Code login) instead of OpenRouter, ' +
+                    'so no OPENROUTER_API_KEY is needed. --judge-model then takes an Anthropic model ID.',
                 default: false,
             },
             'allow-tool-errors': {
@@ -126,11 +138,15 @@ async function main() {
         })
         .help().argv) as CliArgs;
 
+    // Different defaults per judge provider, so an unset --judge-model never sends an
+    // OpenRouter slug to the Anthropic API or vice versa.
+    const judgeModel = argv.judgeModel ?? (argv.claudeJudge ? MODELS.claudeJudge : MODELS.judge);
+
     // Fail before any test runs, listing every missing variable at once.
     const missing = findMissingEnvVars([
         ...LANGFUSE_ENV_VARS,
         'APIFY_TOKEN',
-        'OPENROUTER_API_KEY',
+        ...(argv.claudeJudge ? [] : ['OPENROUTER_API_KEY']),
         ...(argv.subscription ? [] : ['ANTHROPIC_API_KEY']),
     ]);
     if (missing.length > 0) {
@@ -178,7 +194,7 @@ async function main() {
         initTracing();
 
         // Traces each judge call as a generation nested under the item's trace.
-        const llmClient = new LlmClient();
+        const llmClient = argv.claudeJudge ? new ClaudeLlmClient() : new LlmClient();
 
         const agentSdkVersion = resolveAgentSdkVersion();
         const runName = `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`;
@@ -197,7 +213,7 @@ async function main() {
                 llmClient,
                 apifyToken,
                 agentModel: argv.agentModel,
-                judgeModel: argv.judgeModel,
+                judgeModel,
                 toolTimeout: argv.toolTimeout,
                 mcpToolsOnly: argv.mcpToolsOnly,
             }),
@@ -213,7 +229,8 @@ async function main() {
             maxConcurrency: argv.concurrency,
             metadata: {
                 agentModel: argv.agentModel,
-                judgeModel: argv.judgeModel,
+                judgeModel,
+                judgeProvider: argv.claudeJudge ? 'claude-agent-sdk' : 'openrouter',
                 toolTimeout: argv.toolTimeout,
                 mcpToolsOnly: argv.mcpToolsOnly,
                 agentSdkVersion,

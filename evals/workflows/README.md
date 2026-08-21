@@ -21,8 +21,8 @@ dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge ->
 **Prerequisites:**
 - Node.js installed
 - Apify account with API token
-- Anthropic API key (agent)
-- OpenRouter API key (judge)
+- Anthropic API key (agent) — or a local Claude Code login with `--subscription`
+- OpenRouter API key (judge) — or a local Claude Code login with `--claude-judge`
 - Langfuse project (public + secret key)
 
 **Run evaluations:**
@@ -42,7 +42,7 @@ pnpm run build
 pnpm run evals:workflow
 ```
 
-Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, and `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API).
+Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API), and `--claude-judge` runs the judge on the Claude Agent SDK too, so no `OPENROUTER_API_KEY` is needed (`--judge-model` then takes an Anthropic model ID, default `claude-sonnet-5`; note a Claude judge scoring a Claude agent can be self-lenient, so prefer the OpenRouter judge for comparable numbers). With `--subscription --claude-judge` a run needs only `APIFY_TOKEN` and the Langfuse keys.
 
 ### Proper suites vs error-handling suites
 
@@ -352,6 +352,14 @@ Claude Code owns the message history. The harness only sees the SDK's message st
 ### Tests interfere with each other
 **Symptom:** Test 2 fails after Test 1, passes alone.<br>
 **Solution:** ✅ Isolated agent + MCP instance per test.
+
+### Agent claims the Apify MCP server is "still connecting" (remote/sandboxed environments)
+**Symptom:** A transcript shows the agent reading a system notice that MCP servers are still
+connecting, concluding the Apify tools are unavailable, and falling back to a built-in tool.<br>
+**Cause:** In sandboxed remote Claude Code environments the MCP handshake can race the first
+turn; a fast model sometimes doesn't wait or retry. On a local machine the CLI completes the
+handshake before the first turn, so this doesn't reproduce there.<br>
+**Solution:** Retry the item once; a repeat failure on a local machine is real.
 
 ### Agent answers from memory or shells out instead of using our tools
 **Symptom:** The judge reports the agent used `Bash`, `WebSearch`, or its own knowledge.<br>
