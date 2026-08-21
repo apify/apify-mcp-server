@@ -66,10 +66,8 @@ export const publishActorTask: ToolEntry = Object.freeze({
         const result = taskResult(task);
         // publishedAt is the server's confirmation that the page is live: without saying so, an agent
         // asked to "confirm it is live" either claims it unverified or makes a redundant lookup.
-        const summary =
-            `Task "${task.name}" (ID: ${task.id}) is published; publishedAt in the result is the ` +
-            `confirmed publication time. ` +
-            `The link to the public page is available in Apify Console, on the task's Publication tab.`;
+        const summary = `Task "${task.name}" (ID: ${task.id}) is published; publishedAt in the result is the \
+confirmed publication time. The link to the public page is available in Apify Console, on the task's Publication tab.`;
         return respondOk([JSON.stringify(result), summary], { structuredContent: result });
     },
 } as const);
