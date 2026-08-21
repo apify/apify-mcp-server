@@ -1,4 +1,3 @@
-import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
@@ -15,8 +14,8 @@ import {
     HELPER_TOOLS,
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
-import { connectMCPClient } from '../../mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
+import { withRemoteMcpClient } from '../../mcp/remote_tool_call.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import type {
     ActorInfo,
@@ -382,60 +381,52 @@ export async function handleMcpToolCall(params: {
         return respondAborted();
     }
 
-    let client: Client | null = null;
-    try {
-        client = await connectMCPClient(mcpServerUrl as string, apifyToken, mcpSessionId);
-        if (!client) {
-            return respondServerError(`Failed to connect to MCP server ${mcpServerUrl}`);
-        }
-
-        const result = await client.callTool(
-            {
-                name: mcpToolName,
-                arguments: input,
-            },
-            CallToolResultSchema,
-            {
+    const outcome = await withRemoteMcpClient(
+        mcpServerUrl as string,
+        apifyToken,
+        mcpSessionId,
+        signal,
+        async (client) =>
+            client.callTool({ name: mcpToolName, arguments: input }, CallToolResultSchema, {
                 timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
                 signal,
-            },
-        );
+            }),
+    );
 
-        // `call-actor` declares `actorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
-        // without `structuredContent` (unless `isError: true`) with -32600. The pass-through has no
-        // Apify run, so synthesize a sentinel `RunResponse` matching the schema's `required` keys;
-        // the remote tool's payload still flows through `content`. Also forward `isError` so a
-        // failing remote tool surfaces as a failure here.
-        const isErrorFromRemote = result.isError === true;
-        return respondRaw({
-            content: result.content as ContentBlock[],
-            isError: isErrorFromRemote,
-            structuredContent: {
-                runId: 'mcp-passthrough',
-                actorId: baseActorName,
-                actorName: baseActorName,
-                status: isErrorFromRemote ? 'FAILED' : 'SUCCEEDED',
-                storages: {},
-                summary: `Called MCP tool '${mcpToolName}' on '${baseActorName}'.`,
-                nextStep: 'Response content carries the remote MCP tool result; no Apify run was started.',
-            },
-        });
-    } catch (error) {
-        if (signal.aborted) {
-            // Yield a macrotask first: the SDK sends notifications/cancelled fire-and-forget on the
-            // transport's AbortController, which the finally's close() would abort before it flushes.
-            await new Promise((resolve) => setImmediate(resolve));
+    switch (outcome.outcome) {
+        case 'connect-failed':
+            return respondServerError(`Failed to connect to MCP server ${mcpServerUrl}`);
+        case 'aborted':
             return respondAborted();
+        case 'error':
+            logHttpError(outcome.error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {
+                actorName: baseActorName,
+                toolName: mcpToolName,
+            });
+            return respondServerError(
+                `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${remoteMcpFailureDetail(outcome.error)}`,
+            );
+        case 'success': {
+            // `call-actor` declares `actorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
+            // without `structuredContent` (unless `isError: true`) with -32600. The pass-through has no
+            // Apify run, so synthesize a sentinel `RunResponse` matching the schema's `required` keys;
+            // the remote tool's payload still flows through `content`. Also forward `isError` so a
+            // failing remote tool surfaces as a failure here.
+            const isErrorFromRemote = outcome.value.isError === true;
+            return respondRaw({
+                content: outcome.value.content as ContentBlock[],
+                isError: isErrorFromRemote,
+                structuredContent: {
+                    runId: 'mcp-passthrough',
+                    actorId: baseActorName,
+                    actorName: baseActorName,
+                    status: isErrorFromRemote ? 'FAILED' : 'SUCCEEDED',
+                    storages: {},
+                    summary: `Called MCP tool '${mcpToolName}' on '${baseActorName}'.`,
+                    nextStep: 'Response content carries the remote MCP tool result; no Apify run was started.',
+                },
+            });
         }
-        logHttpError(error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {
-            actorName: baseActorName,
-            toolName: mcpToolName,
-        });
-        return respondServerError(
-            `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${remoteMcpFailureDetail(error)}`,
-        );
-    } finally {
-        if (client) await client.close();
     }
 }
 
