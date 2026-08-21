@@ -21,12 +21,7 @@ const createActorTaskArgs = z.object({
         .describe(
             'Name of the task, unique within the account: 3-63 characters, letters, digits and dashes only (e.g. "my-task"). Generated from the Actor name when omitted.',
         ),
-    input: z
-        .looseObject({})
-        .optional()
-        .describe(
-            `The input JSON the task runs the Actor with. Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema first.`,
-        ),
+    input: z.looseObject({}).optional().describe('The input JSON the task runs the Actor with.'),
     title: z.string().optional().describe('Human-readable title of the task.'),
     description: z.string().optional().describe('Short description of what the task does.'),
     build: z.string().optional().describe('Actor build tag or number to run, e.g. "latest".'),
@@ -54,6 +49,10 @@ USAGE:
 - When the user's intent is clear, pick sensible values for unspecified input fields from the Actor's input schema, state the choices, and proceed instead of asking.${
         hasTool(HELPER_TOOLS.STORE_SEARCH)
             ? `\n- When the user names the Actor loosely (e.g. "the troubleshooter Actor from jane.doe"), resolve it with ${HELPER_TOOLS.STORE_SEARCH} instead of asking for the exact ID or guessing one.`
+            : ''
+    }${
+        hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
+            ? `\n- Once you have the exact Actor ID, read its input schema with ${HELPER_TOOLS.ACTOR_GET_DETAILS} before setting \`input\`.`
             : ''
     }
 
@@ -103,9 +102,7 @@ export const createActorTask: ToolEntry = Object.freeze({
         } satisfies TaskCreateData);
 
         const result = taskResult(task);
-        const summary =
-            `Created task "${result.name}" (ID: ${result.taskId}) for Actor ${result.actorId}. ` +
-            `The task is private until published with ${HELPER_TOOLS.ACTOR_TASK_PUBLISH}.`;
+        const summary = `Created task "${result.name}" (ID: ${result.taskId}) for Actor ${result.actorId}.`;
         return respondOk([JSON.stringify(result), summary], { structuredContent: result });
     },
 } as const);
