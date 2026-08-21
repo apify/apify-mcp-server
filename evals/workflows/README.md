@@ -68,6 +68,28 @@ every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture ta
 task examples on `jiri.spilka/actor-troubleshooter`, and publishing needs write access to the Actor, so
 those cases only pass on an account that has it.
 
+The web-fetch suites are `web-fetch-evals` (proper) and `web-fetch-evals-errors` (error handling),
+covering the `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting,
+tool selection among the defaults, and multi-fetch chains. They create no named account state, so
+there is no fixtures script. The cases fetch live third-party pages (example.com, rfc-editor.org,
+httpbin.org), so a failure can also mean the page changed or the host is down — check the target
+before blaming the tool (httpbin outages are common; the status/format references tolerate a
+truthfully reported upstream error). Platform behavior the cases are built on (probed 2026-08-20):
+an HTTP 4xx/5xx from the target page still ends the run SUCCEEDED with `fetch.httpStatusCode` in
+the item; an unreachable domain either fails the run ("Could not connect…") or succeeds with an
+empty 502 item, depending on unblocker routing; JSON content fails `text`/`markdown` formats with a
+status message telling the agent to add `raw`; `ftp://` fails with "Unsupported URL protocol".
+
+The web-tools-selection suites are `web-selection-evals` (proper) and `web-selection-evals-errors`
+(error handling), covering the clash between the default web tools: web search by query
+(`apify/rag-web-browser`) vs single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery
+(`search-actors`) vs a specialized Actor for structured platform data, plus rag→web-fetch
+escalation when a page blocks rag's crawler (reddit) and coexistence with a client's built-in,
+summarizing fetch. Also stateless — no fixtures script. Known residual (2026-08-21): on the
+`web-fetch-unsupported-protocol` case, claude-haiku-4-5 reproducibly rewrites the ftp:// URL to
+https:// without telling the user, despite the scheme note in both the tool description and the
+`url` parameter — a model-level limit the case documents on purpose; stronger models pass.
+
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
 - `1` = any test failed, any test never ran, or setup failed ❌
