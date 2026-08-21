@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import {
     actorDetailsOutputDefaults,
     buildActorDetailsTextResponse,
+    buildActorNotFoundResponse,
     buildFetchActorDetailsResult,
 } from '../../src/tools/actors/fetch_actor_details.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockUserInfo } from './helpers/tool_context.js';
+import { mockUserInfo, textOf } from './helpers/tool_context.js';
 import { stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 vi.mock('../../src/utils/actor_details.js', async () => {
@@ -217,5 +219,24 @@ describe('buildFetchActorDetailsResult()', () => {
         );
 
         await expect(callWithToken('apify_api_test')).rejects.toMatchObject({ statusCode: 401 });
+    });
+});
+
+// Result text has no `hasTool`, so tools.mode_contract.test.ts does not cover it. A guessed Actor
+// name is the common way to land here, and naming a recovery tool the session never received
+// sends the model after something that does not exist.
+describe('buildActorNotFoundResponse()', () => {
+    it('points at the search tool when the session was served it', () => {
+        const text = (buildActorNotFoundResponse('jane.doe/typo', [HELPER_TOOLS.STORE_SEARCH]).content ?? [])
+            .map(textOf)
+            .join('\n');
+        expect(text).toContain('was not found');
+        expect(text).toContain(HELPER_TOOLS.STORE_SEARCH);
+    });
+
+    it('names no tool when the session was not served one', () => {
+        const text = (buildActorNotFoundResponse('jane.doe/typo', []).content ?? []).map(textOf).join('\n');
+        expect(text).toContain('was not found');
+        expect(text).not.toContain(HELPER_TOOLS.STORE_SEARCH);
     });
 });

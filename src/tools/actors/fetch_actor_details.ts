@@ -2,8 +2,15 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type {
+    ConsoleLinkContext,
+    HelperTool,
+    InternalToolArgs,
+    ToolDescriptionContext,
+    ToolEntry,
+    ToolInputSchema,
+} from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import {
     type ActorDetailsResult,
     buildCardOptions,
@@ -101,8 +108,15 @@ export const fetchActorDetailsToolArgsSchema = z.object({
         .describe('Specify which information to include in the response to save tokens.'),
 });
 
-const FETCH_ACTOR_DETAILS_DESCRIPTION = `Get detailed information about an Actor by its ID or full name (format: "username/name", e.g., "apify/rag-web-browser").
-
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    return `Get detailed information about an Actor by its ID or full name (format: "username/name", e.g., "apify/rag-web-browser").
+${
+    hasTool(HELPER_TOOLS.STORE_SEARCH)
+        ? `\nRequires the exact ID or full name. If you only have a description, a partial name, or a name you \
+have not seen in this conversation, find it with ${HELPER_TOOLS.STORE_SEARCH} first — do not construct a \
+plausible-looking name and call this tool with it.\n`
+        : ''
+}
 Use 'output' parameter with boolean flags to control returned information:
 - Default: All fields true except mcpTools
 - Selective: Set desired fields to true (e.g., output: { inputSchema: true })
@@ -115,16 +129,23 @@ EXAMPLES:
 - What does apify/rag-web-browser do?
 - What is the input schema for apify/web-scraper?
 - What tools does apify/actors-mcp-server provide?`;
+}
 
 /**
- * Build error response for when actor is not found.
+ * Build error response for when actor is not found. The recovery tool is named only when the
+ * session was served it: a name the client never received in `tools/list` invites a call to a
+ * tool that does not exist.
  */
-export function buildActorNotFoundResponse(actorName: string): ToolResponse {
-    return respondUserError(dedent`
-        Actor information for '${actorName}' was not found.
-        Please verify Actor ID or name format and ensure that the Actor exists.
-        You can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.
-    `);
+export function buildActorNotFoundResponse(actorName: string, loadedToolNames: readonly string[]): ToolResponse {
+    const recovery = loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
+        ? `\nSearch for the Actor by keyword with ${HELPER_TOOLS.STORE_SEARCH} rather than trying another spelling.`
+        : '';
+    return respondUserError(
+        dedent`
+            Actor information for '${actorName}' was not found.
+            Please verify Actor ID or name format and ensure that the Actor exists.
+        ` + recovery,
+    );
 }
 
 /**
@@ -208,7 +229,7 @@ export function buildActorDetailsTextResponse(options: {
  * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
-    const { args, apifyToken, apifyClient, actorStore, paymentProvider, mcpSessionId } = toolArgs;
+    const { args, apifyToken, apifyClient, actorStore, paymentProvider, mcpSessionId, loadedToolNames } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
 
@@ -225,7 +246,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier, linkContext };
     const details = await fetchActorDetailsFromApi(apifyClient, actorName, cardOptions);
     if (!details) {
-        return buildActorNotFoundResponse(actorName);
+        return buildActorNotFoundResponse(actorName, loadedToolNames);
     }
 
     let actorOutputSchema: Record<string, unknown> | null | undefined;
@@ -259,7 +280,8 @@ export const fetchActorDetails: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_GET_DETAILS,
     title: 'Fetch Actor details',
-    description: FETCH_ACTOR_DETAILS_DESCRIPTION,
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
