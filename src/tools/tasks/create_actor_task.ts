@@ -40,9 +40,10 @@ const createActorTaskArgs = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    return `Create a saved Actor task — a named, reusable configuration of an Actor that stores its
-input and run options such as the build, memory, and timeout. Tasks are useful for repeated or scheduled
-jobs, because the user does not have to configure the Actor again for every run.
+    return `Create a saved Actor task: a reusable configuration of a single Actor, adapted for a specific
+use case. A task stores the Actor input and run options such as the build, memory, and timeout, and can be
+run repeatedly from Apify Console, Schedules, or the API, so the user does not have to configure the Actor
+again for every run.
 
 Creating a task does not make it public. The public display configuration (\`publicConfig\`) can be set \
 here${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? ` or later with ${HELPER_TOOLS.ACTOR_TASK_UPDATE}` : ''}; either \
@@ -50,6 +51,11 @@ way the task stays private until it is published${hasTool(HELPER_TOOLS.ACTOR_TAS
 
 USAGE:
 - Use when the user wants to save an Actor configuration for repeated use.
+- When the user's intent is clear, pick sensible values for unspecified input fields from the Actor's input schema, state the choices, and proceed instead of asking.${
+        hasTool(HELPER_TOOLS.STORE_SEARCH)
+            ? `\n- When the user names the Actor loosely (e.g. "the troubleshooter Actor from jane.doe"), resolve it with ${HELPER_TOOLS.STORE_SEARCH} instead of asking for the exact ID or guessing one.`
+            : ''
+    }
 
 USAGE EXAMPLES:
 - user_input: Save this instagram-scraper config as a task called daily-posts`;
@@ -97,7 +103,9 @@ export const createActorTask: ToolEntry = Object.freeze({
         } satisfies TaskCreateData);
 
         const result = taskResult(task);
-        const summary = `Created task "${result.name}" (ID: ${result.taskId}) for Actor ${result.actorId}.`;
+        const summary =
+            `Created task "${result.name}" (ID: ${result.taskId}) for Actor ${result.actorId}. ` +
+            `The task is private until published with ${HELPER_TOOLS.ACTOR_TASK_PUBLISH}.`;
         return respondOk([JSON.stringify(result), summary], { structuredContent: result });
     },
 } as const);

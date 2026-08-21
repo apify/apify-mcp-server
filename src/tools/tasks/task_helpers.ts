@@ -61,8 +61,16 @@ export const taskNameSchema = z
 
 /** Writable public display configuration, shared by the create and update tools. */
 export const publicConfigSchema = z.object({
-    seoTitle: z.string().optional().describe('Title shown on the public landing page and in search results.'),
-    seoDescription: z.string().optional().describe('Description shown on the public landing page.'),
+    seoTitle: z
+        .string()
+        .max(60)
+        .optional()
+        .describe('Title shown on the public landing page and in search results. At most 60 characters.'),
+    seoDescription: z
+        .string()
+        .max(160)
+        .optional()
+        .describe('Description shown on the public landing page. At most 160 characters.'),
     inputSchemaFields: z
         .array(z.string())
         .optional()
@@ -80,8 +88,10 @@ export const publicConfigSchema = z.object({
 
 /**
  * The task subset returned by every task tool: identity, publication state, and the display
- * config. Input *values* are deliberately omitted — they may hold secrets — but the field names
- * are included because `publicConfig.inputSchemaFields` must reference them.
+ * config. `input` is returned verbatim, as the API, CLI, and apify-client return it — input
+ * fields the Actor's schema declares as secret arrive as `ENCRYPTED_VALUE:` placeholders,
+ * never plaintext, so no extra redaction happens here. Its keys are what
+ * `publicConfig.inputSchemaFields` can reference.
  */
 export function taskResult(task: Task) {
     const publicConfig = task.publicConfig
@@ -103,7 +113,7 @@ export function taskResult(task: Task) {
         // returns a string; the declared output schema promises a string either way.
         publishedAt: toIsoString(task.publicConfig?.publishedAt) ?? null,
         publicConfig,
-        inputFields: task.input && !Array.isArray(task.input) ? Object.keys(task.input) : [],
+        input: task.input ?? null,
     };
 }
 
