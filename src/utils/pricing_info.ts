@@ -22,6 +22,7 @@
  *     description?: string,
  *     priceUsd?: number,
  *     tieredPricing?: [{ tier: string, priceUsd: number }],
+ *     isPrimaryEvent?: boolean,
  *   }],
  *   pricingNote?: string,
  *   eventDescriptionsOmitted?: boolean,
@@ -70,6 +71,7 @@ export type ActorChargeEvent = {
     eventDescription?: string;
     eventPriceUsd?: number;
     eventTieredPricingUsd?: Partial<Record<PricingTier, TieredEventPrice>>;
+    isPrimaryEvent?: boolean;
 };
 
 export type TieredPricing = {
@@ -116,6 +118,7 @@ export type StructuredPricingInfo = {
             tier: string;
             priceUsd: number;
         }[];
+        isPrimaryEvent?: boolean;
     }[];
     pricingNote?: string;
     eventDescriptionsOmitted?: boolean;
@@ -339,6 +342,7 @@ function structurePayPerEventComplete(
                       priceUsd: (price as TieredEventPrice).tieredEventPriceUsd,
                   }))
                 : undefined,
+            ...(event.isPrimaryEvent ? { isPrimaryEvent: true } : {}),
         })),
     };
 }
@@ -482,6 +486,7 @@ function structurePayPerEventSimplified(
         const baseEvent = {
             title: event.eventTitle,
             ...(omitDescriptions ? {} : { description: event.eventDescription || '' }),
+            ...(event.isPrimaryEvent ? { isPrimaryEvent: true as const } : {}),
         };
 
         if (typeof event.eventPriceUsd === 'number') {
@@ -493,9 +498,8 @@ function structurePayPerEventSimplified(
 
         const { tier, value } = resolveTier(tieredMap, userTier);
         resolvedTiers.add(tier);
-        // Simplified mode resolves to one tier; `priceUsd` carries the resolved price
-        // (the widget reads it — src/web/src/utils/formatting.ts), so the 1-element
-        // `tieredPricing` array just duplicates it. Drop it.
+        // Simplified mode resolves to one tier; `priceUsd` carries the resolved price,
+        // so the 1-element `tieredPricing` array just duplicates it. Drop it.
         return {
             ...baseEvent,
             priceUsd: value.tieredEventPriceUsd,
