@@ -106,7 +106,8 @@ Examples of when to use:
 - User has time indicators like "today", "current", "latest", "recent", "now"
 
 This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.
-When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.`;
+When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.
+If a scraped page comes back blocked or empty (e.g. the crawl reports a 403 or the page text is missing), do not give up: retry that URL with the apify/web-fetch tool when it is available - its anti-bot fetching gets through blocks this tool cannot.`;
 
 export const WEB_FETCH = 'apify/web-fetch';
 /**
@@ -123,7 +124,17 @@ Examples of when to use:
 - A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
 - Verbatim page content is needed, e.g. for quoting, extraction, or archiving
 
-This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.`;
+This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.
+If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather than silently substituting a different URL.`;
+
+/**
+ * Appended to the `url` parameter description of the `apify/web-fetch` tool. Lives on the
+ * parameter because that is what an agent reads while writing the argument: eval agents
+ * (web-fetch-evals-errors, unsupported-protocol case) silently rewrote ftp:// URLs to
+ * https:// instead of telling the user the scheme is unsupported.
+ */
+export const WEB_FETCH_URL_SCHEME_NOTE =
+    ' http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
 
 export const defaults = {
     actors: [RAG_WEB_BROWSER, WEB_FETCH],

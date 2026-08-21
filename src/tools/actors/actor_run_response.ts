@@ -503,12 +503,14 @@ function buildSucceededSummaryNextStep(
         };
     }
 
-    // Metadata can report itemCount === 0 briefly after SUCCEEDED (eventual consistency). Surface the
-    // same fetch-first guidance as TIMED-OUT with an empty partial dataset — never imply "re-run only".
+    // Metadata can report itemCount === 0 after SUCCEEDED even past the lag-fallback probe window
+    // (eventual consistency). The zero is unverified, so the summary must not state "no items" as a
+    // conclusion — agents quote the summary and give up on it (observed in web-fetch evals: a run
+    // with an item was reported as blocked). The nextStep is the only place a conclusion may form.
     if (itemCount === 0 && datasetId) {
         return {
-            summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
+            summary: `SUCCEEDED in ${runTimeSecs}s. Dataset item count reads 0 - counts can lag right after a run finishes.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
+            nextStep: `Fetch ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) before concluding the run produced no output.${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 

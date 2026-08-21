@@ -836,10 +836,15 @@ describe('buildStatusTemplate', () => {
             dataset: datasetEmpty,
             keyValueStore: kvWithRecords,
         });
-        expect(t.summary).toContain('No dataset items found');
+        // The count is unverified-zero (it can lag past the probe window), so the summary must
+        // not state "no items" as a conclusion - agents quote the summary and give up on it.
+        expect(t.summary).toContain('Dataset item count reads 0');
+        expect(t.summary).toContain('can lag');
+        expect(t.summary).not.toContain('No dataset items found');
         expect(t.summary).toContain('Key-value store has 2 keys');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
+        expect(t.nextStep).toContain('before concluding');
         expect(t.nextStep).not.toContain('get-key-value-store-record');
     });
 
