@@ -68,6 +68,15 @@ every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture ta
 task examples on `jiri.spilka/actor-troubleshooter`, and publishing needs write access to the Actor, so
 those cases only pass on an account that has it.
 
+Publishing requires all three of `publicConfig.inputSchemaFields`, `datasetView` and `seoDescription`
+(probed against the API), and the API reports the missing ones **non-exhaustively** — which is why
+`task-publish-discovery` budgets turns for several fix-and-retry rounds rather than one.
+
+`task-chain-hard-1` is the calibration edge: roughly 6 runs in 8 on `claude-haiku-4-5`, with the
+residual failure being the agent guessing an Actor slug instead of resolving it with `search-actors`.
+That is the gate working as designed, not a harness flake — the judge passes those runs and only the
+zero-error gate catches them. Treat a change in that ratio as the signal; one red run is not one.
+
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
 - `1` = any test failed, any test never ran, or setup failed ❌
