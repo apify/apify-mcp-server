@@ -68,7 +68,8 @@ export class ActorLoadError extends Error {
         return new ActorLoadError(
             ACTOR_LOAD_ERROR_KIND.STANDBY_WITHOUT_MCP_NOT_SUPPORTED,
             actorName,
-            `Actor "${actorName}" runs in standby mode without an MCP server and has an empty input schema, which is not supported yet.`,
+            `Actor "${actorName}" runs in standby mode without an MCP server and has an empty input schema,` +
+                ' which is not supported yet.',
         );
     }
 
@@ -76,7 +77,8 @@ export class ActorLoadError extends Error {
         return new ActorLoadError(
             ACTOR_LOAD_ERROR_KIND.STANDBY_PAYMENT_NOT_SUPPORTED,
             actorName,
-            `Actor "${actorName}" is a standby Actor, which is not supported in agentic payment mode. Please use OAuth or direct Apify token authentication in order to use standby Actors.`,
+            `Actor "${actorName}" is a standby Actor, which is not supported in agentic payment mode.` +
+                ' Please use OAuth or direct Apify token authentication in order to use standby Actors.',
         );
     }
 }

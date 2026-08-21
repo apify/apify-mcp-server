@@ -14,6 +14,7 @@ vi.mock('../../src/mcp/client.js', () => ({
         listTools: async () => ({
             tools: [{ name: 'add', description: 'adds', inputSchema: { type: 'object', properties: {} } }],
         }),
+        callTool: async () => ({ content: [{ type: 'text', text: 'MCP result' }] }),
         close: async () => {},
     })),
 }));
@@ -125,11 +126,39 @@ describe('Actor run/standby mode decision table', () => {
             );
         });
 
+        it('runs a standby Actor with no MCP server but a non-empty input schema', async () => {
+            const result = await preExecute(STANDBY_INPUT);
+
+            expect('earlyResponse' in result).toBe(false);
+        });
+
+        it('rejects the actor:tool shape for a standby Actor with no MCP server but a non-empty input schema', async () => {
+            const result = await preExecute(`${STANDBY_INPUT}:add`);
+
+            expect('earlyResponse' in result).toBe(true);
+            expect(firstText((result as { earlyResponse: ToolResponse }).earlyResponse)).toContain(
+                'is not an MCP server',
+            );
+        });
+
         it('demands a tool name for a bare call on a standby Actor exposing an MCP server', async () => {
             const result = await preExecute(STANDBY_MCP);
 
             expect('earlyResponse' in result).toBe(true);
             expect(firstText((result as { earlyResponse: ToolResponse }).earlyResponse)).toContain('tool name');
+        });
+
+        it('proxies an MCP tool call on a standby Actor exposing an MCP server', async () => {
+            const result = await callActor(`${STANDBY_MCP}:add`);
+
+            expect(firstText(result)).toBe('MCP result');
+            expect(result.isError).toBe(false);
+        });
+
+        it('rejects a bare unsupported standby Actor during pre-execution', async () => {
+            const result = await preExecute(STANDBY_EMPTY);
+
+            expect('earlyResponse' in result).toBe(true);
         });
 
         it('answers the canonical standby-without-MCP message for both call shapes on the unsupported cell', async () => {

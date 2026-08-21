@@ -8,7 +8,6 @@ vi.mock('../../src/utils/userid_cache.js', () => ({ getUserInfoCached: vi.fn() }
 
 import { actorDefinitionCache } from '../../src/state.js';
 import { getActorDefinition } from '../../src/tools/actors/actor_definition.js';
-import { TOOL_TYPE } from '../../src/types.js';
 import { getActorDefinitionCached, getActorMcpUrlCached, getActorToolResolutionCached } from '../../src/utils/actor.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 
@@ -40,8 +39,6 @@ function seedCache(
     actorDefinitionCache.set(name, entry);
     return entry;
 }
-
-const NON_EMPTY_INPUT = { type: 'object', properties: { url: { type: 'string' } } };
 
 const client = { token: 'caller-token' } as unknown as ApifyClient;
 
@@ -150,64 +147,6 @@ describe('getActorMcpUrlCached — tool-type rule', () => {
 });
 
 describe('getActorToolResolutionCached()', () => {
-    it('resolves a run-only Actor to ACTOR with no MCP URL', async () => {
-        seedCache('acme/run-only', true, 'owner-10', { input: NON_EMPTY_INPUT });
-
-        await expect(getActorToolResolutionCached('acme/run-only', client)).resolves.toEqual({
-            toolType: TOOL_TYPE.ACTOR,
-            mcpServerUrl: null,
-            actorFullName: 'acme/run-only',
-        });
-    });
-
-    it('resolves a run-only Actor with a leftover webServerMcpPath to ACTOR with no MCP URL', async () => {
-        seedCache('acme/run-only-stale', true, 'owner-11', {
-            id: 'actorstale2',
-            webServerMcpPath: '/mcp',
-            input: NON_EMPTY_INPUT,
-        });
-
-        await expect(getActorToolResolutionCached('acme/run-only-stale', client)).resolves.toEqual({
-            toolType: TOOL_TYPE.ACTOR,
-            mcpServerUrl: null,
-            actorFullName: 'acme/run-only-stale',
-        });
-    });
-
-    it('resolves a standby Actor with an MCP path to ACTOR_MCP and its URL', async () => {
-        seedCache('acme/standby-mcp', true, 'owner-12', {
-            id: 'actormcp',
-            webServerMcpPath: '/mcp',
-            isStandbyEnabled: true,
-        });
-
-        await expect(getActorToolResolutionCached('acme/standby-mcp', client)).resolves.toEqual({
-            toolType: TOOL_TYPE.ACTOR_MCP,
-            mcpServerUrl: 'https://actormcp.apify.actor/mcp',
-            actorFullName: 'acme/standby-mcp',
-        });
-    });
-
-    it('resolves a standby Actor without an MCP path but with a non-empty input schema to ACTOR', async () => {
-        seedCache('acme/standby-input', true, 'owner-13', { isStandbyEnabled: true, input: NON_EMPTY_INPUT });
-
-        await expect(getActorToolResolutionCached('acme/standby-input', client)).resolves.toEqual({
-            toolType: TOOL_TYPE.ACTOR,
-            mcpServerUrl: null,
-            actorFullName: 'acme/standby-input',
-        });
-    });
-
-    it('resolves a standby Actor without an MCP path and an empty input schema to no tool type', async () => {
-        seedCache('acme/standby-empty', true, 'owner-14', { isStandbyEnabled: true });
-
-        await expect(getActorToolResolutionCached('acme/standby-empty', client)).resolves.toEqual({
-            toolType: null,
-            mcpServerUrl: null,
-            actorFullName: 'acme/standby-empty',
-        });
-    });
-
     it('reports the canonical Actor full name when the Actor is addressed by its ID', async () => {
         const entry = seedCache('acme/standby-empty-by-id', true, 'owner-15', { isStandbyEnabled: true });
         actorDefinitionCache.set('aBcD1234', entry);

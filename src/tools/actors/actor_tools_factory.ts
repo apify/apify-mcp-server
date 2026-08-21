@@ -370,16 +370,17 @@ export async function getActorsAsTools(
             errors.push(ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName));
             continue;
         }
-        // `null` means the Actor has no tool representation — standby with no MCP server and an empty
-        // input schema. Bulk loaders drop the error; `call-actor` forwards it to the agent. Logged here
-        // because the bulk path leaves no other server-side trace of the dropped Actor.
+        // `null` means the Actor has no tool representation. Bulk loaders drop the returned error,
+        // so log it here to retain a server-side trace.
         if (toolType === null) {
+            const error = ActorLoadError.standbyWithoutMcpNotSupported(actorInfo.definition.actorFullName);
             log.softFail('Skipping standby Actor with no MCP server and an empty input schema', {
                 actorName: actorInfo.definition.actorFullName,
                 mcpSessionId,
+                actorLoadErrorKind: error.kind,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
             });
-            errors.push(ActorLoadError.standbyWithoutMcpNotSupported(actorInfo.definition.actorFullName));
+            errors.push(error);
             continue;
         }
         if (toolType === TOOL_TYPE.ACTOR_MCP) actorMCPServersInfo.push(actorInfo);

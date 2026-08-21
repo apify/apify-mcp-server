@@ -359,9 +359,10 @@ export async function checkPaymentProviderStandbyConflict(params: {
     // Canonical name, not the caller's identifier — it may be an Actor ID or carry a `:toolName` suffix.
     const error = ActorLoadError.standbyPaymentNotSupported(actorDefinitionWithInfo.definition.actorFullName);
     log.softFail('Rejecting call-actor for standby Actor under third-party payment provider', {
-        actorName: baseActorName,
+        actorName: error.actorName,
         paymentProviderId: paymentProvider.id,
         mcpSessionId,
+        actorLoadErrorKind: error.kind,
         failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
     });
 
@@ -400,15 +401,6 @@ export async function handleMcpToolCall(params: {
     signal: AbortSignal;
 }): Promise<ToolResponse | null> {
     const { baseActorName, mcpToolName, input, resolution, apifyToken, mcpSessionId, signal } = params;
-
-    // `toolType: null` is the standby-without-MCP cell — the same reason the bare `call-actor` shape
-    // reports through `buildCallActorErrorResponse`. Both build the message from the canonical
-    // `actorFullName`, not the caller's identifier, so an Actor ID and a full name answer identically.
-    if (resolution?.toolType === null) {
-        return respondStandbyRejection(ActorLoadError.standbyWithoutMcpNotSupported(resolution.actorFullName), {
-            mcpSessionId,
-        });
-    }
 
     if (resolution?.toolType !== TOOL_TYPE.ACTOR_MCP) {
         return respondServerError(`Actor '${resolution?.actorFullName ?? baseActorName}' is not an MCP server.`);
@@ -609,6 +601,16 @@ export async function callActorPreExecute(
     // `checkPaymentProviderStandbyConflict` in the generic tool-call handler — see src/mcp/server.ts.
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const resolution = await getActorToolResolutionCached(baseActorName, apifyClientForDefinition);
+
+    if (resolution?.toolType === null) {
+        return {
+            earlyResponse: respondStandbyRejection(
+                ActorLoadError.standbyWithoutMcpNotSupported(resolution.actorFullName),
+                { mcpSessionId },
+            ),
+        };
+    }
+
     const isActorMcpServer = resolution?.toolType === TOOL_TYPE.ACTOR_MCP;
 
     // Handle the case where LLM does not respect instructions when calling MCP server Actors
