@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HELPER_TOOLS, type HelperToolName } from '../../src/const.js';
+import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
@@ -172,6 +173,28 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(defaultCallActor).toBeDefined();
             expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
             expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+        });
+    });
+
+    describe('fetch-actor-details name-resolution guidance', () => {
+        it('sends the model to search-actors for an inexact name when that tool is served', () => {
+            const { description } = getToolPublicFieldOnly(fetchActorDetails, {
+                presentTools: new Set([HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.STORE_SEARCH]),
+            });
+
+            expect(description).toContain('Requires the exact ID or full name');
+            expect(description).toContain(`find it with ${HELPER_TOOLS.STORE_SEARCH} first`);
+        });
+
+        // The half of the guidance that names no tool must survive a session without
+        // search-actors — it is the only instruction there against inventing a name.
+        it('keeps the exact-name requirement when search-actors is absent', () => {
+            const { description } = getToolPublicFieldOnly(fetchActorDetails, {
+                presentTools: new Set([HELPER_TOOLS.ACTOR_GET_DETAILS]),
+            });
+
+            expect(description).toContain('do not construct a plausible-looking name');
+            expect(description).not.toContain(HELPER_TOOLS.STORE_SEARCH);
         });
     });
 
