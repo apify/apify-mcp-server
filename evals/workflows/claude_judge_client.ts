@@ -95,7 +95,8 @@ export class ClaudeLlmClient {
         })) {
             if (message.type !== 'result') continue;
             if (message.subtype !== 'success') {
-                throw new Error(`Claude judge run ended with "${message.subtype}"`);
+                const detail = message.errors.join('; ') || 'no error detail';
+                throw new Error(`Claude judge run ended with "${message.subtype}": ${detail}`);
             }
             let usage: LlmUsage | undefined;
             if (message.usage) {
