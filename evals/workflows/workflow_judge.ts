@@ -145,9 +145,10 @@ export async function evaluateConversation(
         () => formattedConversation,
     );
 
-    // Some OpenRouter providers occasionally ignore the JSON schema and answer in plain
-    // text (e.g. "PASS: ..."). One fresh judge call recovers those without rerunning the
-    // far more expensive agent conversation; a second malformed answer still throws.
+    // parseJudgeResponse already recovers a prose verdict (e.g. "PASS: ..."); this retry
+    // is for answers that carry no parsable verdict at all. One fresh judge call recovers
+    // those without rerunning the far more expensive agent conversation; a second
+    // malformed answer still throws.
     let lastError: unknown;
     let lastRawResponse = '';
     for (let attempt = 1; attempt <= JUDGE_PARSE_ATTEMPTS; attempt++) {
