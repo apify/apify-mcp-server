@@ -207,6 +207,22 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
     });
 
+    // The direct buildActorNotFoundResponse() tests below cannot see whether this function
+    // forwards the session's tool names, so a hardcoded [] here would go unnoticed.
+    it('forwards the session tool names to the not-found response', async () => {
+        vi.mocked(fetchActorDetails).mockResolvedValue(null as unknown as ActorDetailsResult);
+
+        // output narrowed as in callWithToken above: pricing: false skips the users/me lookup.
+        const notFoundArgs = { actor: 'jane.doe/typo', output: { inputSchema: true } };
+        const served = await buildFetchActorDetailsResult(
+            stubInternalToolArgs(notFoundArgs, [HELPER_TOOLS.STORE_SEARCH]),
+        );
+        const unserved = await buildFetchActorDetailsResult(stubInternalToolArgs(notFoundArgs));
+
+        expect((served.content ?? []).map(textOf).join('\n')).toContain(HELPER_TOOLS.STORE_SEARCH);
+        expect((unserved.content ?? []).map(textOf).join('\n')).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+    });
+
     // Regression: a 401 (invalid/expired APIFY_TOKEN) must not surface as "Actor ... was not
     // found" — that message wrongly nudges the caller to retry search-actors instead of fixing
     // the credential. fetchActorDetails() is expected to propagate auth errors (see

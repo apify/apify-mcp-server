@@ -61,9 +61,11 @@ runs, not at the tools/list boundary, so nothing gates it for you and `tools.mod
 `suggestTool` in `storage/storage_helpers.ts` and the recovery hints in `actors/call_actor.ts`,
 `actors/fetch_actor_details.ts` and `actors/search_actors.ts`. Two rules when the name drops out:
 never leave a dead end — if the sentence *is* the recovery path, replace it rather than omit it
-(`storage_helpers.ts` substitutes "Inspect the returned items directly") — and keep the text
-byte-identical for a session that holds every tool, so gating a hint is never also a rewording.
-Each gate needs its own test; there is no sweeping guard for this surface.
+(`storage_helpers.ts` substitutes "Inspect the returned items directly") — and gate in place, so a
+session holding every tool gets byte-identical text and gating a hint is never also a rewording
+(`call_actor.ts` and `search_actors.ts` were gated that way; the reworded sentence in
+`fetch_actor_details.ts` is a deliberate wording change that rode along with its gate, not the
+pattern to copy). Each gate needs its own test; there is no sweeping guard for this surface.
 
 ## Related, owned elsewhere (don't restate)
 
