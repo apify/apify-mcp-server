@@ -67,9 +67,24 @@ describe('adaptSdkConversation()', () => {
         const { toolInvocations, metrics } = adaptSdkConversation('find a maps scraper', toolCallStream);
 
         expect(toolInvocations).toHaveLength(1);
-        expect(toolInvocations[0]).toMatchObject({ name: 'search-actors', arguments: { search: 'maps' } });
+        expect(toolInvocations[0]).toMatchObject({
+            name: 'search-actors',
+            arguments: { search: 'maps' },
+            isMcpTool: true,
+        });
         expect(toolInvocations[0].result.success).toBe(true);
         expect(metrics.resultBytes).toBe(Buffer.byteLength(JSON.stringify([{ text: 'ok' }]), 'utf8'));
+    });
+
+    // The tool-error gate reads this flag: a failing built-in must not fail the server's suite.
+    it('marks a built-in tool call as not an MCP tool', () => {
+        const { toolInvocations } = adaptSdkConversation('run it', [
+            assistantMessage([{ type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: 'ls' } }]),
+            toolResultMessage([{ type: 'tool_result', tool_use_id: 'tool-1', content: [{ text: 'ok' }] }]),
+            resultMessage(),
+        ]);
+
+        expect(toolInvocations[0]).toMatchObject({ name: 'Bash', isMcpTool: false });
     });
 
     it('times each invocation from when its call and result were streamed', () => {

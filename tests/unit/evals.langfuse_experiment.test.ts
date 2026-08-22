@@ -37,6 +37,7 @@ function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOu
         judgeResult: { verdict: 'PASS', reason: 'looks good', rawResponse: '' },
         totalTokens: 1234,
         transcript: [],
+        toolErrors: [],
         ...overrides,
     };
 }
@@ -67,14 +68,28 @@ describe('evaluators', () => {
     it('emits no token score when the provider never reported usage', async () => {
         expect(await evaluators[1]({ output: makeOutput({ totalTokens: undefined }) })).toEqual([]);
     });
+
+    it('scores tool_errors 0 without a comment on a clean item', async () => {
+        expect(await evaluators[2]({ output: makeOutput() })).toEqual({ name: 'tool_errors', value: 0 });
+    });
+
+    it('scores tool_errors with the failing calls in the comment', async () => {
+        const output = makeOutput({ toolErrors: [{ tool: 'create-actor-task', error: 'name taken' }] });
+        expect(await evaluators[2]({ output })).toEqual({
+            name: 'tool_errors',
+            value: 1,
+            comment: 'create-actor-task: name taken',
+        });
+    });
 });
 
 describe('makeTask()', () => {
-    const makeItem = () => ({
+    const makeItem = (overrides: Record<string, unknown> = {}) => ({
         id: 'search-001',
         input: { query: 'q' },
         expectedOutput: 'r',
         metadata: { category: 'search' },
+        ...overrides,
     });
 
     const makeWorkflowTask = () =>
@@ -89,22 +104,39 @@ describe('makeTask()', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
         mocks.runAgentConversation.mockRejectedValue(new Error('spawn ENOENT'));
     });
 
     it('names the item in a harness error, which the SDK log line omits', async () => {
         await expect(makeWorkflowTask()(makeItem())).rejects.toThrow('Item "search-001": spawn ENOENT');
+        // Both attempts failed: the transient-failure retry ran and did not mask the error.
+        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries the agent run once on a transient failure', async () => {
+        mocks.runAgentConversation.mockRejectedValueOnce(new Error('Connection error.')).mockResolvedValueOnce({
+            conversation: { turns: [], totalTokens: 1234 },
+            transcript: [],
+            toolInvocations: [],
+        });
+
+        await expect(makeWorkflowTask()(makeItem())).resolves.toMatchObject({
+            id: 'search-001',
+            judgeResult: { verdict: 'PASS' },
+        });
+        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
     });
 
     it('still scores the item when emitting the agent trace throws', async () => {
         mocks.runAgentConversation.mockResolvedValue({
             conversation: { turns: [], totalTokens: 1234 },
             transcript: [],
+            toolInvocations: [],
         });
         mocks.emitObservations.mockImplementation(() => {
             throw new Error('span export failed');
         });
-        vi.spyOn(console, 'error').mockImplementation(() => {});
 
         await expect(makeWorkflowTask()(makeItem())).resolves.toMatchObject({
             id: 'search-001',
@@ -112,11 +144,35 @@ describe('makeTask()', () => {
             totalTokens: 1234,
         });
     });
+
+    it('collects failed tool calls, exempting built-ins and the ones failTools injected', async () => {
+        mocks.runAgentConversation.mockResolvedValue({
+            conversation: { turns: [], totalTokens: 1234 },
+            transcript: [],
+            toolInvocations: [
+                { name: 'get-actor-task', isMcpTool: true, result: { success: true, result: 'ok' } },
+                {
+                    name: 'create-actor-task',
+                    isMcpTool: true,
+                    result: { success: false, error: 'name taken\nstack line' },
+                },
+                { name: 'call-actor', isMcpTool: true, result: { success: false, error: 'injected' } },
+                // A built-in failing says nothing about the server under test.
+                { name: 'Bash', isMcpTool: false, result: { success: false, error: 'exit status 1' } },
+            ],
+        });
+        const item = makeItem({ metadata: { category: 'search', failTools: ['call-actor'] } });
+
+        // First line only: the full text already sits on the tool span, so nothing re-uploads it.
+        await expect(makeWorkflowTask()(item)).resolves.toMatchObject({
+            toolErrors: [{ tool: 'create-actor-task', error: 'name taken' }],
+        });
+    });
 });
 
 describe('buildRunSummary()', () => {
     it('counts every requested item that passed', () => {
-        expect(buildRunSummary(['a', 'b'], [makeScoredItem('a', 1), makeScoredItem('b', 1)])).toEqual({
+        expect(buildRunSummary(['a', 'b'], [makeScoredItem('a', 1), makeScoredItem('b', 1)], false)).toEqual({
             passedCount: 2,
             failures: [],
             droppedIds: [],
@@ -125,23 +181,38 @@ describe('buildRunSummary()', () => {
 
     it('names the failure when an item scored 0', () => {
         const failing = { judgeResult: { verdict: 'FAIL' as const, reason: 'missed X', rawResponse: '' } };
-        const summary = buildRunSummary(['a', 'b'], [makeScoredItem('a', 1), makeScoredItem('b', 0, failing)]);
+        const summary = buildRunSummary(['a', 'b'], [makeScoredItem('a', 1), makeScoredItem('b', 0, failing)], false);
         expect(summary.passedCount).toBe(1);
         expect(summary.failures).toEqual([{ id: 'b', reason: 'missed X' }]);
     });
 
+    it('fails a judge-passing item on tool errors under the default gate, naming the calls', () => {
+        const errored = { toolErrors: [{ tool: 'create-actor-task', error: 'name taken' }] };
+        const summary = buildRunSummary(['a'], [makeScoredItem('a', 1, errored)], false);
+        expect(summary.passedCount).toBe(0);
+        expect(summary.failures).toEqual([
+            { id: 'a', reason: 'judge passed, but 1 tool error(s): create-actor-task: name taken' },
+        ]);
+    });
+
+    it('passes a judge-passing item with tool errors when the run allows them', () => {
+        const errored = { toolErrors: [{ tool: 'publish-actor-task', error: 'boom' }] };
+        const summary = buildRunSummary(['a'], [makeScoredItem('a', 1, errored)], true);
+        expect(summary).toEqual({ passedCount: 1, failures: [], droppedIds: [] });
+    });
+
     it('reports items the SDK dropped instead of shrinking the denominator', () => {
-        const summary = buildRunSummary(['a', 'b', 'c'], [makeScoredItem('a', 1)]);
+        const summary = buildRunSummary(['a', 'b', 'c'], [makeScoredItem('a', 1)], false);
         expect(summary.passedCount).toBe(1);
         expect(summary.droppedIds).toEqual(['b', 'c']);
     });
 
     it('reports every requested id as dropped when nothing ran at all', () => {
-        expect(buildRunSummary(['a'], [])).toEqual({ passedCount: 0, failures: [], droppedIds: ['a'] });
+        expect(buildRunSummary(['a'], [], false)).toEqual({ passedCount: 0, failures: [], droppedIds: ['a'] });
     });
 
     it('treats a missing workflow_judge score as a failure, without quoting the stale judge reason', () => {
-        const summary = buildRunSummary(['a'], [{ output: makeOutput({ id: 'a' }), evaluations: [] }]);
+        const summary = buildRunSummary(['a'], [{ output: makeOutput({ id: 'a' }), evaluations: [] }], false);
         expect(summary.passedCount).toBe(0);
         expect(summary.failures).toEqual([{ id: 'a', reason: 'no workflow_judge score (the evaluator threw)' }]);
     });
@@ -154,6 +225,13 @@ describe('countPassed()', () => {
             makeScoredItem('b', 0),
             { output: makeOutput({ id: 'c' }), evaluations: [] },
         ];
-        expect(countPassed(itemResults)).toBe(1);
+        expect(countPassed(itemResults, false)).toBe(1);
+    });
+
+    // countPassed is what feeds the run's pass_rate score, so the gate has to hold here too.
+    it('counts a judge-passing item with tool errors only when the run allows them', () => {
+        const itemResults = [makeScoredItem('a', 1, { toolErrors: [{ tool: 'get-actor-task', error: 'boom' }] })];
+        expect(countPassed(itemResults, false)).toBe(0);
+        expect(countPassed(itemResults, true)).toBe(1);
     });
 });
