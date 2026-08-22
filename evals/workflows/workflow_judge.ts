@@ -116,10 +116,7 @@ export function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'
     } catch (error) {
         const prose = PROSE_VERDICT_PATTERN.exec(response);
         if (prose) {
-            return {
-                verdict: prose[1].toUpperCase() as 'PASS' | 'FAIL',
-                reason: prose[2].trim() || 'no reason given',
-            };
+            return JudgeResponseValidator.parse({ verdict: prose[1], reason: prose[2].trim() || 'no reason given' });
         }
         // No raw response here: the retry loop's final throw already carries it.
         throw new Error(

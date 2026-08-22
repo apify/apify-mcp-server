@@ -8,7 +8,6 @@
  * structured verdict schema keeps that from mattering in practice.
  */
 
-// eslint-disable-next-line import/extensions
 import { tmpdir } from 'node:os';
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
@@ -18,7 +17,7 @@ import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/reso
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
-import type { LlmResponse, LlmUsage } from './llm_client.js';
+import { type LlmResponse, type LlmUsage, toUsageDetails } from './llm_client.js';
 
 /**
  * The model's answer may wrap the verdict JSON in code fences or prose. Return the JSON
@@ -66,18 +65,13 @@ export class ClaudeLlmClient {
             model,
             async (generation) => {
                 generation.update({ model, input: messages });
-                const llmResponse = await this.sendRequest(prompt, model, Boolean(responseFormat));
+                const llmResponse = await this.sendRequest(prompt, model);
+                if (responseFormat && llmResponse.content) {
+                    llmResponse.content = extractJsonObject(llmResponse.content);
+                }
                 generation.update({
                     output: llmResponse.content,
-                    ...(llmResponse.usage
-                        ? {
-                              usageDetails: {
-                                  input: llmResponse.usage.promptTokens,
-                                  output: llmResponse.usage.completionTokens,
-                                  total: llmResponse.usage.totalTokens,
-                              },
-                          }
-                        : {}),
+                    ...toUsageDetails(llmResponse.usage),
                 });
                 return llmResponse;
             },
@@ -86,7 +80,7 @@ export class ClaudeLlmClient {
     }
 
     /** One single-turn, tool-less Claude Code run; its result text is the LLM response. */
-    private async sendRequest(prompt: string, model: string, extractJson: boolean): Promise<LlmResponse> {
+    private async sendRequest(prompt: string, model: string): Promise<LlmResponse> {
         // No tools and one turn: nothing needs permissions, so the default permission mode
         // works everywhere (bypassPermissions would refuse to run as root without a sandbox).
         for await (const message of query({
@@ -103,24 +97,20 @@ export class ClaudeLlmClient {
             if (message.subtype !== 'success') {
                 throw new Error(`Claude judge run ended with "${message.subtype}"`);
             }
-            const usage: LlmUsage | undefined = message.usage
-                ? {
-                      promptTokens:
-                          message.usage.input_tokens +
-                          (message.usage.cache_read_input_tokens ?? 0) +
-                          (message.usage.cache_creation_input_tokens ?? 0),
-                      completionTokens: message.usage.output_tokens,
-                      totalTokens:
-                          message.usage.input_tokens +
-                          (message.usage.cache_read_input_tokens ?? 0) +
-                          (message.usage.cache_creation_input_tokens ?? 0) +
-                          message.usage.output_tokens,
-                  }
-                : undefined;
-            return {
-                content: extractJson ? extractJsonObject(message.result) : message.result,
-                usage,
-            };
+            let usage: LlmUsage | undefined;
+            if (message.usage) {
+                // Cached input tokens count as prompt tokens, like OpenRouter reports them.
+                const promptTokens =
+                    message.usage.input_tokens +
+                    (message.usage.cache_read_input_tokens ?? 0) +
+                    (message.usage.cache_creation_input_tokens ?? 0);
+                usage = {
+                    promptTokens,
+                    completionTokens: message.usage.output_tokens,
+                    totalTokens: promptTokens + message.usage.output_tokens,
+                };
+            }
+            return { content: message.result, usage };
         }
         throw new Error('Claude judge run produced no result message');
     }
