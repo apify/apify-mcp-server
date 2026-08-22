@@ -323,8 +323,8 @@ describe('call_actor_common', () => {
             });
         });
 
-        // Result text has no `hasTool`, so tools.mode_contract.test.ts cannot see it. The stub above
-        // loads no tools, so the assertion on the message body already covers the ungated case.
+        // Result text has no `hasTool`, so tools.mode_contract.test.ts cannot see it: it renders
+        // descriptions only. `?tools=call-actor` is served no search-actors.
         it('names no recovery tool in the not-found message when the session was served none', async () => {
             vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
 
@@ -341,7 +341,7 @@ describe('call_actor_common', () => {
             expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         });
 
-        it('names only the recovery tools the session was served in the not-found message', async () => {
+        it('points at the search tool in the not-found message when the session was served it', async () => {
             vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
 
             const resolution = await resolveAndValidateActor({
@@ -352,7 +352,8 @@ describe('call_actor_common', () => {
 
             const { error } = resolution as { error: TextToolResult };
             const allText = (error.content ?? []).map(textOf).join('\n');
-            expect(allText).toContain(`search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`);
+            expect(allText).toContain(`search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}`);
+            // A detail lookup on a non-existent Actor fails the same way, so it is never offered.
             expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         });
 

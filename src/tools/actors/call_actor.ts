@@ -465,13 +465,17 @@ export async function resolveAndValidateActor(params: {
     const actor = tools[0];
 
     if (!actor) {
-        const hint = buildActorNotFoundHint(loadedToolNames);
+        // Only search-actors: the Actor does not exist, so buildActorNotFoundHint's second
+        // offer (get Actor details) would send the model to a lookup that fails the same way.
+        const recovery = loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
+            ? `\nYou can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.`
+            : '';
         return {
             error: respondUserError(
                 dedent`
                     Actor '${actorName}' was not found.
                     Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
-                ` + (hint ? `\n${hint}` : ''),
+                ` + recovery,
                 { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
             ),
         };
