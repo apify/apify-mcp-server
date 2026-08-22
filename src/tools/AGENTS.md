@@ -53,6 +53,18 @@ reference in `ctx.hasTool(...)`, and set `description` to the `ALL_TOOLS_PRESENT
 happens once, at the tools/list boundary (`getToolPublicFieldOnly` in `../utils/tools.ts`). Enforced
 by `tests/unit/tools.mode_contract.test.ts`.
 
+**Result text is a second surface, and `hasTool` does not reach it.** A tool name in a response
+body (`summary`, `nextStep`, `instructions`, an error's recovery sentence) is built while the tool
+runs, not at the tools/list boundary, so nothing gates it for you and `tools.mode_contract.test.ts`
+— which renders descriptions only — cannot see it. Gate it on `toolArgs.loadedToolNames`
+(`InternalToolArgs` in `../types.ts`), the names the session was actually served: see
+`suggestTool` in `storage/storage_helpers.ts` and the recovery hints in `actors/call_actor.ts`,
+`actors/fetch_actor_details.ts` and `actors/search_actors.ts`. Two rules when the name drops out:
+never leave a dead end — if the sentence *is* the recovery path, replace it rather than omit it
+(`storage_helpers.ts` substitutes "Inspect the returned items directly") — and keep the text
+byte-identical for a session that holds every tool, so gating a hint is never also a rewording.
+Each gate needs its own test; there is no sweeping guard for this surface.
+
 ## Related, owned elsewhere (don't restate)
 
 - Tool-name cap + hash dedupe, transport: [`../mcp/AGENTS.md`](../mcp/AGENTS.md).

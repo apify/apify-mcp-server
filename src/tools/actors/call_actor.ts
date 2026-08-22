@@ -99,8 +99,12 @@ type CallActorErrorResponseParams = {
     loadedToolNames: readonly string[];
 };
 
-/** Names only the recovery tools actually loaded in this session — omits the sentence if none are. */
-function buildActorNotFoundHint(loadedToolNames: readonly string[]): string {
+/**
+ * Recovery offers for a failed call, naming only the tools actually loaded in this session —
+ * omits the sentence if none are. Not for the not-found branch of `resolveAndValidateActor`:
+ * there the Actor does not exist, so the detail-lookup offer is a dead end.
+ */
+function buildCallFailureRecoveryHint(loadedToolNames: readonly string[]): string {
     const hints = [
         loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
             ? `search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`
@@ -216,7 +220,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         [
             `Failed to call Actor '${actorName}': ${errMsg}`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
-            buildActorNotFoundHint(loadedToolNames),
+            buildCallFailureRecoveryHint(loadedToolNames),
         ].filter(Boolean),
         { error, detail: errMsg.slice(0, 200), actorId },
     );
@@ -465,7 +469,7 @@ export async function resolveAndValidateActor(params: {
     const actor = tools[0];
 
     if (!actor) {
-        // Only search-actors: the Actor does not exist, so buildActorNotFoundHint's second
+        // Only search-actors: the Actor does not exist, so buildCallFailureRecoveryHint's second
         // offer (get Actor details) would send the model to a lookup that fails the same way.
         const recovery = loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
             ? `\nYou can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.`

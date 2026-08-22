@@ -347,13 +347,17 @@ describe('call_actor_common', () => {
             const resolution = await resolveAndValidateActor({
                 actorName: 'apify/missing',
                 input: { query: 'x' },
-                toolArgs: { ...stubToolArgs, loadedToolNames: [HELPER_TOOLS.STORE_SEARCH] },
+                toolArgs: {
+                    ...stubToolArgs,
+                    loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
+                },
             });
 
             const { error } = resolution as { error: TextToolResult };
             const allText = (error.content ?? []).map(textOf).join('\n');
             expect(allText).toContain(`search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}`);
-            // A detail lookup on a non-existent Actor fails the same way, so it is never offered.
+            // Served here, and still not offered: a detail lookup on an Actor that does not exist
+            // fails the same way. Passing both names is what makes this assertion bite.
             expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         });
 
