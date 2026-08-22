@@ -50,11 +50,7 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
         const result = await (searchActors as HelperTool).call(
-            stubInternalToolArgs({
-                keywords: SEARCH_KEYWORDS,
-                limit: 5,
-                offset: 0,
-            }),
+            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [HELPER_TOOLS.ACTOR_GET_DETAILS]),
         );
 
         const { structuredContent, content } = result as {
@@ -226,5 +222,24 @@ describe('search-actors without widget (searchActors)', () => {
         expect(structuredContent.actors[0].url).toBe(consoleUrl);
         expect(content[0].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
         expect(content[0].text).not.toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
+    });
+
+    // The footer is result text, which `tools.mode_contract.test.ts` cannot see — it renders
+    // descriptions only. A `?tools=search-actors` session is served no fetch-actor-details.
+    it('names no follow-up tool in the footer when the session was not served one', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+
+        const result = await (searchActors as HelperTool).call(
+            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: { instructions?: string };
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.instructions).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        expect(structuredContent.instructions).toContain('second search with broader');
+        expect(content[0].text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        expect(content[0].text).toContain('second search with broader');
     });
 });
