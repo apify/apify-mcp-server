@@ -449,7 +449,7 @@ export async function resolveAndValidateActor(params: {
     toolArgs: InternalToolArgs;
 }): Promise<{ error: ToolResponse } | { actor: ToolEntry }> {
     const { actorName, input, toolArgs } = params;
-    const { apifyClient } = toolArgs;
+    const { apifyClient, loadedToolNames } = toolArgs;
 
     const { tools, errors } = await getActorsAsTools([actorName], apifyClient, {
         mcpSessionId: toolArgs.mcpSessionId,
@@ -465,13 +465,13 @@ export async function resolveAndValidateActor(params: {
     const actor = tools[0];
 
     if (!actor) {
+        const hint = buildActorNotFoundHint(loadedToolNames);
         return {
             error: respondUserError(
                 dedent`
                     Actor '${actorName}' was not found.
                     Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
-                    You can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.
-                `,
+                ` + (hint ? `\n${hint}` : ''),
                 { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
             ),
         };

@@ -110,13 +110,14 @@ export const fetchActorDetailsToolArgsSchema = z.object({
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return `Get detailed information about an Actor by its ID or full name (format: "username/name", e.g., "apify/rag-web-browser").
-${
-    hasTool(HELPER_TOOLS.STORE_SEARCH)
-        ? `\nRequires the exact ID or full name. If you only have a description, a partial name, or a name you \
-have not seen in this conversation, find it with ${HELPER_TOOLS.STORE_SEARCH} first — do not construct a \
-plausible-looking name and call this tool with it.\n`
-        : ''
-}
+
+Requires the exact ID or full name — do not construct a plausible-looking name and call this tool with it.${
+        hasTool(HELPER_TOOLS.STORE_SEARCH)
+            ? ` If you only have a description, a partial name, or a name you have not seen in this conversation, \
+find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
+            : ''
+    }
+
 Use 'output' parameter with boolean flags to control returned information:
 - Default: All fields true except mcpTools
 - Selective: Set desired fields to true (e.g., output: { inputSchema: true })
