@@ -109,7 +109,7 @@ export const fetchActorDetailsToolArgsSchema = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    return `Get detailed information about an Actor by its ID or full name (format: "username/name", e.g., "apify/rag-web-browser").
+    return dedent`Get detailed information about an Actor by its ID or full name (format: "username/name", e.g., "apify/rag-web-browser").
 
 Requires the exact ID or full name — do not construct a plausible-looking name and call this tool with it.${
         hasTool(HELPER_TOOLS.STORE_SEARCH)
@@ -136,6 +136,7 @@ EXAMPLES:
  * Build error response for when actor is not found. The recovery tool is named only when the
  * session was served it: a name the client never received in `tools/list` invites a call to a
  * tool that does not exist.
+ * See apify/apify-mcp-server#1296.
  */
 export function buildActorNotFoundResponse(actorName: string, loadedToolNames: readonly string[]): ToolResponse {
     const recovery = loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)

@@ -137,6 +137,7 @@ export function buildNoActorsFoundInstructions(keywords: string): string {
  * The ACTOR_GET_DETAILS sentence is named only when the session was served that tool: this is
  * result text, which no `hasTool` gate reaches, so a `?tools=search-actors` session would
  * otherwise be told to call a tool absent from its own `tools/list`.
+ * See apify/apify-mcp-server#1296.
  */
 export function buildSearchActorsFooter(verbatimLinksNudge: string, loadedToolNames: readonly string[]): string {
     const detailsHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
@@ -151,7 +152,7 @@ export function buildSearchActorsFooter(verbatimLinksNudge: string, loadedToolNa
         (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
         you haven't missed a better Actor.${verbatimLinksNudge}
     `;
-    return [detailsHint, secondSearch].filter(Boolean).join('\n');
+    return detailsHint ? `${detailsHint}\n${secondSearch}` : secondSearch;
 }
 
 /**

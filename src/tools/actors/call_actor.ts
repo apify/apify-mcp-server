@@ -469,6 +469,7 @@ export async function resolveAndValidateActor(params: {
     const actor = tools[0];
 
     if (!actor) {
+        // See apify/apify-mcp-server#1296.
         // Only search-actors: the Actor does not exist, so buildCallFailureRecoveryHint's second
         // offer (get Actor details) would send the model to a lookup that fails the same way.
         const recovery = loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
