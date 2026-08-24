@@ -182,6 +182,21 @@ function respondStandbyRejection(
     return respondUserError(error.message, { actorId: opts.actorId, detail: error.kind });
 }
 
+/**
+ * Canonical "Actor not found" answer, shared by the run path and the `actor:toolName` route so an
+ * unknown Actor gets the same response regardless of call shape.
+ */
+function respondActorNotFound(actorName: string): ToolResponse {
+    return respondUserError(
+        dedent`
+            Actor '${actorName}' was not found.
+            Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
+            You can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.
+        `,
+        { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
+    );
+}
+
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ToolResponse {
     const { actorName, error, actorId, mcpSessionId, loadedToolNames } = params;
 
@@ -473,16 +488,7 @@ export async function resolveAndValidateActor(params: {
     const actor = tools[0];
 
     if (!actor) {
-        return {
-            error: respondUserError(
-                dedent`
-                    Actor '${actorName}' was not found.
-                    Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
-                    You can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.
-                `,
-                { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
-            ),
-        };
+        return { error: respondActorNotFound(actorName) };
     }
 
     const actorId = extractActorId(actor);
@@ -597,11 +603,12 @@ export async function callActorPreExecute(
 
     // A `:toolName` suffix only means anything for an MCP-server Actor; every other mode is a dead end.
     if (mcpToolName) {
-        if (resolution?.toolMode !== ACTOR_TOOL_MODE.MCP) {
+        if (resolution === null) {
+            return { earlyResponse: respondActorNotFound(baseActorName) };
+        }
+        if (resolution.toolMode !== ACTOR_TOOL_MODE.MCP) {
             return {
-                earlyResponse: respondServerError(
-                    `Actor '${resolution?.actorFullName ?? baseActorName}' is not an MCP server.`,
-                ),
+                earlyResponse: respondServerError(`Actor '${resolution.actorFullName}' is not an MCP server.`),
             };
         }
         return {

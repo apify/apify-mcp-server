@@ -9,6 +9,12 @@ import type { ToolResponse } from '../../src/utils/mcp.js';
 import { withServer } from './helpers/mcp_server.js';
 import { textOf, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
+// Any Actor not seeded into the definition cache is unknown; the fetch fallback must not hit the network.
+vi.mock('../../src/tools/actors/actor_definition.js', async () => {
+    const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/actors/actor_definition.js');
+    return { ...actual, getActorDefinition: vi.fn(async () => null) };
+});
+
 vi.mock('../../src/mcp/client.js', () => ({
     connectMCPClient: vi.fn(async () => ({
         listTools: async () => ({
@@ -183,6 +189,14 @@ describe('Actor run/standby mode decision table', () => {
             const text = earlyText(result);
             expect(text).toContain(RUN_ONLY);
             expect(text).not.toContain(RUN_ONLY_ID);
+        });
+
+        it('answers not-found instead of "is not an MCP server" for the actor:tool shape on an unknown Actor', async () => {
+            const result = await preExecute('acme/ghost:add');
+
+            const text = earlyText(result);
+            expect(text).toContain("Actor 'acme/ghost' was not found");
+            expect(text).not.toContain('is not an MCP server');
         });
 
         it('keeps the unsupported-cell message distinct from the "is not an MCP server" wording', async () => {
