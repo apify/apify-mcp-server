@@ -280,7 +280,11 @@ describe('call_actor_common', () => {
 
     describe('resolveAndValidateActor', () => {
         const INPUT_SCHEMA = { type: 'object', properties: { query: { type: 'string' } } };
-        const stubToolArgs = { apifyClient: {}, mcpSessionId: 'session-1' } as unknown as InternalToolArgs;
+        const stubToolArgs = {
+            apifyClient: {},
+            mcpSessionId: 'session-1',
+            loadedToolNames: [],
+        } as unknown as InternalToolArgs;
 
         beforeEach(() => {
             vi.mocked(getActorsAsTools).mockReset();
@@ -317,6 +321,44 @@ describe('call_actor_common', () => {
                 failureHttpStatus: 404,
                 failureDetail: "Actor 'apify/missing' was not found",
             });
+        });
+
+        // Result text has no `hasTool`, so tools.mode_contract.test.ts cannot see it: it renders
+        // descriptions only. `?tools=call-actor` is served no search-actors.
+        it('names no recovery tool in the not-found message when the session was served none', async () => {
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
+
+            const resolution = await resolveAndValidateActor({
+                actorName: 'apify/missing',
+                input: { query: 'x' },
+                toolArgs: stubToolArgs,
+            });
+
+            const { error } = resolution as { error: TextToolResult };
+            const allText = (error.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain("Actor 'apify/missing' was not found");
+            expect(allText).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+            expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        });
+
+        it('points at the search tool in the not-found message when the session was served it', async () => {
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
+
+            const resolution = await resolveAndValidateActor({
+                actorName: 'apify/missing',
+                input: { query: 'x' },
+                toolArgs: {
+                    ...stubToolArgs,
+                    loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
+                },
+            });
+
+            const { error } = resolution as { error: TextToolResult };
+            const allText = (error.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain(`search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}`);
+            // Served here, and still not offered: a detail lookup on an Actor that does not exist
+            // fails the same way. Passing both names is what makes this assertion bite.
+            expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         });
 
         // Byte-identity guard for #937: the input-required error embeds the input schema in a

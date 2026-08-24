@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import {
     actorDetailsOutputDefaults,
     buildActorDetailsTextResponse,
+    buildActorNotFoundResponse,
     buildFetchActorDetailsResult,
 } from '../../src/tools/actors/fetch_actor_details.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockUserInfo } from './helpers/tool_context.js';
+import { mockUserInfo, textOf } from './helpers/tool_context.js';
 import { stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 vi.mock('../../src/utils/actor_details.js', async () => {
@@ -205,6 +207,22 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
     });
 
+    // The direct buildActorNotFoundResponse() tests below cannot see whether this function
+    // forwards the session's tool names, so a hardcoded [] here would go unnoticed.
+    it('forwards the session tool names to the not-found response', async () => {
+        vi.mocked(fetchActorDetails).mockResolvedValue(null as unknown as ActorDetailsResult);
+
+        // output narrowed as in callWithToken above: pricing: false skips the users/me lookup.
+        const notFoundArgs = { actor: 'jane.doe/typo', output: { inputSchema: true } };
+        const served = await buildFetchActorDetailsResult(
+            stubInternalToolArgs(notFoundArgs, [HELPER_TOOLS.STORE_SEARCH]),
+        );
+        const unserved = await buildFetchActorDetailsResult(stubInternalToolArgs(notFoundArgs));
+
+        expect((served.content ?? []).map(textOf).join('\n')).toContain(HELPER_TOOLS.STORE_SEARCH);
+        expect((unserved.content ?? []).map(textOf).join('\n')).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+    });
+
     // Regression: a 401 (invalid/expired APIFY_TOKEN) must not surface as "Actor ... was not
     // found" — that message wrongly nudges the caller to retry search-actors instead of fixing
     // the credential. fetchActorDetails() is expected to propagate auth errors (see
@@ -217,5 +235,24 @@ describe('buildFetchActorDetailsResult()', () => {
         );
 
         await expect(callWithToken('apify_api_test')).rejects.toMatchObject({ statusCode: 401 });
+    });
+});
+
+// Result text has no `hasTool`, so tools.mode_contract.test.ts does not cover it. A guessed Actor
+// name is the common way to land here, and naming a recovery tool the session never received
+// sends the model after something that does not exist.
+describe('buildActorNotFoundResponse()', () => {
+    it('points at the search tool when the session was served it', () => {
+        const text = (buildActorNotFoundResponse('jane.doe/typo', [HELPER_TOOLS.STORE_SEARCH]).content ?? [])
+            .map(textOf)
+            .join('\n');
+        expect(text).toContain('was not found');
+        expect(text).toContain(HELPER_TOOLS.STORE_SEARCH);
+    });
+
+    it('names no tool when the session was not served one', () => {
+        const text = (buildActorNotFoundResponse('jane.doe/typo', []).content ?? []).map(textOf).join('\n');
+        expect(text).toContain('was not found');
+        expect(text).not.toContain(HELPER_TOOLS.STORE_SEARCH);
     });
 });
