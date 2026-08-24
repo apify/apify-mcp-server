@@ -629,7 +629,9 @@ export async function callActorPreExecute(
         }
         if (resolution.toolMode !== ACTOR_TOOL_MODE.MCP) {
             return {
-                earlyResponse: respondServerError(`Actor '${resolution.actorFullName}' is not an MCP server.`),
+                earlyResponse: respondUserError(`Actor '${resolution.actorFullName}' is not an MCP server.`, {
+                    detail: 'tool name given for a non-MCP Actor',
+                }),
             };
         }
         return {

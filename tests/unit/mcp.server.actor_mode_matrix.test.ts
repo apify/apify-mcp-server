@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { HELPER_TOOLS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { callActorPreExecute, executeCallActor } from '../../src/tools/actors/call_actor.js';
 import type { ActorDefinitionWithInfo } from '../../src/types.js';
@@ -126,6 +126,17 @@ describe('Actor run/standby mode decision table', () => {
             const result = await preExecute(`${RUN_ONLY_STALE_PATH}:add`);
 
             expect(earlyText(result)).toContain('is not an MCP server');
+        });
+
+        it('records the "is not an MCP server" rejection as a caller mistake, not a server fault', async () => {
+            const result = await preExecute(`${RUN_ONLY_STALE_PATH}:add`);
+
+            expect(earlyResponseOf(result).toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                }),
+            );
         });
 
         it('runs a standby Actor with no MCP server but a non-empty input schema', async () => {
