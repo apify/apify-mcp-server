@@ -51,7 +51,22 @@ does not exist. Any other cross-tool reference must be gated per session: define
 `buildDescription(ctx)` on the entry (see `ToolDescriptionContext` in `../types.ts`), wrap the
 reference in `ctx.hasTool(...)`, and set `description` to the `ALL_TOOLS_PRESENT` render. Rendering
 happens once, at the tools/list boundary (`getToolPublicFieldOnly` in `../utils/tools.ts`). Enforced
-by `tests/unit/tools.mode_contract.test.ts`.
+by `tests/unit/tools.mode_contract.test.ts`, which scans `description` only.
+
+Input-schema field text (`.describe()` on a Zod field) reaches `tools/list` verbatim — nothing
+renders it per session — so never name a tool there; put the guidance in `buildDescription` behind
+`hasTool`. `actors/actor_tools_factory.ts`'s `waitSecs` is the one exception: an Actor tool always
+auto-injects the `get-actor-run` it names.
+
+Result text (`summary` / `nextStep` in `content[1]`) has no `hasTool`, but it does have a per-session
+gate: `InternalToolArgs.loadedToolNames` (see `suggestTool` in `storage/storage_helpers.ts`). Name a
+tool there only through that gate, or when it is the calling tool itself (the "call it again with the
+next offset" pagination hint); otherwise leave the cross-tool guidance to the gated description.
+An `AUTO_INJECTED_TOOLS` member is no exception — the injection is conditional on `call-actor`, an
+Actor tool, or `get-actor-run` being loaded, so a session that loaded only `abort-actor-run` gets
+none of them. The task tools name no tool, enforced by `tests/unit/tools.actor_task_crud.test.ts`;
+result text elsewhere predates the gate, and `suggestTool` is the pattern to fix it with. Grep
+`HELPER_TOOLS` outside `buildDescription` for the current set rather than trusting a list here.
 
 **Result text is a second surface, and `hasTool` does not reach it.** A tool name in a response
 body (`summary`, `nextStep`, `instructions`, an error's recovery sentence) is built while the tool

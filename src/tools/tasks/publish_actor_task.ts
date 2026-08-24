@@ -26,8 +26,7 @@ reliable, and specific use case. Not every saved task needs to be public.
 
 The task's Actor must be public and the task must have its public display configuration set up:
 at least \`publicConfig.inputSchemaFields\`, \`publicConfig.datasetView\`, and \`publicConfig.seoDescription\`. \
-If publishing fails, \
-follow the API reason${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? `; update these fields with ${HELPER_TOOLS.ACTOR_TASK_UPDATE} only when the reason identifies them` : ''}.
+If publishing fails, follow the API reason${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? `; update these fields with ${HELPER_TOOLS.ACTOR_TASK_UPDATE} only when the reason identifies them` : ''}.
 At most 50 tasks can be published per Actor.
 Publishing an already published task has no effect.
 Requires write access to both the task and its Actor.
@@ -65,10 +64,10 @@ export const publishActorTask: ToolEntry = Object.freeze({
         const task = await setTaskPublication(client, parsed.taskId, true);
 
         const result = taskResult(task);
-        const summary =
-            `Task "${task.name}" (ID: ${task.id}) is published; publishedAt in the result is the publication time. ` +
-            `The link to the public page is available in Apify Console, on the task's Publication tab. ` +
-            `To re-check the publication state later, use ${HELPER_TOOLS.ACTOR_TASK_GET}.`;
+        // publishedAt is the server's confirmation that the page is live: without saying so, an agent
+        // asked to "confirm it is live" either claims it unverified or makes a redundant lookup.
+        const summary = `Task "${task.name}" (ID: ${task.id}) is published; publishedAt in the result is the \
+confirmed publication time. The link to the public page is available in Apify Console, on the task's Publication tab.`;
         return respondOk([JSON.stringify(result), summary], { structuredContent: result });
     },
 } as const);

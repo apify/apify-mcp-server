@@ -8,9 +8,14 @@ import {
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
 } from '../const.js';
 
-// Predicates that classify an error received from the Apify API by its `type`. Kept in one leaf
+// Helpers that read or classify an error received from the Apify API by its `type`. Kept in one leaf
 // module (imports only const + apify-client) so logging, telemetry, payments, and the tool layer
 // can share them without import cycles.
+
+/** The API's machine-readable error type (e.g. `actor-task-name-not-unique`), if the error carries one. */
+export function getApifyErrorType(error: unknown): string | undefined {
+    return error instanceof ApifyApiError ? error.type : undefined;
+}
 
 /** True when an Actor requires full-permission approval the user has not granted. */
 export function isPermissionApprovalError(error: unknown): error is ApifyApiError {

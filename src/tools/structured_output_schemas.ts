@@ -352,11 +352,7 @@ export const reportProblemToolOutputSchema = {
     required: ['reported'],
 };
 
-/**
- * Schema shared by every Actor task tool. `input` mirrors the API task object verbatim; input
- * fields the Actor's schema declares as secret arrive as `ENCRYPTED_VALUE:` placeholders. The
- * keys are the field names that `publicConfig.inputSchemaFields` can use.
- */
+/** Schema shared by every Actor task tool. */
 export const actorTaskOutputSchema = {
     type: 'object' as const,
     properties: {
@@ -383,8 +379,8 @@ export const actorTaskOutputSchema = {
         input: {
             type: ['object', 'array', 'null'],
             description:
-                'The stored task input, as the API returns it. Fields the Actor declares as secret are ' +
-                'encrypted placeholders, never plaintext.',
+                'The stored task input, as the API returns it; fields the Actor declares as secret are ' +
+                'encrypted placeholders, never plaintext. Its keys are what `publicConfig.inputSchemaFields` can use.',
         },
     },
     required: ['taskId', 'actorId', 'name', 'title', 'description', 'publishedAt', 'publicConfig', 'input'],
