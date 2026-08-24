@@ -298,6 +298,65 @@ describe('call_actor_common', () => {
                 }),
             );
         });
+
+        it('echoes the input schema and platform message for a start() invalid-input error, not the generic fallback', () => {
+            const error = new ApifyApiError(
+                {
+                    data: {
+                        error: {
+                            type: 'invalid-input',
+                            message: 'Input is not valid: query: must be a non-empty string',
+                        },
+                    },
+                    status: 400,
+                } as AxiosResponse,
+                1,
+            );
+            const inputSchema = { type: 'object', properties: { query: { type: 'string' } } } as const;
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/instagram-scraper',
+                error,
+                actorId: 'actor-321',
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
+                inputSchema,
+            });
+
+            expect(response.isError).toBe(true);
+            const allText = (response.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain(JSON.stringify(inputSchema));
+            expect(allText).toContain('query: must be a non-empty string');
+            expect(allText).toContain('Please ensure the input is correct');
+            // Must not point the agent at the wrong problem (Actor name / existence).
+            expect(allText).not.toContain('verify the Actor name');
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    actorId: 'actor-321',
+                }),
+            );
+        });
+
+        it('still returns the platform message (without a schema) when no inputSchema was resolved', () => {
+            const error = new ApifyApiError(
+                {
+                    data: { error: { type: 'invalid-input', message: 'Input is not valid: bad JSON' } },
+                    status: 400,
+                } as AxiosResponse,
+                1,
+            );
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/instagram-scraper',
+                error,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
+            });
+
+            const allText = (response.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain('Input is not valid: bad JSON');
+            expect(allText).not.toContain('verify the Actor name');
+        });
     });
 
     describe('callActorArgs.callOptions', () => {
@@ -329,7 +388,11 @@ describe('call_actor_common', () => {
 
     describe('resolveAndValidateActor', () => {
         const INPUT_SCHEMA = { type: 'object', properties: { query: { type: 'string' } } };
-        const stubToolArgs = { apifyClient: {}, mcpSessionId: 'session-1' } as unknown as InternalToolArgs;
+        const stubToolArgs = {
+            apifyClient: {},
+            mcpSessionId: 'session-1',
+            loadedToolNames: [],
+        } as unknown as InternalToolArgs;
 
         beforeEach(() => {
             vi.mocked(getActorsAsTools).mockReset();
@@ -366,6 +429,44 @@ describe('call_actor_common', () => {
                 failureHttpStatus: 404,
                 failureDetail: "Actor 'apify/missing' was not found",
             });
+        });
+
+        // Result text has no `hasTool`, so tools.mode_contract.test.ts cannot see it: it renders
+        // descriptions only. `?tools=call-actor` is served no search-actors.
+        it('names no recovery tool in the not-found message when the session was served none', async () => {
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
+
+            const resolution = await resolveAndValidateActor({
+                actorName: 'apify/missing',
+                input: { query: 'x' },
+                toolArgs: stubToolArgs,
+            });
+
+            const { error } = resolution as { error: TextToolResult };
+            const allText = (error.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain("Actor 'apify/missing' was not found");
+            expect(allText).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+            expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        });
+
+        it('points at the search tool in the not-found message when the session was served it', async () => {
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
+
+            const resolution = await resolveAndValidateActor({
+                actorName: 'apify/missing',
+                input: { query: 'x' },
+                toolArgs: {
+                    ...stubToolArgs,
+                    loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
+                },
+            });
+
+            const { error } = resolution as { error: TextToolResult };
+            const allText = (error.content ?? []).map(textOf).join('\n');
+            expect(allText).toContain(`search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}`);
+            // Served here, and still not offered: a detail lookup on an Actor that does not exist
+            // fails the same way. Passing both names is what makes this assertion bite.
+            expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         });
 
         // Byte-identity guard for #937: the input-required error embeds the input schema in a

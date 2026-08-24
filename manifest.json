@@ -75,7 +75,7 @@
       "title": "Enabled tools",
       "description": "Comma-separated list of tool categories or Actors, e.g. \"actors,docs,apify/rag-web-browser\". For details, see https://mcp.apify.com",
       "required": false,
-      "default": "actors,docs,apify/rag-web-browser"
+      "default": "actors,docs,apify/rag-web-browser,apify/web-fetch"
     }
   },
   "compatibility": {

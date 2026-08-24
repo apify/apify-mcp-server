@@ -488,6 +488,8 @@ export type ServerModeOption = SERVER_MODE | 'auto';
 export type ActorExecutionParams = {
     /** Full name of the Actor (e.g., "apify/rag-web-browser") */
     actorFullName: string;
+    /** Actor's platform ID — echoed into telemetry on a platform input-validation error. */
+    actorId?: string;
     /** Input to pass to the Actor (payment fields already stripped) */
     input: Record<string, unknown>;
     /** Apify client (may include payment headers) */

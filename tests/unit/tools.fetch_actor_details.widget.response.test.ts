@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { fetchActorDetailsWidget } from '../../src/tools/widgets/fetch_actor_details_widget.js';
 import type { HelperTool } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockUserInfo } from './helpers/tool_context.js';
+import { mockUserInfo, textOf } from './helpers/tool_context.js';
 import { stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 /**
@@ -132,6 +133,26 @@ describe('fetch-actor-details-widget response', () => {
         const tool = fetchActorDetailsWidget as HelperTool;
         const ok = tool.ajvValidate({ actor: 'apify/web-scraper' });
         expect(ok).toBe(true);
+    });
+
+    // The widget shares buildActorNotFoundResponse with the base tool, so it must forward the
+    // session's tool names too — an apps session can be served the widget without search-actors.
+    it('gates the not-found recovery tool on the names the session was served', async () => {
+        vi.mocked(fetchActorDetails).mockResolvedValue(null as unknown as ActorDetailsResult);
+
+        const served = await (fetchActorDetailsWidget as HelperTool).call(
+            stubInternalToolArgs({ actor: 'jane.doe/typo' }, [HELPER_TOOLS.STORE_SEARCH]),
+        );
+        const servedText = (served.content ?? []).map(textOf).join('\n');
+        expect(servedText).toContain('was not found');
+        expect(servedText).toContain(HELPER_TOOLS.STORE_SEARCH);
+
+        const unserved = await (fetchActorDetailsWidget as HelperTool).call(
+            stubInternalToolArgs({ actor: 'jane.doe/typo' }),
+        );
+        const unservedText = (unserved.content ?? []).map(textOf).join('\n');
+        expect(unservedText).toContain('was not found');
+        expect(unservedText).not.toContain(HELPER_TOOLS.STORE_SEARCH);
     });
 
     // Regression: same fix as tools.fetch_actor_details.response.test.ts — the widget variant

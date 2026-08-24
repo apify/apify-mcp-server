@@ -132,18 +132,27 @@ export function buildNoActorsFoundInstructions(keywords: string): string {
 
 /**
  * Builds the footer/instructions guidance for successful search results.
- * Includes guidance on using ACTOR_GET_DETAILS and performing a second broader search.
  * Interpolates the verbatim links nudge if applicable.
+ *
+ * The ACTOR_GET_DETAILS sentence is named only when the session was served that tool: this is
+ * result text, which no `hasTool` gate reaches, so a `?tools=search-actors` session would
+ * otherwise be told to call a tool absent from its own `tools/list`.
+ * See apify/apify-mcp-server#1296.
  */
-export function buildSearchActorsFooter(verbatimLinksNudge: string): string {
-    return dedent`
-        If you need more detailed information about any of these Actors, including their input
-        schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
-        specific Actor name.
+export function buildSearchActorsFooter(verbatimLinksNudge: string, loadedToolNames: readonly string[]): string {
+    const detailsHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? dedent`
+            If you need more detailed information about any of these Actors, including their input
+            schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
+            specific Actor name.
+        `
+        : '';
+    const secondSearch = dedent`
         IMPORTANT: You MUST always do a second search with broader, more generic keywords
         (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
         you haven't missed a better Actor.${verbatimLinksNudge}
     `;
+    return detailsHint ? `${detailsHint}\n${secondSearch}` : secondSearch;
 }
 
 /**
@@ -167,7 +176,7 @@ export const searchActors: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, paymentProvider } = toolArgs;
+        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames } = toolArgs;
         const parsed = searchActorsBaseArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
@@ -198,7 +207,7 @@ export const searchActors: ToolEntry = Object.freeze({
             query: parsed.keywords,
             count: actors.length,
             userTier: userPlanTier,
-            instructions: buildSearchActorsFooter(verbatimLinksNudge),
+            instructions: buildSearchActorsFooter(verbatimLinksNudge, loadedToolNames),
         };
 
         // Build header and footer with separate `dedent` calls and concatenate around
@@ -212,7 +221,7 @@ export const searchActors: ToolEntry = Object.freeze({
 
             # Actors:
         `;
-        const footer = buildSearchActorsFooter(verbatimLinksNudge);
+        const footer = buildSearchActorsFooter(verbatimLinksNudge, loadedToolNames);
         return respondOk(`${header}\n\n${actorCardText}\n\n${footer}`, { structuredContent });
     },
 } as const satisfies HelperTool);

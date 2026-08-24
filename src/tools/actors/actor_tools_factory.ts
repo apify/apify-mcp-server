@@ -9,6 +9,8 @@ import {
     HELPER_TOOLS,
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
+    WEB_FETCH,
+    WEB_FETCH_ADDITIONAL_DESC,
 } from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
@@ -128,6 +130,8 @@ Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this 
 Actor description: ${definition.description}`;
         if (isRag) {
             description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
+        } else if (definition.actorFullName === WEB_FETCH) {
+            description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
         }
 
         const memoryMbytes = Math.min(

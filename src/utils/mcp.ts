@@ -1,7 +1,14 @@
 import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
+import { ApifyApiError } from 'apify-client';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import type { AjvErrorDetails, ApifyRequestParams, FailureCategory, ToolTelemetryContext } from '../types.js';
+import type {
+    AjvErrorDetails,
+    ApifyRequestParams,
+    FailureCategory,
+    ToolInputSchema,
+    ToolTelemetryContext,
+} from '../types.js';
 import { ACTOR_RUN_LIMIT_MESSAGE, isActorRunLimitError, isCannotPublishTaskError } from './apify_errors.js';
 import { wrapJsonText } from './encode_text.js';
 import { getHttpStatusCode } from './logging.js';
@@ -283,7 +290,12 @@ export function getHttpErrorHint(status: number | undefined): string | undefined
 
 /** User-facing error text for tool execution failures with HTTP-aware hints. */
 export function getToolCallErrorUserText(toolName: string, error: unknown): string {
-    const msg = error instanceof Error ? error.message : String(error);
+    let msg = error instanceof Error ? error.message : String(error);
+    // The Apify API's machine-readable error type (e.g. "actor-task-name-not-unique"), so
+    // callers can branch on the exact error instead of parsing the message.
+    if (error instanceof ApifyApiError && error.type) {
+        msg = `${msg} (API error type: ${error.type})`;
+    }
     if (isActorRunLimitError(error)) {
         return `Error calling tool "${toolName}": ${msg}. ${ACTOR_RUN_LIMIT_MESSAGE}`;
     }
@@ -297,4 +309,13 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
     }
     const hint = getHttpErrorHint(getHttpStatusCode(error)) ?? 'Verify the tool name and input parameters.';
     return `Error calling tool "${toolName}": ${msg}. ${hint}`;
+}
+
+/** Texts for a confirmed platform input-validation error — same shape wherever start() can throw one. */
+export function buildInvalidInputTexts(actorName: string, errMsg: string, inputSchema?: ToolInputSchema): string[] {
+    return [
+        `Failed to call Actor '${actorName}': ${errMsg}`,
+        `Please ensure the input is correct and matches the Actor's input schema.`,
+        ...(inputSchema ? [`Input schema:\n${wrapJsonText(inputSchema)}`] : []),
+    ];
 }

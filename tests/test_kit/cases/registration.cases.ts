@@ -32,49 +32,43 @@ const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
     {
-        // telemetry off so default tool set is deterministic across environments.
-        name: 'should match spec default: actors,docs,apify/rag-web-browser when no params provided (telemetry off)',
+        name: 'matches spec default: actors,docs,apify/rag-web-browser,apify/web-fetch when no params provided',
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: false } }, async (client) => {
             const tools = await client.listTools();
             const names = getToolNames(tools);
 
-            // Equivalent to tools=actors,docs,apify/rag-web-browser (no widgets outside apps).
+            // Equivalent to tools=actors,docs,apify/rag-web-browser,apify/web-fetch (no widgets outside apps).
             const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
-            const expectedActors = [actorNameToToolName('apify/rag-web-browser')];
-
+            const expectedActors = [
+                actorNameToToolName('apify/rag-web-browser'),
+                actorNameToToolName('apify/web-fetch'),
+            ];
             const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
             expect(names).toHaveLength(expectedTotal.length + AUTO_INJECTED_TOOL_NAMES.length);
 
             expectToolNamesToContain(names, expectedActorsTools);
             expectToolNamesToContain(names, expectedDocsTools);
-            expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
             expectToolNamesToContain(names, expectedActors);
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
         }),
     },
     {
-        // telemetry on — only difference is report-problem.
-        name: 'should match spec default: actors,docs,apify/rag-web-browser when no params provided (telemetry on)',
+        name: 'adds report-problem when telemetry is enabled',
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: true } }, async (client) => {
-            const tools = await client.listTools();
-            const names = getToolNames(tools);
-
-            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
-            const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
-            const expectedActors = [actorNameToToolName('apify/rag-web-browser')];
-            const expectedFeedbackTools = [HELPER_TOOLS.PROBLEM_REPORT];
-
-            const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors, expectedFeedbackTools);
-            expect(names).toHaveLength(expectedTotal.length + AUTO_INJECTED_TOOL_NAMES.length);
-
-            expectToolNamesToContain(names, expectedActorsTools);
-            expectToolNamesToContain(names, expectedDocsTools);
+            const names = getToolNames(await client.listTools());
+            expect(names).toHaveLength(8 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain(HELPER_TOOLS.PROBLEM_REPORT);
-            expectToolNamesToContain(names, expectedActors);
-            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
+        }),
+    },
+    {
+        name: 'omits report-problem when telemetry is disabled',
+        isDeploymentTest: true,
+        run: withClient({ telemetry: { enabled: false } }, async (client) => {
+            const names = getToolNames(await client.listTools());
+            expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
         }),
     },
     {

@@ -1,7 +1,13 @@
 import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
-import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
+import {
+    ACTOR_ENUM_MAX_LENGTH,
+    ACTOR_MAX_DESCRIPTION_LENGTH,
+    RAG_WEB_BROWSER_WHITELISTED_FIELDS,
+    WEB_FETCH,
+    WEB_FETCH_URL_SCHEME_NOTE,
+} from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
 import {
@@ -197,6 +203,10 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
     let finalSchema = working;
     if (isRag) {
         finalSchema = pruneSchemaPropertiesByWhitelist(finalSchema, RAG_WEB_BROWSER_WHITELISTED_FIELDS);
+    }
+
+    if (actorFullName === WEB_FETCH && finalSchema.properties.url) {
+        finalSchema.properties.url.description += ` ${WEB_FETCH_URL_SCHEME_NOTE}`;
     }
 
     finalSchema.$id = getToolSchemaID(actorFullName);
