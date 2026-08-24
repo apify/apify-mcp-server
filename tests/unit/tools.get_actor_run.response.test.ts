@@ -902,6 +902,22 @@ describe('buildStatusTemplate', () => {
         expect(t.summary).not.toMatch(/\(50 keys\)/);
     });
 
+    it('SUCCEEDED with a truncated key-value store containing INPUT floors the count at 49, not 50', () => {
+        const truncatedKvWithInput: RunKeyValueStore = {
+            id: 'kv-1',
+            keys: ['INPUT', ...Array.from({ length: 49 }, (_, i) => `k-${i}`)],
+            // keyCount intentionally omitted — buildKeyValueStoreBlock omits it on truncation.
+        };
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('SUCCEEDED'),
+            dataset: datasetEmpty,
+            keyValueStore: truncatedKvWithInput,
+        });
+        // Only 49 of the 50 fetched keys are real output; INPUT must not inflate the floor.
+        expect(t.summary).toContain('at least 49 keys');
+        expect(t.summary).not.toContain('at least 50 keys');
+    });
+
     it('TIMED-OUT with dataset routes to partial-output nextStep', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('TIMED-OUT'),

@@ -453,7 +453,10 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     }
     const kvTruncated = keyValueStore.keyCount === undefined && keys.length === KV_KEYS_LIMIT;
     const n = outputKeys.length;
-    const keyCountLabel = kvTruncated ? `at least ${KV_KEYS_LIMIT} keys` : `${n} ${n === 1 ? 'key' : 'keys'}`;
+    // On truncation the fetched window itself may still hold INPUT; the output-key floor is
+    // one lower than KV_KEYS_LIMIT whenever it does, or the label overstates by one.
+    const truncatedFloor = KV_KEYS_LIMIT - (keys.length - outputKeys.length);
+    const keyCountLabel = kvTruncated ? `at least ${truncatedFloor} keys` : `${n} ${n === 1 ? 'key' : 'keys'}`;
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
