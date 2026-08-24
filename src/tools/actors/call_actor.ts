@@ -31,6 +31,7 @@ import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/acto
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
+    isActorInputValidationError,
     isActorRunLimitError,
     isMemoryQuotaError,
     isPermissionApprovalError,
@@ -40,6 +41,7 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { logHttpError } from '../../utils/logging.js';
 import {
+    buildInvalidInputTexts,
     respondAborted,
     respondRaw,
     respondServerError,
@@ -97,6 +99,8 @@ type CallActorErrorResponseParams = {
     mcpSessionId?: string;
     /** Names of all currently loaded tools — gates which recovery tools this error may name. */
     loadedToolNames: readonly string[];
+    /** Actor's input schema, echoed back only on a confirmed platform input-validation error. */
+    inputSchema?: ToolInputSchema;
 };
 
 /**
@@ -173,7 +177,7 @@ export function buildCallActorAppsDescription(ctx: ToolDescriptionContext = ALL_
 }
 
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ToolResponse {
-    const { actorName, error, actorId, mcpSessionId, loadedToolNames } = params;
+    const { actorName, error, actorId, mcpSessionId, loadedToolNames, inputSchema } = params;
 
     if (isPermissionApprovalError(error)) {
         logHttpError(error, 'Failed to call Actor — permission approval required', {
@@ -213,6 +217,14 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
             error,
             detail: APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
             actorId,
+        });
+    }
+
+    // Checked before the generic fallback below: the Actor was found fine, only its input wasn't.
+    if (isActorInputValidationError(error)) {
+        return respondUserError(buildInvalidInputTexts(actorName, errMsg, inputSchema), {
+            actorId,
+            detail: errMsg.slice(0, 200),
         });
     }
 
@@ -623,6 +635,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
     const waitSecs = toolArgs.taskMode ? undefined : parsed.waitSecs;
 
     let resolvedActorId: string | undefined;
+    let resolvedInputSchema: ToolInputSchema | undefined;
     try {
         const resolution = await resolveAndValidateActor({
             actorName: baseActorName,
@@ -634,6 +647,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
         }
 
         resolvedActorId = extractActorId(resolution.actor);
+        resolvedInputSchema = resolution.actor.inputSchema;
         const { apifyClient } = toolArgs;
         const abortSignal = toolArgs.signal;
 
@@ -686,6 +700,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
             actorId: resolvedActorId,
             mcpSessionId: toolArgs.mcpSessionId,
             loadedToolNames: toolArgs.loadedToolNames,
+            inputSchema: resolvedInputSchema,
         });
     }
 }

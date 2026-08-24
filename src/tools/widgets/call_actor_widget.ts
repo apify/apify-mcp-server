@@ -110,6 +110,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
         const { input, callOptions } = parsed;
 
         let resolvedActorId: string | undefined;
+        let resolvedInputSchema: ToolInputSchema | undefined;
         try {
             const resolution = await resolveAndValidateActor({
                 actorName: baseActorName,
@@ -121,6 +122,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
             }
 
             resolvedActorId = extractActorId(resolution.actor);
+            resolvedInputSchema = resolution.actor.inputSchema;
             const { apifyClient } = toolArgs;
 
             const actorClient = apifyClient.actor(baseActorName);
@@ -142,6 +144,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
                 actorId: resolvedActorId,
                 mcpSessionId: toolArgs.mcpSessionId,
                 loadedToolNames: toolArgs.loadedToolNames,
+                inputSchema: resolvedInputSchema,
             });
         }
     },

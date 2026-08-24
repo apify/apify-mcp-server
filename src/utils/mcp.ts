@@ -2,7 +2,13 @@ import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/typ
 import { ApifyApiError } from 'apify-client';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import type { AjvErrorDetails, ApifyRequestParams, FailureCategory, ToolTelemetryContext } from '../types.js';
+import type {
+    AjvErrorDetails,
+    ApifyRequestParams,
+    FailureCategory,
+    ToolInputSchema,
+    ToolTelemetryContext,
+} from '../types.js';
 import { ACTOR_RUN_LIMIT_MESSAGE, isActorRunLimitError, isCannotPublishTaskError } from './apify_errors.js';
 import { wrapJsonText } from './encode_text.js';
 import { getHttpStatusCode } from './logging.js';
@@ -303,4 +309,13 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
     }
     const hint = getHttpErrorHint(getHttpStatusCode(error)) ?? 'Verify the tool name and input parameters.';
     return `Error calling tool "${toolName}": ${msg}. ${hint}`;
+}
+
+/** Texts for a confirmed platform input-validation error — same shape wherever start() can throw one. */
+export function buildInvalidInputTexts(actorName: string, errMsg: string, inputSchema?: ToolInputSchema): string[] {
+    return [
+        `Failed to call Actor '${actorName}': ${errMsg}`,
+        `Please ensure the input is correct and matches the Actor's input schema.`,
+        ...(inputSchema ? [`Input schema:\n${wrapJsonText(inputSchema)}`] : []),
+    ];
 }
