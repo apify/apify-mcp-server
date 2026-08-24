@@ -4,6 +4,7 @@ import {
     APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
     APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
+    APIFY_ERROR_TYPE_INVALID_INPUT,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
 } from '../const.js';
 
@@ -29,6 +30,14 @@ export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
 /** True when the API rejects a supplied `publicConfig` field or a request to publish the task. */
 export function isCannotPublishTaskError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK;
+}
+
+/**
+ * True when the platform rejected `actor.start()` because the input fails the Actor's real
+ * schema — a stricter, server-side check than our own AJV gate's derived/shortened copy.
+ */
+export function isActorInputValidationError(error: unknown): error is ApifyApiError {
+    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_INVALID_INPUT;
 }
 
 /**

@@ -8,7 +8,7 @@
  */
 
 import { getApifyAPIBaseUrl } from '../../apify_client.js';
-import { HELPER_TOOLS, RAG_WEB_BROWSER } from '../../const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
 import { SERVER_MODE } from '../../types.js';
 
 /**
@@ -101,6 +101,8 @@ ${
         : ''
 }- **\`${HELPER_TOOLS.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
   \`${HELPER_TOOLS.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
+- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**
+  ${WEB_FETCH} fetches one specific URL and returns its full content verbatim; ${RAG_WEB_BROWSER} searches the web by query and returns content from the top results.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs \`${HELPER_TOOLS.ACTOR_CALL}\`:**
   Prefer dedicated tools when available; use \`${HELPER_TOOLS.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.
 ${
