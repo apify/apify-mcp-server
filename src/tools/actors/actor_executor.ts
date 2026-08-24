@@ -2,10 +2,10 @@ import log from '@apify/log';
 
 import { FAILURE_CATEGORY } from '../../const.js';
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
-import { buildInvalidInputTexts, isActorInputValidationError } from '../../utils/apify_errors.js';
+import { isActorInputValidationError } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { redactSkyfirePayId } from '../../utils/logging.js';
-import { respondUserError } from '../../utils/mcp.js';
+import { buildInvalidInputTexts, respondUserError } from '../../utils/mcp.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 
@@ -51,7 +51,7 @@ export const actorExecutor: ActorExecutor = {
                 mcpSessionId,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
             });
-            return respondUserError(buildInvalidInputTexts(actorFullName, error.message, params.inputSchema), {
+            return respondUserError(buildInvalidInputTexts(actorFullName, error.message), {
                 actorId: params.actorId,
                 detail: error.message.slice(0, 200),
             }) as ActorExecutionResult;

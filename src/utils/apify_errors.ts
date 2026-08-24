@@ -7,8 +7,6 @@ import {
     APIFY_ERROR_TYPE_INVALID_INPUT,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
 } from '../const.js';
-import type { ToolInputSchema } from '../types.js';
-import { wrapJsonText } from './encode_text.js';
 
 // Predicates that classify an error received from the Apify API by its `type`. Kept in one leaf
 // module (imports only const + apify-client) so logging, telemetry, payments, and the tool layer
@@ -35,15 +33,6 @@ export function isCannotPublishTaskError(error: unknown): error is ApifyApiError
  */
 export function isActorInputValidationError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_INVALID_INPUT;
-}
-
-/** Texts for a confirmed platform input-validation error — same shape wherever start() can throw one. */
-export function buildInvalidInputTexts(actorName: string, errMsg: string, inputSchema?: ToolInputSchema): string[] {
-    return [
-        `Failed to call Actor '${actorName}': ${errMsg}`,
-        `Please ensure the input is correct and matches the Actor's input schema.`,
-        ...(inputSchema ? [`Input schema:\n${wrapJsonText(inputSchema)}`] : []),
-    ];
 }
 
 /**

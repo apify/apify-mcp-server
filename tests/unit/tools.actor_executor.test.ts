@@ -149,8 +149,6 @@ describe('actorExecutor', () => {
     });
 
     describe('platform input-validation error', () => {
-        const INPUT_SCHEMA = { type: 'object', properties: { query: { type: 'string' } } } as const;
-
         function invalidInputError(message: string): ApifyApiError {
             return new ApifyApiError(
                 { data: { error: { type: 'invalid-input', message } }, status: 400 } as AxiosResponse,
@@ -158,8 +156,8 @@ describe('actorExecutor', () => {
             );
         }
 
-        it('returns the schema + platform message instead of throwing, on a confirmed invalid-input error', async () => {
-            const { params } = buildParams({ query: 'foo' }, { actorId: 'actor-1', inputSchema: INPUT_SCHEMA });
+        it('returns the platform message instead of throwing, on a confirmed invalid-input error (no schema — already in tools/list)', async () => {
+            const { params } = buildParams({ query: 'foo' }, { actorId: 'actor-1' });
             params.apifyClient = {
                 ...params.apifyClient,
                 actor: () => ({
@@ -171,8 +169,8 @@ describe('actorExecutor', () => {
 
             const text = (result?.content ?? []).map(textOf).join('\n');
             expect(text).toContain('query: must be a non-empty string');
-            expect(text).toContain(JSON.stringify(INPUT_SCHEMA));
             expect(text).toContain('Please ensure the input is correct');
+            expect(text).not.toContain('Input schema');
         });
 
         it('rethrows any other actor.start() error unchanged', async () => {

@@ -31,7 +31,6 @@ import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/acto
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
-    buildInvalidInputTexts,
     isActorInputValidationError,
     isActorRunLimitError,
     isMemoryQuotaError,
@@ -42,6 +41,7 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { logHttpError } from '../../utils/logging.js';
 import {
+    buildInvalidInputTexts,
     respondAborted,
     respondRaw,
     respondServerError,

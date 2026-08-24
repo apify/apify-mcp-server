@@ -475,8 +475,6 @@ export type ActorExecutionParams = {
     actorFullName: string;
     /** Actor's platform ID — echoed into telemetry on a platform input-validation error. */
     actorId?: string;
-    /** Actor's input schema — echoed back verbatim on a platform input-validation error. */
-    inputSchema?: ToolInputSchema;
     /** Input to pass to the Actor (payment fields already stripped) */
     input: Record<string, unknown>;
     /** Apify client (may include payment headers) */

@@ -242,7 +242,6 @@ export async function dispatchToolCall(params: {
                 const executorResult = await actorExecutor.executeActorTool({
                     actorFullName: tool.actorFullName,
                     actorId: tool.actorId,
-                    inputSchema: tool.inputSchema,
                     input: toolArgs,
                     apifyClient,
                     callOptions: { memory: tool.memoryMbytes },
