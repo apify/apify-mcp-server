@@ -439,17 +439,24 @@ type KvSummary =
 /**
  * `buildRunKeyValueStore` omits `keyCount` on truncation; surface that as "at least N keys"
  * instead of silently substituting `keys.length`.
+ *
+ * The INPUT record (every run's own input echoed back by the platform) never counts: it is
+ * not run output, and advertising it steers agents into get-key-value-store-record detours
+ * when the real output sits in the dataset. `structuredContent.keys` still carries it.
  */
 function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     const kvId = keyValueStore?.id;
     const keys = keyValueStore?.keys ?? [];
-    if (!kvId || keys.length === 0) {
+    const outputKeys = keys.filter((key) => key !== 'INPUT');
+    if (!kvId || outputKeys.length === 0) {
         return { hasKv: false, summarySuffix: '' };
     }
-    const reportedKeyCount = keyValueStore.keyCount;
-    const kvTruncated = reportedKeyCount === undefined && keys.length === KV_KEYS_LIMIT;
-    const n = reportedKeyCount ?? keys.length;
-    const keyCountLabel = kvTruncated ? `at least ${KV_KEYS_LIMIT} keys` : `${n} ${n === 1 ? 'key' : 'keys'}`;
+    const kvTruncated = keyValueStore.keyCount === undefined && keys.length === KV_KEYS_LIMIT;
+    const n = outputKeys.length;
+    // On truncation the fetched window itself may still hold INPUT; the output-key floor is
+    // one lower than KV_KEYS_LIMIT whenever it does, or the label overstates by one.
+    const truncatedFloor = KV_KEYS_LIMIT - (keys.length - outputKeys.length);
+    const keyCountLabel = kvTruncated ? `at least ${truncatedFloor} keys` : `${n} ${n === 1 ? 'key' : 'keys'}`;
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
@@ -499,12 +506,14 @@ function buildSucceededSummaryNextStep(
         };
     }
 
-    // Metadata can report itemCount === 0 briefly after SUCCEEDED (eventual consistency). Surface the
-    // same fetch-first guidance as TIMED-OUT with an empty partial dataset — never imply "re-run only".
+    // Metadata can report itemCount === 0 after SUCCEEDED even past the lag-fallback probe window
+    // (eventual consistency). The zero is unverified, so the summary must not state "no items" as a
+    // conclusion — agents quote the summary and give up on it (observed in web-fetch evals: a run
+    // with an item was reported as blocked). The nextStep is the only place a conclusion may form.
     if (itemCount === 0 && datasetId) {
         return {
-            summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
+            summary: `SUCCEEDED in ${runTimeSecs}s. Dataset item count reads 0 - counts can lag right after a run finishes.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
+            nextStep: `Fetch ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) before concluding the run produced no output.${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 
