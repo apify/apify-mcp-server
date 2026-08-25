@@ -130,6 +130,16 @@ describe('Structured Output Schemas', () => {
         });
     });
 
+    describe('actorRunOutputSchema', () => {
+        // buildStorageEntries (actor_run_response.ts) omits the whole map unless `default` is
+        // present, so every emitted `storages.datasets`/`storages.keyValueStores` has it (issue #1121).
+        it('requires the default alias on both storage maps', () => {
+            const { storages } = actorRunOutputSchema.properties;
+            expect(storages.properties.datasets.required).toEqual(['default']);
+            expect(storages.properties.keyValueStores.required).toEqual(['default']);
+        });
+    });
+
     describe('actorInfoSchema', () => {
         it('declares pictureUrl as an optional string', () => {
             expect(actorInfoSchema.properties.pictureUrl?.type).toBe('string');
