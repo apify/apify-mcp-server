@@ -1,5 +1,5 @@
 /**
- * Configuration for workflow evaluation system.
+ * Configuration for MCP agent evaluation system.
  *
  * The agent's system prompt and tools come from the SDK's `claude_code` presets, so
  * nothing here defines them. The judge runs on OpenRouter (temperature 0.15, see
