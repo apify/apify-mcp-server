@@ -586,7 +586,13 @@ export function buildStatusSummaryNextStep(params: {
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'SUCCEEDED':
-            return buildSucceededSummaryNextStep(runTimeSecs, statusMessage, dataset, keyValueStore, datasetMetadataFetched);
+            return buildSucceededSummaryNextStep(
+                runTimeSecs,
+                statusMessage,
+                dataset,
+                keyValueStore,
+                datasetMetadataFetched,
+            );
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
