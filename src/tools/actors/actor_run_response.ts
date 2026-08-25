@@ -482,6 +482,7 @@ function buildSucceededSummaryNextStep(
     statusMessage: string | null | undefined,
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
+    datasetMetadataFetched = true,
 ): { summary: string; nextStep: string } {
     const itemCount = dataset?.itemCount;
     const datasetId = dataset?.id;
@@ -500,8 +501,9 @@ function buildSucceededSummaryNextStep(
     // datasetId known but metadata unavailable (transient fetch failure on a terminal run). Don't
     // claim "no output found" — point the agent at dataset items so they can verify directly.
     if (itemCount === undefined && datasetId) {
+        const metadataMsg = datasetMetadataFetched ? ' Dataset metadata unavailable.' : '';
         return {
-            summary: `SUCCEEDED in ${runTimeSecs}s. Dataset metadata unavailable.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
+            summary: `SUCCEEDED in ${runTimeSecs}s.${metadataMsg}${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
             nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to inspect output.`,
         };
     }
@@ -567,8 +569,9 @@ export function buildStatusSummaryNextStep(params: {
     run: ActorRun;
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
+    datasetMetadataFetched?: boolean;
 }): { summary: string; nextStep: string } {
-    const { run, dataset, keyValueStore } = params;
+    const { run, dataset, keyValueStore, datasetMetadataFetched = true } = params;
     const { id: runId, status, statusMessage } = run;
     // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
@@ -597,7 +600,13 @@ export function buildStatusSummaryNextStep(params: {
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'SUCCEEDED':
-            return buildSucceededSummaryNextStep(runTimeSecs, statusMessage, dataset, keyValueStore);
+            return buildSucceededSummaryNextStep(
+                runTimeSecs,
+                statusMessage,
+                dataset,
+                keyValueStore,
+                datasetMetadataFetched,
+            );
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
