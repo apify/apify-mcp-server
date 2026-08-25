@@ -2,16 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.15.2 - **not yet released**
+## [0.15.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.2) (2026-08-25)
 
 ### 🚀 Features
 
 - Prefix MCP-proxied tool names with Actor tool name ([#1279](https://github.com/apify/apify-mcp-server/pull/1279)) ([145460d](https://github.com/apify/apify-mcp-server/commit/145460d8363acd43e09cc49922a3d3464a6e3c8d)) by [@jirispilka](https://github.com/jirispilka), closes [#1277](https://github.com/apify/apify-mcp-server/issues/1277)
 - **evals:** Trace the agent conversation to Langfuse ([#1239](https://github.com/apify/apify-mcp-server/pull/1239)) ([0396e67](https://github.com/apify/apify-mcp-server/commit/0396e67f679011838927661b315231c6d3dd188a)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Return task input verbatim and align task tools with the API ([#1293](https://github.com/apify/apify-mcp-server/pull/1293)) ([91ee491](https://github.com/apify/apify-mcp-server/commit/91ee491b7337575f8ba747ad7b39d64815659d4c)) by [@jirispilka](https://github.com/jirispilka)
+- Add apify&#x2F;web-fetch as a default Actor tool ([#1298](https://github.com/apify/apify-mcp-server/pull/1298)) ([67a8750](https://github.com/apify/apify-mcp-server/commit/67a8750b8e0c302018a2e048a03be59cf3500beb)) by [@jirispilka](https://github.com/jirispilka)
+- Return input schema on start() invalid-input errors ([#1275](https://github.com/apify/apify-mcp-server/pull/1275)) ([df612ef](https://github.com/apify/apify-mcp-server/commit/df612ef571b2866f2541823d3d31ff4b86f1aa23)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Gate the Actor-not-found recovery hint on the loaded tools ([#1302](https://github.com/apify/apify-mcp-server/pull/1302)) ([9876f54](https://github.com/apify/apify-mcp-server/commit/9876f54780042bb1a34eef9301fc3bb0ab18ce39)) by [@jirispilka](https://github.com/jirispilka)
+- Keep cross-tool references out of task tool summaries ([#1295](https://github.com/apify/apify-mcp-server/pull/1295)) ([7061e3e](https://github.com/apify/apify-mcp-server/commit/7061e3e6e2649fdb9ce9d85947f1cdc01f9021d0)) by [@jirispilka](https://github.com/jirispilka)
+- Remove misleading dataset metadata error on abort (closes #1183) ([#1200](https://github.com/apify/apify-mcp-server/pull/1200)) ([bcce612](https://github.com/apify/apify-mcp-server/commit/bcce612c45dba4bb2d2974c1984f53c460ca17ba)) by [@RohithPariki](https://github.com/RohithPariki), closes [#1183](https://github.com/apify/apify-mcp-server/issues/1183)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.15.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.1) (2026-08-20)
 
 ### 🚀 Features
