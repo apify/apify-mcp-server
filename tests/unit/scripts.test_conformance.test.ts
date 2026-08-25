@@ -48,21 +48,15 @@ describe('test_conformance.sh', () => {
         rmSync(stubDir, { recursive: true, force: true });
     });
 
-    it('redacts the raw and percent-encoded token and preserves a successful exit code', () => {
-        const result = runScript(0);
+    it.each([
+        ['a successful run', 0],
+        ['a failing run', 5],
+    ])('redacts the raw and percent-encoded token and preserves the exit code on %s', (_name, stubExitCode) => {
+        const result = runScript(stubExitCode);
         const output = result.stdout + result.stderr;
 
         expect(output).not.toContain(FAKE_TOKEN);
         expect(output).not.toContain(FAKE_TOKEN_ENCODED);
-        expect(result.status).toBe(0);
-    });
-
-    it('redacts the token on a failing run and preserves the modern suite exit code', () => {
-        const result = runScript(5);
-        const output = result.stdout + result.stderr;
-
-        expect(output).not.toContain(FAKE_TOKEN);
-        expect(output).not.toContain(FAKE_TOKEN_ENCODED);
-        expect(result.status).toBe(5);
+        expect(result.status).toBe(stubExitCode);
     });
 });
