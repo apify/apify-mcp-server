@@ -9,6 +9,36 @@ fi
 
 export PORT="${PORT:-3001}"
 
+# The conformance runner accepts the token only via --server-url, so it stays visible in local
+# process arguments (ps, /proc/<pid>/cmdline). Fixing that needs header-based auth support in
+# the upstream conformance runner; only terminal output is redacted here.
+encoded_token=$(node -p 'encodeURIComponent(process.env.APIFY_TOKEN)')
+
+# Redacts both the raw and percent-encoded token from a command's combined output. Line-buffered
+# via fflush() so a long-running suite doesn't look hung; awk (not sed -u/-l) behaves the same on
+# GNU (CI) and BSD (local macOS) since the unbuffering flags differ between the two.
+redact_tokens() {
+    awk -v raw="$APIFY_TOKEN" -v enc="$encoded_token" '
+        # Plain substring replacement (not gsub, which treats its pattern as a regex and would
+        # mishandle a token containing regex metacharacters).
+        function replace_literal(line, needle,    result, pos) {
+            if (needle == "") return line
+            result = ""
+            while ((pos = index(line, needle)) > 0) {
+                result = result substr(line, 1, pos - 1) "***REDACTED***"
+                line = substr(line, pos + length(needle))
+            }
+            return result line
+        }
+        {
+            line = replace_literal($0, raw)
+            line = replace_literal(line, enc)
+            print line
+            fflush()
+        }
+    '
+}
+
 run_conformance() {
     local spec_version="$1"
     local expected_failures_file="$2"
@@ -21,7 +51,7 @@ run_conformance() {
         --server-url "http://127.0.0.1:$PORT/?token=$APIFY_TOKEN" \
         --suite all \
         --spec-version "$spec_version" \
-        --expected-failures "$expected_failures_file"
+        --expected-failures "$expected_failures_file" 2>&1 | redact_tokens
 }
 
 pnpm run build || exit $?
