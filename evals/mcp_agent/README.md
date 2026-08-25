@@ -1,4 +1,4 @@
-# Workflow evaluation system
+# MCP agent evaluation system
 
 Tests Claude Code performing multi-turn conversations with Apify MCP tools, evaluated by an LLM judge. The agent under test is the real Claude Code harness, driven headlessly through the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview), so a run exercises the server the way a Claude Code user does. Results (traces, scores, dataset, experiment runs) are recorded in **Langfuse**: the self-hosted instance at [langfuse.apify.dev](https://langfuse.apify.dev), project `MCP Workflow`.
 
@@ -8,11 +8,11 @@ Tests Claude Code performing multi-turn conversations with Apify MCP tools, eval
 dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge -> scores
 ```
 
-1. **Dataset.** Test cases live in the Langfuse dataset `workflow-evals` and are edited in its UI. A run reads them and never writes back.
+1. **Dataset.** Test cases live in the Langfuse dataset `mcp-agent-evals` and are edited in its UI. A run reads them and never writes back.
 2. **Experiment.** The run executes the active items matching `--id`/`--category` as one Langfuse experiment, `--concurrency` items at a time.
 3. **Conversation.** Each item runs a Claude Code agent (Claude Agent SDK) that spawns its own fresh Apify MCP server and drives it to answer the query.
 4. **Judge.** An LLM judge scores the finished conversation against the item's `expectedOutput`.
-5. **Scores.** The verdict lands as `workflow_judge` (the pass/fail gate) and the conversation's tokens as `total_tokens`, plus `pass_rate` on the run. The console prints failures and the run URL; per-item detail is in Langfuse.
+5. **Scores.** The verdict lands as `mcp_agent_judge` (the pass/fail gate) and the conversation's tokens as `total_tokens`, plus `pass_rate` on the run. The console prints failures and the run URL; per-item detail is in Langfuse.
 
 ---
 
@@ -39,10 +39,10 @@ export LANGFUSE_BASE_URL="https://langfuse.apify.dev"
 pnpm run build
 
 # 3. Run tests
-pnpm run evals:workflow
+pnpm run evals:mcp-agent
 ```
 
-Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 4 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), and `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain.
+Run `pnpm run evals:mcp-agent --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 4 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), and `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain.
 
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
@@ -50,7 +50,7 @@ Run `pnpm run evals:workflow --help` for the full option list. `--category` and 
 
 **Editing test cases:** edit the items in the Langfuse UI, then commit the change here:
 ```bash
-pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot.json (no build, no Apify/OpenRouter keys)
+pnpm run evals:mcp-agent:export-dataset   # rewrites dataset_snapshot.json (no build, no Apify/OpenRouter keys)
 ```
 
 ---
@@ -69,7 +69,7 @@ pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot.json (no bu
 
 ### 1. The Langfuse dataset is the source of truth
 
-**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. `evals:workflow:export-dataset` writes the active items back to `dataset_snapshot.json`; there is no importer and nothing reads the snapshot at runtime.
+**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. `evals:mcp-agent:export-dataset` writes the active items back to `dataset_snapshot.json`; there is no importer and nothing reads the snapshot at runtime.
 
 **Why:**
 - A UI edit takes effect on the next run. An earlier version synced a local file into the dataset first, which silently overwrote UI edits
@@ -80,7 +80,7 @@ Every active item is validated when the dataset is fetched, so a bad UI edit fai
 
 **Trade-off:** the dataset is mutable, so a run is only reproducible against the dataset as it was. Langfuse keeps item versions.
 
-**Location:** `langfuse_dataset.ts`, `run_workflow_evals.ts`, `export_dataset.ts`
+**Location:** `langfuse_dataset.ts`, `run_mcp_agent_evals.ts`, `export_dataset.ts`
 
 ### 2. MCP server isolation per test
 
@@ -114,7 +114,7 @@ The server is registered with `alwaysLoad: true`. Left at the default, its tools
 
 ### 4. Strict pass/fail gated on the requested count
 
-**Decision:** Exit code 0 only when every requested item ran and scored `workflow_judge === 1`.
+**Decision:** Exit code 0 only when every requested item ran and scored `mcp_agent_judge === 1`.
 
 **Why:**
 - Clear CI/CD signal, no ambiguity about which tests are critical
@@ -140,7 +140,7 @@ AGENT: [Called tool: search-actors with args: {"keywords":"google maps","limit":
 AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 ```
 
-**Location:** `workflow_judge.ts`
+**Location:** `mcp_agent_judge.ts`
 
 ### 6. Judge client shared, agent isolated
 
@@ -150,7 +150,7 @@ AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 - The judge client is stateless (OpenRouter/OpenAI SDK), so sharing it saves initialization overhead with no contamination risk
 - The agent holds conversation and Apify state, so it cannot be shared
 
-**Location:** `run_workflow_evals.ts`
+**Location:** `run_mcp_agent_evals.ts`
 
 ### 7. Agent vs judge models
 
@@ -206,12 +206,12 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `sdk_conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
 - `llm_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
 - `langfuse_observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
-- `workflow_judge.ts` - Judge evaluation
+- `mcp_agent_judge.ts` - Judge evaluation
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
 - `langfuse_dataset.ts` - Test case schema, dataset item mapping and validation, dataset fetch
 - `langfuse_experiment.ts` - Experiment task, evaluators, run summary and exit gate
-- `run_workflow_evals.ts` - Main CLI entry
-- `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:workflow:export-dataset`)
+- `run_mcp_agent_evals.ts` - Main CLI entry
+- `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
 - `dataset_snapshot.json` - Exported copy of the dataset, not read at runtime
 
 ## Configuration
@@ -233,10 +233,10 @@ Both entry points fail fast (before any test runs) listing every missing variabl
 
 Results are recorded in Langfuse, not to a local file. Each run:
 
-- **Reads the dataset** `workflow-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
+- **Reads the dataset** `mcp-agent-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
 - **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
 - **Traces** every item as one trace. Its root output is the judge verdict plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed), and a generation for the judge call. See design decision 9.
-- **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) is the strict gate, and `total_tokens` is the agent tokens billed, omitted when the provider reported no usage so an unmeasured run cannot look like a free one.
+- **Scores** each item: `mcp_agent_judge` (`1` on a PASS verdict, comment = judge reason) is the strict gate, and `total_tokens` is the agent tokens billed, omitted when the provider reported no usage so an unmeasured run cannot look like a free one.
 - **Scores the run** with `pass_rate`: passing items over items requested, so runs stay comparable even when items were dropped.
 
 ### Concurrency

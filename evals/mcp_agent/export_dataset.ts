@@ -8,7 +8,7 @@
  * git history and keeps the cases somewhere other than the Langfuse database.
  *
  * Usage:
- *   pnpm run evals:workflow:export-dataset
+ *   pnpm run evals:mcp-agent:export-dataset
  */
 
 // Must be the first import: config modules read process.env at load time.
@@ -24,7 +24,7 @@ import { hideBin } from 'yargs/helpers';
 
 import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
 import { sanitizeProcessEnv } from './config.js';
-import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
+import { fetchMcpAgentCases, MCP_AGENT_DATASET_NAME } from './langfuse_dataset.js';
 
 // Before any client is constructed below: the Langfuse SDK reads process.env itself and
 // passes it to node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
@@ -36,7 +36,7 @@ const SNAPSHOT_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'd
 async function main() {
     const argv = (await yargs(hideBin(process.argv))
         .options({
-            dataset: { type: 'string', description: 'Langfuse dataset to export', default: WORKFLOW_DATASET_NAME },
+            dataset: { type: 'string', description: 'Langfuse dataset to export', default: MCP_AGENT_DATASET_NAME },
         })
         .help().argv) as { dataset: string };
 
@@ -47,7 +47,7 @@ async function main() {
         process.exit(1);
     }
 
-    const cases = await fetchWorkflowCases(new LangfuseClient(), argv.dataset);
+    const cases = await fetchMcpAgentCases(new LangfuseClient(), argv.dataset);
     // Drop the raw item: the snapshot holds test cases, not Langfuse bookkeeping.
     const testCases = cases.map(({ item, ...testCase }) => testCase);
 
