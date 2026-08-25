@@ -475,7 +475,7 @@ function buildSucceededSummaryNextStep(
     statusMessage: string | null | undefined,
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
-    datasetMetadataFetched: boolean = true,
+    datasetMetadataFetched = true,
 ): { summary: string; nextStep: string } {
     const itemCount = dataset?.itemCount;
     const datasetId = dataset?.id;
