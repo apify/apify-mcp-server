@@ -18,16 +18,16 @@
     "reference": "The agent must find tik tok scraper, call it for natgeo profile, return the latest post and present it to the user."
   },
   {
+    "id": "discover-and-call-actor-mcp-tool",
+    "category": "mcp",
+    "query": "List the tools exposed by apify/example-mcp-server. Then use its add tool to add 17 and 25, and tell me the sum.",
+    "reference": "The agent must first call fetch-actor-details with actor='apify/example-mcp-server' and output={ mcpTools: true }. It must then call call-actor with actor='apify/example-mcp-server:add' and input={ firstNumber: 17, secondNumber: 25 }. PASS only if both calls happened and the final answer states 42."
+  },
+  {
     "id": "fetch-details-mcp-tools-list",
     "category": "mcp",
     "query": "Show me what tools are available in the apify/example-mcp-server MCP server",
     "reference": "The agent must use fetch-actor-details with output={ mcpTools: true } to list available tools. The response should present the list of tools with their names and descriptions."
-  },
-  {
-    "id": "fetch-details-mcp-tools-then-call",
-    "category": "mcp",
-    "query": "List tools from apify/actors-mcp-server and then call the fetch-apify-docs tool from the Actor MCP server apify/actors-mcp-server to get docs from https://docs.apify.com",
-    "reference": "The agent must first use fetch-actor-details with output={ mcpTools: true } to discover tools, then use call-actor with actor='apify/actors-mcp-server:fetch-apify-docs' and proper input to call the specific tool."
   },
   {
     "id": "fetch-details-non-mcp-actor-graceful",
