@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.15.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Require default alias on actorRunOutputSchema storage maps ([#1311](https://github.com/apify/apify-mcp-server/pull/1311)) ([158a440](https://github.com/apify/apify-mcp-server/commit/158a44022bcd37ab5a20004b8726c78c95f754f9)) by [@MQ37](https://github.com/MQ37), closes [#1121](https://github.com/apify/apify-mcp-server/issues/1121)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.15.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.2) (2026-08-25)
 
 ### 🚀 Features
