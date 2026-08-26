@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.15.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Redact tokens from local conformance output ([#1315](https://github.com/apify/apify-mcp-server/pull/1315)) ([c3c5f6f](https://github.com/apify/apify-mcp-server/commit/c3c5f6f09510062b298c26076f2504b393553855)) by [@SomSamantray](https://github.com/SomSamantray), closes [#1245](https://github.com/apify/apify-mcp-server/issues/1245)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.15.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.3) (2026-08-26)
 
 ### 🐛 Bug Fixes
