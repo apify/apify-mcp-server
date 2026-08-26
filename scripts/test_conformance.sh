@@ -6,8 +6,6 @@ if [[ -z "${APIFY_TOKEN:-}" ]]; then
     echo "APIFY_TOKEN is not set." >&2
     exit 1
 fi
-export APIFY_TOKEN
-
 export PORT="${PORT:-3001}"
 
 # The conformance runner accepts the token only via --server-url, so it stays visible in local
