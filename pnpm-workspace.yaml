@@ -40,7 +40,7 @@ strictDepBuilds: false
 
 # Dependency version overrides. pnpm 11 reads these from the workspace manifest, not package.json.
 overrides:
-  "@modelcontextprotocol/sdk": "1.29.0"
+  "@modelcontextprotocol/sdk": "1.30.0"
 
 # Required by pnpm v10+ modern `pnpm deploy`: workspace deps get copied ("injected")
 # into consumers' node_modules instead of symlinked, so deploy output is portable.
