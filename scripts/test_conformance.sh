@@ -8,26 +8,21 @@ if [[ -z "${APIFY_TOKEN:-}" ]]; then
 fi
 export PORT="${PORT:-3001}"
 
-# The conformance runner accepts the token only via --server-url, so it stays visible in local
-# process arguments (ps, /proc/<pid>/cmdline). Fixing that needs header-based auth support in
-# the upstream conformance runner; only terminal output is redacted here.
+# Runner only accepts auth via --server-url, so the token stays visible in local process args
+# (ps, /proc/<pid>/cmdline) -- needs upstream header-based auth to fix. Only output is redacted here.
 export ENCODED_APIFY_TOKEN
 ENCODED_APIFY_TOKEN=$(node -p 'encodeURIComponent(process.env.APIFY_TOKEN)')
 
-# Redacts both the raw and percent-encoded token from a command's combined output. Line-buffered
-# via fflush() so a long-running suite doesn't look hung; awk (not sed -u/-l) behaves the same on
-# GNU (CI) and BSD (local macOS) since the unbuffering flags differ between the two. Reads the
-# token via ENVIRON rather than -v: awk's -v assignment runs backslash-escape processing (POSIX),
-# so a token containing a literal backslash would silently fail to match and leak unredacted;
-# ENVIRON values aren't escape-processed. This also keeps the token out of awk's own argv.
+# Redacts raw + percent-encoded token from combined output, flushing every line so a long-running
+# suite doesn't look hung. Reads via ENVIRON, not awk's -v -- -v backslash-escapes its value, so a
+# token with a literal backslash would silently leak unredacted; ENVIRON also keeps it out of argv.
 redact_tokens() {
     awk '
         BEGIN {
             raw = ENVIRON["APIFY_TOKEN"]
             enc = ENVIRON["ENCODED_APIFY_TOKEN"]
         }
-        # Plain substring replacement (not gsub, which treats its pattern as a regex and would
-        # mishandle a token containing regex metacharacters).
+        # Substring replace, not gsub -- gsub treats its pattern as regex, mishandling token metacharacters.
         function replace_literal(line, needle,    result, pos) {
             if (needle == "") return line
             result = ""
@@ -59,9 +54,8 @@ run_conformance() {
         --suite all \
         --spec-version "$spec_version" \
         --expected-failures "$expected_failures_file" 2>&1 | redact_tokens
-    # Capture the conformance runner's own exit code explicitly: under pipefail, the pipeline's
-    # status is the rightmost nonzero exit code, so a redact_tokens/awk failure could otherwise
-    # mask the runner's real status.
+    # PIPESTATUS[0]: under pipefail the pipeline's status is the rightmost nonzero code, which
+    # could otherwise hide the runner's real exit behind an awk failure.
     return "${PIPESTATUS[0]}"
 }
 
