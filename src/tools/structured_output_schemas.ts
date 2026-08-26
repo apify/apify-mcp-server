@@ -491,6 +491,8 @@ export const actorRunOutputSchema = {
                     properties: {
                         default: buildDatasetEntrySchema(),
                     },
+                    // `buildStorageEntries` (actor_run_response.ts) omits this whole map unless `default` is present.
+                    required: ['default'],
                     additionalProperties: buildDatasetEntrySchema(),
                 },
                 keyValueStores: {
@@ -500,6 +502,8 @@ export const actorRunOutputSchema = {
                     properties: {
                         default: buildKeyValueStoreEntrySchema(),
                     },
+                    // `buildStorageEntries` (actor_run_response.ts) omits this whole map unless `default` is present.
+                    required: ['default'],
                     additionalProperties: buildKeyValueStoreEntrySchema(),
                 },
             },
