@@ -199,7 +199,7 @@ describe('getMcpToolsMessage()', () => {
         expect(message).toBe('Note: This Actor is not an MCP server and does not expose MCP tools.');
     });
 
-    it('reports the canonical standby-without-MCP message, matching call-actor\'s rejection', async () => {
+    it("reports the canonical standby-without-MCP message, matching call-actor's rejection", async () => {
         const actorName = 'acme/standby-empty';
         actorDefinitionCache.set(actorName, {
             definition: { id: 'standbyempty', actorFullName: actorName },
