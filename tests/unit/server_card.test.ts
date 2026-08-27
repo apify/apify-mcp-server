@@ -1,9 +1,8 @@
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
-import { APIFY_LOGO_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
+import { APIFY_DOCS_MCP_URL, APIFY_LOGO_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
 import { getServerCard, getServerInfo } from '../../src/server_card.js';
-import { getDefaultTools } from '../../src/tools/index.js';
 import type { ServerCardRemote, ServerCardRepository } from '../../src/types.js';
 import { readJsonFile } from '../../src/utils/generic.js';
 import { getPackageVersion } from '../../src/utils/version.js';
@@ -18,6 +17,25 @@ const serverJson = readJsonFile<{
 
 /** Registry schema constraint on `name`: reverse-DNS with exactly one forward slash. */
 const REGISTRY_NAME_PATTERN = /^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/;
+
+/** Registry schema constraint on `description`. */
+const REGISTRY_DESCRIPTION_MAX_LENGTH = 100;
+
+/**
+ * The tools a default session serves, minus the client-gated `report-problem`. Pinned as a
+ * literal so a change to the default set shows up in the diff instead of passing silently.
+ */
+const EXPECTED_TOOL_NAMES = [
+    'search-actors',
+    'fetch-actor-details',
+    'call-actor',
+    'get-actor-run',
+    'get-dataset-items',
+    'get-key-value-store-record',
+    'abort-actor-run',
+    'search-apify-docs',
+    'fetch-apify-docs',
+];
 
 describe('getServerCard()', () => {
     it('inherits $schema from server.json', () => {
@@ -41,6 +59,12 @@ describe('getServerCard()', () => {
             expect(card.version).toBe(getPackageVersion());
         });
 
+        it('keeps description within the registry length limit', () => {
+            const card = getServerCard();
+
+            expect(card.description.length).toBeLessThanOrEqual(REGISTRY_DESCRIPTION_MAX_LENGTH);
+        });
+
         it('uses a name matching the registry reverse-DNS pattern', () => {
             const card = getServerCard();
 
@@ -58,7 +82,7 @@ describe('getServerCard()', () => {
             const card = getServerCard();
 
             expect(card.title).toBe(SERVER_TITLE);
-            expect(card.websiteUrl).toBe(APIFY_MCP_URL);
+            expect(card.websiteUrl).toBe(APIFY_DOCS_MCP_URL);
             expect(card.serverUrl).toBe(APIFY_MCP_URL);
         });
 
@@ -106,10 +130,10 @@ describe('getServerCard()', () => {
     });
 
     describe('tools', () => {
-        it('lists exactly the default-mode tools', () => {
+        it('lists exactly the tools a default session serves, without report-problem', () => {
             const card = getServerCard();
 
-            expect(card.tools.map((tool) => tool.name)).toEqual(getDefaultTools().map((tool) => tool.name));
+            expect(card.tools.map((tool) => tool.name)).toEqual(EXPECTED_TOOL_NAMES);
         });
 
         it('gives every tool a title, a description and annotations', () => {
@@ -141,7 +165,7 @@ describe('getServerInfo()', () => {
         expect(info.title).toBe(SERVER_TITLE);
         expect(info.version).toBe(getPackageVersion());
         expect(info.description).toBe(serverJson.description);
-        expect(info.websiteUrl).toBe(APIFY_MCP_URL);
+        expect(info.websiteUrl).toBe(APIFY_DOCS_MCP_URL);
         expect(info.icons).toEqual([{ src: APIFY_LOGO_URL, mimeType: 'image/png', sizes: ['180x180'] }]);
     });
 });

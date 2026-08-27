@@ -6,12 +6,14 @@ import {
     APIFY_FAVICON_URL,
     APIFY_LOGO_URL,
     APIFY_MCP_URL,
+    HELPER_TOOLS,
     SERVER_NAME,
     SERVER_TITLE,
 } from './const.js';
-import { getDefaultTools } from './tools/index.js';
 import type { ServerCard, ServerCardRemote, ServerCardRepository, ServerCardTool } from './types.js';
+import { SERVER_MODE } from './types.js';
 import { readJsonFile } from './utils/generic.js';
+import { getToolsForServerMode } from './utils/tools_loader.js';
 import { getPackageVersion } from './utils/version.js';
 
 /**
@@ -47,7 +49,7 @@ export function getServerInfo(): Implementation {
         title: SERVER_TITLE,
         version: getPackageVersion()!,
         description: serverJson.description,
-        websiteUrl: APIFY_MCP_URL,
+        websiteUrl: APIFY_DOCS_MCP_URL,
         icons: [...SERVER_ICONS],
     };
 }
@@ -55,18 +57,25 @@ export function getServerInfo(): Implementation {
 /**
  * Summarises the default tool set for the card.
  *
+ * Composes through `getToolsForServerMode` rather than `getDefaultTools`, because the latter
+ * returns only the default-enabled categories — it omits the run and storage tools that
+ * `call-actor` pulls in, which a real session always gets. `report-problem` is dropped: it is
+ * gated per client at serve time, so it does not belong in a static card.
+ *
  * Uses each tool's plain `description`, which by contract holds the render for consumers without
  * a session tool set — exactly the session-less case a static card describes. Only the default
  * server mode is described: the card is served from a single URL, and the modes differ only in
  * one tool description.
  */
 function getServerCardTools(): ServerCardTool[] {
-    return getDefaultTools().map((tool) => ({
-        name: tool.name,
-        title: tool.title,
-        description: tool.description,
-        annotations: tool.annotations,
-    }));
+    return getToolsForServerMode({}, [], SERVER_MODE.DEFAULT)
+        .filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT)
+        .map((tool) => ({
+            name: tool.name,
+            title: tool.title,
+            description: tool.description,
+            annotations: tool.annotations,
+        }));
 }
 
 /** Returns the MCP server card object. See {@link ServerCard} for why it is a hybrid shape. */
@@ -78,7 +87,7 @@ export function getServerCard(): ServerCard {
         title: SERVER_TITLE,
         description: serverJson.description,
         version: getPackageVersion()!,
-        websiteUrl: APIFY_MCP_URL,
+        websiteUrl: APIFY_DOCS_MCP_URL,
         repository: serverJson.repository,
         icons: [...SERVER_ICONS],
         remotes: serverJson.remotes,

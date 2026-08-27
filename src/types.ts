@@ -763,10 +763,12 @@ export type ServerCardTool = {
  *
  * Deliberately a hybrid of two shapes. The identity fields (`name`, `version`, `description`,
  * `websiteUrl`, `repository`, `icons`, `remotes`) follow the MCP registry schema, which is the
- * only stable dated schema published — both SEP-1649 and its successor SEP-2127 are still
- * drafts. The SEP-1649 fields (`serverInfo`, `protocolVersion`, `transport`, `capabilities`,
- * `authentication`, `iconUrl`) are kept so consumers of the previous shape keep working. The
- * registry schema never sets `additionalProperties: false`, so carrying both validates.
+ * only stable dated schema published — SEP-1649 was closed in favour of SEP-2127, and neither
+ * ever published a machine-readable schema. The SEP-1649 fields (`serverInfo`, `protocolVersion`,
+ * `transport`, `capabilities`, `authentication`, `iconUrl`) are kept so consumers reading those
+ * keep working; `version` and `tools` are not among them — both changed meaning when this card
+ * moved to the registry shape. The registry schema never sets `additionalProperties: false`, so
+ * carrying both validates.
  */
 export type ServerCard = {
     $schema: string;
@@ -785,7 +787,7 @@ export type ServerCard = {
         sizes: string[];
     }[];
     remotes: ServerCardRemote[];
-    /** Absolute MCP endpoint. Not a registry field; read by discovery scanners. */
+    /** Absolute MCP endpoint. Not a registry field; named by ora's server-card methodology. */
     serverUrl: string;
 
     // SEP-1649 compatibility.
@@ -809,6 +811,6 @@ export type ServerCard = {
         schemes: string[];
     };
 
-    /** Default-mode tools, generated from `getDefaultTools()` so the card cannot drift. */
+    /** Default-mode tools, composed the way a session composes them so the card cannot drift. */
     tools: ServerCardTool[];
 };
