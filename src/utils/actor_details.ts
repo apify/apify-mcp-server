@@ -2,6 +2,7 @@ import type { Build } from 'apify-client';
 
 import type { ApifyClient } from '../apify_client.js';
 import { CODE_RUNTIME_ACTOR_NAME } from '../const.js';
+import { ActorLoadError } from '../errors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
@@ -164,6 +165,12 @@ export async function getMcpToolsMessage(
     mcpSessionId?: string,
 ): Promise<string> {
     const resolution = await getActorToolResolutionCached(actorName, apifyClient);
+
+    // Same canonical wording call-actor rejects with, so an agent gets one consistent reason
+    // for this Actor regardless of which tool it asked.
+    if (resolution?.toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
+        return ActorLoadError.standbyWithoutMcpNotSupported(resolution.actorFullName).message;
+    }
 
     // Early return: not an MCP server
     if (resolution?.toolMode !== ACTOR_TOOL_MODE.MCP) {

@@ -198,4 +198,23 @@ describe('getMcpToolsMessage()', () => {
 
         expect(message).toBe('Note: This Actor is not an MCP server and does not expose MCP tools.');
     });
+
+    it('reports the canonical standby-without-MCP message, matching call-actor\'s rejection', async () => {
+        const actorName = 'acme/standby-empty';
+        actorDefinitionCache.set(actorName, {
+            definition: { id: 'standbyempty', actorFullName: actorName },
+            info: { id: 'standbyempty', isPublic: true, userId: 'owner', actorStandby: { isEnabled: true } },
+        } as unknown as ActorDefinitionWithInfo);
+
+        const message = await getMcpToolsMessage(
+            actorName,
+            stubApifyClient(async () => ({})),
+            'token',
+        );
+
+        expect(message).toBe(
+            'Actor "acme/standby-empty" runs in standby mode without an MCP server and has an empty input schema,' +
+                ' which is not supported yet.',
+        );
+    });
 });
