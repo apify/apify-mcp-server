@@ -55,17 +55,9 @@ export function getServerInfo(): Implementation {
 }
 
 /**
- * Summarises the default tool set for the card.
- *
- * Composes through `getToolsForServerMode` rather than `getDefaultTools`, because the latter
- * returns only the default-enabled categories — it omits the run and storage tools that
- * `call-actor` pulls in, which a real session always gets. `report-problem` is dropped: it is
- * gated per client at serve time, so it does not belong in a static card.
- *
- * Uses each tool's plain `description`, which by contract holds the render for consumers without
- * a session tool set — exactly the session-less case a static card describes. Only the default
- * server mode is described: the card is served from a single URL, and the modes differ only in
- * one tool description.
+ * Summarises the tools a default session serves. `getDefaultTools()` under-reports — it omits
+ * what `call-actor` pulls in — and `report-problem` is client-gated at serve time, so a static
+ * card cannot carry it. Each tool's plain `description` is by contract the session-less render.
  */
 function getServerCardTools(): ServerCardTool[] {
     return getToolsForServerMode({}, [], SERVER_MODE.DEFAULT)

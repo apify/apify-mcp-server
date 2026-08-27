@@ -761,14 +761,9 @@ export type ServerCardTool = {
 /**
  * MCP server card, served by `apify-mcp-server-internal` at `/.well-known/mcp/server-card.json`.
  *
- * Deliberately a hybrid of two shapes. The identity fields (`name`, `version`, `description`,
- * `websiteUrl`, `repository`, `icons`, `remotes`) follow the MCP registry schema, which is the
- * only stable dated schema published — SEP-1649 was closed in favour of SEP-2127, and neither
- * ever published a machine-readable schema. The SEP-1649 fields (`serverInfo`, `protocolVersion`,
- * `transport`, `capabilities`, `authentication`, `iconUrl`) are kept so consumers reading those
- * keep working; `version` and `tools` are not among them — both changed meaning when this card
- * moved to the registry shape. The registry schema never sets `additionalProperties: false`, so
- * carrying both validates.
+ * Deliberately hybrid: identity follows the MCP registry schema, the only stable dated one
+ * published; the SEP-1649 fields stay for consumers reading those, except `version` and `tools`,
+ * which changed meaning. The registry schema never sets `additionalProperties: false`, so both fit.
  */
 export type ServerCard = {
     $schema: string;
