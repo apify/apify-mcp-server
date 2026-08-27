@@ -154,10 +154,12 @@ export type WorkflowTaskOptions = {
  * Build the experiment task: per dataset item, a Claude Code agent run against its own
  * freshly spawned MCP server, then the judge.
  *
- * Harness errors (MCP spawn, Anthropic API, OpenRouter, judge) survive one retry at most
- * and are then left to throw, so `buildRunSummary` fails the run on the shortfall instead
- * of a broken harness looking like a failing eval. They are prefixed with the item id
- * because the SDK's own log line carries none.
+ * The agent run survives one retry on any failure. Judge API errors are retried by the
+ * OpenAI SDK itself (maxRetries 2, exponential backoff); this layer retries the judge only
+ * on a malformed answer, see workflow_judge.ts. Anything else is left to throw, so
+ * `buildRunSummary` fails the run on the shortfall instead of a broken harness looking like
+ * a failing eval. Errors are prefixed with the item id because the SDK's own log line
+ * carries none.
  */
 export function makeTask(options: WorkflowTaskOptions) {
     const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout, mcpToolsOnly } = options;
