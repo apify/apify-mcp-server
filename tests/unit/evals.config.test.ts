@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { findMissingEnvVars, sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/shared/config.js';
+import {
+    findMissingEnvVars,
+    ORCAROUTER_CONFIG,
+    sanitizeEnvValue,
+    sanitizeProcessEnv,
+} from '../../evals/shared/config.js';
 
 describe('sanitizeEnvValue', () => {
     it('passes through undefined and null', () => {
@@ -45,6 +50,7 @@ describe('findMissingEnvVars', () => {
     afterEach(() => {
         delete process.env.PHOENIX_API_KEY;
         delete process.env.OPENROUTER_API_KEY;
+        delete process.env.ORCAROUTER_API_KEY;
         delete process.env.LANGFUSE_SECRET_KEY;
     });
 
@@ -61,27 +67,48 @@ describe('findMissingEnvVars', () => {
             'OPENROUTER_API_KEY',
         ]);
     });
+
+    it('treats ORCAROUTER_API_KEY as a first-class provider key', () => {
+        process.env.ORCAROUTER_API_KEY = 'sk-orca-abc123';
+        expect(findMissingEnvVars(['ORCAROUTER_API_KEY'])).toEqual([]);
+    });
 });
 
 describe('sanitizeProcessEnv', () => {
     afterEach(() => {
         delete process.env.PHOENIX_API_KEY;
         delete process.env.OPENROUTER_API_KEY;
+        delete process.env.ORCAROUTER_API_KEY;
         delete process.env.LANGFUSE_SECRET_KEY;
     });
 
     it('sanitizes env vars in-place', () => {
         process.env.PHOENIX_API_KEY = 'key-with-newline\n';
         process.env.OPENROUTER_API_KEY = '  "quoted-key"\r\n';
+        process.env.ORCAROUTER_API_KEY = 'sk-orca-key\n';
         process.env.LANGFUSE_SECRET_KEY = 'sk-lf-secret\n';
         sanitizeProcessEnv();
         expect(process.env.PHOENIX_API_KEY).toBe('key-with-newline');
         expect(process.env.OPENROUTER_API_KEY).toBe('quoted-key');
+        expect(process.env.ORCAROUTER_API_KEY).toBe('sk-orca-key');
         expect(process.env.LANGFUSE_SECRET_KEY).toBe('sk-lf-secret');
     });
 
     it('leaves unset vars untouched', () => {
         sanitizeProcessEnv();
         expect(process.env.PHOENIX_API_KEY).toBeUndefined();
+    });
+});
+
+describe('ORCAROUTER_CONFIG', () => {
+    afterEach(() => {
+        delete process.env.ORCAROUTER_API_KEY;
+        delete process.env.ORCAROUTER_BASE_URL;
+    });
+
+    it('defaults to the OrcaRouter base URL and reads the API key from env', () => {
+        expect(ORCAROUTER_CONFIG.baseURL).toBe('https://api.orcarouter.ai/v1');
+        // Config consts are evaluated at import time, so unset ORCAROUTER_API_KEY reads as ''.
+        expect(typeof ORCAROUTER_CONFIG.apiKey).toBe('string');
     });
 });

@@ -84,7 +84,7 @@ function formatConversationForJudge(conversation: ConversationHistory): string {
 
 /**
  * Judge output as it comes back over the wire. JUDGE_RESPONSE_SCHEMA asks for a strict
- * schema, but that is only honoured by some OpenRouter providers, so normalize the
+ * schema, but that is only honoured by some LLM gateway providers, so normalize the
  * casing the judge actually reached a verdict in rather than discard the item.
  * Structure only: an unrecognized verdict stays an error, never a guess.
  */

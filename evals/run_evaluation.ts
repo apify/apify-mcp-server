@@ -27,8 +27,15 @@ import {
     sanitizeEnvValue,
     sanitizeProcessEnv,
     validatePhoenixEnvVars,
+    ORCAROUTER_CONFIG,
+    OPENROUTER_CONFIG,
 } from './config.js';
-import { loadTools, createOpenRouterTask, createToolSelectionLLMEvaluator } from './evaluation_utils.js';
+import {
+    loadTools,
+    createOpenRouterTask,
+    createOrcaRouterTask,
+    createToolSelectionLLMEvaluator,
+} from './evaluation_utils.js';
 
 type EvaluatorResult = {
     model: string;
@@ -184,6 +191,12 @@ async function main(datasetName: string): Promise<number> {
     const tools = await loadTools();
     log.info(`Loaded ${tools.length} tools`);
 
+    // Model + judge provider. Defaults to OpenRouter; set EVAL_PROVIDER=orcarouter
+    // to route model calls and the LLM evaluator through OrcaRouter instead.
+    const useOrcaRouter = process.env.EVAL_PROVIDER === 'orcarouter';
+    const providerConfig = useOrcaRouter ? ORCAROUTER_CONFIG : OPENROUTER_CONFIG;
+    log.info(`Using ${useOrcaRouter ? 'OrcaRouter' : 'OpenRouter'} as the LLM provider (${providerConfig.baseURL})`);
+
     // Phoenix client init (options may be provided via env)
     const client = createClient({
         options: {
@@ -218,13 +231,13 @@ async function main(datasetName: string): Promise<number> {
     const results: EvaluatorResult[] = [];
 
     // Create the LLM evaluator with loaded tools
-    const toolSelectionLLMEvaluator = createToolSelectionLLMEvaluator(tools);
+    const toolSelectionLLMEvaluator = createToolSelectionLLMEvaluator(tools, providerConfig);
 
     for (const modelName of MODELS_TO_EVALUATE) {
         log.info(`\nEvaluating model: ${modelName}`);
 
-        // OpenRouter task
-        const taskFn = createOpenRouterTask(modelName, tools);
+        // OpenRouter task (or OrcaRouter when EVAL_PROVIDER=orcarouter)
+        const taskFn = useOrcaRouter ? createOrcaRouterTask(modelName, tools) : createOpenRouterTask(modelName, tools);
 
         // Get PR info for better tracking
         const prNumber = process.env.GITHUB_PR_NUMBER || 'local';

@@ -22,7 +22,7 @@ dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge ->
 - Node.js installed
 - Apify account with API token
 - Anthropic API key (agent)
-- OpenRouter API key (judge)
+- OrcaRouter API key (judge) — or OpenRouter API key with `EVAL_PROVIDER=openrouter`
 - Langfuse project (public + secret key)
 
 **Run evaluations:**
@@ -30,7 +30,7 @@ dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge ->
 # 1. Set environment variables (a .env file at the repo root is loaded automatically)
 export APIFY_TOKEN="your_apify_token"
 export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENROUTER_API_KEY="your_openrouter_key"
+export ORCAROUTER_API_KEY="sk-orca-..."
 export LANGFUSE_PUBLIC_KEY="pk-lf-..."
 export LANGFUSE_SECRET_KEY="sk-lf-..."
 export LANGFUSE_BASE_URL="https://langfuse.apify.dev"
@@ -41,6 +41,8 @@ pnpm run build
 # 3. Run tests
 pnpm run evals:workflow
 ```
+
+To route the judge through OpenRouter instead of OrcaRouter, set `EVAL_PROVIDER=openrouter` and `OPENROUTER_API_KEY`.
 
 Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 4 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), and `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain.
 
@@ -120,7 +122,7 @@ The server is registered with `alwaysLoad: true`. Left at the default, its tools
 - Clear CI/CD signal, no ambiguity about which tests are critical
 - The item count matters as much as the scores: the Langfuse SDK drops an item whose task throws, so gating on the results it returns would report `7/7 passed` on a run where three tests never executed
 
-Harness failures (MCP spawn, OpenRouter, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
+Harness failures (MCP spawn, LLM gateway, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
 
 **Location:** `langfuse_experiment.ts` (`buildRunSummary`)
 
@@ -147,7 +149,7 @@ AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 **Decision:** One judge LLM client shared across tests; the agent and its MCP server are per test.
 
 **Why:**
-- The judge client is stateless (OpenRouter/OpenAI SDK), so sharing it saves initialization overhead with no contamination risk
+- The judge client is stateless (OpenAI-compatible SDK), so sharing it saves initialization overhead with no contamination risk
 - The agent holds conversation and Apify state, so it cannot be shared
 
 **Location:** `run_workflow_evals.ts`
@@ -155,7 +157,7 @@ AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 ### 7. Agent vs judge models
 
 **Agent:** `claude-haiku-4-5` on the Anthropic API (fast; a weaker model is a more sensitive probe of tool descriptions)<br>
-**Judge:** `deepseek/deepseek-v4-flash` on OpenRouter (strong reasoning)
+**Judge:** `deepseek/deepseek-v4-flash` on OrcaRouter by default (strong reasoning; `EVAL_PROVIDER=openrouter` switches the judge to OpenRouter)
 
 Separation allows independent optimization for speed vs evaluation quality.
 
@@ -204,7 +206,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `config.ts` - Models, prompts, constants
 - `claude_agent.ts` - The agent under test: Claude Agent SDK options, MCP server registration, failure injection
 - `sdk_conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
-- `llm_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
+- `llm_client.ts` - OpenAI-compatible gateway wrapper for the judge (OrcaRouter by default), traced as a Langfuse generation
 - `langfuse_observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
 - `workflow_judge.ts` - Judge evaluation
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
@@ -221,7 +223,8 @@ experiment-item-run     Langfuse SDK, holds the scores
 ```bash
 export APIFY_TOKEN="your_apify_token"           # Get from https://console.apify.com/account/integrations
 export ANTHROPIC_API_KEY="sk-ant-..."           # Agent, get from https://console.anthropic.com/settings/keys
-export OPENROUTER_API_KEY="your_openrouter_key" # Judge, get from https://openrouter.ai/keys
+export ORCAROUTER_API_KEY="sk-orca-..."         # Judge (default gateway), get from https://www.orcarouter.ai
+export OPENROUTER_API_KEY="your_openrouter_key" # Judge when EVAL_PROVIDER=openrouter, get from https://openrouter.ai/keys
 export LANGFUSE_PUBLIC_KEY="pk-lf-..."          # Langfuse project settings
 export LANGFUSE_SECRET_KEY="sk-lf-..."          # Langfuse project settings
 export LANGFUSE_BASE_URL="https://langfuse.apify.dev"  # self-hosted instance
@@ -330,3 +333,4 @@ Claude Code owns the message history. The harness only sees the SDK's message st
 - [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview)
 - [Apify API](https://docs.apify.com/api/v2)
 - [OpenRouter](https://openrouter.ai/)
+- [OrcaRouter](https://www.orcarouter.ai)

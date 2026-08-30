@@ -1,5 +1,5 @@
 /**
- * LLM client for calling OpenRouter API
+ * LLM client for calling an OpenAI-compatible gateway
  * Phase 3: Added support for tool calling
  */
 
@@ -10,7 +10,7 @@ import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/reso
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
-import { OPENROUTER_CONFIG } from './config.js';
+import { JUDGE_PROVIDER_CONFIG } from './config.js';
 
 /**
  * Token usage reported by the LLM API for a single call
@@ -47,13 +47,13 @@ export class LlmClient {
     private openai: OpenAI;
 
     constructor() {
-        if (!OPENROUTER_CONFIG.apiKey) {
-            throw new Error('OPENROUTER_API_KEY environment variable is required');
+        if (!JUDGE_PROVIDER_CONFIG.apiKey) {
+            throw new Error('An LLM gateway API key is required (ORCAROUTER_API_KEY or OPENROUTER_API_KEY)');
         }
 
         this.openai = new OpenAI({
-            baseURL: OPENROUTER_CONFIG.baseURL,
-            apiKey: OPENROUTER_CONFIG.apiKey,
+            baseURL: JUDGE_PROVIDER_CONFIG.baseURL,
+            apiKey: JUDGE_PROVIDER_CONFIG.apiKey,
         });
     }
 

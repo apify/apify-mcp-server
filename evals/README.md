@@ -21,6 +21,10 @@ To trigger evaluations on a PR, add the `validated` label to your pull request.
 
 Unified API for Gemini, Claude, GPT. No separate integrations needed.
 
+## Why OrcaRouter?
+
+[OrcaRouter](https://www.orcarouter.ai) is an OpenAI-compatible AI gateway. Like OpenRouter it exposes a provider/model namespace across many models, but it also combines adaptive routing, automatic failover, zero-markup inference, observability, guardrails, and agent-tool governance behind the same endpoint. Set `EVAL_PROVIDER=orcarouter` (and `ORCAROUTER_API_KEY`) to run the model calls and the LLM evaluator through OrcaRouter instead of OpenRouter.
+
 ## Judge model
 
 - model: `openai/gpt-4o-mini`
@@ -42,6 +46,9 @@ export PHOENIX_BASE_URL="your_url"
 export PHOENIX_API_KEY="your_key"
 export OPENROUTER_API_KEY="your_key"
 export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
+export ORCAROUTER_API_KEY="your_key"            # optional: OrcaRouter provider
+export ORCAROUTER_BASE_URL="https://api.orcarouter.ai/v1"
+export EVAL_PROVIDER="openrouter"               # optional: 'openrouter' (default) or 'orcarouter'
 
 pnpm install --frozen-lockfile
 pnpm run evals:create-dataset  # one-time: creates dataset from test_cases.json

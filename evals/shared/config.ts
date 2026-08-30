@@ -1,6 +1,7 @@
 /**
  * Shared configuration for evaluation systems
- * Contains OpenRouter config, environment validation, and common utilities
+ * Contains OpenAI-compatible provider config (OpenRouter, OrcaRouter),
+ * environment validation, and common utilities
  */
 
 /**
@@ -10,6 +11,15 @@
 export const OPENROUTER_CONFIG = {
     baseURL: sanitizeEnvValue(process.env.OPENROUTER_BASE_URL) || 'https://openrouter.ai/api/v1',
     apiKey: sanitizeEnvValue(process.env.OPENROUTER_API_KEY) || '',
+};
+
+/**
+ * OrcaRouter API configuration
+ * ORCAROUTER_BASE_URL is optional and defaults to the standard OrcaRouter API URL
+ */
+export const ORCAROUTER_CONFIG = {
+    baseURL: sanitizeEnvValue(process.env.ORCAROUTER_BASE_URL) || 'https://api.orcarouter.ai/v1',
+    apiKey: sanitizeEnvValue(process.env.ORCAROUTER_API_KEY) || '',
 };
 
 /**
@@ -43,6 +53,8 @@ const ENV_KEYS_TO_SANITIZE = [
     'ANTHROPIC_API_KEY',
     'OPENROUTER_API_KEY',
     'OPENROUTER_BASE_URL',
+    'ORCAROUTER_API_KEY',
+    'ORCAROUTER_BASE_URL',
     'PHOENIX_API_KEY',
     'PHOENIX_BASE_URL',
     ...LANGFUSE_ENV_VARS,

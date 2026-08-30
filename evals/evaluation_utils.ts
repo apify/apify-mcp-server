@@ -19,6 +19,7 @@ import {
     EVALUATOR_NAMES,
     TEMPERATURE,
     OPENROUTER_CONFIG,
+    ORCAROUTER_CONFIG,
 } from './config.js';
 import { transformToolsToOpenAIFormat } from './shared/openai_tools.js';
 import { loadTestCases as loadTestCasesShared } from './shared/test_case_loader.js';
@@ -32,6 +33,15 @@ export type { TestData } from './shared/types.js';
 export { filterByCategory, filterById } from './shared/test_case_loader.js';
 
 type ExampleInputOnly = { input: Record<string, unknown>; metadata?: Record<string, unknown>; output?: never };
+
+/**
+ * An OpenAI-compatible gateway config: a base URL and an API key. Both OpenRouter
+ * and OrcaRouter configs satisfy this shape (baseURL is always a string).
+ */
+export type GatewayProviderConfig = {
+    baseURL: string;
+    apiKey: string;
+};
 
 /**
  * Load test cases from a JSON file (wrapper around shared function)
@@ -49,7 +59,7 @@ export async function loadTools(): Promise<ToolBase[]> {
     return urlTools.map((t: ToolEntry) => getToolPublicFieldOnly(t)) as ToolBase[];
 }
 
-export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
+function createProviderTask(modelName: string, tools: ToolBase[], providerConfig: GatewayProviderConfig) {
     const toolsOpenAI = transformToolsToOpenAIFormat(tools);
 
     return async (
@@ -61,7 +71,7 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
         context: string;
         reference: string;
     }> => {
-        const client = new OpenAI(OPENROUTER_CONFIG);
+        const client = new OpenAI(providerConfig);
 
         log.info(`Input: ${JSON.stringify(example)}`);
 
@@ -105,8 +115,16 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
     };
 }
 
-export function createClassifierEvaluator() {
-    const openai = createOpenAI(OPENROUTER_CONFIG);
+export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
+    return createProviderTask(modelName, tools, OPENROUTER_CONFIG);
+}
+
+export function createOrcaRouterTask(modelName: string, tools: ToolBase[]) {
+    return createProviderTask(modelName, tools, ORCAROUTER_CONFIG);
+}
+
+export function createClassifierEvaluator(providerConfig: GatewayProviderConfig = OPENROUTER_CONFIG) {
+    const openai = createOpenAI(providerConfig);
 
     return createClassifierFn({
         model: openai(TOOL_SELECTION_EVAL_MODEL),
@@ -116,8 +134,11 @@ export function createClassifierEvaluator() {
 }
 
 // LLM-based evaluator using Phoenix classifier - more robust than direct LLM calls
-export function createToolSelectionLLMEvaluator(tools: ToolBase[]) {
-    const evaluator = createClassifierEvaluator();
+export function createToolSelectionLLMEvaluator(
+    tools: ToolBase[],
+    providerConfig: GatewayProviderConfig = OPENROUTER_CONFIG,
+) {
+    const evaluator = createClassifierEvaluator(providerConfig);
 
     return asEvaluator({
         name: EVALUATOR_NAMES.TOOL_SELECTION_LLM,

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import log from '@apify/log';
 
 // Re-export shared config
-export { OPENROUTER_CONFIG, sanitizeEnvValue, sanitizeProcessEnv } from './shared/config.js';
+export { OPENROUTER_CONFIG, ORCAROUTER_CONFIG, sanitizeEnvValue, sanitizeProcessEnv } from './shared/config.js';
 
 // Read the version from test-cases.json
 function getTestCasesVersion(): string {
@@ -225,6 +225,7 @@ export function getPhoenixEnvVars(): Record<string, string | undefined> {
         PHOENIX_BASE_URL: process.env.PHOENIX_BASE_URL,
         PHOENIX_API_KEY: process.env.PHOENIX_API_KEY,
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+        ORCAROUTER_API_KEY: process.env.ORCAROUTER_API_KEY,
     };
 }
 
@@ -237,8 +238,16 @@ export function validatePhoenixEnvVars(): boolean {
         .filter(([, value]) => !value)
         .map(([key]) => key);
 
-    if (missing.length > 0) {
-        log.error(`Missing required environment variables: ${missing.join(', ')}`);
+    // Either LLM provider key satisfies the LLM requirement; treat the pair as one var.
+    const missingNonProvider = missing.filter((key) => key !== 'OPENROUTER_API_KEY' && key !== 'ORCAROUTER_API_KEY');
+
+    if (missingNonProvider.length > 0) {
+        log.error(`Missing required environment variables: ${missingNonProvider.join(', ')}`);
+        return false;
+    }
+
+    if (!envVars.OPENROUTER_API_KEY && !envVars.ORCAROUTER_API_KEY) {
+        log.error('Missing an LLM provider API key: set OPENROUTER_API_KEY or ORCAROUTER_API_KEY');
         return false;
     }
 

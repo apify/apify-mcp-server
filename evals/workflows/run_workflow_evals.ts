@@ -111,12 +111,11 @@ async function main() {
         .help().argv) as CliArgs;
 
     // Fail before any test runs, listing every missing variable at once.
-    const missing = findMissingEnvVars([
-        ...LANGFUSE_ENV_VARS,
-        'APIFY_TOKEN',
-        'OPENROUTER_API_KEY',
-        'ANTHROPIC_API_KEY',
-    ]);
+    // Either gateway API key satisfies the judge requirement.
+    const missing = findMissingEnvVars([...LANGFUSE_ENV_VARS, 'APIFY_TOKEN', 'ANTHROPIC_API_KEY']);
+    if (!process.env.ORCAROUTER_API_KEY && !process.env.OPENROUTER_API_KEY) {
+        missing.push('ORCAROUTER_API_KEY or OPENROUTER_API_KEY');
+    }
     if (missing.length > 0) {
         console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
         process.exit(1);

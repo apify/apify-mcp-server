@@ -2,12 +2,21 @@
  * Configuration for workflow evaluation system.
  *
  * The agent's system prompt and tools come from the SDK's `claude_code` presets, so
- * nothing here defines them. The judge runs on OpenRouter (temperature 0.15, see
- * llm_client.ts).
+ * nothing here defines them. The judge runs on an OpenAI-compatible gateway
+ * (OrcaRouter by default, falling back to OpenRouter when EVAL_PROVIDER=openrouter;
+ * temperature 0.15, see llm_client.ts).
  */
 
+import { ORCAROUTER_CONFIG, OPENROUTER_CONFIG, sanitizeProcessEnv } from '../shared/config.js';
+
 // Re-export shared config for convenience
-export { OPENROUTER_CONFIG, sanitizeProcessEnv } from '../shared/config.js';
+export { ORCAROUTER_CONFIG, OPENROUTER_CONFIG, sanitizeProcessEnv };
+
+/**
+ * Provider config for the workflow judge. OrcaRouter is the default gateway;
+ * set EVAL_PROVIDER=openrouter to route the judge through OpenRouter instead.
+ */
+export const JUDGE_PROVIDER_CONFIG = process.env.EVAL_PROVIDER === 'openrouter' ? OPENROUTER_CONFIG : ORCAROUTER_CONFIG;
 
 /** Name the Claude Agent SDK registers the Apify MCP server under. */
 export const MCP_SERVER_NAME = 'apify';
