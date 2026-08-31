@@ -8,12 +8,16 @@
  * cases never clean up, and task names are unique per account, so the leftovers make
  * the fixed-name cases fail on the next run.
  *
- * Usage: pnpm run evals:workflow:tasks-fixtures
+ * Usage:
+ *   pnpm run evals:workflow:tasks-fixtures
+ *   pnpm run evals:workflow:tasks-fixtures -- --dry-run   # list what it would delete
  */
 
 import 'dotenv/config';
 
 import { ApifyClient } from 'apify-client';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
 import { findMissingEnvVars } from '../shared/config.js';
 import { sanitizeProcessEnv } from './config.js';
@@ -29,12 +33,30 @@ const FIXTURE_ACTOR = 'apify/normal-mode-test-actor';
 const FIXTURE_INPUT = { firstNumber: 1, secondNumber: 2 };
 
 async function main() {
+    // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores
+    // every flag behind it. Drop it so both call styles work.
+    const args = hideBin(process.argv).filter((arg) => arg !== '--');
+    const argv = (await yargs(args)
+        .options({
+            'dry-run': {
+                type: 'boolean',
+                description: 'Print what would be deleted, created, or reset and exit without writing',
+                default: false,
+            },
+        })
+        .help().argv) as { dryRun: boolean };
+
     const missing = findMissingEnvVars(['APIFY_TOKEN']);
     if (missing.length > 0) {
         console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
         process.exit(1);
     }
     const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
+
+    // This script deletes tasks, so name the account it is about to delete them on before
+    // it does: APIFY_TOKEN often points at a personal account rather than the eval one.
+    const user = await client.user('me').get();
+    console.log(`👤 Account: ${user.username ?? '(unknown)'} (${user.id})${argv.dryRun ? ' — dry run' : ''}`);
 
     // Read every page before deleting anything: offset paging skips entries when the
     // collection shrinks underneath it, and a missed leftover fails the next run.
@@ -48,6 +70,10 @@ async function main() {
             continue;
         }
         if (task.name.startsWith(EVAL_TASK_PREFIX)) {
+            if (argv.dryRun) {
+                console.log(`🗑️  Would delete leftover task "${task.name}" (${task.id})`);
+                continue;
+            }
             await client.task(task.id).delete();
             console.log(`🗑️  Deleted leftover task "${task.name}" (${task.id})`);
         }
@@ -56,8 +82,14 @@ async function main() {
     if (fixture) {
         // Reset the input: an eval agent may have mutated the fixture (e.g. resolving a
         // name collision by updating the existing task).
-        await client.task(fixture.id).update({ input: FIXTURE_INPUT });
-        console.log(`♻️  Reset fixture task "${fixture.name}" (${fixture.id})`);
+        if (argv.dryRun) {
+            console.log(`♻️  Would reset fixture task "${fixture.name}" (${fixture.id})`);
+        } else {
+            await client.task(fixture.id).update({ input: FIXTURE_INPUT });
+            console.log(`♻️  Reset fixture task "${fixture.name}" (${fixture.id})`);
+        }
+    } else if (argv.dryRun) {
+        console.log(`🌱 Would create fixture task "${FIXTURE_TASK_NAME}" on ${FIXTURE_ACTOR}`);
     } else {
         const actor = await client.actor(FIXTURE_ACTOR).get();
         if (!actor) throw new Error(`Fixture Actor "${FIXTURE_ACTOR}" not found`);
@@ -71,7 +103,7 @@ async function main() {
         console.log(`🌱 Created fixture task "${task.name}" (${task.id})`);
     }
 
-    console.log('✅ Task fixtures ready');
+    console.log(argv.dryRun ? '✅ Dry run complete, nothing changed' : '✅ Task fixtures ready');
 }
 
 void main();
