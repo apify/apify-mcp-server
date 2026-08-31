@@ -159,8 +159,7 @@ async function main() {
 
     let exitCode = 1;
     try {
-        // Read-only: the dataset is the source of truth, edited in the Langfuse UI and
-        // committed back with `evals:workflow:export-dataset`.
+        // Read-only: the dataset is the source of truth, edited in the Langfuse UI.
         console.log(`📇 Fetching dataset "${datasetName}"...`);
         const cases = await fetchWorkflowCases(langfuse, datasetName);
 

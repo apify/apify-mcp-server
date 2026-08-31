@@ -4,8 +4,8 @@
 /**
  * Write the Langfuse dataset back to `dataset_snapshot_<dataset>.json`.
  *
- * The snapshot is a reviewable copy that nothing reads at runtime: it puts UI edits into
- * git history and keeps the cases somewhere other than the Langfuse database.
+ * A local, gitignored copy for reading the cases outside Langfuse (review, diffing two
+ * exports, an offline backup). Nothing reads it at runtime and it is not tracked.
  *
  * Usage:
  *   pnpm run evals:workflow:export-dataset

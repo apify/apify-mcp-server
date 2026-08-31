@@ -64,9 +64,11 @@ gate on it. The console prints a `retrying once` line for those items.
 The task-tool suites are `tasks-evals` (proper) and `tasks-evals-errors` (error handling). They use
 fixed `eval-*` task names, which are unique per account, and the create cases never clean up — so every
 run leaves debris that collides on the next one. Run `pnpm run evals:workflow:tasks-fixtures` before
-every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture task. Both suites publish
-task examples on `jiri.spilka/actor-troubleshooter`, and publishing needs write access to the Actor, so
-those cases only pass on an account that has it.
+every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture task. It deletes on
+whatever account `APIFY_TOKEN` points at and prints that account first; pass `--dry-run` to see what
+it would delete before it does. Both suites publish task examples on
+`jiri.spilka/actor-troubleshooter`, and publishing needs write access to the Actor, so those cases only
+pass on an account that has it.
 
 Publishing requires all three of `publicConfig.inputSchemaFields`, `datasetView` and `seoDescription`
 (probed against the API), and the API reports the missing ones **non-exhaustively** — which is why
@@ -89,9 +91,10 @@ it still passes on Sonnet.
 - `0` = every requested test ran and passed ✅
 - `1` = any test failed, any test never ran, or setup failed ❌
 
-**Editing test cases:** edit the items in the Langfuse UI, then commit the change here:
+**Editing test cases:** edit the items in the Langfuse UI. The next run picks them up; there is nothing to commit.
+To read the cases outside Langfuse, export a local copy (gitignored, not tracked):
 ```bash
-pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot_workflow-evals.json (no build, no Apify/OpenRouter keys)
+pnpm run evals:workflow:export-dataset   # writes dataset_snapshot_workflow-evals.json (no build, no Apify/OpenRouter keys)
 ```
 Each dataset gets its own `dataset_snapshot_<dataset>.json`; `--dataset <name>` exports another one (e.g. `tasks-evals`).
 
@@ -111,12 +114,12 @@ Each dataset gets its own `dataset_snapshot_<dataset>.json`; `--dataset <name>` 
 
 ### 1. The Langfuse dataset is the source of truth
 
-**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. `evals:workflow:export-dataset` writes the active items back to `dataset_snapshot_<dataset>.json`; there is no importer and nothing reads the snapshot at runtime.
+**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy: `evals:workflow:export-dataset` dumps the active items to a gitignored `dataset_snapshot_<dataset>.json` for reading them outside the UI, but there is no importer, nothing reads the snapshot at runtime, and it is not tracked.
 
 **Why:**
 - A UI edit takes effect on the next run. An earlier version synced a local file into the dataset first, which silently overwrote UI edits
 - `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when given real dataset items
-- The snapshot puts UI edits into git history and keeps a copy of the cases outside the Langfuse database. Its output is byte-stable, so an unexpected diff means the dataset changed without being committed
+- Tracking a snapshot would add a second copy that no code reads and nothing keeps in sync, so it is gitignored. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
 
 Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
 
@@ -255,7 +258,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `run_workflow_evals.ts` - Main CLI entry
 - `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:workflow:export-dataset`)
 - `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:workflow:tasks-fixtures`)
-- `dataset_snapshot_<dataset>.json` - Exported copy of each dataset, not read at runtime
+- `dataset_snapshot_<dataset>.json` - Local gitignored export of a dataset, not read at runtime
 
 ## Configuration
 
