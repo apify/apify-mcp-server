@@ -4,6 +4,7 @@ import {
     buildRunSummary,
     countPassed,
     evaluators,
+    isTransientAgentError,
     makeTask,
     type WorkflowTaskOutput,
 } from '../../evals/workflows/langfuse_experiment.js';
@@ -83,6 +84,26 @@ describe('evaluators', () => {
     });
 });
 
+describe('isTransientAgentError()', () => {
+    it.each([
+        'Connection error.',
+        'fetch failed',
+        'socket hang up',
+        'read ECONNRESET',
+        'API error: 529 overloaded_error',
+        'Request failed with status 503',
+    ])('treats "%s" as transient', (message) => {
+        expect(isTransientAgentError(new Error(message))).toBe(true);
+    });
+
+    it.each(['spawn ENOENT', 'Prompt is too long', 'stdio binary not found', 'Invalid model name'])(
+        'treats "%s" as permanent',
+        (message) => {
+            expect(isTransientAgentError(new Error(message))).toBe(false);
+        },
+    );
+});
+
 describe('makeTask()', () => {
     const makeItem = (overrides: Record<string, unknown> = {}) => ({
         id: 'search-001',
@@ -110,7 +131,16 @@ describe('makeTask()', () => {
 
     it('names the item in a harness error, which the SDK log line omits', async () => {
         await expect(makeWorkflowTask()(makeItem())).rejects.toThrow('Item "search-001": spawn ENOENT');
-        // Both attempts failed: the transient-failure retry ran and did not mask the error.
+    });
+
+    it('does not retry the agent run on a deterministic failure', async () => {
+        await expect(makeWorkflowTask()(makeItem())).rejects.toThrow('spawn ENOENT');
+        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(1);
+    });
+
+    it('rethrows a transient failure that persists across the retry', async () => {
+        mocks.runAgentConversation.mockRejectedValue(new Error('Connection error.'));
+        await expect(makeWorkflowTask()(makeItem())).rejects.toThrow('Item "search-001": Connection error.');
         expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
     });
 

@@ -140,6 +140,32 @@ export function buildRunSummary(
     };
 }
 
+/**
+ * Messages of failures worth replaying the agent run for: the network or the provider
+ * dropped the request, not the agent's own doing.
+ *
+ * Matched on the message because the SDK surfaces them as plain `Error`s with no code or
+ * status. Deliberately narrow: retrying a deterministic failure (a bad prompt, a missing
+ * binary, a tool timeout) only doubles the spend and, for a case with fixed-name fixtures,
+ * turns the replay itself into a name collision that fails the zero-tool-error gate.
+ */
+const TRANSIENT_AGENT_ERROR_PATTERNS = [
+    /connection error/i,
+    /socket hang up/i,
+    /fetch failed/i,
+    /network/i,
+    /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN/,
+    /\b(408|429|500|502|503|504)\b/,
+    /overloaded/i,
+    /rate.?limit/i,
+];
+
+/** Whether an agent-run failure is transient, so replaying the prompt could recover it. */
+export function isTransientAgentError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return TRANSIENT_AGENT_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+}
+
 export type WorkflowTaskOptions = {
     llmClient: LlmClient;
     apifyToken: string;
@@ -154,7 +180,7 @@ export type WorkflowTaskOptions = {
  * Build the experiment task: per dataset item, a Claude Code agent run against its own
  * freshly spawned MCP server, then the judge.
  *
- * The agent run survives one retry on any failure. Judge API errors are retried by the
+ * The agent run survives one retry on a transient failure. Judge API errors are retried by the
  * OpenAI SDK itself (maxRetries 2, exponential backoff); this layer retries the judge only
  * on a malformed answer, see workflow_judge.ts. Anything else is left to throw, so
  * `buildRunSummary` fails the run on the shortfall instead of a broken harness looking like
@@ -187,7 +213,9 @@ export function makeTask(options: WorkflowTaskOptions) {
                 // the run. One retry absorbs them; a persistent failure still throws below.
                 // The retry replays the whole prompt, so tool calls that already succeeded run
                 // again: a case with fixed-name fixtures can hit a name collision the second
-                // time round and fail the zero-tool-error gate.
+                // time round and fail the zero-tool-error gate. That cost only buys something
+                // for a transient failure, so anything else is rethrown unretried.
+                if (!isTransientAgentError(error)) throw error;
                 // eslint-disable-next-line no-console
                 console.error(
                     `⚠️ Item "${item.id}": agent run failed (${error instanceof Error ? error.message : String(error)}), retrying once`,
