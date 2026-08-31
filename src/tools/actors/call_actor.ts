@@ -500,9 +500,10 @@ export async function resolveAndValidateActor(params: {
 
     // NOT_FOUND falls through to the structured "Actor not found" response below.
     // Any other error (LOAD_FAILED / STANDBY_PAYMENT_NOT_SUPPORTED /
-    // STANDBY_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor handler reports it;
-    // STANDBY_PAYMENT_NOT_SUPPORTED is also caught upstream by `checkPaymentProviderStandbyConflict`
-    // in the tool-call engine, so it's a defensive fallback here.
+    // STANDBY_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor handler reports it.
+    // STANDBY_PAYMENT_NOT_SUPPORTED cannot actually appear here: the call above passes no
+    // `paymentProvider`, so `getActorsAsTools`' payment gate never fires. Kept in the list because
+    // the rethrow is keyed on "not NOT_FOUND", not on an enumeration of kinds.
     if (errors[0] && errors[0].kind !== ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
         throw errors[0];
     }
@@ -598,7 +599,7 @@ export async function callActorPreExecute(
 
     // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.
     // Standby/MCP-server Actors under a third-party payment provider are rejected upstream by
-    // `checkPaymentProviderStandbyConflict` in the generic tool-call handler — see src/mcp/server.ts.
+    // `checkPaymentProviderStandbyConflict` — see src/mcp/tool_call_engine.ts.
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const resolution = await getActorToolResolutionCached(baseActorName, apifyClientForDefinition);
 
