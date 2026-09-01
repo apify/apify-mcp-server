@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Run&#x2F;standby mode decision table for Actor tool loading ([#1278](https://github.com/apify/apify-mcp-server/pull/1278)) ([76f91b6](https://github.com/apify/apify-mcp-server/commit/76f91b6284ab975c63d45858543ce2d3f19814b8)) by [@jirispilka](https://github.com/jirispilka), closes [#1208](https://github.com/apify/apify-mcp-server/issues/1208)
+- **evals:** Add task-tool workflow eval suites ([#1294](https://github.com/apify/apify-mcp-server/pull/1294)) ([43b2c48](https://github.com/apify/apify-mcp-server/commit/43b2c486eab20d00884a20898b7e50eae6ca429f)) by [@jirispilka](https://github.com/jirispilka), closes [#1288](https://github.com/apify/apify-mcp-server/issues/1288)
 
 ### 🐛 Bug Fixes
 
