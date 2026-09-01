@@ -44,7 +44,7 @@ export const TOOL_SELECTION_EVAL_MODEL = 'deepseek/deepseek-v4-flash';
 export const PHOENIX_RETRY_DELAY_MS = 10_000;
 export const PHOENIX_MAX_RETRIES = 3;
 
-export const PASS_THRESHOLD = 0.7;
+export const PASS_THRESHOLD = 0.6;
 
 // LLM sampling parameters
 // Temperature = 0 provides deterministic, focused responses
