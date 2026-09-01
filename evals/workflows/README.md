@@ -42,16 +42,61 @@ pnpm run build
 pnpm run evals:workflow
 ```
 
-Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 4 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), and `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain.
+Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, and `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API).
+
+### Proper suites vs error-handling suites
+
+By default the gate requires zero failed tool calls: an item whose agent hit any tool error fails even
+on a judge PASS, and every item carries a `tool_errors` score (count, with the failing calls in the
+comment). Cases that provoke errors on purpose (error recovery, not-found lookups, name collisions)
+live in a separate `*-errors` dataset and run with `--allow-tool-errors`, which drops only the
+zero-error condition. Never mix the two: an error-provoking case inside a proper suite either fails the
+run or forces error tolerance onto cases that must stay clean. Only the server's own tools count:
+failures of Claude Code's built-ins (`Bash`, `WebFetch`) and of tools `failTools` injected are exempt.
+
+Read-only probes count too, which is the point: the gate is what keeps the tool descriptions strong
+enough that an agent resolves a loose Actor reference with `search-actors` instead of guessing a slug.
+
+One caveat when reading a failure: a transient agent failure is retried once, and the retry replays the
+whole prompt, so a fixed-name create case can hit a name collision the second time round and fail the
+gate on it. The console prints a `retrying once` line for those items.
+
+The task-tool suites are `tasks-evals` (proper) and `tasks-evals-errors` (error handling). They use
+fixed `eval-*` task names, which are unique per account, and the create cases never clean up — so every
+run leaves debris that collides on the next one. Run `pnpm run evals:workflow:tasks-fixtures` before
+every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture task. It deletes on
+whatever account `APIFY_TOKEN` points at and prints that account first; pass `--dry-run` to see what
+it would delete before it does. Both suites publish task examples on
+`jiri.spilka/actor-troubleshooter`, and publishing needs write access to the Actor, so those cases only
+pass on an account that has it.
+
+Publishing requires all three of `publicConfig.inputSchemaFields`, `datasetView` and `seoDescription`
+(probed against the API), and the API reports the missing ones **non-exhaustively** — which is why
+`task-publish-discovery` budgets turns for several fix-and-retry rounds rather than one.
+
+`task-chain-hard-1` is the calibration edge, and it is calibrated: `claude-sonnet-4-5` passes it 3/3,
+`claude-haiku-4-5` about 5 runs in 8. Every Haiku failure is the same one — it constructs
+`jiri.spilka/troubleshooter` from the loose reference in the query instead of resolving the real
+`actor-troubleshooter` with `search-actors`, eats the not-found, then recovers. The judge passes those
+runs; only the zero-error gate catches them, which is exactly what that gate is for.
+
+Do not try to close that gap by rewording descriptions. Both `create-actor-task` and
+`fetch-actor-details` already say, explicitly, to resolve a loose name with `search-actors` rather than
+guess, and `fetch-actor-details`' not-found response repeats it. Adding the `fetch-actor-details`
+wording was measured at 5/8 against ~7/10 without it — no change. Treat a shift in the ratio as the
+signal, not a single red run, and read a persistent drop as a description problem only after checking
+it still passes on Sonnet.
 
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
 - `1` = any test failed, any test never ran, or setup failed ❌
 
-**Editing test cases:** edit the items in the Langfuse UI, then commit the change here:
+**Editing test cases:** edit the items in the Langfuse UI. The next run picks them up; there is nothing to commit.
+To read the cases outside Langfuse, export a local copy (gitignored, not tracked):
 ```bash
-pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot.json (no build, no Apify/OpenRouter keys)
+pnpm run evals:workflow:export-dataset   # writes dataset_snapshot_workflow-evals.json (no build, no Apify/OpenRouter keys)
 ```
+Each dataset gets its own `dataset_snapshot_<dataset>.json`; `--dataset <name>` exports another one (e.g. `tasks-evals`).
 
 ---
 
@@ -69,12 +114,12 @@ pnpm run evals:workflow:export-dataset   # rewrites dataset_snapshot.json (no bu
 
 ### 1. The Langfuse dataset is the source of truth
 
-**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. `evals:workflow:export-dataset` writes the active items back to `dataset_snapshot.json`; there is no importer and nothing reads the snapshot at runtime.
+**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy: `evals:workflow:export-dataset` dumps the active items to a gitignored `dataset_snapshot_<dataset>.json` for reading them outside the UI, but there is no importer, nothing reads the snapshot at runtime, and it is not tracked.
 
 **Why:**
 - A UI edit takes effect on the next run. An earlier version synced a local file into the dataset first, which silently overwrote UI edits
 - `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when given real dataset items
-- The snapshot puts UI edits into git history and keeps a copy of the cases outside the Langfuse database. Its output is byte-stable, so an unexpected diff means the dataset changed without being committed
+- Tracking a snapshot would add a second copy that no code reads and nothing keeps in sync, so it is gitignored. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
 
 Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
 
@@ -212,7 +257,8 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `langfuse_experiment.ts` - Experiment task, evaluators, run summary and exit gate
 - `run_workflow_evals.ts` - Main CLI entry
 - `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:workflow:export-dataset`)
-- `dataset_snapshot.json` - Exported copy of the dataset, not read at runtime
+- `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:workflow:tasks-fixtures`)
+- `dataset_snapshot_<dataset>.json` - Local gitignored export of a dataset, not read at runtime
 
 ## Configuration
 
@@ -234,9 +280,9 @@ Both entry points fail fast (before any test runs) listing every missing variabl
 Results are recorded in Langfuse, not to a local file. Each run:
 
 - **Reads the dataset** `workflow-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
-- **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
+- **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion, agentAuth, allowToolErrors }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
 - **Traces** every item as one trace. Its root output is the judge verdict plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed), and a generation for the judge call. See design decision 9.
-- **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) is the strict gate, and `total_tokens` is the agent tokens billed, omitted when the provider reported no usage so an unmeasured run cannot look like a free one.
+- **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) and `tool_errors` (failed tool calls, comment lists them, `0` on a clean item) together form the gate, and `total_tokens` is the agent tokens billed (omitted when the provider reported no usage so an unmeasured run cannot look like a free one; an item whose agent run was retried reports only the second attempt).
 - **Scores the run** with `pass_rate`: passing items over items requested, so runs stay comparable even when items were dropped.
 
 ### Concurrency
@@ -245,7 +291,7 @@ Results are recorded in Langfuse, not to a local file. Each run:
 
 ### Test case format
 
-A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in `metadata`. `dataset_snapshot.json` holds the same fields flattened, one object per case:
+A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in `metadata`. The snapshot holds the same fields flattened, one object per case:
 
 ```json
 [

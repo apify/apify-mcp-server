@@ -2,8 +2,9 @@
  * Experiment task, evaluators, and run gate for the Langfuse workflow-evals port.
  *
  * The task runs a fresh Claude Code agent conversation per dataset item (the Agent SDK
- * spawns its own MCP server, so state is isolated per item) and two evaluators score it:
- * the LLM judge (the pass/fail gate) and total tokens.
+ * spawns its own MCP server, so state is isolated per item) and three evaluators score it:
+ * the LLM judge, total tokens, and failed server tool calls. The gate is the judge verdict
+ * plus zero tool errors, unless the run passes `--allow-tool-errors`.
  */
 
 import type { Evaluation } from '@langfuse/client';
@@ -31,6 +32,8 @@ export type WorkflowTaskOutput = {
     totalTokens?: number;
     /** Agent narration, thinking, and tool names per turn. Debug view only, never judged. */
     transcript: TranscriptEntry[];
+    /** Failed server tool calls, first error line only, excluding the ones `failTools` injected. */
+    toolErrors: { tool: string; error: string }[];
 };
 
 /**
@@ -42,6 +45,7 @@ export type WorkflowTaskOutput = {
 export const SCORE_NAMES = {
     WORKFLOW_JUDGE: 'workflow_judge',
     TOTAL_TOKENS: 'total_tokens',
+    TOOL_ERRORS: 'tool_errors',
 } as const;
 
 type WorkflowEvaluator = (params: { output: WorkflowTaskOutput }) => Promise<Evaluation | Evaluation[]>;
@@ -57,23 +61,40 @@ export const evaluators: WorkflowEvaluator[] = [
     // measurement and skew cross-run model comparisons in Langfuse.
     async ({ output }) =>
         output.totalTokens === undefined ? [] : [{ name: SCORE_NAMES.TOTAL_TOKENS, value: output.totalTokens }],
+    // Always emitted, so a clean item shows an explicit 0 rather than nothing.
+    async ({ output }) => ({
+        name: SCORE_NAMES.TOOL_ERRORS,
+        value: output.toolErrors.length,
+        comment: formatToolErrors(output.toolErrors) || undefined,
+    }),
 ];
+
+/** One line per failed call, shared by the score comment and the run summary. */
+function formatToolErrors(toolErrors: WorkflowTaskOutput['toolErrors'], separator = '\n'): string {
+    return toolErrors.map(({ tool, error }) => `${tool}: ${error}`).join(separator);
+}
 
 /** Minimal view of an ExperimentItemResult: what the run gate reads. */
 type ScoredItem = { output: WorkflowTaskOutput; evaluations: { name: string; value?: unknown }[] };
 
-/** Items that scored `workflow_judge === 1`. */
-export function countPassed(itemResults: ScoredItem[]): number {
-    return itemResults.filter(
-        (result) =>
-            result.evaluations.find((evaluation) => evaluation.name === SCORE_NAMES.WORKFLOW_JUDGE)?.value === 1,
-    ).length;
+/** `undefined` when the judge evaluator itself threw, so no score was emitted. */
+function judgeScore(result: ScoredItem): unknown {
+    return result.evaluations.find((evaluation) => evaluation.name === SCORE_NAMES.WORKFLOW_JUDGE)?.value;
+}
+
+/** Whether one item passes the gate: judge PASS, plus no tool errors unless the run allows them. */
+function itemPassed(result: ScoredItem, allowToolErrors: boolean): boolean {
+    return judgeScore(result) === 1 && (allowToolErrors || result.output.toolErrors.length === 0);
+}
+
+export function countPassed(itemResults: ScoredItem[], allowToolErrors: boolean): number {
+    return itemResults.filter((result) => itemPassed(result, allowToolErrors)).length;
 }
 
 export type RunSummary = {
-    /** Items that scored workflow_judge === 1. */
+    /** Items that passed the gate. */
     passedCount: number;
-    /** Items that completed but did not pass, with the judge's reason. */
+    /** Items that completed but did not pass, with the reason. */
     failures: { id: string; reason: string }[];
     /** Requested ids with no result at all: the task threw and the SDK skipped the item. */
     droppedIds: string[];
@@ -86,32 +107,63 @@ export type RunSummary = {
  * threw, so gating on `itemResults.length` would report "7/7 passed" on a run where
  * three tests never executed.
  */
-export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[]): RunSummary {
+export function buildRunSummary(
+    requestedIds: string[],
+    itemResults: ScoredItem[],
+    allowToolErrors: boolean,
+): RunSummary {
     const failures: { id: string; reason: string }[] = [];
 
     for (const result of itemResults) {
-        const judgeScore = result.evaluations.find(
-            (evaluation) => evaluation.name === SCORE_NAMES.WORKFLOW_JUDGE,
-        )?.value;
-        if (judgeScore === 1) continue;
+        if (itemPassed(result, allowToolErrors)) continue;
+        const score = judgeScore(result);
         // No score means the evaluator itself threw, so judgeResult.reason is stale - it can
         // hold the judge's PASS rationale, printed under a failure marker. Say what happened.
-        failures.push({
-            id: result.output.id,
-            reason:
-                judgeScore === undefined
-                    ? `no ${SCORE_NAMES.WORKFLOW_JUDGE} score (the evaluator threw)`
-                    : result.output.judgeResult.reason,
-        });
+        let reason: string;
+        if (score === undefined) {
+            reason = `no ${SCORE_NAMES.WORKFLOW_JUDGE} score (the evaluator threw)`;
+        } else if (score === 1) {
+            const { toolErrors } = result.output;
+            reason = `judge passed, but ${toolErrors.length} tool error(s): ${formatToolErrors(toolErrors, '; ')}`;
+        } else {
+            reason = result.output.judgeResult.reason;
+        }
+        failures.push({ id: result.output.id, reason });
     }
 
     const completedIds = new Set(itemResults.map((result) => result.output.id));
 
     return {
-        passedCount: countPassed(itemResults),
+        passedCount: countPassed(itemResults, allowToolErrors),
         failures,
         droppedIds: requestedIds.filter((id) => !completedIds.has(id)),
     };
+}
+
+/**
+ * Messages of failures worth replaying the agent run for: the network or the provider
+ * dropped the request, not the agent's own doing.
+ *
+ * Matched on the message because the SDK surfaces them as plain `Error`s with no code or
+ * status. Deliberately narrow: retrying a deterministic failure (a bad prompt, a missing
+ * binary, a tool timeout) only doubles the spend and, for a case with fixed-name fixtures,
+ * turns the replay itself into a name collision that fails the zero-tool-error gate.
+ */
+const TRANSIENT_AGENT_ERROR_PATTERNS = [
+    /connection error/i,
+    /socket hang up/i,
+    /fetch failed/i,
+    /network/i,
+    /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|EAI_AGAIN/,
+    /\b(408|429|500|502|503|504)\b/,
+    /overloaded/i,
+    /rate.?limit/i,
+];
+
+/** Whether an agent-run failure is transient, so replaying the prompt could recover it. */
+export function isTransientAgentError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return TRANSIENT_AGENT_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }
 
 export type WorkflowTaskOptions = {
@@ -128,9 +180,11 @@ export type WorkflowTaskOptions = {
  * Build the experiment task: per dataset item, a Claude Code agent run against its own
  * freshly spawned MCP server, then the judge.
  *
- * Harness errors (MCP spawn, Anthropic API, OpenRouter, judge) are left to throw, so
- * `buildRunSummary` fails the run on the shortfall instead of a broken harness looking
- * like a failing eval. They are prefixed with the item id because the SDK's own log line
+ * The agent run survives one retry on a transient failure. Judge API errors are retried by the
+ * OpenAI SDK itself (maxRetries 2, exponential backoff); this layer retries the judge only
+ * on a malformed answer, see workflow_judge.ts. Anything else is left to throw, so
+ * `buildRunSummary` fails the run on the shortfall instead of a broken harness looking like
+ * a failing eval. Errors are prefixed with the item id because the SDK's own log line
  * carries none.
  */
 export function makeTask(options: WorkflowTaskOptions) {
@@ -140,8 +194,7 @@ export function makeTask(options: WorkflowTaskOptions) {
         const item = parseWorkflowItem(rawItem);
 
         try {
-            const startedAt = Date.now();
-            const adapted = await runAgentConversation({
+            const runOptions = {
                 prompt: item.input.query,
                 model: agentModel,
                 apifyToken,
@@ -150,7 +203,26 @@ export function makeTask(options: WorkflowTaskOptions) {
                 maxTurns: item.metadata.maxTurns,
                 toolTimeoutSeconds: toolTimeout,
                 mcpToolsOnly,
-            });
+            };
+            let startedAt = Date.now();
+            let adapted;
+            try {
+                adapted = await runAgentConversation(runOptions);
+            } catch (error) {
+                // Transient SDK/API failures ("Connection error.") drop the whole item from
+                // the run. One retry absorbs them; a persistent failure still throws below.
+                // The retry replays the whole prompt, so tool calls that already succeeded run
+                // again: a case with fixed-name fixtures can hit a name collision the second
+                // time round and fail the zero-tool-error gate. That cost only buys something
+                // for a transient failure, so anything else is rethrown unretried.
+                if (!isTransientAgentError(error)) throw error;
+                // eslint-disable-next-line no-console
+                console.error(
+                    `⚠️ Item "${item.id}": agent run failed (${error instanceof Error ? error.message : String(error)}), retrying once`,
+                );
+                startedAt = Date.now();
+                adapted = await runAgentConversation(runOptions);
+            }
 
             // The agent ran in a subprocess, so its conversation reaches Langfuse only if
             // we send it. Emitted before the judge call, so a failing judge still leaves
@@ -179,11 +251,28 @@ export function makeTask(options: WorkflowTaskOptions) {
             const { conversation, transcript } = adapted;
             const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
 
+            // Server tools only: a failed Claude Code built-in (Bash, WebFetch) says nothing
+            // about the server under test. Failures of tools the harness force-failed itself
+            // are not errors of the run either. First line only: the full text already sits
+            // on the tool span. Known blind spot: the adapter drops subagent activity, so a
+            // server tool failing inside a Task-spawned subagent never reaches this gate.
+            const injected = new Set(item.metadata.failTools ?? []);
+            const toolErrors = adapted.toolInvocations
+                .filter(
+                    (invocation) =>
+                        invocation.isMcpTool && !invocation.result.success && !injected.has(invocation.name),
+                )
+                .map((invocation) => ({
+                    tool: invocation.name,
+                    error: invocation.result.error?.split('\n')[0] || 'unknown error',
+                }));
+
             return {
                 id: item.id,
                 judgeResult,
                 totalTokens: conversation.totalTokens,
                 transcript,
+                toolErrors,
             };
         } catch (error) {
             throw new Error(`Item "${item.id}": ${error instanceof Error ? error.message : String(error)}`, {
