@@ -5,6 +5,7 @@ import log from '@apify/log';
 import type { ApifyClient } from '../../apify_client.js';
 import {
     ACTOR_MAX_MEMORY_MBYTES,
+    FAILURE_CATEGORY,
     HELPER_TOOLS,
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
@@ -24,6 +25,7 @@ import {
     type ApifyToken,
     type ToolEntry,
     type ToolInputSchema,
+    ACTOR_TOOL_MODE,
     TOOL_TYPE,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
@@ -31,7 +33,7 @@ import { ajv } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js';
-import { actorNameToToolName, isActorBlockedUnderPaymentProvider, isActorInfoMcpServer } from '../actor_tool_naming.js';
+import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolMode } from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
 
@@ -368,12 +370,24 @@ export async function getActorsAsTools(
     const actorMCPServersInfo: ActorInfo[] = [];
     const normalActorsInfo: ActorInfo[] = [];
     for (const actorInfo of nonNullActors) {
-        const isMcpServer = isActorInfoMcpServer(actorInfo);
-        if (paymentProvider && isActorBlockedUnderPaymentProvider(actorInfo)) {
+        if (paymentProvider && isActorBlockedUnderPaymentProvider(actorInfo.actor)) {
             errors.push(ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName));
             continue;
         }
-        if (isMcpServer) actorMCPServersInfo.push(actorInfo);
+
+        const toolMode = resolveActorToolMode(actorInfo);
+        if (toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
+            const error = ActorLoadError.standbyWithoutMcpNotSupported(actorInfo.definition.actorFullName);
+            log.softFail('Skipping standby Actor with no MCP server and an empty input schema', {
+                actorName: actorInfo.definition.actorFullName,
+                mcpSessionId,
+                actorLoadErrorKind: error.kind,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            });
+            errors.push(error);
+            continue;
+        }
+        if (toolMode === ACTOR_TOOL_MODE.MCP) actorMCPServersInfo.push(actorInfo);
         else normalActorsInfo.push(actorInfo);
     }
 

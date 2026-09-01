@@ -2,11 +2,13 @@ import type { Build } from 'apify-client';
 
 import type { ApifyClient } from '../apify_client.js';
 import { CODE_RUNTIME_ACTOR_NAME } from '../const.js';
+import { ActorLoadError } from '../errors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
 import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
-import { getActorMcpUrlCached } from './actor.js';
+import { ACTOR_TOOL_MODE } from '../types.js';
+import { getActorToolResolutionCached } from './actor.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
 import { searchActorsByKeywords } from './actor_search.js';
 import { getHttpStatusCode, logHttpError } from './logging.js';
@@ -162,10 +164,16 @@ export async function getMcpToolsMessage(
     paymentProvider?: PaymentProvider,
     mcpSessionId?: string,
 ): Promise<string> {
-    const mcpServerUrl = await getActorMcpUrlCached(actorName, apifyClient);
+    const resolution = await getActorToolResolutionCached(actorName, apifyClient);
+
+    // Same canonical wording call-actor rejects with, so an agent gets one consistent reason
+    // for this Actor regardless of which tool it asked.
+    if (resolution?.toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
+        return ActorLoadError.standbyWithoutMcpNotSupported(resolution.actorFullName).message;
+    }
 
     // Early return: not an MCP server
-    if (!mcpServerUrl || typeof mcpServerUrl !== 'string') {
+    if (resolution?.toolMode !== ACTOR_TOOL_MODE.MCP) {
         return `Note: This Actor is not an MCP server and does not expose MCP tools.`;
     }
 
@@ -175,7 +183,7 @@ export async function getMcpToolsMessage(
     }
 
     // Connect and list tools
-    const client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
+    const client = await connectMCPClient(resolution.mcpServerUrl, apifyToken, mcpSessionId);
     if (!client) {
         return `Failed to connect to MCP server for Actor '${actorName}'.`;
     }

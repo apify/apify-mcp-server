@@ -32,6 +32,7 @@ function makeAdapted(overrides: Partial<AdaptedConversation> = {}): AdaptedConve
             {
                 name: 'search-actors',
                 arguments: { search: 'maps' },
+                isMcpTool: true,
                 result: { toolName: 'search-actors', success: true, result: [{ text: 'ok' }], resultBytes: 16 },
                 startedAt: START + 1_000,
                 endedAt: START + 2_000,
@@ -126,7 +127,12 @@ describe('buildAgentObservations()', () => {
         const adapted = makeAdapted({
             finalTurnStartedAt: undefined,
             toolInvocations: [
-                { name: 'search-actors', arguments: {}, result: { toolName: 'search-actors', success: true } },
+                {
+                    name: 'search-actors',
+                    arguments: {},
+                    isMcpTool: true,
+                    result: { toolName: 'search-actors', success: true },
+                },
             ],
         });
         const [usage] = buildAgentObservations(makeParams({ adapted })).children;
@@ -165,6 +171,7 @@ describe('buildAgentObservations()', () => {
                 {
                     name: 'get-dataset-items',
                     arguments: {},
+                    isMcpTool: true,
                     result: {
                         toolName: 'get-dataset-items',
                         success: true,
@@ -186,6 +193,7 @@ describe('buildAgentObservations()', () => {
                 {
                     name: 'call-actor',
                     arguments: {},
+                    isMcpTool: true,
                     result: { toolName: 'call-actor', success: false, error: 'internal error' },
                 },
             ],
@@ -206,6 +214,7 @@ describe('buildAgentObservations()', () => {
                 {
                     name: 'search-actors',
                     arguments: {},
+                    isMcpTool: true,
                     result: { toolName: 'search-actors', success: true },
                 },
             ],

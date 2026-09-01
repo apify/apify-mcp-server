@@ -2,10 +2,10 @@
 /* eslint-disable no-console */
 /* eslint-disable import/extensions */
 /**
- * Write the Langfuse dataset back to `dataset_snapshot.json`.
+ * Write the Langfuse dataset back to `dataset_snapshot_<dataset>.json`.
  *
- * The snapshot is a reviewable copy that nothing reads at runtime: it puts UI edits into
- * git history and keeps the cases somewhere other than the Langfuse database.
+ * A local, gitignored copy for reading the cases outside Langfuse (review, diffing two
+ * exports, an offline backup). Nothing reads it at runtime and it is not tracked.
  *
  * Usage:
  *   pnpm run evals:mcp-agent:export-dataset
@@ -31,10 +31,18 @@ import { fetchMcpAgentCases, MCP_AGENT_DATASET_NAME } from './langfuse_dataset.j
 sanitizeProcessEnv();
 
 /** Resolved from this module so cwd cannot change it. */
-const SNAPSHOT_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dataset_snapshot.json');
+const SNAPSHOT_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+/** One file per dataset, named after it. */
+function snapshotPath(dataset: string): string {
+    return path.join(SNAPSHOT_DIR, `dataset_snapshot_${dataset.replace(/[^a-zA-Z0-9-]/g, '_')}.json`);
+}
 
 async function main() {
-    const argv = (await yargs(hideBin(process.argv))
+    // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores
+    // every flag behind it. Drop it so both call styles work.
+    const args = hideBin(process.argv).filter((arg) => arg !== '--');
+    const argv = (await yargs(args)
         .options({
             dataset: { type: 'string', description: 'Langfuse dataset to export', default: MCP_AGENT_DATASET_NAME },
         })
@@ -51,8 +59,9 @@ async function main() {
     // Drop the raw item: the snapshot holds test cases, not Langfuse bookkeeping.
     const testCases = cases.map(({ item, ...testCase }) => testCase);
 
-    fs.writeFileSync(SNAPSHOT_PATH, `${JSON.stringify(testCases, null, 2)}\n`);
-    console.log(`✅ Wrote ${testCases.length} case(s) from "${argv.dataset}" to ${SNAPSHOT_PATH}`);
+    const outPath = snapshotPath(argv.dataset);
+    fs.writeFileSync(outPath, `${JSON.stringify(testCases, null, 2)}\n`);
+    console.log(`✅ Wrote ${testCases.length} case(s) from "${argv.dataset}" to ${outPath}`);
 }
 
 void main();
