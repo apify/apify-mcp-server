@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { callActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
 import type { HelperTool, InternalToolArgs, ToolEntry } from '../../src/types.js';
-import { TOOL_TYPE } from '../../src/types.js';
-import { getActorMcpUrlCached } from '../../src/utils/actor.js';
+import { ACTOR_TOOL_MODE, TOOL_TYPE } from '../../src/types.js';
+import { getActorToolResolutionCached } from '../../src/utils/actor.js';
 import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 /**
@@ -13,7 +13,7 @@ import { stubToolCallContext, type TextToolResult } from './helpers/tool_context
  * the response.
  */
 vi.mock('../../src/utils/actor.js', () => ({
-    getActorMcpUrlCached: vi.fn(),
+    getActorToolResolutionCached: vi.fn(),
 }));
 
 vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
@@ -55,8 +55,11 @@ function stubApifyClient(startSpy: (input: unknown, opts: unknown) => Promise<ty
 
 describe('call-actor-widget response', () => {
     beforeEach(() => {
-        vi.mocked(getActorMcpUrlCached).mockReset();
-        vi.mocked(getActorMcpUrlCached).mockResolvedValue(false);
+        vi.mocked(getActorToolResolutionCached).mockReset();
+        vi.mocked(getActorToolResolutionCached).mockResolvedValue({
+            toolMode: ACTOR_TOOL_MODE.RUN,
+            actorFullName: 'apify/rag-web-browser',
+        });
         vi.mocked(getActorsAsTools).mockReset();
         vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [MOCK_ACTOR_TOOL], errors: [] });
     });
