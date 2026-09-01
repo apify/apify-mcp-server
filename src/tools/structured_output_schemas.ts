@@ -352,9 +352,7 @@ export const reportProblemToolOutputSchema = {
     required: ['reported'],
 };
 
-/**
- * Schema shared by every Actor task tool. Input values are omitted on purpose (they may hold secrets) `inputFields` lists the field names that `publicConfig.inputSchemaFields` can use.
- */
+/** Schema shared by every Actor task tool. */
 export const actorTaskOutputSchema = {
     type: 'object' as const,
     properties: {
@@ -378,13 +376,14 @@ export const actorTaskOutputSchema = {
                 datasetView: { type: ['string', 'null'] },
             },
         },
-        inputFields: {
-            type: 'array',
-            items: { type: 'string' },
-            description: "Field names of the task's input; values are not returned",
+        input: {
+            type: ['object', 'array', 'null'],
+            description:
+                'The stored task input, as the API returns it; fields the Actor declares as secret are ' +
+                'encrypted placeholders, never plaintext. Its keys are what `publicConfig.inputSchemaFields` can use.',
         },
     },
-    required: ['taskId', 'actorId', 'name', 'title', 'description', 'publishedAt', 'publicConfig', 'inputFields'],
+    required: ['taskId', 'actorId', 'name', 'title', 'description', 'publishedAt', 'publicConfig', 'input'],
 };
 
 /**

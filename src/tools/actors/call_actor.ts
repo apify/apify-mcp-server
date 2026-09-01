@@ -31,6 +31,7 @@ import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/acto
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
+    isActorInputValidationError,
     isActorRunLimitError,
     isMemoryQuotaError,
     isPermissionApprovalError,
@@ -40,6 +41,7 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { logHttpError } from '../../utils/logging.js';
 import {
+    buildInvalidInputTexts,
     respondAborted,
     respondRaw,
     respondServerError,
@@ -97,10 +99,16 @@ type CallActorErrorResponseParams = {
     mcpSessionId?: string;
     /** Names of all currently loaded tools — gates which recovery tools this error may name. */
     loadedToolNames: readonly string[];
+    /** Actor's input schema, echoed back only on a confirmed platform input-validation error. */
+    inputSchema?: ToolInputSchema;
 };
 
-/** Names only the recovery tools actually loaded in this session — omits the sentence if none are. */
-function buildActorNotFoundHint(loadedToolNames: readonly string[]): string {
+/**
+ * Recovery offers for a failed call, naming only the tools actually loaded in this session —
+ * omits the sentence if none are. Not for the not-found branch of `resolveAndValidateActor`:
+ * there the Actor does not exist, so the detail-lookup offer is a dead end.
+ */
+function buildCallFailureRecoveryHint(loadedToolNames: readonly string[]): string {
     const hints = [
         loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
             ? `search for available Actors using ${HELPER_TOOLS.STORE_SEARCH}`
@@ -169,7 +177,7 @@ export function buildCallActorAppsDescription(ctx: ToolDescriptionContext = ALL_
 }
 
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ToolResponse {
-    const { actorName, error, actorId, mcpSessionId, loadedToolNames } = params;
+    const { actorName, error, actorId, mcpSessionId, loadedToolNames, inputSchema } = params;
 
     if (isPermissionApprovalError(error)) {
         logHttpError(error, 'Failed to call Actor — permission approval required', {
@@ -212,11 +220,19 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         });
     }
 
+    // Checked before the generic fallback below: the Actor was found fine, only its input wasn't.
+    if (isActorInputValidationError(error)) {
+        return respondUserError(buildInvalidInputTexts(actorName, errMsg, inputSchema), {
+            actorId,
+            detail: errMsg.slice(0, 200),
+        });
+    }
+
     return respondServerError(
         [
             `Failed to call Actor '${actorName}': ${errMsg}`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
-            buildActorNotFoundHint(loadedToolNames),
+            buildCallFailureRecoveryHint(loadedToolNames),
         ].filter(Boolean),
         { error, detail: errMsg.slice(0, 200), actorId },
     );
@@ -449,7 +465,7 @@ export async function resolveAndValidateActor(params: {
     toolArgs: InternalToolArgs;
 }): Promise<{ error: ToolResponse } | { actor: ToolEntry }> {
     const { actorName, input, toolArgs } = params;
-    const { apifyClient } = toolArgs;
+    const { apifyClient, loadedToolNames } = toolArgs;
 
     const { tools, errors } = await getActorsAsTools([actorName], apifyClient, {
         mcpSessionId: toolArgs.mcpSessionId,
@@ -465,13 +481,18 @@ export async function resolveAndValidateActor(params: {
     const actor = tools[0];
 
     if (!actor) {
+        // See apify/apify-mcp-server#1296.
+        // Only search-actors: the Actor does not exist, so buildCallFailureRecoveryHint's second
+        // offer (get Actor details) would send the model to a lookup that fails the same way.
+        const recovery = loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
+            ? `\nYou can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.`
+            : '';
         return {
             error: respondUserError(
                 dedent`
                     Actor '${actorName}' was not found.
                     Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
-                    You can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.
-                `,
+                ` + recovery,
                 { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
             ),
         };
@@ -614,6 +635,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
     const waitSecs = toolArgs.taskMode ? undefined : parsed.waitSecs;
 
     let resolvedActorId: string | undefined;
+    let resolvedInputSchema: ToolInputSchema | undefined;
     try {
         const resolution = await resolveAndValidateActor({
             actorName: baseActorName,
@@ -625,6 +647,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
         }
 
         resolvedActorId = extractActorId(resolution.actor);
+        resolvedInputSchema = resolution.actor.inputSchema;
         const { apifyClient } = toolArgs;
         const abortSignal = toolArgs.signal;
 
@@ -677,6 +700,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
             actorId: resolvedActorId,
             mcpSessionId: toolArgs.mcpSessionId,
             loadedToolNames: toolArgs.loadedToolNames,
+            inputSchema: resolvedInputSchema,
         });
     }
 }

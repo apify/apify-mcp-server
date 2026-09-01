@@ -46,9 +46,10 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         hasTool(name),
     );
     return `Update a saved Actor task: its input, run options, or the public display configuration (\`publicConfig\`) of its landing page.
-This does not publish or unpublish the task${publicationTools.length ? ` — use ${publicationTools.join(' and ')} for that` : ''}.
-To publish a task, \`publicConfig.inputSchemaFields\` (at least one field name from the task input) and
-\`publicConfig.datasetView\` must be set here first. Updating \`publicConfig\` requires write access to the task's Actor.
+This does not publish or unpublish the task${publicationTools.length ? `; use ${publicationTools.join(' and ')} for that` : ''}.
+To publish a task, \`publicConfig.inputSchemaFields\` (at least one field name from the task input),
+\`publicConfig.datasetView\`, and \`publicConfig.seoDescription\` must be set here first. Updating \`publicConfig\`
+requires write access to the task's Actor.
 
 USAGE:
 - Use to change a task's input or run options.
