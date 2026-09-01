@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.15.4 - **not yet released**
 
+### 🚀 Features
+
+- Run&#x2F;standby mode decision table for Actor tool loading ([#1278](https://github.com/apify/apify-mcp-server/pull/1278)) ([76f91b6](https://github.com/apify/apify-mcp-server/commit/76f91b6284ab975c63d45858543ce2d3f19814b8)) by [@jirispilka](https://github.com/jirispilka), closes [#1208](https://github.com/apify/apify-mcp-server/issues/1208)
+
 ### 🐛 Bug Fixes
 
 - Redact tokens from local conformance output ([#1315](https://github.com/apify/apify-mcp-server/pull/1315)) ([c3c5f6f](https://github.com/apify/apify-mcp-server/commit/c3c5f6f09510062b298c26076f2504b393553855)) by [@SomSamantray](https://github.com/SomSamantray), closes [#1245](https://github.com/apify/apify-mcp-server/issues/1245)
