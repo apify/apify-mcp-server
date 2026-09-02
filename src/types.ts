@@ -133,6 +133,14 @@ export const TOOL_TYPE = {
  */
 export type TOOL_TYPE = (typeof TOOL_TYPE)[keyof typeof TOOL_TYPE];
 
+/** How an Actor definition maps to the tool surface. */
+export const ACTOR_TOOL_MODE = {
+    RUN: 'RUN',
+    MCP: 'MCP',
+    STANDBY_WITHOUT_MCP: 'STANDBY_WITHOUT_MCP',
+} as const;
+export type ACTOR_TOOL_MODE = (typeof ACTOR_TOOL_MODE)[keyof typeof ACTOR_TOOL_MODE];
+
 /**
  * Type for Actor-based tools - tools that wrap Apify Actors.
  * Type discriminator: {@link TOOL_TYPE.ACTOR}
@@ -255,10 +263,22 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
  * Type representing the Actor information needed in order to turn it into an MCP server tool.
  */
 export type ActorInfo = {
-    webServerMcpPath: string | null; // To determined if the Actor is an MCP server
+    webServerMcpPath: string | null; // Declared MCP endpoint; only means MCP when standby is on — see `resolveActorToolMode`
     definition: ActorDefinitionPruned;
     actor: ActorOutdated;
 };
+
+/**
+ * How an Actor is exposed as a tool, resolved once from its definition by `resolveActorToolMode`.
+ * `mcpServerUrl` is present exactly when `toolMode` is {@link ACTOR_TOOL_MODE.MCP}, so callers
+ * connect without a cast and an un-narrowed read is a compile error.
+ * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
+ * messages built from it read the same whether the Actor was addressed by ID or by name.
+ */
+export type ActorToolResolutionResult = { actorFullName: string } & (
+    | { toolMode: typeof ACTOR_TOOL_MODE.MCP; mcpServerUrl: string }
+    | { toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP }
+);
 
 export type ActorStoreList = ActorStoreListOutdated & {
     actorReviewCount?: number;
@@ -468,6 +488,8 @@ export type ServerModeOption = SERVER_MODE | 'auto';
 export type ActorExecutionParams = {
     /** Full name of the Actor (e.g., "apify/rag-web-browser") */
     actorFullName: string;
+    /** Actor's platform ID — echoed into telemetry on a platform input-validation error. */
+    actorId?: string;
     /** Input to pass to the Actor (payment fields already stripped) */
     input: Record<string, unknown>;
     /** Apify client (may include payment headers) */
@@ -725,17 +747,71 @@ export type ApifyRequestParams = {
     [key: string]: unknown;
 };
 
-/** MCP Server Card per SEP-1649. */
+/** Source repository descriptor, registry `server.json` shape. */
+export type ServerCardRepository = {
+    url: string;
+    source: string;
+};
+
+/** Remote transport descriptor, registry `server.json` shape. */
+export type ServerCardRemote = {
+    type: string;
+    url: string;
+    headers?: {
+        name: string;
+        description?: string;
+        isRequired?: boolean;
+        isSecret?: boolean;
+    }[];
+};
+
+/**
+ * Tool summary embedded in the server card.
+ *
+ * Mirrors `tools/list` without `inputSchema`: the schemas dominate the payload and a card is a
+ * cheap pre-connection GET. Agents that need argument shapes connect and call `tools/list`.
+ */
+export type ServerCardTool = {
+    name: string;
+    title?: string;
+    description?: string;
+    annotations?: ToolBase['annotations'];
+};
+
+/**
+ * MCP server card, served by `apify-mcp-server-internal` at `/.well-known/mcp/server-card.json`.
+ *
+ * Deliberately hybrid: identity follows the MCP registry schema, the only stable dated one
+ * published; the SEP-1649 fields stay for consumers reading those, except `version` and `tools`,
+ * which changed meaning. The registry schema never sets `additionalProperties: false`, so both fit.
+ */
 export type ServerCard = {
     $schema: string;
+
+    // Registry-shaped identity. Sourced from `server.json` so there is one place to edit.
+    name: string;
+    title: string;
+    description: string;
+    /** Server version, per registry semantics — not the card format version, which `$schema` pins. */
     version: string;
+    websiteUrl: string;
+    repository: ServerCardRepository;
+    icons: {
+        src: string;
+        mimeType: string;
+        sizes: string[];
+    }[];
+    remotes: ServerCardRemote[];
+    /** Absolute MCP endpoint. Not a registry field; named by ora's server-card methodology. */
+    serverUrl: string;
+
+    // SEP-1649 compatibility.
     protocolVersion: string;
     serverInfo: {
         name: string;
         title: string;
         version: string;
     };
-    description: string;
     iconUrl: string;
     documentationUrl: string;
     transport: {
@@ -749,5 +825,7 @@ export type ServerCard = {
         required: boolean;
         schemes: string[];
     };
-    tools: string;
+
+    /** Default-mode tools, composed the way a session composes them so the card cannot drift. */
+    tools: ServerCardTool[];
 };

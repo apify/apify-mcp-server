@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
+import { getCategoryTools } from '../../src/tools/index.js';
 import { actorTaskOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { createActorTask } from '../../src/tools/tasks/create_actor_task.js';
 import { getActorTask } from '../../src/tools/tasks/get_actor_task.js';
@@ -15,7 +17,7 @@ import {
 type StructuredResult = TextToolResult & { structuredContent: Record<string, unknown> };
 
 describe('get-actor-task', () => {
-    it('returns the task subset with input field names but no input values', async () => {
+    it('returns the task subset including the stored input', async () => {
         const { apifyClient, calls } = mockTaskApiClient(mockTask());
         const result = (await (getActorTask as HelperTool).call(
             stubToolCallContext({ taskId: 'task-1' }, apifyClient),
@@ -28,16 +30,16 @@ describe('get-actor-task', () => {
             actorId: 'actor-id-1',
             name: 'my-task',
             publishedAt: '2026-08-01T10:00:00.000Z',
-            inputFields: ['query', 'apiKey'],
+            input: { query: 'cats', apiKey: 'secret-input-value' },
         });
         expect(result.structuredContent.publicConfig).toEqual({
             seoTitle: 'Seo title',
             datasetView: 'overview',
         });
 
-        // Input values and internal fields must NOT leak.
+        // Internal fields must NOT leak. Input values are returned by contract (the platform
+        // encrypts fields declared as secret before they ever reach the client).
         const dump = JSON.stringify(result);
-        expect(dump).not.toContain('secret-input-value');
         expect(dump).not.toContain('user-secret');
     });
 
@@ -282,5 +284,29 @@ describe('update-actor-task', () => {
 
         expect(result.content[0].text).toContain('not found');
         expect(calls).toEqual([{ fn: 'get', taskId: '~nope' }]);
+    });
+});
+
+// Cross-tool guidance belongs in buildDescription, where hasTool omits tools this session was not
+// served. A summary can only gate on `loadedToolNames`, so the task tools name no tool at all.
+describe('task tool summaries', () => {
+    const argsByTool: Record<string, Record<string, unknown>> = {
+        [HELPER_TOOLS.ACTOR_TASK_GET]: { taskId: 'task-1' },
+        [HELPER_TOOLS.ACTOR_TASK_CREATE]: { actorId: 'actor-id-1', name: 'my-task' },
+        [HELPER_TOOLS.ACTOR_TASK_UPDATE]: { taskId: 'task-1', title: 'Renamed' },
+        [HELPER_TOOLS.ACTOR_TASK_PUBLISH]: { taskId: 'task-1' },
+        [HELPER_TOOLS.ACTOR_TASK_UNPUBLISH]: { taskId: 'task-1' },
+    };
+    // Driven off the registry so a task tool added later is covered; it needs an `argsByTool` entry.
+    const taskTools = getCategoryTools('default').tasks.map((tool) => [tool.name, tool as HelperTool] as const);
+
+    it.each(taskTools)('%s names no tool, leaving cross-tool guidance to the description', async (name, tool) => {
+        expect(argsByTool[name], `add an \`argsByTool\` entry for ${name}`).toBeDefined();
+        const { apifyClient } = mockTaskApiClient(mockTask());
+        const result = (await tool.call(stubToolCallContext(argsByTool[name], apifyClient))) as TextToolResult;
+
+        for (const toolName of Object.values(HELPER_TOOLS)) {
+            expect(result.content[1].text).not.toContain(toolName);
+        }
     });
 });

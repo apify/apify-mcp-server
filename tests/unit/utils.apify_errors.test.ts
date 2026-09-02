@@ -3,6 +3,7 @@ import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
 import {
+    isActorInputValidationError,
     isActorRunLimitError,
     isMemoryQuotaError,
     isPermissionApprovalError,
@@ -38,6 +39,14 @@ describe('isPermissionApprovalError', () => {
     it('matches only the full-permission-not-approved ApifyApiError type', () => {
         expect(isPermissionApprovalError(apifyApiError('full-permission-actor-not-approved', 403))).toBe(true);
         expect(isPermissionApprovalError(apifyApiError('memory-limit-exceeded'))).toBe(false);
+    });
+});
+
+describe('isActorInputValidationError', () => {
+    it('matches only the invalid-input ApifyApiError type, not the sibling invalid-input-schema type', () => {
+        expect(isActorInputValidationError(apifyApiError('invalid-input', 400))).toBe(true);
+        expect(isActorInputValidationError(apifyApiError('invalid-input-schema', 400))).toBe(false);
+        expect(isActorInputValidationError(new Error('Input is not valid'))).toBe(false);
     });
 });
 

@@ -17,7 +17,7 @@ import {
     transformActorInputSchemaProperties,
 } from '../../src/tools/actor_input_schema.js';
 import { isActorBlockedUnderPaymentProvider } from '../../src/tools/actor_tool_naming.js';
-import type { ActorInfo, ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
+import type { ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { ajv } from '../../src/utils/ajv.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -1027,21 +1027,15 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
 });
 
 describe('isActorBlockedUnderPaymentProvider', () => {
-    const actorInfo = ({ standby, mcpPath = null }: { standby: boolean; mcpPath?: string | null }): ActorInfo => ({
-        definition: { actorFullName: 'user/actor', id: 'act' } as ActorInfo['definition'],
-        actor: { actorStandby: standby ? { isEnabled: true } : undefined } as ActorInfo['actor'],
-        webServerMcpPath: mcpPath,
+    const actor = (standby: boolean) => ({
+        actorStandby: standby ? { isEnabled: true } : undefined,
     });
 
     it('blocks standby Actors', () => {
-        expect(isActorBlockedUnderPaymentProvider(actorInfo({ standby: true }))).toBe(true);
+        expect(isActorBlockedUnderPaymentProvider(actor(true))).toBe(true);
     });
 
     it('does not block normal Actors', () => {
-        expect(isActorBlockedUnderPaymentProvider(actorInfo({ standby: false }))).toBe(false);
-    });
-
-    it('does not block MCP path without standby (must match list-tools filter)', () => {
-        expect(isActorBlockedUnderPaymentProvider(actorInfo({ standby: false, mcpPath: '/mcp' }))).toBe(false);
+        expect(isActorBlockedUnderPaymentProvider(actor(false))).toBe(false);
     });
 });

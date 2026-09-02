@@ -63,7 +63,7 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { apifyToken, apifyClient, mcpSessionId } = toolArgs;
+        const { apifyToken, apifyClient, mcpSessionId, loadedToolNames } = toolArgs;
         const parsed = fetchActorDetailsWidgetArgsSchema.parse(toolArgs.args);
         const actorName = fixActorNameInputAndLog(parsed.actor, {
             mcpSessionId,
@@ -74,7 +74,7 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         const cardOptions = { ...buildCardOptions(actorDetailsOutputDefaults), userTier: userPlanTier };
         const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
         if (!details) {
-            return buildActorNotFoundResponse(actorName);
+            return buildActorNotFoundResponse(actorName, loadedToolNames);
         }
 
         const { actorUrl, actorDetails } = buildActorDetailsForWidget(details, userPlanTier);

@@ -18,8 +18,8 @@ const getActorTaskArgs = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    return `Get a saved Actor task — the Actor it runs, its name, title, description, and run options.
-Input values are not returned (they may contain secrets), only the input field names.
+    return `Get a saved Actor task: the Actor it runs, its name, title, description, stored input, and run options.
+Input fields the Actor declares as secret are returned as encrypted placeholders, never in plaintext.
 Also reports whether the task is published on a public landing page, and its display configuration if so.
 ${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? `Use ${HELPER_TOOLS.ACTOR_TASK_UPDATE} to change the task.\n` : ''}
 USAGE:

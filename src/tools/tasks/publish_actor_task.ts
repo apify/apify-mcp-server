@@ -24,9 +24,9 @@ in the Actor's Examples tab and can be discovered by users, search engines, and 
 users understand and try the Actor and can increase its runs. Publish only tasks that represent a useful,
 reliable, and specific use case. Not every saved task needs to be public.
 
-The task's Actor must be public and the task must have its public display configuration set up -
-at least \`publicConfig.inputSchemaFields\` and \`publicConfig.datasetView\`. If publishing fails, \
-follow the API reason${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? `; update these fields with ${HELPER_TOOLS.ACTOR_TASK_UPDATE} only when the reason identifies them` : ''}.
+The task's Actor must be public and the task must have its public display configuration set up:
+at least \`publicConfig.inputSchemaFields\`, \`publicConfig.datasetView\`, and \`publicConfig.seoDescription\`. \
+If publishing fails, follow the API reason${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? `; update these fields with ${HELPER_TOOLS.ACTOR_TASK_UPDATE} only when the reason identifies them` : ''}.
 At most 50 tasks can be published per Actor.
 Publishing an already published task has no effect.
 Requires write access to both the task and its Actor.
@@ -64,7 +64,10 @@ export const publishActorTask: ToolEntry = Object.freeze({
         const task = await setTaskPublication(client, parsed.taskId, true);
 
         const result = taskResult(task);
-        const summary = `Task "${task.name}" (ID: ${task.id}) is published. The link to the public page is available in Apify Console, on the task's Publication tab.`;
+        // publishedAt is the server's confirmation that the page is live: without saying so, an agent
+        // asked to "confirm it is live" either claims it unverified or makes a redundant lookup.
+        const summary = `Task "${task.name}" (ID: ${task.id}) is published; publishedAt in the result is the \
+confirmed publication time. The link to the public page is available in Apify Console, on the task's Publication tab.`;
         return respondOk([JSON.stringify(result), summary], { structuredContent: result });
     },
 } as const);

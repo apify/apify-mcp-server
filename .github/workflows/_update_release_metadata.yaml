@@ -75,12 +75,14 @@ jobs:
             -   name: Update server.json version
                 run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' server.json > server.json.tmp && mv server.json.tmp server.json
 
+            # Written via heredoc, not an action `with:` input: action inputs become env vars,
+            # and Linux caps a single env var at 128 KiB (MAX_ARG_STRLEN) — the changelog
+            # already exceeds that, which crashed write-file-action with "Argument list too long".
             -   name: Update CHANGELOG.md
-                uses: DamianReeves/write-file-action@master
-                with:
-                    path: CHANGELOG.md
-                    write-mode: overwrite
-                    contents: ${{ needs.release_metadata.outputs.changelog }}
+                run: |
+                    cat > CHANGELOG.md << 'CHANGELOG_EOF'
+                    ${{ needs.release_metadata.outputs.changelog }}
+                    CHANGELOG_EOF
 
             -   name: Commit changes
                 id: commit
