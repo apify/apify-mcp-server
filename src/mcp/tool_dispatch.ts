@@ -17,6 +17,7 @@ import type { createProgressTracker } from '../utils/progress.js';
 import { applyToolTelemetry, buildExecutionDiagnostics } from '../utils/tool_status.js';
 import { buildActorFields } from '../utils/tools.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
+import type { RemoteMcpCallOutcome } from './remote_tool_call.js';
 import { withRemoteMcpClient } from './remote_tool_call.js';
 
 /**
@@ -225,6 +226,13 @@ export async function dispatchToolCall(params: {
                     result = { ...outcome.value };
                     break;
                 }
+                default:
+                    // Exhaustiveness guard mirroring the outer TOOL_TYPE switch: a new outcome
+                    // variant makes `outcome` non-`never` here and fails `satisfies never` at
+                    // compile time. Unreachable at runtime — RemoteMcpCallOutcome is a closed union.
+                    throw new Error(
+                        `Unknown outcome "${(outcome satisfies never as RemoteMcpCallOutcome<unknown>).outcome}"`,
+                    );
             }
             break;
         }
