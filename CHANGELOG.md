@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Run&#x2F;standby mode decision table for Actor tool loading ([#1278](https://github.com/apify/apify-mcp-server/pull/1278)) ([76f91b6](https://github.com/apify/apify-mcp-server/commit/76f91b6284ab975c63d45858543ce2d3f19814b8)) by [@jirispilka](https://github.com/jirispilka), closes [#1208](https://github.com/apify/apify-mcp-server/issues/1208)
 - **evals:** Add task-tool workflow eval suites ([#1294](https://github.com/apify/apify-mcp-server/pull/1294)) ([43b2c48](https://github.com/apify/apify-mcp-server/commit/43b2c486eab20d00884a20898b7e50eae6ca429f)) by [@jirispilka](https://github.com/jirispilka), closes [#1288](https://github.com/apify/apify-mcp-server/issues/1288)
+- Expand MCP server card to hybrid registry shape ([#1318](https://github.com/apify/apify-mcp-server/pull/1318)) ([de3bb58](https://github.com/apify/apify-mcp-server/commit/de3bb58ef8dbfa18cfff89c9d1841e69adaa0131)) by [@marekh19](https://github.com/marekh19), closes [#790](https://github.com/apify/apify-mcp-server/issues/790)
 
 ### 🐛 Bug Fixes
 
