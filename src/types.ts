@@ -747,17 +747,71 @@ export type ApifyRequestParams = {
     [key: string]: unknown;
 };
 
-/** MCP Server Card per SEP-1649. */
+/** Source repository descriptor, registry `server.json` shape. */
+export type ServerCardRepository = {
+    url: string;
+    source: string;
+};
+
+/** Remote transport descriptor, registry `server.json` shape. */
+export type ServerCardRemote = {
+    type: string;
+    url: string;
+    headers?: {
+        name: string;
+        description?: string;
+        isRequired?: boolean;
+        isSecret?: boolean;
+    }[];
+};
+
+/**
+ * Tool summary embedded in the server card.
+ *
+ * Mirrors `tools/list` without `inputSchema`: the schemas dominate the payload and a card is a
+ * cheap pre-connection GET. Agents that need argument shapes connect and call `tools/list`.
+ */
+export type ServerCardTool = {
+    name: string;
+    title?: string;
+    description?: string;
+    annotations?: ToolBase['annotations'];
+};
+
+/**
+ * MCP server card, served by `apify-mcp-server-internal` at `/.well-known/mcp/server-card.json`.
+ *
+ * Deliberately hybrid: identity follows the MCP registry schema, the only stable dated one
+ * published; the SEP-1649 fields stay for consumers reading those, except `version` and `tools`,
+ * which changed meaning. The registry schema never sets `additionalProperties: false`, so both fit.
+ */
 export type ServerCard = {
     $schema: string;
+
+    // Registry-shaped identity. Sourced from `server.json` so there is one place to edit.
+    name: string;
+    title: string;
+    description: string;
+    /** Server version, per registry semantics — not the card format version, which `$schema` pins. */
     version: string;
+    websiteUrl: string;
+    repository: ServerCardRepository;
+    icons: {
+        src: string;
+        mimeType: string;
+        sizes: string[];
+    }[];
+    remotes: ServerCardRemote[];
+    /** Absolute MCP endpoint. Not a registry field; named by ora's server-card methodology. */
+    serverUrl: string;
+
+    // SEP-1649 compatibility.
     protocolVersion: string;
     serverInfo: {
         name: string;
         title: string;
         version: string;
     };
-    description: string;
     iconUrl: string;
     documentationUrl: string;
     transport: {
@@ -771,5 +825,7 @@ export type ServerCard = {
         required: boolean;
         schemes: string[];
     };
-    tools: string;
+
+    /** Default-mode tools, composed the way a session composes them so the card cannot drift. */
+    tools: ServerCardTool[];
 };
