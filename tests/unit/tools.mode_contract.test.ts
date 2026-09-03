@@ -11,15 +11,41 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HELPER_TOOLS, type HelperToolName } from '../../src/const.js';
+import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
 import { WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';
-import type { Input, ToolBase, ToolEntry } from '../../src/types.js';
+import type { ActorInfo, Input, ToolBase, ToolEntry } from '../../src/types.js';
 import { SERVER_MODES, SERVER_MODE } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
+
+/** Fabricated Actor definition — enough for `getNormalActorsAsTools` to build a real tool entry, no network. */
+function buildFixtureActorInfo(actorFullName: string): ActorInfo {
+    return {
+        webServerMcpPath: null,
+        definition: {
+            id: 'test-actor-id',
+            actorFullName,
+            readme: '',
+            description: 'Test actor for description-gating coverage.',
+            defaultRunOptions: { memoryMbytes: 1024, timeoutSecs: 300, build: 'latest' },
+            input: {
+                type: 'object',
+                title: 'Test Input',
+                description: 'Test input schema',
+                properties: {},
+                schemaVersion: 1,
+            },
+        },
+        actor: { id: 'test-actor-id', name: 'test-actor', username: 'apify' } as ActorInfo['actor'],
+    };
+}
+
+// Real getNormalActorsAsTools output, not a hand-written stand-in — exercises the gated description.
+const [actorToolStub] = await getNormalActorsAsTools([buildFixtureActorInfo('apify/test-actor')]);
 
 /** Helper to extract tool names from a category. */
 function toolNames(tools: ToolEntry[]): string[] {
@@ -424,15 +450,14 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
  * the list handlers do and checks the result.
  */
 describe('tool descriptions never name a tool absent from the session', () => {
-    /** Minimal direct Actor tool — enough to trigger AUTO_INJECTED_TOOLS and stand in for a real one. */
-    const actorToolStub = {
-        type: 'actor',
-        name: 'apify--rag-web-browser',
-        actorId: 'test-actor-id',
-        actorFullName: 'apify/rag-web-browser',
-        description: `Fetch output rows with ${HELPER_TOOLS.DATASET_GET_ITEMS}.`,
-        inputSchema: { type: 'object', properties: {} },
-    } as unknown as ToolEntry;
+    it('renders byte-identical to the pre-gating text when call-actor is loaded (ALL_TOOLS_PRESENT)', () => {
+        expect(actorToolStub.description).toBe(
+            `This tool calls the Actor "apify/test-actor" and retrieves its output results.\n` +
+                `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` +
+                `Actor description: Test actor for description-gating coverage.`,
+        );
+    });
+
     const ALL_TOOL_NAMES: string[] = [...Object.values(HELPER_TOOLS), actorToolStub.name];
 
     const sessions: { label: string; input: Input; actorTools: ToolEntry[] }[] = [
@@ -448,7 +473,7 @@ describe('tool descriptions never name a tool absent from the session', () => {
         })),
         {
             label: 'Actor tool only',
-            input: { tools: ['apify/rag-web-browser'] },
+            input: { tools: ['apify/test-actor'] },
             actorTools: [actorToolStub],
         },
         // Mixed cross-category selectors — arbitrary combinations must render correctly too.

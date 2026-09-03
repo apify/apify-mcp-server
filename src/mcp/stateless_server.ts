@@ -75,7 +75,7 @@ export interface StatelessMcpServerHost {
     readonly options: ActorsMcpServerOptions;
     readonly promptService: ReturnType<typeof createPromptService>;
     resolveApifyToken(meta?: ApifyRequestParams['_meta']): string | undefined;
-    getStatelessServerInstructions(): string;
+    getStatelessServerInstructions(requestUrl?: string): string;
     createRequestSnapshot(clientContext: McpClientContext | undefined): Promise<StatelessRequestSnapshot>;
 }
 
@@ -125,7 +125,7 @@ class StatelessMcpServer {
      */
     private snapshot: Promise<StatelessRequestSnapshot> | undefined;
 
-    constructor(host: StatelessMcpServerHost) {
+    constructor(host: StatelessMcpServerHost, requestUrl?: string) {
         this.host = host;
         this.server = new Server(getServerInfo(), {
             capabilities: {
@@ -138,7 +138,7 @@ class StatelessMcpServer {
                 resources: {},
                 prompts: {},
             },
-            instructions: this.host.getStatelessServerInstructions(),
+            instructions: this.host.getStatelessServerInstructions(requestUrl),
         });
         this.setupToolHandlers();
         this.setupResourceHandlers();
@@ -391,7 +391,10 @@ async function emitLogServerSide(msg: { level: string; data?: unknown }): Promis
  * ```ts
  * const handler = createMcpHandler(() => createStatelessServer(actorsMcpServer), { legacy: 'reject' });
  * ```
+ *
+ * `requestUrl` sharpens the served instructions' cross-tool mentions (`call-actor`, Actor tools);
+ * omit it for the same, tool-blind fallback.
  */
-export function createStatelessServer(host: StatelessMcpServerHost): Server {
-    return new StatelessMcpServer(host).server;
+export function createStatelessServer(host: StatelessMcpServerHost, requestUrl?: string): Server {
+    return new StatelessMcpServer(host, requestUrl).server;
 }

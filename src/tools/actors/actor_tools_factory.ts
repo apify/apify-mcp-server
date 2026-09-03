@@ -23,9 +23,11 @@ import {
     type ActorStore,
     type ActorTool,
     type ApifyToken,
+    type ToolDescriptionContext,
     type ToolEntry,
     type ToolInputSchema,
     ACTOR_TOOL_MODE,
+    ALL_TOOLS_PRESENT,
     TOOL_TYPE,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
@@ -125,14 +127,17 @@ export async function getNormalActorsAsTools(
             waitSecs: WAIT_SECS_INPUT_PROPERTY,
         };
 
-        let description = `This tool calls the Actor "${definition.actorFullName}" and retrieves its output results.
-Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.
-Actor description: ${definition.description}`;
-        if (isRag) {
-            description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
-        } else if (definition.actorFullName === WEB_FETCH) {
-            description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
-        }
+        // Names call-actor only when the session actually has it.
+        const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
+            let description = `This tool calls the Actor "${definition.actorFullName}" and retrieves its output results.
+${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${definition.description}`;
+            if (isRag) {
+                description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
+            } else if (definition.actorFullName === WEB_FETCH) {
+                description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
+            }
+            return description;
+        };
 
         const memoryMbytes = Math.min(
             definition.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES,
@@ -160,7 +165,8 @@ Actor description: ${definition.description}`;
             title: definition.actorFullName,
             actorId: definition.id,
             actorFullName: definition.actorFullName,
-            description,
+            description: buildDescription(ALL_TOOLS_PRESENT),
+            buildDescription,
             inputSchema: inputSchema as ToolInputSchema,
             // Canonical RunResponse shape — same as call-actor and get-actor-run.
             outputSchema: actorRunOutputSchema,

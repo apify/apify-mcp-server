@@ -99,7 +99,7 @@ function normalizeInput(input: Input): NormalizedInput {
  * If no selectors / no explicit actors: the defaults apply (or empty when
  * `actors` was explicitly set to empty).
  */
-function resolveActorsToLoad(input: Input): string[] {
+export function resolveActorsToLoad(input: Input): string[] {
     const { selectors, actorsExplicitlyEmpty } = normalizeInput(input);
 
     // Selectors that aren't retired, categories, or internal tools in any mode → Actor names.
