@@ -19,6 +19,7 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv } from '../telemetry.js';
+import { actorNameToToolName } from '../tools/actor_tool_naming.js';
 import type {
     ActorsMcpServerOptions,
     ActorStore,
@@ -32,7 +33,7 @@ import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
-import { getActors, getToolsForServerMode, toolNamesToInput } from '../utils/tools_loader.js';
+import { getActors, getToolsForServerMode, resolveActorsToLoad, toolNamesToInput } from '../utils/tools_loader.js';
 import { buildMcpClientContext, isUiSupportedByClient } from './client_context.js';
 import type { McpClientContext } from './client_context.js';
 import { LegacyMcpServer } from './legacy_server.js';
@@ -279,15 +280,34 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Instructions for a stateless serving unit. The SDK answers `server/discover` from them before
-     * any request's envelope is seen, so they are configuration-level: no report-problem mention
-     * (that tool's presence is decided per request) and the configured mode only. Reads
-     * `serverModeOption`, never `_serverMode` — one facade serves both eras, and a legacy
-     * `initialize` rewrites `_serverMode`, which must not leak into later stateless requests.
+     * Instructions for a stateless serving unit, answered from `server/discover` before any request
+     * is seen — configuration-level only. Reads `serverModeOption`, never `_serverMode` (a legacy
+     * `initialize` must not leak its mode into later stateless requests).
+     *
+     * `requestUrl`, when given, resolves every cross-tool mention except `report-problem` from
+     * `?tools=`/`?actors=` with no fetch: internal tools (incl. `call-actor`) via
+     * `getToolsForServerMode`, Actor tools (`rag-web-browser`, `web-fetch`, ...) via
+     * `resolveActorsToLoad` — both pure functions of the selector list, resolving the *default*
+     * Actor list too when none is given. `report-problem` is excluded either way: its final
+     * servability is per-request-identity-dependent, not derivable from the URL alone. Without
+     * `requestUrl`, falls back to the same "everything but report-problem" shape.
      */
-    public getStatelessServerInstructions(): string {
+    public getStatelessServerInstructions(requestUrl?: string): string {
+        const mode = resolveServerMode(this.serverModeOption, false);
         const notReportProblem = (name: string) => name !== HELPER_TOOLS.PROBLEM_REPORT;
-        return getServerInstructions(resolveServerMode(this.serverModeOption, false), { hasTool: notReportProblem });
+        if (requestUrl === undefined) {
+            return getServerInstructions(mode, { hasTool: notReportProblem });
+        }
+        const input = parseInputParamsFromUrl(requestUrl);
+        const toolNames = new Set(
+            getToolsForServerMode(input, [], mode)
+                .map((tool) => tool.name)
+                .filter(notReportProblem),
+        );
+        for (const actorName of resolveActorsToLoad(input)) {
+            toolNames.add(actorNameToToolName(actorName));
+        }
+        return getServerInstructions(mode, { hasTool: (name) => toolNames.has(name) });
     }
 
     /**

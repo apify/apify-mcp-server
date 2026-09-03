@@ -197,7 +197,7 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
             if (!isDiscoverProbe) {
                 await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken }));
             }
-            return createStatelessServer(mcpServer);
+            return createStatelessServer(mcpServer, req.url);
         },
         {
             legacy: 'reject',

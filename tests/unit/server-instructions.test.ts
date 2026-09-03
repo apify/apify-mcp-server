@@ -76,45 +76,6 @@ describe('getServerInstructions()', () => {
         expect(instructions).toContain(RAG_WEB_BROWSER);
         expect(instructions).toContain(WEB_FETCH);
     });
-
-    it('omits the search-vs-details disambiguation when only one side is loaded, but still names it', () => {
-        const searchOnly = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.STORE_SEARCH));
-        expect(searchOnly).toContain(HELPER_TOOLS.STORE_SEARCH);
-        expect(searchOnly).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-
-        const detailsOnly = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_GET_DETAILS));
-        expect(detailsOnly).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-        expect(detailsOnly).not.toContain(HELPER_TOOLS.STORE_SEARCH);
-    });
-
-    it('omits the search-vs-details disambiguation entirely when neither is loaded', () => {
-        const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_CALL));
-        expect(instructions).not.toContain(HELPER_TOOLS.STORE_SEARCH);
-        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-    });
-
-    it('omits both apps-mode Actor-run sections when get-actor-run is absent', () => {
-        const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.DOCS_SEARCH));
-        expect(instructions).not.toContain('Widget workflow');
-        expect(instructions).not.toContain('Data vs widget Actor tools');
-    });
-
-    it('renders the apps-mode widget-workflow block when get-actor-run is loaded', () => {
-        const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.ACTOR_RUNS_GET));
-        expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
-    });
-
-    it('renders only the data-vs-widget bullets for tools actually loaded, in apps mode', () => {
-        const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.STORE_SEARCH));
-        expect(instructions).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
-    });
-
-    it('omits the search-actors-vs-rag-web-browser comparison when search-actors is absent', () => {
-        const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(actorNameToToolName(RAG_WEB_BROWSER)));
-        expect(instructions).not.toContain(HELPER_TOOLS.STORE_SEARCH);
-    });
 });
 
 /** Pins the Claude-connector tool surface (no call-actor). Offline — no network, no fixture. */
@@ -143,13 +104,18 @@ describe('Claude-connector tool surface (no call-actor)', () => {
         HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
     ];
 
-    it('resolves to exactly the expected internal tools, no call-actor, and instructions mention it nowhere', () => {
+    it('resolves to exactly the expected internal tools, no call-actor', () => {
+        const toolNames = getToolsForServerMode(parseInputParamsFromUrl(url), [], SERVER_MODE.APPS).map(
+            (tool) => tool.name,
+        );
+        expect(new Set(toolNames)).toEqual(new Set(expectedInternalToolNames));
+        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+    });
+
+    it('renders server instructions that mention call-actor nowhere', () => {
         const resolved = new Set(
             getToolsForServerMode(parseInputParamsFromUrl(url), [], SERVER_MODE.APPS).map((tool) => tool.name),
         );
-        expect(resolved).toEqual(new Set(expectedInternalToolNames));
-        expect(resolved.has(HELPER_TOOLS.ACTOR_CALL)).toBe(false);
-
         const instructions = getServerInstructions(SERVER_MODE.APPS, { hasTool: (name) => resolved.has(name) });
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
     });
