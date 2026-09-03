@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import log from '@apify/log';
 
+import { HELPER_TOOLS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { ActorInfo } from '../types.js';
 import { ACTOR_TOOL_MODE } from '../types.js';
@@ -78,4 +79,13 @@ export function legacyToolNameToNew(name: string): string | null {
 
 export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
+}
+
+/** Whether this session can run this Actor: call-actor loaded, or its own dedicated tool is. Soft
+ *  check — false negative for a hash-capped MCP-proxy tool name (`../mcp/proxy.ts`). */
+export function canRunActor(actorFullName: string, loadedToolNames: readonly string[]): boolean {
+    return (
+        loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL) ||
+        loadedToolNames.includes(actorNameToToolName(actorFullName))
+    );
 }

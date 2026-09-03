@@ -242,4 +242,34 @@ describe('search-actors without widget (searchActors)', () => {
         expect(content[0].text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         expect(content[0].text).toContain('second search with broader');
     });
+
+    it('adds the not-runnable caveat to text and structured content when call-actor is absent', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+
+        const result = await (searchActors as HelperTool).call(
+            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: { instructions?: string };
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.instructions).toContain('cannot be run in this configuration');
+        expect(content[0].text).toContain('cannot be run in this configuration');
+    });
+
+    it('omits the not-runnable caveat when call-actor is loaded', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+
+        const result = await (searchActors as HelperTool).call(
+            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [HELPER_TOOLS.ACTOR_CALL]),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: { instructions?: string };
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.instructions).not.toContain('cannot be run in this configuration');
+        expect(content[0].text).not.toContain('cannot be run in this configuration');
+    });
 });

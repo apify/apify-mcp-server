@@ -130,6 +130,16 @@ export function buildNoActorsFoundInstructions(keywords: string): string {
     `;
 }
 
+/** Session-level caveat: without call-actor, only already-dedicated-tool Actors can run — one caveat covers every result. */
+export function buildActorCallabilityCaveat(loadedToolNames: readonly string[]): string {
+    if (loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)) return '';
+    return dedent`
+        This connector can run only Actors already exposed as dedicated tools. Other Actors found
+        here are informational and cannot be run in this configuration. To use another Actor, open
+        its Apify page or configure it separately.
+    `;
+}
+
 /**
  * Builds the footer/instructions guidance for successful search results.
  * Interpolates the verbatim links nudge if applicable.
@@ -152,7 +162,8 @@ export function buildSearchActorsFooter(verbatimLinksNudge: string, loadedToolNa
         (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
         you haven't missed a better Actor.${verbatimLinksNudge}
     `;
-    return detailsHint ? `${detailsHint}\n${secondSearch}` : secondSearch;
+    const callabilityCaveat = buildActorCallabilityCaveat(loadedToolNames);
+    return [detailsHint, secondSearch, callabilityCaveat].filter(Boolean).join('\n');
 }
 
 /**

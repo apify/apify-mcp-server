@@ -2,8 +2,14 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
-import { actorNameToToolName, legacyToolNameToNew, resolveActorToolMode } from '../../src/tools/actor_tool_naming.js';
+import {
+    actorNameToToolName,
+    canRunActor,
+    legacyToolNameToNew,
+    resolveActorToolMode,
+} from '../../src/tools/actor_tool_naming.js';
 import type { ActorInfo, ActorInputSchema } from '../../src/types.js';
 import { ACTOR_TOOL_MODE } from '../../src/types.js';
 
@@ -119,5 +125,20 @@ describe('resolveActorToolMode()', () => {
         ],
     ] as const)('resolves %s to %s', (_label, opts, expected) => {
         expect(resolveActorToolMode(makeActorInfo({ input: NON_EMPTY_INPUT, ...opts }))).toBe(expected);
+    });
+});
+
+describe('canRunActor()', () => {
+    it('returns true when call-actor is loaded, regardless of the Actor', () => {
+        expect(canRunActor('apify/rag-web-browser', [HELPER_TOOLS.ACTOR_CALL])).toBe(true);
+    });
+
+    it('returns true when call-actor is absent but the Actor has its own dedicated tool loaded', () => {
+        expect(canRunActor('apify/rag-web-browser', [actorNameToToolName('apify/rag-web-browser')])).toBe(true);
+    });
+
+    it('returns false when call-actor is absent and no matching dedicated tool is loaded', () => {
+        expect(canRunActor('apify/rag-web-browser', [actorNameToToolName('apify/web-scraper')])).toBe(false);
+        expect(canRunActor('apify/rag-web-browser', [])).toBe(false);
     });
 });

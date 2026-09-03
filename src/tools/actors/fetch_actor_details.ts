@@ -24,6 +24,7 @@ import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } fro
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
+import { canRunActor } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 
@@ -150,6 +151,15 @@ export function buildActorNotFoundResponse(actorName: string, loadedToolNames: r
     );
 }
 
+/** Guidance appended when the Actor exists but `canRunActor` says this session can't run it. */
+export function buildActorNotRunnableGuidance(actorFullName: string, loadedToolNames: readonly string[]): string {
+    if (canRunActor(actorFullName, loadedToolNames)) return '';
+    return dedent`
+        This Actor is not exposed as a tool and cannot be run in this configuration. Open its
+        Apify page or configure it separately to use it.
+    `;
+}
+
 /**
  * Build text and structured response for actor details.
  * Pure/sync: the caller pre-resolves `mcpToolsMessage` when `output.mcpTools` is true.
@@ -270,6 +280,12 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         mcpToolsMessage,
         linkContext,
     });
+
+    // Canonical full name, not the raw `actor` input — that may be an ID, which canRunActor
+    // (via actorNameToToolName) can't match against a loaded dedicated-tool name.
+    const actorFullName = `${details.actorInfo.username}/${details.actorInfo.name}`;
+    const runnableGuidance = buildActorNotRunnableGuidance(actorFullName, loadedToolNames);
+    if (runnableGuidance) texts.push(runnableGuidance);
 
     return respondOk(texts, { structuredContent });
 }
