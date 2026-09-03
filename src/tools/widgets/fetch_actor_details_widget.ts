@@ -10,7 +10,11 @@ import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
-import { actorDetailsOutputDefaults, buildActorNotFoundResponse } from '../actors/fetch_actor_details.js';
+import {
+    actorDetailsOutputDefaults,
+    buildActorNotFoundResponse,
+    buildActorNotRunnableGuidance,
+} from '../actors/fetch_actor_details.js';
 import { actorDetailsWidgetOutputSchema } from '../structured_output_schemas.js';
 
 const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
@@ -95,6 +99,10 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
             An interactive widget has been rendered with detailed Actor information.
         `,
         ];
+        // Canonical full name, not the raw `actor` input — see fetch_actor_details.ts.
+        const actorFullName = `${details.actorInfo.username}/${details.actorInfo.name}`;
+        const runnableGuidance = buildActorNotRunnableGuidance(actorFullName, loadedToolNames);
+        if (runnableGuidance) texts.push(runnableGuidance);
 
         return respondOk(texts, {
             structuredContent,

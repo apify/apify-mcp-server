@@ -5,6 +5,7 @@ import {
     actorDetailsOutputDefaults,
     buildActorDetailsTextResponse,
     buildActorNotFoundResponse,
+    buildActorNotRunnableGuidance,
     buildFetchActorDetailsResult,
 } from '../../src/tools/actors/fetch_actor_details.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
@@ -178,9 +179,12 @@ describe('buildFetchActorDetailsResult()', () => {
     });
 
     // pricing: false → the users/me lookup is needed only for Console UI tokens.
+    // call-actor loaded so these unrelated assertions aren't perturbed by the not-runnable guidance.
     const callWithToken = async (apifyToken: string) => {
         const result = await buildFetchActorDetailsResult({
-            ...stubInternalToolArgs({ actor: 'apify/example-mcp-server', output: { inputSchema: true } }),
+            ...stubInternalToolArgs({ actor: 'apify/example-mcp-server', output: { inputSchema: true } }, [
+                HELPER_TOOLS.ACTOR_CALL,
+            ]),
             apifyToken,
         });
         return result as { content: { type: string; text: string }[] };
@@ -235,6 +239,66 @@ describe('buildFetchActorDetailsResult()', () => {
         );
 
         await expect(callWithToken('apify_api_test')).rejects.toMatchObject({ statusCode: 401 });
+    });
+
+    it('appends not-runnable guidance when neither call-actor nor a dedicated tool is loaded', async () => {
+        const result = await buildFetchActorDetailsResult(
+            stubInternalToolArgs({ actor: 'apify/example-mcp-server', output: { inputSchema: true } }),
+        );
+        const text = ((result as { content: { text: string }[] }).content ?? []).map((c) => c.text).join('\n');
+
+        expect(text).toContain('This Actor is not exposed as a tool and cannot be run in this configuration.');
+    });
+
+    it('omits not-runnable guidance when call-actor is loaded', async () => {
+        const result = await buildFetchActorDetailsResult(
+            stubInternalToolArgs({ actor: 'apify/example-mcp-server', output: { inputSchema: true } }, [
+                HELPER_TOOLS.ACTOR_CALL,
+            ]),
+        );
+        const text = ((result as { content: { text: string }[] }).content ?? []).map((c) => c.text).join('\n');
+
+        expect(text).not.toContain('cannot be run in this configuration');
+    });
+
+    it('omits not-runnable guidance when the Actor has its own dedicated tool loaded', async () => {
+        const result = await buildFetchActorDetailsResult(
+            stubInternalToolArgs({ actor: 'apify/example-mcp-server', output: { inputSchema: true } }, [
+                'apify--example-mcp-server',
+            ]),
+        );
+        const text = ((result as { content: { text: string }[] }).content ?? []).map((c) => c.text).join('\n');
+
+        expect(text).not.toContain('cannot be run in this configuration');
+    });
+
+    // Regression: the guidance check must use the resolved actorInfo (canonical username/name),
+    // not the raw `actor` input — an Actor ID resolves fine but never matches a dedicated tool
+    // name via actorNameToToolName, which would falsely claim it can't run.
+    it('omits not-runnable guidance when queried by Actor ID and the dedicated tool is loaded', async () => {
+        const result = await buildFetchActorDetailsResult(
+            stubInternalToolArgs({ actor: 'aXeS4nzT3S9RRAQEy', output: { inputSchema: true } }, [
+                'apify--example-mcp-server',
+            ]),
+        );
+        const text = ((result as { content: { text: string }[] }).content ?? []).map((c) => c.text).join('\n');
+
+        expect(text).not.toContain('cannot be run in this configuration');
+    });
+});
+
+describe('buildActorNotRunnableGuidance()', () => {
+    it('is empty when call-actor is loaded', () => {
+        expect(buildActorNotRunnableGuidance('apify/example-mcp-server', [HELPER_TOOLS.ACTOR_CALL])).toBe('');
+    });
+
+    it('is empty when the Actor has its own dedicated tool loaded', () => {
+        expect(buildActorNotRunnableGuidance('apify/example-mcp-server', ['apify--example-mcp-server'])).toBe('');
+    });
+
+    it('names no tool, only states the Actor cannot run, when neither is loaded', () => {
+        const text = buildActorNotRunnableGuidance('apify/example-mcp-server', []);
+        expect(text).toContain('cannot be run in this configuration');
     });
 });
 

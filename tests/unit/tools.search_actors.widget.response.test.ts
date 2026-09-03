@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
 import type { HelperTool } from '../../src/types.js';
@@ -33,12 +34,16 @@ describe('search-actors-widget response', () => {
     it('returns widgetActors plus widget _meta and short pointer text', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
+        // call-actor loaded: this assertion is about the widget's content shape, not the caveat.
         const result = await (searchActorsWidget as HelperTool).call(
-            stubInternalToolArgs({
-                keywords: SEARCH_KEYWORDS,
-                limit: 5,
-                offset: 0,
-            }),
+            stubInternalToolArgs(
+                {
+                    keywords: SEARCH_KEYWORDS,
+                    limit: 5,
+                    offset: 0,
+                },
+                [HELPER_TOOLS.ACTOR_CALL],
+            ),
         );
 
         const { structuredContent, content, _meta } = result as {
@@ -102,6 +107,28 @@ describe('search-actors-widget response', () => {
         expect(content).toHaveLength(1);
         expect(content[0].text).toContain('No Actors were found');
         expect(_meta).toBeUndefined();
+    });
+
+    it('appends the not-runnable caveat when call-actor is absent', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+
+        const result = await (searchActorsWidget as HelperTool).call(
+            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+        );
+        const { content } = result as { content: { type: string; text: string }[] };
+
+        expect(content.at(-1)?.text).toContain('cannot be run in this configuration');
+    });
+
+    it('omits the not-runnable caveat when call-actor is loaded', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+
+        const result = await (searchActorsWidget as HelperTool).call(
+            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [HELPER_TOOLS.ACTOR_CALL]),
+        );
+        const { content } = result as { content: { type: string; text: string }[] };
+
+        expect(content.every((c) => !c.text.includes('cannot be run in this configuration'))).toBe(true);
     });
 
     it('carries widget _meta on the tool definition', () => {
