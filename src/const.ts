@@ -241,7 +241,7 @@ export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
 export const APIFY_LOGO_URL = `${APIFY_STORE_URL}/apple-icon.png`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
-export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/platform/integrations/mcp';
+export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/integrations/mcp';
 
 // Telemetry
 export const TELEMETRY_ENV = {

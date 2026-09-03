@@ -125,7 +125,7 @@ describe('getServerCard()', () => {
         it('includes documentation URL', () => {
             const card = getServerCard();
 
-            expect(card.documentationUrl).toBe('https://docs.apify.com/platform/integrations/mcp');
+            expect(card.documentationUrl).toBe('https://docs.apify.com/integrations/mcp');
         });
     });
 
