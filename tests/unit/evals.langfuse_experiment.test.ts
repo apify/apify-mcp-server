@@ -6,6 +6,7 @@ import {
     evaluators,
     isTransientAgentError,
     makeTask,
+    type WorkflowTaskOptions,
     type WorkflowTaskOutput,
 } from '../../evals/workflows/langfuse_experiment.js';
 import type { LlmClient } from '../../evals/workflows/llm_client.js';
@@ -113,7 +114,7 @@ describe('makeTask()', () => {
         ...overrides,
     });
 
-    const makeWorkflowTask = () =>
+    const makeWorkflowTask = (overrides: Partial<WorkflowTaskOptions> = {}) =>
         makeTask({
             llmClient: {} as LlmClient,
             apifyToken: 'token',
@@ -121,6 +122,15 @@ describe('makeTask()', () => {
             judgeModel: 'judge',
             toolTimeout: 1,
             mcpToolsOnly: false,
+            ...overrides,
+        });
+
+    /** A conversation the judge and the scores can read, for cases that must reach the end. */
+    const mockAgentRun = () =>
+        mocks.runAgentConversation.mockResolvedValue({
+            conversation: { turns: [], totalTokens: 1234 },
+            transcript: [],
+            toolInvocations: [],
         });
 
     beforeEach(() => {
@@ -173,6 +183,48 @@ describe('makeTask()', () => {
             judgeResult: { verdict: 'PASS' },
             totalTokens: 1234,
         });
+    });
+
+    it('loads the skills the item asks for from the checkout of the run', async () => {
+        mockAgentRun();
+        const item = makeItem({ metadata: { category: 'scrape', skills: ['apify-ultimate-scraper'] } });
+
+        await makeWorkflowTask({ skillsPluginPath: '/tmp/plugin', defaultSkills: ['apify-actorization'] })(item);
+
+        expect(mocks.runAgentConversation).toHaveBeenCalledWith(
+            expect.objectContaining({ skills: { pluginPath: '/tmp/plugin', names: ['apify-ultimate-scraper'] } }),
+        );
+    });
+
+    it('falls back to the skills of the run when the item declares none', async () => {
+        mockAgentRun();
+
+        await makeWorkflowTask({ skillsPluginPath: '/tmp/plugin', defaultSkills: ['apify-ultimate-scraper'] })(
+            makeItem(),
+        );
+
+        expect(mocks.runAgentConversation).toHaveBeenCalledWith(
+            expect.objectContaining({ skills: { pluginPath: '/tmp/plugin', names: ['apify-ultimate-scraper'] } }),
+        );
+    });
+
+    it('runs without skills when neither the item nor the run asks for any', async () => {
+        mockAgentRun();
+
+        await makeWorkflowTask()(makeItem());
+
+        expect(mocks.runAgentConversation).toHaveBeenCalledWith(
+            expect.not.objectContaining({ skills: expect.anything() }),
+        );
+    });
+
+    it('fails the item instead of scoring a skill-less run when the checkout is missing', async () => {
+        mockAgentRun();
+        const item = makeItem({ metadata: { category: 'scrape', skills: ['apify-ultimate-scraper'] } });
+
+        await expect(makeWorkflowTask()(item)).rejects.toThrow(
+            'Item "search-001": skills apify-ultimate-scraper requested but no skills checkout was passed',
+        );
     });
 
     it('collects failed tool calls, exempting built-ins and the ones failTools injected', async () => {

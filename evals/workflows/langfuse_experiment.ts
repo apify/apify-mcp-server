@@ -174,6 +174,10 @@ export type WorkflowTaskOptions = {
     toolTimeout: number;
     /** Restrict the agent to MCP tools only, dropping Claude Code's built-in toolset. */
     mcpToolsOnly: boolean;
+    /** Apify skills checkout, present when the run or any of its items asked for a skill. */
+    skillsPluginPath?: string;
+    /** Skills for items that declare none of their own, from `--skills`. */
+    defaultSkills?: string[];
 };
 
 /**
@@ -189,17 +193,30 @@ export type WorkflowTaskOptions = {
  */
 export function makeTask(options: WorkflowTaskOptions) {
     const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout, mcpToolsOnly } = options;
+    const { skillsPluginPath, defaultSkills } = options;
 
     return async (rawItem: unknown): Promise<WorkflowTaskOutput> => {
         const item = parseWorkflowItem(rawItem);
 
         try {
+            // The item's own skills win over `--skills`, so a case that needs a skill carries
+            // it in the dataset and runs the same way whoever starts the run.
+            const skillNames = item.metadata.skills ?? defaultSkills ?? [];
+            // A harness bug, not an eval failure: the runner clones the checkout whenever the
+            // selection asks for a skill. Fail loudly instead of scoring a skill-less run.
+            if (skillNames.length > 0 && !skillsPluginPath) {
+                throw new Error(`skills ${skillNames.join(', ')} requested but no skills checkout was passed`);
+            }
+
             const runOptions = {
                 prompt: item.input.query,
                 model: agentModel,
                 apifyToken,
                 tools: item.metadata.tools,
                 failTools: item.metadata.failTools,
+                ...(skillsPluginPath && skillNames.length > 0
+                    ? { skills: { pluginPath: skillsPluginPath, names: skillNames } }
+                    : {}),
                 maxTurns: item.metadata.maxTurns,
                 toolTimeoutSeconds: toolTimeout,
                 mcpToolsOnly,

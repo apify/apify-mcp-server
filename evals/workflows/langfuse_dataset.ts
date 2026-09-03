@@ -28,6 +28,8 @@ const WorkflowMetadataValidator = z.strictObject({
     maxTurns: z.number().int().positive().optional(),
     /** Tools to enable, e.g. ["actors", "docs", "apify/rag-web-browser"] */
     tools: z.array(z.string()).optional(),
+    /** Apify agent skills to preload, e.g. ["apify-ultimate-scraper"]. See apify_skills.ts. */
+    skills: z.array(z.string()).optional(),
     /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See mcp_client.ts. */
     failTools: z.array(z.string()).optional(),
 });
@@ -78,6 +80,7 @@ export function toWorkflowTestCase(item: unknown): WorkflowTestCase {
         reference: expectedOutput,
         ...(metadata.maxTurns !== undefined && { maxTurns: metadata.maxTurns }),
         ...(metadata.tools !== undefined && { tools: metadata.tools }),
+        ...(metadata.skills !== undefined && { skills: metadata.skills }),
         ...(metadata.failTools !== undefined && { failTools: metadata.failTools }),
     };
 }

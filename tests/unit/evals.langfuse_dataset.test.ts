@@ -25,7 +25,15 @@ describe('parseWorkflowItem()', () => {
     });
 
     it('keeps the optional harness knobs from metadata', () => {
-        const withKnobs = { ...item, metadata: { category: 'search', maxTurns: 5, failTools: ['call-actor'] } };
+        const withKnobs = {
+            ...item,
+            metadata: {
+                category: 'search',
+                maxTurns: 5,
+                failTools: ['call-actor'],
+                skills: ['apify-ultimate-scraper'],
+            },
+        };
         expect(parseWorkflowItem(withKnobs).metadata).toEqual(withKnobs.metadata);
     });
 
@@ -58,7 +66,13 @@ describe('toWorkflowTestCase()', () => {
     });
 
     it('writes the keys in a fixed order whatever order metadata arrives in', () => {
-        const knobs = { failTools: ['call-actor'], tools: ['actors'], category: 'search', maxTurns: 5 };
+        const knobs = {
+            failTools: ['call-actor'],
+            skills: ['apify-ultimate-scraper'],
+            tools: ['actors'],
+            category: 'search',
+            maxTurns: 5,
+        };
         expect(Object.keys(toWorkflowTestCase({ ...item, metadata: knobs }))).toEqual([
             'id',
             'category',
@@ -66,6 +80,7 @@ describe('toWorkflowTestCase()', () => {
             'reference',
             'maxTurns',
             'tools',
+            'skills',
             'failTools',
         ]);
     });

@@ -13,6 +13,11 @@ place — move it and delete the note.
 Checklist for the ChatGPT MCP Apps store submission. In progress — screenshots, test prompts
 and localization are still open. Delete once the submission is decided either way.
 
+### [skills_evals_dataset.md](./skills_evals_dataset.md)
+How to create the `skills-evals` Langfuse dataset and its first case. The harness support for
+Apify agent skills is in; the dataset is not. Delete once the dataset exists and its first wave
+of cases is calibrated.
+
 ### [code_runtime_eval.md](./code_runtime_eval.md)
 Blind A/B runbook for `apify/code-runtime` (Code Mode) vs normal Actor tool use: 7 tests, the
 single mode-line variable, how to measure tokens and Apify spend, per-test grading checks.

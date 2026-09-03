@@ -42,7 +42,7 @@ pnpm run build
 pnpm run evals:workflow
 ```
 
-Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, and `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API).
+Run `pnpm run evals:workflow --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, `--skills` preloads Apify agent skills (see [Skill evals](#skill-evals)), and `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API).
 
 ### Proper suites vs error-handling suites
 
@@ -86,6 +86,33 @@ guess, and `fetch-actor-details`' not-found response repeats it. Adding the `fet
 wording was measured at 5/8 against ~7/10 without it — no change. Treat a shift in the ratio as the
 signal, not a single red run, and read a persistent drop as a description problem only after checking
 it still passes on Sonnet.
+
+### Skill evals
+
+Apify publishes its agent skills as a Claude Code plugin in
+[apify/agent-skills](https://github.com/apify/agent-skills). A run can preload any of them into the
+agent under test, so a case measures the server's tools together with the skill that steers them:
+
+```bash
+pnpm run evals:workflow --dataset skills-evals --skills apify-ultimate-scraper
+```
+
+`skills-evals` is the dataset for those cases. `--skills` (repeatable, or comma-separated) sets the
+skills for the whole run; a case that names its own in `metadata.skills` wins over it, which is how
+one suite mixes cases with and without a skill and how such a case runs the same way whoever starts
+the run. Error-provoking skill cases belong in `skills-evals-errors`, per the two-suite rule above.
+
+The repo is shallow-cloned once per run into a temp dir, registered with the Agent SDK as a local
+plugin, and deleted when the run ends; the commit it used is in the run metadata as `skillsCommit`.
+An unknown skill name fails the run before any LLM spend, listing what the checkout provides.
+
+Two prerequisites:
+
+- The Apify skills drive the **`apify` CLI** (`npm install -g apify-cli`), not the MCP server, and
+  authenticate with the `APIFY_TOKEN` the run already needs. Without the CLI on `PATH` a case
+  measures the agent's recovery from a missing binary, not the skill.
+- A skill is instructions for the built-in tools, so `--skills` is rejected together with
+  `--mcp-tools-only`.
 
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
@@ -241,6 +268,25 @@ experiment-item-run     Langfuse SDK, holds the scores
 
 **Location:** `langfuse_observations.ts`, `claude_agent.ts`, `llm_client.ts`
 
+### 10. Skills come from a fresh clone of the published repo
+
+**Decision:** A run that needs a skill shallow-clones `apify/agent-skills` into a temp dir, registers
+the checkout as a local Agent SDK plugin, records the commit, and deletes it afterwards.
+
+**Why:**
+- The eval must measure the skill Apify ships, not a copy of it. A vendored or cached copy would
+  drift, and a run against a stale skill looks exactly like a run against the current one
+- `settingSources` is empty and `cwd` is a temp dir, so the SDK discovers nothing from disk. A plugin
+  is the way to hand it skills without reopening the isolation the rest of the harness relies on
+- The SDK's `skills` option is a filter over discovered skills, so it also hides Claude Code's
+  bundled ones and a case sees only the skills it asked for
+
+**Trade-off:** a run needs `git` and network at startup, and the skills move under it between runs -
+hence `skillsCommit` in the run metadata. The checkout is a whole plugin, so its slash command and
+its `agents/AGENTS.md` agent load with the skills; neither runs unless the agent invokes it.
+
+**Location:** `apify_skills.ts`, `claude_agent.ts`
+
 ## System components
 
 ### Core files
@@ -253,6 +299,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `langfuse_observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
 - `workflow_judge.ts` - Judge evaluation
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
+- `apify_skills.ts` - Clones the published Apify skills plugin and validates the requested skill names
 - `langfuse_dataset.ts` - Test case schema, dataset item mapping and validation, dataset fetch
 - `langfuse_experiment.ts` - Experiment task, evaluators, run summary and exit gate
 - `run_workflow_evals.ts` - Main CLI entry
@@ -280,7 +327,7 @@ Both entry points fail fast (before any test runs) listing every missing variabl
 Results are recorded in Langfuse, not to a local file. Each run:
 
 - **Reads the dataset** `workflow-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
-- **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion, agentAuth, allowToolErrors }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
+- **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion, agentAuth, allowToolErrors, skills, skillsCommit }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
 - **Traces** every item as one trace. Its root output is the judge verdict plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed), and a generation for the judge call. See design decision 9.
 - **Scores** each item: `workflow_judge` (`1` on a PASS verdict, comment = judge reason) and `tool_errors` (failed tool calls, comment lists them, `0` on a clean item) together form the gate, and `total_tokens` is the agent tokens billed (omitted when the provider reported no usage so an unmeasured run cannot look like a free one; an item whose agent run was retried reports only the second attempt).
 - **Scores the run** with `pass_rate`: passing items over items requested, so runs stay comparable even when items were dropped.
@@ -315,6 +362,7 @@ A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in 
 **Optional:**
 - `maxTurns` - Override default (10)
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
+- `skills` - Apify agent skills to preload for this test (e.g. `["apify-ultimate-scraper"]`). Overrides the run's `--skills`. See [Skill evals](#skill-evals).
 - `failTools` - Tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny, the one hook that survives `bypassPermissions`, so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `claude_agent.ts`.
 
 ## Key insights

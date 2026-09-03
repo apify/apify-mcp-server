@@ -15,6 +15,7 @@
  *   pnpm run evals:workflow -- --id search-google-maps
  *   pnpm run evals:workflow -- --concurrency 8
  *   pnpm run evals:workflow -- --mcp-tools-only   # drop Claude Code's built-in tools
+ *   pnpm run evals:workflow -- --dataset skills-evals --skills apify-ultimate-scraper
  *   pnpm run evals:workflow -- --subscription     # bill the local Claude Code login, not the API
  *   pnpm run evals:workflow -- --dataset tasks-evals-errors --allow-tool-errors
  */
@@ -31,6 +32,8 @@ import { hideBin } from 'yargs/helpers';
 import { readJsonFile } from '../../src/utils/generic.js';
 import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
+import type { ApifySkillsCheckout } from './apify_skills.js';
+import { APIFY_SKILLS_REPO_URL, assertSkillsExist, cloneApifySkills, removeApifySkills } from './apify_skills.js';
 import { assertStdioBinExists } from './claude_agent.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
@@ -53,6 +56,7 @@ type CliArgs = {
     toolTimeout: number;
     concurrency: number;
     mcpToolsOnly: boolean;
+    skills?: string[];
     subscription: boolean;
     allowToolErrors: boolean;
 };
@@ -103,6 +107,13 @@ async function main() {
                 description: "Drop Claude Code's built-in tools, leaving only the Apify MCP server's",
                 default: false,
             },
+            skills: {
+                type: 'array',
+                string: true,
+                description:
+                    'Apify agent skills to preload for items that declare none themselves, ' +
+                    'e.g. --skills apify-ultimate-scraper (from github.com/apify/agent-skills)',
+            },
             subscription: {
                 type: 'boolean',
                 description: 'Run the agent on the local Claude Code login (subscription) instead of ANTHROPIC_API_KEY',
@@ -121,6 +132,11 @@ async function main() {
         .check((parsed) => {
             if (!Number.isInteger(parsed.concurrency) || parsed.concurrency < 1) {
                 throw new Error(`--concurrency must be a positive integer, got "${parsed.concurrency}"`);
+            }
+            // A skill is instructions for the built-in tools (the Apify ones drive the `apify`
+            // CLI through Bash), so with those dropped the skill has nothing to act with.
+            if (parsed.skills !== undefined && parsed['mcp-tools-only']) {
+                throw new Error('--skills cannot be combined with --mcp-tools-only');
             }
             return true;
         })
@@ -156,8 +172,11 @@ async function main() {
     // Non-empty: checked above. Sanitized above that.
     const apifyToken = process.env.APIFY_TOKEN as string;
     const datasetName = argv.dataset;
+    // `--skills a b` and `--skills a,b` both mean two skills.
+    const cliSkills = argv.skills?.flatMap((entry) => entry.split(',').map((name) => name.trim())).filter(Boolean);
 
     let exitCode = 1;
+    let skillsCheckout: ApifySkillsCheckout | undefined;
     try {
         // Read-only: the dataset is the source of truth, edited in the Langfuse UI.
         console.log(`📇 Fetching dataset "${datasetName}"...`);
@@ -174,6 +193,21 @@ async function main() {
             );
         }
         const requestedIds = data.map((item) => item.id);
+
+        // Cloned once per run, only when something asks for a skill. Every requested name is
+        // checked against the checkout up front: the SDK drops an unknown one silently, which
+        // would score a skill-less run as if the skill had been loaded.
+        const requestedSkills = [
+            ...new Set([...(cliSkills ?? []), ...selected.flatMap((workflowCase) => workflowCase.skills ?? [])]),
+        ].sort();
+        if (requestedSkills.length > 0) {
+            skillsCheckout = cloneApifySkills();
+            assertSkillsExist(skillsCheckout, requestedSkills);
+            console.log(
+                `🧠 Skills from ${APIFY_SKILLS_REPO_URL} @ ${skillsCheckout.commit.slice(0, 7)}: ` +
+                    `${requestedSkills.join(', ')}`,
+            );
+        }
 
         initTracing();
 
@@ -200,6 +234,8 @@ async function main() {
                 judgeModel: argv.judgeModel,
                 toolTimeout: argv.toolTimeout,
                 mcpToolsOnly: argv.mcpToolsOnly,
+                skillsPluginPath: skillsCheckout?.pluginPath,
+                defaultSkills: cliSkills,
             }),
             evaluators,
             runEvaluators: [
@@ -219,6 +255,10 @@ async function main() {
                 agentSdkVersion,
                 agentAuth: argv.subscription ? 'subscription' : 'api-key',
                 allowToolErrors: argv.allowToolErrors,
+                // Every skill the run loaded, from `--skills` and from the items themselves.
+                // Upstream skills move, so a run is only comparable against the commit it used.
+                skills: requestedSkills,
+                skillsCommit: skillsCheckout?.commit ?? null,
             },
         });
 
@@ -254,6 +294,7 @@ async function main() {
         } catch (error) {
             console.error(`⚠️ Span export failed: ${error instanceof Error ? error.message : String(error)}`);
         }
+        if (skillsCheckout) removeApifySkills(skillsCheckout);
     }
 
     process.exit(exitCode);

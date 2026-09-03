@@ -11,6 +11,9 @@ pnpm run evals:workflow --dataset <family>-evals --agent-model claude-opus-5 --s
 # Error suite: drops only the zero-error condition
 pnpm run evals:workflow --dataset <family>-evals-errors --allow-tool-errors --agent-model <m> --subscription
 
+# Skill suite: preload Apify agent skills (needs the apify CLI; never with --mcp-tools-only)
+pnpm run evals:workflow --dataset skills-evals --skills apify-ultimate-scraper --subscription
+
 # Narrow: --id '<regex>' or --category <name>; --concurrency N; --tool-timeout secs
 ```
 
@@ -32,7 +35,8 @@ pnpm run evals:workflow --dataset <family>-evals-errors --allow-tool-errors --ag
 }
 ```
 
-- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `maxTurns`, `tools`, `failTools`.
+- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `maxTurns`, `tools`, `skills`, `failTools`.
+- `skills` preloads Apify agent skills from [apify/agent-skills](https://github.com/apify/agent-skills) (e.g. `["apify-ultimate-scraper"]`) and overrides the run's `--skills`. Skill cases live in `skills-evals`, need the `apify` CLI on `PATH`, and cannot run with `--mcp-tools-only`.
 - `category` = tool under test (what `--category` filters); difficulty goes in the id.
 - Items upsert on `id`. Ids are **project-unique forever**, across datasets, even after archive/delete-and-recreate elsewhere. Retire a case by upserting `"status": "ARCHIVED"`.
 - `maxTurns` guide: single tool 6–8, create+verify 10, chains 12–18. Budget for the longest path the reference permits (explore → decline → fallback), not the happy path; Actor-run cases need headroom for a poll cycle when the run outlives the wait cap.

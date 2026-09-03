@@ -27,6 +27,8 @@ export type AgentRunOptions = {
     tools?: string[];
     /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See denyToolsHook(). */
     failTools?: string[];
+    /** Apify agent skills to preload, and the plugin checkout they come from. See apify_skills.ts. */
+    skills?: { pluginPath: string; names: string[] };
     maxTurns?: number;
     toolTimeoutSeconds: number;
     /** Restrict the agent to MCP tools only, dropping Claude Code's built-in toolset. */
@@ -76,7 +78,7 @@ export function denyToolsHook(failTools: string[]): HookCallbackMatcher[] {
 
 /** Run one test case to completion and fold the whole SDK stream into the judge's shape. */
 export async function runAgentConversation(options: AgentRunOptions): Promise<AdaptedConversation> {
-    const { prompt, model, apifyToken, tools, failTools, maxTurns, toolTimeoutSeconds, mcpToolsOnly } = options;
+    const { prompt, model, apifyToken, tools, failTools, skills, maxTurns, toolTimeoutSeconds, mcpToolsOnly } = options;
 
     const serverArgs = [STDIO_BIN_PATH];
     if (tools && tools.length > 0) {
@@ -115,6 +117,16 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ad
         cwd: tmpdir(),
         abortController,
         ...(failTools && failTools.length > 0 ? { hooks: { PreToolUse: denyToolsHook(failTools) } } : {}),
+        // The skills come from a plugin checkout, not from disk discovery: `settingSources`
+        // is empty and `cwd` is a temp dir, so nothing else is found. `skills` then filters
+        // the listing down to the case's own, hiding the bundled ones from the agent.
+        // MCP discovery is skipped because this harness owns the server registration above.
+        ...(skills
+            ? {
+                  plugins: [{ type: 'local' as const, path: skills.pluginPath, skipMcpDiscovery: true }],
+                  skills: skills.names,
+              }
+            : {}),
     };
 
     try {
