@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.15.5 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Use canonical Apify docs MCP URL in server card ([#1325](https://github.com/apify/apify-mcp-server/pull/1325)) ([2d1c6dc](https://github.com/apify/apify-mcp-server/commit/2d1c6dcace8ea75c30b056b14f78241f341ffc48)) by [@marekh19](https://github.com/marekh19)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.15.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.4) (2026-09-02)
 
 ### 🚀 Features
