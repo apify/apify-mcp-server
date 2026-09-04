@@ -131,6 +131,17 @@ describe('search-actors-widget response', () => {
         expect(content.every((c) => !c.text.includes('cannot be run in this configuration'))).toBe(true);
     });
 
+    it('omits the not-runnable caveat when call-actor is absent but every result is already loaded', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+
+        const result = await (searchActorsWidget as HelperTool).call(
+            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [], [MOCK_STORE_ACTOR.id]),
+        );
+        const { content } = result as { content: { type: string; text: string }[] };
+
+        expect(content.every((c) => !c.text.includes('cannot be run in this configuration'))).toBe(true);
+    });
+
     it('carries widget _meta on the tool definition', () => {
         const tool = searchActorsWidget as HelperTool;
         const meta = tool._meta as { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown } };
