@@ -439,6 +439,24 @@ export const buildActorToolOutputSchema = {
     required: ['build'],
 };
 
+/**
+ * Schema for push-actor-source: what was pushed where, plus the build when one was started
+ * (the same allowlisted build subset, `toBuildResult`, as get-actor-build).
+ */
+export const pushActorSourceToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the Actor the files were pushed to' },
+        actorName: { type: 'string', description: 'Full Actor name, username/name' },
+        created: { type: 'boolean', description: 'True when the Actor was created by this call' },
+        versionNumber: { type: 'string', description: 'Version the files were pushed to, e.g. 0.1' },
+        buildTag: { type: 'string', description: 'Build tag of the version, e.g. latest' },
+        filesPushed: { type: 'integer', description: 'Number of files now in the version' },
+        build: getActorBuildToolOutputSchema.properties.build,
+    },
+    required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
