@@ -29,6 +29,29 @@ const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
 const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
+// Locked Claude-connector `?tools=` allowlist — see ai-team#232. No call-actor.
+const CLAUDE_CONNECTOR_TOOLS = [
+    'search-actors',
+    'search-actors-widget',
+    'fetch-actor-details',
+    'fetch-actor-details-widget',
+    'search-apify-docs',
+    'fetch-apify-docs',
+    'get-actor-run',
+    'get-actor-run-widget',
+    'get-actor-run-list',
+    'get-actor-log',
+    'abort-actor-run',
+    'get-dataset-list',
+    'get-dataset',
+    'get-dataset-items',
+    'get-key-value-store-list',
+    'get-key-value-store',
+    'get-key-value-store-record',
+    'apify/rag-web-browser',
+    'apify/web-fetch',
+];
+
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
     {
@@ -70,6 +93,21 @@ export const registrationCases: Case[] = [
             const names = getToolNames(await client.listTools());
             expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
         }),
+    },
+    {
+        // Claude-connector compliance: the pinned ?tools= list is authoritative even with
+        // telemetry on, which would otherwise auto-inject report-problem for a default session.
+        name: 'Claude connector: pinned tool surface excludes call-actor and report-problem even with telemetry enabled',
+        isDeploymentTest: true,
+        run: withClient(
+            { tools: CLAUDE_CONNECTOR_TOOLS, serverMode: 'apps', telemetry: { enabled: true } },
+            async (client) => {
+                const names = getToolNames(await client.listTools());
+                expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+                expect(new Set(names)).toEqual(new Set(CLAUDE_CONNECTOR_TOOLS));
+            },
+        ),
     },
     {
         // isDeploymentTest: default tool/Actor set.
