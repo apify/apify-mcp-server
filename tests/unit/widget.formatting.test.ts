@@ -73,21 +73,22 @@ describe('formatPricing()', () => {
         expect(
             formatPricing({
                 model: 'PAY_PER_EVENT',
-                events: [{ title: 'Each tweet', priceUsd: 0.00025 }],
+                events: [{ title: 'Result', priceUsd: 0.00025 }],
             }),
-        ).toBe('$0.25 / 1,000 each tweet');
+        ).toBe('$0.25 / 1,000 results');
     });
 
     it('uses the event flagged isPrimaryEvent when an actor has multiple charge events', () => {
+        // The Store pluralizes the last word of the title; "plans" is already plural.
         expect(
             formatPricing({
                 model: 'PAY_PER_EVENT',
                 events: [
                     { title: 'Actor start', priceUsd: 0.0004 },
-                    { title: 'Each tweet', priceUsd: 0.00025, isPrimaryEvent: true },
+                    { title: 'Each tweet. Cheaper for higher plans', priceUsd: 0.00025, isPrimaryEvent: true },
                 ],
             }),
-        ).toBe('from $0.25 / 1,000 each tweet');
+        ).toBe('from $0.25 / 1,000 each tweet. cheaper for higher plans');
     });
 
     it('falls back to Pay per event when multi-event PPE has no primary event', () => {
@@ -115,9 +116,10 @@ describe('formatPricing()', () => {
         );
     });
 
-    it('uses the true cheapest tier, not GOLD, when a higher tier is cheaper', () => {
-        // compass/crawler-google-places-shaped: price decreases monotonically per tier,
-        // DIAMOND ($0.76/1,000) is cheaper than GOLD ($2.10/1,000).
+    it('prices the badge at the GOLD tier, not the cheapest tier (#905)', () => {
+        // compass/crawler-google-places real tiers. DIAMOND is $0.76 / 1,000, yet the Store
+        // badge shows "from $1.50 / 1,000 scraped places" — GOLD is the best tier listed on
+        // apify.com/pricing; PLATINUM/DIAMOND are enterprise-only and never shown.
         const price = formatPricing({
             model: 'PAY_PER_EVENT',
             events: [
@@ -125,16 +127,158 @@ describe('formatPricing()', () => {
                     title: 'Scraped place',
                     tieredPricing: [
                         { tier: 'FREE', priceUsd: 0.004 },
-                        { tier: 'BRONZE', priceUsd: 0.004 },
-                        { tier: 'SILVER', priceUsd: 0.003 },
-                        { tier: 'GOLD', priceUsd: 0.0021 },
+                        { tier: 'BRONZE', priceUsd: 0.003 },
+                        { tier: 'SILVER', priceUsd: 0.002 },
+                        { tier: 'GOLD', priceUsd: 0.0015 },
                         { tier: 'PLATINUM', priceUsd: 0.00126 },
-                        { tier: 'DIAMOND', priceUsd: 0.00076 },
+                        { tier: 'DIAMOND', priceUsd: 0.000756 },
                     ],
                 },
             ],
         });
 
-        expect(price).toBe('from $0.76 / 1,000 scraped places');
+        expect(price).toBe('from $1.50 / 1,000 scraped places');
+    });
+
+    it('shows "from" for a single tiered event and prices it at GOLD', () => {
+        // apify/instagram-scraper real tiers. Store badge: "from $1.50 / 1,000 results".
+        const price = formatPricing({
+            model: 'PAY_PER_EVENT',
+            events: [
+                {
+                    title: 'Result',
+                    tieredPricing: [
+                        { tier: 'FREE', priceUsd: 0.0027 },
+                        { tier: 'BRONZE', priceUsd: 0.0023 },
+                        { tier: 'SILVER', priceUsd: 0.0019 },
+                        { tier: 'GOLD', priceUsd: 0.0015 },
+                        { tier: 'PLATINUM', priceUsd: 0.0009 },
+                        { tier: 'DIAMOND', priceUsd: 0.0005 },
+                    ],
+                },
+            ],
+        });
+
+        expect(price).toBe('from $1.50 / 1,000 results');
+    });
+
+    it('matches the Store page for a multi-event Actor whose GOLD price is above its cheapest tier', () => {
+        // xtdata/tiktok-user-information-scraper real tiers (from the live widget payload).
+        // Store badge: "from $6.80 / 1,000 user queries" — GOLD, not the $6.00 DIAMOND tier.
+        const price = formatPricing({
+            model: 'PAY_PER_EVENT',
+            events: [
+                {
+                    title: 'Actor Start',
+                    tieredPricing: [
+                        { tier: 'FREE', priceUsd: 0.006 },
+                        { tier: 'BRONZE', priceUsd: 0.0056 },
+                        { tier: 'SILVER', priceUsd: 0.0052 },
+                        { tier: 'GOLD', priceUsd: 0.0048 },
+                        { tier: 'PLATINUM', priceUsd: 0.0044 },
+                        { tier: 'DIAMOND', priceUsd: 0.004 },
+                    ],
+                },
+                {
+                    title: 'User query',
+                    isPrimaryEvent: true,
+                    tieredPricing: [
+                        { tier: 'FREE', priceUsd: 0.008 },
+                        { tier: 'BRONZE', priceUsd: 0.0076 },
+                        { tier: 'SILVER', priceUsd: 0.0072 },
+                        { tier: 'GOLD', priceUsd: 0.0068 },
+                        { tier: 'PLATINUM', priceUsd: 0.0064 },
+                        { tier: 'DIAMOND', priceUsd: 0.006 },
+                    ],
+                },
+            ],
+        });
+
+        expect(price).toBe('from $6.80 / 1,000 user queries');
+    });
+
+    it('falls back to the cheapest paid tier when GOLD is missing', () => {
+        const price = formatPricing({
+            model: 'PAY_PER_EVENT',
+            events: [
+                {
+                    title: 'Result',
+                    tieredPricing: [
+                        { tier: 'FREE', priceUsd: 0.004 },
+                        { tier: 'BRONZE', priceUsd: 0.003 },
+                        { tier: 'SILVER', priceUsd: 0.002 },
+                    ],
+                },
+            ],
+        });
+
+        expect(price).toBe('from $2.00 / 1,000 results');
+    });
+
+    it('prices tiered PRICE_PER_DATASET_ITEM at GOLD like the PAY_PER_EVENT badge', () => {
+        const price = formatPricing({
+            model: 'PRICE_PER_DATASET_ITEM',
+            unitName: 'result',
+            pricePerUnit: 0.004,
+            tieredPricing: [
+                { tier: 'FREE', pricePerUnit: 0.004 },
+                { tier: 'GOLD', pricePerUnit: 0.0015 },
+                { tier: 'DIAMOND', pricePerUnit: 0.0005 },
+            ],
+        });
+
+        expect(price).toBe('from $1.50 / 1,000 results');
+    });
+
+    it('prices tiered FLAT_PRICE_PER_MONTH at GOLD instead of the un-resolved base price', () => {
+        // Complete mode carries the base `pricePerUnit` (30) untouched; the badge must resolve the tier.
+        const price = formatPricing({
+            model: 'FLAT_PRICE_PER_MONTH',
+            pricePerUnit: 30,
+            trialMinutes: 0,
+            tieredPricing: [
+                { tier: 'FREE', pricePerUnit: 30 },
+                { tier: 'GOLD', pricePerUnit: 20 },
+            ],
+        });
+
+        expect(price).toBe('$20.00/month + usage');
+    });
+
+    it('falls back to the flat price when no paid tier exists', () => {
+        expect(
+            formatPricing({
+                model: 'PAY_PER_EVENT',
+                events: [{ title: 'Result', priceUsd: 0.002, tieredPricing: [{ tier: 'FREE', priceUsd: 0.002 }] }],
+            }),
+        ).toBe('$2.00 / 1,000 results');
+    });
+
+    it('returns Pay per event when neither a paid tier nor a flat price exists', () => {
+        expect(
+            formatPricing({
+                model: 'PAY_PER_EVENT',
+                events: [{ title: 'Result', tieredPricing: [{ tier: 'FREE', priceUsd: 0 }] }],
+            }),
+        ).toBe('Pay per event');
+    });
+
+    it('prices an event at or above $0.01 per event, with "from" only when other events exist', () => {
+        const analysis = { title: 'Competitor analysis', priceUsd: 0.05 };
+
+        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [analysis] })).toBe('$0.05 / competitor analysis');
+        expect(
+            formatPricing({
+                model: 'PAY_PER_EVENT',
+                events: [
+                    { title: 'Actor start', priceUsd: 0.0001 },
+                    { ...analysis, isPrimaryEvent: true },
+                ],
+            }),
+        ).toBe('from $0.05 / competitor analysis');
+    });
+
+    it('formats FLAT_PRICE_PER_MONTH without tiers from the base price', () => {
+        expect(formatPricing({ model: 'FLAT_PRICE_PER_MONTH', pricePerUnit: 30 })).toBe('$30.00/month + usage');
     });
 });
