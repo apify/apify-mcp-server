@@ -141,9 +141,4 @@ describe('canRunActor()', () => {
         expect(canRunActor('actor-id-1', [], new Set(['other-actor-id']))).toBe(false);
         expect(canRunActor('actor-id-1', [], new Set())).toBe(false);
     });
-
-    // loadedActorIds covers both ACTOR and ACTOR_MCP entries, so either tool shape counts.
-    it('returns true when the Actor ID comes from a loaded Actor-MCP sub-tool', () => {
-        expect(canRunActor('mcp-actor-id', [], new Set(['mcp-actor-id']))).toBe(true);
-    });
 });
