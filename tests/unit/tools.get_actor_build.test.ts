@@ -105,14 +105,18 @@ describe('get-actor-build', () => {
         expect((structuredContent as { logTail: string[] }).logTail).toHaveLength(20);
     });
 
-    it('does not fetch the log when lines is 0', async () => {
+    it('returns the entire log when lines is 0', async () => {
         getMock.mockResolvedValue(mockBuild());
         logGetMock.mockClear();
+        logGetMock.mockResolvedValue(numberedLog(50));
 
         const { structuredContent } = await callTool({ buildId: 'build-1', lines: 0 });
 
-        expect(logGetMock).not.toHaveBeenCalled();
-        expect((structuredContent as { logTail: string[] }).logTail).toEqual([]);
+        const { logTail } = structuredContent as { logTail: string[] };
+        expect(logGetMock).toHaveBeenCalledTimes(1);
+        expect(logTail).toHaveLength(50);
+        expect(logTail[0]).toBe('line 1');
+        expect(logTail[49]).toBe('line 50');
     });
 
     it('returns an empty log tail when the log is missing', async () => {

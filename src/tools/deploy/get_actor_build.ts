@@ -21,7 +21,7 @@ const getActorBuildArgs = z.object({
         .min(0)
         .max(50)
         .default(20)
-        .describe('Number of trailing log lines to include; 0 returns no log'),
+        .describe('Output the last N lines of the build log; pass 0 to return the entire log'),
 });
 
 /**
@@ -32,6 +32,7 @@ async function fetchLogTail(client: ApifyClient, buildId: string, lines: number)
     const log = await client.build(buildId).log().get();
     if (!log) return [];
     // Logs from the API end with a newline; drop it so the tail slice counts only content lines.
+    // slice(-0) is slice(0), so lines 0 returns the whole log, the same as get-actor-log.
     return log.replace(/\n$/, '').split('\n').slice(-lines);
 }
 
@@ -85,7 +86,7 @@ USAGE EXAMPLES:
         if (!build) {
             return respondUserError(`Build with ID '${parsed.buildId}' not found.`);
         }
-        const logTail = parsed.lines > 0 ? await fetchLogTail(client, parsed.buildId, parsed.lines) : [];
+        const logTail = await fetchLogTail(client, parsed.buildId, parsed.lines);
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const structuredContent = { build: toBuildResult(build, linkContext), logTail };
         const summary = `Build ${build.buildNumber} of Actor ${build.actId} is ${build.status}.`;
