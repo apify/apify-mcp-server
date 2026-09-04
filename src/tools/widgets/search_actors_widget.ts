@@ -59,7 +59,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames } = toolArgs;
+        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = searchActorsWidgetArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
@@ -108,7 +108,11 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
             in your response.
         `,
         ];
-        const callabilityCaveat = buildActorCallabilityCaveat(loadedToolNames);
+        const callabilityCaveat = buildActorCallabilityCaveat(
+            actors.map((actor) => actor.id),
+            loadedToolNames,
+            loadedActorIds,
+        );
         if (callabilityCaveat) texts.push(callabilityCaveat);
 
         const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);

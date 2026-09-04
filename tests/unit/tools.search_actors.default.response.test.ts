@@ -272,4 +272,35 @@ describe('search-actors without widget (searchActors)', () => {
         expect(structuredContent.instructions).not.toContain('cannot be run in this configuration');
         expect(content[0].text).not.toContain('cannot be run in this configuration');
     });
+
+    it('omits the not-runnable caveat when call-actor is absent but every result is already loaded', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+
+        const result = await (searchActors as HelperTool).call(
+            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [], [MOCK_STORE_ACTOR.id]),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: { instructions?: string };
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.instructions).not.toContain('cannot be run in this configuration');
+        expect(content[0].text).not.toContain('cannot be run in this configuration');
+    });
+
+    it('adds the not-runnable caveat for mixed results when call-actor is absent and only one result is loaded', async () => {
+        const otherActor = { ...MOCK_STORE_ACTOR, id: 'actor-id-2' };
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR, otherActor]);
+
+        const result = await (searchActors as HelperTool).call(
+            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [], [MOCK_STORE_ACTOR.id]),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: { instructions?: string };
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.instructions).toContain('cannot be run in this configuration');
+        expect(content[0].text).toContain('cannot be run in this configuration');
+    });
 });
