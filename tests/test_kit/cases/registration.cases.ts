@@ -30,6 +30,8 @@ const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
 // Locked Claude-connector `?tools=` allowlist — see ai-team#232. No call-actor.
+// Valid as the `tools=` selector value as-is (Actor entries use their slash name);
+// served tool names differ for the two Actor entries — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
@@ -51,6 +53,9 @@ const CLAUDE_CONNECTOR_TOOLS = [
     'apify/rag-web-browser',
     'apify/web-fetch',
 ];
+const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selector) =>
+    selector.includes('/') ? actorNameToToolName(selector) : selector,
+);
 
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
@@ -105,7 +110,7 @@ export const registrationCases: Case[] = [
                 const names = getToolNames(await client.listTools());
                 expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
                 expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL);
-                expect(new Set(names)).toEqual(new Set(CLAUDE_CONNECTOR_TOOLS));
+                expect(new Set(names)).toEqual(new Set(CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES));
             },
         ),
     },
