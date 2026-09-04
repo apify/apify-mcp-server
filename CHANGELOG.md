@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - **evals:** Add --claude-judge to run the judge on the Agent SDK ([#1299](https://github.com/apify/apify-mcp-server/pull/1299)) ([737b748](https://github.com/apify/apify-mcp-server/commit/737b748a9159ab5f4098535f51e34d2848dd6f1f)) by [@jirispilka](https://github.com/jirispilka)
+- **evals:** Add web-fetch and web-tools-selection eval suites ([#1300](https://github.com/apify/apify-mcp-server/pull/1300)) ([23b94c0](https://github.com/apify/apify-mcp-server/commit/23b94c07f7cc373ac2d1276f4e4fa67d6658fecd)) by [@jirispilka](https://github.com/jirispilka)
 
 ### 🐛 Bug Fixes
 
