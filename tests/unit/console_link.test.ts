@@ -4,6 +4,7 @@ import type { ApifyClient } from '../../src/apify_client.js';
 import { STAGING_MCP_HOSTNAME } from '../../src/const.js';
 import {
     buildConsoleActorUrl,
+    buildConsoleBuildUrl,
     buildConsoleDatasetUrl,
     buildConsoleKeyValueStoreUrl,
     buildConsoleRunUrl,
@@ -58,6 +59,9 @@ describe('buildConsole*Url (production host)', () => {
     it('builds personal Actor/run/dataset/key-value-store URLs', () => {
         expect(buildConsoleActorUrl({}, 'ACTOR_ID')).toBe('https://console.apify.com/actors/ACTOR_ID');
         expect(buildConsoleRunUrl({}, 'RUN_ID')).toBe('https://console.apify.com/actors/runs/RUN_ID');
+        expect(buildConsoleBuildUrl({}, 'ACTOR_ID', 'BUILD_ID')).toBe(
+            'https://console.apify.com/actors/ACTOR_ID/builds/BUILD_ID',
+        );
         expect(buildConsoleDatasetUrl({}, 'DATASET_ID')).toBe('https://console.apify.com/storage/datasets/DATASET_ID');
         expect(buildConsoleKeyValueStoreUrl({}, 'STORE_ID')).toBe(
             'https://console.apify.com/storage/key-value-stores/STORE_ID',
@@ -72,6 +76,9 @@ describe('buildConsole*Url (production host)', () => {
         expect(buildConsoleRunUrl(org, 'RUN_ID')).toBe(
             'https://console.apify.com/organization/ORG_ID/actors/runs/RUN_ID',
         );
+        expect(buildConsoleBuildUrl(org, 'ACTOR_ID', 'BUILD_ID')).toBe(
+            'https://console.apify.com/organization/ORG_ID/actors/ACTOR_ID/builds/BUILD_ID',
+        );
         expect(buildConsoleDatasetUrl(org, 'DATASET_ID')).toBe(
             'https://console.apify.com/organization/ORG_ID/storage/datasets/DATASET_ID',
         );
@@ -83,6 +90,7 @@ describe('buildConsole*Url (production host)', () => {
     it('returns undefined without a context (non-Console session)', () => {
         expect(buildConsoleActorUrl(undefined, 'ACTOR_ID')).toBeUndefined();
         expect(buildConsoleRunUrl(undefined, 'RUN_ID')).toBeUndefined();
+        expect(buildConsoleBuildUrl(undefined, 'ACTOR_ID', 'BUILD_ID')).toBeUndefined();
         expect(buildConsoleDatasetUrl(undefined, 'DATASET_ID')).toBeUndefined();
         expect(buildConsoleKeyValueStoreUrl(undefined, 'STORE_ID')).toBeUndefined();
     });
