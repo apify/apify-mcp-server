@@ -140,7 +140,7 @@ export function buildActorCallabilityCaveat(
     const anyResultCannotRun = actorIds.some((id) => !canRunActor(id, loadedToolNames, loadedActorIds));
     if (!anyResultCannotRun) return '';
     return dedent`
-        This connector can run only Actors already exposed as dedicated tools. Other Actors found
+        This session can run only Actors already exposed as dedicated tools. Other Actors found
         here are informational and cannot be run in this configuration. To use another Actor, open
         its Apify page or configure it separately.
     `;
