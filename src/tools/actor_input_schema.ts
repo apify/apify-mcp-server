@@ -381,7 +381,7 @@ function enumWasDropped(displayEnum: string[] | undefined, rawEnum: string[] | u
 
 /**
  * Keys (post dot-encoding) whose enum/items.enum shortenProperties() dropped — used to gate the
- * per-session "see full schema" addendum. A key missing from `rawProperties` (e.g. `waitSecs`) is skipped.
+ * per-session fetch-actor-details addendum. A key missing from `rawProperties` (e.g. `waitSecs`) is skipped.
  */
 export function findDroppedEnumProperties(
     displayProperties: Record<string, SchemaProperties>,
