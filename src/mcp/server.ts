@@ -271,11 +271,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Server instructions for the current connection: mode plus whether report-problem is loaded.
+     * Server instructions for the current connection: mode plus the session's real tool set.
      * Read by the legacy adapter after `applyInitialize`, when the tool set is final.
      */
     public getServerInstructions(): string {
-        return getServerInstructions(this.serverMode, this.tools.has(HELPER_TOOLS.PROBLEM_REPORT));
+        return getServerInstructions(this.serverMode, { hasTool: (name) => this.tools.has(name) });
     }
 
     /**
@@ -286,7 +286,8 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * `initialize` rewrites `_serverMode`, which must not leak into later stateless requests.
      */
     public getStatelessServerInstructions(): string {
-        return getServerInstructions(resolveServerMode(this.serverModeOption, false));
+        const notReportProblem = (name: string) => name !== HELPER_TOOLS.PROBLEM_REPORT;
+        return getServerInstructions(resolveServerMode(this.serverModeOption, false), { hasTool: notReportProblem });
     }
 
     /**
