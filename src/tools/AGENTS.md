@@ -55,8 +55,14 @@ by `tests/unit/tools.mode_contract.test.ts`, which scans `description` only.
 
 Input-schema field text (`.describe()` on a Zod field) reaches `tools/list` verbatim — nothing
 renders it per session — so never name a tool there; put the guidance in `buildDescription` behind
-`hasTool`. `actors/actor_tools_factory.ts`'s `waitSecs` is the one exception: an Actor tool always
-auto-injects the `get-actor-run` it names.
+`hasTool`. Two exceptions: `actors/actor_tools_factory.ts`'s `waitSecs` always auto-injects the
+`get-actor-run` it names; and a dynamically-built Actor `inputSchema` (not a Zod field) can define
+`buildInputSchema(ctx)` on the entry — same `ToolDescriptionContext`/`hasTool` contract as
+`buildDescription`, rendered at the same `getToolPublicFieldOnly` boundary — see
+`actor_tools_factory.ts`'s dropped-enum addendum, gated on `fetch-actor-details`. A payment
+decorator that clones a tool (`payments/skyfire.ts`) must wrap an existing `buildInputSchema`
+rather than only mutating the static `inputSchema`, or an injected field (`skyfire-pay-id`)
+disappears whenever the gated render is used instead.
 
 Result text (`summary` / `nextStep` in `content[1]`) has no `hasTool`, but it does have a per-session
 gate: `InternalToolArgs.loadedToolNames` (see `suggestTool` in `storage/storage_helpers.ts`). Name a

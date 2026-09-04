@@ -106,4 +106,20 @@ describe('cloneToolEntry', () => {
         // Original should be unaffected
         expect((original.inputSchema.properties as Record<string, unknown>).newProp).toBeUndefined();
     });
+
+    it('should preserve buildInputSchema function reference when present', () => {
+        const buildInputSchema = vi.fn(() => ({ type: 'object' as const, properties: {} }));
+        const original = makeActorTool({ buildInputSchema });
+        const cloned = cloneToolEntry(original);
+
+        expect(cloned.buildInputSchema).toBe(original.buildInputSchema);
+        expect(typeof cloned.buildInputSchema).toBe('function');
+    });
+
+    it('should leave buildInputSchema undefined when absent from the original', () => {
+        const original = makeActorTool();
+        const cloned = cloneToolEntry(original);
+
+        expect(cloned.buildInputSchema).toBeUndefined();
+    });
 });

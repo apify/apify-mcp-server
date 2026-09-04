@@ -105,12 +105,16 @@ export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldO
         tool.buildDescription && presentTools
             ? tool.buildDescription({ hasTool: (name) => presentTools.has(name) })
             : tool.description;
+    const inputSchema =
+        tool.buildInputSchema && presentTools
+            ? tool.buildInputSchema({ hasTool: (name) => presentTools.has(name) })
+            : tool.inputSchema;
 
     return {
         name: tool.name,
         title: tool.title,
         description,
-        inputSchema: fixZodInputSchemaRequired(tool.inputSchema),
+        inputSchema: fixZodInputSchemaRequired(inputSchema),
         outputSchema: tool.outputSchema,
         annotations: tool.annotations,
         icons: tool.icons,
@@ -138,6 +142,7 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     const originalAjvValidate = toolEntry.ajvValidate;
     const originalCall = toolEntry.type === TOOL_TYPE.INTERNAL ? toolEntry.call : undefined;
     const originalBuildDescription = toolEntry.buildDescription;
+    const originalBuildInputSchema = toolEntry.buildInputSchema;
 
     // Create a deep copy using JSON serialization (excluding functions)
     const cloned = JSON.parse(
@@ -154,6 +159,9 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     }
     if (originalBuildDescription) {
         cloned.buildDescription = originalBuildDescription;
+    }
+    if (originalBuildInputSchema) {
+        cloned.buildInputSchema = originalBuildInputSchema;
     }
 
     return cloned;

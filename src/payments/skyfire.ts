@@ -1,4 +1,4 @@
-import type { ToolEntry } from '../types.js';
+import type { ToolEntry, ToolInputSchema } from '../types.js';
 import { redactSkyfirePayId } from '../utils/logging.js';
 import { appendToolDescription, cloneToolEntry } from '../utils/tools.js';
 import {
@@ -9,6 +9,18 @@ import {
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from './const.js';
 import type { PaymentHeaders, PaymentProvider } from './types.js';
+
+/** Adds `skyfire-pay-id` to a schema's properties in place, if not already present. */
+function injectPayIdProperty(inputSchema: ToolInputSchema): void {
+    if (!inputSchema || !('properties' in inputSchema)) return;
+    const props = inputSchema.properties as Record<string, unknown>;
+    if (!props[SKYFIRE_PAY_ID_KEY]) {
+        props[SKYFIRE_PAY_ID_KEY] = {
+            type: 'string',
+            description: SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
+        };
+    }
+}
 
 /**
  * Skyfire payment provider.
@@ -31,15 +43,16 @@ export class SkyfirePaymentProvider implements PaymentProvider {
 
         appendToolDescription(cloned, SKYFIRE_TOOL_INSTRUCTIONS);
 
-        // Add skyfire-pay-id property to inputSchema (idempotent)
-        if (cloned.inputSchema && 'properties' in cloned.inputSchema) {
-            const props = cloned.inputSchema.properties as Record<string, unknown>;
-            if (!props[SKYFIRE_PAY_ID_KEY]) {
-                props[SKYFIRE_PAY_ID_KEY] = {
-                    type: 'string',
-                    description: SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
-                };
-            }
+        injectPayIdProperty(cloned.inputSchema);
+        // A per-session inputSchema render bypasses the static field above — wrap it too, or
+        // pay-id vanishes whenever it's used instead.
+        if (cloned.buildInputSchema) {
+            const renderBase = cloned.buildInputSchema;
+            cloned.buildInputSchema = (ctx) => {
+                const schema = renderBase(ctx);
+                injectPayIdProperty(schema);
+                return schema;
+            };
         }
 
         return Object.freeze(cloned);
