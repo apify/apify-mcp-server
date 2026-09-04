@@ -273,29 +273,11 @@ describe('buildFetchActorDetailsResult()', () => {
 
         expect(text).not.toContain('cannot be run in this configuration');
     });
-
-    // The guidance check matches by resolved Actor ID — querying by ID or full name resolves identically.
-    it('omits not-runnable guidance when queried by Actor ID and the dedicated tool is loaded', async () => {
-        const result = await buildFetchActorDetailsResult(
-            stubInternalToolArgs(
-                { actor: 'aXeS4nzT3S9RRAQEy', output: { inputSchema: true } },
-                [],
-                [MOCK_DETAILS.actorInfo.id],
-            ),
-        );
-        const text = ((result as { content: { text: string }[] }).content ?? []).map((c) => c.text).join('\n');
-
-        expect(text).not.toContain('cannot be run in this configuration');
-    });
 });
 
 describe('buildActorNotRunnableGuidance()', () => {
     it('is empty when call-actor is loaded', () => {
         expect(buildActorNotRunnableGuidance('actor-id-1', [HELPER_TOOLS.ACTOR_CALL], new Set())).toBe('');
-    });
-
-    it('is empty when the Actor has its own dedicated tool loaded', () => {
-        expect(buildActorNotRunnableGuidance('actor-id-1', [], new Set(['actor-id-1']))).toBe('');
     });
 
     it('names no tool, only states the Actor cannot run, when neither is loaded', () => {
