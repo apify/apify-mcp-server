@@ -3,7 +3,9 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
-import { actorNameToToolName, legacyToolNameToNew } from '../../src/tools/actor_tool_naming.js';
+import { actorNameToToolName, legacyToolNameToNew, resolveActorToolMode } from '../../src/tools/actor_tool_naming.js';
+import type { ActorInfo, ActorInputSchema } from '../../src/types.js';
+import { ACTOR_TOOL_MODE } from '../../src/types.js';
 
 describe('actors', () => {
     describe('actorNameToToolName', () => {
@@ -64,5 +66,58 @@ describe('actors', () => {
             expect(legacyToolNameToNew('apify--rag-web-browser')).toBeNull();
             expect(legacyToolNameToNew('search-actors')).toBeNull();
         });
+    });
+});
+
+function makeActorInfo(opts: {
+    isStandbyEnabled?: boolean;
+    webServerMcpPath?: string | null;
+    input?: unknown;
+}): ActorInfo {
+    return {
+        webServerMcpPath: opts.webServerMcpPath ?? null,
+        definition: { id: 'actor-id', actorFullName: 'acme/actor', input: opts.input as ActorInputSchema | undefined },
+        actor: opts.isStandbyEnabled ? { actorStandby: { isEnabled: true } } : {},
+    } as unknown as ActorInfo;
+}
+
+const NON_EMPTY_INPUT = { type: 'object', properties: { url: { type: 'string' } } };
+
+describe('resolveActorToolMode()', () => {
+    // One row per cell of the decision table in `resolveActorToolMode`'s docstring, plus the
+    // edge cases that define what counts as an empty input schema.
+    it.each([
+        ['standby disabled, no MCP path', {}, ACTOR_TOOL_MODE.RUN],
+        ['standby disabled, leftover MCP path', { webServerMcpPath: '/mcp' }, ACTOR_TOOL_MODE.RUN],
+        ['standby disabled, empty input schema', { input: undefined }, ACTOR_TOOL_MODE.RUN],
+        ['standby enabled, MCP path', { isStandbyEnabled: true, webServerMcpPath: '/mcp' }, ACTOR_TOOL_MODE.MCP],
+        ['standby enabled, no MCP path, non-empty input', { isStandbyEnabled: true }, ACTOR_TOOL_MODE.RUN],
+        [
+            'missing input counts as empty',
+            { isStandbyEnabled: true, input: undefined },
+            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+        ],
+        [
+            'input without properties counts as empty',
+            { isStandbyEnabled: true, input: { type: 'object' } },
+            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+        ],
+        [
+            'zero properties counts as empty',
+            { isStandbyEnabled: true, input: { type: 'object', properties: {} } },
+            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+        ],
+        [
+            'required without properties still counts as empty',
+            { isStandbyEnabled: true, input: { type: 'object', properties: {}, required: ['url'] } },
+            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+        ],
+        [
+            'non-object input carrying properties counts as non-empty',
+            { isStandbyEnabled: true, input: { type: 'string', properties: { url: { type: 'string' } } } },
+            ACTOR_TOOL_MODE.RUN,
+        ],
+    ] as const)('resolves %s to %s', (_label, opts, expected) => {
+        expect(resolveActorToolMode(makeActorInfo({ input: NON_EMPTY_INPUT, ...opts }))).toBe(expected);
     });
 });

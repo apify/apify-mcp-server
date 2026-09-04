@@ -352,6 +352,40 @@ export const reportProblemToolOutputSchema = {
     required: ['reported'],
 };
 
+/** Schema shared by every Actor task tool. */
+export const actorTaskOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        taskId: { type: 'string', description: 'ID of the task' },
+        actorId: { type: 'string', description: 'ID of the Actor the task belongs to' },
+        name: { type: 'string', description: 'Name of the task' },
+        title: { type: ['string', 'null'], description: 'Human-readable title of the task' },
+        description: { type: ['string', 'null'], description: 'Short description of the task' },
+        publishedAt: {
+            type: ['string', 'null'],
+            description: 'When the task was published (ISO 8601); null when the task is not published',
+        },
+        publicConfig: {
+            type: ['object', 'null'],
+            description: 'Public display configuration of the task landing page',
+            properties: {
+                seoTitle: { type: ['string', 'null'] },
+                seoDescription: { type: ['string', 'null'] },
+                inputSchemaFields: { type: ['array', 'null'], items: { type: 'string' } },
+                datasetName: { type: ['string', 'null'] },
+                datasetView: { type: ['string', 'null'] },
+            },
+        },
+        input: {
+            type: ['object', 'array', 'null'],
+            description:
+                'The stored task input, as the API returns it; fields the Actor declares as secret are ' +
+                'encrypted placeholders, never plaintext. Its keys are what `publicConfig.inputSchemaFields` can use.',
+        },
+    },
+    required: ['taskId', 'actorId', 'name', 'title', 'description', 'publishedAt', 'publicConfig', 'input'],
+};
+
 /**
  * Schema for get-actor-log. The log API returns plain text, so the schema wraps it in a single field.
  */
@@ -457,6 +491,8 @@ export const actorRunOutputSchema = {
                     properties: {
                         default: buildDatasetEntrySchema(),
                     },
+                    // `buildStorageEntries` (actor_run_response.ts) omits this whole map unless `default` is present.
+                    required: ['default'],
                     additionalProperties: buildDatasetEntrySchema(),
                 },
                 keyValueStores: {
@@ -466,6 +502,8 @@ export const actorRunOutputSchema = {
                     properties: {
                         default: buildKeyValueStoreEntrySchema(),
                     },
+                    // `buildStorageEntries` (actor_run_response.ts) omits this whole map unless `default` is present.
+                    required: ['default'],
                     additionalProperties: buildKeyValueStoreEntrySchema(),
                 },
             },

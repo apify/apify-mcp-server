@@ -5,8 +5,6 @@
 
 import type OpenAI from 'openai';
 
-import type { McpTool } from './types.js';
-
 /**
  * Generic tool interface that matches both ToolBase and McpTool
  */
@@ -29,11 +27,4 @@ export function transformToolsToOpenAIFormat(tools: GenericTool[]): OpenAI.Chat.
             parameters: tool.inputSchema,
         },
     }));
-}
-
-/**
- * Alias for MCP-specific usage (keeps backwards compatibility)
- */
-export function mcpToolsToOpenAiTools(mcpTools: McpTool[]): OpenAI.Chat.Completions.ChatCompletionTool[] {
-    return transformToolsToOpenAIFormat(mcpTools);
 }

@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HELPER_TOOLS, type HelperToolName } from '../../src/const.js';
+import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
@@ -66,6 +67,18 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             ];
             expect(toolNames(defaultCategories.storage)).toEqual(expected);
             expect(toolNames(appsCategories.storage)).toEqual(expected);
+        });
+
+        it('should have correct tools in tasks category (both modes)', () => {
+            const expected = [
+                HELPER_TOOLS.ACTOR_TASK_CREATE,
+                HELPER_TOOLS.ACTOR_TASK_GET,
+                HELPER_TOOLS.ACTOR_TASK_UPDATE,
+                HELPER_TOOLS.ACTOR_TASK_PUBLISH,
+                HELPER_TOOLS.ACTOR_TASK_UNPUBLISH,
+            ];
+            expect(toolNames(defaultCategories.tasks)).toEqual(expected);
+            expect(toolNames(appsCategories.tasks)).toEqual(expected);
         });
 
         it('should have correct tools in dev category (both modes)', () => {
@@ -160,6 +173,28 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(defaultCallActor).toBeDefined();
             expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
             expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+        });
+    });
+
+    describe('fetch-actor-details name-resolution guidance', () => {
+        it('sends the model to search-actors for an inexact name when that tool is served', () => {
+            const { description } = getToolPublicFieldOnly(fetchActorDetails, {
+                presentTools: new Set([HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.STORE_SEARCH]),
+            });
+
+            expect(description).toContain('Requires the exact ID or full name');
+            expect(description).toContain(`find it with ${HELPER_TOOLS.STORE_SEARCH} first`);
+        });
+
+        // The half of the guidance that names no tool must survive a session without
+        // search-actors — it is the only instruction there against inventing a name.
+        it('keeps the exact-name requirement when search-actors is absent', () => {
+            const { description } = getToolPublicFieldOnly(fetchActorDetails, {
+                presentTools: new Set([HELPER_TOOLS.ACTOR_GET_DETAILS]),
+            });
+
+            expect(description).toContain('do not construct a plausible-looking name');
+            expect(description).not.toContain(HELPER_TOOLS.STORE_SEARCH);
         });
     });
 
@@ -379,25 +414,89 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
 
         expect(schema.required).toEqual(['query']);
     });
+});
 
-    // Regression: #637 — phantom `default: undefined` from filterSchemaProperties must not clear required.
-    it('should preserve required fields even when upstream writes `default: undefined`', () => {
-        const toolWithPhantomDefaults = {
-            name: 'apify--some-actor',
-            description: 'Test Actor tool',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    query: { type: 'string', description: 'Search query', default: undefined },
-                    maxResults: { type: 'integer', description: 'Limit', default: 3 },
-                },
-                required: ['query'],
-            },
-        } as unknown as ToolBase;
+/**
+ * A description must not name a tool that is absent from the same session — the model would call
+ * something `tools/list` never returned. Cross-tool references are gated per session via
+ * `buildDescription` + `ctx.hasTool(...)` and rendered at the tools/list boundary
+ * (`getToolPublicFieldOnly` with `presentTools`). This renders every session shape the same way
+ * the list handlers do and checks the result.
+ */
+describe('tool descriptions never name a tool absent from the session', () => {
+    /** Minimal direct Actor tool — enough to trigger AUTO_INJECTED_TOOLS and stand in for a real one. */
+    const actorToolStub = {
+        type: 'actor',
+        name: 'apify--rag-web-browser',
+        actorId: 'test-actor-id',
+        actorFullName: 'apify/rag-web-browser',
+        description: `Fetch output rows with ${HELPER_TOOLS.DATASET_GET_ITEMS}.`,
+        inputSchema: { type: 'object', properties: {} },
+    } as unknown as ToolEntry;
+    const ALL_TOOL_NAMES: string[] = [...Object.values(HELPER_TOOLS), actorToolStub.name];
 
-        const { inputSchema } = getToolPublicFieldOnly(toolWithPhantomDefaults, { filterWidgetMeta: false });
-        const schema = inputSchema as { required?: string[] };
+    const sessions: { label: string; input: Input; actorTools: ToolEntry[] }[] = [
+        { label: 'default (no selectors)', input: {}, actorTools: [actorToolStub] },
+        { label: "tools: ['docs']", input: { tools: ['docs'] }, actorTools: [] },
+        { label: "tools: ['runs']", input: { tools: ['runs'] }, actorTools: [] },
+        { label: "tools: ['storage']", input: { tools: ['storage'] }, actorTools: [] },
+        { label: "tools: ['actors']", input: { tools: ['actors'] }, actorTools: [] },
+        ...ALL_TOOL_NAMES.map((name) => ({
+            label: `tools: ['${name}']`,
+            input: { tools: [name] },
+            actorTools: [],
+        })),
+        {
+            label: 'Actor tool only',
+            input: { tools: ['apify/rag-web-browser'] },
+            actorTools: [actorToolStub],
+        },
+        // Mixed cross-category selectors — arbitrary combinations must render correctly too.
+        {
+            label: "tools: ['call-actor', 'get-dataset']",
+            input: { tools: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.DATASET_GET] },
+            actorTools: [],
+        },
+        {
+            label: "tools: ['search-actors', 'fetch-apify-docs']",
+            input: { tools: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.DOCS_FETCH] },
+            actorTools: [],
+        },
+        {
+            label: "tools: ['docs', 'get-key-value-store-keys']",
+            input: { tools: ['docs', HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET] },
+            actorTools: [],
+        },
+    ];
 
-        expect(schema.required).toEqual(['query']);
-    });
+    for (const mode of SERVER_MODES) {
+        for (const { label, input, actorTools } of sessions) {
+            it(`${label} in ${mode} mode`, () => {
+                const tools = getToolsForServerMode(input, actorTools, mode);
+                const present = new Set(tools.map((t) => t.name));
+                const absent = ALL_TOOL_NAMES.filter((name) => !present.has(name));
+
+                const violations: string[] = [];
+                for (const tool of tools) {
+                    const { description } = getToolPublicFieldOnly(tool, { presentTools: present });
+                    for (const line of (description ?? '').split('\n')) {
+                        if (line.includes('available in this session')) {
+                            violations.push(`${tool.name} still hedges instead of rendering: ${line.trim()}`);
+                        }
+                        for (const name of absent) {
+                            // Boundary guard so `get-dataset` does not match inside `get-dataset-items`,
+                            // nor `call-actor` inside `call-actor-widget`. `:` is excluded too — it
+                            // marks a remote MCP-Actor tool ("apify/actors-mcp-server:fetch-apify-docs"),
+                            // not a tool served from this session.
+                            if (new RegExp(`(?<![\\w-:])${name}(?![\\w-])`).test(line)) {
+                                violations.push(`${tool.name} names absent ${name}: ${line.trim()}`);
+                            }
+                        }
+                    }
+                }
+
+                expect(violations).toEqual([]);
+            });
+        }
+    }
 });

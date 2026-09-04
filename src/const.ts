@@ -49,6 +49,11 @@ export const HELPER_TOOLS = {
     ACTOR_RUNS_GET_WIDGET: 'get-actor-run-widget',
     ACTOR_RUNS_LOG: 'get-actor-log',
     ACTOR_RUN_LIST_GET: 'get-actor-run-list',
+    ACTOR_TASK_GET: 'get-actor-task',
+    ACTOR_TASK_CREATE: 'create-actor-task',
+    ACTOR_TASK_UPDATE: 'update-actor-task',
+    ACTOR_TASK_PUBLISH: 'publish-actor-task',
+    ACTOR_TASK_UNPUBLISH: 'unpublish-actor-task',
     DATASET_GET: 'get-dataset',
     DATASET_LIST_GET: 'get-dataset-list',
     DATASET_GET_ITEMS: 'get-dataset-items',
@@ -93,17 +98,46 @@ export const APIFY_AI_CLIENT_NAME = 'apify-console-ai-chat';
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
 export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool when user wants to GET or RETRIEVE actual data immediately (one-time data retrieval).
-This tool directly fetches and returns data - it does NOT just find tools.
+This tool scrapes the data itself - it does NOT just find tools.
 
 Examples of when to use:
 - User wants current/immediate data (e.g., "Get flight prices for tomorrow", "What's the weather today?")
 - User needs to fetch specific content now (e.g., "Fetch news articles from CNN", "Get product info from Amazon")
 - User has time indicators like "today", "current", "latest", "recent", "now"
 
-This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.`;
+This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.
+When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.
+If a scraped page comes back blocked or empty (e.g. the crawl reports a 403 or the page text is missing), do not give up: retry that URL with the apify/web-fetch tool when it is available - its anti-bot fetching gets through blocks this tool cannot.`;
+
+export const WEB_FETCH = 'apify/web-fetch';
+/**
+ * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
+ * no references to any specific client or its built-in tools, so the same text works
+ * for every MCP client. Tune only based on eval results (`web-fetch-evals` dataset).
+ */
+export const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
+It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
+The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
+
+Examples of when to use:
+- User provides a URL and wants its content, its data or links, or an answer that requires reading that page
+- A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
+- Verbatim page content is needed, e.g. for quoting, extraction, or archiving
+
+This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.
+If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather than silently substituting a different URL.`;
+
+/**
+ * Appended to the `url` parameter description of the `apify/web-fetch` tool. Lives on the
+ * parameter because that is what an agent reads while writing the argument: eval agents
+ * (web-fetch-evals-errors, unsupported-protocol case) silently rewrote ftp:// URLs to
+ * https:// instead of telling the user the scheme is unsupported.
+ */
+export const WEB_FETCH_URL_SCHEME_NOTE =
+    'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
 
 export const defaults = {
-    actors: [RAG_WEB_BROWSER],
+    actors: [RAG_WEB_BROWSER, WEB_FETCH],
 };
 
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
@@ -177,6 +211,26 @@ export const DOCS_SNIPPET_HIGHLIGHT_TAG = '\uE000';
 
 export const ALLOWED_DOC_DOMAINS = ['https://docs.apify.com', 'https://crawlee.dev'] as const;
 
+/** Actor usernames treated as official Apify (drives `isOfficialApify` on the Actor card). */
+export const OFFICIAL_APIFY_USERNAMES: ReadonlySet<string> = new Set([
+    'agentify',
+    'apify',
+    'apifyatevents',
+    'clockworks',
+    'compass',
+    'e-commerce',
+    'h_reviews',
+    'hooli',
+    'junglee',
+    'lukaskrivka',
+    'maxcopell',
+    'misceres',
+    'streamers',
+    'tri_angle',
+    'vdrmota',
+    'voyager',
+]);
+
 export const APIFY_STORE_URL = 'https://apify.com';
 /** Apify Console origin (production). */
 export const CONSOLE_BASE_URL = 'https://console.apify.com';
@@ -187,7 +241,7 @@ export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
 export const APIFY_LOGO_URL = `${APIFY_STORE_URL}/apple-icon.png`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
-export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/platform/integrations/mcp';
+export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/integrations/mcp';
 
 // Telemetry
 export const TELEMETRY_ENV = {
@@ -221,6 +275,8 @@ export const FAILURE_CATEGORY = {
 export const APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED = 'full-permission-actor-not-approved';
 export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
+export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
+export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

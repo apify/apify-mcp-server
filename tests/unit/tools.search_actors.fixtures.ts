@@ -26,13 +26,16 @@ export const MOCK_STORE_ACTOR = {
 
 export const SEARCH_KEYWORDS = 'web scraper';
 
-export function stubInternalToolArgs(args: Record<string, unknown>): InternalToolArgs {
+export function stubInternalToolArgs(
+    args: Record<string, unknown>,
+    loadedToolNames: readonly string[] = [],
+): InternalToolArgs {
     return {
         args,
         apifyToken: 'test-token',
         apifyClient: {} as InternalToolArgs['apifyClient'],
         signal: new AbortController().signal,
         paymentProvider: undefined,
-        loadedToolNames: [],
+        loadedToolNames,
     };
 }

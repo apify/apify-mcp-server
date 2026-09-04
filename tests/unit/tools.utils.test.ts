@@ -18,7 +18,7 @@ import {
     transformActorInputSchemaProperties,
 } from '../../src/tools/actor_input_schema.js';
 import { isActorBlockedUnderPaymentProvider } from '../../src/tools/actor_tool_naming.js';
-import type { ActorInfo, ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
+import type { ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { ajv } from '../../src/utils/ajv.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -839,20 +839,8 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result.sources.items).toBeDefined();
         expect(result.sources.items?.properties?.url).toBeDefined();
         // 3. filterSchemaProperties: only allowed fields present
-        // NOTE: includes phantom `default: undefined` etc. from filterSchemaProperties (#675).
-        expect(Object.keys(result['foo-dot-bar'])).toEqual(
-            expect.arrayContaining([
-                'title',
-                'description',
-                'type',
-                'default',
-                'prefill',
-                'properties',
-                'items',
-                'required',
-                'enum',
-            ]),
-        );
+        // 'foo.bar' upstream only declares title/description/type — no default, prefill, enum, etc.
+        expect(Object.keys(result['foo-dot-bar']).sort()).toEqual(['description', 'title', 'type']);
         // 4. shortenProperties: longDesc is truncated, enumProp.enum is shortened
         expect(result.longDesc.description.length).toBeLessThanOrEqual(ACTOR_MAX_DESCRIPTION_LENGTH + 3);
         if (result.enumProp.enum) {
@@ -1118,12 +1106,13 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         const pub = getToolPublicFieldOnly(tool, { filterWidgetMeta: false });
         const schema = pub.inputSchema as {
             required?: string[];
-            properties?: Record<string, { description?: string }>;
+            properties?: Record<string, { description?: string; prefill?: unknown }>;
         };
 
         expect(schema.required).toEqual(['query']);
         expect(schema.properties?.query?.description).toMatch(/^\*\*REQUIRED\*\*/);
         expect(schema.properties?.maxResults?.description).not.toMatch(/^\*\*REQUIRED\*\*/);
+        expect(schema.properties?.query?.prefill).toBe('web browser for RAG pipelines');
     });
 
     // Regression: #1253 — a value cut only by display truncation must still pass AJV.
@@ -1171,21 +1160,15 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
 });
 
 describe('isActorBlockedUnderPaymentProvider', () => {
-    const actorInfo = ({ standby, mcpPath = null }: { standby: boolean; mcpPath?: string | null }): ActorInfo => ({
-        definition: { actorFullName: 'user/actor', id: 'act' } as ActorInfo['definition'],
-        actor: { actorStandby: standby ? { isEnabled: true } : undefined } as ActorInfo['actor'],
-        webServerMcpPath: mcpPath,
+    const actor = (standby: boolean) => ({
+        actorStandby: standby ? { isEnabled: true } : undefined,
     });
 
     it('blocks standby Actors', () => {
-        expect(isActorBlockedUnderPaymentProvider(actorInfo({ standby: true }))).toBe(true);
+        expect(isActorBlockedUnderPaymentProvider(actor(true))).toBe(true);
     });
 
     it('does not block normal Actors', () => {
-        expect(isActorBlockedUnderPaymentProvider(actorInfo({ standby: false }))).toBe(false);
-    });
-
-    it('does not block MCP path without standby (must match list-tools filter)', () => {
-        expect(isActorBlockedUnderPaymentProvider(actorInfo({ standby: false, mcpPath: '/mcp' }))).toBe(false);
+        expect(isActorBlockedUnderPaymentProvider(actor(false))).toBe(false);
     });
 });

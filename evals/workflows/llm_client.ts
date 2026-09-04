@@ -3,6 +3,7 @@
  * Phase 3: Added support for tool calling
  */
 
+import { startActiveObservation } from '@langfuse/tracing';
 import OpenAI from 'openai';
 // eslint-disable-next-line import/extensions
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
@@ -36,6 +37,27 @@ export type LlmResponse = {
     usage?: LlmUsage;
 };
 
+/** Low temperature for deterministic evaluation results. */
+const TEMPERATURE = 0.15;
+
+/**
+ * What the judge needs from an LLM client. Implemented by {@link LlmClient} (OpenRouter)
+ * and `ClaudeLlmClient` (Claude Agent SDK, `--claude-judge`).
+ */
+export type JudgeLlmClient = Pick<LlmClient, 'callLlm'>;
+
+/** Langfuse generation-update fields for a usage report; empty when the provider sent none. */
+export function toUsageDetails(usage?: LlmUsage): { usageDetails?: { input: number; output: number; total: number } } {
+    if (!usage) return {};
+    return {
+        usageDetails: {
+            input: usage.promptTokens,
+            output: usage.completionTokens,
+            total: usage.totalTokens,
+        },
+    };
+}
+
 /**
  * LLM client for chat completions with optional tool support
  */
@@ -57,8 +79,34 @@ export class LlmClient {
      * Call LLM with messages and optional tools
      * Phase 3: Added tools parameter
      * Phase 4: Added responseFormat for structured outputs
+     *
+     * Traced as a Langfuse generation, nested under whichever observation is active at the
+     * call site: inside the experiment task that is the item's trace, so a judge call shows
+     * up with its prompt, verdict, tokens, and cost.
      */
     async callLlm(
+        messages: ChatCompletionMessageParam[],
+        model: string,
+        tools?: ChatCompletionTool[],
+        responseFormat?: ResponseFormatJSONSchema,
+    ): Promise<LlmResponse> {
+        return startActiveObservation(
+            model,
+            async (generation) => {
+                generation.update({ model, input: messages, modelParameters: { temperature: TEMPERATURE } });
+                const llmResponse = await this.sendRequest(messages, model, tools, responseFormat);
+                generation.update({
+                    output: llmResponse.toolCalls ?? llmResponse.content,
+                    ...toUsageDetails(llmResponse.usage),
+                });
+                return llmResponse;
+            },
+            { asType: 'generation' },
+        );
+    }
+
+    /** The request itself, untraced. */
+    private async sendRequest(
         messages: ChatCompletionMessageParam[],
         model: string,
         tools?: ChatCompletionTool[],
@@ -67,7 +115,7 @@ export class LlmClient {
         const response = await this.openai.chat.completions.create({
             model,
             messages,
-            temperature: 0.15, // Low temperature for deterministic evaluation results
+            temperature: TEMPERATURE,
             ...(tools && tools.length > 0 ? { tools } : {}),
             ...(responseFormat ? { response_format: responseFormat } : {}),
         });

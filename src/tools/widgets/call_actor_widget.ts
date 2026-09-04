@@ -5,8 +5,8 @@ import log from '@apify/log';
 
 import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondServerError } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
@@ -43,32 +43,42 @@ const callActorWidgetArgsSchema = z
     })
     .strict();
 
-const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
-    Render an interactive UI element (widget) that displays live Actor run progress for the user.
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    const workflowSection = [
+        'WORKFLOW:',
+        ...(hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
+            ? [
+                  `1. Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema`,
+                  '2. Call this tool with the actor name and proper input based on the schema',
+              ]
+            : ['Call this tool with the actor name and proper input matching the Actor input schema.']),
+        ...(hasTool(HELPER_TOOLS.STORE_SEARCH)
+            ? [
+                  '',
+                  `If the actor name is not in "username/name" format, use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first.`,
+              ]
+            : []),
+    ].join('\n');
+    return dedent`
+        Render an interactive UI element (widget) that displays live Actor run progress for the user.
 
-    Use this tool ONLY when the user explicitly wants to see run progress visually
-    (e.g., "run apify/rag-web-browser and show progress", "start this Actor with a progress view").
-    The response renders as an interactive widget that automatically tracks run status until
-    completion — do NOT poll or call any other tool after this.
+        Use this tool ONLY when the user explicitly wants to see run progress visually
+        (e.g., "run apify/rag-web-browser and show progress", "start this Actor with a progress view").
+        The response renders as an interactive widget that automatically tracks run status until
+        completion — do NOT poll the run status after this.${hasTool(HELPER_TOOLS.DATASET_GET_ITEMS) ? ` Use ${HELPER_TOOLS.DATASET_GET_ITEMS} to fetch output once the widget reports completion.` : ''}
+        ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `\nFor silent starts where no UI is needed (e.g., "start this in the background"), use ${HELPER_TOOLS.ACTOR_CALL} instead — same run, no widget.\n` : ''}
+        ${workflowSection}
 
-    For silent async starts where no UI is needed (e.g., "start this in the background",
-    or when your next step is to fetch results via ${HELPER_TOOLS.DATASET_GET_ITEMS}), use
-    ${HELPER_TOOLS.ACTOR_CALL} instead — it returns the same runId without rendering a widget.
-
-    WORKFLOW:
-    1. Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema
-    2. Call this tool with the actor name and proper input based on the schema
-
-    If the actor name is not in "username/name" format, use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first.
-
-    Input: actor name and input JSON; callOptions (memory, timeout) are optional.
-`;
+        Input: actor name and input JSON; callOptions (memory, timeout) are optional.
+    `;
+}
 
 export const callActorWidget: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_CALL_WIDGET,
     title: 'Call Actor (widget)',
-    description: CALL_ACTOR_WIDGET_DESCRIPTION,
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(callActorWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorRunOutputSchema,
     // Allow arbitrary keys inside `input` (dynamic Actor input) while keeping the outer shape strict.
@@ -100,6 +110,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
         const { input, callOptions } = parsed;
 
         let resolvedActorId: string | undefined;
+        let resolvedInputSchema: ToolInputSchema | undefined;
         try {
             const resolution = await resolveAndValidateActor({
                 actorName: baseActorName,
@@ -111,6 +122,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
             }
 
             resolvedActorId = extractActorId(resolution.actor);
+            resolvedInputSchema = resolution.actor.inputSchema;
             const { apifyClient } = toolArgs;
 
             const actorClient = apifyClient.actor(baseActorName);
@@ -131,7 +143,8 @@ export const callActorWidget: ToolEntry = Object.freeze({
                 error,
                 actorId: resolvedActorId,
                 mcpSessionId: toolArgs.mcpSessionId,
-                actorGetDetailsTool: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                loadedToolNames: toolArgs.loadedToolNames,
+                inputSchema: resolvedInputSchema,
             });
         }
     },

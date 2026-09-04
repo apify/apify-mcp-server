@@ -21,7 +21,7 @@ TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.
 
 ## Git: branch names, commits, PR titles
 
-Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connection-timeout`). Commit/PR title: `type: Description` (e.g. `fix: Handle connection errors`). Types: `feat`, `fix`, `chore`, `refactor`, `docs`. Append `!` for breaking changes. PR title ≤70 chars.
+Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connection-timeout`). Commit/PR title: `type: Description` (e.g. `fix: Handle connection errors`). Types: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`. Append `!` for breaking changes. PR title ≤70 chars.
 
 Use `git mv` (not `mv` + `rm`) when renaming files so git records a rename rather than delete+create.
 
@@ -47,7 +47,7 @@ After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (def
 - **Integration tests**: `pnpm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
 - **Conformance tests**: `pnpm run test:conformance` (needs `APIFY_TOKEN`) builds and runs both protocol eras locally. `_integration_tests.yaml` calls `_conformance_tests.yaml` for the same `2026-07-28` and `2025-11-25` coverage in CI. Both eras always run; the command exits with the first non-zero code. Scenarios excluded from each era's gate are listed with reasons in `scripts/conformance_expected_failures_2026_07_28.yaml` and `scripts/conformance_expected_failures_2025_11_25.yaml`.
 - **Package manager**: this repo uses **pnpm 11+**. `devEngines.packageManager` is pinned with `onFail: "error"`, so npm / yarn refuse to run inside the checkout — use `pnpm install` only.
-- `tests/integration/suite.ts` is the main suite, reused by the stdio, streamable-http and `2026-07-28` (stateless HTTP) transport dimensions. Add new integration cases there, NOT in separate files.
+- `tests/integration/suite.ts` wires the `stdio`, `2025-11-25` (streamable HTTP) and `2026-07-28` (stateless HTTP) transport dimensions into one shared suite. Add new integration cases to the matching capability array in `tests/test_kit/cases/*.cases.ts` (registration, tools, actors, apps, tasks, storage, payments) — each is a plain `Case[]` (`{ name, isDeploymentTest, run, ... }`), registered via `registerCases(name, cases, ctx)`. Mark a case `isDeploymentTest: true` only if it's worth running against `apify-mcp-server-internal`'s live staging and production deploys — the flag doesn't just share the case, it makes internal execute it for real on every release (see [DEVELOPMENT.md](./DEVELOPMENT.md#test-organization-across-repos)). Shared assertion helpers live in `tests/test_kit/helpers.ts`. Cases that share expensive setup (e.g. one seeded Actor run, see `storage.cases.ts`'s `normalModeRunFixture`) do so via `ctx.getFixture(fixture)`, memoized once per transport dimension — not a vitest `beforeAll`, so any subset of cases can share it while staying flat `Case` objects.
 - Follow existing test patterns (names, structure) — check neighboring files.
 - **Test naming**: `describe('fnName()')`, plain-verb `it()` names (no `should` prefix). Group with nested `describe()` per method when a factory/class exposes several.
 
@@ -88,7 +88,7 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** — project structure, setup, build system, hot-reload workflow, two-phase tool loading, manual MCP testing.
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** — naming and coding standards (single source of truth).
-- **[res/](./res/index.md)** — ad-hoc notes: architecture analyses, refactor plans, protocol references. **May be obsolete** — verify against current code before trusting.
+- **[res/](./res/index.md)** — ephemeral working notes only (in-flight checklists, dated experiment records). Not a reference: durable facts live in `AGENTS.md`, decision rationale in the docstring of the code that owns it.
 
 ## Keep AGENTS.md current
 

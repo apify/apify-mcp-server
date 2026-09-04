@@ -40,9 +40,8 @@ Returns run result: status, storages (datasets/keyValueStores alias map), stats,
 - waitSecs (0–${WAIT_SECS_MAX}, default ${WAIT_SECS_DEFAULT}) waits up to that many seconds for terminal status before returning.
 
 USAGE:
-- Use to check the status of a run started with ${HELPER_TOOLS.ACTOR_CALL}.
+- Use to check the status of a run started by any Actor-running tool.
 - Pass waitSecs > 0 to block until terminal (or until the cap elapses).
-- If \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` or \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` rendered a widget for this run, do NOT poll here — the widget self-polls.
 
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc

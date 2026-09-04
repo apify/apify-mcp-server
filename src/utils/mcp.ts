@@ -1,8 +1,19 @@
 import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import type { AjvErrorDetails, ApifyRequestParams, FailureCategory, ToolTelemetryContext } from '../types.js';
-import { ACTOR_RUN_LIMIT_MESSAGE, isActorRunLimitError } from './apify_errors.js';
+import type {
+    AjvErrorDetails,
+    ApifyRequestParams,
+    FailureCategory,
+    ToolInputSchema,
+    ToolTelemetryContext,
+} from '../types.js';
+import {
+    ACTOR_RUN_LIMIT_MESSAGE,
+    getApifyErrorType,
+    isActorRunLimitError,
+    isCannotPublishTaskError,
+} from './apify_errors.js';
 import { wrapJsonText } from './encode_text.js';
 import { getHttpStatusCode } from './logging.js';
 import { classifyFailureCategory, getToolStatusFromError } from './tool_status.js';
@@ -283,10 +294,33 @@ export function getHttpErrorHint(status: number | undefined): string | undefined
 
 /** User-facing error text for tool execution failures with HTTP-aware hints. */
 export function getToolCallErrorUserText(toolName: string, error: unknown): string {
-    const msg = error instanceof Error ? error.message : String(error);
+    let msg = error instanceof Error ? error.message : String(error);
+    // The model only sees the message, so name the API's error type (e.g.
+    // "actor-task-name-not-unique") to let it report the exact failure.
+    const apiErrorType = getApifyErrorType(error);
+    if (apiErrorType) {
+        msg = `${msg} (API error type: ${apiErrorType})`;
+    }
     if (isActorRunLimitError(error)) {
         return `Error calling tool "${toolName}": ${msg}. ${ACTOR_RUN_LIMIT_MESSAGE}`;
     }
+    if (isCannotPublishTaskError(error)) {
+        return (
+            `Error calling tool "${toolName}": ${msg}.\n\n` +
+            'The API validates supplied `publicConfig` fields on create and update, and all publication ' +
+            'requirements on publish. Fix the stated requirement before retrying. If `datasetView` is invalid, ' +
+            'ask the user for its key; no tool can list dataset views.'
+        );
+    }
     const hint = getHttpErrorHint(getHttpStatusCode(error)) ?? 'Verify the tool name and input parameters.';
     return `Error calling tool "${toolName}": ${msg}. ${hint}`;
+}
+
+/** Texts for a confirmed platform input-validation error — same shape wherever start() can throw one. */
+export function buildInvalidInputTexts(actorName: string, errMsg: string, inputSchema?: ToolInputSchema): string[] {
+    return [
+        `Failed to call Actor '${actorName}': ${errMsg}`,
+        `Please ensure the input is correct and matches the Actor's input schema.`,
+        ...(inputSchema ? [`Input schema:\n${wrapJsonText(inputSchema)}`] : []),
+    ];
 }

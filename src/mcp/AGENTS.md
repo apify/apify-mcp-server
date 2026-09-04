@@ -34,13 +34,17 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
   preparation; `executeSyncToolCall()` runs synchronous calls.
 - `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
-- `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(url, toolName)`.
+- `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
+  `tool_dispatch.ts` and `call_actor.ts`'s remote tool calls.
+- `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
 - `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, and Actor tools.
 - `tool_call_telemetry.ts` — shared tool-call telemetry preparation and logging.
-- `task_execution.ts` — legacy long-running task execution and status notifications.
+- `task_execution.ts` — legacy long-running task execution and status notifications. `tasks/cancel`
+  reaches the Actor run through `createTaskCancellationWatcher` (`utils.ts`), which polls the
+  TaskStore rather than chaining the request's `extra.signal` — see its docstring for why.
 - `const.ts` — the invariant constants below (the single source for these values).
 
 ## Gotchas & invariants
@@ -59,15 +63,19 @@ Two MCP protocol revisions are served, each by its own adapter:
   instance field it touches is the identity-independent widget-resolution memo). Never resolve a
   stateless request by writing to the shared facade — concurrent requests would contaminate
   each other.
-- **Tool names: capped + hash-deduped.** Names are capped at `MAX_TOOL_NAME_LENGTH`;
-  over-length or colliding names get a `TOOL_NAME_HASH_LENGTH` hash suffix so the
-  exposed set stays unique within the limit (Actor tools: `../tools/actor_tool_naming.ts`;
-  proxied Actor-MCP tools: `proxy.ts` `getProxyMCPServerToolName`). Never widen the
-  cap — downstream clients depend on it.
+- **Tool names are capped at `MAX_TOOL_NAME_LENGTH`.** Every name the cap truncates — username,
+  tail, or both — carries a `TOOL_NAME_HASH_LENGTH` suffix hashed from the uncapped name;
+  truncation alone collides. If any proxied name exceeds the cap, all sibling tools cap their
+  username to `MAX_TOOL_NAME_USERNAME_LENGTH`; direct Actor tools do not. Collisions remain
+  first-wins in `getToolsForServerMode`. Never widen the cap — clients depend on it
+  (Actor tools: `../tools/actor_tool_naming.ts`; proxied Actor-MCP tools: `proxy.ts`
+  `getProxyMCPServerToolName`).
 - **Proxy server IDs are keyed by URL, not Actor ID.** `getMCPServerID(url)` is
-  `sha256(url)` sliced to `SERVER_ID_LENGTH`. One Actor can expose both an SSE and a
-  streamable endpoint; keying by URL keeps those distinct. Keying by Actor ID would
-  collapse them and cross transports.
+  `sha256(url)` sliced to `SERVER_ID_LENGTH`; its one consumer is the MCP SDK client
+  name (`client.ts`). One Actor can expose both an SSE and a streamable endpoint; keying
+  by URL keeps those distinct. Keying by Actor ID would collapse them and cross transports.
+  Exposed tool names do not use it — they are `{username}--{actor-name}--{originToolName}`,
+  with the username cap above.
 - **Transport negotiation is streamable-first, SSE-fallback** (`client.ts`): try
   streamable HTTP, fall back to SSE on a protocol failure — but a connection
   **timeout** returns `null` with no SSE fallback (a timeout means unreachable, not

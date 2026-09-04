@@ -205,7 +205,7 @@ settings:
   injectWorkspacePackages: true
 
 overrides:
-  '@modelcontextprotocol/sdk': 1.29.0
+  '@modelcontextprotocol/sdk': 1.30.0
 
 importers:
 
@@ -222,13 +222,13 @@ importers:
         version: 2.31.0
       '@modelcontextprotocol/ext-apps':
         specifier: ^1.1.2
-        version: 1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.4.3)
+        version: 1.7.2(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.4.3)
       '@modelcontextprotocol/node':
         specifier: 2.0.0
         version: 2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.12.19)
       '@modelcontextprotocol/sdk':
-        specifier: 1.29.0
-        version: 1.29.0(zod@4.4.3)
+        specifier: 1.30.0
+        version: 1.30.0(zod@4.4.3)
       '@modelcontextprotocol/server':
         specifier: 2.0.0
         version: 2.0.0
@@ -245,8 +245,8 @@ importers:
         specifier: ^5.31.0
         version: 5.52.1
       apify-client:
-        specifier: ^2.22.1
-        version: 2.23.3
+        specifier: ^2.25.0
+        version: 2.25.0
       axios:
         specifier: ^1.16.0
         version: 1.16.1
@@ -269,6 +269,9 @@ importers:
       '@ai-sdk/openai':
         specifier: ^3.0.52
         version: 3.0.64(zod@4.4.3)
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: 0.3.206
+        version: 0.3.206(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(zod@4.4.3)
       '@apify/mcpc':
         specifier: ^0.6.0
         version: 0.6.0(zod@4.4.3)
@@ -299,6 +302,9 @@ importers:
       '@modelcontextprotocol/conformance':
         specifier: 0.2.0-alpha.9
         version: 0.2.0-alpha.9
+      '@opentelemetry/api':
+        specifier: 1.9.1
+        version: 1.9.1
       '@opentelemetry/sdk-node':
         specifier: 0.220.0
         version: 0.220.0(@opentelemetry/api@1.9.1)
@@ -349,7 +355,7 @@ importers:
         version: 1.141.3(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(styled-components@6.4.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
       '@modelcontextprotocol/ext-apps':
         specifier: ^1.1.2
-        version: 1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.4.3)
+        version: 1.7.2(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.4.3)
       pluralize:
         specifier: ^8.0.0
         version: 8.0.0
@@ -471,6 +477,58 @@ packages:
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
+
+  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.206':
+    resolution: {integrity: sha512-FL2+NKcMMN47vcnCW2Fkt3AOgeRRlQxrisbPNaxrxqPJFzhUKs17x5j0XzLefd0xRbDAr74hd0PK/tnp6PHM6w==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.206':
+    resolution: {integrity: sha512-mRW8PPMfQN15EunLwpdmcVzk3XuM4DXQUM8DOzaeA1Hr1yxYPaVVBLr9hkdBKOqr8XTl3ueoTR6RZAy6a/n7OA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.206':
+    resolution: {integrity: sha512-aMZe1Kl+kYv5QlA15W9Ae25MAzBsA9FA40f5TOtJebA+M/xliF0r2LLb2NdyBviiZCDllcE31l0zgYE0rQqFQw==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.206':
+    resolution: {integrity: sha512-Id6H8l6EsGb7849EAZDOB4Ic+FQpbzt4D5HGOwp59CTW3o/1c4etjQA/Kl1K+DSEWn3FGo6D5UMVgc/rwhBj8g==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.206':
+    resolution: {integrity: sha512-xQBOBhlcmTNc7YeYT5qLZOikpSq3WHlsJ/t6i7kJqUWrcXlOPaAoSMdKp5xO/V0CjAdzdJoWB88I55UAh8mclQ==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.206':
+    resolution: {integrity: sha512-egZhOC1RlEVhZyq6Oa1b04AF7hh4hO+8oCsJCZ3gOifJQuHih1oW3lZ8fOUxU85jlT2ytAnt5kRp4uQr6PJgbg==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.206':
+    resolution: {integrity: sha512-oRQk23bFXSz4QRhOxqnnvlLWq/KiF2PtSBYXrMg1AQrCOHJd2k66aOAS7AJ4ZSzejiyV4N6sS6UThfmF6ipHBQ==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.206':
+    resolution: {integrity: sha512-BdjKmDojZjc5RjN+8Q6K7Yqf1WYhel6I3DkMXc9zdxS/xIuN42sx7zgQpdMGY73pm7ROPLqo3LieOeMhVH161w==}
+    cpu: [x64]
+    os: [win32]
+
+  '@anthropic-ai/claude-agent-sdk@0.3.206':
+    resolution: {integrity: sha512-KljDh9Pg4YCYpoXS8dnWoVSsOHtU4yLCW268K2iOruSxFXE8/Tay6DPvmJzYuqjP5YLNYfj05ZGykwZSUn6GXA==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@anthropic-ai/sdk': '>=0.93.0'
+      '@modelcontextprotocol/sdk': 1.30.0
+      zod: ^4.0.0
 
   '@apify/consts@2.53.1':
     resolution: {integrity: sha512-dIapeviS1DubmhMLQVHj19nmGllgvFV8ZQTqsnYYperuKjVaTwoEs+dKoRmOnm+OvkZcVQOyDGnbQUoXsCghgw==}
@@ -1076,7 +1134,7 @@ packages:
     resolution: {integrity: sha512-OOWKDxdAjYDcgHkmzVzccyyag3FK+jBWPaWu4WvTxFsU4R/cgOX4eep66zPRA5n4v6WfxUNibPyvX4iJ7egYTg==}
     engines: {node: '>=20'}
     peerDependencies:
-      '@modelcontextprotocol/sdk': 1.29.0
+      '@modelcontextprotocol/sdk': 1.30.0
       react: ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^17.0.0 || ^18.0.0 || ^19.0.0
       zod: ^3.25.0 || ^4.0.0
@@ -1096,8 +1154,8 @@ packages:
       hono:
         optional: true
 
-  '@modelcontextprotocol/sdk@1.29.0':
-    resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
+  '@modelcontextprotocol/sdk@1.30.0':
+    resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -2683,8 +2741,8 @@ packages:
     resolution: {integrity: sha512-KMReFUr0B4t+D+OBkjR3KYqvocp2XaSzO55UcB6mgQMd3KbcE+mWTyvVV7D/zsdEbNnV6acZUutkiHQXvTr1Rw==}
     engines: {node: '>= 8'}
 
-  apify-client@2.23.3:
-    resolution: {integrity: sha512-oL/BQ/pscRpcC4t3NOcniGef6eBMI8xPnXXHdofa7G51ONTw97/LFIeqlFZ61xHpX2yb3bisUAlgd/+n1KjJmA==}
+  apify-client@2.25.0:
+    resolution: {integrity: sha512-g6ttHJ4Au/Gg0iDHIevN3CvTbJfey9DUXUXJxe0ORF6JIYaVVfKdyJjINGb6/49gOpt/62ZFPw+HSEVIzrwR5w==}
 
   arg@5.0.2:
     resolution: {integrity: sha512-PYjyFOLKQ9y57JvQ6QLo8dAgNqswh8M1RMJYdQduT6xbWSgK36P/Z/v+p888pM69jMMfS8Xd8F6I1kQ/I9HUGg==}
@@ -4757,6 +4815,44 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
+  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.206':
+    optional: true
+
+  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.206':
+    optional: true
+
+  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.206':
+    optional: true
+
+  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.206':
+    optional: true
+
+  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.206':
+    optional: true
+
+  '@anthropic-ai/claude-agent-sdk-linux-x64@0.3.206':
+    optional: true
+
+  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.206':
+    optional: true
+
+  '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.206':
+    optional: true
+
+  '@anthropic-ai/claude-agent-sdk@0.3.206(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(zod@4.4.3)':
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
+      zod: 4.4.3
+    optionalDependencies:
+      '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.206
+      '@anthropic-ai/claude-agent-sdk-darwin-x64': 0.3.206
+      '@anthropic-ai/claude-agent-sdk-linux-arm64': 0.3.206
+      '@anthropic-ai/claude-agent-sdk-linux-arm64-musl': 0.3.206
+      '@anthropic-ai/claude-agent-sdk-linux-x64': 0.3.206
+      '@anthropic-ai/claude-agent-sdk-linux-x64-musl': 0.3.206
+      '@anthropic-ai/claude-agent-sdk-win32-arm64': 0.3.206
+      '@anthropic-ai/claude-agent-sdk-win32-x64': 0.3.206
+
   '@apify/consts@2.53.1': {}
 
   '@apify/datastructures@2.0.6': {}
@@ -4770,7 +4866,7 @@ snapshots:
     dependencies:
       '@modelcontextprotocol/client': 2.0.0
       '@modelcontextprotocol/core': 2.0.0
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
       '@napi-rs/keyring': 1.3.0
       chalk: 5.6.2
       commander: 15.0.0
@@ -5306,7 +5402,7 @@ snapshots:
 
   '@modelcontextprotocol/conformance@0.2.0-alpha.9':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
       '@octokit/rest': 22.0.1
       commander: 14.0.3
       eventsource-parser: 3.0.8
@@ -5323,9 +5419,9 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
-  '@modelcontextprotocol/ext-apps@1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.4.3)':
+  '@modelcontextprotocol/ext-apps@1.7.2(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.4.3)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
       '@standard-schema/spec': 1.1.0
       zod: 4.4.3
     optionalDependencies:
@@ -5339,7 +5435,7 @@ snapshots:
     optionalDependencies:
       hono: 4.12.19
 
-  '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.30.0(zod@4.4.3)':
     dependencies:
       '@hono/node-server': 1.19.14(hono@4.12.19)
       ajv: 8.20.0
@@ -6865,7 +6961,7 @@ snapshots:
       normalize-path: 3.0.0
       picomatch: 2.3.2
 
-  apify-client@2.23.3:
+  apify-client@2.25.0:
     dependencies:
       '@apify/consts': 2.53.1
       '@apify/log': 2.5.39

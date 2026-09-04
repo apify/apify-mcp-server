@@ -12,6 +12,9 @@ directory you're editing.
 - `index.ts` — the library export (`ActorsMcpServer` plus `createStatelessServer`, the
   per-request registration for 2026-07-28 traffic); `index_internals.ts` — the
   `./internals.js` surface the internal repo consumes (keep it minimal).
+  `index_internals_test_kit.ts` — the separate `./internals/test-kit.js` surface
+  for `tests/test_kit/**`'s own self-reference imports only; apify-mcp-server-internal
+  doesn't consume it, don't add anything here it does.
 - `stdio.ts` — CLI entry (used for Docker). **Sentry must be imported first** — keep
   that import order.
 - `dev_server.ts` — Express server for local dev / standby Actor mode. Its POST route

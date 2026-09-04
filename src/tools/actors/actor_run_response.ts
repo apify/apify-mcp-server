@@ -439,17 +439,24 @@ type KvSummary =
 /**
  * `buildRunKeyValueStore` omits `keyCount` on truncation; surface that as "at least N keys"
  * instead of silently substituting `keys.length`.
+ *
+ * The INPUT record (every run's own input echoed back by the platform) never counts: it is
+ * not run output, and advertising it steers agents into get-key-value-store-record detours
+ * when the real output sits in the dataset. `structuredContent.keys` still carries it.
  */
 function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     const kvId = keyValueStore?.id;
     const keys = keyValueStore?.keys ?? [];
-    if (!kvId || keys.length === 0) {
+    const outputKeys = keys.filter((key) => key !== 'INPUT');
+    if (!kvId || outputKeys.length === 0) {
         return { hasKv: false, summarySuffix: '' };
     }
-    const reportedKeyCount = keyValueStore.keyCount;
-    const kvTruncated = reportedKeyCount === undefined && keys.length === KV_KEYS_LIMIT;
-    const n = reportedKeyCount ?? keys.length;
-    const keyCountLabel = kvTruncated ? `at least ${KV_KEYS_LIMIT} keys` : `${n} ${n === 1 ? 'key' : 'keys'}`;
+    const kvTruncated = keyValueStore.keyCount === undefined && keys.length === KV_KEYS_LIMIT;
+    const n = outputKeys.length;
+    // On truncation the fetched window itself may still hold INPUT; the output-key floor is
+    // one lower than KV_KEYS_LIMIT whenever it does, or the label overstates by one.
+    const truncatedFloor = KV_KEYS_LIMIT - (keys.length - outputKeys.length);
+    const keyCountLabel = kvTruncated ? `at least ${truncatedFloor} keys` : `${n} ${n === 1 ? 'key' : 'keys'}`;
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
@@ -475,6 +482,7 @@ function buildSucceededSummaryNextStep(
     statusMessage: string | null | undefined,
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
+    datasetMetadataFetched = true,
 ): { summary: string; nextStep: string } {
     const itemCount = dataset?.itemCount;
     const datasetId = dataset?.id;
@@ -493,18 +501,21 @@ function buildSucceededSummaryNextStep(
     // datasetId known but metadata unavailable (transient fetch failure on a terminal run). Don't
     // claim "no output found" — point the agent at dataset items so they can verify directly.
     if (itemCount === undefined && datasetId) {
+        const metadataMsg = datasetMetadataFetched ? ' Dataset metadata unavailable.' : '';
         return {
-            summary: `SUCCEEDED in ${runTimeSecs}s. Dataset metadata unavailable.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
+            summary: `SUCCEEDED in ${runTimeSecs}s.${metadataMsg}${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
             nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to inspect output.`,
         };
     }
 
-    // Metadata can report itemCount === 0 briefly after SUCCEEDED (eventual consistency). Surface the
-    // same fetch-first guidance as TIMED-OUT with an empty partial dataset — never imply "re-run only".
+    // Metadata can report itemCount === 0 after SUCCEEDED even past the lag-fallback probe window
+    // (eventual consistency). The zero is unverified, so the summary must not state "no items" as a
+    // conclusion — agents quote the summary and give up on it (observed in web-fetch evals: a run
+    // with an item was reported as blocked). The nextStep is the only place a conclusion may form.
     if (itemCount === 0 && datasetId) {
         return {
-            summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
+            summary: `SUCCEEDED in ${runTimeSecs}s. Dataset item count reads 0 - counts can lag right after a run finishes.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
+            nextStep: `Fetch ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) before concluding the run produced no output.${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 
@@ -548,13 +559,19 @@ function buildTimedOutSummaryNextStep(
 
 /**
  * Build {summary, nextStep} per status. Returns one primary action — never two.
+ *
+ * Every observed terminal status — including FAILED, ABORTED and TIMED-OUT — is a successful
+ * observation, so responses stay `isError: false` and the MCP task lands in `completed`. Task
+ * `failed` is reserved for tool-side failures (auth, validation, network): the agent learning
+ * that a run failed is a normal result, not a protocol error.
  */
 export function buildStatusSummaryNextStep(params: {
     run: ActorRun;
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
+    datasetMetadataFetched?: boolean;
 }): { summary: string; nextStep: string } {
-    const { run, dataset, keyValueStore } = params;
+    const { run, dataset, keyValueStore, datasetMetadataFetched = true } = params;
     const { id: runId, status, statusMessage } = run;
     // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
@@ -583,7 +600,13 @@ export function buildStatusSummaryNextStep(params: {
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'SUCCEEDED':
-            return buildSucceededSummaryNextStep(runTimeSecs, statusMessage, dataset, keyValueStore);
+            return buildSucceededSummaryNextStep(
+                runTimeSecs,
+                statusMessage,
+                dataset,
+                keyValueStore,
+                datasetMetadataFetched,
+            );
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,

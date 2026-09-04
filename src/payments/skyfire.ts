@@ -1,6 +1,6 @@
 import type { ToolEntry } from '../types.js';
 import { redactSkyfirePayId } from '../utils/logging.js';
-import { cloneToolEntry } from '../utils/tools.js';
+import { appendToolDescription, cloneToolEntry } from '../utils/tools.js';
 import {
     PAYMENT_PROTOCOL_HEADER,
     SKYFIRE_PAY_ID_KEY,
@@ -29,10 +29,7 @@ export class SkyfirePaymentProvider implements PaymentProvider {
 
         const cloned = cloneToolEntry(tool);
 
-        // Append Skyfire instructions to description (idempotent)
-        if (cloned.description && !cloned.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
-            cloned.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
-        }
+        appendToolDescription(cloned, SKYFIRE_TOOL_INSTRUCTIONS);
 
         // Add skyfire-pay-id property to inputSchema (idempotent)
         if (cloned.inputSchema && 'properties' in cloned.inputSchema) {
