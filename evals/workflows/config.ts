@@ -3,7 +3,8 @@
  *
  * The agent's system prompt and tools come from the SDK's `claude_code` presets, so
  * nothing here defines them. The judge runs on OpenRouter (temperature 0.15, see
- * llm_client.ts).
+ * llm_client.ts) by default, or on the Claude Agent SDK with `--claude-judge` (see
+ * claude_judge_client.ts).
  */
 
 // Re-export shared config for convenience
@@ -37,6 +38,9 @@ export const MODELS = {
 
     // Judge model - evaluates conversation quality
     judge: 'deepseek/deepseek-v4-flash',
+
+    // Judge model when the judge runs on the Claude Agent SDK (--claude-judge).
+    claudeJudge: 'claude-sonnet-5',
 };
 
 /**
