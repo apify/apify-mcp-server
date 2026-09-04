@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 /**
- * Fixtures for the `tasks-evals` and `tasks-evals-errors` datasets (task-tool workflow evals).
+ * Fixtures for the `tasks-evals` and `tasks-evals-errors` datasets (task-tool MCP agent evals).
  *
  * Deletes tasks named `eval-*` left behind by previous runs and ensures the one
  * permanent read-only fixture task exists. Run it before every eval run: the create
  * cases never clean up, and task names are unique per account, so the leftovers make
  * the fixed-name cases fail on the next run.
  *
- * Usage: pnpm run evals:workflow:tasks-fixtures [--dry-run]
+ * Usage: pnpm run evals:mcp-agent:tasks-fixtures [--dry-run]
  */
 
 import 'dotenv/config';
@@ -75,7 +75,7 @@ async function main() {
             actId: actor.id,
             name: FIXTURE_TASK_NAME,
             title: 'Eval fixture (read-only)',
-            description: 'Permanent fixture for task-tool workflow evals. Do not modify or delete.',
+            description: 'Permanent fixture for task-tool MCP agent evals. Do not modify or delete.',
             input: FIXTURE_INPUT,
         });
         console.log(`🌱 Created fixture task "${task.name}" (${task.id})`);

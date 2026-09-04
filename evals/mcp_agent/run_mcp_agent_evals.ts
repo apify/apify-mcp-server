@@ -2,7 +2,7 @@
 /* eslint-disable no-console */
 /* eslint-disable import/extensions */
 /**
- * Main CLI entry point for workflow evaluations (Langfuse backend).
+ * Main CLI entry point for MCP agent evaluations (Langfuse backend).
  *
  * Every run reads its test cases from the Langfuse dataset and executes the matching
  * items as an experiment: a Claude Code agent (Claude Agent SDK) driving its own freshly
@@ -10,13 +10,13 @@
  * Langfuse.
  *
  * Usage:
- *   pnpm run evals:workflow
- *   pnpm run evals:workflow -- --category search
- *   pnpm run evals:workflow -- --id search-google-maps
- *   pnpm run evals:workflow -- --concurrency 8
- *   pnpm run evals:workflow -- --mcp-tools-only   # drop Claude Code's built-in tools
- *   pnpm run evals:workflow -- --subscription     # bill the local Claude Code login, not the API
- *   pnpm run evals:workflow -- --dataset tasks-evals-errors --allow-tool-errors
+ *   pnpm run evals:mcp-agent
+ *   pnpm run evals:mcp-agent -- --category search
+ *   pnpm run evals:mcp-agent -- --id search-google-maps
+ *   pnpm run evals:mcp-agent -- --concurrency 8
+ *   pnpm run evals:mcp-agent -- --mcp-tools-only   # drop Claude Code's built-in tools
+ *   pnpm run evals:mcp-agent -- --subscription     # bill the local Claude Code login, not the API
+ *   pnpm run evals:mcp-agent -- --dataset tasks-evals-errors --allow-tool-errors
  */
 
 // Must be the first import: config modules read process.env at load time.
@@ -34,7 +34,7 @@ import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { assertStdioBinExists } from './claude_agent.js';
 import { ClaudeLlmClient } from './claude_judge_client.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
-import { fetchWorkflowCases, WORKFLOW_DATASET_NAME } from './langfuse_dataset.js';
+import { fetchMcpAgentCases, MCP_AGENT_DATASET_NAME } from './langfuse_dataset.js';
 import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_experiment.js';
 import { initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
@@ -90,7 +90,7 @@ async function main() {
             dataset: {
                 type: 'string',
                 description: 'Langfuse dataset to run',
-                default: WORKFLOW_DATASET_NAME,
+                default: MCP_AGENT_DATASET_NAME,
             },
             'agent-model': { type: 'string', description: 'LLM model for the agent', default: MODELS.agent },
             'judge-model': {
@@ -177,13 +177,13 @@ async function main() {
     try {
         // Read-only: the dataset is the source of truth, edited in the Langfuse UI.
         console.log(`📇 Fetching dataset "${datasetName}"...`);
-        const cases = await fetchWorkflowCases(langfuse, datasetName);
+        const cases = await fetchMcpAgentCases(langfuse, datasetName);
 
         // Shared helpers, so every entry point filters test cases by the same rule.
         let selected = cases;
         if (argv.id) selected = filterById(selected, argv.id);
         if (argv.category) selected = filterByCategory(selected, argv.category);
-        const data = selected.map((workflowCase) => workflowCase.item);
+        const data = selected.map((mcpAgentCase) => mcpAgentCase.item);
         if (data.length === 0) {
             throw new Error(
                 `No active item in dataset "${datasetName}" (${cases.length} total) matches --id/--category`,
@@ -207,7 +207,7 @@ async function main() {
         const result = await langfuse.experiment.run({
             name: datasetName,
             runName,
-            description: 'Multi-turn workflow evals for the Apify MCP server.',
+            description: 'Multi-turn MCP agent evals for the Apify MCP server.',
             data,
             task: makeTask({
                 llmClient,

@@ -1,7 +1,7 @@
 import type { LangfuseClient } from '@langfuse/client';
 import { describe, expect, it } from 'vitest';
 
-import { fetchWorkflowCases, parseWorkflowItem, toWorkflowTestCase } from '../../evals/workflows/langfuse_dataset.js';
+import { fetchMcpAgentCases, parseMcpAgentItem, toMcpAgentTestCase } from '../../evals/mcp_agent/langfuse_dataset.js';
 
 const item = { id: 'a', input: { query: 'q' }, expectedOutput: 'r', metadata: { category: 'search' } };
 
@@ -19,47 +19,47 @@ function makeLangfuseClient(items: unknown[]) {
     return { client, requested };
 }
 
-describe('parseWorkflowItem()', () => {
+describe('parseMcpAgentItem()', () => {
     it('returns the fields a run reads', () => {
-        expect(parseWorkflowItem(item)).toEqual(item);
+        expect(parseMcpAgentItem(item)).toEqual(item);
     });
 
     it('keeps the optional harness knobs from metadata', () => {
         const withKnobs = { ...item, metadata: { category: 'search', maxTurns: 5, failTools: ['call-actor'] } };
-        expect(parseWorkflowItem(withKnobs).metadata).toEqual(withKnobs.metadata);
+        expect(parseMcpAgentItem(withKnobs).metadata).toEqual(withKnobs.metadata);
     });
 
     it('rejects a misspelled knob instead of silently stripping it', () => {
         const typo = { ...item, metadata: { category: 'search', failTool: ['call-actor'] } };
-        expect(() => parseWorkflowItem(typo)).toThrow(/failTool/);
+        expect(() => parseMcpAgentItem(typo)).toThrow(/failTool/);
     });
 
     it('throws naming the item when metadata was cleared', () => {
-        expect(() => parseWorkflowItem({ ...item, metadata: undefined })).toThrow(/Dataset item "a"/);
+        expect(() => parseMcpAgentItem({ ...item, metadata: undefined })).toThrow(/Dataset item "a"/);
     });
 
     it('throws when the query or the reference is empty', () => {
-        expect(() => parseWorkflowItem({ ...item, input: { query: '' } })).toThrow(/not a usable workflow test case/);
-        expect(() => parseWorkflowItem({ ...item, expectedOutput: '' })).toThrow(/not a usable workflow test case/);
+        expect(() => parseMcpAgentItem({ ...item, input: { query: '' } })).toThrow(/not a usable MCP agent test case/);
+        expect(() => parseMcpAgentItem({ ...item, expectedOutput: '' })).toThrow(/not a usable MCP agent test case/);
     });
 
     it('reports an unknown id when the item is not an object', () => {
-        expect(() => parseWorkflowItem(null)).toThrow(/Dataset item "\(unknown\)"/);
+        expect(() => parseMcpAgentItem(null)).toThrow(/Dataset item "\(unknown\)"/);
     });
 });
 
-describe('toWorkflowTestCase()', () => {
+describe('toMcpAgentTestCase()', () => {
     it('flattens an item into a test case', () => {
-        expect(toWorkflowTestCase(item)).toEqual({ id: 'a', category: 'search', query: 'q', reference: 'r' });
+        expect(toMcpAgentTestCase(item)).toEqual({ id: 'a', category: 'search', query: 'q', reference: 'r' });
     });
 
     it('leaves out knobs the item does not set, so the snapshot stays minimal', () => {
-        expect(Object.keys(toWorkflowTestCase(item))).toEqual(['id', 'category', 'query', 'reference']);
+        expect(Object.keys(toMcpAgentTestCase(item))).toEqual(['id', 'category', 'query', 'reference']);
     });
 
     it('writes the keys in a fixed order whatever order metadata arrives in', () => {
         const knobs = { failTools: ['call-actor'], tools: ['actors'], category: 'search', maxTurns: 5 };
-        expect(Object.keys(toWorkflowTestCase({ ...item, metadata: knobs }))).toEqual([
+        expect(Object.keys(toMcpAgentTestCase({ ...item, metadata: knobs }))).toEqual([
             'id',
             'category',
             'query',
@@ -71,12 +71,12 @@ describe('toWorkflowTestCase()', () => {
     });
 });
 
-describe('fetchWorkflowCases()', () => {
+describe('fetchMcpAgentCases()', () => {
     it('returns each active case with the item the experiment runs on', async () => {
         const { client, requested } = makeLangfuseClient([item]);
-        const cases = await fetchWorkflowCases(client, 'workflow-evals');
+        const cases = await fetchMcpAgentCases(client, 'mcp-agent-evals');
 
-        expect(requested).toEqual([{ name: 'workflow-evals', options: { fetchItemsPageSize: 100 } }]);
+        expect(requested).toEqual([{ name: 'mcp-agent-evals', options: { fetchItemsPageSize: 100 } }]);
         expect(cases).toHaveLength(1);
         expect(cases[0]).toMatchObject({ id: 'a', category: 'search', query: 'q', reference: 'r' });
         expect(cases[0].item).toMatchObject({ id: 'a', status: 'ACTIVE' });
@@ -84,16 +84,16 @@ describe('fetchWorkflowCases()', () => {
 
     it('drops archived items, which dataset.get returns regardless of status', async () => {
         const { client } = makeLangfuseClient([item, { ...item, id: 'b', status: 'ARCHIVED' }]);
-        expect((await fetchWorkflowCases(client, 'workflow-evals')).map((entry) => entry.id)).toEqual(['a']);
+        expect((await fetchMcpAgentCases(client, 'mcp-agent-evals')).map((entry) => entry.id)).toEqual(['a']);
     });
 
     it('sorts by id, so run order and the snapshot do not depend on the API', async () => {
         const { client } = makeLangfuseClient([{ ...item, id: 'c' }, item, { ...item, id: 'b' }]);
-        expect((await fetchWorkflowCases(client, 'workflow-evals')).map((entry) => entry.id)).toEqual(['a', 'b', 'c']);
+        expect((await fetchMcpAgentCases(client, 'mcp-agent-evals')).map((entry) => entry.id)).toEqual(['a', 'b', 'c']);
     });
 
     it('throws on a malformed item, before the run spends anything on LLM calls', async () => {
         const { client } = makeLangfuseClient([item, { ...item, id: 'b', metadata: {} }]);
-        await expect(fetchWorkflowCases(client, 'workflow-evals')).rejects.toThrow(/Dataset item "b"/);
+        await expect(fetchMcpAgentCases(client, 'mcp-agent-evals')).rejects.toThrow(/Dataset item "b"/);
     });
 });

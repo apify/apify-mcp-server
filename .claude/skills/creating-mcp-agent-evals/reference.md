@@ -1,15 +1,15 @@
 # Reference: commands, shapes, probes
 
-Repo: `apify-mcp-server`. Harness docs: `evals/workflows/README.md` (read it first; it documents the two-suite doctrine, scores, and flags).
+Repo: `apify-mcp-server`. Harness docs: `evals/mcp_agent/README.md` (read it first; it documents the two-suite doctrine, scores, and flags).
 
 ## Running evals
 
 ```bash
 # Proper suite: strict gate (judge PASS and tool_errors == 0)
-pnpm run evals:workflow --dataset <family>-evals --agent-model claude-opus-5 --subscription
+pnpm run evals:mcp-agent --dataset <family>-evals --agent-model claude-opus-5 --subscription
 
 # Error suite: drops only the zero-error condition
-pnpm run evals:workflow --dataset <family>-evals-errors --allow-tool-errors --agent-model <m> --subscription
+pnpm run evals:mcp-agent --dataset <family>-evals-errors --allow-tool-errors --agent-model <m> --subscription
 
 # Narrow: --id '<regex>' or --category <name>; --concurrency N; --tool-timeout secs
 ```
@@ -18,7 +18,7 @@ pnpm run evals:workflow --dataset <family>-evals-errors --allow-tool-errors --ag
 - `--claude-judge` runs the judge on the Agent SDK too (`--judge-model` then takes an Anthropic ID, default `claude-sonnet-5`); with `--subscription --claude-judge` a run needs only `APIFY_TOKEN` + Langfuse keys. Caveat: a Claude judge scoring a Claude agent can be self-lenient — prefer the OpenRouter judge for comparable numbers.
 - Ladder: `claude-opus-5` (calibration) → `claude-sonnet-5` → `claude-haiku-4-5` (default; the sensitive probe). A chained shell command's exit code is the LAST run's — read each log's `📊` line, not the chain status.
 - Known flakes, retry the single item once before diagnosing: `🔥 Never completed (task threw)` (harness/SDK spawn); in remote/sandboxed environments, the agent reading "MCP servers still connecting" and falling back to built-ins (doesn't reproduce locally).
-- Between runs of suites that create named resources: `pnpm run evals:workflow:tasks-fixtures` (adapt per family) deletes leftover `eval-*` resources and reseeds the permanent fixture. Web-target families that create no named state need no fixtures script — say so in the README instead.
+- Between runs of suites that create named resources: `pnpm run evals:mcp-agent:tasks-fixtures` (adapt per family) deletes leftover `eval-*` resources and reseeds the permanent fixture. Web-target families that create no named state need no fixtures script — say so in the README instead.
 
 ## Dataset item shape (Langfuse)
 
@@ -68,7 +68,7 @@ npx -y langfuse-cli api dataset-items get <id>
 npx -y langfuse-cli api dataset-items delete <id>          # irreversible, frees nothing (id stays burned) — archive instead (status: "ARCHIVED")
 ```
 
-The edit loop per case: upsert item → `pnpm run evals:workflow:export-dataset --dataset <name>` →
+The edit loop per case: upsert item → `pnpm run evals:mcp-agent:export-dataset --dataset <name>` →
 re-run just that item with `--id '<substring-regex>'` → read the transcript.
 
 Read failing transcripts (judge reason + per-turn tool calls). `--from-start-time` is **required**;
@@ -91,13 +91,13 @@ npx -y langfuse-cli api observations list --level ERROR \
 ## Snapshot to git (after every dataset edit)
 
 ```bash
-pnpm run evals:workflow:export-dataset --dataset <family>-evals          # dataset_snapshot_<name>.json
-pnpm run evals:workflow:export-dataset --dataset <family>-evals-errors
+pnpm run evals:mcp-agent:export-dataset --dataset <family>-evals          # dataset_snapshot_<name>.json
+pnpm run evals:mcp-agent:export-dataset --dataset <family>-evals-errors
 ```
 
 ## API probe pattern (before writing platform-dependent cases)
 
-Throwaway script in `evals/workflows/probe_*_tmp.ts`, run with `pnpm exec tsx`, **delete after use**. Probe with the real `apify-client` exactly what the case will depend on: required fields, uniqueness errors, publish requirements, length limits, secret handling. Capture exact error messages and `type` slugs — references can require the agent to react to them (tool errors include `(API error type: <slug>)`). For live-web cases, probe the exact target URL and verify the fetched *content* supports the premise (status, body, the fact the answer needs) — and prefer stable hosts (rfc-editor.org, example.com) over flaky ones (httpbin.org 503s regularly) wherever content is the deliverable.
+Throwaway script in `evals/mcp_agent/probe_*_tmp.ts`, run with `pnpm exec tsx`, **delete after use**. Probe with the real `apify-client` exactly what the case will depend on: required fields, uniqueness errors, publish requirements, length limits, secret handling. Capture exact error messages and `type` slugs — references can require the agent to react to them (tool errors include `(API error type: <slug>)`). For live-web cases, probe the exact target URL and verify the fetched *content* supports the premise (status, body, the fact the answer needs) — and prefer stable hosts (rfc-editor.org, example.com) over flaky ones (httpbin.org 503s regularly) wherever content is the deliverable.
 
 ```ts
 import 'dotenv/config';
@@ -108,7 +108,7 @@ const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
 ## Fixtures script pattern
 
-One script per stateful family (`evals/workflows/tasks_fixtures.ts` is the template): delete leftover `eval-*` resources except the permanent fixture, create the fixture if missing, and **reset the fixture's mutable state** every run (an eval agent may have mutated it). Wire as `evals:workflow:<family>-fixtures` in package.json.
+One script per stateful family (`evals/mcp_agent/tasks_fixtures.ts` is the template): delete leftover `eval-*` resources except the permanent fixture, create the fixture if missing, and **reset the fixture's mutable state** every run (an eval agent may have mutated it). Wire as `evals:mcp-agent:<family>-fixtures` in package.json.
 
 ## Coverage matrix (definition of done for the dataset)
 
@@ -121,4 +121,4 @@ For each tool: at least one dedicated case, plus every argument group exercised 
 3. **Field renames / shape alignment** — if a field name invites misreading or diverges from the API contract, align with the API object (`structuredContent` changes must be flagged for the internal repo's contract suite).
 4. **Description USAGE lines** — bias-to-act nudges ("resolve loose Actor references with search-actors instead of asking"), conditional on `hasTool()`.
 
-After any tool change: `pnpm run build` happens via `evals:workflow` automatically; rerun only the affected model/case pairs first, full ladder last.
+After any tool change: `pnpm run build` happens via `evals:mcp-agent` automatically; rerun only the affected model/case pairs first, full ladder last.

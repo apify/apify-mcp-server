@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { LlmClient } from '../../evals/workflows/llm_client.js';
-import type { ConversationHistory } from '../../evals/workflows/types.js';
-import { evaluateConversation, parseJudgeResponse } from '../../evals/workflows/workflow_judge.js';
+import type { LlmClient } from '../../evals/mcp_agent/llm_client.js';
+import { evaluateConversation, parseJudgeResponse } from '../../evals/mcp_agent/mcp_agent_judge.js';
+import type { ConversationHistory } from '../../evals/mcp_agent/types.js';
 
 /** LLM client that returns the given judge responses in order, repeating the last one. */
 function makeJudgeClient(...responses: string[]): LlmClient & { callLlm: ReturnType<typeof vi.fn> } {

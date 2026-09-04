@@ -6,9 +6,9 @@ import {
     evaluators,
     isTransientAgentError,
     makeTask,
-    type WorkflowTaskOutput,
-} from '../../evals/workflows/langfuse_experiment.js';
-import type { LlmClient } from '../../evals/workflows/llm_client.js';
+    type McpAgentTaskOutput,
+} from '../../evals/mcp_agent/langfuse_experiment.js';
+import type { LlmClient } from '../../evals/mcp_agent/llm_client.js';
 
 // The task runs the Claude Agent SDK, which would otherwise spawn the real agent + server.
 const mocks = vi.hoisted(() => ({
@@ -19,20 +19,20 @@ const mocks = vi.hoisted(() => ({
     evaluateConversation: vi.fn(async () => ({ verdict: 'PASS', reason: 'looks good', rawResponse: '' })),
 }));
 
-vi.mock('../../evals/workflows/claude_agent.js', () => ({
+vi.mock('../../evals/mcp_agent/claude_agent.js', () => ({
     runAgentConversation: mocks.runAgentConversation,
 }));
 
-vi.mock('../../evals/workflows/langfuse_observations.js', () => ({
+vi.mock('../../evals/mcp_agent/langfuse_observations.js', () => ({
     buildAgentObservations: () => ({}),
     emitObservations: mocks.emitObservations,
 }));
 
-vi.mock('../../evals/workflows/workflow_judge.js', () => ({
+vi.mock('../../evals/mcp_agent/mcp_agent_judge.js', () => ({
     evaluateConversation: mocks.evaluateConversation,
 }));
 
-function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOutput {
+function makeOutput(overrides: Partial<McpAgentTaskOutput> = {}): McpAgentTaskOutput {
     return {
         id: 'search-001',
         judgeResult: { verdict: 'PASS', reason: 'looks good', rawResponse: '' },
@@ -44,22 +44,22 @@ function makeOutput(overrides: Partial<WorkflowTaskOutput> = {}): WorkflowTaskOu
 }
 
 /** An item result as the SDK hands it to the run gate. */
-function makeScoredItem(id: string, judgeValue: number, output: Partial<WorkflowTaskOutput> = {}) {
-    return { output: makeOutput({ id, ...output }), evaluations: [{ name: 'workflow_judge', value: judgeValue }] };
+function makeScoredItem(id: string, judgeValue: number, output: Partial<McpAgentTaskOutput> = {}) {
+    return { output: makeOutput({ id, ...output }), evaluations: [{ name: 'mcp_agent_judge', value: judgeValue }] };
 }
 
 describe('evaluators', () => {
-    it('scores workflow_judge 1 with the judge reason as comment on PASS', async () => {
+    it('scores mcp_agent_judge 1 with the judge reason as comment on PASS', async () => {
         expect(await evaluators[0]({ output: makeOutput() })).toEqual({
-            name: 'workflow_judge',
+            name: 'mcp_agent_judge',
             value: 1,
             comment: 'looks good',
         });
     });
 
-    it('scores workflow_judge 0 on FAIL', async () => {
+    it('scores mcp_agent_judge 0 on FAIL', async () => {
         const output = makeOutput({ judgeResult: { verdict: 'FAIL', reason: 'missed X', rawResponse: '' } });
-        expect(await evaluators[0]({ output })).toEqual({ name: 'workflow_judge', value: 0, comment: 'missed X' });
+        expect(await evaluators[0]({ output })).toEqual({ name: 'mcp_agent_judge', value: 0, comment: 'missed X' });
     });
 
     it('reports the conversation token total', async () => {
@@ -113,7 +113,7 @@ describe('makeTask()', () => {
         ...overrides,
     });
 
-    const makeWorkflowTask = () =>
+    const makeMcpAgentTask = () =>
         makeTask({
             llmClient: {} as LlmClient,
             apifyToken: 'token',
@@ -130,17 +130,17 @@ describe('makeTask()', () => {
     });
 
     it('names the item in a harness error, which the SDK log line omits', async () => {
-        await expect(makeWorkflowTask()(makeItem())).rejects.toThrow('Item "search-001": spawn ENOENT');
+        await expect(makeMcpAgentTask()(makeItem())).rejects.toThrow('Item "search-001": spawn ENOENT');
     });
 
     it('does not retry the agent run on a deterministic failure', async () => {
-        await expect(makeWorkflowTask()(makeItem())).rejects.toThrow('spawn ENOENT');
+        await expect(makeMcpAgentTask()(makeItem())).rejects.toThrow('spawn ENOENT');
         expect(mocks.runAgentConversation).toHaveBeenCalledTimes(1);
     });
 
     it('rethrows a transient failure that persists across the retry', async () => {
         mocks.runAgentConversation.mockRejectedValue(new Error('Connection error.'));
-        await expect(makeWorkflowTask()(makeItem())).rejects.toThrow('Item "search-001": Connection error.');
+        await expect(makeMcpAgentTask()(makeItem())).rejects.toThrow('Item "search-001": Connection error.');
         expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
     });
 
@@ -151,7 +151,7 @@ describe('makeTask()', () => {
             toolInvocations: [],
         });
 
-        await expect(makeWorkflowTask()(makeItem())).resolves.toMatchObject({
+        await expect(makeMcpAgentTask()(makeItem())).resolves.toMatchObject({
             id: 'search-001',
             judgeResult: { verdict: 'PASS' },
         });
@@ -168,7 +168,7 @@ describe('makeTask()', () => {
             throw new Error('span export failed');
         });
 
-        await expect(makeWorkflowTask()(makeItem())).resolves.toMatchObject({
+        await expect(makeMcpAgentTask()(makeItem())).resolves.toMatchObject({
             id: 'search-001',
             judgeResult: { verdict: 'PASS' },
             totalTokens: 1234,
@@ -194,7 +194,7 @@ describe('makeTask()', () => {
         const item = makeItem({ metadata: { category: 'search', failTools: ['call-actor'] } });
 
         // First line only: the full text already sits on the tool span, so nothing re-uploads it.
-        await expect(makeWorkflowTask()(item)).resolves.toMatchObject({
+        await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({
             toolErrors: [{ tool: 'create-actor-task', error: 'name taken' }],
         });
     });
@@ -241,10 +241,10 @@ describe('buildRunSummary()', () => {
         expect(buildRunSummary(['a'], [], false)).toEqual({ passedCount: 0, failures: [], droppedIds: ['a'] });
     });
 
-    it('treats a missing workflow_judge score as a failure, without quoting the stale judge reason', () => {
+    it('treats a missing mcp_agent_judge score as a failure, without quoting the stale judge reason', () => {
         const summary = buildRunSummary(['a'], [{ output: makeOutput({ id: 'a' }), evaluations: [] }], false);
         expect(summary.passedCount).toBe(0);
-        expect(summary.failures).toEqual([{ id: 'a', reason: 'no workflow_judge score (the evaluator threw)' }]);
+        expect(summary.failures).toEqual([{ id: 'a', reason: 'no mcp_agent_judge score (the evaluator threw)' }]);
     });
 });
 

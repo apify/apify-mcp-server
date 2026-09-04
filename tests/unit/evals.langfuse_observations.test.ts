@@ -6,8 +6,8 @@ import {
     type AgentObservationParams,
     buildAgentObservations,
     emitObservations,
-} from '../../evals/workflows/langfuse_observations.js';
-import type { AdaptedConversation } from '../../evals/workflows/sdk_conversation_adapter.js';
+} from '../../evals/mcp_agent/langfuse_observations.js';
+import type { AdaptedConversation } from '../../evals/mcp_agent/sdk_conversation_adapter.js';
 
 vi.mock('@langfuse/tracing', () => ({ startObservation: vi.fn() }));
 
