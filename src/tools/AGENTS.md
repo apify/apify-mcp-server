@@ -25,6 +25,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
+  - `deploy/` — `get-actor-build` (build status plus a log tail); `build_helpers.ts` holds the
+    allowlisted build result shape.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
