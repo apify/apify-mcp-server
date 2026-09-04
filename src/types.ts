@@ -108,6 +108,13 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
      * session tool set. Resolved at the tools/list boundary in `getToolPublicFieldOnly`.
      */
     buildDescription?: (ctx: ToolDescriptionContext) => string;
+    /**
+     * Session-exact inputSchema builder (e.g. a dropped-enum property naming fetch-actor-details
+     * only when it's present). Unlike `buildDescription`, `inputSchema` must hold the tool-absent
+     * (generic) render — a bare tool name in schema text isn't otherwise session-rendered.
+     * Resolved at the tools/list boundary in `getToolPublicFieldOnly`.
+     */
+    buildInputSchema?: (ctx: ToolDescriptionContext) => ToolInputSchema;
 };
 
 /**

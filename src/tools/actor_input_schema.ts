@@ -266,22 +266,11 @@ export function inferArrayItemType(property: SchemaProperties): string | null {
     }
 }
 
-/**
- * Add enum values as string to property descriptions, guarding against libraries/agent
- * frameworks that don't handle enums or examples via JSON Schema annotations.
- *
- * https://json-schema.org/understanding-json-schema/reference/enum
- * https://json-schema.org/understanding-json-schema/reference/annotations
- *
- * @param properties
- */
-export function addEnumsToDescriptionsWithExamples(
+/** Adds prefill/default values to descriptions as examples, for clients that ignore JSON Schema `examples`. */
+export function addExampleValuesToDescriptions(
     properties: Record<string, SchemaProperties>,
 ): Record<string, SchemaProperties> {
     for (const property of Object.values(properties)) {
-        if (property.enum && property.enum.length > 0) {
-            property.description = `${property.description}\nPossible values: ${property.enum.slice(0, 20).join(',')}`;
-        }
         const value = property.prefill ?? property.default;
         if (value && !(Array.isArray(value) && value.length === 0)) {
             property.examples = Array.isArray(value) ? value : [value];
@@ -291,30 +280,34 @@ export function addEnumsToDescriptionsWithExamples(
     return properties;
 }
 
-/**
- * Helper function to filter and shorten the enum list.
- * Removes empty strings and truncates if the total character count exceeds the limit.
- *
- * @param {string[]} enumList - The list of enum values to be filtered and shortened.
- * @returns {string[] | undefined} - The filtered and shortened enum list or undefined if the list is too long.
- */
-export function filterAndShortenEnum(enumList: string[]): string[] | undefined {
-    let charCount = 0;
-    const resultEnumList = enumList.filter((enumValue) => {
-        if (enumValue === '') return false;
-        charCount += enumValue.length;
-        return charCount <= ACTOR_ENUM_MAX_LENGTH;
-    });
+const ENUM_DROPPED_NOTE_EXAMPLE_COUNT = 5;
+const ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH = 60;
 
-    return resultEnumList.length > 0 ? resultEnumList : undefined;
+/** Note for a dropped enum — the field still accepts these values, just too many to list. */
+function buildEnumDroppedNote(rawValues: string[]): string {
+    const examples = rawValues
+        .filter((value) => value !== '')
+        .slice(0, ENUM_DROPPED_NOTE_EXAMPLE_COUNT)
+        .map((value) =>
+            value.length > ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH
+                ? `${value.slice(0, ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH)}...`
+                : value,
+        );
+    return `\nAccepts more values than shown here (e.g. ${examples.join(', ')}, ...) — full list omitted, too long to include.`;
 }
 
 /**
- * Shortens the description, enum, and items.enum properties of the schema properties.
- * This is mostly problem with compass/crawler-google-places, which has large number of categories
- * such as ( 'abbey', 'accountant', 'accounting',  'acupuncturist', .... )
- * @param properties
+ * Blanks removed, kept whole if it fits ACTOR_ENUM_MAX_LENGTH; otherwise dropped entirely (#1253)
+ * — a partially-cut enum falsely implies exhaustiveness to both the LLM and AJV.
  */
+export function filterAndShortenEnum(enumList: string[]): string[] | undefined {
+    const nonEmpty = enumList.filter((value) => value !== '');
+    if (nonEmpty.length === 0) return undefined;
+    const charCount = nonEmpty.reduce((sum, value) => sum + value.length, 0);
+    return charCount <= ACTOR_ENUM_MAX_LENGTH ? nonEmpty : undefined;
+}
+
+/** Caps description length; drops (not truncates) an oversized enum/items.enum, noting examples instead. */
 export function shortenProperties(properties: { [key: string]: SchemaProperties }): {
     [key: string]: SchemaProperties;
 } {
@@ -323,12 +316,20 @@ export function shortenProperties(properties: { [key: string]: SchemaProperties 
             property.description = `${property.description.slice(0, ACTOR_MAX_DESCRIPTION_LENGTH)}...`;
         }
 
-        if (property.enum && property.enum?.length > 0) {
-            property.enum = filterAndShortenEnum(property.enum);
+        if (property.enum && property.enum.length > 0) {
+            const rawEnum = property.enum;
+            property.enum = filterAndShortenEnum(rawEnum);
+            if (property.enum === undefined) {
+                property.description += buildEnumDroppedNote(rawEnum);
+            }
         }
 
         if (property.items?.enum && property.items.enum.length > 0) {
-            property.items.enum = filterAndShortenEnum(property.items.enum);
+            const rawEnum = property.items.enum;
+            property.items.enum = filterAndShortenEnum(rawEnum);
+            if (property.items.enum === undefined) {
+                property.description += buildEnumDroppedNote(rawEnum);
+            }
         }
     }
 
@@ -372,44 +373,36 @@ export function decodeDotPropertyNames(properties: Record<string, unknown>): Rec
     return decodedProperties;
 }
 
-/**
- * True if filterAndShortenEnum() truncated the enum — compared against the non-empty raw count,
- * not raw length, since it also drops blank entries regardless of the character cap.
- */
-function wasEnumTruncated(displayEnum: string[], rawEnum: string[]): boolean {
-    const nonEmptyRawCount = rawEnum.filter((value) => value !== '').length;
-    return displayEnum.length < nonEmptyRawCount;
+/** True if a non-empty enum existed on the raw side but shortenProperties() dropped it entirely. */
+function enumWasDropped(displayEnum: string[] | undefined, rawEnum: string[] | undefined): boolean {
+    if (displayEnum !== undefined) return false;
+    return (rawEnum ?? []).some((value) => value !== '');
 }
 
 /**
- * Clones properties and drops `enum`/`items.enum` wherever shortenProperties() truncated it —
- * AJV must not enforce an incomplete list (#1253), but the schema shown to the LLM keeps it.
- * A property missing from one side (e.g. the injected `waitSecs`) is left untouched.
+ * Keys (post dot-encoding) whose enum/items.enum shortenProperties() dropped — used to gate the
+ * per-session "see full schema" addendum. A key missing from `rawProperties` (e.g. `waitSecs`) is skipped.
  */
-export function stripTruncatedEnumsForValidation(
+export function findDroppedEnumProperties(
     displayProperties: Record<string, SchemaProperties>,
     rawProperties: Record<string, SchemaProperties>,
-): Record<string, SchemaProperties> {
+): string[] {
     const rawEncoded = encodeDotPropertyNames(rawProperties);
-    const validationProperties = structuredClone(displayProperties);
+    const dropped: string[] = [];
 
-    for (const [key, property] of Object.entries(validationProperties)) {
+    for (const [key, property] of Object.entries(displayProperties)) {
         const rawProperty = rawEncoded[key];
         if (!rawProperty) continue;
 
-        if (property.enum && rawProperty.enum && wasEnumTruncated(property.enum, rawProperty.enum)) {
-            delete property.enum;
-        }
         if (
-            property.items?.enum &&
-            rawProperty.items?.enum &&
-            wasEnumTruncated(property.items.enum, rawProperty.items.enum)
+            enumWasDropped(property.enum, rawProperty.enum) ||
+            enumWasDropped(property.items?.enum, rawProperty.items?.enum)
         ) {
-            delete property.items.enum;
+            dropped.push(key);
         }
     }
 
-    return validationProperties;
+    return dropped;
 }
 
 export function transformActorInputSchemaProperties(input: Readonly<ActorInputSchema>): ActorInputSchemaProperties {
@@ -420,7 +413,7 @@ export function transformActorInputSchemaProperties(input: Readonly<ActorInputSc
     transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
     transformedProperties = filterSchemaProperties(transformedProperties);
     transformedProperties = shortenProperties(transformedProperties);
-    transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
+    transformedProperties = addExampleValuesToDescriptions(transformedProperties);
     transformedProperties = encodeDotPropertyNames(transformedProperties);
     return transformedProperties;
 }

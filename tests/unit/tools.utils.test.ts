@@ -8,13 +8,13 @@ import {
     decodeDotPropertyNames,
     encodeDotPropertyNames,
     filterAndShortenEnum,
+    findDroppedEnumProperties,
     fixedAjvCompile,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     MAX_UNTRUSTED_SCHEMA_BYTES,
     markInputPropertiesAsRequired,
     shortenProperties,
-    stripTruncatedEnumsForValidation,
     transformActorInputSchemaProperties,
 } from '../../src/tools/actor_input_schema.js';
 import { isActorBlockedUnderPaymentProvider } from '../../src/tools/actor_tool_naming.js';
@@ -377,7 +377,23 @@ describe('shortenProperties', () => {
         expect(result.prop1.description).toBe(description);
     });
 
-    it('should shorten enum values if they exceed the limit', () => {
+    it('keeps the enum in full, with no note, when every value fits under the cap', () => {
+        const properties: Record<string, SchemaProperties> = {
+            prop1: {
+                type: 'string',
+                title: 'Property 1',
+                description: 'Property with enum',
+                enum: ['a', 'b', 'c'],
+            },
+        };
+
+        const result = shortenProperties(properties);
+
+        expect(result.prop1.enum).toEqual(['a', 'b', 'c']);
+        expect(result.prop1.description).toBe('Property with enum');
+    });
+
+    it('drops the enum entirely (not partially) when the values don\u2019t fit the cap as a whole, noting a few examples', () => {
         // Create an enum with many values to exceed the character limit
         const value = 'enum-value-';
         const enumValues = Array.from(
@@ -395,22 +411,33 @@ describe('shortenProperties', () => {
 
         const result = shortenProperties(properties);
 
-        // Check that enum was shortened
-        expect(result.prop1.enum).toBeDefined();
-        if (result.prop1.enum) {
-            expect(result.prop1.enum.length).toBeLessThan(enumValues.length);
-            const totalEnumLen = result.prop1.enum.reduce((sum, v) => sum + v.length, 0);
-            expect(totalEnumLen).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
-
-            // Calculate total character length of enum values
-            const totalLength = result.prop1.enum.reduce((sum, val) => sum + val.length, 0);
-            expect(totalLength).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
-        } else {
-            expect(result.prop1.enum).toBeUndefined();
-        }
+        expect(result.prop1.enum).toBeUndefined();
+        expect(result.prop1.description).toContain('Accepts more values than shown here');
+        expect(result.prop1.description).toContain(enumValues[0]);
     });
 
-    it('should shorten items.enum values if they exceed the limit', () => {
+    it('keeps items.enum in full, with no note, when every value fits under the cap', () => {
+        const properties: Record<string, SchemaProperties> = {
+            prop1: {
+                type: 'array',
+                title: 'Property 1',
+                description: 'Property with items.enum',
+                items: {
+                    type: 'string',
+                    title: 'Item',
+                    description: 'Item description',
+                    enum: ['a', 'b', 'c'],
+                },
+            },
+        };
+
+        const result = shortenProperties(properties);
+
+        expect(result.prop1.items?.enum).toEqual(['a', 'b', 'c']);
+        expect(result.prop1.description).toBe('Property with items.enum');
+    });
+
+    it('drops items.enum entirely (not partially) when the values don\u2019t fit the cap as a whole, noting a few examples', () => {
         // Create an enum with many values to exceed the character limit
         const value = 'enum-value-';
         const enumValues = Array.from(
@@ -433,18 +460,9 @@ describe('shortenProperties', () => {
 
         const result = shortenProperties(properties);
 
-        // Check that items.enum was shortened
-        expect(result.prop1.items?.enum).toBeDefined();
-        if (result.prop1.items?.enum) {
-            expect(result.prop1.items.enum.length).toBeLessThan(enumValues.length);
-            const totalLength = result.prop1.items.enum.reduce((sum, val) => sum + val.length, 0);
-            expect(totalLength).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
-
-            // Calculate total character length of enum values
-            expect(totalLength).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
-        } else {
-            expect(result.prop1.items?.enum).toBeUndefined();
-        }
+        expect(result.prop1.items?.enum).toBeUndefined();
+        expect(result.prop1.description).toContain('Accepts more values than shown here');
+        expect(result.prop1.description).toContain(enumValues[0]);
     });
 
     it('should handle properties without enum or items.enum', () => {
@@ -500,8 +518,8 @@ describe('shortenProperties', () => {
     });
 });
 
-describe('stripTruncatedEnumsForValidation', () => {
-    it('keeps enum unchanged when it fits comfortably under the cap on both sides', () => {
+describe('findDroppedEnumProperties', () => {
+    it('does not flag a property whose enum fits comfortably under the cap', () => {
         const display: Record<string, SchemaProperties> = {
             prop1: { type: 'string', title: 'Prop 1', description: 'desc', enum: ['a', 'b'] },
         };
@@ -509,12 +527,10 @@ describe('stripTruncatedEnumsForValidation', () => {
             prop1: { type: 'string', title: 'Prop 1', description: 'desc', enum: ['a', 'b'] },
         };
 
-        const result = stripTruncatedEnumsForValidation(display, raw);
-
-        expect(result.prop1.enum).toEqual(['a', 'b']);
+        expect(findDroppedEnumProperties(display, raw)).toEqual([]);
     });
 
-    it('strips enum entirely when it was truncated by shortenProperties', () => {
+    it('flags a property whose enum shortenProperties() dropped for not fitting the cap', () => {
         const rawEnum = Array.from({ length: 300 }, (_, i) => `value-${i}`);
         const display: Record<string, SchemaProperties> = {
             prop1: { type: 'string', title: 'Prop 1', description: 'desc', enum: filterAndShortenEnum(rawEnum) },
@@ -523,12 +539,10 @@ describe('stripTruncatedEnumsForValidation', () => {
             prop1: { type: 'string', title: 'Prop 1', description: 'desc', enum: rawEnum },
         };
 
-        const result = stripTruncatedEnumsForValidation(display, raw);
-
-        expect(result.prop1.enum).toBeUndefined();
+        expect(findDroppedEnumProperties(display, raw)).toEqual(['prop1']);
     });
 
-    it('strips items.enum entirely when it was truncated (the #1253 shape), leaving other items fields untouched', () => {
+    it('flags a property whose items.enum shortenProperties() dropped (the #1253 shape)', () => {
         const rawEnum = Array.from({ length: 300 }, (_, i) => `value-${i}`);
         const display: Record<string, SchemaProperties> = {
             prop1: {
@@ -547,14 +561,10 @@ describe('stripTruncatedEnumsForValidation', () => {
             },
         };
 
-        const result = stripTruncatedEnumsForValidation(display, raw);
-
-        expect(result.prop1.items?.enum).toBeUndefined();
-        expect(result.prop1.items?.type).toBe('string');
-        expect(result.prop1.items?.title).toBe('Item');
+        expect(findDroppedEnumProperties(display, raw)).toEqual(['prop1']);
     });
 
-    it('does not treat empty-string removal as truncation when non-empty count never exceeds the cap', () => {
+    it('does not flag blank-entry removal as a drop when the non-empty count never exceeds the cap', () => {
         const rawEnum = ['a', 'b', '', '', 'c'];
         const display: Record<string, SchemaProperties> = {
             prop1: { type: 'string', title: 'Prop 1', description: 'desc', enum: filterAndShortenEnum(rawEnum) },
@@ -563,19 +573,15 @@ describe('stripTruncatedEnumsForValidation', () => {
             prop1: { type: 'string', title: 'Prop 1', description: 'desc', enum: rawEnum },
         };
 
-        const result = stripTruncatedEnumsForValidation(display, raw);
-
-        expect(result.prop1.enum).toEqual(['a', 'b', 'c']);
+        expect(findDroppedEnumProperties(display, raw)).toEqual([]);
     });
 
-    it('leaves a property with no counterpart in rawProperties untouched (e.g. the injected waitSecs)', () => {
+    it('skips a property with no counterpart in rawProperties (e.g. the injected waitSecs)', () => {
         const display: Record<string, SchemaProperties> = {
             waitSecs: { type: 'integer', title: 'Wait seconds', description: 'desc' },
         };
 
-        const result = stripTruncatedEnumsForValidation(display, {});
-
-        expect(result).toEqual(display);
+        expect(findDroppedEnumProperties(display, {})).toEqual([]);
     });
 
     it('is a safe no-op when rawProperties is empty', () => {
@@ -583,9 +589,7 @@ describe('stripTruncatedEnumsForValidation', () => {
             prop1: { type: 'string', title: 'Prop 1', description: 'desc', enum: ['a', 'b'] },
         };
 
-        const result = stripTruncatedEnumsForValidation(display, {});
-
-        expect(result).toEqual(display);
+        expect(findDroppedEnumProperties(display, {})).toEqual([]);
     });
 });
 
@@ -772,10 +776,10 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result.simpleString.type).toBe('string');
         expect(result.simpleString.description).toContain('**REQUIRED**');
 
-        // Enum String
+        // Enum String — kept in full (fits the cap); no "Possible values" duplication with `enum`.
         expect(result.enumString).toBeDefined();
-        expect(result.enumString.enum).toBeDefined();
-        expect(result.enumString.description).toContain('Possible values:');
+        expect(result.enumString.enum).toEqual(['A', 'B', 'C']);
+        expect(result.enumString.description).not.toContain('Possible values:');
         expect(result.enumString.description).toContain('Example values:');
         expect(result.enumString.description).toContain('**REQUIRED**');
 
@@ -851,8 +855,8 @@ describe('transformActorInputSchemaProperties', () => {
             // If enum is too long, it may be set to undefined
             expect(result.enumProp.enum).toBeUndefined();
         }
-        // 5. addEnumsToDescriptionsWithExamples: enum values in description
-        expect(result.enumProp.description).toMatch(/Possible values:/);
+        // 5. Enum fits the cap (30 short values) — kept in full, no "Possible values" duplication.
+        expect(result.enumProp.description).not.toMatch(/Possible values:/);
         // 6. encodeDotPropertyNames: foo.bar becomes foo-dot-bar
         expect(result['foo-dot-bar']).toBeDefined();
         expect(result['foo.bar']).toBeUndefined();
@@ -1006,18 +1010,21 @@ describe('inferArrayItemsTypeIfMissing', () => {
 });
 
 describe('filterAndShortenEnum', () => {
-    it('shorten enum list', () => {
-        const enumList: string[] = [];
+    it('keeps the full list (blanks removed) when it fits the cap', () => {
+        const enumList = ['a', '', 'b', 'c'];
+        expect(filterAndShortenEnum(enumList)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('drops the list entirely \u2014 not partially \u2014 when it exceeds the cap', () => {
         const wordLength = 100;
-        const wordCount = ACTOR_ENUM_MAX_LENGTH / wordLength + 1; // exceed the limit
+        const wordCount = Math.ceil(ACTOR_ENUM_MAX_LENGTH / wordLength) + 1; // total exceeds the cap
+        const enumList = Array.from({ length: wordCount }, () => 'a'.repeat(wordLength));
 
-        for (let i = 1; i < wordCount; i++) {
-            enumList.push('a'.repeat(wordLength));
-        }
+        expect(filterAndShortenEnum(enumList)).toBeUndefined();
+    });
 
-        const shortenedList = filterAndShortenEnum(enumList);
-
-        expect(shortenedList?.length || 0).toBe(ACTOR_ENUM_MAX_LENGTH / wordLength);
+    it('returns undefined for an all-blank list', () => {
+        expect(filterAndShortenEnum(['', ''])).toBeUndefined();
     });
 });
 
@@ -1115,14 +1122,11 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         expect(schema.properties?.query?.prefill).toBe('web browser for RAG pipelines');
     });
 
-    // Regression: #1253 — a value cut only by display truncation must still pass AJV.
-    it('accepts an enum value dropped by display truncation, while the displayed schema keeps the truncated list', () => {
-        // 'kept-0' is short and sorts first, so it always survives filterAndShortenEnum's cap;
-        // 'dropped-value' is padded long enough to land well past the cap.
-        const keptValue = 'kept-0';
+    // Regression: #1253 — an oversized enum is dropped entirely (not partially truncated), one schema for both display and AJV.
+    it('drops an oversized enum from the displayed schema entirely, noting examples, and AJV accepts any value it would have cut', () => {
         const droppedValue = 'dropped-value-cut-by-truncation';
         const rawEnum = [
-            keptValue,
+            'kept-0',
             ...Array.from({ length: 300 }, (_, i) => `kept-padding-${i}-${'x'.repeat(20)}`),
             droppedValue,
         ];
@@ -1142,19 +1146,13 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         const { inputSchema } = buildActorInputSchema('compass/crawler-google-places', upstream, false);
         const displayProperties = inputSchema.properties as Record<string, SchemaProperties>;
 
-        // Display schema still shows the truncated enum, unaffected by the fix.
-        const displayEnum = displayProperties.categoryFilterWords.enum;
-        expect(displayEnum).toBeDefined();
-        expect(displayEnum!.length).toBeGreaterThan(0);
-        expect(displayEnum!.length).toBeLessThan(rawEnum.length);
-        expect(displayEnum).not.toContain(droppedValue);
+        // No partial/incomplete list shown as if exhaustive.
+        expect(displayProperties.categoryFilterWords.enum).toBeUndefined();
+        expect(displayProperties.categoryFilterWords.description).toContain('Accepts more values than shown here');
+        expect(displayProperties.categoryFilterWords.description).toContain('kept-0');
 
-        // AJV accepts the dropped value — the #1253 repro (categoryFilterWords: ['restaurant']).
-        const validationSchema = {
-            ...inputSchema,
-            properties: stripTruncatedEnumsForValidation(displayProperties, upstream.properties),
-        };
-        const validate = fixedAjvCompile(ajv, validationSchema);
+        // #1253 repro (categoryFilterWords: ['restaurant']) — only `type` is enforced now.
+        const validate = fixedAjvCompile(ajv, inputSchema);
         expect(validate({ categoryFilterWords: droppedValue })).toBe(true);
     });
 });
