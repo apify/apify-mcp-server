@@ -81,11 +81,13 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
-/** Whether this session can run this Actor: call-actor loaded, or its own dedicated tool is. Soft
- *  check — false negative for a hash-capped MCP-proxy tool name (`../mcp/proxy.ts`). */
+/**
+ * Whether this session can run this Actor: call-actor loaded, its own dedicated tool is, or (for an
+ * Actor MCP server, `../mcp/proxy.ts`) at least one of its `{tool}--{originTool}`-prefixed sub-tools is.
+ * Soft check — false negative only when hash-capping (`MAX_TOOL_NAME_LENGTH`) altered the prefix.
+ */
 export function canRunActor(actorFullName: string, loadedToolNames: readonly string[]): boolean {
-    return (
-        loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL) ||
-        loadedToolNames.includes(actorNameToToolName(actorFullName))
-    );
+    if (loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)) return true;
+    const toolName = actorNameToToolName(actorFullName);
+    return loadedToolNames.some((name) => name === toolName || name.startsWith(`${toolName}--`));
 }

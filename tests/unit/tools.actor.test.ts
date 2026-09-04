@@ -141,4 +141,11 @@ describe('canRunActor()', () => {
         expect(canRunActor('apify/rag-web-browser', [actorNameToToolName('apify/web-scraper')])).toBe(false);
         expect(canRunActor('apify/rag-web-browser', [])).toBe(false);
     });
+
+    // Regression: an Actor MCP server (`../../src/mcp/proxy.ts`) registers each of its sub-tools as
+    // `{actorToolName}--{originToolName}`, never as the bare actorToolName — an exact-match check
+    // alone is always false for this Actor type, not just for a hash-capped name.
+    it('returns true when a loaded tool is an MCP-proxy sub-tool of the Actor', () => {
+        expect(canRunActor('apify/actors-mcp-server', ['apify--actors-mcp-server--fetch-apify-docs'])).toBe(true);
+    });
 });
