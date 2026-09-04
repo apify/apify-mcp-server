@@ -22,6 +22,12 @@ Results of that runbook, 2026-08-08 on Sonnet 5: per-run cost/wall/pass table, m
 retry counts, and the confounds to fix before re-running. A dated record — do not edit it after
 the fact; a re-run gets its own file.
 
+### [2026-09-04-selection-mode-spike.md](./2026-09-04-selection-mode-spike.md)
+Executed spike for selection mode (apify/ai-team#260): deny-all PreToolUse capture, the
+clean-stop denial wording, the `ToolSearch` false-first-call caveat, `--iterations` via
+repeated items in one `experiment.run()`, Langfuse v4 endpoint map. Throwaway scripts under
+`evals/mcp_agent/spike/`. A dated record — do not edit; delete both once #260 ships.
+
 ## Rules
 
 - A note gets a **deletion trigger** when it is written ("delete when X ships / closes / is
