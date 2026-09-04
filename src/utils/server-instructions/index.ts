@@ -9,22 +9,86 @@
 
 import { getApifyAPIBaseUrl } from '../../apify_client.js';
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
-import { SERVER_MODE } from '../../types.js';
+import { actorNameToToolName } from '../../tools/actor_tool_naming.js';
+import type { ToolDescriptionContext } from '../../types.js';
+import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../types.js';
+
+// hasTool checks registered tool names, not Actor full names — see call_actor.ts's RAG_WEB_BROWSER_TOOL.
+const RAG_WEB_BROWSER_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
+const WEB_FETCH_TOOL = actorNameToToolName(WEB_FETCH);
 
 /**
- * Build server instructions for the given mode.
- *
- * Apps-only sections are omitted in default mode to prevent models from
- * attempting to call widget tools that are not registered. The report-problem line is
- * emitted only when `reportProblemAvailable` is true — i.e. `report-problem` is actually
- * served — so clients that never receive the tool (Anthropic surfaces, telemetry off, or a
- * `tools=` selection that omits report-problem) are not told to call it.
+ * Build server instructions for the given mode. Every cross-tool mention is gated on
+ * `ctx.hasTool(...)` so a session missing a tool is never told to call it.
  */
-export function getServerInstructions(mode: SERVER_MODE = SERVER_MODE.DEFAULT, reportProblemAvailable = false): string {
+export function getServerInstructions(
+    mode: SERVER_MODE = SERVER_MODE.DEFAULT,
+    { hasTool }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
+): string {
     const isApps = mode === SERVER_MODE.APPS;
     // Derive the API base from config so examples match the gate/templates under an
     // APIFY_API_BASE_URL / staging override, instead of a hardcoded api.apify.com.
     const apiBaseUrl = getApifyAPIBaseUrl();
+
+    const hasSearch = hasTool(HELPER_TOOLS.STORE_SEARCH);
+    const hasDetails = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS);
+    const hasCall = hasTool(HELPER_TOOLS.ACTOR_CALL);
+    const hasRunsGet = hasTool(HELPER_TOOLS.ACTOR_RUNS_GET);
+
+    // get-actor-run-widget is auto-added alongside get-actor-run in apps mode, so gating on the
+    // base tool alone is enough.
+    const widgetWorkflowSection =
+        isApps && hasRunsGet
+            ? `
+## Widget workflow (applies when tool responses include widget metadata)
+Some clients render widget-backed Actor tools: the response includes a live UI that automatically polls run status. When a widget is rendered, follow-up status polling by the model is a forbidden duplicate.
+
+${
+    hasCall
+        ? `- **After \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` or \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\`, never call \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` or \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` for the same run.** Both widgets render live progress and poll themselves — stop after the widget response and defer to it for run status. Re-rendering the same run via \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` is a duplicate.
+- Polling \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` after \`${HELPER_TOOLS.ACTOR_CALL}\` is fine — that tool renders no UI, so polling is expected when the run is non-terminal and you need the latest status.
+`
+        : `- **After \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\`, never call \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` or \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` for the same run.** It renders live progress and polls itself — stop after the widget response and defer to it for run status. Re-rendering the same run via \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` is a duplicate.
+`
+}`
+            : '';
+
+    const toolDependencies = hasCall
+        ? `
+### Tool dependencies
+- \`${HELPER_TOOLS.ACTOR_CALL}\`:
+  - ${hasDetails ? `Use \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema.` : `Check the Actor's input schema first.`}
+  - Then call with proper input to execute the Actor.
+  - For MCP server Actors, use format "actorName:toolName" to call specific tools.
+  - Supports a \`waitSecs\` parameter (default 30, max 45):
+    - \`waitSecs: 0\`: fire-and-forget — starts the run and returns immediately with a runId.
+    - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns its current status and storage IDs (never the output rows — fetch those with \`${HELPER_TOOLS.DATASET_GET_ITEMS}\`).
+`
+        : '';
+
+    // Compares both when loaded; names whichever one is loaded alone otherwise.
+    const searchVsDetailsDisambiguation =
+        hasSearch && hasDetails
+            ? `### Tool disambiguation
+- **\`${HELPER_TOOLS.STORE_SEARCH}\` vs \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`:**
+  \`${HELPER_TOOLS.STORE_SEARCH}\` finds Actors; \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
+`
+            : hasSearch
+              ? `### Tool disambiguation
+- \`${HELPER_TOOLS.STORE_SEARCH}\` finds Actors by keyword.
+`
+              : hasDetails
+                ? `### Tool disambiguation
+- \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
+`
+                : '';
+
+    // Each bullet gates on its base tool; the widget sibling is auto-present alongside it.
+    const widgetToolDisambiguation =
+        isApps && (hasSearch || hasDetails || hasCall || hasRunsGet)
+            ? `- **Data vs widget Actor tools (when the client supports widgets):**
+${hasSearch ? `  - \`${HELPER_TOOLS.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HELPER_TOOLS.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.\n` : ''}${hasDetails ? `  - \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.\n` : ''}${hasCall ? `  - \`${HELPER_TOOLS.ACTOR_CALL}\` runs the Actor and returns its run status and storage IDs (no UI); \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.\n` : ''}${hasRunsGet ? `  - \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.\n` : ''}${hasSearch && hasDetails ? `  - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.\n` : ''}`
+            : '';
 
     return `
 Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.
@@ -64,52 +128,31 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`${apiBaseUrl}/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
 - Reads inline up to ~256 KB; a larger response is not downloaded — it returns a short notice with a download URL instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap.
 - Examples: \`${apiBaseUrl}/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`${apiBaseUrl}/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
-${
-    isApps
-        ? `
-## Widget workflow (applies when tool responses include widget metadata)
-Some clients render widget-backed Actor tools: the response includes a live UI that automatically polls run status. When a widget is rendered, follow-up status polling by the model is a forbidden duplicate.
-
-- **After \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` or \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\`, never call \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` or \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` for the same run.** Both widgets render live progress and poll themselves — stop after the widget response and defer to it for run status. Re-rendering the same run via \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` is a duplicate.
-- Polling \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` after \`${HELPER_TOOLS.ACTOR_CALL}\` is fine — that tool renders no UI, so polling is expected when the run is non-terminal and you need the latest status.
-`
-        : ''
-}
+${widgetWorkflowSection}
 ## Tool dependencies and disambiguation
-
-### Tool dependencies
-- \`${HELPER_TOOLS.ACTOR_CALL}\`:
-  - Use \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema.
-  - Then call with proper input to execute the Actor.
-  - For MCP server Actors, use format "actorName:toolName" to call specific tools.
-  - Supports a \`waitSecs\` parameter (default 30, max 45):
-    - \`waitSecs: 0\`: fire-and-forget — starts the run and returns immediately with a runId.
-    - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns its current status and storage IDs (never the output rows — fetch those with \`${HELPER_TOOLS.DATASET_GET_ITEMS}\`).
-
-### Tool disambiguation
-- **\`${HELPER_TOOLS.STORE_SEARCH}\` vs \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`:**
-  \`${HELPER_TOOLS.STORE_SEARCH}\` finds Actors; \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
-${
-    isApps
-        ? `- **Data vs widget Actor tools (when the client supports widgets):**
-  - \`${HELPER_TOOLS.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HELPER_TOOLS.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.
-  - \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.
-  - \`${HELPER_TOOLS.ACTOR_CALL}\` runs the Actor and returns its run status and storage IDs (no UI); \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.
-  - \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.
-  - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.
-`
-        : ''
-}- **\`${HELPER_TOOLS.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
+${toolDependencies}${searchVsDetailsDisambiguation}${widgetToolDisambiguation}${
+        hasSearch && hasTool(RAG_WEB_BROWSER_TOOL)
+            ? `- **\`${HELPER_TOOLS.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
   \`${HELPER_TOOLS.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
-- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**
+`
+            : ''
+    }${
+        hasTool(WEB_FETCH_TOOL) && hasTool(RAG_WEB_BROWSER_TOOL)
+            ? `- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**
   ${WEB_FETCH} fetches one specific URL and returns its full content verbatim; ${RAG_WEB_BROWSER} searches the web by query and returns content from the top results.
-- **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs \`${HELPER_TOOLS.ACTOR_CALL}\`:**
+`
+            : ''
+    }${
+        hasCall
+            ? `- **Dedicated Actor tools${hasTool(RAG_WEB_BROWSER_TOOL) ? ` (e.g. ${RAG_WEB_BROWSER})` : ''} vs \`${HELPER_TOOLS.ACTOR_CALL}\`:**
   Prefer dedicated tools when available; use \`${HELPER_TOOLS.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.
-${
-    reportProblemAvailable
-        ? `
+`
+            : ''
+    }${
+        hasTool(HELPER_TOOLS.PROBLEM_REPORT)
+            ? `
 If a tool or Actor fails and you cannot resolve it, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.
 `
-        : ''
-}`;
+            : ''
+    }`;
 }

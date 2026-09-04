@@ -34,7 +34,7 @@ import {
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../const.js';
 import type { createPromptService } from '../prompts/prompt_service.js';
 import type { createResourceService } from '../resources/resource_service.js';
 import { getServerInfo } from '../server_card.js';
@@ -138,7 +138,9 @@ export class LegacyMcpServer {
                 prompts: {},
                 logging: {},
             },
-            instructions: getServerInstructions(),
+            // Placeholder, always overwritten below once the real tool set is known — matches
+            // the pre-gating default (everything but report-problem) rather than every mention.
+            instructions: getServerInstructions(undefined, { hasTool: (name) => name !== HELPER_TOOLS.PROBLEM_REPORT }),
         });
         this.setupInitializeHandler();
         this.setupLoggingProxy();
