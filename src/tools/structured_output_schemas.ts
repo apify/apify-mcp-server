@@ -428,6 +428,17 @@ export const getActorBuildToolOutputSchema = {
     required: ['build', 'logTail'],
 };
 
+/**
+ * Schema for build-actor: the same allowlisted build subset (`toBuildResult`) as get-actor-build.
+ */
+export const buildActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        build: getActorBuildToolOutputSchema.properties.build,
+    },
+    required: ['build'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into

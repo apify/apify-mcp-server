@@ -25,6 +25,7 @@ import { SERVER_MODE } from '../types.js';
 import { callActorApps, callActorDefault } from './actors/call_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
 import { searchActors } from './actors/search_actors.js';
+import { buildActor } from './deploy/build_actor.js';
 import { getActorBuild } from './deploy/get_actor_build.js';
 import { reportProblem } from './dev/report_problem.js';
 import { fetchApifyDocs } from './docs/fetch_apify_docs.js';
@@ -89,7 +90,7 @@ export const toolCategories = {
         getKeyValueStoreList,
     ],
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
-    deploy: [getActorBuild],
+    deploy: [getActorBuild, buildActor],
     dev: [reportProblem],
 } satisfies Record<string, CategoryToolEntry[]>;
 
