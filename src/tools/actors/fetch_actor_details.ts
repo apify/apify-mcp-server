@@ -152,8 +152,12 @@ export function buildActorNotFoundResponse(actorName: string, loadedToolNames: r
 }
 
 /** Guidance appended when the Actor exists but `canRunActor` says this session can't run it. */
-export function buildActorNotRunnableGuidance(actorFullName: string, loadedToolNames: readonly string[]): string {
-    if (canRunActor(actorFullName, loadedToolNames)) return '';
+export function buildActorNotRunnableGuidance(
+    actorId: string,
+    loadedToolNames: readonly string[],
+    loadedActorIds: ReadonlySet<string>,
+): string {
+    if (canRunActor(actorId, loadedToolNames, loadedActorIds)) return '';
     return dedent`
         This Actor is not exposed as a tool and cannot be run in this configuration. Open its
         Apify page or configure it separately to use it.
@@ -241,7 +245,16 @@ export function buildActorDetailsTextResponse(options: {
  * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
-    const { args, apifyToken, apifyClient, actorStore, paymentProvider, mcpSessionId, loadedToolNames } = toolArgs;
+    const {
+        args,
+        apifyToken,
+        apifyClient,
+        actorStore,
+        paymentProvider,
+        mcpSessionId,
+        loadedToolNames,
+        loadedActorIds,
+    } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
 
@@ -281,10 +294,8 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         linkContext,
     });
 
-    // Canonical full name, not the raw `actor` input — that may be an ID, which canRunActor
-    // (via actorNameToToolName) can't match against a loaded dedicated-tool name.
-    const actorFullName = `${details.actorInfo.username}/${details.actorInfo.name}`;
-    const runnableGuidance = buildActorNotRunnableGuidance(actorFullName, loadedToolNames);
+    // Resolved Actor ID, not the raw `actor` input — that may itself be an ID.
+    const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
     if (runnableGuidance) texts.push(runnableGuidance);
 
     return respondOk(texts, { structuredContent });

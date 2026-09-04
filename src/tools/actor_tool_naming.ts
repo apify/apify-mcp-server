@@ -82,12 +82,13 @@ export function getToolSchemaID(actorName: string): string {
 }
 
 /**
- * Whether this session can run this Actor: call-actor loaded, its own dedicated tool is, or (for an
- * Actor MCP server, `../mcp/proxy.ts`) at least one of its `{tool}--{originTool}`-prefixed sub-tools is.
- * Soft check — false negative only when hash-capping (`MAX_TOOL_NAME_LENGTH`) altered the prefix.
+ * Whether this session can run this Actor: call-actor loaded, or the Actor's own tool loaded
+ * (direct or Actor-MCP). Soft check for a guidance hint, not a hard gate.
  */
-export function canRunActor(actorFullName: string, loadedToolNames: readonly string[]): boolean {
-    if (loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)) return true;
-    const toolName = actorNameToToolName(actorFullName);
-    return loadedToolNames.some((name) => name === toolName || name.startsWith(`${toolName}--`));
+export function canRunActor(
+    actorId: string,
+    loadedToolNames: readonly string[],
+    loadedActorIds: ReadonlySet<string>,
+): boolean {
+    return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL) || loadedActorIds.has(actorId);
 }

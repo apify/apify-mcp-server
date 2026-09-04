@@ -130,22 +130,20 @@ describe('resolveActorToolMode()', () => {
 
 describe('canRunActor()', () => {
     it('returns true when call-actor is loaded, regardless of the Actor', () => {
-        expect(canRunActor('apify/rag-web-browser', [HELPER_TOOLS.ACTOR_CALL])).toBe(true);
+        expect(canRunActor('actor-id-1', [HELPER_TOOLS.ACTOR_CALL], new Set())).toBe(true);
     });
 
-    it('returns true when call-actor is absent but the Actor has its own dedicated tool loaded', () => {
-        expect(canRunActor('apify/rag-web-browser', [actorNameToToolName('apify/rag-web-browser')])).toBe(true);
+    it('returns true when call-actor is absent but the Actor ID is in loadedActorIds', () => {
+        expect(canRunActor('actor-id-1', [], new Set(['actor-id-1']))).toBe(true);
     });
 
-    it('returns false when call-actor is absent and no matching dedicated tool is loaded', () => {
-        expect(canRunActor('apify/rag-web-browser', [actorNameToToolName('apify/web-scraper')])).toBe(false);
-        expect(canRunActor('apify/rag-web-browser', [])).toBe(false);
+    it('returns false when call-actor is absent and the Actor ID is not in loadedActorIds', () => {
+        expect(canRunActor('actor-id-1', [], new Set(['other-actor-id']))).toBe(false);
+        expect(canRunActor('actor-id-1', [], new Set())).toBe(false);
     });
 
-    // Regression: an Actor MCP server (`../../src/mcp/proxy.ts`) registers each of its sub-tools as
-    // `{actorToolName}--{originToolName}`, never as the bare actorToolName — an exact-match check
-    // alone is always false for this Actor type, not just for a hash-capped name.
-    it('returns true when a loaded tool is an MCP-proxy sub-tool of the Actor', () => {
-        expect(canRunActor('apify/actors-mcp-server', ['apify--actors-mcp-server--fetch-apify-docs'])).toBe(true);
+    // loadedActorIds covers both ACTOR and ACTOR_MCP entries, so either tool shape counts.
+    it('returns true when the Actor ID comes from a loaded Actor-MCP sub-tool', () => {
+        expect(canRunActor('mcp-actor-id', [], new Set(['mcp-actor-id']))).toBe(true);
     });
 });

@@ -182,6 +182,8 @@ export type InternalToolArgs = {
     paymentProvider?: PaymentProvider;
     /** Names of all currently loaded tools. */
     loadedToolNames: readonly string[];
+    /** IDs of Actors backing all currently loaded Actor / Actor-MCP tools. */
+    loadedActorIds: ReadonlySet<string>;
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
     /** MCP session ID for logging context */
