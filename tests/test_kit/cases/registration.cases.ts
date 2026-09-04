@@ -29,9 +29,8 @@ const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
 const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
-// Locked Claude-connector `?tools=` allowlist — see ai-team#232. No call-actor.
-// Valid as the `tools=` selector value as-is (Actor entries use their slash name);
-// served tool names differ for the two Actor entries — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
+// Claude-connector `?tools=` allowlist. No call-actor. Actor entries use their slash name here;
+// served tool names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
@@ -100,8 +99,7 @@ export const registrationCases: Case[] = [
         }),
     },
     {
-        // Claude-connector compliance: the pinned ?tools= list is authoritative even with
-        // telemetry on, which would otherwise auto-inject report-problem for a default session.
+        // Pinned ?tools= wins even with telemetry on, which would otherwise auto-inject report-problem.
         name: 'Claude connector: pinned tool surface excludes call-actor and report-problem even with telemetry enabled',
         isDeploymentTest: true,
         run: withClient(
