@@ -412,7 +412,7 @@ describe('shortenProperties', () => {
         const result = shortenProperties(properties);
 
         expect(result.prop1.enum).toBeUndefined();
-        expect(result.prop1.description).toContain('Accepts more values than shown here');
+        expect(result.prop1.description).toContain('More values accepted than shown');
         expect(result.prop1.description).toContain(enumValues[0]);
     });
 
@@ -461,7 +461,7 @@ describe('shortenProperties', () => {
         const result = shortenProperties(properties);
 
         expect(result.prop1.items?.enum).toBeUndefined();
-        expect(result.prop1.description).toContain('Accepts more values than shown here');
+        expect(result.prop1.description).toContain('More values accepted than shown');
         expect(result.prop1.description).toContain(enumValues[0]);
     });
 
@@ -1148,7 +1148,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
 
         // No partial/incomplete list shown as if exhaustive.
         expect(displayProperties.categoryFilterWords.enum).toBeUndefined();
-        expect(displayProperties.categoryFilterWords.description).toContain('Accepts more values than shown here');
+        expect(displayProperties.categoryFilterWords.description).toContain('More values accepted than shown');
         expect(displayProperties.categoryFilterWords.description).toContain('kept-0');
 
         // #1253 repro (categoryFilterWords: ['restaurant']) — only `type` is enforced now.

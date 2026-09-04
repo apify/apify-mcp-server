@@ -280,7 +280,7 @@ export function addExampleValuesToDescriptions(
     return properties;
 }
 
-const ENUM_DROPPED_NOTE_EXAMPLE_COUNT = 5;
+const ENUM_DROPPED_NOTE_EXAMPLE_COUNT = 3;
 const ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH = 60;
 
 /** Note for a dropped enum — the field still accepts these values, just too many to list. */
@@ -293,7 +293,7 @@ function buildEnumDroppedNote(rawValues: string[]): string {
                 ? `${value.slice(0, ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH)}...`
                 : value,
         );
-    return `\nAccepts more values than shown here (e.g. ${examples.join(', ')}, ...) — full list omitted, too long to include.`;
+    return `\nMore values accepted than shown (e.g. ${examples.join(', ')}, ...) — list too long to include.`;
 }
 
 /**

@@ -66,7 +66,7 @@ describe('getNormalActorsAsTools — dropped-enum buildInputSchema gating', () =
         const { properties } = tool.inputSchema as { properties: Record<string, SchemaProperties> };
 
         expect(properties.category.enum).toBeUndefined();
-        expect(properties.category.description).toContain('Accepts more values than shown here');
+        expect(properties.category.description).toContain('More values accepted than shown');
         expect(properties.category.description).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
 
@@ -79,7 +79,7 @@ describe('getNormalActorsAsTools — dropped-enum buildInputSchema gating', () =
             properties: Record<string, SchemaProperties>;
         };
         expect(rendered.properties.category.description).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-        expect(rendered.properties.category.description).toContain('Accepts more values than shown here');
+        expect(rendered.properties.category.description).toContain('More values accepted than shown');
     });
 
     it('buildInputSchema names fetch-actor-details in the addendum when it is present in the session', async () => {
@@ -91,7 +91,7 @@ describe('getNormalActorsAsTools — dropped-enum buildInputSchema gating', () =
         }) as { properties: Record<string, SchemaProperties> };
 
         expect(rendered.properties.category.description).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-        expect(rendered.properties.category.description).toContain('full input schema');
+        expect(rendered.properties.category.description).toContain('more on this Actor');
     });
 
     it('leaves other properties (e.g. the injected waitSecs) untouched by the addendum', async () => {

@@ -83,7 +83,7 @@ describe('SkyfirePaymentProvider.decorateToolSchema — composes with buildInput
 
         const { properties } = decorated.inputSchema as { properties: Record<string, SchemaProperties> };
         // The dropped-enum note must appear exactly once, not accumulate across renders.
-        const occurrences = properties.category.description.split('Accepts more values than shown here').length - 1;
+        const occurrences = properties.category.description.split('More values accepted than shown').length - 1;
         expect(occurrences).toBe(1);
     });
 });

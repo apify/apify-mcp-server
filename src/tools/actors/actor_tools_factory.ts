@@ -172,7 +172,7 @@ Actor description: ${definition.description}`;
                           for (const key of droppedEnumKeys) {
                               const property = rendered.properties[key];
                               if (property) {
-                                  property.description += ` See ${HELPER_TOOLS.ACTOR_GET_DETAILS} for the Actor's full input schema.`;
+                                  property.description += ` See ${HELPER_TOOLS.ACTOR_GET_DETAILS} for more on this Actor.`;
                               }
                           }
                       }
