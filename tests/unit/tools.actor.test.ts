@@ -2,8 +2,14 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
-import { actorNameToToolName, legacyToolNameToNew, resolveActorToolMode } from '../../src/tools/actor_tool_naming.js';
+import {
+    actorNameToToolName,
+    canRunActor,
+    legacyToolNameToNew,
+    resolveActorToolMode,
+} from '../../src/tools/actor_tool_naming.js';
 import type { ActorInfo, ActorInputSchema } from '../../src/types.js';
 import { ACTOR_TOOL_MODE } from '../../src/types.js';
 
@@ -119,5 +125,20 @@ describe('resolveActorToolMode()', () => {
         ],
     ] as const)('resolves %s to %s', (_label, opts, expected) => {
         expect(resolveActorToolMode(makeActorInfo({ input: NON_EMPTY_INPUT, ...opts }))).toBe(expected);
+    });
+});
+
+describe('canRunActor()', () => {
+    it('returns true when call-actor is loaded, regardless of the Actor', () => {
+        expect(canRunActor('actor-id-1', [HELPER_TOOLS.ACTOR_CALL], new Set())).toBe(true);
+    });
+
+    it('returns true when call-actor is absent but the Actor ID is in loadedActorIds', () => {
+        expect(canRunActor('actor-id-1', [], new Set(['actor-id-1']))).toBe(true);
+    });
+
+    it('returns false when call-actor is absent and the Actor ID is not in loadedActorIds', () => {
+        expect(canRunActor('actor-id-1', [], new Set(['other-actor-id']))).toBe(false);
+        expect(canRunActor('actor-id-1', [], new Set())).toBe(false);
     });
 });

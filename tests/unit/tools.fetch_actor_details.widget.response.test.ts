@@ -65,8 +65,9 @@ describe('fetch-actor-details-widget response', () => {
     it('returns { actorDetails: { actorInfo, actorCard, readme } } as structuredContent plus widget _meta', async () => {
         vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
 
+        // call-actor loaded: this assertion is about the widget's content shape, not the guidance.
         const result = await (fetchActorDetailsWidget as HelperTool).call(
-            stubInternalToolArgs({ actor: 'apify/web-scraper' }),
+            stubInternalToolArgs({ actor: 'apify/web-scraper' }, [HELPER_TOOLS.ACTOR_CALL]),
         );
 
         const { structuredContent, content, _meta } = result as {
@@ -153,6 +154,28 @@ describe('fetch-actor-details-widget response', () => {
         const unservedText = (unserved.content ?? []).map(textOf).join('\n');
         expect(unservedText).toContain('was not found');
         expect(unservedText).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+    });
+
+    it('appends not-runnable guidance when neither call-actor nor a dedicated tool is loaded', async () => {
+        vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
+
+        const result = await (fetchActorDetailsWidget as HelperTool).call(
+            stubInternalToolArgs({ actor: 'apify/web-scraper' }),
+        );
+        const text = ((result.content ?? []) as { text: string }[]).map((c) => c.text).join('\n');
+
+        expect(text).toContain('cannot be run in this configuration');
+    });
+
+    it('omits not-runnable guidance when call-actor is loaded', async () => {
+        vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
+
+        const result = await (fetchActorDetailsWidget as HelperTool).call(
+            stubInternalToolArgs({ actor: 'apify/web-scraper' }, [HELPER_TOOLS.ACTOR_CALL]),
+        );
+        const text = ((result.content ?? []) as { text: string }[]).map((c) => c.text).join('\n');
+
+        expect(text).not.toContain('cannot be run in this configuration');
     });
 
     // Regression: same fix as tools.fetch_actor_details.response.test.ts — the widget variant
