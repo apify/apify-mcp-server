@@ -1,7 +1,7 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { adaptSdkConversation } from '../../evals/workflows/sdk_conversation_adapter.js';
+import { adaptSdkConversation } from '../../evals/mcp_agent/sdk_conversation_adapter.js';
 
 /** An assistant message as the SDK streams it; only the fields the adapter reads. */
 function assistantMessage(content: unknown[], parentToolUseId: string | null = null, id?: string): SDKMessage {

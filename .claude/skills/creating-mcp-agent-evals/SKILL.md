@@ -1,9 +1,9 @@
 ---
-name: creating-workflow-evals
-description: Use when adding Langfuse workflow evals for a tool family of the Apify MCP server ("create evals for the storage tools"), when eval cases fail and you must decide whether the case, the tool, or its description is at fault, or when eval runs show tool errors in Langfuse traces.
+name: creating-mcp-agent-evals
+description: Use when adding Langfuse MCP agent evals for a tool family of the Apify MCP server ("create evals for the storage tools"), when eval cases fail and you must decide whether the case, the tool, or its description is at fault, or when eval runs show tool errors in Langfuse traces.
 ---
 
-# Creating workflow evals for an MCP tool family
+# Creating MCP agent evals for an MCP tool family
 
 ## Overview
 
@@ -45,7 +45,7 @@ Always read the transcript before assigning blame. The judge's one-liner is a hi
 - **Probe the target, not just the mechanism.** For live-web cases, fetch the exact URL at authoring time and check the *content* supports the premise (a probed-working scraper still returned nothing for a profile that turned out to have zero posts).
 - **State is account-global.** Fixed `eval-` prefixed resource names + a fixtures seed/cleanup script; each conversation self-contained (create → act → clean up); one permanent read-only fixture for pure "get" cases.
 - **Dataset item ids are project-unique forever** — they cannot move between datasets or be reused after archiving. Choose ids you can live with; "moving" a case = new id + archive old.
-- **Snapshot after every dataset edit** (`evals:workflow:export-dataset --dataset X`) so git reviews the cases.
+- **Snapshot after every dataset edit** (`evals:mcp-agent:export-dataset --dataset X`) so git reviews the cases.
 
 ## Red flags — stop and rethink
 

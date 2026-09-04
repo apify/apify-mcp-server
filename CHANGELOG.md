@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.15.5 - **not yet released**
 
+### 🚀 Features
+
+- **evals:** Add --claude-judge to run the judge on the Agent SDK ([#1299](https://github.com/apify/apify-mcp-server/pull/1299)) ([737b748](https://github.com/apify/apify-mcp-server/commit/737b748a9159ab5f4098535f51e34d2848dd6f1f)) by [@jirispilka](https://github.com/jirispilka)
+
 ### 🐛 Bug Fixes
 
 - Use canonical Apify docs MCP URL in server card ([#1325](https://github.com/apify/apify-mcp-server/pull/1325)) ([2d1c6dc](https://github.com/apify/apify-mcp-server/commit/2d1c6dcace8ea75c30b056b14f78241f341ffc48)) by [@marekh19](https://github.com/marekh19)

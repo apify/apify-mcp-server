@@ -1,5 +1,5 @@
 /**
- * Experiment task, evaluators, and run gate for the Langfuse workflow-evals port.
+ * Experiment task, evaluators, and run gate for the Langfuse mcp-agent-evals port.
  *
  * The task runs a fresh Claude Code agent conversation per dataset item (the Agent SDK
  * spawns its own MCP server, so state is isolated per item) and three evaluators score it:
@@ -10,12 +10,12 @@
 import type { Evaluation } from '@langfuse/client';
 
 import { runAgentConversation } from './claude_agent.js';
-import { parseWorkflowItem } from './langfuse_dataset.js';
+import { parseMcpAgentItem } from './langfuse_dataset.js';
 import { buildAgentObservations, emitObservations } from './langfuse_observations.js';
 import type { JudgeLlmClient } from './llm_client.js';
+import type { JudgeResult } from './mcp_agent_judge.js';
+import { evaluateConversation } from './mcp_agent_judge.js';
 import type { TranscriptEntry } from './sdk_conversation_adapter.js';
-import type { JudgeResult } from './workflow_judge.js';
-import { evaluateConversation } from './workflow_judge.js';
 
 /**
  * Output produced by the experiment task for a single dataset item.
@@ -24,7 +24,7 @@ import { evaluateConversation } from './workflow_judge.js';
  * summary: the transcript carries narration and tool names, never the tool payloads,
  * which would otherwise be re-uploaded on top of the tool spans that already hold them.
  */
-export type WorkflowTaskOutput = {
+export type McpAgentTaskOutput = {
     /** Item id, carried here because `ExperimentItemResult.item` is typed as a union without one. */
     id: string;
     judgeResult: JudgeResult;
@@ -43,17 +43,17 @@ export type WorkflowTaskOutput = {
  * item from the pass count rather than fail.
  */
 export const SCORE_NAMES = {
-    WORKFLOW_JUDGE: 'workflow_judge',
+    MCP_AGENT_JUDGE: 'mcp_agent_judge',
     TOTAL_TOKENS: 'total_tokens',
     TOOL_ERRORS: 'tool_errors',
 } as const;
 
-type WorkflowEvaluator = (params: { output: WorkflowTaskOutput }) => Promise<Evaluation | Evaluation[]>;
+type McpAgentEvaluator = (params: { output: McpAgentTaskOutput }) => Promise<Evaluation | Evaluation[]>;
 
 /** The evaluators attached to each experiment item. */
-export const evaluators: WorkflowEvaluator[] = [
+export const evaluators: McpAgentEvaluator[] = [
     async ({ output }) => ({
-        name: SCORE_NAMES.WORKFLOW_JUDGE,
+        name: SCORE_NAMES.MCP_AGENT_JUDGE,
         value: output.judgeResult.verdict === 'PASS' ? 1 : 0,
         comment: output.judgeResult.reason,
     }),
@@ -70,16 +70,16 @@ export const evaluators: WorkflowEvaluator[] = [
 ];
 
 /** One line per failed call, shared by the score comment and the run summary. */
-function formatToolErrors(toolErrors: WorkflowTaskOutput['toolErrors'], separator = '\n'): string {
+function formatToolErrors(toolErrors: McpAgentTaskOutput['toolErrors'], separator = '\n'): string {
     return toolErrors.map(({ tool, error }) => `${tool}: ${error}`).join(separator);
 }
 
 /** Minimal view of an ExperimentItemResult: what the run gate reads. */
-type ScoredItem = { output: WorkflowTaskOutput; evaluations: { name: string; value?: unknown }[] };
+type ScoredItem = { output: McpAgentTaskOutput; evaluations: { name: string; value?: unknown }[] };
 
 /** `undefined` when the judge evaluator itself threw, so no score was emitted. */
 function judgeScore(result: ScoredItem): unknown {
-    return result.evaluations.find((evaluation) => evaluation.name === SCORE_NAMES.WORKFLOW_JUDGE)?.value;
+    return result.evaluations.find((evaluation) => evaluation.name === SCORE_NAMES.MCP_AGENT_JUDGE)?.value;
 }
 
 /** Whether one item passes the gate: judge PASS, plus no tool errors unless the run allows them. */
@@ -121,7 +121,7 @@ export function buildRunSummary(
         // hold the judge's PASS rationale, printed under a failure marker. Say what happened.
         let reason: string;
         if (score === undefined) {
-            reason = `no ${SCORE_NAMES.WORKFLOW_JUDGE} score (the evaluator threw)`;
+            reason = `no ${SCORE_NAMES.MCP_AGENT_JUDGE} score (the evaluator threw)`;
         } else if (score === 1) {
             const { toolErrors } = result.output;
             reason = `judge passed, but ${toolErrors.length} tool error(s): ${formatToolErrors(toolErrors, '; ')}`;
@@ -166,7 +166,7 @@ export function isTransientAgentError(error: unknown): boolean {
     return TRANSIENT_AGENT_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }
 
-export type WorkflowTaskOptions = {
+export type McpAgentTaskOptions = {
     llmClient: JudgeLlmClient;
     apifyToken: string;
     agentModel: string;
@@ -182,16 +182,16 @@ export type WorkflowTaskOptions = {
  *
  * The agent run survives one retry on a transient failure. Judge API errors are retried by the
  * OpenAI SDK itself (maxRetries 2, exponential backoff); this layer retries the judge only
- * on a malformed answer, see workflow_judge.ts. Anything else is left to throw, so
+ * on a malformed answer, see mcp_agent_judge.ts. Anything else is left to throw, so
  * `buildRunSummary` fails the run on the shortfall instead of a broken harness looking like
  * a failing eval. Errors are prefixed with the item id because the SDK's own log line
  * carries none.
  */
-export function makeTask(options: WorkflowTaskOptions) {
+export function makeTask(options: McpAgentTaskOptions) {
     const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout, mcpToolsOnly } = options;
 
-    return async (rawItem: unknown): Promise<WorkflowTaskOutput> => {
-        const item = parseWorkflowItem(rawItem);
+    return async (rawItem: unknown): Promise<McpAgentTaskOutput> => {
+        const item = parseMcpAgentItem(rawItem);
 
         try {
             const runOptions = {

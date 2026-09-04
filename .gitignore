@@ -41,5 +41,5 @@ __pycache__/
 dev.log
 .pnpm-store
 
-# Local Langfuse dataset exports (evals:workflow:export-dataset), not tracked
-evals/workflows/dataset_snapshot_*.json
+# Local Langfuse dataset exports (evals:mcp-agent:export-dataset), not tracked
+evals/mcp_agent/dataset_snapshot_*.json
