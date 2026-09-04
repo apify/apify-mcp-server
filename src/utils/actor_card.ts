@@ -314,7 +314,13 @@ export type WidgetActor = {
  * Formats Actor for widget UI components.
  * Used only in OpenAI (widget) mode — search results and Actor details widgets.
  *
- * Uses complete pricing so the widget badge can pick the primary event and match the public Store pricing badge logic.
+ * Uses complete pricing so the widget badge can match the public Store page: the primary event
+ * (`isPrimaryEvent`) priced at the GOLD tier. GOLD is the best tier listed on apify.com/pricing
+ * (Business plan); PLATINUM/DIAMOND are enterprise-only and the Store does not show them.
+ * Rendering lives in `formatPricing` (src/web/src/utils/formatting.ts).
+ *
+ * Complete mode carries every event's description and full tier matrix (no simplified-mode
+ * 5-event trim). Accepted: bounded by the 10-Actor search cap, and the widget renders only the badge.
  */
 export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: PricingTier): WidgetActor {
     const fullName = `${actor.username}/${actor.name}`;
