@@ -3,19 +3,31 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.15.4 - **not yet released**
+## 0.15.5 - **not yet released**
+
+### 🚀 Features
+
+- **evals:** Add --claude-judge to run the judge on the Agent SDK ([#1299](https://github.com/apify/apify-mcp-server/pull/1299)) ([737b748](https://github.com/apify/apify-mcp-server/commit/737b748a9159ab5f4098535f51e34d2848dd6f1f)) by [@jirispilka](https://github.com/jirispilka)
+
+### 🐛 Bug Fixes
+
+- Use canonical Apify docs MCP URL in server card ([#1325](https://github.com/apify/apify-mcp-server/pull/1325)) ([2d1c6dc](https://github.com/apify/apify-mcp-server/commit/2d1c6dcace8ea75c30b056b14f78241f341ffc48)) by [@marekh19](https://github.com/marekh19)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.15.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.4) (2026-09-02)
 
 ### 🚀 Features
 
 - Run&#x2F;standby mode decision table for Actor tool loading ([#1278](https://github.com/apify/apify-mcp-server/pull/1278)) ([76f91b6](https://github.com/apify/apify-mcp-server/commit/76f91b6284ab975c63d45858543ce2d3f19814b8)) by [@jirispilka](https://github.com/jirispilka), closes [#1208](https://github.com/apify/apify-mcp-server/issues/1208)
 - **evals:** Add task-tool workflow eval suites ([#1294](https://github.com/apify/apify-mcp-server/pull/1294)) ([43b2c48](https://github.com/apify/apify-mcp-server/commit/43b2c486eab20d00884a20898b7e50eae6ca429f)) by [@jirispilka](https://github.com/jirispilka), closes [#1288](https://github.com/apify/apify-mcp-server/issues/1288)
+- Expand MCP server card to hybrid registry shape ([#1318](https://github.com/apify/apify-mcp-server/pull/1318)) ([de3bb58](https://github.com/apify/apify-mcp-server/commit/de3bb58ef8dbfa18cfff89c9d1841e69adaa0131)) by [@marekh19](https://github.com/marekh19), closes [#790](https://github.com/apify/apify-mcp-server/issues/790)
 
 ### 🐛 Bug Fixes
 
 - Redact tokens from local conformance output ([#1315](https://github.com/apify/apify-mcp-server/pull/1315)) ([c3c5f6f](https://github.com/apify/apify-mcp-server/commit/c3c5f6f09510062b298c26076f2504b393553855)) by [@SomSamantray](https://github.com/SomSamantray), closes [#1245](https://github.com/apify/apify-mcp-server/issues/1245)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.15.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.3) (2026-08-26)
 
 ### 🐛 Bug Fixes

@@ -12,10 +12,10 @@ import type { Evaluation } from '@langfuse/client';
 import { runAgentConversation } from './claude_agent.js';
 import { parseMcpAgentItem } from './langfuse_dataset.js';
 import { buildAgentObservations, emitObservations } from './langfuse_observations.js';
-import type { LlmClient } from './llm_client.js';
-import type { TranscriptEntry } from './sdk_conversation_adapter.js';
+import type { JudgeLlmClient } from './llm_client.js';
 import type { JudgeResult } from './mcp_agent_judge.js';
 import { evaluateConversation } from './mcp_agent_judge.js';
+import type { TranscriptEntry } from './sdk_conversation_adapter.js';
 
 /**
  * Output produced by the experiment task for a single dataset item.
@@ -167,7 +167,7 @@ export function isTransientAgentError(error: unknown): boolean {
 }
 
 export type McpAgentTaskOptions = {
-    llmClient: LlmClient;
+    llmClient: JudgeLlmClient;
     apifyToken: string;
     agentModel: string;
     judgeModel: string;

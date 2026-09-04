@@ -564,6 +564,43 @@ describe('call_actor_common', () => {
             expect(connectSpy).not.toHaveBeenCalled();
         });
 
+        it('returns a server error when the connection fails', async () => {
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
+
+            const result = await handleMcpToolCall({
+                baseActorName: 'apify/mcp-demo',
+                mcpToolName: 'search',
+                input: { q: 'x' },
+                mcpServerUrl: 'https://example.invalid/mcp',
+                apifyToken: 'token',
+                signal: new AbortController().signal,
+            });
+
+            expect(result?.isError).toBe(true);
+            const allText = ((result as TextToolResult).content ?? []).map(textOf).join('\n');
+            expect(allText).toContain('Failed to connect to MCP server');
+        });
+
+        it('returns a server error when the remote call rejects without an abort', async () => {
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
+                callTool: vi.fn().mockRejectedValue(new Error('remote boom')),
+                close: vi.fn().mockResolvedValue(undefined),
+            } as unknown as Client);
+
+            const result = await handleMcpToolCall({
+                baseActorName: 'apify/mcp-demo',
+                mcpToolName: 'search',
+                input: { q: 'x' },
+                mcpServerUrl: 'https://example.invalid/mcp',
+                apifyToken: 'token',
+                signal: new AbortController().signal,
+            });
+
+            expect(result?.isError).toBe(true);
+            const allText = ((result as TextToolResult).content ?? []).map(textOf).join('\n');
+            expect(allText).toContain("Failed to call MCP tool 'search' on Actor 'apify/mcp-demo'");
+        });
+
         it('returns aborted when the remote call rejects after the signal aborts', async () => {
             const controller = new AbortController();
             vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
