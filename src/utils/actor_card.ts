@@ -314,13 +314,10 @@ export type WidgetActor = {
  * Formats Actor for widget UI components.
  * Used only in OpenAI (widget) mode — search results and Actor details widgets.
  *
- * Uses complete pricing (full tier matrix + `userTier`) so the widget badge can show the primary
- * event (`isPrimaryEvent`) at the user's own tier, plus the Store page's "from" price (GOLD, the
- * best tier listed on apify.com/pricing) as a hint when a paid plan is cheaper.
- * Rendering lives in `formatPricing` (src/web/src/utils/formatting.ts).
- *
- * Complete mode carries every event's description and full tier matrix (no simplified-mode
- * 5-event trim). Accepted: bounded by the 10-Actor search cap, and the widget renders only the badge.
+ * Uses simplified pricing: the server resolves the user's tier and adds the Store page's "from"
+ * price (`paidPlanPriceUsd` / `paidPlanPricePerUnit`) when a paid plan is cheaper, so the widget
+ * badge only renders — the pricing rule lives in one place (src/utils/pricing_info.ts).
+ * See apify/apify-mcp-server#905.
  */
 export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: PricingTier): WidgetActor {
     const fullName = `${actor.username}/${actor.name}`;
@@ -340,6 +337,6 @@ export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: Pr
             totalUsers: actor.stats?.totalUsers || 0,
         },
         url: `${APIFY_STORE_URL}/${fullName}`,
-        currentPricingInfo: pricingInfoToStructured(getActorPricingInfo(actor), userTier),
+        currentPricingInfo: pricingInfoToSimplifiedStructured(getActorPricingInfo(actor), userTier),
     };
 }

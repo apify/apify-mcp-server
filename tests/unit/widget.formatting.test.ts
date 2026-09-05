@@ -7,9 +7,8 @@ import type { PricingInfo } from '../../src/utils/pricing_info.js';
 import { formatPricing } from '../../src/web/src/utils/formatting.js';
 
 /**
- * Mirrors xtdata/twitter-x-scraper current PAY_PER_EVENT pricing
- * (see https://github.com/apify/apify-mcp-server/issues/905).
- * Public Store page shows: "from $0.25 / 1,000 each tweet. cheaper for higher plans"
+ * Mirrors xtdata/twitter-x-scraper live PAY_PER_EVENT pricing (apify/apify-mcp-server#905).
+ * Store badge: "from $0.25 / 1,000 each tweet. cheaper for higher plans" (GOLD = Business plan).
  */
 const twitterXScraperPricing = {
     pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
@@ -52,46 +51,64 @@ const twitterXScraperStoreActor = {
     username: 'xtdata',
     title: 'X.com Twitter API Scraper',
     description: 'Scrape Twitter (X) data efficiently.',
-    isDeprecated: false,
-    modifiedAt: new Date('2026-05-03T11:04:10.172Z'),
-    categories: ['SOCIAL_MEDIA'],
-    actorReviewRating: 3.4,
-    actorReviewCount: 5,
     currentPricingInfo: twitterXScraperPricing,
-    stats: {
-        totalBuilds: 1,
-        totalRuns: 1,
-        totalUsers: 2400,
-        totalUsers30Days: 177,
-        actorReviewCount: 5,
-        actorReviewRating: 3.4,
-    },
+    stats: { totalUsers: 2400, actorReviewCount: 5, actorReviewRating: 3.4 },
 } as unknown as ActorStoreList;
 
 describe('formatPricing()', () => {
-    it('formats PAY_PER_EVENT with a single event', () => {
+    it('renders the primary event through the server pricing: own price plus the Store price (#905)', () => {
+        // FREE user pays $0.005 per tweet; the Store advertises the GOLD price, $0.25 / 1,000.
+        expect(formatPricing(formatActorForWidget(twitterXScraperStoreActor, 'FREE').currentPricingInfo)).toBe(
+            '$5.00 / 1,000 each tweet. cheaper for higher plans · from $0.25 on paid plans',
+        );
+        // GOLD user already pays the advertised price: no hint.
+        expect(formatPricing(formatActorForWidget(twitterXScraperStoreActor, 'GOLD').currentPricingInfo)).toBe(
+            '$0.25 / 1,000 each tweet. cheaper for higher plans',
+        );
+    });
+
+    it('quotes repeatable events per 1,000, like the Store, whatever the unit price', () => {
+        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Result', priceUsd: 0.00025 }] })).toBe(
+            '$0.25 / 1,000 results',
+        );
+        expect(
+            formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Competitor analysis', priceUsd: 0.05 }] }),
+        ).toBe('$50.00 / 1,000 competitor analyses');
+    });
+
+    it('quotes one-time events per run', () => {
         expect(
             formatPricing({
                 model: 'PAY_PER_EVENT',
-                events: [{ title: 'Result', priceUsd: 0.00025 }],
+                events: [{ title: 'Actor start', priceUsd: 0.0005, isOneTimeEvent: true, paidPlanPriceUsd: 0.0004 }],
             }),
-        ).toBe('$0.25 / 1,000 results');
+        ).toBe('$0.0005 per run · from $0.0004 on paid plans');
     });
 
-    it('uses the event flagged isPrimaryEvent when an actor has multiple charge events', () => {
-        // The Store pluralizes the last word of the title; "plans" is already plural.
+    it('keeps sub-cent per-1,000 prices precise instead of rounding to $0.00', () => {
+        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Review', priceUsd: 0.0000945 }] })).toBe(
+            '$0.0945 / 1,000 reviews',
+        );
+    });
+
+    it('uses the event flagged isPrimaryEvent when an Actor has several events', () => {
         expect(
             formatPricing({
                 model: 'PAY_PER_EVENT',
                 events: [
-                    { title: 'Actor start', priceUsd: 0.0004 },
-                    { title: 'Each tweet. Cheaper for higher plans', priceUsd: 0.00025, isPrimaryEvent: true },
+                    { title: 'Actor start', priceUsd: 0.0004, isOneTimeEvent: true },
+                    {
+                        title: 'Each tweet. Cheaper for higher plans',
+                        priceUsd: 0.005,
+                        isPrimaryEvent: true,
+                        paidPlanPriceUsd: 0.00025,
+                    },
                 ],
             }),
-        ).toBe('$0.25 / 1,000 each tweet. cheaper for higher plans');
+        ).toBe('$5.00 / 1,000 each tweet. cheaper for higher plans · from $0.25 on paid plans');
     });
 
-    it('falls back to Pay per event when multi-event PPE has no primary event', () => {
+    it('falls back to Pay per event without a primary event, events, or a price', () => {
         expect(
             formatPricing({
                 model: 'PAY_PER_EVENT',
@@ -101,265 +118,40 @@ describe('formatPricing()', () => {
                 ],
             }),
         ).toBe('Pay per event');
-    });
-
-    it('falls back to Pay per event when there are no events', () => {
         expect(formatPricing({ model: 'PAY_PER_EVENT', events: [] })).toBe('Pay per event');
         expect(formatPricing({ model: 'PAY_PER_EVENT' })).toBe('Pay per event');
+        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Result' }] })).toBe('Pay per event');
     });
 
-    it("shows the user's own price plus the Store's paid-plan price for a multi-event Actor (#905)", () => {
-        // FREE user pays $0.005 per tweet; the Store page advertises "from $0.25" (GOLD).
-        expect(formatPricing(formatActorForWidget(twitterXScraperStoreActor, 'FREE').currentPricingInfo)).toBe(
-            '$5.00 / 1,000 each tweet. cheaper for higher plans · from $0.25 on paid plans',
-        );
-        // GOLD user already pays the advertised price — no hint.
-        expect(formatPricing(formatActorForWidget(twitterXScraperStoreActor, 'GOLD').currentPricingInfo)).toBe(
-            '$0.25 / 1,000 each tweet. cheaper for higher plans',
+    it('renders a $0 price as $0.00', () => {
+        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Result', priceUsd: 0 }] })).toBe(
+            '$0.00 / 1,000 results',
         );
     });
 
-    it('hints the GOLD tier, not the cheapest tier, as the paid-plan price (#905)', () => {
-        // compass/crawler-google-places real tiers. DIAMOND is $0.76 / 1,000, yet the Store
-        // badge shows "from $1.50 / 1,000 scraped places" — GOLD is the best tier listed on
-        // apify.com/pricing; PLATINUM/DIAMOND are enterprise-only and never shown.
-        const price = formatPricing({
-            model: 'PAY_PER_EVENT',
-            events: [
-                {
-                    title: 'Scraped place',
-                    tieredPricing: [
-                        { tier: 'FREE', priceUsd: 0.004 },
-                        { tier: 'BRONZE', priceUsd: 0.003 },
-                        { tier: 'SILVER', priceUsd: 0.002 },
-                        { tier: 'GOLD', priceUsd: 0.0015 },
-                        { tier: 'PLATINUM', priceUsd: 0.00126 },
-                        { tier: 'DIAMOND', priceUsd: 0.000756 },
-                    ],
-                },
-            ],
-        });
-
-        expect(price).toBe('$4.00 / 1,000 scraped places · from $1.50 on paid plans');
-    });
-
-    it('omits the paid-plan hint when the user already pays GOLD or less', () => {
-        // apify/instagram-scraper real tiers. Store badge: "from $1.50 / 1,000 results".
-        const instagram = {
-            title: 'Result',
-            tieredPricing: [
-                { tier: 'FREE', priceUsd: 0.0027 },
-                { tier: 'BRONZE', priceUsd: 0.0023 },
-                { tier: 'SILVER', priceUsd: 0.0019 },
-                { tier: 'GOLD', priceUsd: 0.0015 },
-                { tier: 'PLATINUM', priceUsd: 0.0009 },
-                { tier: 'DIAMOND', priceUsd: 0.0005 },
-            ],
-        };
-
-        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [instagram] })).toBe(
-            '$2.70 / 1,000 results · from $1.50 on paid plans',
-        );
-        expect(formatPricing({ model: 'PAY_PER_EVENT', userTier: 'GOLD', events: [instagram] })).toBe(
-            '$1.50 / 1,000 results',
-        );
-        expect(formatPricing({ model: 'PAY_PER_EVENT', userTier: 'DIAMOND', events: [instagram] })).toBe(
-            '$0.50 / 1,000 results',
-        );
-    });
-
-    it('hints GOLD for a multi-event Actor whose GOLD price is above its cheapest tier', () => {
-        // xtdata/tiktok-user-information-scraper real tiers (from the live widget payload).
-        // Store badge: "from $6.80 / 1,000 user queries" — GOLD, not the $6.00 DIAMOND tier.
-        const price = formatPricing({
-            model: 'PAY_PER_EVENT',
-            events: [
-                {
-                    title: 'Actor Start',
-                    tieredPricing: [
-                        { tier: 'FREE', priceUsd: 0.006 },
-                        { tier: 'BRONZE', priceUsd: 0.0056 },
-                        { tier: 'SILVER', priceUsd: 0.0052 },
-                        { tier: 'GOLD', priceUsd: 0.0048 },
-                        { tier: 'PLATINUM', priceUsd: 0.0044 },
-                        { tier: 'DIAMOND', priceUsd: 0.004 },
-                    ],
-                },
-                {
-                    title: 'User query',
-                    isPrimaryEvent: true,
-                    tieredPricing: [
-                        { tier: 'FREE', priceUsd: 0.008 },
-                        { tier: 'BRONZE', priceUsd: 0.0076 },
-                        { tier: 'SILVER', priceUsd: 0.0072 },
-                        { tier: 'GOLD', priceUsd: 0.0068 },
-                        { tier: 'PLATINUM', priceUsd: 0.0064 },
-                        { tier: 'DIAMOND', priceUsd: 0.006 },
-                    ],
-                },
-            ],
-        });
-
-        expect(price).toBe('$8.00 / 1,000 user queries · from $6.80 on paid plans');
-    });
-
-    it('hints the cheapest paid tier when GOLD is missing', () => {
-        const price = formatPricing({
-            model: 'PAY_PER_EVENT',
-            events: [
-                {
-                    title: 'Result',
-                    tieredPricing: [
-                        { tier: 'FREE', priceUsd: 0.004 },
-                        { tier: 'BRONZE', priceUsd: 0.003 },
-                        { tier: 'SILVER', priceUsd: 0.002 },
-                    ],
-                },
-            ],
-        });
-
-        expect(price).toBe('$4.00 / 1,000 results · from $2.00 on paid plans');
-    });
-
-    it('falls back to the FREE tier when the user tier is not in the matrix', () => {
-        // Mirrors the server's resolveTier(): user tier → FREE → first entry.
-        const price = formatPricing({
-            model: 'PAY_PER_EVENT',
-            userTier: 'SILVER',
-            events: [
-                {
-                    title: 'Result',
-                    tieredPricing: [
-                        { tier: 'FREE', priceUsd: 0.004 },
-                        { tier: 'GOLD', priceUsd: 0.0015 },
-                    ],
-                },
-            ],
-        });
-
-        expect(price).toBe('$4.00 / 1,000 results · from $1.50 on paid plans');
-    });
-
-    it('applies the same tier rule to tiered PRICE_PER_DATASET_ITEM', () => {
-        const price = formatPricing({
-            model: 'PRICE_PER_DATASET_ITEM',
-            unitName: 'result',
-            pricePerUnit: 0.004,
-            tieredPricing: [
-                { tier: 'FREE', pricePerUnit: 0.004 },
-                { tier: 'GOLD', pricePerUnit: 0.0015 },
-                { tier: 'DIAMOND', pricePerUnit: 0.0005 },
-            ],
-        });
-
-        expect(price).toBe('$4.00 / 1,000 results · from $1.50 on paid plans');
-    });
-
-    it('applies the same tier rule to tiered FLAT_PRICE_PER_MONTH instead of the un-resolved base price', () => {
-        // Complete mode carries the base `pricePerUnit` (30) untouched; the badge must resolve the tier.
-        const price = formatPricing({
-            model: 'FLAT_PRICE_PER_MONTH',
-            pricePerUnit: 30,
-            trialMinutes: 0,
-            tieredPricing: [
-                { tier: 'FREE', pricePerUnit: 30 },
-                { tier: 'GOLD', pricePerUnit: 20 },
-            ],
-        });
-
-        expect(price).toBe('$30.00/month + usage · from $20.00 on paid plans');
-    });
-
-    it('falls back to the flat price when the tier matrix is empty', () => {
-        expect(
-            formatPricing({
-                model: 'PAY_PER_EVENT',
-                events: [{ title: 'Result', priceUsd: 0.002, tieredPricing: [] }],
-            }),
-        ).toBe('$2.00 / 1,000 results');
+    it('formats PRICE_PER_DATASET_ITEM per 1,000 with the paid-plan hint when the server sets one', () => {
         expect(
             formatPricing({
                 model: 'PRICE_PER_DATASET_ITEM',
                 unitName: 'result',
-                pricePerUnit: 0.002,
-                tieredPricing: [],
+                pricePerUnit: 0.004,
+                paidPlanPricePerUnit: 0.0015,
             }),
-        ).toBe('$2.00 / 1,000 results');
-        expect(formatPricing({ model: 'FLAT_PRICE_PER_MONTH', pricePerUnit: 30, tieredPricing: [] })).toBe(
-            '$30.00/month + usage',
-        );
-    });
-
-    it('falls back to the flat price when no paid tier exists', () => {
-        expect(
-            formatPricing({
-                model: 'PAY_PER_EVENT',
-                events: [{ title: 'Result', priceUsd: 0.002, tieredPricing: [{ tier: 'FREE', priceUsd: 0.002 }] }],
-            }),
-        ).toBe('$2.00 / 1,000 results');
-    });
-
-    it('renders a $0 tier as the real price instead of falling back to the base price', () => {
-        // Free for FREE users, paid on GOLD. The un-resolved base price (0.03) must not leak through.
-        expect(
-            formatPricing({
-                model: 'PRICE_PER_DATASET_ITEM',
-                unitName: 'result',
-                pricePerUnit: 0.03,
-                tieredPricing: [
-                    { tier: 'FREE', pricePerUnit: 0 },
-                    { tier: 'GOLD', pricePerUnit: 0.0015 },
-                ],
-            }),
-        ).toBe('$0.00 / 1,000 results');
-        expect(
-            formatPricing({
-                model: 'PAY_PER_EVENT',
-                events: [{ title: 'Result', tieredPricing: [{ tier: 'FREE', priceUsd: 0 }] }],
-            }),
-        ).toBe('$0.00 / 1,000 results');
-    });
-
-    it('falls back to the first tier when neither the user tier nor FREE is in the matrix', () => {
-        const price = formatPricing({
-            model: 'PAY_PER_EVENT',
-            userTier: 'SILVER',
-            events: [
-                {
-                    title: 'Result',
-                    tieredPricing: [
-                        { tier: 'BRONZE', priceUsd: 0.003 },
-                        { tier: 'GOLD', priceUsd: 0.0015 },
-                    ],
-                },
-            ],
-        });
-
-        expect(price).toBe('$3.00 / 1,000 results · from $1.50 on paid plans');
-    });
-
-    it('prices an event at or above $0.01 per event, never per 1,000', () => {
-        const analysis = { title: 'Competitor analysis', priceUsd: 0.05 };
-
-        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [analysis] })).toBe('$0.05 / competitor analysis');
-        expect(
-            formatPricing({
-                model: 'PAY_PER_EVENT',
-                events: [
-                    { title: 'Actor start', priceUsd: 0.0001 },
-                    { ...analysis, isPrimaryEvent: true },
-                ],
-            }),
-        ).toBe('$0.05 / competitor analysis');
-    });
-
-    it('formats PRICE_PER_DATASET_ITEM without tiers from the base price, without "from"', () => {
+        ).toBe('$4.00 / 1,000 results · from $1.50 on paid plans');
         expect(formatPricing({ model: 'PRICE_PER_DATASET_ITEM', unitName: 'page', pricePerUnit: 0.002 })).toBe(
             '$2.00 / 1,000 pages',
         );
     });
 
-    it('formats FLAT_PRICE_PER_MONTH without tiers from the base price', () => {
+    it('formats FLAT_PRICE_PER_MONTH with the paid-plan hint when the server sets one', () => {
+        expect(
+            formatPricing({
+                model: 'FLAT_PRICE_PER_MONTH',
+                pricePerUnit: 30,
+                trialMinutes: 0,
+                paidPlanPricePerUnit: 20,
+            }),
+        ).toBe('$30.00/month + usage · from $20.00 on paid plans');
         expect(formatPricing({ model: 'FLAT_PRICE_PER_MONTH', pricePerUnit: 30 })).toBe('$30.00/month + usage');
     });
 });
