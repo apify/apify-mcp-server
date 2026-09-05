@@ -194,6 +194,16 @@ export function makeTask(options: McpAgentTaskOptions) {
         const item = parseMcpAgentItem(rawItem);
 
         try {
+            // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
+            // "agent" items; this task only runs those, so a missing expectedOutput here is
+            // a caller bug. Checked before the agent run so a kind: "selection" item (not
+            // executed until #260) fails fast instead of spending an agent conversation it
+            // cannot be scored on.
+            if (item.expectedOutput === undefined) {
+                throw new Error(
+                    `kind "${item.metadata.kind}" item has no expectedOutput; this task only runs agent items`,
+                );
+            }
             const runOptions = {
                 prompt: item.input.query,
                 model: agentModel,
@@ -249,14 +259,6 @@ export function makeTask(options: McpAgentTaskOptions) {
             }
 
             const { conversation, transcript } = adapted;
-            // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
-            // "agent" items; this task does not run kind: "selection" items (no conversation
-            // to have here), so a missing expectedOutput at this point is a caller bug.
-            if (item.expectedOutput === undefined) {
-                throw new Error(
-                    `kind "${item.metadata.kind}" item has no expectedOutput; this task only runs agent items`,
-                );
-            }
             const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
 
             // Server tools only: a failed Claude Code built-in (Bash, WebFetch) says nothing

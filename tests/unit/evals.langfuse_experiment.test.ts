@@ -200,6 +200,18 @@ describe('makeTask()', () => {
             toolErrors: [{ tool: 'create-actor-task', error: 'name taken' }],
         });
     });
+
+    it('rejects a kind: selection item without spending an agent run', async () => {
+        const item = makeItem({
+            expectedOutput: undefined,
+            metadata: { category: 'search', kind: 'selection', tier: ['full'], expectedTools: ['search-actors'] },
+        });
+
+        await expect(makeMcpAgentTask()(item)).rejects.toThrow(
+            'Item "search-001": kind "selection" item has no expectedOutput; this task only runs agent items',
+        );
+        expect(mocks.runAgentConversation).not.toHaveBeenCalled();
+    });
 });
 
 describe('buildRunSummary()', () => {

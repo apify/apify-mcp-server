@@ -4,7 +4,7 @@ import {
     buildMigratedItem,
     deriveNewId,
     EXPECTED_ERRORS_BY_NEW_ID,
-    expectedErrorsForId,
+    getExpectedErrorsForId,
     findIdCollisions,
     parseLegacyMcpAgentItem,
     SOURCE_DATASETS,
@@ -34,20 +34,20 @@ describe('deriveNewId()', () => {
     });
 });
 
-describe('expectedErrorsForId()', () => {
+describe('getExpectedErrorsForId()', () => {
     it('returns the hardcoded tool list for each of the 8 known error item ids', () => {
-        expect(expectedErrorsForId('tasks/get-not-found')).toEqual(['get-actor-task']);
-        expect(expectedErrorsForId('tasks/create-collision')).toEqual(['create-actor-task']);
-        expect(expectedErrorsForId('tasks/publish-discovery')).toEqual(['publish-actor-task']);
-        expect(expectedErrorsForId('web-fetch/unsupported-protocol')).toEqual(['apify--web-fetch']);
-        expect(expectedErrorsForId('web-fetch/format-discovery')).toEqual(['apify--web-fetch']);
-        expect(expectedErrorsForId('web-fetch/unreachable')).toEqual(['apify--web-fetch']);
-        expect(expectedErrorsForId('web-selection/rag-blocked')).toEqual(['apify--rag-web-browser']);
-        expect(expectedErrorsForId('web-selection/blocked-native')).toEqual(['apify--rag-web-browser']);
+        expect(getExpectedErrorsForId('tasks/get-not-found')).toEqual(['get-actor-task']);
+        expect(getExpectedErrorsForId('tasks/create-collision')).toEqual(['create-actor-task']);
+        expect(getExpectedErrorsForId('tasks/publish-discovery')).toEqual(['publish-actor-task']);
+        expect(getExpectedErrorsForId('web-fetch/unsupported-protocol')).toEqual(['apify--web-fetch']);
+        expect(getExpectedErrorsForId('web-fetch/format-discovery')).toEqual(['apify--web-fetch']);
+        expect(getExpectedErrorsForId('web-fetch/unreachable')).toEqual(['apify--web-fetch']);
+        expect(getExpectedErrorsForId('web-selection/rag-blocked')).toEqual(['apify--rag-web-browser']);
+        expect(getExpectedErrorsForId('web-selection/blocked-native')).toEqual(['apify--rag-web-browser']);
     });
 
     it('returns undefined for an id with no known expected error', () => {
-        expect(expectedErrorsForId('tasks/create-explicit-1')).toBeUndefined();
+        expect(getExpectedErrorsForId('tasks/create-explicit-1')).toBeUndefined();
     });
 
     it('has exactly 8 entries, matching the migration plan', () => {

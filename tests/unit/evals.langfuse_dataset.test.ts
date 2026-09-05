@@ -61,6 +61,10 @@ describe('parseMcpAgentItem()', () => {
         expect(() => parseMcpAgentItem({ ...item, input: { query: '' } })).toThrow(/not a usable MCP agent test case/);
     });
 
+    it('throws when expectedOutput is an empty string', () => {
+        expect(() => parseMcpAgentItem({ ...item, expectedOutput: '' })).toThrow(/not a usable MCP agent test case/);
+    });
+
     it('reports an unknown id when the item is not an object', () => {
         expect(() => parseMcpAgentItem(null)).toThrow(/Dataset item "\(unknown\)"/);
     });

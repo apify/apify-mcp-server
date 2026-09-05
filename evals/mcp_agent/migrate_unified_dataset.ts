@@ -89,7 +89,7 @@ export const EXPECTED_ERRORS_BY_NEW_ID: Readonly<Record<string, readonly string[
 };
 
 /** Tool names this item's zero-tool-error gate must exempt, or undefined for a clean item. */
-export function expectedErrorsForId(newId: string): string[] | undefined {
+export function getExpectedErrorsForId(newId: string): string[] | undefined {
     const errors = EXPECTED_ERRORS_BY_NEW_ID[newId];
     return errors ? [...errors] : undefined;
 }
@@ -162,7 +162,7 @@ export type MigratedItemPlan = {
 /** Map one legacy item onto its migrated shape: kind: agent, tier: [full], new id. */
 export function buildMigratedItem(sourceDataset: string, family: string, item: LegacyMcpAgentItem): MigratedItemPlan {
     const id = deriveNewId(family, item.id);
-    const expectedErrors = expectedErrorsForId(id);
+    const expectedErrors = getExpectedErrorsForId(id);
     return {
         id,
         sourceDataset,

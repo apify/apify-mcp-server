@@ -50,8 +50,10 @@ Every item is `mcp-server-evals`, no per-family or per-suite dataset split. Each
 `metadata` says what it is and when it runs:
 
 - `kind`: `"agent"` (a multi-turn conversation, judged) or `"selection"` (a single-turn tool
-  pick, no judge — not yet executed by this runner; lands with #260). Every item in
-  `mcp-server-evals` today is `kind: "agent"`.
+  pick, no judge — not yet executed by this runner; lands with #260). A `kind: "selection"`
+  item is rejected before any agent run starts, so adding one ahead of #260 fails fast
+  instead of spending an agent conversation on it. Every item in `mcp-server-evals` today is
+  `kind: "agent"`.
 - `tier`: `["pr"]`, `["full"]`, or both — which run(s) include the item. Everything migrated
   so far is `tier: ["full"]`.
 - `expectedErrors` (optional): tool names allowed to fail on this item without failing the
