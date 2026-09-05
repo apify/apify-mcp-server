@@ -1,17 +1,22 @@
 # Reference: commands, shapes, probes
 
-Repo: `apify-mcp-server`. Harness docs: `evals/mcp_agent/README.md` (read it first; it documents the two-suite doctrine, scores, and flags).
+Repo: `apify-mcp-server`. Harness docs: `evals/mcp_agent/README.md` (read it first; it documents the dataset, id scheme, `kind`/`tier`/`expectedErrors`, scores, and flags).
 
 ## Running evals
 
 ```bash
-# Proper suite: strict gate (judge PASS and tool_errors == 0)
-pnpm run evals:mcp-agent --dataset <family>-evals --agent-model claude-opus-5 --subscription
+# The default dataset, mcp-server-evals; strict gate (judge PASS and tool_errors == 0)
+pnpm run evals:mcp-agent --agent-model claude-opus-5 --subscription
 
-# Error suite: drops only the zero-error condition
-pnpm run evals:mcp-agent --dataset <family>-evals-errors --allow-tool-errors --agent-model <m> --subscription
+# One family, by its id prefix
+pnpm run evals:mcp-agent --id '^<family>/' --agent-model claude-opus-5 --subscription
 
-# Narrow: --id '<regex>' or --category <name>; --concurrency N; --tool-timeout secs
+# A case with metadata.expectedErrors: until #260, the runner doesn't consume that field yet,
+# so a plain run fails it on the zero-tool-error gate. --allow-tool-errors works around that
+# for now, but tolerates ANY tool failing on the run, not just the named one.
+pnpm run evals:mcp-agent --id '<case-id>' --allow-tool-errors --agent-model <m> --subscription
+
+# Narrow further: --category <name>; --concurrency N; --tool-timeout secs
 ```
 
 - `--subscription` deletes `ANTHROPIC_API_KEY` from the process env so the Agent SDK's Claude Code subprocess uses the local login. Without it the run bills the API key.
@@ -24,17 +29,20 @@ pnpm run evals:mcp-agent --dataset <family>-evals-errors --allow-tool-errors --a
 
 ```json
 {
-  "datasetName": "<family>-evals",
-  "id": "<family>-<tool>-<difficulty>-1",
+  "datasetName": "mcp-server-evals",
+  "id": "<family>/<tool>-<difficulty>-1",
   "input": { "query": "<user-language prompt, no tool names>" },
   "expectedOutput": "PASS only if <tool> was called with <args> and the final answer states <fact>. FAIL if <specific bad behavior>.",
-  "metadata": { "category": "<tool-or-chain>", "maxTurns": 10, "tools": ["<family>", "actors"] }
+  "metadata": { "category": "<tool-or-chain>", "kind": "agent", "tier": ["full"], "maxTurns": 10, "tools": ["<family>", "actors"] }
 }
 ```
 
-- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `maxTurns`, `tools`, `failTools`.
-- `category` = tool under test (what `--category` filters); difficulty goes in the id.
-- Items upsert on `id`. Ids are **project-unique forever**, across datasets, even after archive/delete-and-recreate elsewhere. Retire a case by upserting `"status": "ARCHIVED"`.
+- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `tier`, `expectedTools`, `expectedErrors`, `maxTurns`, `tools`, `failTools`.
+- `category` = tool under test (what `--category` filters); difficulty goes in the id's `<slug>` half.
+- `kind: "agent"` requires `expectedOutput`; `kind: "selection"` (not yet run by this harness, #260) requires a non-empty `expectedTools` instead and has no `expectedOutput`.
+- A case that provokes an error on purpose sets `expectedErrors: ["<tool-name>", ...]` — the tool(s) allowed to fail on that item.
+- The id is `<family>/<slug>`: `<family>` is the coarse dataset-migration category (`mcp-agent`, `tasks`, `web-fetch`, `web-selection`), distinct from the fine-grained `metadata.category` above. Filter one family with `--id '^<family>/'`.
+- Items upsert on `id`. Ids are **project-unique forever**, even after archive/delete-and-recreate elsewhere. Retire a case by upserting `"status": "ARCHIVED"`.
 - `maxTurns` guide: single tool 6–8, create+verify 10, chains 12–18. Budget for the longest path the reference permits (explore → decline → fallback), not the happy path; Actor-run cases need headroom for a poll cycle when the run outlives the wait cap.
 
 ## Langfuse environment
@@ -61,8 +69,7 @@ cd /tmp && export $(grep -E '^LANGFUSE' <repo>/.env | xargs) && export LANGFUSE_
 ```
 
 ```bash
-npx -y langfuse-cli api datasets list --json                # check what exists before creating
-npx -y langfuse-cli api datasets create --body-json '{"name":"<family>-evals","description":"..."}'
+npx -y langfuse-cli api datasets list --json                # mcp-server-evals already exists; no need to create it
 jq -c '.[0]' items.json | npx -y langfuse-cli api dataset-items create --body-file -   # create = UPSERT on id: iterate on a case by re-posting the same id
 npx -y langfuse-cli api dataset-items get <id>
 npx -y langfuse-cli api dataset-items delete <id>          # irreversible, frees nothing (id stays burned) — archive instead (status: "ARCHIVED")
@@ -81,7 +88,7 @@ npx -y langfuse-cli api experiment-items list \
       + ([$o.transcript[] | to_entries[] | "  " + .key + ": " + (.value | tostring | .[0:300])] | join("\n"))'
 ```
 
-Sweep for unexpected errors after a run (proper-suite runs must contribute zero rows):
+Sweep for unexpected errors after a run (a run with no `expectedErrors` items must contribute zero rows):
 
 ```bash
 npx -y langfuse-cli api observations list --level ERROR \
@@ -91,8 +98,7 @@ npx -y langfuse-cli api observations list --level ERROR \
 ## Snapshot to git (after every dataset edit)
 
 ```bash
-pnpm run evals:mcp-agent:export-dataset --dataset <family>-evals          # dataset_snapshot_<name>.json
-pnpm run evals:mcp-agent:export-dataset --dataset <family>-evals-errors
+pnpm run evals:mcp-agent:export-dataset   # writes dataset_snapshot_mcp-server-evals.json, committed
 ```
 
 ## API probe pattern (before writing platform-dependent cases)
@@ -112,7 +118,7 @@ One script per stateful family (`evals/mcp_agent/tasks_fixtures.ts` is the templ
 
 ## Coverage matrix (definition of done for the dataset)
 
-For each tool: at least one dedicated case, plus every argument group exercised somewhere (create: input/name/config; get: found + not-found; update: each independently updatable group; lifecycle tools: happy path in proper suite, requirement-discovery in error suite). A tool exercised only as the tail of another case (like unpublish) is acceptable if a dedicated case would duplicate an existing one — say so explicitly when reporting coverage.
+For each tool: at least one dedicated case, plus every argument group exercised somewhere (create: input/name/config; get: found + not-found; update: each independently updatable group; lifecycle tools: a clean happy-path case plus a requirement-discovery case with `expectedErrors` set). A tool exercised only as the tail of another case (like unpublish) is acceptable if a dedicated case would duplicate an existing one — say so explicitly when reporting coverage.
 
 ## Fixing tools from findings (order of preference)
 

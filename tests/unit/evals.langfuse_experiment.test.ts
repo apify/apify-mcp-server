@@ -109,7 +109,7 @@ describe('makeTask()', () => {
         id: 'search-001',
         input: { query: 'q' },
         expectedOutput: 'r',
-        metadata: { category: 'search' },
+        metadata: { category: 'search', kind: 'agent', tier: ['full'] },
         ...overrides,
     });
 
@@ -191,7 +191,9 @@ describe('makeTask()', () => {
                 { name: 'Bash', isMcpTool: false, result: { success: false, error: 'exit status 1' } },
             ],
         });
-        const item = makeItem({ metadata: { category: 'search', failTools: ['call-actor'] } });
+        const item = makeItem({
+            metadata: { category: 'search', kind: 'agent', tier: ['full'], failTools: ['call-actor'] },
+        });
 
         // First line only: the full text already sits on the tool span, so nothing re-uploads it.
         await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({

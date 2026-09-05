@@ -10,7 +10,7 @@ import type { LangfuseClient } from '@langfuse/client';
 import { z } from 'zod';
 
 /** Name of the Langfuse dataset holding the MCP agent test cases. */
-export const MCP_AGENT_DATASET_NAME = 'mcp-agent-evals';
+export const MCP_AGENT_DATASET_NAME = 'mcp-server-evals';
 
 /** Item shape returned by the client, derived so we don't depend on @langfuse/core. */
 export type DatasetItem = Awaited<ReturnType<LangfuseClient['dataset']['get']>>['items'][number];
@@ -24,6 +24,14 @@ export type DatasetItem = Awaited<ReturnType<LangfuseClient['dataset']['get']>>[
 const McpAgentMetadataValidator = z.strictObject({
     /** Grouping key, e.g. "search-actors". What `--category` matches on. */
     category: z.string().min(1),
+    /** What this item measures: a single-turn tool pick, or a full judged conversation. */
+    kind: z.enum(['selection', 'agent']),
+    /** When this item runs: a fast PR-gating set, the full set, or both. */
+    tier: z.array(z.enum(['pr', 'full'])).min(1),
+    /** `kind: "selection"` only: tool names the first tool call must match. */
+    expectedTools: z.array(z.string()).optional(),
+    /** Tool names allowed to fail on this item without failing the zero-tool-error gate. */
+    expectedErrors: z.array(z.string()).optional(),
     /** Defaults to the config value */
     maxTurns: z.number().int().positive().optional(),
     /** Tools to enable, e.g. ["actors", "docs", "apify/rag-web-browser"] */
@@ -32,12 +40,30 @@ const McpAgentMetadataValidator = z.strictObject({
     failTools: z.array(z.string()).optional(),
 });
 
-const McpAgentItemValidator = z.object({
-    id: z.string().min(1),
-    input: z.object({ query: z.string().min(1) }),
-    expectedOutput: z.string().min(1),
-    metadata: McpAgentMetadataValidator,
-});
+const McpAgentItemValidator = z
+    .object({
+        id: z.string().min(1),
+        input: z.object({ query: z.string().min(1) }),
+        /** Required for `kind: "agent"` (the judge's reference); absent for `kind: "selection"`. */
+        expectedOutput: z.string().min(1).optional(),
+        metadata: McpAgentMetadataValidator,
+    })
+    .superRefine((item, ctx) => {
+        if (item.metadata.kind === 'selection' && (item.metadata.expectedTools?.length ?? 0) === 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'metadata.kind "selection" requires a non-empty "expectedTools" array',
+                path: ['metadata', 'expectedTools'],
+            });
+        }
+        if (item.metadata.kind === 'agent' && !item.expectedOutput) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'metadata.kind "agent" requires a non-empty "expectedOutput"',
+                path: ['expectedOutput'],
+            });
+        }
+    });
 
 /** The parts of a dataset item a run reads. */
 export type McpAgentItem = z.infer<typeof McpAgentItemValidator>;
@@ -46,7 +72,8 @@ export type McpAgentItem = z.infer<typeof McpAgentItemValidator>;
 export type McpAgentTestCase = z.infer<typeof McpAgentMetadataValidator> & {
     id: string;
     query: string;
-    reference: string;
+    /** Absent for `kind: "selection"`, which nothing executes and no judge scores. */
+    reference?: string;
 };
 
 /** A dataset item plus its flat view, so the shared filter helpers apply directly. */
@@ -74,8 +101,12 @@ export function toMcpAgentTestCase(item: unknown): McpAgentTestCase {
     return {
         id,
         category: metadata.category,
+        kind: metadata.kind,
+        tier: metadata.tier,
         query: input.query,
-        reference: expectedOutput,
+        ...(expectedOutput !== undefined && { reference: expectedOutput }),
+        ...(metadata.expectedTools !== undefined && { expectedTools: metadata.expectedTools }),
+        ...(metadata.expectedErrors !== undefined && { expectedErrors: metadata.expectedErrors }),
         ...(metadata.maxTurns !== undefined && { maxTurns: metadata.maxTurns }),
         ...(metadata.tools !== undefined && { tools: metadata.tools }),
         ...(metadata.failTools !== undefined && { failTools: metadata.failTools }),
