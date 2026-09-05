@@ -32,6 +32,19 @@ describe('Widget Utils', () => {
         });
     });
 
+    describe('WIDGET_REGISTRY metadata placement', () => {
+        // MCP Apps spec (SEP-1865): csp/prefersBorder belong to the UI resource's _meta.ui
+        // (McpUiResourceMeta); the tool's _meta.ui (McpUiToolMeta) carries only
+        // resourceUri/visibility and types csp/permissions as `never` — hosts ignore them there.
+        it.each(Object.entries(WIDGET_REGISTRY))('keeps %s ui fields on their own surface', (uri, config) => {
+            expect(config.meta.ui).toStrictEqual({ resourceUri: uri, visibility: ['model', 'app'] });
+            expect(config.resourceMeta.ui.csp).toBeDefined();
+            expect(config.resourceMeta.ui.prefersBorder).toBe(true);
+            expect(config.resourceMeta.ui).not.toHaveProperty('resourceUri');
+            expect(config.resourceMeta.ui).not.toHaveProperty('visibility');
+        });
+    });
+
     describe('resolveAvailableWidgets', () => {
         it('should correctly identify existing and missing widgets', async () => {
             const fs = await import('node:fs');
