@@ -21,6 +21,11 @@
  * Idempotent: upserting is by id, so re-running after a partial failure only re-applies the
  * same content, never duplicates.
  *
+ * Already run (2026-09-05): the legacy datasets are archived. `validateMigration`'s checks
+ * assert the whole `mcp-server-evals` dataset equals the migration plan, which predates the
+ * `kind: "selection", tier: ["pr"]` items #260 added afterward - a re-run today stops at
+ * validation by design, not by regression.
+ *
  * Usage:
  *   pnpm run evals:mcp-agent:migrate-unified-dataset -- --dry-run
  *   pnpm run evals:mcp-agent:migrate-unified-dataset

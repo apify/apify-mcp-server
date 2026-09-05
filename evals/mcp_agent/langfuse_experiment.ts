@@ -1,5 +1,6 @@
 /**
- * Experiment task, evaluators, and run gate for the Langfuse mcp-agent-evals port.
+ * Experiment task, evaluators, run summary/gate, iteration expansion, run-flag validation,
+ * and console formatting for the Langfuse mcp-agent-evals port.
  *
  * Dispatches per item on `metadata.kind`. A `kind: "agent"` item runs a fresh Claude Code
  * agent conversation (the Agent SDK spawns its own MCP server, so state is isolated per
@@ -7,6 +8,12 @@
  * item's `expectedErrors`). A `kind: "selection"` item runs the same agent under a
  * deny-all hook - nothing executes, no judge runs - and is scored on `first_tool_match`
  * alone: does the first attempted tool call match `expectedTools`/`expectedArgs`.
+ *
+ * Also owns what the CLI (`run_mcp_agent_evals.ts`) needs testable and can't test itself,
+ * since that file ends in `void main()` and cannot be imported: `expandIterations` (the
+ * `--iterations` flat `data` array), `validateIterations`/`validatePassThreshold`/
+ * `validateConcurrency` (run-flag checks), and `formatRunSummary` (the printed run summary).
+ * The CLI itself stays thin wiring over these.
  */
 
 import type { Evaluation } from '@langfuse/client';
@@ -39,7 +46,7 @@ export type McpAgentTaskOutput =
           kind: 'agent';
           /** Item id, carried here because `ExperimentItemResult.item` is typed as a union without one. */
           id: string;
-          /** `--iterations` trial index (1-based); absent when the run requested only one. */
+          /** `--iterations` trial index (1-based). Always set by the runner; `1` on a default run. */
           iteration?: number;
           judgeResult: JudgeResult;
           /** Agent tokens across the conversation; undefined when the provider never reported usage. */
@@ -52,6 +59,7 @@ export type McpAgentTaskOutput =
     | {
           kind: 'selection';
           id: string;
+          /** `--iterations` trial index (1-based). Always set by the runner; `1` on a default run. */
           iteration?: number;
           /** Whether the first attempted (non-`ToolSearch`) call matched, and why. */
           firstToolMatch: { isMatch: boolean; comment: string };
@@ -156,8 +164,12 @@ function failureReason(result: ScoredItem): string {
 }
 
 export type RunSummary = {
-    /** One entry per requested id, its trials in iteration order (1..iterations). */
-    items: { id: string; trials: { iteration: number; passed: boolean }[] }[];
+    /**
+     * One entry per requested id, its trials in iteration order (1..iterations), plus the
+     * pass@k/pass^k predicates for that item - computed once here so `formatRunSummary` and
+     * the `passAtK`/`passHatK` aggregates below always agree with what `items` itself shows.
+     */
+    items: { id: string; trials: { iteration: number; passed: boolean }[]; anyPassed: boolean; allPassed: boolean }[];
     /** Trials that passed the gate. */
     passedTrials: number;
     /** `requestedIds.length * iterations` - the fixed denominator, dropped trials included. */
@@ -226,7 +238,7 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
 
         if (anyPassed) passAtK++;
         if (allPassed) passHatK++;
-        items.push({ id, trials });
+        items.push({ id, trials, anyPassed, allPassed });
     }
 
     const requestedTrials = requestedIds.length * iterations;
@@ -271,8 +283,15 @@ export function validateIterations(value: number): void {
 
 /** `--pass-threshold` gates a rate (`passedTrials / requestedTrials`), so it must fall in [0, 1]. */
 export function validatePassThreshold(value: number): void {
-    if (value < 0 || value > 1) {
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
         throw new Error(`--pass-threshold must be between 0 and 1, got "${value}"`);
+    }
+}
+
+/** Langfuse batches items with `i += concurrency`, so 0 loops forever and NaN never starts. */
+export function validateConcurrency(value: number): void {
+    if (!Number.isInteger(value) || value < 1) {
+        throw new Error(`--concurrency must be a positive integer, got "${value}"`);
     }
 }
 
@@ -292,13 +311,11 @@ export function formatRunSummary(summary: RunSummary, passThreshold: number, ite
     if (iterations > 1) {
         for (const item of summary.items) {
             const outcomes = item.trials.map((trial) => (trial.passed ? '✅' : '❌')).join(' ');
-            const anyPassed = item.trials.some((trial) => trial.passed);
-            const allPassed = item.trials.every((trial) => trial.passed);
             lines.push({
                 stream: 'log',
                 text:
-                    `🔁 ${item.id}   ${outcomes}   pass@${iterations} ${anyPassed ? '✅' : '❌'}  ` +
-                    `pass^${iterations} ${allPassed ? '✅' : '❌'}`,
+                    `🔁 ${item.id}   ${outcomes}   pass@${iterations} ${item.anyPassed ? '✅' : '❌'}  ` +
+                    `pass^${iterations} ${item.allPassed ? '✅' : '❌'}`,
             });
         }
     }

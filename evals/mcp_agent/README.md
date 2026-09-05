@@ -441,11 +441,11 @@ holds the same fields flattened, one object per case, in this fixed key order:
 **Optional:**
 - `expectedTools` - `kind: "selection"` only, required for that kind: tool names the first attempted (non-`ToolSearch`) call must match
 - `expectedArgs` - `kind: "selection"` only: a flat object; every key in it must deep-equal the same key of the captured call's arguments, keys not listed are ignored. Omit for a name-only check
-- `expectedErrors` - `kind: "agent"` only: tool names allowed to fail on this item without failing the zero-tool-error gate (see "Selection mode" above and the "One dataset" section)
+- `expectedErrors` - `kind: "agent"` only: tool names allowed to fail on this item without failing the zero-tool-error gate (see "Selection mode" above and the "One dataset" section). Not accepted on `kind: "selection"`
 - `maxTurns` - `kind: "agent"` only: override the default (10). Not accepted on `kind: "selection"`, which is fixed at 2
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
 - `mcpToolsOnly` - Force MCP-tools-only for this item, dropping Claude Code's built-ins (OR-ed with the run-wide `--mcp-tools-only`). Useful on a selection item that must isolate MCP-vs-MCP tool choice
-- `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny (the same hook mechanism the selection-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `claude_agent.ts`.
+- `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny (the same hook mechanism the selection-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `claude_agent.ts`. Not accepted on `kind: "selection"`.
 
 ## Key insights
 

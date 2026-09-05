@@ -196,6 +196,56 @@ describe('parseMcpAgentItem()', () => {
         const bogus = { ...item, metadata: { ...item.metadata, bogusKey: true } };
         expect(() => parseMcpAgentItem(bogus)).toThrow(/bogusKey/);
     });
+
+    it('rejects expectedOutput on a kind: selection item', () => {
+        const selection = {
+            id: 'b',
+            input: { query: 'q' },
+            expectedOutput: 'judge me',
+            metadata: { category: 'search', kind: 'selection', tier: ['pr'], expectedTools: ['search-actors'] },
+        };
+        expect(() => parseMcpAgentItem(selection)).toThrow(/expectedOutput/);
+    });
+
+    it('accepts a kind: selection item with no expectedOutput (null normalized to undefined)', () => {
+        const selection = {
+            id: 'b',
+            input: { query: 'q' },
+            expectedOutput: null,
+            metadata: { category: 'search', kind: 'selection', tier: ['pr'], expectedTools: ['search-actors'] },
+        };
+        expect(() => parseMcpAgentItem(selection)).not.toThrow();
+    });
+
+    it('rejects failTools on a kind: selection item', () => {
+        const selection = {
+            id: 'b',
+            input: { query: 'q' },
+            metadata: {
+                category: 'search',
+                kind: 'selection',
+                tier: ['pr'],
+                expectedTools: ['search-actors'],
+                failTools: ['call-actor'],
+            },
+        };
+        expect(() => parseMcpAgentItem(selection)).toThrow(/failTools/);
+    });
+
+    it('rejects expectedErrors on a kind: selection item', () => {
+        const selection = {
+            id: 'b',
+            input: { query: 'q' },
+            metadata: {
+                category: 'search',
+                kind: 'selection',
+                tier: ['pr'],
+                expectedTools: ['search-actors'],
+                expectedErrors: ['call-actor'],
+            },
+        };
+        expect(() => parseMcpAgentItem(selection)).toThrow(/expectedErrors/);
+    });
 });
 
 describe('toMcpAgentTestCase()', () => {

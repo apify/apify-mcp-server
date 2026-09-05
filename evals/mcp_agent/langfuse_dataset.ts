@@ -94,6 +94,28 @@ const McpAgentItemValidator = z
                 path: ['metadata', 'maxTurns'],
             });
         }
+        if (item.metadata.kind === 'selection' && item.expectedOutput !== undefined) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                    'expectedOutput is not valid on a kind: "selection" item; nothing executes, so nothing is judged',
+                path: ['expectedOutput'],
+            });
+        }
+        if (item.metadata.kind === 'selection' && item.metadata.failTools !== undefined) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'metadata.failTools is only valid on a kind: "agent" item',
+                path: ['metadata', 'failTools'],
+            });
+        }
+        if (item.metadata.kind === 'selection' && item.metadata.expectedErrors !== undefined) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'metadata.expectedErrors is only valid on a kind: "agent" item',
+                path: ['metadata', 'expectedErrors'],
+            });
+        }
     });
 
 /** The parts of a dataset item a run reads. */

@@ -8,6 +8,7 @@ import {
     isTransientAgentError,
     makeTask,
     resolveExitCode,
+    validateConcurrency,
     validateIterations,
     validatePassThreshold,
     type McpAgentTaskOutput,
@@ -384,6 +385,26 @@ describe('makeTask()', () => {
         expect(mocks.runAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ mcpToolsOnly: true }));
     });
 
+    it('retries a kind: selection item once on a transient failure, scoring off the second attempt only', async () => {
+        mocks.runAgentConversation.mockRejectedValueOnce(new Error('Connection error.')).mockResolvedValueOnce({
+            conversation: { turns: [], totalTokens: undefined },
+            transcript: [],
+            toolInvocations: [],
+            attemptedCalls: [{ toolName: 'mcp__apify__search-actors', input: { keywords: 'tiktok' } }],
+        });
+
+        const result = await makeMcpAgentTask()(makeSelectionItem());
+
+        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
+        expect(result).toMatchObject({
+            kind: 'selection',
+            firstToolMatch: {
+                isMatch: true,
+                comment: 'search-actors({"keywords":"tiktok"}) — matched expectedTools [search-actors]',
+            },
+        });
+    });
+
     it('carries a runner-injected iteration through to the output', async () => {
         mocks.runAgentConversation.mockResolvedValue({
             conversation: { turns: [], totalTokens: 1234 },
@@ -502,6 +523,8 @@ describe('buildRunSummary()', () => {
                         { iteration: 1, passed: true },
                         { iteration: 2, passed: true },
                     ],
+                    anyPassed: true,
+                    allPassed: true,
                 },
             ]);
         });
@@ -517,6 +540,37 @@ describe('buildRunSummary()', () => {
             const summary = buildRunSummary(['a', 'b'], itemResults, 2);
             expect(summary.passAtK).toBe(2); // both items had at least one pass
             expect(summary.passHatK).toBe(1); // only "a" passed every trial
+        });
+
+        it('carries anyPassed/allPassed on each item, matching the passAtK/passHatK aggregates', () => {
+            const passFail = { judgeResult: { verdict: 'FAIL' as const, reason: 'x', rawResponse: '' } };
+            const itemResults = [
+                makeScoredAgentItem('a', 1, { iteration: 1 }),
+                makeScoredAgentItem('a', 1, { iteration: 2 }),
+                makeScoredAgentItem('b', 1, { iteration: 1 }),
+                makeScoredAgentItem('b', 0, { iteration: 2, ...passFail }),
+            ];
+            const summary = buildRunSummary(['a', 'b'], itemResults, 2);
+            expect(summary.items).toEqual([
+                {
+                    id: 'a',
+                    trials: [
+                        { iteration: 1, passed: true },
+                        { iteration: 2, passed: true },
+                    ],
+                    anyPassed: true,
+                    allPassed: true,
+                },
+                {
+                    id: 'b',
+                    trials: [
+                        { iteration: 1, passed: true },
+                        { iteration: 2, passed: false },
+                    ],
+                    anyPassed: true,
+                    allPassed: false,
+                },
+            ]);
         });
 
         it('scales the requested-trials denominator by requestedIds.length * iterations', () => {
@@ -601,16 +655,6 @@ describe('expandIterations()', () => {
         expect(data[0].metadata).toEqual({ category: 'x', iteration: 1 });
     });
 
-    it('makes exactly one call to build the flat data array, not N separate ones', () => {
-        // Pure function, called once by the CLI: one item x N iterations in a single flatMap
-        // pass, never N calls to build separate arrays that would need N experiment.run()s.
-        const items = [
-            { id: 'a', metadata: {} },
-            { id: 'b', metadata: {} },
-        ] as unknown as Parameters<typeof expandIterations>[0];
-        expect(expandIterations(items, 4)).toHaveLength(8);
-    });
-
     it('does not mutate the source item', () => {
         const source = { id: 'a', metadata: { category: 'x' } };
         const items = [source] as unknown as Parameters<typeof expandIterations>[0];
@@ -676,5 +720,23 @@ describe('validatePassThreshold()', () => {
     it('rejects values outside [0, 1]', () => {
         expect(() => validatePassThreshold(-0.1)).toThrow('--pass-threshold must be between 0 and 1, got "-0.1"');
         expect(() => validatePassThreshold(1.1)).toThrow('--pass-threshold must be between 0 and 1');
+    });
+
+    it('rejects NaN, e.g. from a typo like "--pass-threshold high"', () => {
+        expect(() => validatePassThreshold(NaN)).toThrow('--pass-threshold must be between 0 and 1, got "NaN"');
+    });
+});
+
+describe('validateConcurrency()', () => {
+    it('accepts a positive integer', () => {
+        expect(() => validateConcurrency(1)).not.toThrow();
+        expect(() => validateConcurrency(8)).not.toThrow();
+    });
+
+    it('rejects zero, negative, non-integer, and NaN values', () => {
+        expect(() => validateConcurrency(0)).toThrow('--concurrency must be a positive integer, got "0"');
+        expect(() => validateConcurrency(-1)).toThrow('--concurrency must be a positive integer');
+        expect(() => validateConcurrency(1.5)).toThrow('--concurrency must be a positive integer');
+        expect(() => validateConcurrency(NaN)).toThrow('--concurrency must be a positive integer');
     });
 });

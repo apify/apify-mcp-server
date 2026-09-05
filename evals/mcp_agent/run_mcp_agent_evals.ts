@@ -44,6 +44,7 @@ import {
     formatRunSummary,
     makeTask,
     resolveExitCode,
+    validateConcurrency,
     validateIterations,
     validatePassThreshold,
 } from './langfuse_experiment.js';
@@ -149,12 +150,9 @@ async function main() {
                 default: 1.0,
             },
         })
-        // Langfuse batches items with `i += concurrency`, so 0 loops forever and NaN never
-        // starts, reporting every item as "never completed". Reject both up front.
+        // Reject a bad run flag up front, before any LLM spend.
         .check((parsed) => {
-            if (!Number.isInteger(parsed.concurrency) || parsed.concurrency < 1) {
-                throw new Error(`--concurrency must be a positive integer, got "${parsed.concurrency}"`);
-            }
+            validateConcurrency(parsed.concurrency);
             validateIterations(parsed.iterations);
             validatePassThreshold(parsed['pass-threshold']);
             return true;

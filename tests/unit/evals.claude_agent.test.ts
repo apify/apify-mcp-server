@@ -208,6 +208,44 @@ describe('runAgentConversation()', () => {
         errorSpy.mockRestore();
     });
 
+    it('keeps only the last MAX_APPENDED_STDERR_LINES lines in the ring buffer', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        mocks.query.mockImplementation(({ options }: { options: Options }) => {
+            // 8 lines, more than the 5-line cap: only the last 5 should survive the shift.
+            for (let i = 1; i <= 8; i++) options.stderr?.(`line ${i}\n`);
+            // eslint-disable-next-line require-yield
+            return (async function* () {
+                throw new Error('Claude Code process exited with code 1');
+            })();
+        });
+
+        let caught: unknown;
+        try {
+            await runAgentConversation(baseOptions());
+        } catch (error) {
+            caught = error;
+        }
+
+        const message = caught instanceof Error ? caught.message : String(caught);
+        expect(message).toMatch(/line 4[\s\S]*line 5[\s\S]*line 6[\s\S]*line 7[\s\S]*line 8/);
+        expect(message).not.toContain('line 1');
+        expect(message).not.toContain('line 2');
+        expect(message).not.toContain('line 3');
+        vi.restoreAllMocks();
+    });
+
+    it('rethrows the original error unwrapped when the run fails with no stderr captured', async () => {
+        const originalError = new Error('Claude Code process exited with code 1');
+        mocks.query.mockImplementation(() => {
+            // eslint-disable-next-line require-yield
+            return (async function* () {
+                throw originalError;
+            })();
+        });
+
+        await expect(runAgentConversation(baseOptions())).rejects.toBe(originalError);
+    });
+
     it('appends the last stderr lines to the error thrown when the run fails', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         mocks.query.mockImplementation(({ options }: { options: Options }) => {
