@@ -11,12 +11,10 @@ pnpm run evals:mcp-agent --agent-model claude-opus-5 --subscription
 # One family, by its id prefix
 pnpm run evals:mcp-agent --id '^<family>/' --agent-model claude-opus-5 --subscription
 
-# A case with metadata.expectedErrors: until #260, the runner doesn't consume that field yet,
-# so a plain run fails it on the zero-tool-error gate. --allow-tool-errors works around that
-# for now, but tolerates ANY tool failing on the run, not just the named one.
-pnpm run evals:mcp-agent --id '<case-id>' --allow-tool-errors --agent-model <m> --subscription
+# The fast PR-gating set: kind: "selection" items tagged tier: ["pr"]
+pnpm run evals:mcp-agent --tier pr --agent-model claude-haiku-4-5 --subscription
 
-# Narrow further: --category <name>; --concurrency N; --tool-timeout secs
+# Narrow further: --category <name>; --concurrency N; --tool-timeout secs; --iterations N (pass@k/pass^k)
 ```
 
 - `--subscription` deletes `ANTHROPIC_API_KEY` from the process env so the Agent SDK's Claude Code subprocess uses the local login. Without it the run bills the API key.
@@ -37,10 +35,11 @@ pnpm run evals:mcp-agent --id '<case-id>' --allow-tool-errors --agent-model <m> 
 }
 ```
 
-- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `tier`, `expectedTools`, `expectedErrors`, `maxTurns`, `tools`, `failTools`.
+- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `tier`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
 - `category` = tool under test (what `--category` filters); difficulty goes in the id's `<slug>` half.
-- `kind: "agent"` requires `expectedOutput`; `kind: "selection"` (not yet run by this harness, #260) requires a non-empty `expectedTools` instead and has no `expectedOutput`.
-- A case that provokes an error on purpose sets `expectedErrors: ["<tool-name>", ...]` — the tool(s) allowed to fail on that item.
+- `kind: "agent"` requires `expectedOutput` (multi-turn, judged, `expectedErrors`/`failTools`/`maxTurns` apply); `kind: "selection"` requires a non-empty `expectedTools` instead, has no `expectedOutput`, and rejects `maxTurns` (fixed at 2). `expectedArgs` (optional, `kind: "selection"` only): a flat object, every key deep-equals the captured call's same key, unlisted keys ignored — use it to pin an argument the tool-name check alone would miss (e.g. a resolved vs. guessed Actor slug).
+- A `kind: "agent"` case that provokes an error on purpose sets `expectedErrors: ["<tool-name>", ...]` — the tool(s) allowed to fail on that item; there is no run-wide error-tolerance flag.
+- `mcpToolsOnly: true` on a `kind: "selection"` item drops Claude Code's built-ins for that item alone (OR-ed with the run-wide `--mcp-tools-only`) — use it when a case must isolate MCP-vs-MCP tool choice, or when the built-in's own tool-search meta-tool (`ToolSearch`) would otherwise be a false first capture.
 - The id is `<family>/<slug>`: `<family>` is the coarse dataset-migration category (`mcp-agent`, `tasks`, `web-fetch`, `web-selection`), distinct from the fine-grained `metadata.category` above. Filter one family with `--id '^<family>/'`.
 - Items upsert on `id`. Ids are **project-unique forever**, even after archive/delete-and-recreate elsewhere. Retire a case by upserting `"status": "ARCHIVED"`.
 - `maxTurns` guide: single tool 6–8, create+verify 10, chains 12–18. Budget for the longest path the reference permits (explore → decline → fallback), not the happy path; Actor-run cases need headroom for a poll cycle when the run outlives the wait cap.

@@ -16,7 +16,9 @@
  *   pnpm run evals:mcp-agent -- --concurrency 8
  *   pnpm run evals:mcp-agent -- --mcp-tools-only   # drop Claude Code's built-in tools
  *   pnpm run evals:mcp-agent -- --subscription     # bill the local Claude Code login, not the API
- *   pnpm run evals:mcp-agent -- --allow-tool-errors # until #260 lands, needed for items with expectedErrors
+ *   pnpm run evals:mcp-agent -- --tier pr           # the fast PR-gating set
+ *   pnpm run evals:mcp-agent -- --iterations 3      # 3 trials per item, pass@k / pass^k in the summary
+ *   pnpm run evals:mcp-agent -- --pass-threshold 0.9 # exit 0 while the aggregate pass rate is >= 0.9
  */
 
 // Must be the first import: config modules read process.env at load time.
@@ -34,8 +36,9 @@ import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { assertStdioBinExists } from './claude_agent.js';
 import { ClaudeLlmClient } from './claude_judge_client.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
-import { fetchMcpAgentCases, MCP_AGENT_DATASET_NAME } from './langfuse_dataset.js';
-import { buildRunSummary, countPassed, evaluators, makeTask } from './langfuse_experiment.js';
+import type { DatasetItem } from './langfuse_dataset.js';
+import { fetchMcpAgentCases, filterByTier, MCP_AGENT_DATASET_NAME } from './langfuse_dataset.js';
+import { buildRunSummary, evaluators, makeTask, resolveExitCode } from './langfuse_experiment.js';
 import { initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
 
@@ -48,6 +51,7 @@ sanitizeProcessEnv();
 type CliArgs = {
     category?: string;
     id?: string;
+    tier?: 'pr' | 'full';
     dataset: string;
     agentModel: string;
     judgeModel?: string;
@@ -56,7 +60,8 @@ type CliArgs = {
     mcpToolsOnly: boolean;
     subscription: boolean;
     claudeJudge: boolean;
-    allowToolErrors: boolean;
+    iterations: number;
+    passThreshold: number;
 };
 
 /** Current git branch, or 'unknown' if it can't be resolved. */
@@ -66,6 +71,11 @@ function getGitBranch(): string {
     } catch {
         return 'unknown';
     }
+}
+
+/** A dataset item repeated for `--iterations`, tagged with its 1-based trial index. */
+function withIteration(item: DatasetItem, iteration: number): DatasetItem {
+    return { ...item, metadata: { ...(item.metadata as Record<string, unknown> | undefined), iteration } };
 }
 
 /**
@@ -87,6 +97,11 @@ async function main() {
         .options({
             category: { type: 'string', description: 'Filter by test case category (supports * wildcard)' },
             id: { type: 'string', description: 'Run test cases whose ID matches this regex' },
+            tier: {
+                type: 'string',
+                choices: ['pr', 'full'] as const,
+                description: 'Only run items whose tier includes this value (default: all tiers)',
+            },
             dataset: {
                 type: 'string',
                 description: 'Langfuse dataset to run',
@@ -120,12 +135,15 @@ async function main() {
                     'so no OPENROUTER_API_KEY is needed. --judge-model then takes an Anthropic model ID.',
                 default: false,
             },
-            'allow-tool-errors': {
-                type: 'boolean',
-                description:
-                    'Do not fail items on failed tool calls. Only for error-handling suites ' +
-                    '(cases that provoke errors on purpose); the default gate requires zero tool errors.',
-                default: false,
+            iterations: {
+                type: 'number',
+                description: 'Repeat each selected item N times in one run; prints pass@k / pass^k',
+                default: 1,
+            },
+            'pass-threshold': {
+                type: 'number',
+                description: 'Aggregate pass rate (passed trials / requested trials) required to exit 0',
+                default: 1.0,
             },
         })
         // Langfuse batches items with `i += concurrency`, so 0 loops forever and NaN never
@@ -133,6 +151,12 @@ async function main() {
         .check((parsed) => {
             if (!Number.isInteger(parsed.concurrency) || parsed.concurrency < 1) {
                 throw new Error(`--concurrency must be a positive integer, got "${parsed.concurrency}"`);
+            }
+            if (!Number.isInteger(parsed.iterations) || parsed.iterations < 1) {
+                throw new Error(`--iterations must be a positive integer, got "${parsed.iterations}"`);
+            }
+            if (parsed['pass-threshold'] < 0 || parsed['pass-threshold'] > 1) {
+                throw new Error(`--pass-threshold must be between 0 and 1, got "${parsed['pass-threshold']}"`);
             }
             return true;
         })
@@ -183,13 +207,20 @@ async function main() {
         let selected = cases;
         if (argv.id) selected = filterById(selected, argv.id);
         if (argv.category) selected = filterByCategory(selected, argv.category);
-        const data = selected.map((mcpAgentCase) => mcpAgentCase.item);
-        if (data.length === 0) {
+        if (argv.tier) selected = filterByTier(selected, argv.tier);
+        if (selected.length === 0) {
             throw new Error(
-                `No active item in dataset "${datasetName}" (${cases.length} total) matches --id/--category`,
+                `No active item in dataset "${datasetName}" (${cases.length} total) matches --id/--category/--tier`,
             );
         }
-        const requestedIds = data.map((item) => item.id);
+        const requestedIds = selected.map((mcpAgentCase) => mcpAgentCase.id);
+        const { iterations } = argv;
+        // One experiment.run() call, each selected item repeated `iterations` times: the
+        // Langfuse v4 API has no native iteration concept, so each repeat is a shallow copy
+        // tagged with metadata.iteration (1-based) and scored as its own trace/trial.
+        const data = selected.flatMap((mcpAgentCase) =>
+            Array.from({ length: iterations }, (_, index) => withIteration(mcpAgentCase.item, index + 1)),
+        );
 
         initTracing();
 
@@ -199,7 +230,8 @@ async function main() {
         const agentSdkVersion = resolveAgentSdkVersion();
         const runName = `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`;
         console.log(
-            `▶️  Running experiment "${runName}" over ${data.length} item(s), concurrency ${argv.concurrency} ` +
+            `▶️  Running experiment "${runName}" over ${requestedIds.length} item(s)` +
+                `${iterations > 1 ? ` x ${iterations} iteration(s)` : ''}, concurrency ${argv.concurrency} ` +
                 `(agent: ${argv.agentModel} via Claude Agent SDK ${agentSdkVersion}` +
                 `${argv.mcpToolsOnly ? ', MCP tools only' : ', +built-in tools'})`,
         );
@@ -207,7 +239,7 @@ async function main() {
         const result = await langfuse.experiment.run({
             name: datasetName,
             runName,
-            description: 'Multi-turn MCP agent evals for the Apify MCP server.',
+            description: 'MCP agent evals for the Apify MCP server (agent + selection items).',
             data,
             task: makeTask({
                 llmClient,
@@ -219,11 +251,11 @@ async function main() {
             }),
             evaluators,
             runEvaluators: [
-                // Denominator is the requested count, not itemResults.length, so items the
-                // SDK dropped pull the rate down instead of vanishing from it.
+                // passed trials / requested trials: requestedIds.length * iterations, so a
+                // dropped trial pulls the rate down instead of vanishing from it.
                 async ({ itemResults }) => ({
                     name: 'pass_rate',
-                    value: countPassed(itemResults, argv.allowToolErrors) / requestedIds.length,
+                    value: buildRunSummary(requestedIds, itemResults, iterations).passRate,
                 }),
             ],
             maxConcurrency: argv.concurrency,
@@ -235,25 +267,51 @@ async function main() {
                 mcpToolsOnly: argv.mcpToolsOnly,
                 agentSdkVersion,
                 agentAuth: argv.subscription ? 'subscription' : 'api-key',
-                allowToolErrors: argv.allowToolErrors,
+                tier: argv.tier ?? 'all',
+                iterations,
+                passThreshold: argv.passThreshold,
             },
         });
 
         // Compact on purpose: Langfuse holds the full per-item view behind the run link.
-        const summary = buildRunSummary(requestedIds, result.itemResults, argv.allowToolErrors);
-        for (const failure of summary.failures) {
-            console.log(`❌ ${failure.id}: ${failure.reason}`);
-        }
-        if (summary.droppedIds.length > 0) {
-            console.error(`🔥 Never completed (task threw, see errors above): ${summary.droppedIds.join(', ')}`);
+        const summary = buildRunSummary(requestedIds, result.itemResults, iterations);
+
+        if (iterations > 1) {
+            for (const item of summary.items) {
+                const outcomes = item.trials.map((trial) => (trial.passed ? '✅' : '❌')).join(' ');
+                const anyPassed = item.trials.some((trial) => trial.passed);
+                const allPassed = item.trials.every((trial) => trial.passed);
+                console.log(
+                    `🔁 ${item.id}   ${outcomes}   pass@${iterations} ${anyPassed ? '✅' : '❌'}  ` +
+                        `pass^${iterations} ${allPassed ? '✅' : '❌'}`,
+                );
+            }
         }
 
-        console.log(`📊 ${summary.passedCount}/${requestedIds.length} passed`);
+        for (const failure of summary.failures) {
+            const iterationSuffix = iterations > 1 ? ` (iteration ${failure.iteration})` : '';
+            console.log(`❌ ${failure.id}${iterationSuffix}: ${failure.reason}`);
+        }
+        if (summary.droppedTrials.length > 0) {
+            const dropped = summary.droppedTrials.map(
+                ({ id, iteration }) => `${id}${iterations > 1 ? ` (iteration ${iteration})` : ''}`,
+            );
+            console.error(`🔥 Never completed (task threw, see errors above): ${dropped.join(', ')}`);
+        }
+
+        console.log(
+            `📊 ${summary.passedTrials}/${summary.requestedTrials} trials passed ` +
+                `(pass_rate ${summary.passRate.toFixed(2)}, threshold ${argv.passThreshold.toFixed(2)})`,
+        );
+        if (iterations > 1) {
+            console.log(
+                `📈 pass@${iterations} ${summary.passAtK}/${requestedIds.length} items · ` +
+                    `pass^${iterations} ${summary.passHatK}/${requestedIds.length} items`,
+            );
+        }
         console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" (view in Langfuse)`}`);
 
-        // 0 only when every requested item ran and passed: a dropped item leaves
-        // passedCount short of the request, so this covers it too.
-        exitCode = summary.passedCount === requestedIds.length ? 0 : 1;
+        exitCode = resolveExitCode(summary, argv.passThreshold);
     } catch (error) {
         console.error(`❌ Run failed: ${error instanceof Error ? error.message : String(error)}`);
         exitCode = 1;
