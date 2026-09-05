@@ -51,79 +51,105 @@ export function formatPriceUsd(price: number, options: FormatPriceUsdOptions = {
     return formatNumberWithOptions(price, { style: 'currency', ...intlOptions }); // Intl will return the format we want: i.e. -$123,323.21;
 }
 
+type TierPrice = { tier: string; price: number };
+
 /**
- * Tier the public Store badge prices at: GOLD, else the cheapest paid tier.
- * GOLD (Business plan) is the best tier listed on apify.com/pricing; PLATINUM/DIAMOND are
- * enterprise-only and the Store never shows them, so "cheapest tier" would undercut the badge.
- * See apify/apify-mcp-server#905.
+ * What this user pays: their tier, else FREE, else the first entry — the same fallback order as
+ * the server's `resolveTier` in src/utils/pricing_info.ts. Anonymous users resolve as FREE.
  */
-function resolveStoreBadgeTierPrice(tiers: { tier: string; price: number }[]): number | undefined {
+function resolveUserTierPrice(tiers: TierPrice[], userTier = 'FREE'): number | undefined {
+    const priceByTier = new Map(tiers.map(({ tier, price }) => [tier, price]));
+    return priceByTier.get(userTier) ?? priceByTier.get('FREE') ?? tiers[0]?.price;
+}
+
+/**
+ * What the public Store badge advertises: GOLD, else the cheapest paid tier.
+ * GOLD (Business plan) is the best tier listed on apify.com/pricing; PLATINUM/DIAMOND are
+ * enterprise-only and the Store never shows them. See apify/apify-mcp-server#905.
+ */
+function resolveStoreBadgeTierPrice(tiers: TierPrice[]): number | undefined {
     const paidTiers = tiers.filter(({ tier, price }) => tier !== 'FREE' && price > 0);
     if (paidTiers.length === 0) return undefined;
     const goldPrice = paidTiers.find(({ tier }) => tier === 'GOLD')?.price;
     return goldPrice ?? Math.min(...paidTiers.map(({ price }) => price));
 }
 
+/**
+ * Badge for a tiered price: what this user pays, plus the Store's "from" price as an upgrade hint
+ * when a paid plan is cheaper. The Store page shows "from GOLD" because it does not know the
+ * visitor; the widget does, so it shows both. Returns undefined when the user's price resolves to
+ * nothing (or zero) so callers fall back to their flat-price path. See apify/apify-mcp-server#905.
+ */
+function formatTieredPrice(
+    tiers: TierPrice[],
+    userTier: string | undefined,
+    scale: number,
+    toBadge: (amount: string) => string,
+): string | undefined {
+    const ownPrice = resolveUserTierPrice(tiers, userTier);
+    if (!ownPrice) return undefined;
+    const storePrice = resolveStoreBadgeTierPrice(tiers);
+    const hint =
+        storePrice !== undefined && storePrice < ownPrice
+            ? ` · from ${formatPriceUsd(storePrice * scale)} on paid plans`
+            : '';
+    return `${toBadge(formatPriceUsd(ownPrice * scale))}${hint}`;
+}
+
 function formatFlatPricePerMonth(pricing: StructuredPricingInfo): string {
-    // Complete-mode `pricePerUnit` is the un-resolved base price; tiered rentals need the same badge tier.
-    const badgePrice = pricing.tieredPricing?.length
-        ? resolveStoreBadgeTierPrice(
+    // Complete-mode `pricePerUnit` is the un-resolved base price; tiered rentals must resolve the tier.
+    const tieredBadge = pricing.tieredPricing?.length
+        ? formatTieredPrice(
               pricing.tieredPricing.map(({ tier, pricePerUnit }) => ({ tier, price: pricePerUnit })),
+              pricing.userTier,
+              1,
+              (amount) => `${amount}/month + usage`,
           )
         : undefined;
-    const monthlyPrice = badgePrice ?? pricing.pricePerUnit ?? 0;
-    return `${formatPriceUsd(monthlyPrice)}/month + usage`;
+    return tieredBadge ?? `${formatPriceUsd(pricing.pricePerUnit || 0)}/month + usage`;
 }
 
 function formatPayPerEventPricing(
     event: NonNullable<StructuredPricingInfo['events']>[0],
-    { shouldShowFromPrefix = false }: { shouldShowFromPrefix?: boolean } = {},
+    userTier: string | undefined,
 ): string {
     const title = event.title.toLowerCase() || 'result';
-    const prefix = shouldShowFromPrefix ? 'from ' : '';
+    const perThousand = (amount: string) => `${amount} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
 
     if (event.tieredPricing && event.tieredPricing.length > 0) {
-        const badgePrice = resolveStoreBadgeTierPrice(
+        const tieredBadge = formatTieredPrice(
             event.tieredPricing.map(({ tier, priceUsd }) => ({ tier, price: priceUsd })),
+            userTier,
+            PRICE_DISPLAY_UNIT_SIZE,
+            perThousand,
         );
-
-        if (typeof badgePrice === 'number') {
-            const pricePerThousand = badgePrice * PRICE_DISPLAY_UNIT_SIZE;
-            return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
-        }
+        if (tieredBadge) return tieredBadge;
     }
 
     if (typeof event.priceUsd === 'number') {
         const isPricedPerThousandResults = event.priceUsd < PER_THOUSAND_PRICING_THRESHOLD;
-
-        if (isPricedPerThousandResults) {
-            const pricePerThousand = event.priceUsd * PRICE_DISPLAY_UNIT_SIZE;
-            return `${prefix}${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
-        }
-        return `${prefix}${formatPriceUsd(event.priceUsd)} / ${title}`;
+        if (isPricedPerThousandResults) return perThousand(formatPriceUsd(event.priceUsd * PRICE_DISPLAY_UNIT_SIZE));
+        return `${formatPriceUsd(event.priceUsd)} / ${title}`;
     }
 
     return 'Pay per event';
 }
 
 function formatPricePerDatasetItem(pricing: StructuredPricingInfo): string {
-    const unitName = pricing.unitName || 'result';
-    const pluralUnitName = pluralize(unitName);
+    const pluralUnitName = pluralize(pricing.unitName || 'result');
+    const perThousand = (amount: string) => `${amount} / 1,000 ${pluralUnitName}`;
 
     if (pricing.tieredPricing && pricing.tieredPricing.length > 0) {
-        const badgePrice = resolveStoreBadgeTierPrice(
+        const tieredBadge = formatTieredPrice(
             pricing.tieredPricing.map(({ tier, pricePerUnit }) => ({ tier, price: pricePerUnit })),
+            pricing.userTier,
+            PRICE_DISPLAY_UNIT_SIZE,
+            perThousand,
         );
-
-        if (typeof badgePrice === 'number') {
-            const pricePerThousand = badgePrice * PRICE_DISPLAY_UNIT_SIZE;
-            return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralUnitName}`;
-        }
+        if (tieredBadge) return tieredBadge;
     }
 
-    const pricePerUnit = pricing.pricePerUnit || 0;
-    const pricePerThousand = pricePerUnit * PRICE_DISPLAY_UNIT_SIZE;
-    return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralUnitName}`;
+    return perThousand(formatPriceUsd((pricing.pricePerUnit || 0) * PRICE_DISPLAY_UNIT_SIZE));
 }
 
 export const formatPricing = (pricing: StructuredPricingInfo): string => {
@@ -144,9 +170,7 @@ export const formatPricing = (pricing: StructuredPricingInfo): string => {
         const primaryEvent =
             pricing.events.length === 1 ? pricing.events[0] : pricing.events.find((event) => event.isPrimaryEvent);
 
-        return primaryEvent
-            ? formatPayPerEventPricing(primaryEvent, { shouldShowFromPrefix: pricing.events.length > 1 })
-            : 'Pay per event';
+        return primaryEvent ? formatPayPerEventPricing(primaryEvent, pricing.userTier) : 'Pay per event';
     }
 
     if (pricing.model === 'PRICE_PER_DATASET_ITEM') {
