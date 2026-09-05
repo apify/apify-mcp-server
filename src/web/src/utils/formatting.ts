@@ -77,17 +77,23 @@ function resolveStoreBadgeTierPrice(tiers: TierPrice[]): number | undefined {
 /**
  * Badge for a tiered price: what this user pays, plus the Store's "from" price as an upgrade hint
  * when a paid plan is cheaper. The Store page shows "from GOLD" because it does not know the
- * visitor; the widget does, so it shows both. Returns undefined when the user's price resolves to
- * nothing (or zero) so callers fall back to their flat-price path. See apify/apify-mcp-server#905.
+ * visitor; the widget does, so it shows both. A $0 tier is a real price ("free for you") and is
+ * rendered; only an empty matrix returns undefined so callers fall back to their flat-price path.
+ * See apify/apify-mcp-server#905.
  */
-function formatTieredPrice(
-    tiers: TierPrice[],
-    userTier: string | undefined,
-    scale: number,
-    toBadge: (amount: string) => string,
-): string | undefined {
+function formatTieredPrice({
+    tiers,
+    userTier,
+    scale,
+    toBadge,
+}: {
+    tiers: TierPrice[];
+    userTier: string | undefined;
+    scale: number;
+    toBadge: (amount: string) => string;
+}): string | undefined {
     const ownPrice = resolveUserTierPrice(tiers, userTier);
-    if (!ownPrice) return undefined;
+    if (ownPrice === undefined) return undefined;
     const storePrice = resolveStoreBadgeTierPrice(tiers);
     const hint =
         storePrice !== undefined && storePrice < ownPrice
@@ -98,13 +104,13 @@ function formatTieredPrice(
 
 function formatFlatPricePerMonth(pricing: StructuredPricingInfo): string {
     // Complete-mode `pricePerUnit` is the un-resolved base price; tiered rentals must resolve the tier.
-    const tieredBadge = pricing.tieredPricing?.length
-        ? formatTieredPrice(
-              pricing.tieredPricing.map(({ tier, pricePerUnit }) => ({ tier, price: pricePerUnit })),
-              pricing.userTier,
-              1,
-              (amount) => `${amount}/month + usage`,
-          )
+    const tieredBadge = pricing.tieredPricing
+        ? formatTieredPrice({
+              tiers: pricing.tieredPricing.map(({ tier, pricePerUnit }) => ({ tier, price: pricePerUnit })),
+              userTier: pricing.userTier,
+              scale: 1,
+              toBadge: (amount) => `${amount}/month + usage`,
+          })
         : undefined;
     return tieredBadge ?? `${formatPriceUsd(pricing.pricePerUnit || 0)}/month + usage`;
 }
@@ -116,13 +122,13 @@ function formatPayPerEventPricing(
     const title = event.title.toLowerCase() || 'result';
     const perThousand = (amount: string) => `${amount} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
 
-    if (event.tieredPricing && event.tieredPricing.length > 0) {
-        const tieredBadge = formatTieredPrice(
-            event.tieredPricing.map(({ tier, priceUsd }) => ({ tier, price: priceUsd })),
+    if (event.tieredPricing) {
+        const tieredBadge = formatTieredPrice({
+            tiers: event.tieredPricing.map(({ tier, priceUsd }) => ({ tier, price: priceUsd })),
             userTier,
-            PRICE_DISPLAY_UNIT_SIZE,
-            perThousand,
-        );
+            scale: PRICE_DISPLAY_UNIT_SIZE,
+            toBadge: perThousand,
+        });
         if (tieredBadge) return tieredBadge;
     }
 
@@ -139,13 +145,13 @@ function formatPricePerDatasetItem(pricing: StructuredPricingInfo): string {
     const pluralUnitName = pluralize(pricing.unitName || 'result');
     const perThousand = (amount: string) => `${amount} / 1,000 ${pluralUnitName}`;
 
-    if (pricing.tieredPricing && pricing.tieredPricing.length > 0) {
-        const tieredBadge = formatTieredPrice(
-            pricing.tieredPricing.map(({ tier, pricePerUnit }) => ({ tier, price: pricePerUnit })),
-            pricing.userTier,
-            PRICE_DISPLAY_UNIT_SIZE,
-            perThousand,
-        );
+    if (pricing.tieredPricing) {
+        const tieredBadge = formatTieredPrice({
+            tiers: pricing.tieredPricing.map(({ tier, pricePerUnit }) => ({ tier, price: pricePerUnit })),
+            userTier: pricing.userTier,
+            scale: PRICE_DISPLAY_UNIT_SIZE,
+            toBadge: perThousand,
+        });
         if (tieredBadge) return tieredBadge;
     }
 
