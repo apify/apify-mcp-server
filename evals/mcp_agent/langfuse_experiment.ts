@@ -13,7 +13,7 @@ import type { Evaluation } from '@langfuse/client';
 
 import type { AgentRunResult } from './claude_agent.js';
 import { runAgentConversation } from './claude_agent.js';
-import type { McpAgentItem } from './langfuse_dataset.js';
+import type { DatasetItem, McpAgentItem } from './langfuse_dataset.js';
 import { parseMcpAgentItem } from './langfuse_dataset.js';
 import { buildAgentObservations, emitObservations } from './langfuse_observations.js';
 import type { JudgeLlmClient } from './llm_client.js';
@@ -245,6 +245,95 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
 /** The gate: `0` while the aggregate pass rate meets the threshold, `1` otherwise. */
 export function resolveExitCode(summary: RunSummary, passThreshold: number): number {
     return summary.passRate >= passThreshold ? 0 : 1;
+}
+
+/** One dataset item repeated for `--iterations`, tagged with its 1-based trial index. */
+function withIteration(item: DatasetItem, iteration: number): DatasetItem {
+    return { ...item, metadata: { ...(item.metadata as Record<string, unknown> | undefined), iteration } };
+}
+
+/**
+ * `--iterations N`: repeat each selected item N times into the flat `data` array a single
+ * `experiment.run()` call takes, each repeat a shallow copy tagged `metadata.iteration`
+ * (1-based). The Langfuse v4 API has no native iteration concept, so this is what turns one
+ * requested item into `N` separately-scored trials without a second `experiment.run()` call.
+ */
+export function expandIterations(items: DatasetItem[], iterations: number): DatasetItem[] {
+    return items.flatMap((item) => Array.from({ length: iterations }, (_, index) => withIteration(item, index + 1)));
+}
+
+/** `--iterations` must be a positive integer: anything else can't index a 1-based trial run. */
+export function validateIterations(value: number): void {
+    if (!Number.isInteger(value) || value < 1) {
+        throw new Error(`--iterations must be a positive integer, got "${value}"`);
+    }
+}
+
+/** `--pass-threshold` gates a rate (`passedTrials / requestedTrials`), so it must fall in [0, 1]. */
+export function validatePassThreshold(value: number): void {
+    if (value < 0 || value > 1) {
+        throw new Error(`--pass-threshold must be between 0 and 1, got "${value}"`);
+    }
+}
+
+/** One line of run-summary output, tagged with the console stream it belongs on. */
+export type RunSummaryLine = { stream: 'log' | 'error'; text: string };
+
+/**
+ * Console lines for a finished run, in print order: per-item trial outcomes (`🔁`, only when
+ * `iterations > 1`), one `❌` line per failed trial, a `🔥` line for trials the SDK dropped
+ * (stderr, since the failure detail already went to stderr above it), the `📊` pass-rate
+ * line, and `📈` pass@k/pass^k (only when `iterations > 1`). Pure so the CLI's print block is
+ * just "loop over this and route each line to its stream".
+ */
+export function formatRunSummary(summary: RunSummary, passThreshold: number, iterations: number): RunSummaryLine[] {
+    const lines: RunSummaryLine[] = [];
+
+    if (iterations > 1) {
+        for (const item of summary.items) {
+            const outcomes = item.trials.map((trial) => (trial.passed ? '✅' : '❌')).join(' ');
+            const anyPassed = item.trials.some((trial) => trial.passed);
+            const allPassed = item.trials.every((trial) => trial.passed);
+            lines.push({
+                stream: 'log',
+                text:
+                    `🔁 ${item.id}   ${outcomes}   pass@${iterations} ${anyPassed ? '✅' : '❌'}  ` +
+                    `pass^${iterations} ${allPassed ? '✅' : '❌'}`,
+            });
+        }
+    }
+
+    for (const failure of summary.failures) {
+        const iterationSuffix = iterations > 1 ? ` (iteration ${failure.iteration})` : '';
+        lines.push({ stream: 'log', text: `❌ ${failure.id}${iterationSuffix}: ${failure.reason}` });
+    }
+
+    if (summary.droppedTrials.length > 0) {
+        const dropped = summary.droppedTrials.map(
+            ({ id, iteration }) => `${id}${iterations > 1 ? ` (iteration ${iteration})` : ''}`,
+        );
+        lines.push({
+            stream: 'error',
+            text: `🔥 Never completed (task threw, see errors above): ${dropped.join(', ')}`,
+        });
+    }
+
+    lines.push({
+        stream: 'log',
+        text:
+            `📊 ${summary.passedTrials}/${summary.requestedTrials} trials passed ` +
+            `(pass_rate ${summary.passRate.toFixed(2)}, threshold ${passThreshold.toFixed(2)})`,
+    });
+    if (iterations > 1) {
+        lines.push({
+            stream: 'log',
+            text:
+                `📈 pass@${iterations} ${summary.passAtK}/${summary.items.length} items · ` +
+                `pass^${iterations} ${summary.passHatK}/${summary.items.length} items`,
+        });
+    }
+
+    return lines;
 }
 
 /**

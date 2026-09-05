@@ -3,9 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     buildRunSummary,
     evaluators,
+    expandIterations,
+    formatRunSummary,
     isTransientAgentError,
     makeTask,
     resolveExitCode,
+    validateIterations,
+    validatePassThreshold,
     type McpAgentTaskOutput,
 } from '../../evals/mcp_agent/langfuse_experiment.js';
 import type { LlmClient } from '../../evals/mcp_agent/llm_client.js';
@@ -129,6 +133,17 @@ describe('evaluators', () => {
             name: 'tool_errors',
             value: 1,
             comment: 'get-actor-task: task not found (expected)\ncreate-actor-task: name taken',
+        });
+    });
+
+    it('scores tool_errors 0 when the only failure is exempted by expectedErrors', async () => {
+        const output = makeAgentOutput({
+            toolErrors: [{ tool: 'get-actor-task', error: 'task not found', expected: true }],
+        });
+        expect(await evaluators[2]({ output })).toEqual({
+            name: 'tool_errors',
+            value: 0,
+            comment: 'get-actor-task: task not found (expected)',
         });
     });
 
@@ -349,6 +364,26 @@ describe('makeTask()', () => {
         expect(mocks.runAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ mcpToolsOnly: true }));
     });
 
+    it('applies the run-wide mcpToolsOnly to an item that does not set its own flag', async () => {
+        mocks.runAgentConversation.mockResolvedValue({
+            conversation: { turns: [], totalTokens: undefined },
+            transcript: [],
+            toolInvocations: [],
+            attemptedCalls: [],
+        });
+        const task = makeTask({
+            llmClient: {} as LlmClient,
+            apifyToken: 'token',
+            agentModel: 'agent',
+            judgeModel: 'judge',
+            toolTimeout: 1,
+            mcpToolsOnly: true,
+        });
+
+        await task(makeSelectionItem());
+        expect(mocks.runAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ mcpToolsOnly: true }));
+    });
+
     it('carries a runner-injected iteration through to the output', async () => {
         mocks.runAgentConversation.mockResolvedValue({
             conversation: { turns: [], totalTokens: 1234 },
@@ -447,6 +482,14 @@ describe('buildRunSummary()', () => {
         ]);
     });
 
+    it('treats a missing first_tool_match score on a selection item as a failure', () => {
+        const summary = buildRunSummary(['a'], [{ output: makeSelectionOutput({ id: 'a' }), evaluations: [] }], 1);
+        expect(summary.passedTrials).toBe(0);
+        expect(summary.failures).toEqual([
+            { id: 'a', iteration: 1, reason: 'no first_tool_match score (the evaluator threw)' },
+        ]);
+    });
+
     describe('with iterations > 1', () => {
         it('groups repeated trials of the same id by metadata.iteration', () => {
             const trial1 = makeScoredAgentItem('a', 1, { iteration: 1 });
@@ -533,5 +576,105 @@ describe('resolveExitCode()', () => {
             1,
         );
         expect(resolveExitCode(oneFailed, 1.0)).toBe(1);
+    });
+});
+
+describe('expandIterations()', () => {
+    it('repeats each item N times, tagging metadata.iteration 1..N', () => {
+        const items = [
+            { id: 'a', metadata: { category: 'x' } },
+            { id: 'b', metadata: { category: 'y' } },
+        ] as unknown as Parameters<typeof expandIterations>[0];
+
+        const data = expandIterations(items, 3) as unknown as { id: string; metadata: { iteration: number } }[];
+
+        expect(data).toHaveLength(6);
+        const iterationsFor = (id: string) =>
+            data.filter((item) => item.id === id).map((item) => item.metadata.iteration);
+        expect(iterationsFor('a')).toEqual([1, 2, 3]);
+        expect(iterationsFor('b')).toEqual([1, 2, 3]);
+    });
+
+    it('carries the item metadata through alongside the injected iteration', () => {
+        const items = [{ id: 'a', metadata: { category: 'x' } }] as unknown as Parameters<typeof expandIterations>[0];
+        const data = expandIterations(items, 1) as unknown as { metadata: { category: string; iteration: number } }[];
+        expect(data[0].metadata).toEqual({ category: 'x', iteration: 1 });
+    });
+
+    it('makes exactly one call to build the flat data array, not N separate ones', () => {
+        // Pure function, called once by the CLI: one item x N iterations in a single flatMap
+        // pass, never N calls to build separate arrays that would need N experiment.run()s.
+        const items = [
+            { id: 'a', metadata: {} },
+            { id: 'b', metadata: {} },
+        ] as unknown as Parameters<typeof expandIterations>[0];
+        expect(expandIterations(items, 4)).toHaveLength(8);
+    });
+
+    it('does not mutate the source item', () => {
+        const source = { id: 'a', metadata: { category: 'x' } };
+        const items = [source] as unknown as Parameters<typeof expandIterations>[0];
+        expandIterations(items, 2);
+        expect(source.metadata).toEqual({ category: 'x' });
+    });
+});
+
+describe('formatRunSummary()', () => {
+    it('omits the 🔁 and 📈 lines when iterations is 1, but shows the threshold in 📊', () => {
+        const summary = buildRunSummary(['a', 'b'], [makeScoredAgentItem('a', 1), makeScoredAgentItem('b', 1)], 1);
+        const lines = formatRunSummary(summary, 1, 1);
+        const texts = lines.map((line) => line.text);
+
+        expect(texts.some((text) => text.startsWith('🔁'))).toBe(false);
+        expect(texts.some((text) => text.startsWith('📈'))).toBe(false);
+        expect(texts).toContain('📊 2/2 trials passed (pass_rate 1.00, threshold 1.00)');
+    });
+
+    it('prints 🔁 per item in iteration order, a ❌ line naming the failed iteration, and 📈 pass@k/pass^k', () => {
+        const trial1 = makeScoredAgentItem('a', 1, { iteration: 1 });
+        const trial2Fail = makeScoredAgentItem('a', 0, {
+            iteration: 2,
+            judgeResult: { verdict: 'FAIL' as const, reason: 'missed X', rawResponse: '' },
+        });
+        const summary = buildRunSummary(['a'], [trial2Fail, trial1], 2);
+
+        const texts = formatRunSummary(summary, 0.8, 2).map((line) => line.text);
+
+        expect(texts[0]).toBe('🔁 a   ✅ ❌   pass@2 ✅  pass^2 ❌');
+        expect(texts).toContain('❌ a (iteration 2): missed X');
+        expect(texts).toContain('📊 1/2 trials passed (pass_rate 0.50, threshold 0.80)');
+        expect(texts).toContain('📈 pass@2 1/1 items · pass^2 0/1 items');
+    });
+
+    it('routes the dropped-trial line to the error stream', () => {
+        const summary = buildRunSummary(['a', 'b'], [makeScoredAgentItem('a', 1)], 1);
+        const dropped = formatRunSummary(summary, 1, 1).find((line) => line.text.startsWith('🔥'));
+        expect(dropped).toEqual({ stream: 'error', text: '🔥 Never completed (task threw, see errors above): b' });
+    });
+});
+
+describe('validateIterations()', () => {
+    it('accepts a positive integer', () => {
+        expect(() => validateIterations(1)).not.toThrow();
+        expect(() => validateIterations(5)).not.toThrow();
+    });
+
+    it('rejects zero, negative, and non-integer values', () => {
+        expect(() => validateIterations(0)).toThrow('--iterations must be a positive integer, got "0"');
+        expect(() => validateIterations(-1)).toThrow('--iterations must be a positive integer');
+        expect(() => validateIterations(1.5)).toThrow('--iterations must be a positive integer');
+    });
+});
+
+describe('validatePassThreshold()', () => {
+    it('accepts values within [0, 1]', () => {
+        expect(() => validatePassThreshold(0)).not.toThrow();
+        expect(() => validatePassThreshold(1)).not.toThrow();
+        expect(() => validatePassThreshold(0.8)).not.toThrow();
+    });
+
+    it('rejects values outside [0, 1]', () => {
+        expect(() => validatePassThreshold(-0.1)).toThrow('--pass-threshold must be between 0 and 1, got "-0.1"');
+        expect(() => validatePassThreshold(1.1)).toThrow('--pass-threshold must be between 0 and 1');
     });
 });

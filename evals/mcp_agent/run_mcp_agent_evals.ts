@@ -36,9 +36,17 @@ import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { assertStdioBinExists } from './claude_agent.js';
 import { ClaudeLlmClient } from './claude_judge_client.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
-import type { DatasetItem } from './langfuse_dataset.js';
 import { fetchMcpAgentCases, filterByTier, MCP_AGENT_DATASET_NAME } from './langfuse_dataset.js';
-import { buildRunSummary, evaluators, makeTask, resolveExitCode } from './langfuse_experiment.js';
+import {
+    buildRunSummary,
+    evaluators,
+    expandIterations,
+    formatRunSummary,
+    makeTask,
+    resolveExitCode,
+    validateIterations,
+    validatePassThreshold,
+} from './langfuse_experiment.js';
 import { initTracing, shutdownTracing } from './langfuse_tracing.js';
 import { LlmClient } from './llm_client.js';
 
@@ -71,11 +79,6 @@ function getGitBranch(): string {
     } catch {
         return 'unknown';
     }
-}
-
-/** A dataset item repeated for `--iterations`, tagged with its 1-based trial index. */
-function withIteration(item: DatasetItem, iteration: number): DatasetItem {
-    return { ...item, metadata: { ...(item.metadata as Record<string, unknown> | undefined), iteration } };
 }
 
 /**
@@ -152,12 +155,8 @@ async function main() {
             if (!Number.isInteger(parsed.concurrency) || parsed.concurrency < 1) {
                 throw new Error(`--concurrency must be a positive integer, got "${parsed.concurrency}"`);
             }
-            if (!Number.isInteger(parsed.iterations) || parsed.iterations < 1) {
-                throw new Error(`--iterations must be a positive integer, got "${parsed.iterations}"`);
-            }
-            if (parsed['pass-threshold'] < 0 || parsed['pass-threshold'] > 1) {
-                throw new Error(`--pass-threshold must be between 0 and 1, got "${parsed['pass-threshold']}"`);
-            }
+            validateIterations(parsed.iterations);
+            validatePassThreshold(parsed['pass-threshold']);
             return true;
         })
         .help().argv) as CliArgs;
@@ -215,11 +214,11 @@ async function main() {
         }
         const requestedIds = selected.map((mcpAgentCase) => mcpAgentCase.id);
         const { iterations } = argv;
-        // One experiment.run() call, each selected item repeated `iterations` times: the
-        // Langfuse v4 API has no native iteration concept, so each repeat is a shallow copy
-        // tagged with metadata.iteration (1-based) and scored as its own trace/trial.
-        const data = selected.flatMap((mcpAgentCase) =>
-            Array.from({ length: iterations }, (_, index) => withIteration(mcpAgentCase.item, index + 1)),
+        // One experiment.run() call over every requested item x iteration: see
+        // expandIterations() for why the Langfuse v4 API forces this shape.
+        const data = expandIterations(
+            selected.map((mcpAgentCase) => mcpAgentCase.item),
+            iterations,
         );
 
         initTracing();
@@ -276,38 +275,8 @@ async function main() {
         // Compact on purpose: Langfuse holds the full per-item view behind the run link.
         const summary = buildRunSummary(requestedIds, result.itemResults, iterations);
 
-        if (iterations > 1) {
-            for (const item of summary.items) {
-                const outcomes = item.trials.map((trial) => (trial.passed ? '✅' : '❌')).join(' ');
-                const anyPassed = item.trials.some((trial) => trial.passed);
-                const allPassed = item.trials.every((trial) => trial.passed);
-                console.log(
-                    `🔁 ${item.id}   ${outcomes}   pass@${iterations} ${anyPassed ? '✅' : '❌'}  ` +
-                        `pass^${iterations} ${allPassed ? '✅' : '❌'}`,
-                );
-            }
-        }
-
-        for (const failure of summary.failures) {
-            const iterationSuffix = iterations > 1 ? ` (iteration ${failure.iteration})` : '';
-            console.log(`❌ ${failure.id}${iterationSuffix}: ${failure.reason}`);
-        }
-        if (summary.droppedTrials.length > 0) {
-            const dropped = summary.droppedTrials.map(
-                ({ id, iteration }) => `${id}${iterations > 1 ? ` (iteration ${iteration})` : ''}`,
-            );
-            console.error(`🔥 Never completed (task threw, see errors above): ${dropped.join(', ')}`);
-        }
-
-        console.log(
-            `📊 ${summary.passedTrials}/${summary.requestedTrials} trials passed ` +
-                `(pass_rate ${summary.passRate.toFixed(2)}, threshold ${argv.passThreshold.toFixed(2)})`,
-        );
-        if (iterations > 1) {
-            console.log(
-                `📈 pass@${iterations} ${summary.passAtK}/${requestedIds.length} items · ` +
-                    `pass^${iterations} ${summary.passHatK}/${requestedIds.length} items`,
-            );
+        for (const { stream, text } of formatRunSummary(summary, argv.passThreshold, iterations)) {
+            (stream === 'error' ? console.error : console.log)(text);
         }
         console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" (view in Langfuse)`}`);
 

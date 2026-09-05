@@ -86,9 +86,10 @@ function preToolUseHook(decide: (toolName: string, toolInput: unknown) => string
  * Force-fail the listed tools with the real server nudge, so evals for error-driven
  * behavior (e.g. report-problem) do not depend on the live server erroring on demand.
  *
- * A PreToolUse deny is the injection point that survives a denying `canUseTool`: the SDK
- * fires this hook first regardless of what `canUseTool` would decide. The agent receives it
- * as a refusal rather than an INTERNAL_ERROR tool result.
+ * `canUseTool` below unconditionally allows every call - the point of a `PreToolUse` deny is
+ * that the SDK fires it before the permission layer regardless, so a denied call here never
+ * reaches `canUseTool` or executes. The agent receives it as a refusal rather than an
+ * INTERNAL_ERROR tool result.
  */
 export function denyToolsHook(failTools: string[]): HookCallbackMatcher[] {
     const failing = new Set(failTools);

@@ -128,8 +128,9 @@ describe('runAgentConversation()', () => {
     });
 
     it('fixes maxTurns at SELECTION_MAX_TURNS for a selection item, ignoring maxTurns', async () => {
-        await runAgentConversation(baseOptions({ isSelectionMode: true }));
+        await runAgentConversation(baseOptions({ isSelectionMode: true, maxTurns: 9999 }));
         expect(capturedOptions?.maxTurns).toBe(SELECTION_MAX_TURNS);
+        expect(capturedOptions?.maxTurns).not.toBe(9999);
     });
 
     it('installs a PreToolUse hook for a selection item that denies every call', async () => {
