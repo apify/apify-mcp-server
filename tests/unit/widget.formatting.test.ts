@@ -270,6 +270,26 @@ describe('formatPricing()', () => {
         expect(price).toBe('$30.00/month + usage · from $20.00 on paid plans');
     });
 
+    it('falls back to the flat price when the tier matrix is empty', () => {
+        expect(
+            formatPricing({
+                model: 'PAY_PER_EVENT',
+                events: [{ title: 'Result', priceUsd: 0.002, tieredPricing: [] }],
+            }),
+        ).toBe('$2.00 / 1,000 results');
+        expect(
+            formatPricing({
+                model: 'PRICE_PER_DATASET_ITEM',
+                unitName: 'result',
+                pricePerUnit: 0.002,
+                tieredPricing: [],
+            }),
+        ).toBe('$2.00 / 1,000 results');
+        expect(formatPricing({ model: 'FLAT_PRICE_PER_MONTH', pricePerUnit: 30, tieredPricing: [] })).toBe(
+            '$30.00/month + usage',
+        );
+    });
+
     it('falls back to the flat price when no paid tier exists', () => {
         expect(
             formatPricing({
@@ -279,13 +299,43 @@ describe('formatPricing()', () => {
         ).toBe('$2.00 / 1,000 results');
     });
 
-    it('returns Pay per event when neither a paid tier nor a flat price exists', () => {
+    it('renders a $0 tier as the real price instead of falling back to the base price', () => {
+        // Free for FREE users, paid on GOLD. The un-resolved base price (0.03) must not leak through.
+        expect(
+            formatPricing({
+                model: 'PRICE_PER_DATASET_ITEM',
+                unitName: 'result',
+                pricePerUnit: 0.03,
+                tieredPricing: [
+                    { tier: 'FREE', pricePerUnit: 0 },
+                    { tier: 'GOLD', pricePerUnit: 0.0015 },
+                ],
+            }),
+        ).toBe('$0.00 / 1,000 results');
         expect(
             formatPricing({
                 model: 'PAY_PER_EVENT',
                 events: [{ title: 'Result', tieredPricing: [{ tier: 'FREE', priceUsd: 0 }] }],
             }),
-        ).toBe('Pay per event');
+        ).toBe('$0.00 / 1,000 results');
+    });
+
+    it('falls back to the first tier when neither the user tier nor FREE is in the matrix', () => {
+        const price = formatPricing({
+            model: 'PAY_PER_EVENT',
+            userTier: 'SILVER',
+            events: [
+                {
+                    title: 'Result',
+                    tieredPricing: [
+                        { tier: 'BRONZE', priceUsd: 0.003 },
+                        { tier: 'GOLD', priceUsd: 0.0015 },
+                    ],
+                },
+            ],
+        });
+
+        expect(price).toBe('$3.00 / 1,000 results · from $1.50 on paid plans');
     });
 
     it('prices an event at or above $0.01 per event, never per 1,000', () => {
