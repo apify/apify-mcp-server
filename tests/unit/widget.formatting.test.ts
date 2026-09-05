@@ -108,6 +108,38 @@ describe('formatPricing()', () => {
         ).toBe('$5.00 / 1,000 each tweet. cheaper for higher plans · from $0.25 on paid plans');
     });
 
+    it('renders the event the server chose when no event is flagged primary (the only tiered one)', () => {
+        // compass/crawler-google-places-like: only "Scraped place" has tiers, "Actor start" is a flat one-time fee.
+        const actor = {
+            ...twitterXScraperStoreActor,
+            currentPricingInfo: {
+                pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
+                pricingPerEvent: {
+                    actorChargeEvents: {
+                        place: {
+                            eventTitle: 'Scraped place',
+                            eventDescription: 'A Google Maps place scraped',
+                            eventTieredPricingUsd: {
+                                FREE: { tieredEventPriceUsd: 0.004 },
+                                GOLD: { tieredEventPriceUsd: 0.0021 },
+                            },
+                        },
+                        start: {
+                            eventTitle: 'Actor start',
+                            eventDescription: 'Initial fee',
+                            eventPriceUsd: 0.00005,
+                            isOneTimeEvent: true,
+                        },
+                    },
+                },
+            },
+        } as unknown as ActorStoreList;
+        // The note says "Paid plans from $2.10 / 1,000 events (Scraped place)"; the badge must agree.
+        expect(formatPricing(formatActorForWidget(actor, 'FREE').currentPricingInfo)).toBe(
+            '$4.00 / 1,000 scraped places · from $2.10 on paid plans',
+        );
+    });
+
     it('falls back to Pay per event without a primary event, events, or a price', () => {
         expect(
             formatPricing({

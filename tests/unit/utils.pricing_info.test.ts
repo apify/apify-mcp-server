@@ -168,7 +168,7 @@ const freeActor = { pricingModel: ACTOR_PRICING_MODEL.FREE } as PricingInfo;
 
 // A Business (GOLD) user already pays the Store's advertised price, so the note carries no "from" clause.
 const NOTE_GOLD = 'Prices shown are for the Business plan. Use fetch-actor-details for the full pricing table.';
-// A Free user sees the Store's advertised price (GOLD, else the cheapest paid tier) as the "from" clause.
+// A Free user sees the Store's advertised price (GOLD, else the cheapest Starter/Scale tier) as the "from" clause.
 const NOTE_FREE =
     'Prices shown are for the Free plan. Paid plans from $4.00 / 1,000 results. ' +
     'Use fetch-actor-details for the full pricing table.';
@@ -642,6 +642,42 @@ describe('pricingNote edge cases', () => {
         expect(pricingInfoToSimplifiedString(info, 'FREE')).toBe(
             'This Actor costs $5.00 / 1,000 results. Prices shown are for the Free plan. ' +
                 'Paid plans from $4.00 / 1,000 results. Use fetch-actor-details for the full pricing table.',
+        );
+    });
+
+    it('advertises the cheapest Starter/Scale price when GOLD is missing, never an enterprise tier', () => {
+        const info = {
+            pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
+            pricePerUnitUsd: 0.004,
+            unitName: 'result',
+            tieredPricing: {
+                FREE: { tieredPricePerUnitUsd: 0.004 },
+                BRONZE: { tieredPricePerUnitUsd: 0.003 },
+                DIAMOND: { tieredPricePerUnitUsd: 0.0005 },
+            },
+        } as unknown as PricingInfo;
+        const out = pricingInfoToSimplifiedStructured(info, 'FREE');
+        expect(out.paidPlanPricePerUnit).toBe(0.003);
+        expect(out.pricingNote).toBe(
+            'Prices shown are for the Free plan. Paid plans from $3.00 / 1,000 results. ' +
+                'Use fetch-actor-details for the full pricing table.',
+        );
+    });
+
+    it('omits the "from" clause when the only paid tiers are enterprise (PLATINUM/DIAMOND)', () => {
+        const info = {
+            pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
+            pricePerUnitUsd: 0.004,
+            unitName: 'result',
+            tieredPricing: {
+                FREE: { tieredPricePerUnitUsd: 0.004 },
+                DIAMOND: { tieredPricePerUnitUsd: 0.0005 },
+            },
+        } as unknown as PricingInfo;
+        const out = pricingInfoToSimplifiedStructured(info, 'FREE');
+        expect(out.paidPlanPricePerUnit).toBeUndefined();
+        expect(out.pricingNote).toBe(
+            'Prices shown are for the Free plan. Use fetch-actor-details for the full pricing table.',
         );
     });
 
