@@ -14,6 +14,7 @@
  *   model: string,
  *   userTier?: PricingTier,
  *   pricePerUnit?: number,
+ *   paidPlanPricePerUnit?: number,   // simplified only: the Store's "from" price when cheaper
  *   unitName?: string,
  *   trialMinutes?: number,
  *   tieredPricing?: [{ tier: string, pricePerUnit: number }],
@@ -21,8 +22,10 @@
  *     title: string,
  *     description?: string,
  *     priceUsd?: number,
+ *     paidPlanPriceUsd?: number,     // simplified only, on the advertised event
  *     tieredPricing?: [{ tier: string, priceUsd: number }],
  *     isPrimaryEvent?: boolean,
+ *     isOneTimeEvent?: boolean,
  *   }],
  *   pricingNote?: string,
  *   eventDescriptionsOmitted?: boolean,
@@ -92,6 +95,8 @@ export type ActorChargeEvent = {
     eventPriceUsd?: number;
     eventTieredPricingUsd?: Partial<Record<PricingTier, TieredEventPrice>>;
     isPrimaryEvent?: boolean;
+    /** Charged once per run (e.g. "Actor start"); quoted per run instead of per 1,000. */
+    isOneTimeEvent?: boolean;
 };
 
 export type TieredPricing = {
@@ -124,6 +129,8 @@ export type StructuredPricingInfo = {
     model: string;
     userTier?: PricingTier;
     pricePerUnit?: number;
+    /** Simplified mode: the Store page's "from" price (GOLD, else cheapest paid tier) when it is below `pricePerUnit`. */
+    paidPlanPricePerUnit?: number;
     unitName?: string;
     trialMinutes?: number;
     tieredPricing?: {
@@ -134,11 +141,14 @@ export type StructuredPricingInfo = {
         title: string;
         description?: string;
         priceUsd?: number;
+        /** Simplified mode, advertised event only: the Store's "from" price when it is below `priceUsd`. */
+        paidPlanPriceUsd?: number;
         tieredPricing?: {
             tier: string;
             priceUsd: number;
         }[];
         isPrimaryEvent?: boolean;
+        isOneTimeEvent?: boolean;
     }[];
     pricingNote?: string;
     eventDescriptionsOmitted?: boolean;
@@ -157,10 +167,17 @@ type RentalLike = {
     tieredPricing?: TieredPricing;
 };
 
-/** The price the Store page advertises ("from $X"), with the unit it is quoted per. */
+/** How a unit price is quoted in text: "per 1000 results" scales the raw per-unit price by 1000. */
+type PriceQuote = {
+    unit: string;
+    scale: number;
+};
+
+/** The raw per-unit price the Store page advertises ("from $X"), how text quotes it, and which event it is about. */
 type PaidPlanHint = {
     price: number;
-    unit: string;
+    quote: PriceQuote;
+    title?: string;
 };
 
 type SimplifiedResult = {
@@ -201,23 +218,84 @@ function resolveAdvertisedPrice(priceByTier: Record<string, number>): number | u
     return goldPrice ?? Math.min(...paidTiers.map(([, price]) => price));
 }
 
-/** Hint for the note: the advertised price, only when it undercuts what this user pays. */
-function buildPaidPlanHint(priceByTier: Record<string, number>, ownPrice: number, unit: string): PaidPlanHint | null {
-    const advertised = resolveAdvertisedPrice(priceByTier);
-    return advertised !== undefined && advertised < ownPrice ? { price: advertised, unit } : null;
+/** Currency text with 2 to 6 decimals: "$5.00", "$0.0945", "$0.00005" — sub-cent prices are never rounded to "$0.00". */
+const USD_FORMAT = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+});
+
+const PER_THOUSAND = 1000;
+/** Top tier: nothing is cheaper by plan, so no upsell hint in the note or the widget. */
+const TOP_TIER: PricingTier = 'DIAMOND';
+const PER_RUN_QUOTE: PriceQuote = { unit: 'per run', scale: 1 };
+const PER_MONTH_QUOTE: PriceQuote = { unit: 'per month', scale: 1 };
+
+/** Results and repeatable events are quoted per 1,000, as on the Store page. */
+function buildPerThousandQuote(unitLabel: string): PriceQuote {
+    return { unit: `/ 1,000 ${unitLabel}`, scale: PER_THOUSAND };
 }
 
-/** How a unit price is quoted in text: "per 1000 results" scales the raw per-unit price by 1000. */
-type PriceQuote = {
-    unit: string;
-    scale: number;
+/** One-time events ("Actor start") are charged once per run, so "per 1,000" would mislead. */
+function resolveEventQuote(event: ActorChargeEvent): PriceQuote {
+    return event.isOneTimeEvent ? PER_RUN_QUOTE : buildPerThousandQuote('events');
+}
+
+function formatQuotedPrice(price: number, quote: PriceQuote): string {
+    return `${USD_FORMAT.format(price * quote.scale)} ${quote.unit}`;
+}
+
+/** "Free: $5.00, Business: $2.00 / 1,000 results" — plan names, the unit once at the end. */
+function formatPlanPrices(priceByTier: Record<string, number>, quote: PriceQuote): string {
+    const list = Object.entries(priceByTier)
+        .map(([tier, price]) => `${getPlanName(tier)}: ${USD_FORMAT.format(price * quote.scale)}`)
+        .join(', ');
+    return `${list} ${quote.unit}`;
+}
+
+function getPriceByTier(tieredPricing: TieredPricing): Record<string, number> {
+    return Object.fromEntries(
+        Object.entries(tieredPricing).map(([tier, entry]) => [tier, entry.tieredPricePerUnitUsd]),
+    );
+}
+
+function getEventPriceByTier(tieredMap: Record<string, TieredEventPrice>): Record<string, number> {
+    return Object.fromEntries(Object.entries(tieredMap).map(([tier, entry]) => [tier, entry.tieredEventPriceUsd]));
+}
+
+/** What this user pays, with the tier it resolved to. */
+type ResolvedPrice = {
+    tier: string;
+    price: number;
 };
 
-function buildUnitPaidPlanHint(tieredPricing: TieredPricing, ownPrice: number, quote: PriceQuote): PaidPlanHint | null {
-    const priceByTier = Object.fromEntries(
-        Object.entries(tieredPricing).map(([tier, entry]) => [tier, entry.tieredPricePerUnitUsd * quote.scale]),
-    );
-    return buildPaidPlanHint(priceByTier, ownPrice * quote.scale, quote.unit);
+/**
+ * The advertised price as a hint for the note and the widget, only when it undercuts what this
+ * user pays. Top-tier users never get one, even if a developer priced a lower tier below theirs.
+ */
+function buildPaidPlanHint({
+    priceByTier,
+    own,
+    quote,
+    title,
+}: {
+    priceByTier: Record<string, number>;
+    own: ResolvedPrice;
+    quote: PriceQuote;
+    title?: string;
+}): PaidPlanHint | null {
+    if (own.tier === TOP_TIER) return null;
+    const advertised = resolveAdvertisedPrice(priceByTier);
+    return advertised !== undefined && advertised < own.price ? { price: advertised, quote, title } : null;
+}
+
+function buildUnitPaidPlanHint(
+    tieredPricing: TieredPricing,
+    own: ResolvedPrice,
+    quote: PriceQuote,
+): PaidPlanHint | null {
+    return buildPaidPlanHint({ priceByTier: getPriceByTier(tieredPricing), own, quote });
 }
 
 /**
@@ -232,14 +310,17 @@ function findAdvertisedEvent(events: ActorChargeEvent[]): ActorChargeEvent | und
 }
 
 function buildEventPaidPlanHint(events: ActorChargeEvent[], userTier: PricingTier): PaidPlanHint | null {
-    const tieredMap = findAdvertisedEvent(events)?.eventTieredPricingUsd as
-        | Record<string, TieredEventPrice>
-        | undefined;
-    if (!hasTiers(tieredMap)) return null;
-    const priceByTier = Object.fromEntries(
-        Object.entries(tieredMap).map(([tier, entry]) => [tier, entry.tieredEventPriceUsd]),
-    );
-    return buildPaidPlanHint(priceByTier, resolveTier(tieredMap, userTier).value.tieredEventPriceUsd, 'per event');
+    const event = findAdvertisedEvent(events);
+    const tieredMap = event?.eventTieredPricingUsd as Record<string, TieredEventPrice> | undefined;
+    if (!event || !hasTiers(tieredMap)) return null;
+    const resolved = resolveTier(tieredMap, userTier);
+    return buildPaidPlanHint({
+        priceByTier: getEventPriceByTier(tieredMap),
+        own: { tier: resolved.tier, price: resolved.value.tieredEventPriceUsd },
+        quote: resolveEventQuote(event),
+        // With several events, say which one the number is about.
+        title: events.length > 1 ? event.eventTitle : undefined,
+    });
 }
 
 /**
@@ -247,8 +328,9 @@ function buildEventPaidPlanHint(events: ActorChargeEvent[], userTier: PricingTie
  * DIAMOND is the top tier — nothing is cheaper, so the note is skipped for DIAMOND users.
  */
 function buildPricingNote(resolvedTier: string, hint: PaidPlanHint | null): string | null {
-    if (resolvedTier === 'DIAMOND') return null;
-    const paidPlans = hint ? ` Paid plans from $${hint.price} ${hint.unit}.` : '';
+    if (resolvedTier === TOP_TIER) return null;
+    const about = hint?.title ? ` (${hint.title})` : '';
+    const paidPlans = hint ? ` Paid plans from ${formatQuotedPrice(hint.price, hint.quote)}${about}.` : '';
     return `Prices shown are for the ${getPlanName(resolvedTier)} plan.${paidPlans} Use fetch-actor-details for the full pricing table.`;
 }
 
@@ -312,37 +394,28 @@ export function pricingInfoToString(pricingInfo: PricingInfo | null): string {
     }
 }
 
+/** Resolves the single price of a unit model: its only tier, else the flat price. */
+function getSingleUnitPrice(info: DatasetItemLike | RentalLike): number {
+    const [onlyTier] = info.tieredPricing ? Object.values(info.tieredPricing) : [];
+    return onlyTier?.tieredPricePerUnitUsd ?? info.pricePerUnitUsd ?? 0;
+}
+
 function formatDatasetItemComplete(info: DatasetItemLike): string {
-    const unitLabel = info.unitName ? `${info.unitName}s` : 'results';
-    const tierEntries = info.tieredPricing ? Object.entries(info.tieredPricing) : [];
-
-    if (tierEntries.length > 1) {
-        const tierList = tierEntries
-            .map(([tier, obj]) => `${getPlanName(tier)}: $${obj.tieredPricePerUnitUsd * 1000}`)
-            .join(', ');
-        return `This Actor has tiered pricing per 1000 ${unitLabel}: ${tierList}.`;
+    const quote = buildPerThousandQuote(info.unitName ? `${info.unitName}s` : 'results');
+    if (hasTiers(info.tieredPricing) && hasMultipleTiers(info.tieredPricing)) {
+        return `This Actor has tiered pricing: ${formatPlanPrices(getPriceByTier(info.tieredPricing), quote)}.`;
     }
-
-    const price = tierEntries.length === 1 ? tierEntries[0][1].tieredPricePerUnitUsd : (info.pricePerUnitUsd ?? 0);
-    return `This Actor costs $${price * 1000} per 1000 ${unitLabel}.`;
+    return `This Actor costs ${formatQuotedPrice(getSingleUnitPrice(info), quote)}.`;
 }
 
 function formatRentalComplete(info: RentalLike): string {
     const { value, unit } = convertMinutesToGreatestUnit(info.trialMinutes || 0);
-    const tierEntries = info.tieredPricing ? Object.entries(info.tieredPricing) : [];
-
-    if (tierEntries.length > 1) {
-        const tierList = tierEntries
-            .map(([tier, obj]) => `${getPlanName(tier)}: $${obj.tieredPricePerUnitUsd}`)
-            .join(', ');
-        return (
-            `This Actor is rental and has tiered pricing per month: ${tierList}, ` +
-            `with a trial period of ${value} ${unit}.`
-        );
+    const trial = `with a trial period of ${value} ${unit}.`;
+    if (hasTiers(info.tieredPricing) && hasMultipleTiers(info.tieredPricing)) {
+        const plans = formatPlanPrices(getPriceByTier(info.tieredPricing), PER_MONTH_QUOTE);
+        return `This Actor is rental and has tiered pricing: ${plans}, ${trial}`;
     }
-
-    const price = tierEntries.length === 1 ? tierEntries[0][1].tieredPricePerUnitUsd : (info.pricePerUnitUsd ?? 0);
-    return `This Actor is rental and costs $${price} per month, with a trial period of ${value} ${unit}.`;
+    return `This Actor is rental and costs ${formatQuotedPrice(getSingleUnitPrice(info), PER_MONTH_QUOTE)}, ${trial}`;
 }
 
 function formatPayPerEventComplete(
@@ -359,16 +432,13 @@ function formatPayPerEventComplete(
 }
 
 function formatCompleteEventDetail(event: ActorChargeEvent): string {
-    if (typeof event.eventPriceUsd === 'number') return `$${event.eventPriceUsd} per event`;
+    const quote = resolveEventQuote(event);
+    if (typeof event.eventPriceUsd === 'number') return formatQuotedPrice(event.eventPriceUsd, quote);
     const tiered = event.eventTieredPricingUsd as Record<string, TieredEventPrice> | undefined;
     if (!hasTiers(tiered)) return 'No price info';
-    if (hasMultipleTiers(tiered)) {
-        return `${Object.entries(tiered)
-            .map(([tier, price]) => `${getPlanName(tier)}: $${price.tieredEventPriceUsd}`)
-            .join(', ')} per event`;
-    }
+    if (hasMultipleTiers(tiered)) return formatPlanPrices(getEventPriceByTier(tiered), quote);
     const [price] = Object.values(tiered);
-    return `$${price.tieredEventPriceUsd} per event`;
+    return formatQuotedPrice(price.tieredEventPriceUsd, quote);
 }
 
 /** Complete structured contract used by `fetch-actor-details`. */
@@ -425,6 +495,7 @@ function structurePayPerEventComplete(
                   }))
                 : undefined,
             ...(event.isPrimaryEvent ? { isPrimaryEvent: true } : {}),
+            ...(event.isOneTimeEvent ? { isOneTimeEvent: true } : {}),
         })),
     };
 }
@@ -446,35 +517,32 @@ export function pricingInfoToSimplifiedString(pricingInfo: PricingInfo | null, u
 }
 
 function formatDatasetItemSimplified(info: DatasetItemLike, userTier: PricingTier): string {
-    const unitLabel = info.unitName ? `${info.unitName}s` : 'results';
+    const quote = buildPerThousandQuote(info.unitName ? `${info.unitName}s` : 'results');
     if (hasTiers(info.tieredPricing)) {
         const { tier, value } = resolveTier(info.tieredPricing, userTier);
-        const base = `This Actor costs $${value.tieredPricePerUnitUsd * 1000} per 1000 ${unitLabel}.`;
-        const hint = buildUnitPaidPlanHint(info.tieredPricing, value.tieredPricePerUnitUsd, {
-            unit: `per 1000 ${unitLabel}`,
-            scale: 1000,
-        });
+        const base = `This Actor costs ${formatQuotedPrice(value.tieredPricePerUnitUsd, quote)}.`;
+        const hint = buildUnitPaidPlanHint(info.tieredPricing, { tier, price: value.tieredPricePerUnitUsd }, quote);
         const note = hasMultipleTiers(info.tieredPricing) ? buildPricingNote(tier, hint) : null;
         return note ? `${base} ${note}` : base;
     }
-    return `This Actor costs $${(info.pricePerUnitUsd ?? 0) * 1000} per 1000 ${unitLabel}.`;
+    return `This Actor costs ${formatQuotedPrice(info.pricePerUnitUsd ?? 0, quote)}.`;
 }
 
 function formatRentalSimplified(info: RentalLike, userTier: PricingTier): string {
     const { value, unit } = convertMinutesToGreatestUnit(info.trialMinutes || 0);
+    const trial = `with a trial period of ${value} ${unit}.`;
     if (hasTiers(info.tieredPricing)) {
         const { tier, value: entry } = resolveTier(info.tieredPricing, userTier);
-        const base =
-            `This Actor is rental and costs $${entry.tieredPricePerUnitUsd} per month, ` +
-            `with a trial period of ${value} ${unit}.`;
-        const hint = buildUnitPaidPlanHint(info.tieredPricing, entry.tieredPricePerUnitUsd, {
-            unit: 'per month',
-            scale: 1,
-        });
+        const base = `This Actor is rental and costs ${formatQuotedPrice(entry.tieredPricePerUnitUsd, PER_MONTH_QUOTE)}, ${trial}`;
+        const hint = buildUnitPaidPlanHint(
+            info.tieredPricing,
+            { tier, price: entry.tieredPricePerUnitUsd },
+            PER_MONTH_QUOTE,
+        );
         const note = hasMultipleTiers(info.tieredPricing) ? buildPricingNote(tier, hint) : null;
         return note ? `${base} ${note}` : base;
     }
-    return `This Actor is rental and costs $${info.pricePerUnitUsd ?? 0} per month, with a trial period of ${value} ${unit}.`;
+    return `This Actor is rental and costs ${formatQuotedPrice(info.pricePerUnitUsd ?? 0, PER_MONTH_QUOTE)}, ${trial}`;
 }
 
 function formatPayPerEventSimplified(
@@ -500,7 +568,7 @@ function formatPayPerEventSimplified(
             }
         }
 
-        const detail = typeof price === 'number' ? `$${price} per event` : 'No price info';
+        const detail = typeof price === 'number' ? formatQuotedPrice(price, resolveEventQuote(event)) : 'No price info';
         if (omitDescriptions) return `  - **${event.eventTitle}**: ${detail}`;
         return `  - **${event.eventTitle}**: ${event.eventDescription ?? ''} (${detail})`;
     });
@@ -538,14 +606,11 @@ function resolveSimplifiedPatch(pricingInfo: PricingInfo, userTier: PricingTier)
     switch (pricingInfo.pricingModel) {
         case ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM: {
             const unitLabel = pricingInfo.unitName ? `${pricingInfo.unitName}s` : 'results';
-            const r = structureTieredUnitSimplified(pricingInfo, userTier, {
-                unit: `per 1000 ${unitLabel}`,
-                scale: 1000,
-            });
+            const r = structureTieredUnitSimplified(pricingInfo, userTier, buildPerThousandQuote(unitLabel));
             return { ...r, patch: { unitName: pricingInfo.unitName || 'result', ...r.patch } };
         }
         case ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH: {
-            const r = structureTieredUnitSimplified(pricingInfo, userTier, { unit: 'per month', scale: 1 });
+            const r = structureTieredUnitSimplified(pricingInfo, userTier, PER_MONTH_QUOTE);
             return { ...r, patch: { trialMinutes: pricingInfo.trialMinutes, ...r.patch } };
         }
         case ACTOR_PRICING_MODEL.PAY_PER_EVENT:
@@ -566,11 +631,9 @@ function structureTieredUnitSimplified(
         // Simplified mode resolves to one tier; the resolved price lives in `pricePerUnit`,
         // so the 1-element `tieredPricing` array just duplicates it. Drop it.
         patch.pricePerUnit = value.tieredPricePerUnitUsd;
-        return {
-            patch,
-            noteTier: hasMultipleTiers(info.tieredPricing) ? tier : null,
-            noteHint: buildUnitPaidPlanHint(info.tieredPricing, value.tieredPricePerUnitUsd, quote),
-        };
+        const noteHint = buildUnitPaidPlanHint(info.tieredPricing, { tier, price: value.tieredPricePerUnitUsd }, quote);
+        if (noteHint) patch.paidPlanPricePerUnit = noteHint.price;
+        return { patch, noteTier: hasMultipleTiers(info.tieredPricing) ? tier : null, noteHint };
     }
     return { patch, noteTier: null, noteHint: null };
 }
@@ -583,12 +646,15 @@ function structurePayPerEventSimplified(
 
     const rawEvents = Object.values(pricingPerEvent.actorChargeEvents);
     const omitDescriptions = shouldOmitEventDescriptions(rawEvents.length);
+    const advertisedEvent = findAdvertisedEvent(rawEvents);
+    const noteHint = buildEventPaidPlanHint(rawEvents, userTier);
     const resolvedTiers = new Set<string>();
     const events = rawEvents.map((event) => {
         const baseEvent = {
             title: event.eventTitle,
             ...(omitDescriptions ? {} : { description: event.eventDescription || '' }),
             ...(event.isPrimaryEvent ? { isPrimaryEvent: true as const } : {}),
+            ...(event.isOneTimeEvent ? { isOneTimeEvent: true as const } : {}),
         };
 
         if (typeof event.eventPriceUsd === 'number') {
@@ -605,6 +671,7 @@ function structurePayPerEventSimplified(
         return {
             ...baseEvent,
             priceUsd: value.tieredEventPriceUsd,
+            ...(event === advertisedEvent && noteHint ? { paidPlanPriceUsd: noteHint.price } : {}),
         };
     });
 
@@ -621,6 +688,6 @@ function structurePayPerEventSimplified(
                 : {}),
         },
         noteTier,
-        noteHint: buildEventPaidPlanHint(rawEvents, userTier),
+        noteHint,
     };
 }

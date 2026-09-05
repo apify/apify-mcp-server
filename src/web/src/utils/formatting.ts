@@ -2,8 +2,8 @@ import pluralize from 'pluralize';
 
 import type { StructuredPricingInfo } from '../types';
 
-const PER_THOUSAND_PRICING_THRESHOLD = 0.01;
 const PRICE_DISPLAY_UNIT_SIZE = 1000;
+const PAID_PLAN_HINT_SUFFIX = 'on paid plans';
 
 type FormatPriceUsdOptions = {
     decimals?: number;
@@ -51,111 +51,41 @@ export function formatPriceUsd(price: number, options: FormatPriceUsdOptions = {
     return formatNumberWithOptions(price, { style: 'currency', ...intlOptions }); // Intl will return the format we want: i.e. -$123,323.21;
 }
 
-type TierPrice = { tier: string; price: number };
-
-/**
- * What this user pays: their tier, else FREE, else the first entry — the same fallback order as
- * the server's `resolveTier` in src/utils/pricing_info.ts. Anonymous users resolve as FREE.
- */
-function resolveUserTierPrice(tiers: TierPrice[], userTier = 'FREE'): number | undefined {
-    const priceByTier = new Map(tiers.map(({ tier, price }) => [tier, price]));
-    return priceByTier.get(userTier) ?? priceByTier.get('FREE') ?? tiers[0]?.price;
+/** Badge prices show 2 to 6 decimals so sub-cent per-1,000 prices ("$0.0945") are not rounded away. */
+function formatBadgePrice(price: number): string {
+    return formatPriceUsd(price, { maximumFractionDigits: 6 });
 }
 
 /**
- * What the public Store badge advertises: GOLD, else the cheapest paid tier.
- * GOLD (Business plan) is the best tier listed on apify.com/pricing; PLATINUM/DIAMOND are
- * enterprise-only and the Store never shows them. See apify/apify-mcp-server#905.
- */
-function resolveStoreBadgeTierPrice(tiers: TierPrice[]): number | undefined {
-    const paidTiers = tiers.filter(({ tier, price }) => tier !== 'FREE' && price > 0);
-    if (paidTiers.length === 0) return undefined;
-    const goldPrice = paidTiers.find(({ tier }) => tier === 'GOLD')?.price;
-    return goldPrice ?? Math.min(...paidTiers.map(({ price }) => price));
-}
-
-/**
- * Badge for a tiered price: what this user pays, plus the Store's "from" price as an upgrade hint
- * when a paid plan is cheaper. The Store page shows "from GOLD" because it does not know the
- * visitor; the widget does, so it shows both. A $0 tier is a real price ("free for you") and is
- * rendered; only an empty matrix returns undefined so callers fall back to their flat-price path.
+ * Appends the Store page's "from" price as an upgrade hint. The server sets the paid-plan price
+ * only when a paid plan is cheaper than what this user pays, so presence alone decides.
  * See apify/apify-mcp-server#905.
  */
-function formatTieredPrice({
-    tiers,
-    userTier,
-    scale,
-    toBadge,
-}: {
-    tiers: TierPrice[];
-    userTier: string | undefined;
-    scale: number;
-    toBadge: (amount: string) => string;
-}): string | undefined {
-    const ownPrice = resolveUserTierPrice(tiers, userTier);
-    if (ownPrice === undefined) return undefined;
-    const storePrice = resolveStoreBadgeTierPrice(tiers);
-    const hint =
-        storePrice !== undefined && storePrice < ownPrice
-            ? ` · from ${formatPriceUsd(storePrice * scale)} on paid plans`
-            : '';
-    return `${toBadge(formatPriceUsd(ownPrice * scale))}${hint}`;
+function formatWithPaidPlanHint(badge: string, paidPlanPrice: number | undefined, scale: number): string {
+    if (paidPlanPrice === undefined) return badge;
+    return `${badge} · from ${formatBadgePrice(paidPlanPrice * scale)} ${PAID_PLAN_HINT_SUFFIX}`;
 }
 
 function formatFlatPricePerMonth(pricing: StructuredPricingInfo): string {
-    // Complete-mode `pricePerUnit` is the un-resolved base price; tiered rentals must resolve the tier.
-    const tieredBadge = pricing.tieredPricing
-        ? formatTieredPrice({
-              tiers: pricing.tieredPricing.map(({ tier, pricePerUnit }) => ({ tier, price: pricePerUnit })),
-              userTier: pricing.userTier,
-              scale: 1,
-              toBadge: (amount) => `${amount}/month + usage`,
-          })
-        : undefined;
-    return tieredBadge ?? `${formatPriceUsd(pricing.pricePerUnit || 0)}/month + usage`;
+    const badge = `${formatBadgePrice(pricing.pricePerUnit || 0)}/month + usage`;
+    return formatWithPaidPlanHint(badge, pricing.paidPlanPricePerUnit, 1);
 }
 
-function formatPayPerEventPricing(
-    event: NonNullable<StructuredPricingInfo['events']>[0],
-    userTier: string | undefined,
-): string {
+/** Repeatable events are quoted per 1,000 like the Store page; one-time events ("Actor start") per run. */
+function formatPayPerEventPricing(event: NonNullable<StructuredPricingInfo['events']>[0]): string {
+    if (typeof event.priceUsd !== 'number') return 'Pay per event';
+    if (event.isOneTimeEvent) {
+        return formatWithPaidPlanHint(`${formatBadgePrice(event.priceUsd)} per run`, event.paidPlanPriceUsd, 1);
+    }
     const title = event.title.toLowerCase() || 'result';
-    const perThousand = (amount: string) => `${amount} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
-
-    if (event.tieredPricing) {
-        const tieredBadge = formatTieredPrice({
-            tiers: event.tieredPricing.map(({ tier, priceUsd }) => ({ tier, price: priceUsd })),
-            userTier,
-            scale: PRICE_DISPLAY_UNIT_SIZE,
-            toBadge: perThousand,
-        });
-        if (tieredBadge) return tieredBadge;
-    }
-
-    if (typeof event.priceUsd === 'number') {
-        const isPricedPerThousandResults = event.priceUsd < PER_THOUSAND_PRICING_THRESHOLD;
-        if (isPricedPerThousandResults) return perThousand(formatPriceUsd(event.priceUsd * PRICE_DISPLAY_UNIT_SIZE));
-        return `${formatPriceUsd(event.priceUsd)} / ${title}`;
-    }
-
-    return 'Pay per event';
+    const badge = `${formatBadgePrice(event.priceUsd * PRICE_DISPLAY_UNIT_SIZE)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
+    return formatWithPaidPlanHint(badge, event.paidPlanPriceUsd, PRICE_DISPLAY_UNIT_SIZE);
 }
 
 function formatPricePerDatasetItem(pricing: StructuredPricingInfo): string {
     const pluralUnitName = pluralize(pricing.unitName || 'result');
-    const perThousand = (amount: string) => `${amount} / 1,000 ${pluralUnitName}`;
-
-    if (pricing.tieredPricing) {
-        const tieredBadge = formatTieredPrice({
-            tiers: pricing.tieredPricing.map(({ tier, pricePerUnit }) => ({ tier, price: pricePerUnit })),
-            userTier: pricing.userTier,
-            scale: PRICE_DISPLAY_UNIT_SIZE,
-            toBadge: perThousand,
-        });
-        if (tieredBadge) return tieredBadge;
-    }
-
-    return perThousand(formatPriceUsd((pricing.pricePerUnit || 0) * PRICE_DISPLAY_UNIT_SIZE));
+    const badge = `${formatBadgePrice((pricing.pricePerUnit || 0) * PRICE_DISPLAY_UNIT_SIZE)} / 1,000 ${pluralUnitName}`;
+    return formatWithPaidPlanHint(badge, pricing.paidPlanPricePerUnit, PRICE_DISPLAY_UNIT_SIZE);
 }
 
 export const formatPricing = (pricing: StructuredPricingInfo): string => {
@@ -176,7 +106,7 @@ export const formatPricing = (pricing: StructuredPricingInfo): string => {
         const primaryEvent =
             pricing.events.length === 1 ? pricing.events[0] : pricing.events.find((event) => event.isPrimaryEvent);
 
-        return primaryEvent ? formatPayPerEventPricing(primaryEvent, pricing.userTier) : 'Pay per event';
+        return primaryEvent ? formatPayPerEventPricing(primaryEvent) : 'Pay per event';
     }
 
     if (pricing.model === 'PRICE_PER_DATASET_ITEM') {
