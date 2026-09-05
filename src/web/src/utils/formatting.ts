@@ -103,10 +103,14 @@ export const formatPricing = (pricing: StructuredPricingInfo): string => {
         }
 
         // The Store badge shows the API's primary event, not a generic label; see apify/apify-mcp-server#905.
-        const primaryEvent =
-            pricing.events.length === 1 ? pricing.events[0] : pricing.events.find((event) => event.isPrimaryEvent);
+        // Without the flag, the server marks the event it advertises in the pricing note with paidPlanPriceUsd.
+        const advertisedEvent =
+            pricing.events.length === 1
+                ? pricing.events[0]
+                : (pricing.events.find((event) => event.isPrimaryEvent) ??
+                  pricing.events.find((event) => event.paidPlanPriceUsd !== undefined));
 
-        return primaryEvent ? formatPayPerEventPricing(primaryEvent) : 'Pay per event';
+        return advertisedEvent ? formatPayPerEventPricing(advertisedEvent) : 'Pay per event';
     }
 
     if (pricing.model === 'PRICE_PER_DATASET_ITEM') {

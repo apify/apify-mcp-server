@@ -205,17 +205,20 @@ function resolveTier<T>(map: Record<string, T>, userTier: PricingTier): { tier: 
     return { tier: firstTier, value: firstValue };
 }
 
+/** Paid tiers below GOLD that a visitor can buy on apify.com/pricing (Starter, Scale). */
+const PUBLIC_FALLBACK_TIERS: PricingTier[] = ['BRONZE', 'SILVER'];
+
 /**
- * Price the public Store page advertises as "from": GOLD, else the cheapest paid tier. GOLD
- * (Business plan) is the best tier on apify.com/pricing; PLATINUM/DIAMOND are enterprise-only
- * and never shown there. Same rule as the widget badge (src/web/src/utils/formatting.ts).
+ * Price the public Store page advertises as "from": GOLD (Business, the best plan on
+ * apify.com/pricing), else the cheapest priced Starter/Scale tier. PLATINUM/DIAMOND are
+ * enterprise-only and never advertised; with no public paid tier there is no "from" price.
+ * The widget only renders what this produces (src/web/src/utils/formatting.ts).
  * See apify/apify-mcp-server#905.
  */
 function resolveAdvertisedPrice(priceByTier: Record<string, number>): number | undefined {
-    const paidTiers = Object.entries(priceByTier).filter(([tier, price]) => tier !== 'FREE' && price > 0);
-    if (paidTiers.length === 0) return undefined;
-    const goldPrice = paidTiers.find(([tier]) => tier === 'GOLD')?.[1];
-    return goldPrice ?? Math.min(...paidTiers.map(([, price]) => price));
+    if (priceByTier.GOLD > 0) return priceByTier.GOLD;
+    const publicPrices = PUBLIC_FALLBACK_TIERS.map((tier) => priceByTier[tier]).filter((price) => price > 0);
+    return publicPrices.length > 0 ? Math.min(...publicPrices) : undefined;
 }
 
 /** Currency text with 2 to 6 decimals: "$5.00", "$0.0945", "$0.00005" — sub-cent prices are never rounded to "$0.00". */
