@@ -230,7 +230,12 @@ that change was made), each fixed and re-verified before moving on to Haiku:
 
   Every failure across the 3 runs is a documented Haiku-only weakness (not flagged by Opus after
   the fixes above) or the same `report-problem` residual — see Follow-up findings. None required
-  a case edit, so the series stands as run (no restart).
+  a case edit, so the series stands as run (no restart). 5 earlier Haiku runs at concurrency 3
+  (a pre-series run that found the real `create-actor-task` defect, kept; 2 would-be "official"
+  attempts and 1 stalled attempt, all superseded once the concurrency-2 Opus runs above found the
+  `playwright-mcp-server`/`fetch-apify-docs` defects; and 1 killed mid-run the moment that
+  defect was confirmed) were discarded, not cited — see `.shepherd/iter-1/claim.md`'s
+  "Cost and time" for the full accounting.
 - `PR_TIER_PASS_THRESHOLD` (`config.ts`) = **0.93** — the floor of the 3 runs' *completed-only*
   rates (0.96, 0.93, 0.98), rounded down to 2 decimals, **marked PROVISIONAL in `config.ts`'s
   comment**. Not the floor of the raw rates (0.83, 0.82, 0.89): those are dominated by the sandbox
@@ -239,12 +244,13 @@ that change was made), each fixed and re-verified before moving on to Haiku:
   default applies to every tier and every run); apify/ai-team#261's CI workflow is expected to
   read it explicitly and re-pin it once measured in an environment without this fault.
 
-**Cost and time.** 9 full `--tier pr` runs (116 items each) across this calibration: 4
-`claude-opus-5` + 1 discarded + 3 official `claude-haiku-4-5` (plus 1 further-discarded Haiku
-attempt killed for unrelated sandbox CPU contention at the default concurrency). Each run took
-roughly 10-18 minutes wall-clock (build + 116 trials at `--concurrency 2` or `3`, `--claude-judge`
-on the Claude Agent SDK, `--subscription` billing so no per-token API cost was metered in this
-session).
+**Cost and time.** 13 full `--tier pr` runs (116 items each) were attempted; 7 are cited as
+evidence (the 4 Opus + 3 Haiku runs above), the other 6 discarded — 1 aborted Opus run and 5
+superseded/stalled Haiku runs at concurrency 3 (plus 1 further attempt at the default
+concurrency 8, killed for unrelated sandbox CPU contention before any trial completed). See
+`.shepherd/iter-1/claim.md`'s "Cost and time" for the full accounting. Each cited run took
+roughly 10-14 minutes wall-clock (build + 116 trials, `--claude-judge` on the Claude Agent SDK,
+`--subscription` billing so no per-token API cost was metered in this session).
 
 **Environment note (this sandbox only):** at the default `--concurrency 8`, a `pr`-tier run of
 116 items on this session's runner saturated the sandbox (a 4-core box briefly hit a load
