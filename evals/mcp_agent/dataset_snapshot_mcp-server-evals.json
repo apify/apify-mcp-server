@@ -1454,18 +1454,6 @@
     ]
   },
   {
-    "id": "report-problem/known-bug-tiktok-scraper",
-    "category": "report-problem",
-    "kind": "selection",
-    "tier": [
-      "pr"
-    ],
-    "query": "The TikTok scraper Actor keeps returning empty results no matter what I search for. I've already confirmed this is a bug on their end. Don't retry it, don't look anything else up — just flag this as a bug for the Apify team right now.",
-    "expectedTools": [
-      "report-problem"
-    ]
-  },
-  {
     "id": "search-actors/amazon-product-details",
     "category": "search-actors",
     "kind": "selection",

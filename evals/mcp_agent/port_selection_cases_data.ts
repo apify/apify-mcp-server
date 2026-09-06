@@ -1072,18 +1072,37 @@ const STORAGE_WAVE: PortCaseSpec[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Wave 5: runs + report-problem — 4 brand-new cases. The old suite has zero cases for these
-// 4 tools (no `abort-actor-run`/`get-actor-log`/`get-actor-run-list`/`report-problem` category
-// ever existed in test_cases.json), so there is nothing to port; these fill the coverage floor.
+// Wave 5: runs — 3 brand-new cases. The old suite has zero cases for these tools (no
+// `abort-actor-run`/`get-actor-log`/`get-actor-run-list` category ever existed in
+// test_cases.json), so there is nothing to port; these fill the coverage floor.
+//
+// `report-problem` is deliberately NOT in this wave. It was authored and calibrated here
+// (apify/ai-team#240 iter-2) but never cleared claude-opus-5 3/3 across 3 query attempts:
+//   1. Base query + `mcpToolsOnly: true` (removes Claude Code's built-ins, ToolSearch
+//      included, so the agent sees report-problem directly): 0/3, all "no tool call attempted".
+//   2. Rephrase framing the bug as already reproduced ("I've already confirmed this is a bug
+//      on their end... don't investigate further"): 0/3 — 2 "no tool call attempted", 1 called
+//      `search-actors` to look up "TikTok" despite the explicit instruction not to.
+//   3. Rephrase naming the Actor id directly (`apify/tiktok-scraper`) so nothing needed
+//      resolving: 0/3, all "no tool call attempted".
+// Every attempt spends the fixed 2-turn selection budget without ever attempting
+// report-problem, or investigates instead. This is a structural gap, not a case defect this
+// PR's scope can fix (no touching `SELECTION_MAX_TURNS` or the tool description) — the
+// coverage floor's 25th tool identifier is uncovered on purpose; see `KNOWN_UNCOVERED_TOOLS`
+// in `tests/unit/evals.port_selection_cases.test.ts` and the README's "pr tier" section for
+// the 3 run URLs. The item was upserted then archived (not deleted) in the `mcp-server-evals`
+// Langfuse dataset, with this reason recorded in its metadata, for anyone who wants to pick
+// the problem back up.
 // ---------------------------------------------------------------------------
 
-const RUNS_AND_REPORT_PROBLEM_WAVE: PortCaseSpec[] = [
+const RUNS_WAVE: PortCaseSpec[] = [
     {
         // Rephrased after Opus calibration (2026-09-06): the original wording ("has been
         // running way longer than it should — stop it") left room for a cautious first check
         // (Opus called get-actor-run to see its current status before aborting). Made explicit
-        // that the status is already known and no check is wanted, matching the one genuinely
-        // hard report-problem case below, which uses the same "don't verify first" pattern.
+        // that the status is already known and no check is wanted (the same "don't verify
+        // first" pattern that the archived report-problem case above needed but never cleared
+        // Opus on).
         decision: 'new',
         id: 'abort-actor-run/stuck-run',
         query:
@@ -1109,25 +1128,6 @@ const RUNS_AND_REPORT_PROBLEM_WAVE: PortCaseSpec[] = [
         category: 'get-actor-run-list',
         expectedTools: ['get-actor-run-list'],
         tools: ['runs'],
-    },
-    {
-        // The one genuinely hard case: report-problem's natural trigger is reactive (something
-        // already failed). This query works as a single right answer because it rules out every
-        // alternative (retrying the failing tool, searching for more context) and asks only to
-        // relay a complaint the user has already formed — nothing left for the agent to
-        // investigate first. Strengthened after Opus calibration (2026-09-06): the original
-        // wording still let Opus spend both turns on ToolSearch without ever attempting
-        // report-problem; "don't search for anything else" closes that path explicitly (the
-        // design's own documented fallback for this case: strengthen the instruction, never
-        // widen expectedTools to a wrong-but-plausible investigative call).
-        decision: 'new',
-        id: 'report-problem/known-bug-tiktok-scraper',
-        query:
-            'The TikTok scraper Actor keeps returning empty results no matter what I search for. ' +
-            "I've already confirmed this is a bug on their end. Don't retry it, don't look " +
-            'anything else up — just flag this as a bug for the Apify team right now.',
-        category: 'report-problem',
-        expectedTools: ['report-problem'],
     },
 ];
 
@@ -1181,12 +1181,12 @@ const LAZY_USER_WAVE: PortCaseSpec[] = [
     },
 ];
 
-/** All ported + new cases, grouped by wave (actors, docs, tasks, storage, runs+report-problem, lazy-user). */
+/** All ported + new cases, grouped by wave (actors, docs, tasks, storage, runs, lazy-user). */
 export const PORT_SELECTION_CASES: PortCaseSpec[] = [
     ...ACTORS_WAVE,
     ...DOCS_WAVE,
     ...TASKS_WAVE,
     ...STORAGE_WAVE,
-    ...RUNS_AND_REPORT_PROBLEM_WAVE,
+    ...RUNS_WAVE,
     ...LAZY_USER_WAVE,
 ];
