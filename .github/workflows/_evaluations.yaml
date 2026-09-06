@@ -28,7 +28,11 @@ jobs:
     evaluations:
         name: MCP agent evaluations (${{ inputs.tier }})
         runs-on: ubuntu-latest
-        timeout-minutes: 20
+        # Generous, provisional ceilings — neither tier has been timed on a real runner yet.
+        # The labeled run measures actual durations; tighten these once real numbers exist
+        # (see evals/mcp_agent/README.md's CI section, same "measure then tune" treatment as
+        # PR_TIER_PASS_THRESHOLD and --concurrency).
+        timeout-minutes: ${{ inputs.tier == 'pr' && 30 || 90 }}
         steps:
             -   name: Validate tier input
                 run: |
