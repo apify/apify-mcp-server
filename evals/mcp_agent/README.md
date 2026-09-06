@@ -191,9 +191,10 @@ or investigates instead of reporting. This is structural — no single-turn quer
 either that constant or the tool description, both out of this issue's scope. The case was
 upserted then **archived** (not deleted) in the live `mcp-server-evals` dataset, with this
 reason recorded in its metadata, and the coverage test carries an explicit, commented exclusion
-for it (`tests/unit/evals.port_selection_cases.test.ts`). **Success criterion 1.5 / 4.4 ("every
-one of the 25 tool identifiers has ≥1 case") is therefore NOT MET for `report-problem`** — 24 of
-25 tools are covered; this one is a documented, structural gap, not a silent omission.
+for it (`tests/unit/evals.port_selection_cases.test.ts`). **`report-problem` has no `pr`-tier
+case** — 24 of the 25 tool identifiers are covered, not 25; this is a documented, structural
+gap (see above), accepted for now and tracked as a follow-up (a later change may touch
+`SELECTION_MAX_TURNS` or the tool description), not a silent omission.
 
 **Per-tool coverage** (count of `pr`-tier selection cases whose `expectedTools` includes it; 24
 of the 25 non-widget tool identifiers have at least 1 — see above for the one exception):
@@ -320,13 +321,40 @@ model's floor off 3 separate runs.
   vs. reproducible before fixing.
 - 6 full `--tier pr` runs (115 items each): 3 `claude-opus-5` (2 discarded — each found a
   genuine, fixed case defect; the 3rd is the cited clean baseline) + 3 `claude-haiku-4-5` (all 3
-  cited, no edits between them). 3 cited + 3 discarded = 6, matching this list exactly.
+  cited, no edits between them). 4 cited (1 Opus + 3 Haiku) + 2 discarded (2 Opus) = 6, matching
+  this list exactly.
+
+`--subscription` billing metered no per-token API cost in this session, so the dollar figures
+below are computed after the fact from each cited run's own token usage, pulled from Langfuse
+(`GET /api/public/v2/observations?fields=basic,usage&type=GENERATION&environment=sdk-experiment`,
+summed over each run's `startTime`/`endTime` window — this instance is Langfuse v4 events-only,
+so there is no dataset-run-cost endpoint to read instead) and priced at list rates (Anthropic's
+published list prices as of June 2026): `claude-opus-5` $5.00 / $25.00 per MTok input/output,
+`claude-haiku-4-5` $1.00 / $5.00, with cache write at ~1.25× and cache read at ~0.1× the input
+rate (the SDK docs' own cache-cost multipliers). Langfuse's dashboard reports a different, lower
+cost for these same runs (its own pricing table, not list price) — not used here:
+
+| run | model | input tok | cache write tok | cache read tok | output tok | cost @ list price |
+|---|---|---|---|---|---|---|
+| `5ff91a0f929438cb` (Opus, clean baseline) | opus | 402,644 | 259,878 | 6,343,948 | 56,998 | **$8.23** |
+| `0b331d119ab12b7c` (Haiku #1) | haiku | 1,768 | 844,902 | 5,372,095 | 43,343 | **$1.81** |
+| `46b26f6ccda3663f` (Haiku #2) | haiku | 1,839 | 284,060 | 6,122,526 | 45,756 | **$1.20** |
+| `1977e527d82e9601` (Haiku #3) | haiku | 1,744 | 198,092 | 5,856,061 | 41,875 | **$1.04** |
+
+`MODELS.agent` (`config.ts`) is `claude-haiku-4-5` — Haiku, not Opus, is the model a `pr`-tier CI
+gate actually runs, so the Haiku rows are the relevant per-run cost: **$1.04-$1.81 per 115-item
+run** (mean ≈$1.35), roughly $0.01-$0.016 per item. **This corrects apify/ai-team#240's "<$1 per
+run" estimate — none of the 3 measured Haiku runs came in under $1**, the closest being $1.04.
+The Opus clean baseline (**$8.23/run**) is a calibration-only cost, not a per-PR one.
 
 Each full-tier run took roughly 12-15 minutes wall-clock (`pnpm run build` + 115 trials,
-`--claude-judge` on the Claude Agent SDK, `--subscription` billing so no per-token API cost was
-metered in this session) — above the issue's original 3-6 minute estimate, consistent with every
-prior calibration pass on this suite; the smaller diagnostic/verification runs took 1-3 minutes
-each.
+`--claude-judge` on the Claude Agent SDK) — 2-3× over the issue's original 3-6 minute estimate,
+consistent with every prior calibration pass on this suite; the smaller diagnostic/verification
+runs took 1-3 minutes each. Per-run wall-clock (Langfuse `startTime`/`endTime`): `5ff91a0f929438cb`
+15m16s, `0b331d119ab12b7c` 11m47s, `46b26f6ccda3663f` 11m46s, `1977e527d82e9601` 12m54s — all
+measured at `--concurrency 2` on this sandbox's 4-core box (see "Environment note" below). The
+time on a GitHub-hosted runner at the default `--concurrency 8` is pending the first CI run
+(apify/ai-team#261) — not measured here.
 
 **Environment note (this sandbox only):** trials intermittently drop with `API Error: Unable to
 connect to API: Self-signed certificate detected` — a direct, unproxied TLS handshake failure

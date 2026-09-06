@@ -177,6 +177,41 @@ describe('findUnsafeCollisions()', () => {
     });
 });
 
+/**
+ * Offline collision check against the real non-selection (`kind: agent`) ids, read from the
+ * committed dataset snapshot rather than Langfuse, so this stays zero-network. This is the same
+ * check `port_selection_cases.ts`'s CLI runs live against `liveNonSelectionIds` before any write
+ * — here it runs against a fixed, checked-in set instead.
+ */
+describe('findUnsafeCollisions() against the committed snapshot', () => {
+    const snapshotRows = readJsonFile<{ id: string; kind: string }[]>(
+        import.meta.url,
+        '../../evals/mcp_agent/dataset_snapshot_mcp-server-evals.json',
+    );
+    const agentIds = snapshotRows.filter((row) => row.kind === 'agent').map((row) => row.id);
+
+    it('the snapshot has exactly 60 kind: agent ids', () => {
+        expect(agentIds).toHaveLength(60);
+    });
+
+    it('the real authoring table collides with none of the live kind: agent ids', () => {
+        expect(findUnsafeCollisions(PORT_SELECTION_CASES, new Set(agentIds))).toEqual([]);
+    });
+
+    it('flags a fabricated row whose id equals a real kind: agent id', () => {
+        const rows = [
+            {
+                decision: 'new' as const,
+                id: agentIds[0],
+                query: 'q',
+                category: 'x',
+                expectedTools: ['x'],
+            },
+        ];
+        expect(findUnsafeCollisions(rows, new Set(agentIds))).toEqual([agentIds[0]]);
+    });
+});
+
 describe('PORT_SELECTION_CASES: id scheme', () => {
     it('every id has exactly one "/" and the prefix is a real tool family', () => {
         const requiredToolIdentifiers = new Set(computeRequiredToolIdentifiers());
@@ -244,9 +279,10 @@ const PRE_EXISTING_SELECTION_EXPECTED_TOOLS: string[][] = [
  * makes report-problem the first call within `SELECTION_MAX_TURNS`, not fixable by editing the
  * query further within this PR's scope (no touching `SELECTION_MAX_TURNS` or the tool
  * description). The case was upserted then archived (not deleted) in the live `mcp-server-evals`
- * Langfuse dataset, with this reason in its metadata. Coverage criterion 1.5/4.4 ("every one of
- * the 25 tool identifiers has >= 1 case") is therefore NOT MET for this one tool — tracked here
- * explicitly, rather than hidden by shrinking the required-identifier count.
+ * Langfuse dataset, with this reason in its metadata. This tool has no `pr`-tier case, so 24 of
+ * the 25 tool identifiers are covered, not 25 — accepted for now and tracked as a follow-up (a
+ * later change may touch `SELECTION_MAX_TURNS` or the tool description), tracked here explicitly
+ * rather than hidden by shrinking the required-identifier count.
  */
 const KNOWN_UNCOVERED_TOOL_IDENTIFIERS: readonly string[] = [HELPER_TOOLS.PROBLEM_REPORT];
 
