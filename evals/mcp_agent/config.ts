@@ -50,6 +50,26 @@ export const MODELS = {
 export const MAX_CONVERSATION_TURNS = 10;
 
 /**
+ * Minimum aggregate pass rate the `pr` tier must clear, calibrated from 3 consecutive
+ * `claude-haiku-4-5 --tier pr` runs (apify/ai-team#240) after a clean `claude-opus-5 --tier pr`
+ * run. Not wired as `run_mcp_agent_evals.ts`'s `--pass-threshold` CLI default (that default
+ * applies to every tier and every run; repointing it here would silently change behavior for
+ * `full`-tier and non-CI runs) — read explicitly by whatever consumes it (apify/ai-team#261's CI
+ * workflow). See README.md's "The `pr` tier" section for the 3 run URLs and rates.
+ *
+ * PROVISIONAL: calibrated in a sandbox whose TLS proxy intermittently drops trials with
+ * "Self-signed certificate detected" against api.anthropic.com — a sandbox network fault
+ * unrelated to case quality, not expected on a real CI runner. This is the floor of the
+ * *honest completed rate* per run: passed / (requested - TLS-cert drops), i.e. an SDK-level
+ * "Reached maximum number of turns (2)" drop still counts against the rate (it is the agent
+ * running out of its turn budget without ever attempting a tool call, not a sandbox fault) even
+ * though it is also dropped, not scored, by the harness. The 3 runs' honest rates were 0.9434
+ * (100/106), 0.9381 (106/113), and 0.9429 (99/105) — floor 0.9381, rounded down to 0.93. Confirm
+ * on the first CI run (apify/ai-team#261) and re-pin once measured without the TLS fault.
+ */
+export const PR_TIER_PASS_THRESHOLD = 0.93;
+
+/**
  * Default timeout for MCP tool calls (in seconds)
  * This is the maximum time to wait for a single tool call to complete.
  *

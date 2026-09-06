@@ -53,7 +53,8 @@ Every item is `mcp-server-evals`, no per-family or per-suite dataset split. Each
   pick, no judge, nothing executes - see "Selection mode" below).
 - `tier`: `["pr"]`, `["full"]`, or both — which run(s) include the item (`--tier` filters on
   this). Everything migrated from the old per-family datasets is `tier: ["full"]`; new
-  `pr`-tier items are `kind: "selection"`, so a PR gate can run in seconds, not minutes.
+  `pr`-tier items are `kind: "selection"`, so a PR gate spends no judge tokens and executes no
+  tools — see the measured wall-clock and cost under "The `pr` tier" below.
 - `expectedErrors` (optional, `kind: "agent"` only): tool names allowed to fail on this item
   without failing the zero-tool-error gate below. The gate exempts only the named tools; any
   other tool's failure still fails the item.
@@ -161,6 +162,237 @@ Scoring (`first_tool_match`, 1 or 0):
 
 A denied selection call still shows as a failed (ERROR) MCP tool span in its trace - harmless
 (`tool_errors` never runs for selection items), but expected; don't "fix" it.
+
+### The `pr` tier: port, coverage, and calibration (apify/ai-team#240)
+
+The `pr` tier is 115 `kind: "selection"` items: 5 from #260's original set plus 110 from
+apify/ai-team#240's port of `evals/test_cases.json` (the old Phoenix runner's 106-case
+next-tool-prediction suite, now archived for deletion under #262) — 103 kept/rephrased/widened
+old cases, a 3-case coverage wave for tools the old suite never exercised (`abort-actor-run`,
+`get-actor-log`, `get-actor-run-list`), and a 4-case lazy-user wave (typo, vague goal, missing
+parameter, wrong Actor name). 3 of the 106 old ids are archived as exact-duplicate queries, not
+ported; every one of the 106 is accounted for (ported id or archive reason) in
+`evals/mcp_agent/port_selection_cases_data.ts`.
+
+**`report-problem` has zero `pr`-tier coverage, on purpose.** A `report-problem` case was
+authored and calibrated (see "Calibration" below) but never cleared `claude-opus-5` 3/3 across 3
+query attempts, each isolating a different hypothesis:
+1. The original query + `mcpToolsOnly: true` (removes Claude Code's built-ins, `ToolSearch`
+   included, so the agent sees `report-problem` directly in its tool list): 0/3, every trial "no
+   tool call attempted".
+2. A rephrase framing the bug as already reproduced and ruling out investigation explicitly
+   ("I've already confirmed this is a bug on their end... don't investigate further"): 0/3 — 2
+   "no tool call attempted", 1 called `search-actors` to look up "TikTok" anyway.
+3. A rephrase naming the Actor id directly (`apify/tiktok-scraper`) so nothing needed resolving:
+   0/3, every trial "no tool call attempted".
+
+Every attempt spends the fixed 2-turn selection budget without ever attempting `report-problem`,
+or investigates instead of reporting. This is structural — no single-turn query makes
+`report-problem` the first call within `SELECTION_MAX_TURNS`, and fixing it would mean touching
+either that constant or the tool description, both out of this issue's scope. The case was
+upserted then **archived** (not deleted) in the live `mcp-server-evals` dataset, with this
+reason recorded in its metadata, and the coverage test carries an explicit, commented exclusion
+for it (`tests/unit/evals.port_selection_cases.test.ts`). **`report-problem` has no `pr`-tier
+case** — 24 of the 25 tool identifiers are covered, not 25; this is a documented, structural
+gap (see above), accepted for now and tracked as a follow-up (a later change may touch
+`SELECTION_MAX_TURNS` or the tool description), not a silent omission.
+
+**Per-tool coverage** (count of `pr`-tier selection cases whose `expectedTools` includes it; 24
+of the 25 non-widget tool identifiers have at least 1 — see above for the one exception):
+
+| tool | count | tool | count |
+|---|---|---|---|
+| `call-actor` | 7 | `get-key-value-store-list` | 2 |
+| `fetch-actor-details` | 18 | `get-key-value-store` | 2 |
+| `abort-actor-run` | 1 | `get-key-value-store-keys` | 2 |
+| `get-actor-run` | 1 | `get-key-value-store-record` | 3 |
+| `get-actor-log` | 2 | `search-actors` | 34 |
+| `get-actor-run-list` | 1 | `search-apify-docs` | 10 |
+| `get-actor-task` | 12 | `fetch-apify-docs` | 2 |
+| `create-actor-task` | 2 | `report-problem` | **0** (see above) |
+| `update-actor-task` | 5 | `apify--rag-web-browser` | 13 |
+| `publish-actor-task` | 3 | `apify--web-fetch` | 1 |
+| `unpublish-actor-task` | 2 | | |
+| `get-dataset` | 3 | | |
+| `get-dataset-list` | 3 | | |
+| `get-dataset-items` | 7 | | |
+| `get-dataset-schema` | 3 | | |
+
+**Calibration.** Per the `creating-mcp-agent-evals` skill: calibrate on the strongest model
+first (a failure there is a case defect, never a description problem), then read the target
+model's floor off 3 separate runs.
+
+- `claude-opus-5 --tier pr --subscription --claude-judge`, concurrency 2, 3 full runs before a
+  clean one:
+  1. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/4b1706ad6627c95f) —
+     107/115, 4 failures, all "no tool call attempted" on otherwise plain, unambiguous queries
+     (`apify--rag-web-browser/tech-industry-news`, `create-actor-task/google-search-pizza`,
+     `search-actors/flight-data-booking-sites`, `search-actors/instagram-posts-generic`) plus 4
+     TLS-cert drops. A targeted 3-iteration reproduction on all 4
+     ([run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/b7f35643bea1cf8a))
+     showed the two `search-actors` items pass 3/3 (noise, not a case defect) while
+     `apify--rag-web-browser/tech-industry-news` and `create-actor-task/google-search-pizza`
+     each failed 1/3 — an intermittent (not deterministic) version of the same built-in-`ToolSearch`
+     detour documented for `report-problem` above. Fixed by setting `mcpToolsOnly: true` on those
+     2 items (removes the detour), confirmed clean at 4/4 and 5/5 completed trials respectively
+     in a follow-up
+     [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/d105265a4013ebfa).
+  2. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/e6f47eb9029e63a1) —
+     95/115, 2 new failures of the same intermittent `ToolSearch`-detour pattern
+     (`apify--rag-web-browser/ai-blog-articles`, `get-dataset-list/list-all`) plus 18 TLS-cert
+     drops. Fixed the same way (`mcpToolsOnly: true`).
+  3. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/5ff91a0f929438cb) —
+     **110/115, zero `first_tool_match` failures**, 5 TLS-cert drops (all "Self-signed
+     certificate detected", zero `Reached maximum number of turns`). **Clean Opus baseline.**
+
+  The `ToolSearch`-detour pattern (both this intermittent form and `report-problem`'s
+  deterministic one) is a real, low-frequency (~2 items per 115-item run, ~2%) cost of running
+  with Claude Code's built-in tools on: the agent occasionally spends its whole 2-turn selection
+  budget searching for a tool that is already directly in its list. `mcpToolsOnly: true` (already
+  in the schema for the MCP-vs-MCP axis) removes it item-by-item; the 6 items above needed it,
+  found by running the full tier repeatedly rather than by inspection.
+
+- `claude-haiku-4-5 --tier pr --subscription --claude-judge`, 3 separate runs at concurrency 2
+  (not `--iterations 3`, each its own dataset run), after all of the above fixes, with **no case
+  edits between the three**:
+
+  | # | Requested | TLS-cert drops | Max-turns drops | Passed | Raw pass_rate | Honest rate (passed / (requested − TLS-cert drops)) | Run |
+  |---|---|---|---|---|---|---|---|
+  | 1 | 115 | 9 | 2 | 100 | 0.87 | 100/106 = **0.9434** | [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/0b331d119ab12b7c) |
+  | 2 | 115 | 2 | 4 | 106 | 0.92 | 106/113 = **0.9381** | [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/46b26f6ccda3663f) |
+  | 3 | 115 | 10 | 2 | 99 | 0.86 | 99/105 = **0.9429** | [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/1977e527d82e9601) |
+
+  The honest rate keeps a `Reached maximum number of turns (2)` drop in the denominator as a
+  failure — it is the agent exhausting its turn budget without ever attempting a tool call
+  (agent behavior), not a sandbox artifact, even though the harness drops rather than scores the
+  trial. Only "Self-signed certificate detected" drops (the sandbox TLS fault, see "Environment
+  note" below) are excluded from the denominator. No case was edited between the 3 runs; two
+  items failed somewhere in the series — `fetch-actor-details/typo-actor-name` never passed
+  (failed choosing `search-actors` in runs 1 and 3, dropped on a max-turns exhaustion in run 2)
+  and `search-apify-docs/mcp-server-docs` passed run 1 then failed "no tool call attempted" in
+  runs 2 and 3 — both pass cleanly on the clean Opus baseline above, so per the "fix only if Opus also
+  flags it" rule these are Haiku-only weaknesses, not case defects; see Follow-up findings below.
+
+- `PR_TIER_PASS_THRESHOLD` (`config.ts`) = **0.93** — the floor of the 3 runs' honest rates
+  (0.9434, 0.9381, 0.9429), rounded down to 2 decimals, **marked PROVISIONAL in `config.ts`'s
+  comment**. Not the floor of the raw rates (0.87, 0.92, 0.86): those fold in the sandbox TLS
+  fault's drops, which is not case quality. Not wired as `run_mcp_agent_evals.ts`'s
+  `--pass-threshold` CLI default (that default applies to every tier and every run);
+  apify/ai-team#261's CI workflow is expected to read it explicitly and re-pin it once measured
+  in an environment without this fault.
+
+**Follow-up findings** (documented, not fixed here):
+1. **`report-problem`'s `ToolSearch`-discoverability cost** (see above) — worth a dedicated
+   follow-up issue on whether `report-problem` needs a description change or selection-mode
+   items exercising it need special handling. Neither is in this issue's scope.
+2. **The intermittent built-in-`ToolSearch` detour is not fully eliminated**, only mitigated on
+   the 6 items observed to hit it across this calibration's runs. Any item could in principle hit
+   it on a future run at the same low background rate; `mcpToolsOnly` is the fix once one does,
+   not a preventive rewrite of every item (that would remove built-in-vs-MCP competition testing
+   from cases designed to exercise it, e.g. `apify--web-fetch` vs. the built-in `WebFetch`).
+3. **Two Haiku-only weaknesses that recurred across the series, both clean on the Opus
+   baseline.** `fetch-actor-details/typo-actor-name` never actually passed in the 3 official
+   runs: it chose `search-actors` in run 1, was dropped on a max-turns exhaustion in run 2 (the
+   same class as Follow-up finding 5 below), and chose `search-actors` again in run 3.
+   `search-apify-docs/mcp-server-docs` passed run 1 but hit "no tool call attempted" in both
+   runs 2 and 3. Since both pass on Opus and neither case's query is unusual or ambiguous, these
+   read as Haiku-specific tool-selection weaknesses worth a description pass in a follow-up PR —
+   not fixed here per this issue's scope (no touching tool descriptions to chase a Haiku floor).
+4. **Single-occurrence Haiku-only scored failures, never reproduced**: `call-actor/
+   instagram-scraper-hashtag` chose `search-actors` (run 1); `fetch-apify-docs/nonexistent-page`
+   called `apify--web-fetch` (run 1); `get-actor-run/status` hit "no tool call attempted" after a
+   skipped `ToolSearch` capture (run 1); `search-actors/amazon-product-details` hit "no tool call
+   attempted" (run 2); `search-actors/flight-data-extraction` delegated to Claude Code's `Agent`
+   (subagent) tool instead of calling `search-actors` directly (run 2); `fetch-actor-details/
+   nonexistent-actor` hit "no tool call attempted" (run 3); `apify--rag-web-browser/
+   sf-weather-forecast` called Claude Code's `Skill` tool instead (run 3). Consistent with
+   general Haiku tool-selection noise rather than any one case's wording — none repeated, so
+   none were candidates for a case fix under the "fix only if Opus also flags it" rule.
+5. **A selection item that exhausts `maxTurns` without ever attempting a tool call is dropped by
+   the runner (an unscored, thrown trial), not scored `first_tool_match = 0`.** #260's design
+   intended the latter ("no tool call attempted" as a scored failure, matching the wording
+   `SELECTION_DENY_REASON` primes the agent to expect). Tracked for #261/#265, not fixed here
+   (would mean changing the runner, out of this issue's scope).
+
+**Cost and time.** This calibration ran 11 live evaluations total, none an oracle command:
+- 3 single-item, 3-iteration `report-problem` verification runs (concurrency 1) — all 0/3,
+  leading to archiving the case (see above). Not full-tier runs; no dataset-wide pass rate.
+- 2 diagnostic runs isolating the `ToolSearch`-detour items (one 4-item × 3-iteration run, one
+  2-item × 5-iteration run) — not full-tier runs, used only to confirm which failures were noise
+  vs. reproducible before fixing.
+- 6 full `--tier pr` runs (115 items each): 3 `claude-opus-5` (2 discarded — each found a
+  genuine, fixed case defect; the 3rd is the cited clean baseline) + 3 `claude-haiku-4-5` (all 3
+  cited, no edits between them). 4 cited (1 Opus + 3 Haiku) + 2 discarded (2 Opus) = 6, matching
+  this list exactly.
+
+`--subscription` billing metered no per-token API cost in this session, so the dollar figures
+below are computed after the fact from each cited run's own token usage, pulled from Langfuse
+(`GET /api/public/v2/observations?fields=basic,usage&type=GENERATION&environment=sdk-experiment`,
+summed over each run's `startTime`/`endTime` window — this instance is Langfuse v4 events-only,
+so there is no dataset-run-cost endpoint to read instead) and priced at list rates (Anthropic's
+published list prices as of June 2026): `claude-opus-5` $5.00 / $25.00 per MTok input/output,
+`claude-haiku-4-5` $1.00 / $5.00, with cache write at ~1.25× and cache read at ~0.1× the input
+rate (the SDK docs' own cache-cost multipliers). Langfuse's dashboard reports a different, lower
+cost for these same runs (its own pricing table, not list price) — not used here:
+
+| run | model | input tok | cache write tok | cache read tok | output tok | cost @ list price |
+|---|---|---|---|---|---|---|
+| `5ff91a0f929438cb` (Opus, clean baseline) | opus | 402,644 | 259,878 | 6,343,948 | 56,998 | **$8.23** |
+| `0b331d119ab12b7c` (Haiku #1) | haiku | 1,768 | 844,902 | 5,372,095 | 43,343 | **$1.81** |
+| `46b26f6ccda3663f` (Haiku #2) | haiku | 1,839 | 284,060 | 6,122,526 | 45,756 | **$1.20** |
+| `1977e527d82e9601` (Haiku #3) | haiku | 1,744 | 198,092 | 5,856,061 | 41,875 | **$1.04** |
+
+`MODELS.agent` (`config.ts`) is `claude-haiku-4-5` — Haiku, not Opus, is the model a `pr`-tier CI
+gate actually runs, so the Haiku rows are the relevant per-run cost: **$1.04-$1.81 per 115-item
+run** (mean ≈$1.35), roughly $0.01-$0.016 per item. **This corrects apify/ai-team#240's "<$1 per
+run" estimate — none of the 3 measured Haiku runs came in under $1**, the closest being $1.04.
+The Opus clean baseline (**$8.23/run**) is a calibration-only cost, not a per-PR one.
+
+Each complete `pr`-tier run (all 115 selection items; not the `full` tier, which is the 60
+agent items) took roughly 12-15 minutes wall-clock — 2-3× over the issue's original 3-6 minute
+estimate,
+consistent with every prior calibration pass on this suite; the smaller diagnostic/verification
+runs took 1-3 minutes each. Per-run wall-clock, measuring the experiment only — Langfuse
+`startTime`/`endTime`, which begins after the package script's `pnpm run build`:
+`5ff91a0f929438cb`
+15m16s, `0b331d119ab12b7c` 11m47s, `46b26f6ccda3663f` 11m46s, `1977e527d82e9601` 12m54s — all
+measured at `--concurrency 2` on this sandbox's 4-core box (see "Environment note" below). The
+time on a GitHub-hosted runner at the default `--concurrency 8` is pending the first CI run
+(apify/ai-team#261) — not measured here.
+
+**Environment note (this sandbox only):** trials intermittently drop with `API Error: Unable to
+connect to API: Self-signed certificate detected` — a direct, unproxied TLS handshake failure
+against `api.anthropic.com` (it's in the proxy's own `noProxy` list, so this is not a proxy
+misconfiguration) — at a rate of roughly 2-16% per run in this calibration, even at
+`--concurrency 2`. A smaller number of drops are `Reached maximum number of turns (2)` instead —
+a distinct, SDK-level exhaustion of the fixed 2-turn selection budget (see Follow-up finding 5),
+not the TLS fault. Neither is evidence about case quality: every calibration run in this section
+used `--concurrency 2` (the default 8 previously saturated this sandbox's 4-core box). The
+calibration numbers report both the raw pass rate (dropped trials counted as failed, per the
+metric's definition) and the *honest* rate (`passed / (requested - TLS-cert drops)`, keeping
+max-turns drops as failures) so sandbox network health and case/model quality aren't conflated;
+`PR_TIER_PASS_THRESHOLD` is pinned PROVISIONAL off the latter, pending confirmation on a real CI
+runner (apify/ai-team#261) where this fault is not expected to reproduce.
+
+**Adding a `pr`-tier selection case:**
+1. Add a row to `evals/mcp_agent/port_selection_cases_data.ts`'s `PORT_SELECTION_CASES` array:
+   `id` (`<category>/<slug>`, `<category>` a real tool identifier), `query` (self-contained user
+   language, no tool names in easy/medium cases), `category`, `expectedTools`, and — only when
+   `expectedTools` names exactly one tool and the query pins an argument — `expectedArgs`. Add
+   `tools: ["runs" | "storage" | "tasks"]` if the tool isn't default-served (see the coverage
+   table's tools above `get-dataset-items`/`get-key-value-store-record`, which are
+   auto-injected). Add `mcpToolsOnly: true` for an MCP-vs-MCP axis case (see
+   `apify--rag-web-browser/*` above) or, after a full-tier run shows a plain, unambiguous query
+   losing its 2-turn budget to a `ToolSearch` detour, as the fix for that (see "Calibration"
+   above) — never as a preventive default.
+2. `pnpm run evals:mcp-agent:port-selection-cases -- --dry-run` — validates every row and
+   prints the plan; touches nothing, needs no network.
+3. `pnpm run evals:mcp-agent:port-selection-cases` — upserts by id (idempotent; re-running is a
+   no-op replay of unchanged rows).
+4. `pnpm run evals:mcp-agent:export-dataset` — re-export the committed snapshot so the diff
+   shows the new case.
+5. `pnpm run test:unit -- evals.port_selection_cases` — the coverage/collision/validation
+   assertions run against the updated table.
 
 ### Permission path, and running under root
 

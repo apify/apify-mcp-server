@@ -79,9 +79,9 @@ const TARGET_DATASET_DESCRIPTION =
     'tier (pr/full), and expectedErrors, replacing the old per-family and *-errors datasets.';
 
 /**
- * Tools allowed to fail on each of the 8 error items, hardcoded from the fact-check's live
- * probe of the source items (none of them set the `failTools` knob, so this cannot be derived
- * from the source item itself). Keyed by the new `<category>/<slug>` id.
+ * Tools allowed to fail on each of the 8 error items, hardcoded from a live probe of the source
+ * items taken while authoring this migration (none of them set the `failTools` knob, so this
+ * cannot be derived from the source item itself). Keyed by the new `<category>/<slug>` id.
  *
  * `web-selection/blocked-native` names only `apify--rag-web-browser`: the client's own
  * built-in fetch may also fail on that item, but built-in tool failures are already exempt
