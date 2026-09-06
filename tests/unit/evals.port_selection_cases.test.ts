@@ -142,7 +142,7 @@ describe('findUnsafeCollisions()', () => {
         expect(findUnsafeCollisions(PORT_SELECTION_CASES, new Set())).toEqual([]);
     });
 
-    it('BURNED_LIVE_IDS names exactly the 4 slugs the fact-check found already claimed', () => {
+    it('BURNED_LIVE_IDS names exactly the 4 slugs #260 already claimed live', () => {
         expect(BURNED_LIVE_IDS).toEqual([
             'call-actor/rag-web-browser',
             'fetch-actor-details/input-schema',
@@ -196,8 +196,8 @@ describe('PORT_SELECTION_CASES: validation', () => {
 });
 
 /**
- * The 5 `pr`-tier selection items #260 already added, before this port. Hardcoded from the
- * fact-check's live probe (`_request_fact_check.md` §4) rather than fetched, so the coverage
+ * The 5 `pr`-tier selection items #260 already added, before this port. Hardcoded from a live
+ * probe of the dataset taken while authoring this table, rather than fetched, so the coverage
  * test below stays zero-network; `findUnsafeCollisions`'s live-id check (network, in
  * `port_selection_cases.ts`) is the runtime guard that these stay accurate.
  */

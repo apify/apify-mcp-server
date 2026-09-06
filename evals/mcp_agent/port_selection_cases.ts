@@ -35,7 +35,12 @@ import { PORT_SELECTION_CASES, type PortCaseSpec } from './port_selection_cases_
 // passes it to node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
 sanitizeProcessEnv();
 
-/** The 4 live selection-item slugs a careless new id must not reuse (see 2-design.md, fact-check §4). */
+/**
+ * The 4 live selection-item slugs a careless new id must not reuse: `#260`'s original 5-item
+ * `pr`-tier set already holds `call-actor/rag-web-browser`, `fetch-actor-details/input-schema`,
+ * `search-actors/tiktok-scraper`, and `get-actor-run/status` (the 5th, `web-fetch/example-com`,
+ * doesn't collide with anything this port authors).
+ */
 export const BURNED_LIVE_IDS: readonly string[] = [
     'call-actor/rag-web-browser',
     'fetch-actor-details/input-schema',
