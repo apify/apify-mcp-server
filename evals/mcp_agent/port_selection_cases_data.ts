@@ -234,10 +234,16 @@ const ACTORS_WAVE: PortCaseSpec[] = [
         expectedTools: ['search-actors'],
     },
     {
+        // Rephrased after it failed on both `claude-opus-5` (run 2) and `claude-haiku-4-5`
+        // (multiple runs) with "no tool call attempted, ToolSearch exhausted the 2-turn
+        // budget" — a genuine cross-model case defect, not a Haiku-only weakness (Opus failed
+        // it too). Root cause: "MCP server" is self-referential in this harness (the agent
+        // itself runs as an MCP client), which sent both models down a ToolSearch detour
+        // instead of committing to search-actors. Rephrased to drop "MCP server" entirely.
         sourceId: 'search-actors-10',
-        decision: 'keep',
+        decision: 'rephrase',
         id: 'search-actors/playwright-mcp-server',
-        query: 'Search for Playwright browser MCP server',
+        query: 'Find an Actor that can automate a headless browser using Playwright.',
         category: 'search-actors',
         expectedTools: ['search-actors'],
     },
