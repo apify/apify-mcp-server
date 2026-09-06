@@ -117,6 +117,13 @@ One script per stateful family (`evals/mcp_agent/tasks_fixtures.ts` is the templ
 
 ## Coverage matrix (definition of done for the dataset)
 
+The matrix is generated, not hand-authored: run `pnpm run evals:coverage` and read the committed
+`evals/mcp_agent/coverage_matrix.md` (apify/ai-team#265) — don't write your own coverage table.
+Its "argument groups" are mechanical schema properties (every top-level `inputSchema` property, one
+level of nesting expanded into `parent.child`), not a curated semantic list — the create:
+input/name/config-style grouping below is only how to *think* about what a case should exercise, not
+what the matrix counts or reports.
+
 For each tool: at least one dedicated case, plus every argument group exercised somewhere (create: input/name/config; get: found + not-found; update: each independently updatable group; lifecycle tools: a clean happy-path case plus a requirement-discovery case with `expectedErrors` set). A tool exercised only as the tail of another case (like unpublish) is acceptable if a dedicated case would duplicate an existing one — say so explicitly when reporting coverage.
 
 ## Fixing tools from findings (order of preference)

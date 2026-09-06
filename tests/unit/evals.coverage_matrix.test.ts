@@ -7,23 +7,41 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
     buildCoverageMatrix,
+    type CoverageMatrix,
     countExercisedSpans,
     deriveArgumentGroups,
     fetchExperimentToolObservations,
     getDynamicToolIdentifiers,
     getWidgetToolIdentifiers,
+    type MeasuredCoverageMatrixRow,
     type ObservedToolSpan,
     readSnapshot,
     renderCoverageMatrixMarkdown,
     renderSummaryLines,
     resolveExercisedArgumentGroups,
     resolveInScopeToolIdentifiers,
+    resolveOutputPlan,
     resolveReachableToolNames,
 } from '../../evals/mcp_agent/coverage_matrix.js';
 import type { McpAgentTestCase } from '../../evals/mcp_agent/langfuse_dataset.js';
+import { SELECTION_DENY_REASON } from '../../evals/mcp_agent/selection_mode.js';
 import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../../evals/shared/config.js';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { readJsonFile } from '../../src/utils/generic.js';
+
+/** Look up a row by identifier, failing loudly (not with a vague `undefined`) if it's missing. */
+function requireRow(matrix: CoverageMatrix, identifier: string) {
+    const row = matrix.rows.find((r) => r.identifier === identifier);
+    if (row === undefined) throw new Error(`no coverage-matrix row for ${identifier}`);
+    return row;
+}
+
+/** Same, narrowed to a `measured` row — throws if the tool turned out dynamic or excluded. */
+function requireMeasuredRow(matrix: CoverageMatrix, identifier: string): MeasuredCoverageMatrixRow {
+    const row = requireRow(matrix, identifier);
+    if (row.kind !== 'measured') throw new Error(`expected a measured row for ${identifier}, got kind "${row.kind}"`);
+    return row;
+}
 
 describe('module entrypoint guard', () => {
     it('does not run the CLI on import: no process.exit', async () => {
@@ -50,7 +68,7 @@ describe('resolveInScopeToolIdentifiers()', () => {
     it('returns exactly 25 identifiers, ascending, no widgets, no retired names', () => {
         const identifiers = resolveInScopeToolIdentifiers();
         expect(identifiers).toHaveLength(25);
-        expect(identifiers).toEqual([...identifiers].sort((a, b) => a.localeCompare(b)));
+        expect(identifiers).toEqual([...identifiers].sort());
         expect(identifiers.some((name) => name.endsWith('-widget'))).toBe(false);
         expect(identifiers).toContain('apify--rag-web-browser');
         expect(identifiers).toContain('apify--web-fetch');
@@ -168,18 +186,18 @@ function agentCase(overrides: Partial<McpAgentTestCase> & Pick<McpAgentTestCase,
 describe('buildCoverageMatrix()', () => {
     it('marks a tool covered from a selection case naming it, with 0 argument groups covered when expectedArgs is absent', () => {
         const matrix = buildCoverageMatrix([selectionCase({ id: 's1', expectedTools: ['search-actors'] })]);
-        const row = matrix.rows.find((r) => r.identifier === 'search-actors');
-        expect(row?.status).toBe('covered');
-        expect(row?.prSelectionCaseCount).toBe(1);
-        expect(row?.coveredArgumentGroups).toEqual([]);
+        const row = requireMeasuredRow(matrix, 'search-actors');
+        expect(row.status).toBe('covered');
+        expect(row.prSelectionCaseCount).toBe(1);
+        expect(row.coveredArgumentGroups).toEqual([]);
     });
 
     it('covers an argument group when a selection case pins it in expectedArgs', () => {
         const matrix = buildCoverageMatrix([
             selectionCase({ id: 's1', expectedTools: ['search-actors'], expectedArgs: { keywords: 'weather' } }),
         ]);
-        const row = matrix.rows.find((r) => r.identifier === 'search-actors');
-        expect(row?.coveredArgumentGroups).toEqual(['keywords']);
+        const row = requireMeasuredRow(matrix, 'search-actors');
+        expect(row.coveredArgumentGroups).toEqual(['keywords']);
     });
 
     it('a pinned parent object covers every one of its nested child groups', () => {
@@ -190,8 +208,8 @@ describe('buildCoverageMatrix()', () => {
                 expectedArgs: { callOptions: { memory: 256 } },
             }),
         ]);
-        const row = matrix.rows.find((r) => r.identifier === 'call-actor');
-        expect(row?.coveredArgumentGroups).toEqual(
+        const row = requireMeasuredRow(matrix, 'call-actor');
+        expect(row.coveredArgumentGroups).toEqual(
             expect.arrayContaining([
                 'callOptions.memory',
                 'callOptions.timeout',
@@ -204,17 +222,17 @@ describe('buildCoverageMatrix()', () => {
 
     it('leaves a tool uncovered when it is only reachable via an agent case, never named by a selection case', () => {
         const matrix = buildCoverageMatrix([agentCase({ id: 'a1', tools: ['runs'], reference: 'ref' })]);
-        const row = matrix.rows.find((r) => r.identifier === 'get-actor-log');
-        expect(row?.status).toBe('uncovered');
-        expect(row?.prSelectionCaseCount).toBe(0);
-        expect(row?.fullAgentReachableCount).toBeGreaterThan(0);
+        const row = requireMeasuredRow(matrix, 'get-actor-log');
+        expect(row.status).toBe('uncovered');
+        expect(row.prSelectionCaseCount).toBe(0);
+        expect(row.fullAgentReachableCount).toBeGreaterThan(0);
     });
 
     it('reports the 2 default direct-Actor tools as dynamic, excluded from argument-group totals', () => {
         const matrix = buildCoverageMatrix([selectionCase({ id: 's1', expectedTools: ['apify--web-fetch'] })]);
-        const row = matrix.rows.find((r) => r.identifier === 'apify--web-fetch');
-        expect(row?.argumentGroups).toBe('dynamic');
-        expect(row?.status).toBe('covered');
+        const row = requireRow(matrix, 'apify--web-fetch');
+        expect(row.kind).toBe('dynamic');
+        expect(row.status).toBe('covered');
 
         const summary = renderSummaryLines(matrix);
         expect(summary[1]).toContain('2 dynamic Actor tools not statically measurable');
@@ -224,8 +242,8 @@ describe('buildCoverageMatrix()', () => {
         const matrix = buildCoverageMatrix([
             selectionCase({ id: 's1', expectedTools: [HELPER_TOOLS.STORE_SEARCH_WIDGET] }),
         ]);
-        const row = matrix.rows.find((r) => r.identifier === HELPER_TOOLS.STORE_SEARCH_WIDGET);
-        expect(row?.status).toBe('excluded');
+        const row = requireRow(matrix, HELPER_TOOLS.STORE_SEARCH_WIDGET);
+        expect(row.status).toBe('excluded');
     });
 
     it('folds in experiment-exercised argument groups alongside selection coverage', () => {
@@ -233,10 +251,84 @@ describe('buildCoverageMatrix()', () => {
         const matrix = buildCoverageMatrix([selectionCase({ id: 's1', expectedTools: ['search-actors'] })], {
             experimentId: 'exp1',
             spans,
+            agentItemCount: 1,
         });
-        const row = matrix.rows.find((r) => r.identifier === 'search-actors');
-        expect(row?.coveredArgumentGroups).toEqual(['limit']);
-        expect(row?.fullAgentExercisedCount).toBe(1);
+        const row = requireMeasuredRow(matrix, 'search-actors');
+        expect(row.coveredArgumentGroups).toEqual(['limit']);
+        expect(row.fullAgentExercisedCount).toBe(1);
+    });
+
+    it('renders "n/a", not "0", when the experiment carried zero kind: agent items', () => {
+        const matrix = buildCoverageMatrix([selectionCase({ id: 's1', expectedTools: ['search-actors'] })], {
+            experimentId: 'exp1',
+            spans: [],
+            agentItemCount: 0,
+        });
+        const row = requireMeasuredRow(matrix, 'search-actors');
+        expect(row.fullAgentExercisedCount).toBeUndefined();
+        expect(renderCoverageMatrixMarkdown(matrix)).toContain('| n/a |');
+    });
+});
+
+describe('resolveOutputPlan()', () => {
+    it('rejects --check combined with --experiment', () => {
+        const plan = resolveOutputPlan({ check: true, experiment: 'exp1', out: undefined });
+        expect(plan.kind).toBe('error');
+    });
+
+    it('--experiment alone (no --out) prints to stdout — never writes the committed file', () => {
+        expect(resolveOutputPlan({ check: false, experiment: 'exp1', out: undefined })).toEqual({ kind: 'stdout' });
+    });
+
+    it('--experiment with --out writes to the given path', () => {
+        expect(resolveOutputPlan({ check: false, experiment: 'exp1', out: 'somewhere.md' })).toEqual({
+            kind: 'write',
+            path: 'somewhere.md',
+        });
+    });
+
+    it('with no flags, writes to the default committed path', () => {
+        const plan = resolveOutputPlan({ check: false, experiment: undefined, out: undefined });
+        expect(plan.kind).toBe('write');
+        if (plan.kind === 'write') expect(plan.path).toMatch(/coverage_matrix\.md$/);
+    });
+
+    it('--check alone compares the default committed path', () => {
+        const plan = resolveOutputPlan({ check: true, experiment: undefined, out: undefined });
+        expect(plan.kind).toBe('check');
+        if (plan.kind === 'check') expect(plan.path).toMatch(/coverage_matrix\.md$/);
+    });
+
+    it('--check with --out compares the given path instead', () => {
+        expect(resolveOutputPlan({ check: true, experiment: undefined, out: 'somewhere.md' })).toEqual({
+            kind: 'check',
+            path: 'somewhere.md',
+        });
+    });
+});
+
+describe('renderSummaryLines() — agent-kind line', () => {
+    it('no --experiment: says so, and how to fill it in', () => {
+        const matrix = buildCoverageMatrix([]);
+        expect(renderSummaryLines(matrix)[2]).toBe(
+            'Agent kind (full tier): reachable only — no --experiment given, so no observed tool spans ' +
+                '(pass --experiment <id> to fill in "exercised")',
+        );
+    });
+
+    it('--experiment with zero kind: agent items: warns instead of claiming exercised coverage', () => {
+        const matrix = buildCoverageMatrix([], { experimentId: 'exp1', spans: [], agentItemCount: 0 });
+        expect(renderSummaryLines(matrix)[2]).toBe(
+            '⚠️ --experiment "exp1" contains no kind: agent items — the exercised column stays n/a',
+        );
+    });
+
+    it('--experiment with observed agent spans: reports the experiment id and span count', () => {
+        const spans: ObservedToolSpan[] = [{ name: 'search-actors', input: '{}' }];
+        const matrix = buildCoverageMatrix([], { experimentId: 'exp1', spans, agentItemCount: 1 });
+        expect(renderSummaryLines(matrix)[2]).toBe(
+            'Agent kind (full tier): reachable + exercised — experiment "exp1", 1 observed tool span(s)',
+        );
     });
 });
 
@@ -271,11 +363,14 @@ describe('--experiment env precondition', () => {
 describe('fetchExperimentToolObservations()', () => {
     /** Minimal fake Langfuse client: only the two `.api.*` methods this reader calls. */
     function fakeLangfuseClient(overrides: {
-        listItems: (args: { cursor?: string }) => Promise<{ data: { traceId: string }[]; meta: { cursor?: string } }>;
+        listItems: (args: { cursor?: string }) => Promise<{
+            data: { traceId: string; experimentItemMetadata?: Record<string, unknown> | null }[];
+            meta: { cursor?: string };
+        }>;
         getMany: (args: {
             traceId: string;
             cursor?: string;
-        }) => Promise<{ data: { name?: string; input?: unknown }[]; meta: { cursor?: string } }>;
+        }) => Promise<{ data: { name?: string; input?: unknown; output?: unknown }[]; meta: { cursor?: string } }>;
     }) {
         return {
             api: {
@@ -312,7 +407,7 @@ describe('fetchExperimentToolObservations()', () => {
             },
         });
 
-        const spans = await fetchExperimentToolObservations(client, 'exp1');
+        const { spans } = await fetchExperimentToolObservations(client, 'exp1');
 
         expect(getManyCallCount).toBe(2);
         expect(spans.map((span) => span.name)).toEqual(['search-actors', 'call-actor']);
@@ -332,10 +427,66 @@ describe('fetchExperimentToolObservations()', () => {
                 Promise.resolve({ data: [{ name: `tool-for-${traceId}`, input: '{}' }], meta: {} }),
         });
 
-        const spans = await fetchExperimentToolObservations(client, 'exp1');
+        const { spans } = await fetchExperimentToolObservations(client, 'exp1');
 
         expect(listItemsCallCount).toBe(2);
         expect(spans.map((span) => span.name)).toEqual(['tool-for-t1', 'tool-for-t2']);
+    });
+
+    it('skips a TOOL observation whose output is the selection-mode denial text', async () => {
+        const client = fakeLangfuseClient({
+            listItems: () =>
+                Promise.resolve({ data: [{ traceId: 't1', experimentItemMetadata: { kind: 'agent' } }], meta: {} }),
+            getMany: () =>
+                Promise.resolve({
+                    data: [{ name: 'search-actors', input: '{}', output: SELECTION_DENY_REASON }],
+                    meta: {},
+                }),
+        });
+
+        const { spans, agentItemCount } = await fetchExperimentToolObservations(client, 'exp1');
+
+        expect(spans).toEqual([]);
+        expect(agentItemCount).toBe(1);
+    });
+
+    it('skips a kind: "selection" item entirely — no observations are even fetched for it', async () => {
+        let getManyCallCount = 0;
+        const client = fakeLangfuseClient({
+            listItems: () =>
+                Promise.resolve({
+                    data: [{ traceId: 't1', experimentItemMetadata: { kind: 'selection' } }],
+                    meta: {},
+                }),
+            getMany: () => {
+                getManyCallCount += 1;
+                return Promise.resolve({ data: [{ name: 'search-actors', input: '{}' }], meta: {} });
+            },
+        });
+
+        const { spans, agentItemCount } = await fetchExperimentToolObservations(client, 'exp1');
+
+        expect(getManyCallCount).toBe(0);
+        expect(spans).toEqual([]);
+        expect(agentItemCount).toBe(0);
+    });
+
+    it('counts agentItemCount as 0 when every item is kind: "selection" (a pr-tier experiment)', async () => {
+        const client = fakeLangfuseClient({
+            listItems: () =>
+                Promise.resolve({
+                    data: [
+                        { traceId: 't1', experimentItemMetadata: { kind: 'selection' } },
+                        { traceId: 't2', experimentItemMetadata: { kind: 'selection' } },
+                    ],
+                    meta: {},
+                }),
+            getMany: () => Promise.resolve({ data: [], meta: {} }),
+        });
+
+        const { agentItemCount } = await fetchExperimentToolObservations(client, 'exp1');
+
+        expect(agentItemCount).toBe(0);
     });
 });
 
@@ -376,6 +527,26 @@ describe('countExercisedSpans() / resolveExercisedArgumentGroups()', () => {
         expect(countExercisedSpans(fixture, 'ToolSearch')).toBe(1);
         expect(countExercisedSpans(fixture, 'nonexistent-tool')).toBe(0);
     });
+
+    it('treats a non-string input as unparseable — nothing exercised, no crash', () => {
+        const spans: ObservedToolSpan[] = [{ name: 'search-actors', input: 123 }];
+        expect(resolveExercisedArgumentGroups(spans, 'search-actors', ['keywords'])).toEqual(new Set());
+    });
+
+    it('treats malformed JSON as unparseable', () => {
+        const spans: ObservedToolSpan[] = [{ name: 'search-actors', input: 'not json' }];
+        expect(resolveExercisedArgumentGroups(spans, 'search-actors', ['keywords'])).toEqual(new Set());
+    });
+
+    it('treats valid JSON that is not an object (e.g. an array) as unparseable', () => {
+        const spans: ObservedToolSpan[] = [{ name: 'search-actors', input: '[]' }];
+        expect(resolveExercisedArgumentGroups(spans, 'search-actors', ['keywords'])).toEqual(new Set());
+    });
+
+    it('does not mark a nested group exercised when the parent key holds a scalar, not an object', () => {
+        const spans: ObservedToolSpan[] = [{ name: 'call-actor', input: JSON.stringify({ callOptions: 'nope' }) }];
+        expect(resolveExercisedArgumentGroups(spans, 'call-actor', ['callOptions.memory'])).toEqual(new Set());
+    });
 });
 
 describe('renderCoverageMatrixMarkdown()', () => {
@@ -402,22 +573,21 @@ describe('freshness: the committed coverage_matrix.md matches a fresh regenerati
         );
         const committed = fs.readFileSync(committedPath, 'utf-8');
 
-        expect(regenerated).toBe(committed);
+        expect(regenerated, "coverage_matrix.md is stale — run 'pnpm run evals:coverage' and commit the result").toBe(
+            committed,
+        );
     });
 
     it('flags call-actor callOptions.* as uncovered and fetch-actor-details actor as covered (acceptance check)', () => {
         const matrix = buildCoverageMatrix(readSnapshot());
-        const callActor = matrix.rows.find((r) => r.identifier === 'call-actor');
-        const fetchDetails = matrix.rows.find((r) => r.identifier === 'fetch-actor-details');
+        const callActor = requireMeasuredRow(matrix, 'call-actor');
+        const fetchDetails = requireMeasuredRow(matrix, 'fetch-actor-details');
 
-        expect(callActor?.argumentGroups).not.toBe('dynamic');
-        if (callActor?.argumentGroups !== 'dynamic') {
-            const uncoveredCallActor = (callActor?.argumentGroups ?? []).filter(
-                (group) => !(callActor?.coveredArgumentGroups ?? []).includes(group),
-            );
-            expect(uncoveredCallActor).toEqual(expect.arrayContaining(['callOptions.memory', 'callOptions.timeout']));
-        }
-        expect(fetchDetails?.coveredArgumentGroups).toContain('actor');
+        const uncoveredCallActor = callActor.argumentGroups.filter(
+            (group) => !callActor.coveredArgumentGroups.includes(group),
+        );
+        expect(uncoveredCallActor).toEqual(expect.arrayContaining(['callOptions.memory', 'callOptions.timeout']));
+        expect(fetchDetails.coveredArgumentGroups).toContain('actor');
     });
 
     it('the only uncovered non-widget, non-dynamic tool is the documented report-problem gap', () => {
