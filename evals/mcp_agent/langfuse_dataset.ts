@@ -87,6 +87,15 @@ const McpAgentItemValidator = z
                 path: ['metadata', 'expectedArgs'],
             });
         }
+        // Nothing scores expectedTools on an agent item, so accepting one would silently drop
+        // the assertion its author wrote.
+        if (item.metadata.kind !== 'selection' && item.metadata.expectedTools !== undefined) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'metadata.expectedTools is only valid on a kind: "selection" item',
+                path: ['metadata', 'expectedTools'],
+            });
+        }
         if (item.metadata.kind === 'selection' && item.metadata.maxTurns !== undefined) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
