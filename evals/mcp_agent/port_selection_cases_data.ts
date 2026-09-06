@@ -676,20 +676,26 @@ const TASKS_WAVE: PortCaseSpec[] = [
         tools: ['tasks'],
     },
     {
+        // Strengthened after Opus calibration (2026-09-06): reproduced in 2 of 2 runs — Opus
+        // spent its whole 2-turn budget on ToolSearch and never attempted create-actor-task.
+        // Made the action explicit and immediate so there is nothing left to explore first.
         sourceId: 'create-actor-task-1',
-        decision: 'keep',
+        decision: 'rephrase',
         id: 'create-actor-task/instagram-insta-daily',
-        query: 'Save my apify/instagram-scraper settings as a task called insta-daily',
+        query:
+            'Save my apify/instagram-scraper settings as a task called insta-daily right now — ' +
+            'just create it directly.',
         category: 'create-actor-task',
         expectedTools: ['create-actor-task'],
         expectedArgs: { actorId: 'apify/instagram-scraper', name: 'insta-daily' },
         tools: ['tasks'],
     },
     {
+        // Strengthened for the same reason as create-actor-task-1.
         sourceId: 'create-actor-task-2',
-        decision: 'keep',
+        decision: 'rephrase',
         id: 'create-actor-task/google-search-pizza',
-        query: 'Create a task for apify/google-search-scraper that searches for pizza',
+        query: 'Create a task for apify/google-search-scraper that searches for pizza — just create it directly.',
         category: 'create-actor-task',
         expectedTools: ['create-actor-task'],
         expectedArgs: { actorId: 'apify/google-search-scraper' },

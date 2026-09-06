@@ -267,7 +267,7 @@
     "tier": [
       "pr"
     ],
-    "query": "Create a task for apify/google-search-scraper that searches for pizza",
+    "query": "Create a task for apify/google-search-scraper that searches for pizza — just create it directly.",
     "expectedTools": [
       "create-actor-task"
     ],
@@ -285,7 +285,7 @@
     "tier": [
       "pr"
     ],
-    "query": "Save my apify/instagram-scraper settings as a task called insta-daily",
+    "query": "Save my apify/instagram-scraper settings as a task called insta-daily right now — just create it directly.",
     "expectedTools": [
       "create-actor-task"
     ],
