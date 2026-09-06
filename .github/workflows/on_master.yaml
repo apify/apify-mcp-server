@@ -22,37 +22,6 @@ jobs:
         secrets:
             APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
 
-    evaluations_pr:
-        name: MCP agent evaluations (pr)
-        concurrency:
-            group: eval-pr-master
-            cancel-in-progress: false
-        uses: ./.github/workflows/_evaluations.yaml
-        with:
-            tier: pr
-        secrets:
-            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-            LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
-            LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
-            LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
-            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
-
-    evaluations_full:
-        name: MCP agent evaluations (full)
-        concurrency:
-            group: eval-full-master
-            cancel-in-progress: false
-        uses: ./.github/workflows/_evaluations.yaml
-        with:
-            tier: full
-        secrets:
-            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-            LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
-            LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
-            LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
-            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
-            OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-
     release_metadata:
         # Skip this for "ci", "docs" and "test" commits
         if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'test')"

@@ -78,8 +78,16 @@ jobs:
                     LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 
-            -   name: Run full-tier evals
+            # Measurement-only until a full-tier threshold exists. The CLI default is
+            # --pass-threshold 1.0 (every item must pass) on claude-haiku-4-5, and the README
+            # documents full-tier cases Haiku fails by design, so a blocking job here would red
+            # every merge — and apify/ai-team#236 rules out a per-item all-pass gate anyway.
+            # Set FULL_TIER_PASS_THRESHOLD from the first runs, pass it here, then drop this.
+            # continue-on-error belongs on the step: a caller job that uses: a reusable workflow
+            # does not support it.
+            -   name: Run full-tier evals (not gating)
                 if: inputs.tier == 'full'
+                continue-on-error: true
                 run: pnpm run evals:mcp-agent -- --tier full
                 env:
                     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

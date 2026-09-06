@@ -833,22 +833,42 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 
 ## CI (apify/ai-team#261)
 
-CI gates real PR merges on these two suites, replacing the old Phoenix runner (`evals/run_evaluation.ts`,
-scheduled for deletion under #262 — its own `evals/README.md` no longer describes CI behavior).
+CI runs these two suites, replacing the old Phoenix runner (`evals/run_evaluation.ts`, scheduled
+for deletion under #262 — its own `evals/README.md` no longer describes CI behavior). What each
+run does when it fails differs, and neither is a required status check today:
+
+- the `pr` tier **fails its job** on a pass rate below `PR_TIER_PASS_THRESHOLD`, so it shows red
+  on the PR, but no branch-protection rule requires it (see "Not a required check" below);
+- the `full` tier runs **after** a merge and is currently `continue-on-error` — measurement only
+  until a full-tier threshold is calibrated. It cannot block anything.
+
 `.github/workflows/_evaluations.yaml` is the reusable workflow both tiers run through
-(`inputs.tier: pr | full`); three surfaces call it:
+(`inputs.tier: pr | full`); four workflows call it:
 
 | Surface | Tier(s) | Firing event | Workflow file |
 |---|---|---|---|
 | Same-repo, non-draft PR, eval-relevant paths changed | `pr` | `opened` / `reopened` / `ready_for_review` (never `synchronize`, so pushing a review fix doesn't re-spend the budget) | `on_pull_request_evals.yaml` |
-| `validated` label added | `pr` | `labeled` | `on_pull_request_label.yaml` |
-| Push to `master` (i.e. a merge) | `pr` **and** `full` | `push` | `on_master.yaml` |
+| `validated` label added to a same-repo PR | `pr` | `labeled` | `on_pull_request_label.yaml` |
+| Push to `master` (i.e. a merge) | `pr` **and** `full` | `push` | `on_master_evals.yaml` |
 
-**Fork limitation.** A PR from a fork never gets the automatic `pr`-tier trigger: GitHub does not
-pass repo secrets to a workflow triggered from a fork
+`on_master_evals.yaml` is deliberately separate from `on_master.yaml`: that workflow holds the
+`release` concurrency group for its entire run, so an eval job inside it would keep the next
+release queued behind up to 90 minutes of evaluation it does not gate.
+
+**Forks cannot run evals at all.** GitHub withholds repo secrets from any `pull_request`-triggered
+run on a fork
 ([docs](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions)),
-and every tier needs several (see below). To run the `pr` tier on a fork PR, or to re-run it
-manually on any PR, add the **`validated`** label.
+and every tier needs several (see below). The `validated` label does not change that — the label
+workflow is `pull_request` too — so its job is restricted to same-repo PRs and skips a fork PR
+rather than starting and failing on missing credentials. Use the label to re-run the `pr` tier on
+a same-repo PR the automatic trigger skipped (a draft, or a later push). To evaluate a fork's
+changes, push its branch into this repo and open a PR from there.
+
+**Not a required check.** Neither eval job is in branch protection, and the automatic one should
+not be added as-is: `on_pull_request_evals.yaml` never fires on `synchronize`, so after a second
+push the check would read as missing for the new head and block the merge until someone
+re-applies `validated`. Requiring it means adding `synchronize` to the trigger and paying for the
+extra runs.
 
 **Secrets a maintainer must add** (names only — never commit or paste a value):
 
@@ -860,8 +880,10 @@ manually on any PR, add the **`validated`** label.
 | `LANGFUSE_SECRET_KEY` | both tiers |
 | `LANGFUSE_BASE_URL` | both tiers |
 
-`APIFY_TOKEN` is not a new secret: both tiers reuse the existing `APIFY_TEST_USER_API_TOKEN`
-repo secret, mapped to the `APIFY_TOKEN` env var the CLI reads. The `full` tier's
+`OPENROUTER_API_KEY` already exists at repository level (the pre-#261 workflow consumed it
+through `secrets: inherit`); the other four are new. `APIFY_TOKEN` is not a new secret either:
+both tiers reuse the existing `APIFY_TEST_USER_API_TOKEN` (available through the organization),
+mapped to the `APIFY_TOKEN` env var the CLI reads. The `full` tier's
 `tasks-fixtures` step and its `tasks/publish-*` cases additionally need that token's account to
 have write/collaborator access on `jiri.spilka/actor-troubleshooter` — without it, those cases
 fail regardless of code correctness.
