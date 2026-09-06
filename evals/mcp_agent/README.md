@@ -838,7 +838,10 @@ fail regardless of code correctness.
 measured on a real CI runner — the calibration in "The `pr` tier" section above ran at
 `--concurrency 2` in a resource-constrained sandbox (12-15 min), which is not a valid estimate for
 a GitHub-hosted runner at the CLI's default `--concurrency 8`. The first `validated`-labeled run
-after this PR exists is what settles it.
+after this PR exists is what settles it. `_evaluations.yaml`'s job `timeout-minutes` (30 for `pr`,
+90 for `full`) is a generous, provisional safety net, not the target — it gets tightened once the
+labeled run gives a real number, the same "measure then tune" treatment as
+`PR_TIER_PASS_THRESHOLD` and `--concurrency` above.
 
 **MCP-handshake race.** See "Common issues" above: a fast model can read the SDK's
 still-connecting notice and fall back to a built-in tool instead of waiting. A CI run retries a
