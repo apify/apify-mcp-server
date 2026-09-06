@@ -206,6 +206,9 @@ async function main() {
 
     try {
         console.log(`📋 Reading live "${MCP_AGENT_DATASET_NAME}" ids to guard against unsafe collisions...`);
+        // ACTIVE items only (fetchMcpAgentCases skips archived ones), so this guards against
+        // overwriting a live agent item, not against reusing an archived id — which Langfuse
+        // rejects on its own, since ids are project-unique forever.
         const liveCases = await fetchMcpAgentCases(langfuse, MCP_AGENT_DATASET_NAME);
         const liveNonSelectionIds = new Set(liveCases.filter((c) => c.kind !== 'selection').map((c) => c.id));
 

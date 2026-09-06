@@ -53,7 +53,8 @@ Every item is `mcp-server-evals`, no per-family or per-suite dataset split. Each
   pick, no judge, nothing executes - see "Selection mode" below).
 - `tier`: `["pr"]`, `["full"]`, or both — which run(s) include the item (`--tier` filters on
   this). Everything migrated from the old per-family datasets is `tier: ["full"]`; new
-  `pr`-tier items are `kind: "selection"`, so a PR gate can run in seconds, not minutes.
+  `pr`-tier items are `kind: "selection"`, so a PR gate spends no judge tokens and executes no
+  tools — see the measured wall-clock and cost under "The `pr` tier" below.
 - `expectedErrors` (optional, `kind: "agent"` only): tool names allowed to fail on this item
   without failing the zero-tool-error gate below. The gate exempts only the named tools; any
   other tool's failure still fails the item.
@@ -266,10 +267,10 @@ model's floor off 3 separate runs.
   (agent behavior), not a sandbox artifact, even though the harness drops rather than scores the
   trial. Only "Self-signed certificate detected" drops (the sandbox TLS fault, see "Environment
   note" below) are excluded from the denominator. No case was edited between the 3 runs; two
-  items never actually passed across the series — `fetch-actor-details/typo-actor-name` (failed
-  choosing `search-actors` in runs 1 and 3, dropped on a max-turns exhaustion in run 2) and
-  `search-apify-docs/mcp-server-docs` (passed run 1, failed "no tool call attempted" in runs 2
-  and 3) — both pass cleanly on the clean Opus baseline above, so per the "fix only if Opus also
+  items failed somewhere in the series — `fetch-actor-details/typo-actor-name` never passed
+  (failed choosing `search-actors` in runs 1 and 3, dropped on a max-turns exhaustion in run 2)
+  and `search-apify-docs/mcp-server-docs` passed run 1 then failed "no tool call attempted" in
+  runs 2 and 3 — both pass cleanly on the clean Opus baseline above, so per the "fix only if Opus also
   flags it" rule these are Haiku-only weaknesses, not case defects; see Follow-up findings below.
 
 - `PR_TIER_PASS_THRESHOLD` (`config.ts`) = **0.93** — the floor of the 3 runs' honest rates
@@ -347,10 +348,13 @@ run** (mean ≈$1.35), roughly $0.01-$0.016 per item. **This corrects apify/ai-t
 run" estimate — none of the 3 measured Haiku runs came in under $1**, the closest being $1.04.
 The Opus clean baseline (**$8.23/run**) is a calibration-only cost, not a per-PR one.
 
-Each full-tier run took roughly 12-15 minutes wall-clock (`pnpm run build` + 115 trials,
-`--claude-judge` on the Claude Agent SDK) — 2-3× over the issue's original 3-6 minute estimate,
+Each complete `pr`-tier run (all 115 selection items; not the `full` tier, which is the 60
+agent items) took roughly 12-15 minutes wall-clock — 2-3× over the issue's original 3-6 minute
+estimate,
 consistent with every prior calibration pass on this suite; the smaller diagnostic/verification
-runs took 1-3 minutes each. Per-run wall-clock (Langfuse `startTime`/`endTime`): `5ff91a0f929438cb`
+runs took 1-3 minutes each. Per-run wall-clock, measuring the experiment only — Langfuse
+`startTime`/`endTime`, which begins after the package script's `pnpm run build`:
+`5ff91a0f929438cb`
 15m16s, `0b331d119ab12b7c` 11m47s, `46b26f6ccda3663f` 11m46s, `1977e527d82e9601` 12m54s — all
 measured at `--concurrency 2` on this sandbox's 4-core box (see "Environment note" below). The
 time on a GitHub-hosted runner at the default `--concurrency 8` is pending the first CI run

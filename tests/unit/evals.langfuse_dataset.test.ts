@@ -214,7 +214,17 @@ describe('parseMcpAgentItem()', () => {
             expectedOutput: null,
             metadata: { category: 'search', kind: 'selection', tier: ['pr'], expectedTools: ['search-actors'] },
         };
-        expect(() => parseMcpAgentItem(selection)).not.toThrow();
+        expect(parseMcpAgentItem(selection).expectedOutput).toBeUndefined();
+    });
+
+    it('rejects expectedTools on a kind: agent item, which nothing would score', () => {
+        const agent = {
+            id: 'c',
+            input: { query: 'q' },
+            expectedOutput: 'r',
+            metadata: { category: 'search', kind: 'agent', tier: ['full'], expectedTools: ['search-actors'] },
+        };
+        expect(() => parseMcpAgentItem(agent)).toThrow(/metadata.expectedTools is only valid on a kind/);
     });
 
     it('rejects failTools on a kind: selection item', () => {

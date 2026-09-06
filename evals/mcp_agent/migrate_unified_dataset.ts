@@ -18,8 +18,12 @@
  * `kind`/`tier`. Archiving is raw passthrough with no schema at all, because
  * `workflow-evals-rubric`'s items carry an unrelated `expectedTools` field that predates #236.
  *
- * Idempotent: upserting is by id, so re-running after a partial failure only re-applies the
- * same content, never duplicates.
+ * Idempotent while it is still creating items: upserting is by id, so re-running after a
+ * failure before the archive step only re-applies the same content, never duplicates.
+ * NOT resumable once archiving has begun: the plan is rebuilt from the ACTIVE source items,
+ * so already-archived sources drop out of it and post-migration validation then rejects the
+ * items they produced as unexpected. Recovering a half-archived run means un-archiving the
+ * source items in the Langfuse UI (or migrating the remainder by hand), not re-running this.
  *
  * Already run (2026-09-05): the legacy datasets are archived. `validateMigration`'s checks
  * assert the whole `mcp-server-evals` dataset equals the migration plan, which predates the
@@ -43,7 +47,7 @@ import { z } from 'zod';
 
 import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
 import { sanitizeProcessEnv } from './config.js';
-import { fetchMcpAgentCases, MCP_AGENT_DATASET_NAME } from './langfuse_dataset.js';
+import { fetchMcpAgentCases, MCP_AGENT_DATASET_NAME, type McpAgentTestCase } from './langfuse_dataset.js';
 
 // Before any client is constructed below: the Langfuse SDK reads process.env itself and
 // passes it to node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
@@ -250,8 +254,25 @@ async function upsertMigratedItems(langfuse: LangfuseClient, plans: MigratedItem
 }
 
 /**
- * Fetch the migrated dataset back through the real (extended) validator and check it matches
- * the plan exactly. Throws with a diff on any mismatch, so nothing downstream (archiving) runs.
+ * Names of the planned fields the migrated item does not reproduce. Compares every field the
+ * plan sets: the prompt, the judge reference, the category, and the exempted tool names.
+ */
+export function comparePlannedFields(plan: MigratedItemPlan, actual: McpAgentTestCase): string[] {
+    const wrongFields: string[] = [];
+    if (actual.query !== plan.input.query) wrongFields.push('query');
+    if (actual.reference !== plan.expectedOutput) wrongFields.push('expectedOutput');
+    if (actual.category !== plan.metadata.category) wrongFields.push('category');
+    const plannedErrors = plan.metadata.expectedErrors ?? [];
+    const actualErrors = actual.expectedErrors ?? [];
+    if (JSON.stringify(actualErrors) !== JSON.stringify(plannedErrors)) wrongFields.push('expectedErrors');
+    return wrongFields;
+}
+
+/**
+ * Fetch the migrated dataset back through the real (extended) validator and check every item
+ * reproduces its plan: the ids present, and each item's kind, tier, prompt, judge reference,
+ * category and exempted tool names. Throws with a diff on any mismatch, so nothing downstream
+ * (archiving, which destroys the only other copy) runs.
  */
 async function validateMigration(langfuse: LangfuseClient, plans: MigratedItemPlan[]): Promise<void> {
     const cases = await fetchMcpAgentCases(langfuse, MCP_AGENT_DATASET_NAME);
@@ -263,13 +284,16 @@ async function validateMigration(langfuse: LangfuseClient, plans: MigratedItemPl
     const wrongKindIds = cases.filter((c) => c.kind !== 'agent').map((c) => c.id);
     const wrongTierIds = cases.filter((c) => c.tier.length !== 1 || c.tier[0] !== 'full').map((c) => c.id);
 
-    const expectedErrorIds = new Set(
-        plans.filter((plan) => plan.metadata.expectedErrors !== undefined).map((plan) => plan.id),
-    );
-    const actualErrorIds = new Set(cases.filter((c) => (c.expectedErrors?.length ?? 0) > 0).map((c) => c.id));
-    const expectedErrorsMismatchIds = [...expectedErrorIds]
-        .filter((id) => !actualErrorIds.has(id))
-        .concat([...actualErrorIds].filter((id) => !expectedErrorIds.has(id)));
+    // Content, not just presence: an id/kind/tier check would pass a item whose query, judge
+    // reference or exempted tool names were written wrong, and archiving the sources after that
+    // destroys the only other copy.
+    const caseById = new Map(cases.map((c) => [c.id, c]));
+    const contentMismatches = plans.flatMap((plan) => {
+        const actual = caseById.get(plan.id);
+        if (actual === undefined) return [];
+        const wrongFields = comparePlannedFields(plan, actual);
+        return wrongFields.length > 0 ? [`${plan.id} (${wrongFields.join(', ')})`] : [];
+    });
 
     const problems: string[] = [];
     if (cases.length !== plans.length) problems.push(`expected ${plans.length} items, got ${cases.length}`);
@@ -277,8 +301,7 @@ async function validateMigration(langfuse: LangfuseClient, plans: MigratedItemPl
     if (unexpectedIds.length > 0) problems.push(`unexpected: ${unexpectedIds.join(', ')}`);
     if (wrongKindIds.length > 0) problems.push(`kind !== "agent": ${wrongKindIds.join(', ')}`);
     if (wrongTierIds.length > 0) problems.push(`tier !== ["full"]: ${wrongTierIds.join(', ')}`);
-    if (expectedErrorsMismatchIds.length > 0)
-        problems.push(`expectedErrors mismatch: ${expectedErrorsMismatchIds.join(', ')}`);
+    if (contentMismatches.length > 0) problems.push(`content mismatch: ${contentMismatches.join('; ')}`);
 
     if (problems.length > 0) {
         throw new Error(`Post-migration validation of "${MCP_AGENT_DATASET_NAME}" failed:\n  ${problems.join('\n  ')}`);
