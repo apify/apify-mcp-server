@@ -362,6 +362,72 @@ runner (apify/ai-team#261) where this fault is not expected to reproduce.
 5. `pnpm run test:unit -- evals.port_selection_cases` — the coverage/collision/validation
    assertions run against the updated table.
 
+### Coverage matrix (apify/ai-team#265)
+
+`pnpm run evals:coverage` measures — and writes to the committed `evals/mcp_agent/coverage_matrix.md`
+— which tools and which argument groups the dataset actually exercises, per the
+`creating-mcp-agent-evals` skill's per-tool/per-argument-group definition of done and #236's "proven
+by a generated coverage matrix, not by memory". It reads two offline inputs only — the live tool
+registry (`src/tools/**`) and the committed `dataset_snapshot_mcp-server-evals.json` — so it needs no
+env vars and makes no network call by default; the same inputs always produce the same file, byte for
+byte.
+
+**What it measures, per tool:**
+- **`pr` selection cases** — how many `kind: "selection"` items name this tool in `expectedTools`.
+  This is what `covered`/`uncovered` means in the Status column.
+- **`full` agent reachable** — across `kind: "agent"` items, how many would even *serve* this tool
+  (via `metadata.tools` selectors, or the default categories when absent), computed with the
+  server's own `getToolsForServerMode` resolver. Informational only — reachable is not the same as
+  called, so it is never counted as coverage (`report-problem` is reachable in 34 agent items and
+  exercised in none; counting reachability would flip that known gap to green).
+- **`full` agent exercised** — how many observed tool spans of a real full-tier experiment actually
+  called this tool. Reads `n/a` until `--experiment <id>` points at one that has run (see below).
+- **Argument groups** — one per top-level `inputSchema` property, expanded one level into
+  `parent.child` groups when a property's own schema carries a non-empty `properties` object (e.g.
+  `call-actor`'s `callOptions` → `callOptions.memory`, `callOptions.timeout`, ...); a free-form
+  object (e.g. `call-actor`'s `input`) has no declared `properties` and stays one group. A group is
+  `covered` when some selection case's `expectedArgs` pins that key (a pinned parent object covers
+  every `parent.*` child, since the runner's check deep-equals the whole object) or, with
+  `--experiment`, when an observed span actually sent it.
+- **Status**: `covered`, `uncovered`, or `excluded` (the 4 `*-widget` tools — out of scope until a
+  headless MCP Apps host exists, per #265 point 3; never counted as covered regardless of anything
+  in the dataset). `apify--rag-web-browser`/`apify--web-fetch` build their schema at runtime from
+  the live Actor definition, so their argument-group cell reads `dynamic` and they're excluded from
+  the argument-group totals — not silently scored zero.
+
+**Regenerate:**
+```bash
+pnpm run evals:coverage              # writes coverage_matrix.md and prints the summary
+pnpm run evals:coverage -- --check   # compares in memory; exit 1 + stale message, no write
+pnpm run evals:coverage -- --experiment <id>   # also fills in "exercised" from that experiment's observed tool spans
+```
+
+**Freshness.** `tests/unit/evals.coverage_matrix.test.ts` regenerates the matrix from the committed
+snapshot and the live registry and asserts byte-equality with the committed `coverage_matrix.md` —
+zero network, so a stale matrix (a new tool, a changed schema, an unregenerated snapshot) fails
+`pnpm run test:unit` on every PR that causes it, not just ones that touch this script. `--check` runs
+the same comparison from the CLI, for local use before committing.
+
+**`--experiment <id>`** fetches that experiment's dataset-item traces and their `TOOL`-type
+observation spans from Langfuse (needs `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_BASE_URL`;
+the default run needs none of this and never calls Langfuse). No full-tier experiment has ever run
+against `mcp-server-evals` yet (confirmed live while designing this script — every experiment on this
+dataset so far is a `pr`-tier selection run), so this path is unit-tested against a fixture of
+captured observations (`tests/unit/fixtures/evals_coverage_observations.json`), not exercised against
+a real full-tier run. The committed `coverage_matrix.md` is always the snapshot-only version
+(generated without `--experiment`) so it stays reproducible offline.
+
+**Known gaps this matrix exposes, not fixed here** (this PR is the measurement, not the gap fill;
+see apify/ai-team#265's own plan for the fill order):
+- **Runs family**: no `full`-tier agent coverage for the run lifecycle chain (`call-actor` async →
+  `get-actor-run` → `get-actor-log` → `abort-actor-run`) or run-list filtering.
+- **Docs**: no `full`-tier agent coverage for the `search-apify-docs` → `fetch-apify-docs` chain.
+- **Storage and `call-actor` argument groups**: `call-actor`'s `callOptions.*` run options and
+  `get-dataset-items`'s pagination/format arguments (`offset`, `limit`, `fields`, ...) are pinned by
+  no case today — the matrix's uncovered-argument-groups column names them.
+- **Error cases via `expectedErrors`** (e.g. `get-actor-run` on a nonexistent run id) are not yet
+  matched to the tools/arguments they'd cover.
+
 ### Permission path, and running under root
 
 Every item runs with `canUseTool` granting every tool call, not `bypassPermissions` +
