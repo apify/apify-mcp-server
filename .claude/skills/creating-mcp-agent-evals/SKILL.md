@@ -15,7 +15,7 @@ Commands, item shapes, probe patterns, and sweep queries: [reference.md](referen
 
 1. **Inventory the tools** — every tool and every argument group needs at least one case (the coverage matrix at the end proves it).
 2. **Probe the platform first.** Before writing any case that depends on API behavior (required fields, uniqueness rules, limits, error messages), verify it with a throwaway `tsx` script against the real API. Never write a case on an assumed contract — that's how you get input values the schema rejects.
-3. **Two datasets, never one**: `<family>-evals` (proper suite, zero tool errors tolerated) and `<family>-evals-errors` (cases that provoke errors on purpose: collisions, not-found, requirement discovery). Mixing them masks real failures.
+3. **One dataset, `mcp-server-evals`.** Every item declares `metadata.kind` (`"agent"` today; `"selection"` lands with #260) and `metadata.tier` (`["pr"]`/`["full"]`). A case that provokes an error on purpose (a collision, a not-found, requirement discovery) sets `metadata.expectedErrors` to the tool name(s) allowed to fail on it — the zero-tool-error gate exempts only those, so it never masks an unrelated failure the way a blanket error-tolerant dataset would. Give the item id the `<category>/<slug>` shape: `<category>` is the tool family (`tasks`, `web-fetch`, …), `<slug>` is the rest.
 4. **Write cases in waves**: 2–3 easy (single tool, explicit input) → 1–2 medium (cross-tool chains, run options) → 2–3 hard (vague user language, error recovery, collisions). Run and review each wave before writing the next.
 5. **Calibrate on the strongest model first** (Opus). A failure there is a case defect or a product gap — never a description problem. Only a calibrated suite (strong model 100%) can attribute weaker-model failures to descriptions.
 6. **Ladder down** (Sonnet → Haiku). Passes-on-Opus-fails-on-Haiku = the tool description or output doesn't carry a naive agent. That's the signal you built the suite for.
@@ -38,19 +38,19 @@ Always read the transcript before assigning blame. The judge's one-liner is a hi
 
 - **References are judge-checkable contracts**: "PASS only if `<tool>` was called with `<arg>` and the final answer states `<fact>`. FAIL if …". Never "the agent should handle it well".
 - **Queries in user language.** A query that names tools tests parroting, not descriptions. Hard cases must never name a tool.
-- **Truth in telemetry.** Never downgrade span levels to hide expected errors — that masks real ones. Expected errors live in the error suite; the proper suite's gate is `tool_errors == 0` over **server (MCP) tool calls** (failed read-only probes count: guessing a slug instead of searching is a failure; the agent's built-in tools are exempt — their stumbles are client noise, not ours).
+- **Truth in telemetry.** Never downgrade span levels to hide expected errors — that masks real ones. Name an expected failure in the item's `metadata.expectedErrors` instead; the gate is `tool_errors == 0` over **server (MCP) tool calls** except the named ones (failed read-only probes still count: guessing a slug instead of searching is a failure; the agent's built-in tools are exempt — their stumbles are client noise, not ours).
 - **Write judge-blindness clauses.** The judge never sees tool results, so references must pre-empt misreadings: an agent narrating a quirk ("the count read 0 but the items were there") is not admitting failure; content delivered via a clearly-attributed fallback is retrieved, not fabricated; and never require narrating an event (a block, an error) that a legitimate alternative path skips entirely.
 - **Fail false claims, not silent success.** Outcome and honesty are the axes; etiquette (announcing a tool switch, apologizing for a detour) is a bonus, never a PASS condition.
 - **Selection cases need exactly one right answer.** A target a second legitimate tool also serves (an Apify docs URL when `fetch-apify-docs` is loaded) makes defensible behavior fail; pick targets where only the tool under test fits.
 - **Probe the target, not just the mechanism.** For live-web cases, fetch the exact URL at authoring time and check the *content* supports the premise (a probed-working scraper still returned nothing for a profile that turned out to have zero posts).
 - **State is account-global.** Fixed `eval-` prefixed resource names + a fixtures seed/cleanup script; each conversation self-contained (create → act → clean up); one permanent read-only fixture for pure "get" cases.
 - **Dataset item ids are project-unique forever** — they cannot move between datasets or be reused after archiving. Choose ids you can live with; "moving" a case = new id + archive old.
-- **Snapshot after every dataset edit** (`evals:mcp-agent:export-dataset --dataset X`) so git reviews the cases.
+- **Snapshot after every dataset edit** (`evals:mcp-agent:export-dataset`) — `mcp-server-evals`'s export is committed, so this shows up as a git diff.
 
 ## Red flags — stop and rethink
 
 - Writing a case while looking at the tool's description → you're testing parroting. Close the file.
-- Adding an expected-error match/filter to the proper suite → move the case to the error suite instead.
+- Reaching for `--allow-tool-errors` on a normal run to get one error-provoking case to pass → set `metadata.expectedErrors` on that item instead; the run-wide flag tolerates every tool failing, not just the one the case provokes.
 - A rerun "fixed" a failure you didn't diagnose → known harness flake ("task threw, never completed") is retry-once; a judged FAIL is never a flake, read the transcript.
 - Editing the tool because one model failed once → reproduce or diagnose first; single runs are stochastic.
 - An obviously fake URL in a query (`ftp.example.com`, `this-is-a-test.com`) → models defensibly refuse "placeholder" targets; use a real host, and a nonexistent path on it when the fetch must fail.
@@ -61,7 +61,7 @@ Always read the transcript before assigning blame. The judge's one-liner is a hi
 
 | Mistake | Consequence |
 |---|---|
-| One dataset for everything | Error-provoking cases force error tolerance onto clean cases; red spans everywhere mean nothing |
+| A case with no `metadata.expectedErrors` provokes an error on purpose | The zero-tool-error gate fails it; either it's a case bug, or `expectedErrors` is missing |
 | Calibrating on the cheap model | Can't tell case bugs from description bugs; you'll "fix" descriptions against broken cases |
 | `maxTurns` too low on chain cases | Agent runs out of turns mid-flow and the judge sees an unfinished transcript |
 | Fixed names without cleanup | Second run collides with the first run's leftovers; nondeterministic failures |

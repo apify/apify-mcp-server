@@ -43,3 +43,5 @@ dev.log
 
 # Local Langfuse dataset exports (evals:mcp-agent:export-dataset), not tracked
 evals/mcp_agent/dataset_snapshot_*.json
+# Except the unified dataset's snapshot, committed so git reviews dataset edits
+!evals/mcp_agent/dataset_snapshot_mcp-server-evals.json

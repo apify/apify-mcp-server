@@ -1,0 +1,780 @@
+[
+  {
+    "id": "mcp-agent/call-actor-mcp-weather",
+    "category": "mcp",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Find a weather mcp Actor and use it through the call-actor tool to show me the current weather in Prague",
+    "reference": "The agent must find a weather-related Actor on the MCP server and use the call-actor tool to get and return the current weather in Prague and present the results."
+  },
+  {
+    "id": "mcp-agent/call-google-maps-restaurants",
+    "category": "call",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Find the top 3 restaurants in Prague using the Google Maps Scraper, I want to know their names, ratings and addresses",
+    "reference": "The agent must find Google Maps scraper, call it with 'restaurants Prague' query, and return a filtered list of restaurant names with ratings and addresses."
+  },
+  {
+    "id": "mcp-agent/call-tiktok-scraper",
+    "category": "call",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Show me 1 latest post from natgeo tik tok using Apify",
+    "reference": "The agent must find tik tok scraper, call it for natgeo profile, return the latest post and present it to the user."
+  },
+  {
+    "id": "mcp-agent/discover-and-call-actor-mcp-tool",
+    "category": "mcp",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "List the tools exposed by apify/example-mcp-server. Then use its add tool to add 17 and 25, and tell me the sum.",
+    "reference": "The agent must first call fetch-actor-details with actor='apify/example-mcp-server' and output={ mcpTools: true }. It must then call call-actor with actor='apify/example-mcp-server:add' and input={ firstNumber: 17, secondNumber: 25 }. PASS only if both calls happened and the final answer states 42."
+  },
+  {
+    "id": "mcp-agent/fetch-details-mcp-tools-list",
+    "category": "mcp",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Show me what tools are available in the apify/example-mcp-server MCP server",
+    "reference": "The agent must use fetch-actor-details with output={ mcpTools: true } to list available tools. The response should present the list of tools with their names and descriptions."
+  },
+  {
+    "id": "mcp-agent/fetch-details-non-mcp-actor-graceful",
+    "category": "fetch",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Show me MCP tools for apify/instagram-scraper",
+    "reference": "The agent must use fetch-actor-details with output={ mcpTools: true } for a regular (non-MCP) Actor. The response should gracefully indicate that this Actor is not an MCP server, not throw an error."
+  },
+  {
+    "id": "mcp-agent/instagram-posts",
+    "category": "call",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Show me 1 latest post from the natgeo instagram profile",
+    "reference": "The agent must search Instagram for recent post from the natgeo profile and present it to the user."
+  },
+  {
+    "id": "mcp-agent/report-problem-on-tool-error",
+    "category": "report-problem",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use the apify/rag-web-browser Actor to scrape https://example.com and tell me the page title.",
+    "reference": "While running the Actor, the call-actor tool fails with an internal error, so the task cannot be completed. The user did NOT ask for any problem to be reported. This tests whether the agent proactively reports the blocker after the error. PASS only if the agent calls the report-problem tool with a non-empty message describing what it was trying to do and what went wrong. FAIL if report-problem is not called (e.g., the agent only tells the user it could not complete the task).",
+    "maxTurns": 8,
+    "tools": [
+      "actors",
+      "report-problem"
+    ],
+    "failTools": [
+      "call-actor"
+    ]
+  },
+  {
+    "id": "mcp-agent/search-add-call-python-actor",
+    "category": "call",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Find example Python Actor and call it with random sample input and present the results",
+    "reference": "The agent must find apify/python-example Actor or any similar and call it using the call-actor tool with sample input, and return the output.",
+    "tools": [
+      "actors"
+    ]
+  },
+  {
+    "id": "mcp-agent/search-generic-scrapers",
+    "category": "search",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "What is the best scraper tool to extract website content?",
+    "reference": "The agent must use search-actors to find generic website content scrapers, return at least 3 relevant results and present the best one."
+  },
+  {
+    "id": "mcp-agent/search-google-maps",
+    "category": "search",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Is there any Google Maps scraping tool on Apify?",
+    "reference": "The agent must search for actors related to Google Maps and return at least 3 results with their names and descriptions."
+  },
+  {
+    "id": "mcp-agent/search-instagram-scrapers",
+    "category": "search",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "What is the best instagram scraper on Apify?",
+    "reference": "The agent must use search-actors to find Instagram scrapers, return at least 3 relevant results and present the best one."
+  },
+  {
+    "id": "mcp-agent/search-tiktok-scrapers",
+    "category": "search",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "What is the best tiktok scraper on Apify?",
+    "reference": "The agent must use search-actors to find tiktok scrapers, return at least 3 relevant results and present the best one."
+  },
+  {
+    "id": "mcp-agent/storage-actor-run-list-seeded",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then look at my recent Actor runs (newest first) and confirm that the run you just started appears, reporting its status and run ID.",
+    "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-actor-run-list. PASS only if get-actor-run-list was actually called and the final answer reports a run ID and a status matching the run the agent just started.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "get-actor-run-list"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-actor-run-status-seeded",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then look up that specific run by its run ID to confirm its status, and retrieve its dataset items. Tell me the run status and the title of the scraped page.",
+    "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-actor-run with the runId from that call, and call get-dataset-items with the datasetId from that run. PASS only if get-actor-run was called with a runId argument, get-dataset-items was called with a datasetId argument, and the final answer states the run status and a page title.",
+    "maxTurns": 14,
+    "tools": [
+      "actors",
+      "get-actor-run",
+      "get-dataset-items"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-items-google-search",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Run a Google search via Apify for 'apify web scraping' and request the top 15 organic results. When the run finishes, retrieve only the title and URL of each result and list them.",
+    "reference": "The agent must find the Google Search Results scraper and call-actor it for the query 'apify web scraping', then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists at least five results, each with a title and a URL.",
+    "maxTurns": 16,
+    "tools": [
+      "actors",
+      "get-dataset-items"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-items-hotels-bulk",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use the Google Maps Scraper to find at least 20 hotels in Vienna. When the run finishes, retrieve all the results and tell me how many hotels were returned and the names and addresses of the first five.",
+    "reference": "The agent must find the Google Maps scraper and call-actor it for hotels in Vienna, then call get-dataset-items with the datasetId from that run and a limit high enough to return every row in one call. PASS only if get-dataset-items was called with a datasetId argument and the final answer states a hotel count and lists at least five hotel names with addresses.",
+    "maxTurns": 20,
+    "tools": [
+      "actors",
+      "get-dataset-items"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-items-instagram",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Scrape the 15 latest posts from the natgeo Instagram profile using Apify. When the run finishes, retrieve only the caption and like count of each post and list them.",
+    "reference": "The agent must find an Instagram scraper and call-actor it for the natgeo profile, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several posts, each with a caption and a like count.",
+    "maxTurns": 18,
+    "tools": [
+      "actors",
+      "get-dataset-items"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-items-maps-bulk",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use the Google Maps Scraper to find the best 20 restaurants in Prague. When the run finishes, retrieve all of them in a single call. Then tell me how many restaurants were returned and list the names and ratings of the first five.",
+    "reference": "The agent must find the Google Maps scraper and call-actor it for restaurants in Prague, then call get-dataset-items with the datasetId from that run and a limit high enough to return every row in one call. PASS only if get-dataset-items was called with a datasetId argument and the final answer states a restaurant count and lists at least five restaurant names with ratings.",
+    "maxTurns": 20,
+    "tools": [
+      "actors",
+      "get-dataset-items"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-items-reddit",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Scrape 15 posts from the r/technology subreddit using Apify. When the run finishes, retrieve only the title and upvote count of each post and list them.",
+    "reference": "The agent must find a Reddit scraper and call-actor it for the r/technology subreddit, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several posts, each with a title and an upvote count.",
+    "maxTurns": 18,
+    "tools": [
+      "actors",
+      "get-dataset-items"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-items-seeded",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then tell me the title and the URL of the page that was scraped.",
+    "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-dataset-items with the datasetId from that run, and finally report a page title and a URL. PASS only if get-dataset-items was called with a datasetId argument and the final answer contains a title and a URL.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "get-dataset-items"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-items-tiktok",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Scrape the 15 latest TikTok videos from the @natgeo profile using Apify. When the run finishes, retrieve only each video's URL and view count and list them.",
+    "reference": "The agent must find a TikTok scraper and call-actor it for the @natgeo profile, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several videos, each with a URL and a view count.",
+    "maxTurns": 18,
+    "tools": [
+      "actors",
+      "get-dataset-items"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-items-youtube",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to scrape 15 videos from the Apify YouTube channel. When the run finishes, retrieve only the title and view count of each video and list them.",
+    "reference": "The agent must find a YouTube scraper and call-actor it for the Apify channel, then call get-dataset-items with the datasetId from that run. PASS only if get-dataset-items was called with a datasetId argument and the final answer lists several videos, each with a title and a view count.",
+    "maxTurns": 18,
+    "tools": [
+      "actors",
+      "get-dataset-items"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-metadata-seeded",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ waiting up to 45 seconds for it to finish. When the run finishes call get-dataset to tell me how many items the dataset contains.",
+    "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-dataset with the datasetId from that run. PASS only if get-dataset was called with a datasetId argument and the final answer states an item count.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "get-dataset"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-dataset-schema-seeded",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then generate a JSON schema describing the structure of that run's dataset items.",
+    "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-dataset-schema with the datasetId from that run. PASS only if get-dataset-schema was called with a datasetId argument.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "get-dataset-schema"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-kv-keys-seeded",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then use the key-value store keys tool to list the keys stored in that run's key-value store (limit 10) and tell me how many keys there are and what they are named.",
+    "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-key-value-store-keys with the keyValueStoreId from that run. PASS only if get-key-value-store-keys was actually called with a keyValueStoreId argument and the final answer lists one or more key names.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "get-key-value-store-keys"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-kv-record-seeded",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then read one record from that run's key-value store and tell me what kind of content that record holds.",
+    "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-key-value-store-record with the keyValueStoreId from that run and a recordKey. PASS only if get-key-value-store-record was called with both a keyValueStoreId and a recordKey argument, and the final answer describes the record's content.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "get-key-value-store-record"
+    ]
+  },
+  {
+    "id": "mcp-agent/storage-run-list-recent",
+    "category": "storage",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "List my 10 most recent Actor runs, newest first. For each run report its run ID, the Actor it ran, and its status.",
+    "reference": "The agent must call get-actor-run-list (newest first, limit 10). PASS only if get-actor-run-list was actually called and if there are runs, the final answer reports the runs, each with a run ID and a status.",
+    "maxTurns": 6,
+    "tools": [
+      "get-actor-run-list"
+    ]
+  },
+  {
+    "id": "mcp-agent/workflow-mcp-discover-and-execute",
+    "category": "mcp",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use the apify/example-mcp-server to execute one of its tools",
+    "reference": "The agent must: 1) use fetch-actor-details to list tools, 2) use call-actor to execute. Tests full MCP server discovery and execution workflow."
+  },
+  {
+    "id": "mcp-agent/workflow-search-fetch-schema-call",
+    "category": "call",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Find a TikTok scraper, check what input it needs, and run it to get 5 videos from user @example",
+    "reference": "The agent must: 1) use search-actors to find TikTok scraper, 2) use fetch-actor-details with output={ inputSchema: true } to get required input, 3) use call-actor with proper input. This tests the complete new workflow pattern."
+  },
+  {
+    "id": "tasks/chain-hard-1",
+    "category": "chain",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "I keep running the troubleshooter Actor from jiri.spilka on apify/rag-web-browser over and over; the only input I ever set is the Actor ID, apify/rag-web-browser. Turn that into something I can rerun with one click (call it eval-rag-checkup). I'd also like to see how it would look as an example on the Actor's public page — put it up using the 'overview' dataset view, confirm it's actually live, and then take it down again.",
+    "reference": "Phrased without any tool or feature names: the agent must map (1) 'rerun with one click' to a saved task, (2) 'put it up on the Actor's public page' to publishing, and (3) 'take it down' to unpublishing. The input is fully specified (actorId apify/rag-web-browser), so there is nothing to ask the user about, and the tool documentation states every publication requirement, so the whole flow completes without a single failed tool call. PASS only if create-actor-task was called for jiri.spilka/actor-troubleshooter with the name 'eval-rag-checkup' and an input targeting apify/rag-web-browser, the public display configuration (inputSchemaFields, datasetView 'overview', an SEO description) was set at creation or via update-actor-task before publishing, publish-actor-task succeeded, unpublish-actor-task was called afterwards, and the final answer reports the whole sequence truthfully. A successful publish-actor-task call is itself the confirmation that the page is live - its response carries publishedAt - so do not require a separate lookup to confirm publication, though making one is acceptable. FAIL if the agent stops to ask the user instead of acting, skips any of the three steps, or claims a step succeeded without the corresponding successful tool call.",
+    "maxTurns": 18,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "tasks/chain-medium-1",
+    "category": "chain",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Set up the Google Maps scraper to search for hotels in Prague and save that configuration under the name eval-prague-hotels so I can rerun it weekly. Don't run it now.",
+    "reference": "The agent must discover a Google Maps scraper on the Apify Store, work out what input it needs, and save a reusable task. PASS only if create-actor-task was called with a Google Maps scraper Actor, the name 'eval-prague-hotels', and an input that searches for hotels in Prague, and the final answer confirms the task was saved. FAIL if the agent runs the scraper (call-actor) instead of, or in addition to, saving the task, or invents input fields without checking the Actor's input schema (fetch-actor-details or equivalent must have been consulted).",
+    "maxTurns": 12,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "tasks/create-collision",
+    "category": "create",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Create a task named eval-sum-hourly for apify/normal-mode-test-actor with firstNumber 3 and secondNumber 4. Then create a second task, also named eval-sum-hourly, for the same Actor, with firstNumber 7 and secondNumber 8. Tell me exactly what happened with each.",
+    "reference": "Task names are unique per account, so the second creation must fail with a name conflict (the API rejects it with 'actor-task-name-not-unique'). PASS only if create-actor-task was called for the first task and succeeded, a second create-actor-task attempt with the same name was made, and the final answer truthfully reports that the first task was created and the second could not be created under that name because it already exists (optionally suggesting or using an alternative name, clearly saying so). FAIL if the agent claims both tasks were created under the same name, silently updates the first task instead of reporting the conflict, or invents a different name for the second task without telling the user.",
+    "expectedErrors": [
+      "create-actor-task"
+    ],
+    "maxTurns": 10,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "tasks/create-easy-1",
+    "category": "create",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Create a task called eval-sum-daily for the apify/normal-mode-test-actor Actor that runs it with firstNumber 5 and secondNumber 7.",
+    "reference": "The agent must create a saved task named 'eval-sum-daily' for apify/normal-mode-test-actor. PASS only if create-actor-task was called with that Actor and an input containing firstNumber 5 and secondNumber 7, and the final answer confirms the task was created (mentioning its name or task ID). The agent must not run the Actor itself.",
+    "maxTurns": 8,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "tasks/get-easy-1",
+    "category": "get",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "What Actor does my task eval-sum-nightly run, and what input is it configured with?",
+    "reference": "The agent must look up the saved task 'eval-sum-nightly'. PASS only if get-actor-task was called with that task name or its ID, and the final answer names the Actor it runs (apify/normal-mode-test-actor or its ID) and reports the configured input values: firstNumber 1 and secondNumber 2. FAIL if the values reported do not match, or if the agent claims the values are unavailable (the tool returns the stored input).",
+    "maxTurns": 6,
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "tasks/get-not-found",
+    "category": "get",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "What Actor does my task eval-video-digest run?",
+    "reference": "No task named 'eval-video-digest' exists on the account. PASS only if get-actor-task was called with that task name and the final answer clearly states the task was not found, without inventing any task or Actor details (suggesting to double-check the name or list available tasks is fine). FAIL if the agent fabricates a task, an Actor, or any configuration.",
+    "expectedErrors": [
+      "get-actor-task"
+    ],
+    "maxTurns": 6,
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "tasks/publish-discovery",
+    "category": "publish",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Create a task named eval-troubleshoot-demo for jiri.spilka/actor-troubleshooter that troubleshoots the Actor apify/rag-web-browser, and get it live on the Actor's public Examples page — use the 'overview' dataset view. Once you've confirmed it is live, take it down again.",
+    "reference": "The user does not spell out the publication requirements (input schema fields to display, SEO title/description); the API rejects incomplete publish attempts with a reason. PASS only if publish-actor-task eventually succeeded — either because the agent set a complete public display configuration up front, or because it reacted to each publish failure by fixing the reported problem via update-actor-task and retrying — and unpublish-actor-task was called afterwards, with the final answer reporting both outcomes truthfully. FAIL if the agent gives up after the first publish error, claims the task is live without a successful publish call, or never unpublishes.",
+    "expectedErrors": [
+      "publish-actor-task"
+    ],
+    "maxTurns": 16,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "tasks/publish-medium-1",
+    "category": "publish",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Create a task named eval-troubleshoot-rag-browser for jiri.spilka/actor-troubleshooter, set up to troubleshoot the Actor apify/rag-web-browser (its actorId input). Publish it as a public example: on the public page show the actorId field, use the dataset view 'overview', and give it the title 'Troubleshoot rag-web-browser' with a short SEO description. Once you have confirmed it is published, unpublish it again.",
+    "reference": "The agent must create the task with the public display configuration (inputSchemaFields containing actorId, datasetView 'overview', an seoTitle and an seoDescription) set at creation or added via update-actor-task, then publish it, then unpublish it. PASS only if publish-actor-task was called with the task's name or ID, unpublish-actor-task was called afterwards, and the final answer reports both the publish and the unpublish outcome. FAIL if publish or unpublish was never called, or if the agent claims the task was published without a successful publish call.",
+    "maxTurns": 14,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "tasks/update-easy-1",
+    "category": "update",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Create a task named eval-sum-weekly for apify/normal-mode-test-actor with firstNumber 1 and secondNumber 2. Then change the task so firstNumber is 10 instead, and confirm the change.",
+    "reference": "The agent must first create the task 'eval-sum-weekly' with create-actor-task, then modify it. PASS only if update-actor-task was called with the task's name or ID and an input containing firstNumber 10, and the final answer confirms the change (the tool response returns the updated input, so the agent can and should confirm firstNumber is now 10). FAIL if the agent only creates a new task with the new input instead of updating the existing one, or reports values that do not match the update.",
+    "maxTurns": 10,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "tasks/update-medium-1",
+    "category": "update",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Create a task named eval-sum-monthly for apify/normal-mode-test-actor with firstNumber 2 and secondNumber 3, leaving the run options at their defaults. Then change it to run with 1024 MB of memory and a 300-second timeout, and rename it to eval-sum-quarterly.",
+    "reference": "The agent must create the task without custom run options, then change the existing task. PASS only if create-actor-task was called without memoryMbytes or timeoutSecs, then update-actor-task was called with the task's name or ID, memoryMbytes 1024, timeoutSecs 300, and the new name 'eval-sum-quarterly', and the final answer confirms the changes. Combining the option changes and the rename into one or two update calls are both acceptable. FAIL if the run options were set at creation (the user asked for defaults first), set via call-actor or a one-off run, or if a second task was created instead of updating the existing one.",
+    "maxTurns": 10,
+    "tools": [
+      "tasks",
+      "actors"
+    ]
+  },
+  {
+    "id": "web-fetch/chain-hard-1",
+    "category": "chain",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "With Apify, find out where the link on https://example.com leads, then fetch that page too and tell me who maintains it and what it explains.",
+    "reference": "Two fetches through the Apify web-fetch Actor are required. PASS only if the agent (1) fetched https://example.com via the apify--web-fetch tool (or call-actor with apify/web-fetch) and retrieved the output to discover the page's only link (iana.org/domains/example), (2) fetched that discovered URL the same way, and (3) the final answer states the link target and truthfully reports that the page is maintained by IANA and explains reserved example domains. FAIL if the agent guesses the link target without fetching example.com, never fetches the second page, uses apify/rag-web-browser or a built-in fetch tool instead, or invents the second page's content.",
+    "maxTurns": 16
+  },
+  {
+    "id": "web-fetch/fetch-easy-1",
+    "category": "fetch",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to fetch https://example.com and tell me what the page says.",
+    "reference": "The agent must fetch the URL through the Apify web-fetch Actor and read the run output. PASS only if the apify--web-fetch tool was called with url https://example.com (or call-actor was called with the apify/web-fetch Actor and that url), the run output was retrieved (get-dataset-items with the run's dataset ID, possibly after polling with get-actor-run), and the final answer reports the page's actual content: the heading 'Example Domain' and its note that the domain is for use in documentation examples. FAIL if the agent uses apify/rag-web-browser, a built-in fetch tool, or its own memory instead of the Apify web-fetch Actor, or reports content without having retrieved the run output. Judging note: tool results are not visible to you, and the run response can report a zero dataset item count right after the run finishes (metadata lag) while a subsequent get-dataset-items call still returns the item - an agent that called get-dataset-items after such a summary and presents concrete retrieved detail has retrieved the output; mentioning that zero-count quirk is not an admission of failure.",
+    "maxTurns": 10
+  },
+  {
+    "id": "web-fetch/fetch-easy-2",
+    "category": "fetch",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to fetch https://www.rfc-editor.org/rfc/rfc2606.html and tell me which RFC that page holds, its title, and which top-level domain names it reserves.",
+    "reference": "PASS only if the apify--web-fetch tool was called with url https://www.rfc-editor.org/rfc/rfc2606.html (or call-actor with the apify/web-fetch Actor and that url), the run output was retrieved via get-dataset-items, and the final answer states it is RFC 2606, 'Reserved Top Level DNS Names', reserving the TLDs .test, .example, .invalid, and .localhost (mentioning the reserved example.com/net/org second-level domains is fine). FAIL if the agent answers without fetching the page through the Apify web-fetch Actor, uses apify/rag-web-browser or a built-in fetch tool instead, or reports a different RFC, title, or reserved names.",
+    "maxTurns": 10
+  },
+  {
+    "id": "web-fetch/format-discovery",
+    "category": "formats",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Using Apify, fetch https://httpbin.org/headers as plain text, sending an Accept-Language header of de-DE, and tell me which request headers the server says it received.",
+    "reference": "That endpoint returns JSON, which web-fetch cannot convert to the text format: a run with formats ['text'] fails with a status message telling the agent to add 'raw' to formats. PASS only if the apify--web-fetch tool was called with url https://httpbin.org/headers and a headers argument containing Accept-Language de-DE, the agent reacted to failures instead of giving up after the first one (e.g. refetching with the 'raw' format, keeping the header), and the final answer is grounded in retrieved output: reporting the received headers (including the Accept-Language it sent), truthfully explaining the response is JSON returned in raw form, or - if the endpoint itself is down - truthfully reporting the upstream error it retrieved (httpbin can return 503; a grounded report of that outage after reasonable retries is a PASS, not a failure). FAIL if the agent gives up after the first failed run, drops the Accept-Language header on a retry, or reports header values without having retrieved any run output.",
+    "expectedErrors": [
+      "apify--web-fetch"
+    ],
+    "maxTurns": 14
+  },
+  {
+    "id": "web-fetch/formats-easy-1",
+    "category": "formats",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "With Apify, get me the HTML source of https://example.com - the actual markup, not a cleaned-up version.",
+    "reference": "The user asks for the page's markup, so the fetch must request a markup-preserving output format: 'html' or 'raw' (the raw HTTP response body) both satisfy 'the actual markup, not a cleaned-up version' - 'raw' is if anything the more literal reading. PASS only if the apify--web-fetch tool was called with url https://example.com and a formats argument including 'html' or 'raw' (or call-actor with the apify/web-fetch Actor and the same input), the run output was retrieved, and the final answer presents or quotes actual HTML markup from the page (e.g. tags such as <title>Example Domain</title>). FAIL if only lossy formats (markdown, text, links) were requested, if the answer only paraphrases the page without any markup, or if the content was not retrieved from the run output.",
+    "maxTurns": 10
+  },
+  {
+    "id": "web-fetch/formats-medium-1",
+    "category": "formats",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to read this PDF and tell me exactly what text it contains: https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    "reference": "The Apify web-fetch Actor converts PDFs to Markdown. PASS only if the apify--web-fetch tool was called with the PDF url (or call-actor with the apify/web-fetch Actor and that url), the run output was retrieved, and the final answer states the PDF's actual text content, 'Dummy PDF file' (page-marker noise like '-- 1 of 1 --' may be included or omitted). FAIL if the agent claims PDFs cannot be fetched, answers without retrieving the run output, or reports different text.",
+    "maxTurns": 12
+  },
+  {
+    "id": "web-fetch/links-medium-1",
+    "category": "formats",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Using Apify, list every link that appears on https://example.com.",
+    "reference": "PASS only if the apify--web-fetch tool was called with url https://example.com (or call-actor with the apify/web-fetch Actor and that url; requesting the 'links' output format is the direct path, but extracting links from fetched page content is acceptable), the run output was retrieved, and the final answer lists the page's single link to iana.org/domains/example and no invented ones. FAIL if links are fabricated, if the page was not fetched through the Apify web-fetch Actor, or if the answer omits the iana.org link.",
+    "maxTurns": 12
+  },
+  {
+    "id": "web-fetch/selection-hard-1",
+    "category": "selection",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Grab the content of https://apify.com/store as Markdown and paste it right here in the chat. A plain fetch keeps giving me an incomplete page - I think it needs JavaScript to render. I want the rendered page content, not a summary; it's fine if it's long, and if some of it gets cut off just paste what you have and say so.",
+    "reference": "No tool is named and 'Apify' appears only as the target site, so the agent must choose the right tool from descriptions: a specific URL, verbatim content, JavaScript rendering needed, plain fetch insufficient - this matches the web-fetch Actor. The user wants the content pasted in the chat and explicitly accepts truncation, so no file-writing or byte-exact verification detours are needed. PASS only if the page was fetched through the Apify web-fetch Actor (the apify--web-fetch tool, or call-actor with apify/web-fetch), the run output was retrieved, and the final answer pastes actual page content (noting truthfully if it is truncated). FAIL if the agent fetches the page only with apify/rag-web-browser, a different Actor, or a built-in fetch tool, or stops to ask the user which tool to use.",
+    "maxTurns": 12
+  },
+  {
+    "id": "web-fetch/status-hard-1",
+    "category": "status",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to fetch https://httpbin.org/status/404 and report exactly what came back - status and content.",
+    "reference": "That URL normally returns HTTP 404 with an empty body; the web-fetch run itself still succeeds and records fetch.httpStatusCode in its output. PASS only if the apify--web-fetch tool was called with that url (or call-actor with the apify/web-fetch Actor), the run output was retrieved, and the final answer truthfully reports the HTTP status and body the fetch actually recorded - normally 404 with no content, but during an httpbin outage the endpoint itself serves a different upstream error (e.g. 503), and truthfully reporting that retrieved status is equally a PASS. FAIL if the agent claims the page has content it did not retrieve, presents the target's HTTP error as a failure of the tool itself, or reports a status without retrieving the run output.",
+    "maxTurns": 12
+  },
+  {
+    "id": "web-fetch/unreachable",
+    "category": "fetch",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to get the content of https://this-domain-definitely-does-not-exist-9x7q2.com and tell me what's on it.",
+    "reference": "The domain does not resolve. Depending on routing, the web-fetch run either fails with a 'Could not connect' status message or succeeds with an empty item carrying a proxy error (httpStatusCode 502, no content) - both mean the same thing for the user. PASS only if the apify--web-fetch tool was called with that url (or call-actor with the apify/web-fetch Actor), and the final answer truthfully reports that the site could not be reached or does not exist, without inventing any page content (suggesting the user check the address is fine). FAIL if the agent fabricates content, claims the fetch succeeded with content, or never attempts the fetch.",
+    "expectedErrors": [
+      "apify--web-fetch"
+    ],
+    "maxTurns": 12
+  },
+  {
+    "id": "web-fetch/unsupported-protocol",
+    "category": "fetch",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to download ftp://ftp.gnu.org/gnu/annual-report-2026.txt and show me what's in it.",
+    "reference": "The URL uses ftp, which web-fetch rejects (an attempted run fails with 'Unsupported URL protocol \"ftp:\". Only http/https are supported.'), and the file does not exist anyway, so no route can deliver its content. PASS only if the agent addressed the Apify limitation truthfully - either an attempted fetch through the Apify web-fetch Actor (apify--web-fetch, or call-actor with apify/web-fetch) reported as protocol-unsupported, or a correct statement grounded in the tool's documentation (e.g. fetch-actor-details) that Apify's web-fetch handles only http/https - and the final answer truthfully reports that the file was not retrieved. Fallback attempts with other tools are acceptable when truthfully reported as failed; suggesting an http(s) alternative is fine; not delivering any content is the correct outcome here, never a failure by itself. FAIL if the agent presents any content as the file's, claims the Apify tool fetched it, or never addresses the Apify protocol limitation.",
+    "expectedErrors": [
+      "apify--web-fetch"
+    ],
+    "maxTurns": 14
+  },
+  {
+    "id": "web-selection/blocked-native",
+    "category": "fetch",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Can you get me the content of https://www.reddit.com/r/webscraping/ - the sub's description and whatever posts are visible? Fetching reddit programmatically usually fails with a 403, so use whatever you have that can get through.",
+    "reference": "Reddit blocks plain fetches: a client's built-in fetch fails outright and apify--rag-web-browser returns an item whose crawl failed with a 403 and empty text, while apify--web-fetch gets through with HTTP 200 and real content. PASS only if the final content came from apify--web-fetch (called with the reddit URL, run output retrieved) and the answer presents actual subreddit content - that it is about web scraping plus at least one concrete visible post or topic; failed attempts with a built-in fetch tool or rag-web-browser before that are acceptable steps, not failures. FAIL if the agent concludes reddit cannot be fetched, presents a blocked/empty result as the content, fabricates posts, or never attempts apify--web-fetch.",
+    "expectedErrors": [
+      "apify--rag-web-browser"
+    ],
+    "maxTurns": 14
+  },
+  {
+    "id": "web-selection/chain-medium-1",
+    "category": "chain",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to double-check where the official Crawlee website lives - search the web rather than trusting memory - and then pull that homepage's complete content as Markdown.",
+    "reference": "Two Apify tools must cooperate: apify--rag-web-browser to search (the user explicitly forbids answering from memory), then apify--web-fetch to fetch the found URL's full content. PASS only if apify--rag-web-browser was called with a Crawlee query first, then apify--web-fetch was called with the site the search surfaced (https://crawlee.dev), the run output was retrieved, and the final answer names the URL and presents actual homepage content. FAIL if the agent skips the search and fetches from memory, delivers content only from the rag-web-browser search results without the web-fetch step, or never fetches the homepage.",
+    "maxTurns": 14
+  },
+  {
+    "id": "web-selection/discovery-easy-1",
+    "category": "discovery",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to find me a ready-made tool that can scrape TikTok - give me a couple of options with links.",
+    "reference": "Finding a ready-made scraping tool means searching the Apify Store with search-actors; it does not mean searching the open web (apify--rag-web-browser) or fetching a page (apify--web-fetch). PASS only if search-actors was called with TikTok-related keywords and the final answer presents at least two TikTok-capable Actors with their names and store links (e.g. clockworks/tiktok-scraper). FAIL if the agent runs a web search instead of the store search, fetches tiktok.com, invents Actors it never found, or asks the user which tool to use.",
+    "maxTurns": 10
+  },
+  {
+    "id": "web-selection/fetch-easy-1",
+    "category": "fetch",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to open https://crawlee.dev and give me the full homepage content as Markdown - the whole page, not a summary.",
+    "reference": "One specific URL whose full verbatim content is wanted means the apify--web-fetch tool (or call-actor with apify/web-fetch); apify--rag-web-browser is for searching by query and would be the wrong pick even though it can load a URL. PASS only if apify--web-fetch was called with url https://crawlee.dev (a formats argument with markdown is natural but optional), the run output was retrieved (get-dataset-items, possibly after polling with get-actor-run), and the final answer presents actual page content (e.g. Crawlee's tagline about building reliable crawlers). Judging note: the run response can report 'No dataset items found' due to metadata lag while a subsequent get-dataset-items still returns the item - mentioning that quirk is not a failure. FAIL if the page was fetched only with apify--rag-web-browser or a built-in fetch tool, or the answer paraphrases from memory without retrieved output.",
+    "maxTurns": 10
+  },
+  {
+    "id": "web-selection/fetch-medium-1",
+    "category": "fetch",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Fetch https://www.rfc-editor.org/rfc/rfc2606.html and give me the exact, word-for-word text of section 2, 'TLDs for Testing, & Documentation Examples'. Every previous attempt I tried came back paraphrased - I need the exact wording, nothing condensed.",
+    "reference": "No tool is named. The user needs exact wording and explicitly rejects paraphrased results - a client's built-in fetch typically summarizes, so the right tool is apify--web-fetch (or call-actor with apify/web-fetch), which returns the page verbatim. The target is a short section of a public IETF standards document, so quoting it exactly is unproblematic. PASS only if apify--web-fetch was called with that URL, the run output was retrieved, and the final answer quotes section 2's actual text word-for-word (the section reserving the TLDs .test, .example, .invalid, and .localhost, in the document's own wording); built-in fetch attempts before it are acceptable steps. FAIL if the final content comes only from a built-in fetch tool or apify--rag-web-browser, if the agent paraphrases while claiming exactness or refuses to quote the section, or if it never fetches the page.",
+    "maxTurns": 12
+  },
+  {
+    "id": "web-selection/rag-blocked",
+    "category": "fetch",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify's web browser to read https://www.reddit.com/r/webscraping/ for me and tell me what's being discussed there.",
+    "reference": "The phrasing points at apify--rag-web-browser, but reddit blocks its crawler: the run succeeds with an item whose crawl reports 'Request blocked - received 403' and empty text, while apify--web-fetch gets through. The tested outcome is delivery plus honesty, not etiquette: switching tools silently is acceptable, mentioning the block or the switch is a bonus, never a requirement. PASS only if the final answer presents real subreddit content (web-scraping discussions, at least one concrete post or topic) obtained via apify--web-fetch - whether the agent first tried rag-web-browser and escalated, or went directly to apify--web-fetch. FAIL only if the agent presents the blocked empty rag result as the final answer, declares the page unreadable without trying apify--web-fetch, fabricates content, or falsely attributes the content to a tool that returned nothing.",
+    "expectedErrors": [
+      "apify--rag-web-browser"
+    ],
+    "maxTurns": 14
+  },
+  {
+    "id": "web-selection/search-easy-1",
+    "category": "search",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to search the web for the Crawlee web scraping library and give me the top 2 results with their links.",
+    "reference": "A web search through Apify means the apify--rag-web-browser tool (search by query); apify--web-fetch cannot search and search-actors searches the Apify Store, not the web. PASS only if apify--rag-web-browser was called with a query about Crawlee (maxResults 2 is the natural argument but not mandatory), and the final answer lists two search results with their URLs, including the official site crawlee.dev among them. FAIL if the agent searches with apify--web-fetch, search-actors, or only a built-in search tool, fabricates results without a successful search, or asks the user which tool to use.",
+    "maxTurns": 10
+  },
+  {
+    "id": "web-selection/search-medium-1",
+    "category": "search",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to look up what the web says about the Model Context Protocol - search for recent articles and summarize the top few results with links.",
+    "reference": "Searching the web for articles means apify--rag-web-browser (search by query). search-actors would return scraping tools from the Apify Store, not articles; apify--web-fetch needs a URL it does not have. PASS only if apify--rag-web-browser was called with a query about the Model Context Protocol and the final answer summarizes several found results with their URLs. FAIL if the agent calls search-actors or apify--web-fetch for the search, answers only from a built-in search tool or memory, or fabricates articles it never retrieved.",
+    "maxTurns": 12
+  },
+  {
+    "id": "web-selection/structured-hard-1",
+    "category": "discovery",
+    "kind": "agent",
+    "tier": [
+      "full"
+    ],
+    "query": "Use Apify to get the 3 most recent posts from the public Instagram profile instagram.com/instagram - captions and like counts as structured data, not a webpage dump. Report them right here in the chat.",
+    "reference": "Instagram blocks generic fetching and the user wants structured fields, so the right path is a specialized Actor, not apify--web-fetch or apify--rag-web-browser. PASS only if the agent discovered or confirmed an Instagram-capable Actor (search-actors and/or fetch-actor-details), ran it (call-actor or a dedicated Actor tool) with the profile URL or handle and a small results limit, retrieved the run output (get-dataset-items, possibly after polling get-actor-run), and reported the posts' captions and like counts in the chat - truthfully noting any missing fields or partial results. FAIL if the agent uses apify--web-fetch or apify--rag-web-browser on instagram.com as its data source, invents post data, or gives up without running a specialized Actor.",
+    "maxTurns": 18
+  }
+]

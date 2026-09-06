@@ -109,7 +109,7 @@ describe('makeTask()', () => {
         id: 'search-001',
         input: { query: 'q' },
         expectedOutput: 'r',
-        metadata: { category: 'search' },
+        metadata: { category: 'search', kind: 'agent', tier: ['full'] },
         ...overrides,
     });
 
@@ -191,12 +191,38 @@ describe('makeTask()', () => {
                 { name: 'Bash', isMcpTool: false, result: { success: false, error: 'exit status 1' } },
             ],
         });
-        const item = makeItem({ metadata: { category: 'search', failTools: ['call-actor'] } });
+        const item = makeItem({
+            metadata: { category: 'search', kind: 'agent', tier: ['full'], failTools: ['call-actor'] },
+        });
 
         // First line only: the full text already sits on the tool span, so nothing re-uploads it.
         await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({
             toolErrors: [{ tool: 'create-actor-task', error: 'name taken' }],
         });
+    });
+
+    it('rejects a kind: selection item without spending an agent run', async () => {
+        const item = makeItem({
+            expectedOutput: undefined,
+            metadata: { category: 'search', kind: 'selection', tier: ['full'], expectedTools: ['search-actors'] },
+        });
+
+        await expect(makeMcpAgentTask()(item)).rejects.toThrow(
+            'Item "search-001": kind "selection" item reached the agent task; this task only runs agent items',
+        );
+        expect(mocks.runAgentConversation).not.toHaveBeenCalled();
+    });
+
+    it('rejects a kind: selection item that also carries an expectedOutput', async () => {
+        const item = makeItem({
+            expectedOutput: 'a reference the validator does not yet reject on a selection item',
+            metadata: { category: 'search', kind: 'selection', tier: ['full'], expectedTools: ['search-actors'] },
+        });
+
+        await expect(makeMcpAgentTask()(item)).rejects.toThrow(
+            'Item "search-001": kind "selection" item reached the agent task; this task only runs agent items',
+        );
+        expect(mocks.runAgentConversation).not.toHaveBeenCalled();
     });
 });
 

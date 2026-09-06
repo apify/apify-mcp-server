@@ -8,7 +8,7 @@ Tests Claude Code performing multi-turn conversations with Apify MCP tools, eval
 dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge -> scores
 ```
 
-1. **Dataset.** Test cases live in the Langfuse dataset `mcp-agent-evals` and are edited in its UI. A run reads them and never writes back.
+1. **Dataset.** Test cases live in the Langfuse dataset `mcp-server-evals` and are edited in its UI. A run reads them and never writes back.
 2. **Experiment.** The run executes the active items matching `--id`/`--category` as one Langfuse experiment, `--concurrency` items at a time.
 3. **Conversation.** Each item runs a Claude Code agent (Claude Agent SDK) that spawns its own fresh Apify MCP server and drives it to answer the query.
 4. **Judge.** An LLM judge scores the finished conversation against the item's `expectedOutput`.
@@ -44,15 +44,40 @@ pnpm run evals:mcp-agent
 
 Run `pnpm run evals:mcp-agent --help` for the full option list. `--category` and `--id` narrow the run, `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API), and `--claude-judge` runs the judge on the Claude Agent SDK too, so no `OPENROUTER_API_KEY` is needed (`--judge-model` then takes an Anthropic model ID, default `claude-sonnet-5`; note a Claude judge scoring a Claude agent can be self-lenient, so prefer the OpenRouter judge for comparable numbers). With `--subscription --claude-judge` a run needs only `APIFY_TOKEN` and the Langfuse keys.
 
-### Proper suites vs error-handling suites
+### One dataset: kind, tier, id scheme, and expectedErrors
+
+Every item is `mcp-server-evals`, no per-family or per-suite dataset split. Each item's
+`metadata` says what it is and when it runs:
+
+- `kind`: `"agent"` (a multi-turn conversation, judged) or `"selection"` (a single-turn tool
+  pick, no judge — not yet executed by this runner; lands with #260). A `kind: "selection"`
+  item is rejected before any agent run starts, so adding one ahead of #260 fails fast
+  instead of spending an agent conversation on it. Every item in `mcp-server-evals` today is
+  `kind: "agent"`.
+- `tier`: `["pr"]`, `["full"]`, or both — which run(s) include the item. Everything migrated
+  so far is `tier: ["full"]`.
+- `expectedErrors` (optional): tool names allowed to fail on this item without failing the
+  zero-tool-error gate below. Replaces the old separate `*-errors` datasets and the run-wide
+  `--allow-tool-errors` flag with a per-item, per-tool exemption.
+
+  **Not consumed by the runner yet** (`langfuse_experiment.ts`; see #260): until that lands, a
+  plain `pnpm run evals:mcp-agent` against `mcp-server-evals` fails exactly the 8 items that
+  carry `expectedErrors`, on the zero-tool-error gate below. Pass `--allow-tool-errors` to get
+  a green run in the meantime — it still tolerates *any* tool failing, not just the named one,
+  same as before.
+
+Item ids are `<category>/<slug>` (e.g. `tasks/create-explicit-1`, `web-fetch/unreachable`),
+where `<category>` is a coarse family name — `mcp-agent`, `tasks`, `web-fetch`, or
+`web-selection` — and `<slug>` is the rest of the id. This `<category>` is not the same as
+`metadata.category` (the fine-grained value `--category` filters on, e.g. `create`, `get`,
+`search-actors`); the id's category only tells you which family a case belongs to. Run one
+family with `--id`, which already matches by regex: `pnpm run evals:mcp-agent -- --id '^tasks/'`
+runs the 10 tasks-family items (7 proper + 3 error) in one call.
 
 By default the gate requires zero failed tool calls: an item whose agent hit any tool error fails even
 on a judge PASS, and every item carries a `tool_errors` score (count, with the failing calls in the
-comment). Cases that provoke errors on purpose (error recovery, not-found lookups, name collisions)
-live in a separate `*-errors` dataset and run with `--allow-tool-errors`, which drops only the
-zero-error condition. Never mix the two: an error-provoking case inside a proper suite either fails the
-run or forces error tolerance onto cases that must stay clean. Only the server's own tools count:
-failures of Claude Code's built-ins (`Bash`, `WebFetch`) and of tools `failTools` injected are exempt.
+comment). Only the server's own tools count: failures of Claude Code's built-ins (`Bash`, `WebFetch`)
+and of tools `failTools` injected are exempt.
 
 Read-only probes count too, which is the point: the gate is what keeps the tool descriptions strong
 enough that an agent resolves a loose Actor reference with `search-actors` instead of guessing a slug.
@@ -61,20 +86,20 @@ One caveat when reading a failure: a transient agent failure is retried once, an
 whole prompt, so a fixed-name create case can hit a name collision the second time round and fail the
 gate on it. The console prints a `retrying once` line for those items.
 
-The task-tool suites are `tasks-evals` (proper) and `tasks-evals-errors` (error handling). They use
-fixed `eval-*` task names, which are unique per account, and the create cases never clean up — so every
-run leaves debris that collides on the next one. Run `pnpm run evals:mcp-agent:tasks-fixtures` before
-every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture task. It deletes on
-whatever account `APIFY_TOKEN` points at and prints that account first; pass `--dry-run` to see what
-it would delete before it does. Both suites publish task examples on
+The tasks family (`tasks/*`, 10 items: 7 proper + 3 with `expectedErrors`) uses fixed `eval-*`
+task names, which are unique per account, and the create cases never clean up — so every run
+leaves debris that collides on the next one. Run `pnpm run evals:mcp-agent:tasks-fixtures`
+before every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture task. It
+deletes on whatever account `APIFY_TOKEN` points at and prints that account first; pass
+`--dry-run` to see what it would delete before it does. The family publishes task examples on
 `jiri.spilka/actor-troubleshooter`, and publishing needs write access to the Actor, so those cases only
 pass on an account that has it.
 
 Publishing requires all three of `publicConfig.inputSchemaFields`, `datasetView` and `seoDescription`
 (probed against the API), and the API reports the missing ones **non-exhaustively** — which is why
-`task-publish-discovery` budgets turns for several fix-and-retry rounds rather than one.
+`tasks/publish-discovery` budgets turns for several fix-and-retry rounds rather than one.
 
-`task-chain-hard-1` is the calibration edge, and it is calibrated: `claude-sonnet-4-5` passes it 3/3,
+`tasks/chain-hard-1` is the calibration edge, and it is calibrated: `claude-sonnet-4-5` passes it 3/3,
 `claude-haiku-4-5` about 5 runs in 8. Every Haiku failure is the same one — it constructs
 `jiri.spilka/troubleshooter` from the loose reference in the query instead of resolving the real
 `actor-troubleshooter` with `search-actors`, eats the not-found, then recovers. The judge passes those
@@ -87,9 +112,9 @@ wording was measured at 5/8 against ~7/10 without it — no change. Treat a shif
 signal, not a single red run, and read a persistent drop as a description problem only after checking
 it still passes on Sonnet.
 
-The web-fetch suites are `web-fetch-evals` (proper) and `web-fetch-evals-errors` (error handling),
-covering the `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting,
-tool selection among the defaults, and multi-fetch chains. They create no named account state, so
+The web-fetch family (`web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
+`apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
+selection among the defaults, and multi-fetch chains. They create no named account state, so
 there is no fixtures script. The cases fetch live third-party pages (example.com, rfc-editor.org,
 httpbin.org), so a failure can also mean the page changed or the host is down — check the target
 before blaming the tool (httpbin outages are common; the status/format references tolerate a
@@ -99,26 +124,27 @@ the item; an unreachable domain either fails the run ("Could not connect…") or
 empty 502 item, depending on unblocker routing; JSON content fails `text`/`markdown` formats with a
 status message telling the agent to add `raw`; `ftp://` fails with "Unsupported URL protocol".
 
-The web-tools-selection suites are `web-selection-evals` (proper) and `web-selection-evals-errors`
-(error handling), covering the clash between the default web tools: web search by query
-(`apify/rag-web-browser`) vs single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery
-(`search-actors`) vs a specialized Actor for structured platform data, plus rag→web-fetch
-escalation when a page blocks rag's crawler (reddit) and coexistence with a client's built-in,
-summarizing fetch. Also stateless — no fixtures script. Known residual (2026-08-21): on the
-`web-fetch-unsupported-protocol` case, claude-haiku-4-5 reproducibly rewrites the ftp:// URL to
-https:// without telling the user, despite the scheme note in both the tool description and the
-`url` parameter — a model-level limit the case documents on purpose; stronger models pass.
+The web-selection family (`web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
+the clash between the default web tools: web search by query (`apify/rag-web-browser`) vs
+single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery (`search-actors`) vs a
+specialized Actor for structured platform data, plus rag→web-fetch escalation when a page
+blocks rag's crawler (reddit) and coexistence with a client's built-in, summarizing fetch. Also
+stateless — no fixtures script. Known residual (2026-08-21): on `web-fetch/unsupported-protocol`,
+claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without telling the user,
+despite the scheme note in both the tool description and the `url` parameter — a model-level
+limit the case documents on purpose; stronger models pass.
 
 **Exit codes:**
 - `0` = every requested test ran and passed ✅
 - `1` = any test failed, any test never ran, or setup failed ❌
 
-**Editing test cases:** edit the items in the Langfuse UI. The next run picks them up; there is nothing to commit.
-To read the cases outside Langfuse, export a local copy (gitignored, not tracked):
+**Editing test cases:** edit the items in the Langfuse UI. The next run picks them up; there is nothing to commit
+in the dataset itself — but re-run the export below so the committed snapshot reflects the edit.
 ```bash
-pnpm run evals:mcp-agent:export-dataset   # writes dataset_snapshot_mcp-agent-evals.json (no build, no Apify/OpenRouter keys)
+pnpm run evals:mcp-agent:export-dataset   # writes dataset_snapshot_mcp-server-evals.json (no build, no Apify/OpenRouter keys)
 ```
-Each dataset gets its own `dataset_snapshot_<dataset>.json`; `--dataset <name>` exports another one (e.g. `tasks-evals`).
+`dataset_snapshot_mcp-server-evals.json` is committed, so a UI edit shows as a diff on the next export; `--dataset <name>`
+exports any other dataset to its own `dataset_snapshot_<dataset>.json`, which stays gitignored.
 
 ---
 
@@ -136,12 +162,12 @@ Each dataset gets its own `dataset_snapshot_<dataset>.json`; `--dataset <name>` 
 
 ### 1. The Langfuse dataset is the source of truth
 
-**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy: `evals:mcp-agent:export-dataset` dumps the active items to a gitignored `dataset_snapshot_<dataset>.json` for reading them outside the UI, but there is no importer, nothing reads the snapshot at runtime, and it is not tracked.
+**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy: `evals:mcp-agent:export-dataset` dumps the active items to `dataset_snapshot_<dataset>.json` for reading them outside the UI, but there is no importer and nothing reads the snapshot at runtime.
 
 **Why:**
 - A UI edit takes effect on the next run. An earlier version synced a local file into the dataset first, which silently overwrote UI edits
 - `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when given real dataset items
-- Tracking a snapshot would add a second copy that no code reads and nothing keeps in sync, so it is gitignored. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
+- A snapshot is a second copy that no code reads and nothing keeps in sync automatically, so most are gitignored. `dataset_snapshot_mcp-server-evals.json` is the one exception, committed so a git reviewer sees dataset edits as a diff. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
 
 Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
 
@@ -280,7 +306,8 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `run_mcp_agent_evals.ts` - Main CLI entry
 - `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
 - `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
-- `dataset_snapshot_<dataset>.json` - Local gitignored export of a dataset, not read at runtime
+- `migrate_unified_dataset.ts` - One-off migration into `mcp-server-evals` from the old per-family datasets (#259); not part of the regular workflow
+- `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime. Gitignored except `dataset_snapshot_mcp-server-evals.json`, which is committed
 
 ## Configuration
 
@@ -301,7 +328,7 @@ Both entry points fail fast (before any test runs) listing every missing variabl
 
 Results are recorded in Langfuse, not to a local file. Each run:
 
-- **Reads the dataset** `mcp-agent-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
+- **Reads the dataset** `mcp-server-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
 - **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion, agentAuth, allowToolErrors }`. Running on dataset items is what makes it a Langfuse **dataset run**, whose URL the console prints.
 - **Traces** every item as one trace. Its root output is the judge verdict plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed), and a generation for the judge call. See design decision 9.
 - **Scores** each item: `mcp_agent_judge` (`1` on a PASS verdict, comment = judge reason) and `tool_errors` (failed tool calls, comment lists them, `0` on a clean item) together form the gate, and `total_tokens` is the agent tokens billed (omitted when the provider reported no usage so an unmeasured run cannot look like a free one; an item whose agent run was retried reports only the second attempt).
@@ -313,28 +340,45 @@ Results are recorded in Langfuse, not to a local file. Each run:
 
 ### Test case format
 
-A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in `metadata`. The snapshot holds the same fields flattened, one object per case:
+A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in `metadata`. The id is
+`<category>/<slug>` (see "One dataset: kind, tier, id scheme, and expectedErrors" above). The snapshot
+holds the same fields flattened, one object per case, in this fixed key order:
 
 ```json
 [
   {
-    "id": "test-001",
-    "category": "basic",
+    "id": "tasks/create-explicit-1",
+    "category": "create",
+    "kind": "agent",
+    "tier": ["full"],
     "query": "User prompt for agent",
     "reference": "What agent must do to pass",
     "maxTurns": 10,
     "tools": ["actors", "docs"]
+  },
+  {
+    "id": "tasks/get-not-found",
+    "category": "get",
+    "kind": "agent",
+    "tier": ["full"],
+    "query": "What Actor does my task eval-video-digest run?",
+    "reference": "PASS if get-actor-task reports the task does not exist and the agent says so.",
+    "expectedErrors": ["get-actor-task"]
   }
 ]
 ```
 
 **Required fields:**
-- `id` - Unique identifier
-- `category` - For filtering
+- `id` - Unique identifier, `<category>/<slug>`
+- `category` - For `--category` filtering (fine-grained, e.g. `create`, `get`, `search-actors` — not the same as the id's coarse `<category>` prefix)
+- `kind` - `"agent"` (multi-turn, judged; the only kind this runner executes today) or `"selection"` (single-turn tool pick, no judge — lands with #260)
+- `tier` - Array of `"pr"` and/or `"full"`: which run(s) include the item
 - `query` - User request
-- `reference` - Success criteria for judge
+- `reference` - Success criteria for the judge. Required for `kind: "agent"`; absent for `kind: "selection"` (nothing executes, so there's nothing to judge)
 
 **Optional:**
+- `expectedTools` - `kind: "selection"` only: tool names the first tool call must match
+- `expectedErrors` - Tool names allowed to fail on this item without failing the zero-tool-error gate (see above; not yet consumed by the runner, #260)
 - `maxTurns` - Override default (10)
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
 - `failTools` - Tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny, the one hook that survives `bypassPermissions`, so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `claude_agent.ts`.
