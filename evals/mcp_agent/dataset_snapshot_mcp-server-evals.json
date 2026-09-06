@@ -285,7 +285,7 @@
     "tier": [
       "pr"
     ],
-    "query": "Save my apify/instagram-scraper settings as a task called insta-daily right now — just create it directly.",
+    "query": "Create a task called insta-daily that runs apify/instagram-scraper — just create it directly.",
     "expectedTools": [
       "create-actor-task"
     ],

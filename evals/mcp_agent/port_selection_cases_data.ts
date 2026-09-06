@@ -676,15 +676,16 @@ const TASKS_WAVE: PortCaseSpec[] = [
         tools: ['tasks'],
     },
     {
-        // Strengthened after Opus calibration (2026-09-06): reproduced in 2 of 2 runs — Opus
-        // spent its whole 2-turn budget on ToolSearch and never attempted create-actor-task.
-        // Made the action explicit and immediate so there is nothing left to explore first.
+        // Rephrased twice after calibration (2026-09-06). First pass ("just create it
+        // directly") didn't hold on either Opus or Haiku — the real defect was "my ...
+        // settings", which references pre-existing settings the agent was never given (the
+        // skill's "query references context the agent can't obtain" failure mode), inviting a
+        // clarifying question instead of a tool call. Rewritten as a fully self-contained
+        // create request with nothing left to ask about.
         sourceId: 'create-actor-task-1',
         decision: 'rephrase',
         id: 'create-actor-task/instagram-insta-daily',
-        query:
-            'Save my apify/instagram-scraper settings as a task called insta-daily right now — ' +
-            'just create it directly.',
+        query: 'Create a task called insta-daily that runs apify/instagram-scraper — just create it directly.',
         category: 'create-actor-task',
         expectedTools: ['create-actor-task'],
         expectedArgs: { actorId: 'apify/instagram-scraper', name: 'insta-daily' },
