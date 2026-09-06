@@ -63,6 +63,14 @@ const McpAgentItemValidator = z
                 path: ['expectedOutput'],
             });
         }
+        if (item.metadata.kind === 'selection' && item.expectedOutput !== undefined) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                    'expectedOutput is not valid on a kind: "selection" item; nothing executes, so nothing is judged',
+                path: ['expectedOutput'],
+            });
+        }
     });
 
 /** The parts of a dataset item a run reads. */
