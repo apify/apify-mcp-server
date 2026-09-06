@@ -394,6 +394,93 @@ runner (apify/ai-team#261) where this fault is not expected to reproduce.
 5. `pnpm run test:unit -- evals.port_selection_cases` — the coverage/collision/validation
    assertions run against the updated table.
 
+### Coverage matrix (apify/ai-team#265)
+
+`pnpm run evals:coverage` measures — and writes to the committed `evals/mcp_agent/coverage_matrix.md`
+— which tools and which argument groups the dataset actually exercises, per the
+`creating-mcp-agent-evals` skill's per-tool/per-argument-group definition of done and #236's "proven
+by a generated coverage matrix, not by memory". It reads two offline inputs only — the live tool
+registry (`src/tools/**`) and the committed `dataset_snapshot_mcp-server-evals.json` — so it needs no
+env vars and makes no network call by default; the same inputs always produce the same file, byte for
+byte.
+
+**What it measures, per tool:**
+- **`pr` selection cases** — how many `kind: "selection"` items name this tool in `expectedTools`.
+  This is what `covered`/`uncovered` means in the Status column.
+- **`full` agent reachable** — across `kind: "agent"` items, how many would even *serve* this tool
+  (via `metadata.tools` selectors, or the default categories when absent), computed with the
+  server's own `getToolsForServerMode` resolver. Informational only — reachable is not the same as
+  called, so it is never counted as coverage (`report-problem` is reachable in 34 agent items and
+  exercised in none; counting reachability would flip that known gap to green).
+- **`full` agent exercised** — how many observed tool spans of a real full-tier experiment actually
+  called this tool. Reads `n/a` unless `--experiment <id>` is given, and stays `n/a` (not `0`) if
+  that experiment turns out to carry no `kind: "agent"` items — see below.
+- **Argument groups** — one per top-level `inputSchema` property, expanded one level into
+  `parent.child` groups when a property's own schema carries a non-empty `properties` object (e.g.
+  `call-actor`'s `callOptions` → `callOptions.memory`, `callOptions.timeout`, ...); a free-form
+  object (e.g. `call-actor`'s `input`) has no declared `properties` and stays one group. A group is
+  `covered` when some selection case's `expectedArgs` pins that key (a pinned parent object covers
+  every `parent.*` child, since the runner's check deep-equals the whole object) or, with
+  `--experiment`, when an observed span actually sent it.
+- **Status**: `covered`, `uncovered`, or `excluded` (the 4 `*-widget` tools — out of scope until a
+  headless MCP Apps host exists, per #265 point 3; never counted as covered regardless of anything
+  in the dataset). `apify--rag-web-browser`/`apify--web-fetch` build their schema at runtime from
+  the live Actor definition, so their argument-group cell reads `dynamic` and they're excluded from
+  the argument-group totals — not silently scored zero.
+
+**Regenerate:**
+```bash
+pnpm run evals:coverage                        # writes coverage_matrix.md and prints the summary
+pnpm run evals:coverage -- --check             # compares in memory; exit 1 + stale message, no write
+pnpm run evals:coverage -- --experiment <id>   # prints the experiment-augmented matrix to stdout; never writes coverage_matrix.md
+pnpm run evals:coverage -- --experiment <id> --out somewhere.md   # ...or write it there instead, explicitly
+```
+
+`--check` and `--experiment` cannot be combined (`--check` compares only the committed,
+snapshot-only matrix; passing `--experiment` alongside it is rejected with a `❌` message and a
+non-zero exit, before any Langfuse call). `--experiment` without `--out` prints to stdout instead of
+writing anywhere — this is structural, not a convention to remember: with `--experiment`, the
+committed `coverage_matrix.md` can only be touched by passing `--out` explicitly.
+
+**Freshness.** `tests/unit/evals.coverage_matrix.test.ts` regenerates the matrix from the committed
+snapshot and the live registry and asserts byte-equality with the committed `coverage_matrix.md` —
+zero network, so a stale matrix (a new tool, a changed schema, an unregenerated snapshot) fails
+`pnpm run test:unit` on every PR that causes it, not just ones that touch this script. `--check` runs
+the same comparison from the CLI, for local use before committing.
+
+**`--experiment <id>`** fetches that experiment's dataset-item traces (and their dataset-item
+metadata, to tell `kind: "agent"` items from `kind: "selection"` ones) and the agent items' `TOOL`-type
+observation spans from Langfuse (needs `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_BASE_URL`,
+loaded from a `.env` file at the repo root the same as every other script in this directory; the
+default run needs none of this and never calls Langfuse). A span whose output is the selection-mode
+deny-all hook's canned text is always skipped, so a denied call is never counted as "exercised". There
+are two real outcomes, not one: an API error (bad credentials, an unreachable host, ...) fails
+with a `❌ --experiment failed: ...` message and a non-zero exit, not an unhandled rejection; an id
+that resolves to zero `kind: "agent"` items prints a `⚠️ --experiment "<id>" contains no items with
+kind: agent metadata — the exercised column stays n/a` warning and renders `n/a`, not a false `0`, in
+every "exercised" cell. `experimentId` is a filter on a list endpoint, so this second outcome covers
+both a real `pr`-tier selection experiment (every one of which resolves to zero agent items, since
+selection items don't execute) and a typo'd or nonexistent experiment id — both look identical from
+this script's side: an empty item list, the `⚠️` line, and `n/a` everywhere, not an error.
+No full-tier experiment has ever run against `mcp-server-evals` (confirmed 2026-09-06 — every
+experiment on this dataset so far is a `pr`-tier selection run), so the "exercised" path is unit-tested
+against a fixture of captured observations
+(`tests/unit/fixtures/evals_coverage_observations.json`) and against fake Langfuse clients (pagination,
+error propagation, denial-output and selection-item filtering), not exercised end-to-end against a real
+full-tier run — though the network glue itself (pagination, the item-metadata field group, the
+zero-agent-item warning) was verified live against a real `pr`-tier experiment while fixing this path.
+
+**Known gaps this matrix exposes, not fixed here** (this PR is the measurement, not the gap fill;
+see apify/ai-team#265's own plan for the fill order):
+- **Runs family**: no `full`-tier agent coverage for the run lifecycle chain (`call-actor` async →
+  `get-actor-run` → `get-actor-log` → `abort-actor-run`) or run-list filtering.
+- **Docs**: no `full`-tier agent coverage for the `search-apify-docs` → `fetch-apify-docs` chain.
+- **Storage and `call-actor` argument groups**: `call-actor`'s `callOptions.*` run options and
+  `get-dataset-items`'s pagination/format arguments (`offset`, `limit`, `fields`, ...) are pinned by
+  no case today — the matrix's uncovered-argument-groups column names them.
+- **Error cases via `expectedErrors`** (e.g. `get-actor-run` on a nonexistent run id) are not yet
+  matched to the tools/arguments they'd cover.
+
 ### Permission path, and running under root
 
 Every item runs with `canUseTool` granting every tool call, not `bypassPermissions` +
@@ -445,12 +532,12 @@ exports any other dataset to its own `dataset_snapshot_<dataset>.json`, which st
 
 ### 1. The Langfuse dataset is the source of truth
 
-**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy: `evals:mcp-agent:export-dataset` dumps the active items to `dataset_snapshot_<dataset>.json` for reading them outside the UI, but there is no importer and nothing reads the snapshot at runtime.
+**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy a run reads: `evals:mcp-agent:export-dataset` dumps the active items to `dataset_snapshot_<dataset>.json` for reading them outside the UI, and there is no importer. The snapshot is not dead weight — `evals:coverage` and the unit tests read it precisely because it is offline and committed — but no eval run reads it.
 
 **Why:**
 - A UI edit takes effect on the next run. An earlier version synced a local file into the dataset first, which silently overwrote UI edits
 - `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when given real dataset items
-- A snapshot is a second copy that no code reads and nothing keeps in sync automatically, so most are gitignored. `dataset_snapshot_mcp-server-evals.json` is the one exception, committed so a git reviewer sees dataset edits as a diff. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
+- A snapshot is a second copy that no eval run reads and nothing keeps in sync automatically, so most are gitignored. `dataset_snapshot_mcp-server-evals.json` is the one exception, committed so a git reviewer sees dataset edits as a diff and so `evals:coverage` can measure coverage without network access. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
 
 Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
 
@@ -591,8 +678,12 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `run_mcp_agent_evals.ts` - Main CLI entry
 - `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
 - `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
+- `port_selection_cases.ts` - One-off port of the old Phoenix `pr`-tier selection cases into `mcp-server-evals` CLI entry (`pnpm run evals:mcp-agent:port-selection-cases`); validates, dedupes, and upserts by id
+- `port_selection_cases_data.ts` - The authoring table `port_selection_cases.ts` ports: every row, decision, and archived source id, reviewable as a diff
 - `migrate_unified_dataset.ts` - One-off migration into `mcp-server-evals` from the old per-family datasets (#259); not part of the regular workflow
+- `coverage_matrix.ts` - Tool + argument coverage matrix CLI entry (`pnpm run evals:coverage`, apify/ai-team#265); see "Coverage matrix" above
 - `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime. Gitignored except `dataset_snapshot_mcp-server-evals.json`, which is committed
+- `coverage_matrix.md` - Committed, generated output of `coverage_matrix.ts`; do not edit by hand
 
 ## Configuration
 
@@ -607,7 +698,7 @@ export LANGFUSE_SECRET_KEY="sk-lf-..."          # Langfuse project settings
 export LANGFUSE_BASE_URL="https://langfuse.apify.dev"  # self-hosted instance
 ```
 
-Both entry points fail fast (before any test runs) listing every missing variable at once, and sanitize these values in place first, because the Langfuse SDK reads `process.env` directly and a secret with a trailing newline dies inside `node:http` instead. They can also be set in a `.env` file at the repo root.
+Both entry points fail fast (before any test runs) listing every missing variable at once, and sanitize these values in place first, because the Langfuse SDK reads `process.env` directly and a secret with a trailing newline dies inside `node:http` instead. They can also be set in a `.env` file at the repo root. `coverage_matrix.ts`'s `--experiment <id>` is a third, narrower Langfuse-touching entry point: the default run needs none of these variables and never sanitizes anything, so it checks and sanitizes only inside the `--experiment` branch, and only for the 3 `LANGFUSE_*` variables it actually needs.
 
 ### Results in Langfuse
 

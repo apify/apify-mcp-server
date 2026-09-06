@@ -1,0 +1,65 @@
+[
+  {
+    "id": "d09ebde3d3f0a6e1",
+    "traceId": "5951217cf9428f2dff85001868a96dcb",
+    "type": "TOOL",
+    "name": "apify--web-fetch",
+    "level": "ERROR",
+    "input": "{\"url\":\"https://example.com\"}",
+    "output": "Tool calls are disabled in this evaluation. Do not retry with a different tool or arguments — report to the user, in your final answer, which tool you would have called and with what arguments, then stop."
+  },
+  {
+    "id": "55bd4f0a70f4f9a4",
+    "traceId": "09ba0ac15b505420c4c3c12c96171813",
+    "type": "TOOL",
+    "name": "fetch-actor-details",
+    "level": "ERROR",
+    "input": "{\"actor\":\"apify/rag-web-browser\",\"output\":{\"pricing\":true,\"description\":true}}",
+    "output": "Tool calls are disabled in this evaluation. Do not retry with a different tool or arguments — report to the user, in your final answer, which tool you would have called and with what arguments, then stop."
+  },
+  {
+    "id": "f23e9fd8b22c5369",
+    "traceId": "430cee1200244116d81d6536232d47f6",
+    "type": "TOOL",
+    "name": "create-actor-task",
+    "level": "ERROR",
+    "input": "{\"actorId\":\"apify/instagram-scraper\",\"name\":\"insta-daily\",\"title\":\"Daily Instagram Scraper\",\"description\":\"Daily task for scraping Instagram data\",\"input\":{}}",
+    "output": "Tool calls are disabled in this evaluation. Do not retry with a different tool or arguments — report to the user, in your final answer, which tool you would have called and with what arguments, then stop."
+  },
+  {
+    "id": "dd90e677ba46bcb2",
+    "traceId": "f7e1a8b7b8ed7a55f5a1db75d47b7b32",
+    "type": "TOOL",
+    "name": "get-dataset-items",
+    "level": "ERROR",
+    "input": "{\"datasetId\":\"UvsU\",\"fields\":\"title,url\"}",
+    "output": "Tool calls are disabled in this evaluation. Do not retry with a different tool or arguments — report to the user, in your final answer, which tool you would have called and with what arguments, then stop."
+  },
+  {
+    "id": "4d82f9c0c7afd3b7",
+    "traceId": "1b55daaa27aabf853fcbe8063790a45f",
+    "type": "TOOL",
+    "name": "search-actors",
+    "level": "ERROR",
+    "input": "{\"keywords\":\"weather\",\"limit\":10}",
+    "output": "Tool calls are disabled in this evaluation. Do not retry with a different tool or arguments — report to the user, in your final answer, which tool you would have called and with what arguments, then stop."
+  },
+  {
+    "id": "99807a34631a4a10",
+    "traceId": "09f7aee1749b683e989077cba4a53291",
+    "type": "TOOL",
+    "name": "update-actor-task",
+    "level": "ERROR",
+    "input": "{\"taskId\":\"insta-daily\",\"publicConfig\":{\"seoTitle\":\"Daily Instagram scraper\"}}",
+    "output": "Tool calls are disabled in this evaluation. Do not retry with a different tool or arguments — report to the user, in your final answer, which tool you would have called and with what arguments, then stop."
+  },
+  {
+    "id": "6714697662de8665",
+    "traceId": "f915b0597b0def01898f08177482fd0c",
+    "type": "TOOL",
+    "name": "ToolSearch",
+    "level": "ERROR",
+    "input": "{\"query\":\"select:SearchMcpRegistry\",\"max_results\":1}",
+    "output": "Tool calls are disabled in this evaluation. Do not retry with a different tool or arguments — report to the user, in your final answer, which tool you would have called and with what arguments, then stop."
+  }
+]
