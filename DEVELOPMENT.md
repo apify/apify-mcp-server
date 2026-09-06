@@ -151,11 +151,11 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 | **Integration tests** | `pnpm run test:integration` | Full server over stdio, streamable HTTP and the `2026-07-28` stateless HTTP dimension against real Apify API (requires `APIFY_TOKEN` + `pnpm run build`) |
 | **Conformance tests** | `pnpm run test:conformance` | Official MCP conformance runner (`--suite all`) against a compiled dev server, run once per protocol era — spec versions `2026-07-28` and `2025-11-25`, in that order. The command builds first, runs both eras, and exits with the first non-zero code. `_conformance_tests.yaml`, called by `_integration_tests.yaml`, runs the same coverage in CI. Excluded scenarios and their reasons live in `scripts/conformance_expected_failures_2026_07_28.yaml` and `scripts/conformance_expected_failures_2025_11_25.yaml` (requires `APIFY_TOKEN`; set `PORT` to override port 3001) |
 | **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development |
-| **LLM evals** | CI only — apply `validated` label | Runs `evals/run_evaluation.ts` against multiple models via OpenRouter; requires `PHOENIX_*` and `OPENROUTER_*` secrets |
+| **MCP agent evals** | `pnpm run evals:mcp-agent` | Two-tier Langfuse-backed suite (`pr`: fast tool-selection checks; `full`: judged multi-turn agent cases) — see `evals/mcp_agent/README.md`'s CI section |
 
-To trigger the eval workflow on a PR, apply the **`validated`** label.
-The workflow then runs automatically and posts results to Phoenix.
-It also runs automatically on every merge to the `master` branch.
+The `pr` tier runs automatically on same-repo, non-draft PRs that touch eval-relevant paths, and
+again (plus the `full` tier) on every push to `master`. To run the `pr` tier on a fork PR, or to
+re-run it manually on any PR, apply the **`validated`** label.
 
 ### Test Actors
 

@@ -6,11 +6,9 @@ You can find the results here: https://app.phoenix.arize.com/s/apify
 
 ## CI Workflow
 
-The evaluation workflow runs automatically on:
-- **Master branch pushes** - for production evaluations (saves CI cycles)
-- **PRs with `validated` label** - for testing evaluation changes before merging
-
-To trigger evaluations on a PR, add the `validated` label to your pull request.
+This runner (Phoenix) no longer runs in CI (apify/ai-team#261) — its files stay for now, pending
+deletion under #262. Real CI gating on PRs and merges now runs the Langfuse-backed suites in
+`evals/mcp_agent/`; see [`evals/mcp_agent/README.md`'s CI section](./mcp_agent/README.md#ci-apifyai-team261).
 
 ## Two evaluation methods
 
