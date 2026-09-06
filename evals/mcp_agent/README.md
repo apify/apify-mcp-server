@@ -532,12 +532,12 @@ exports any other dataset to its own `dataset_snapshot_<dataset>.json`, which st
 
 ### 1. The Langfuse dataset is the source of truth
 
-**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy: `evals:mcp-agent:export-dataset` dumps the active items to `dataset_snapshot_<dataset>.json` for reading them outside the UI, but there is no importer and nothing reads the snapshot at runtime.
+**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy a run reads: `evals:mcp-agent:export-dataset` dumps the active items to `dataset_snapshot_<dataset>.json` for reading them outside the UI, and there is no importer. The snapshot is not dead weight — `evals:coverage` and the unit tests read it precisely because it is offline and committed — but no eval run reads it.
 
 **Why:**
 - A UI edit takes effect on the next run. An earlier version synced a local file into the dataset first, which silently overwrote UI edits
 - `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when given real dataset items
-- A snapshot is a second copy that no code reads and nothing keeps in sync automatically, so most are gitignored. `dataset_snapshot_mcp-server-evals.json` is the one exception, committed so a git reviewer sees dataset edits as a diff. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
+- A snapshot is a second copy that no eval run reads and nothing keeps in sync automatically, so most are gitignored. `dataset_snapshot_mcp-server-evals.json` is the one exception, committed so a git reviewer sees dataset edits as a diff and so `evals:coverage` can measure coverage without network access. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
 
 Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
 

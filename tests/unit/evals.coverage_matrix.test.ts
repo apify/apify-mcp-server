@@ -200,7 +200,7 @@ describe('buildCoverageMatrix()', () => {
         expect(row.coveredArgumentGroups).toEqual(['keywords']);
     });
 
-    it('a pinned parent object covers every one of its nested child groups', () => {
+    it('a pinned parent object covers only the nested child it names', () => {
         const matrix = buildCoverageMatrix([
             selectionCase({
                 id: 's1',
@@ -209,15 +209,26 @@ describe('buildCoverageMatrix()', () => {
             }),
         ]);
         const row = requireMeasuredRow(matrix, 'call-actor');
-        expect(row.coveredArgumentGroups).toEqual(
+        expect(row.coveredArgumentGroups).toEqual(['callOptions.memory']);
+        // Exact equality on the parent asserts the other options are absent, not exercised.
+        expect(row.argumentGroups).toEqual(
             expect.arrayContaining([
-                'callOptions.memory',
                 'callOptions.timeout',
                 'callOptions.build',
                 'callOptions.maxItems',
                 'callOptions.maxTotalChargeUsd',
             ]),
         );
+    });
+
+    it('ignores a selection case that is not pr tier, and an agent case that is not full tier', () => {
+        const matrix = buildCoverageMatrix([
+            selectionCase({ id: 's1', expectedTools: ['search-actors'], tier: ['full'] }),
+            agentCase({ id: 'a1', tools: ['runs'], reference: 'ref', tier: ['pr'] }),
+        ]);
+        expect(requireMeasuredRow(matrix, 'search-actors').prSelectionCaseCount).toBe(0);
+        expect(requireMeasuredRow(matrix, 'search-actors').status).toBe('uncovered');
+        expect(requireMeasuredRow(matrix, 'get-actor-log').fullAgentReachableCount).toBe(0);
     });
 
     it('leaves a tool uncovered when it is only reachable via an agent case, never named by a selection case', () => {
