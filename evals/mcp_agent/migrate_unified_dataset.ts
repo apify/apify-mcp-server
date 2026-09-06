@@ -25,6 +25,11 @@
  * items they produced as unexpected. Recovering a half-archived run means un-archiving the
  * source items in the Langfuse UI (or migrating the remainder by hand), not re-running this.
  *
+ * Already run (2026-09-05): the legacy datasets are archived. `validateMigration`'s checks
+ * assert the whole `mcp-server-evals` dataset equals the migration plan, which predates the
+ * `kind: "selection", tier: ["pr"]` items #260 added afterward - a re-run today stops at
+ * validation by design, not by regression.
+ *
  * Usage:
  *   pnpm run evals:mcp-agent:migrate-unified-dataset -- --dry-run
  *   pnpm run evals:mcp-agent:migrate-unified-dataset

@@ -1,5 +1,45 @@
 [
   {
+    "id": "call-actor/rag-web-browser",
+    "category": "call-actor",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Use the RAG web browser Actor (apify/rag-web-browser) to search the web for 'latest news on AI regulation' and summarize the top results.",
+    "expectedTools": [
+      "apify--rag-web-browser",
+      "call-actor"
+    ]
+  },
+  {
+    "id": "fetch-actor-details/input-schema",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me the input schema for apify/rag-web-browser",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/rag-web-browser"
+    }
+  },
+  {
+    "id": "get-actor-run/status",
+    "category": "get-actor-run",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What is the status of my Actor run with ID abc123XYZ456?",
+    "expectedTools": [
+      "get-actor-run"
+    ]
+  },
+  {
     "id": "mcp-agent/call-actor-mcp-weather",
     "category": "mcp",
     "kind": "agent",
@@ -386,6 +426,18 @@
     "reference": "The agent must: 1) use search-actors to find TikTok scraper, 2) use fetch-actor-details with output={ inputSchema: true } to get required input, 3) use call-actor with proper input. This tests the complete new workflow pattern."
   },
   {
+    "id": "search-actors/tiktok-scraper",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What is the best TikTok scraper on Apify?",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
     "id": "tasks/chain-hard-1",
     "category": "chain",
     "kind": "agent",
@@ -552,6 +604,19 @@
     "query": "With Apify, find out where the link on https://example.com leads, then fetch that page too and tell me who maintains it and what it explains.",
     "reference": "Two fetches through the Apify web-fetch Actor are required. PASS only if the agent (1) fetched https://example.com via the apify--web-fetch tool (or call-actor with apify/web-fetch) and retrieved the output to discover the page's only link (iana.org/domains/example), (2) fetched that discovered URL the same way, and (3) the final answer states the link target and truthfully reports that the page is maintained by IANA and explains reserved example domains. FAIL if the agent guesses the link target without fetching example.com, never fetches the second page, uses apify/rag-web-browser or a built-in fetch tool instead, or invents the second page's content.",
     "maxTurns": 16
+  },
+  {
+    "id": "web-fetch/example-com",
+    "category": "web-fetch",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Fetch https://example.com and tell me what it says.",
+    "expectedTools": [
+      "apify--web-fetch"
+    ],
+    "mcpToolsOnly": true
   },
   {
     "id": "web-fetch/fetch-easy-1",
