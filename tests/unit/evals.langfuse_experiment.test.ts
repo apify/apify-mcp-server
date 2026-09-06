@@ -208,7 +208,19 @@ describe('makeTask()', () => {
         });
 
         await expect(makeMcpAgentTask()(item)).rejects.toThrow(
-            'Item "search-001": kind "selection" item has no expectedOutput; this task only runs agent items',
+            'Item "search-001": kind "selection" item reached the agent task; this task only runs agent items',
+        );
+        expect(mocks.runAgentConversation).not.toHaveBeenCalled();
+    });
+
+    it('rejects a kind: selection item that also carries an expectedOutput', async () => {
+        const item = makeItem({
+            expectedOutput: 'a reference the validator does not yet reject on a selection item',
+            metadata: { category: 'search', kind: 'selection', tier: ['full'], expectedTools: ['search-actors'] },
+        });
+
+        await expect(makeMcpAgentTask()(item)).rejects.toThrow(
+            'Item "search-001": kind "selection" item reached the agent task; this task only runs agent items',
         );
         expect(mocks.runAgentConversation).not.toHaveBeenCalled();
     });
