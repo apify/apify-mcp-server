@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
     buildMigratedItem,
+    comparePlannedFields,
     deriveNewId,
     EXPECTED_ERRORS_BY_NEW_ID,
     getExpectedErrorsForId,
@@ -204,6 +205,57 @@ describe('SOURCE_DATASETS', () => {
             { name: 'tasks-evals-errors', family: 'tasks' },
             { name: 'web-fetch-evals-errors', family: 'web-fetch' },
             { name: 'web-selection-evals-errors', family: 'web-selection' },
+        ]);
+    });
+});
+
+describe('comparePlannedFields()', () => {
+    const plan = {
+        id: 'tasks/create-explicit-1',
+        sourceDataset: 'tasks-evals',
+        sourceId: 'task-create-explicit-1',
+        input: { query: 'create a task' },
+        expectedOutput: 'the task was created',
+        metadata: {
+            category: 'tasks',
+            kind: 'agent' as const,
+            tier: ['full'] as ['full'],
+            expectedErrors: ['create-actor-task'],
+        },
+    };
+    const migrated = {
+        id: plan.id,
+        query: plan.input.query,
+        reference: plan.expectedOutput,
+        category: 'tasks',
+        kind: 'agent' as const,
+        tier: ['full'] as ('pr' | 'full')[],
+        expectedErrors: ['create-actor-task'],
+    };
+
+    it('reports no wrong field when every planned field round-trips', () => {
+        expect(comparePlannedFields(plan, migrated)).toEqual([]);
+    });
+
+    it('names the query when the migrated prompt differs', () => {
+        expect(comparePlannedFields(plan, { ...migrated, query: 'something else' })).toEqual(['query']);
+    });
+
+    it('names expectedOutput when the judge reference differs', () => {
+        expect(comparePlannedFields(plan, { ...migrated, reference: 'wrong' })).toEqual(['expectedOutput']);
+    });
+
+    it('names expectedErrors when a different tool is exempted', () => {
+        expect(comparePlannedFields(plan, { ...migrated, expectedErrors: ['get-actor-task'] })).toEqual([
+            'expectedErrors',
+        ]);
+    });
+
+    it('names every field that differs at once', () => {
+        expect(comparePlannedFields(plan, { ...migrated, query: 'x', reference: 'y', category: 'web-fetch' })).toEqual([
+            'query',
+            'expectedOutput',
+            'category',
         ]);
     });
 });

@@ -571,6 +571,9 @@ describe('buildRunSummary()', () => {
                     allPassed: false,
                 },
             ]);
+            // The per-item flags are what the aggregates count, so assert the pair here too.
+            expect(summary.passAtK).toBe(summary.items.filter((entry) => entry.anyPassed).length);
+            expect(summary.passHatK).toBe(summary.items.filter((entry) => entry.allPassed).length);
         });
 
         it('scales the requested-trials denominator by requestedIds.length * iterations', () => {
