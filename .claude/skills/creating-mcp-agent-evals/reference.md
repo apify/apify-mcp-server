@@ -87,7 +87,10 @@ npx -y langfuse-cli api experiment-items list \
       + ([$o.transcript[] | to_entries[] | "  " + .key + ": " + (.value | tostring | .[0:300])] | join("\n"))'
 ```
 
-Sweep for unexpected errors after a run (a run with no `expectedErrors` items must contribute zero rows):
+Sweep for unexpected errors after a run. Read this on `kind: "agent"` items only: an
+agent run with no `expectedErrors` items must contribute zero rows, but every passing
+`kind: "selection"` trial produces one ERROR span by design (the deny-all hook refuses the
+call it is measuring), and selection items cannot declare `expectedErrors`.
 
 ```bash
 npx -y langfuse-cli api observations list --level ERROR \

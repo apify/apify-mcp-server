@@ -32,10 +32,10 @@
  * cell reads `dynamic` and they are excluded from the argument-group totals.
  *
  * An argument group is `covered` when some `pr`-tier selection case's `expectedArgs` pins that
- * key (a pinned parent object counts as covering every `parent.*` child, since the runner's
- * check deep-equals the whole object) — or, with `--experiment <id>`, when an observed tool span
- * actually sent that key (nested groups: the child key was present inside the parent's own sent
- * value).
+ * key — or, with `--experiment <id>`, when an observed tool span actually sent it. Both read a
+ * nested `parent.child` group the same way: the child key must be present inside the parent's
+ * own value. A parent pinned to `{memory: 256}` deep-equals, so it asserts the sibling options
+ * were *not* sent, which is the opposite of exercising them.
  *
  * Usage:
  *   pnpm run evals:coverage                              # regenerate and write coverage_matrix.md
@@ -420,18 +420,30 @@ function selectionCasesFor(identifier: string, selectionCases: readonly McpAgent
     return selectionCases.filter((testCase) => (testCase.expectedTools ?? []).includes(identifier));
 }
 
-/** Whether some selection case naming `identifier` pins `argumentGroup` (or its dotted parent) in `expectedArgs`. */
+/**
+ * Whether some selection case naming `identifier` pins `argumentGroup` in `expectedArgs`. A
+ * nested `parent.child` group needs the child itself: pinning `{callOptions: {memory: 256}}`
+ * asserts the other `callOptions.*` options are absent, which is the opposite of exercising
+ * them. Mirrors `resolveExercisedArgumentGroups`, which reads observed inputs the same way.
+ */
 function isArgumentGroupCoveredBySelection(
     argumentGroup: string,
     matchingSelectionCases: readonly McpAgentTestCase[],
 ): boolean {
     const dotIndex = argumentGroup.indexOf('.');
     const parentKey = dotIndex === -1 ? argumentGroup : argumentGroup.slice(0, dotIndex);
-    return matchingSelectionCases.some(
-        (testCase) =>
-            testCase.expectedArgs !== undefined &&
-            Object.prototype.hasOwnProperty.call(testCase.expectedArgs, parentKey),
-    );
+    const childKey = dotIndex === -1 ? undefined : argumentGroup.slice(dotIndex + 1);
+    return matchingSelectionCases.some((testCase) => {
+        if (testCase.expectedArgs === undefined) return false;
+        if (!Object.prototype.hasOwnProperty.call(testCase.expectedArgs, parentKey)) return false;
+        if (childKey === undefined) return true;
+        const parentValue = testCase.expectedArgs[parentKey];
+        return (
+            typeof parentValue === 'object' &&
+            parentValue !== null &&
+            Object.prototype.hasOwnProperty.call(parentValue, childKey)
+        );
+    });
 }
 
 /** Build the full coverage matrix from the dataset snapshot and (optionally) observed experiment spans. */
@@ -439,8 +451,10 @@ export function buildCoverageMatrix(
     snapshot: readonly McpAgentTestCase[],
     experiment?: { experimentId: string; spans: readonly ObservedToolSpan[]; agentItemCount: number },
 ): CoverageMatrix {
-    const selectionCases = snapshot.filter((testCase) => testCase.kind === 'selection');
-    const agentCases = snapshot.filter((testCase) => testCase.kind === 'agent');
+    // Tier as well as kind: the columns are labelled `pr` selection and `full` agent, and an item
+    // carrying the other tier would inflate the count the label promises.
+    const selectionCases = snapshot.filter((testCase) => testCase.kind === 'selection' && testCase.tier.includes('pr'));
+    const agentCases = snapshot.filter((testCase) => testCase.kind === 'agent' && testCase.tier.includes('full'));
     const reachableCounts = resolveReachableCounts(agentCases);
     const categoryByHelperToolName = buildCategoryByHelperToolName();
     const dynamicToolIdentifiers = new Set(getDynamicToolIdentifiers());
