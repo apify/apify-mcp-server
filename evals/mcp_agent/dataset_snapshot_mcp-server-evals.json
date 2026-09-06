@@ -49,7 +49,8 @@
     "query": "Get recent articles about AI from tech blogs",
     "expectedTools": [
       "apify--rag-web-browser"
-    ]
+    ],
+    "mcpToolsOnly": true
   },
   {
     "id": "apify--rag-web-browser/ai-news-current",
@@ -167,7 +168,8 @@
     "query": "Get the latest tech industry news",
     "expectedTools": [
       "apify--rag-web-browser"
-    ]
+    ],
+    "mcpToolsOnly": true
   },
   {
     "id": "call-actor/ecommerce-scraper-iphone",
@@ -276,7 +278,8 @@
     },
     "tools": [
       "tasks"
-    ]
+    ],
+    "mcpToolsOnly": true
   },
   {
     "id": "create-actor-task/instagram-insta-daily",
@@ -742,7 +745,8 @@
     ],
     "tools": [
       "storage"
-    ]
+    ],
+    "mcpToolsOnly": true
   },
   {
     "id": "get-dataset-schema/basic-schema",

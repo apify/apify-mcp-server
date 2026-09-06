@@ -373,12 +373,18 @@ const ACTORS_WAVE: PortCaseSpec[] = [
     // --- apify--rag-web-browser (12 ported: 5 kept as-is, 7 widened on the MCP-vs-MCP axis —
     // see the per-item calibration notes below for which ones and why) ---
     {
+        // mcpToolsOnly added after apify/ai-team#240 iter-2's full-tier Opus run: the agent
+        // burned its 2-turn selection budget on a ToolSearch detour before ever attempting
+        // apify--rag-web-browser on this plain query — the same built-in-detour failure mode
+        // documented for report-problem and the other rag-web-browser/create-actor-task items
+        // above, just probabilistic rather than deterministic.
         sourceId: 'rag-web-browser-1',
         decision: 'keep',
         id: 'apify--rag-web-browser/ai-blog-articles',
         query: 'Get recent articles about AI from tech blogs',
         category: 'apify--rag-web-browser',
         expectedTools: ['apify--rag-web-browser'],
+        mcpToolsOnly: true,
     },
     {
         sourceId: 'rag-web-browser-2',
@@ -414,12 +420,19 @@ const ACTORS_WAVE: PortCaseSpec[] = [
         mcpToolsOnly: true,
     },
     {
+        // mcpToolsOnly added after apify/ai-team#240 iter-2's full-tier Opus run: intermittently
+        // (1/3 on a targeted reproduction) the agent burned its 2-turn selection budget on a
+        // ToolSearch detour before ever attempting apify--rag-web-browser, on this plain,
+        // unambiguous query — the same built-in-detour failure mode documented for
+        // report-problem, just probabilistic here instead of deterministic. Dropping built-ins
+        // removes the detour entirely (verified below).
         sourceId: 'rag-web-browser-5',
         decision: 'keep',
         id: 'apify--rag-web-browser/tech-industry-news',
         query: 'Get the latest tech industry news',
         category: 'apify--rag-web-browser',
         expectedTools: ['apify--rag-web-browser'],
+        mcpToolsOnly: true,
     },
     {
         sourceId: 'misleading-query-1',
@@ -706,7 +719,12 @@ const TASKS_WAVE: PortCaseSpec[] = [
         tools: ['tasks'],
     },
     {
-        // Strengthened for the same reason as create-actor-task-1.
+        // Strengthened for the same reason as create-actor-task-1. mcpToolsOnly added after
+        // apify/ai-team#240 iter-2's full-tier Opus run: intermittently (1/3 on a targeted
+        // reproduction) the agent burned its 2-turn selection budget on a ToolSearch detour
+        // before ever attempting create-actor-task — the same built-in-detour failure mode
+        // documented for report-problem, just probabilistic here instead of deterministic.
+        // Dropping built-ins removes the detour entirely (verified below).
         sourceId: 'create-actor-task-2',
         decision: 'rephrase',
         id: 'create-actor-task/google-search-pizza',
@@ -715,6 +733,7 @@ const TASKS_WAVE: PortCaseSpec[] = [
         expectedTools: ['create-actor-task'],
         expectedArgs: { actorId: 'apify/google-search-scraper' },
         tools: ['tasks'],
+        mcpToolsOnly: true,
     },
     // --- update/publish/unpublish-actor-task: all widened to accept get-actor-task after Opus
     // calibration (2026-09-06), which checked the task's current state via get-actor-task
@@ -958,6 +977,10 @@ const STORAGE_WAVE: PortCaseSpec[] = [
         tools: ['storage'],
     },
     {
+        // mcpToolsOnly added after apify/ai-team#240 iter-2's full-tier Opus run: the agent
+        // burned its 2-turn selection budget on a ToolSearch detour before ever attempting
+        // get-dataset-list on this plain query — the same built-in-detour failure mode
+        // documented for report-problem above, just probabilistic rather than deterministic.
         sourceId: 'get-dataset-list-1',
         decision: 'keep',
         id: 'get-dataset-list/list-all',
@@ -965,6 +988,7 @@ const STORAGE_WAVE: PortCaseSpec[] = [
         category: 'get-dataset-list',
         expectedTools: ['get-dataset-list'],
         tools: ['storage'],
+        mcpToolsOnly: true,
     },
     {
         sourceId: 'get-dataset-list-2',
