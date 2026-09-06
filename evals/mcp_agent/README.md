@@ -257,9 +257,9 @@ model's floor off 3 separate runs.
 
   | # | Requested | TLS-cert drops | Max-turns drops | Passed | Raw pass_rate | Honest rate (passed / (requested − TLS-cert drops)) | Run |
   |---|---|---|---|---|---|---|---|
-  | 1 | 115 | 9 | 2 | 100 | 0.87 | 100/106 = **0.94** | [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/0b331d119ab12b7c) |
-  | 2 | 115 | 2 | 4 | 106 | 0.92 | 106/113 = **0.94** | [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/46b26f6ccda3663f) |
-  | 3 | 115 | 10 | 2 | 99 | 0.86 | 99/105 = **0.93** | [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/1977e527d82e9601) |
+  | 1 | 115 | 9 | 2 | 100 | 0.87 | 100/106 = **0.9434** | [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/0b331d119ab12b7c) |
+  | 2 | 115 | 2 | 4 | 106 | 0.92 | 106/113 = **0.9381** | [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/46b26f6ccda3663f) |
+  | 3 | 115 | 10 | 2 | 99 | 0.86 | 99/105 = **0.9429** | [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/1977e527d82e9601) |
 
   The honest rate keeps a `Reached maximum number of turns (2)` drop in the denominator as a
   failure — it is the agent exhausting its turn budget without ever attempting a tool call

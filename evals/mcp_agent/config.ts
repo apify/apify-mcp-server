@@ -63,8 +63,8 @@ export const MAX_CONVERSATION_TURNS = 10;
  * *honest completed rate* per run: passed / (requested - TLS-cert drops), i.e. an SDK-level
  * "Reached maximum number of turns (2)" drop still counts against the rate (it is the agent
  * running out of its turn budget without ever attempting a tool call, not a sandbox fault) even
- * though it is also dropped, not scored, by the harness. The 3 runs' honest rates were 0.94
- * (100/106), 0.94 (106/113), and 0.93 (99/105) — floor 0.93, rounded down to 2 decimals. Confirm
+ * though it is also dropped, not scored, by the harness. The 3 runs' honest rates were 0.9434
+ * (100/106), 0.9381 (106/113), and 0.9429 (99/105) — floor 0.9381, rounded down to 0.93. Confirm
  * on the first CI run (apify/ai-team#261) and re-pin once measured without the TLS fault.
  */
 export const PR_TIER_PASS_THRESHOLD = 0.93;
