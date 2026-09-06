@@ -22,6 +22,8 @@
 // Must be the first import: config modules read process.env at load time.
 import 'dotenv/config';
 
+import { fileURLToPath } from 'node:url';
+
 import { LangfuseClient } from '@langfuse/client';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -227,4 +229,6 @@ async function main() {
     }
 }
 
-void main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    void main();
+}

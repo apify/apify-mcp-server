@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { parseMcpAgentItem } from '../../evals/mcp_agent/langfuse_dataset.js';
 import {
@@ -11,6 +11,31 @@ import { ARCHIVED_CASES, PORT_SELECTION_CASES } from '../../evals/mcp_agent/port
 import { HELPER_TOOLS, RETIRED_SELECTOR_NAMES, defaults, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { readJsonFile } from '../../src/utils/generic.js';
+
+describe('module entrypoint guard', () => {
+    it('does not run the CLI on import: no process.exit, no LangfuseClient construction', async () => {
+        const langfuseCtor = vi.fn();
+        vi.doMock('@langfuse/client', () => ({ LangfuseClient: langfuseCtor }));
+        const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+        const originalEnv = { ...process.env };
+        delete process.env.LANGFUSE_PUBLIC_KEY;
+        delete process.env.LANGFUSE_SECRET_KEY;
+        delete process.env.LANGFUSE_BASE_URL;
+
+        try {
+            vi.resetModules();
+            await import('../../evals/mcp_agent/port_selection_cases.js');
+        } finally {
+            process.env = originalEnv;
+            vi.doUnmock('@langfuse/client');
+            vi.resetModules();
+            exitSpy.mockRestore();
+        }
+
+        expect(exitSpy).not.toHaveBeenCalled();
+        expect(langfuseCtor).not.toHaveBeenCalled();
+    });
+});
 
 /**
  * The 106 old ids from `evals/test_cases.json`, read once here so a change to the source file
