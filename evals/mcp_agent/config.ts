@@ -57,12 +57,15 @@ export const MAX_CONVERSATION_TURNS = 10;
  * `full`-tier and non-CI runs) — read explicitly by whatever consumes it (apify/ai-team#261's CI
  * workflow). See README.md's "The `pr` tier" section for the 3 run URLs and rates.
  *
- * PROVISIONAL: calibrated in a sandbox whose TLS proxy dropped 9-14% of trials per run
- * ("Self-signed certificate detected" against api.anthropic.com, unrelated to case quality —
- * see the README and .shepherd/iter-1/claim.md). The 3 runs' raw pass rates (0.83, 0.82, 0.89)
- * are dominated by that drop noise, so this is instead the floor of the *completed-only* rate
- * (passed / (requested - dropped): 0.96, 0.93, 0.98) rounded down to 2 decimals. Confirm on the
- * first CI run (apify/ai-team#261) and re-pin once measured in an environment without this fault.
+ * PROVISIONAL: calibrated in a sandbox whose TLS proxy intermittently drops trials with
+ * "Self-signed certificate detected" against api.anthropic.com — a sandbox network fault
+ * unrelated to case quality, not expected on a real CI runner. This is the floor of the
+ * *honest completed rate* per run: passed / (requested - TLS-cert drops), i.e. an SDK-level
+ * "Reached maximum number of turns (2)" drop still counts against the rate (it is the agent
+ * running out of its turn budget without ever attempting a tool call, not a sandbox fault) even
+ * though it is also dropped, not scored, by the harness. The 3 runs' honest rates were 0.94
+ * (100/106), 0.94 (106/113), and 0.93 (99/105) — floor 0.93, rounded down to 2 decimals. Confirm
+ * on the first CI run (apify/ai-team#261) and re-pin once measured without the TLS fault.
  */
 export const PR_TIER_PASS_THRESHOLD = 0.93;
 
