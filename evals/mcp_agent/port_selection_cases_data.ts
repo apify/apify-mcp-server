@@ -636,19 +636,27 @@ const DOCS_WAVE: PortCaseSpec[] = [
         expectedTools: ['search-apify-docs'],
     },
     {
+        // Rephrased after "Get configuration info from: <url>" pulled `apify--web-fetch` instead
+        // of `fetch-apify-docs` on both `claude-haiku-4-5` (pre-series run) and `claude-opus-5`
+        // (confirmation run after the playwright-mcp-server fix) — a genuine cross-model case
+        // defect, not a Haiku-only weakness. Root cause: the query read as generic "fetch this
+        // URL," which is exactly `apify--web-fetch`'s job description, with nothing marking the
+        // target as Apify's own docs. Rephrased to frame it as a docs lookup.
         sourceId: 'fetch-apify-docs-1',
-        decision: 'keep',
+        decision: 'rephrase',
         id: 'fetch-apify-docs/mcp-integration-page',
-        query: 'Get configuration info from: https://docs.apify.com/platform/integrations/mcp',
+        query: 'What does the Apify docs page at https://docs.apify.com/platform/integrations/mcp say?',
         category: 'fetch-apify-docs',
         expectedTools: ['fetch-apify-docs'],
         expectedArgs: { url: 'https://docs.apify.com/platform/integrations/mcp' },
     },
     {
+        // Same fix as above, same root cause — this one failed on `claude-opus-5`'s
+        // confirmation run directly (see the sibling case's comment for the full story).
         sourceId: 'fetch-apify-docs-edge-1',
-        decision: 'keep',
+        decision: 'rephrase',
         id: 'fetch-apify-docs/nonexistent-page',
-        query: 'Get content from: https://docs.apify.com/nonexistent-page',
+        query: 'Check the Apify docs for this page: https://docs.apify.com/nonexistent-page',
         category: 'fetch-apify-docs',
         expectedTools: ['fetch-apify-docs'],
         expectedArgs: { url: 'https://docs.apify.com/nonexistent-page' },
