@@ -1112,11 +1112,11 @@ const STORAGE_WAVE: PortCaseSpec[] = [
 // Every attempt spends the fixed 2-turn selection budget without ever attempting
 // report-problem, or investigates instead. This is a structural gap, not a case defect this
 // PR's scope can fix (no touching `SELECTION_MAX_TURNS` or the tool description) — the
-// coverage floor's 25th tool identifier is uncovered on purpose; see `KNOWN_UNCOVERED_TOOLS`
-// in `tests/unit/evals.port_selection_cases.test.ts` and the README's "pr tier" section for
-// the 3 run URLs. The item was upserted then archived (not deleted) in the `mcp-server-evals`
-// Langfuse dataset, with this reason recorded in its metadata, for anyone who wants to pick
-// the problem back up.
+// coverage floor's 25th tool identifier is uncovered on purpose; see
+// `KNOWN_UNCOVERED_TOOL_IDENTIFIERS` in `tests/unit/evals.port_selection_cases.test.ts` and the
+// README's "pr tier" section for the 3 run URLs. The item was upserted then archived (not
+// deleted) in the `mcp-server-evals` Langfuse dataset, with this reason recorded in its
+// metadata, for anyone who wants to pick the problem back up.
 // ---------------------------------------------------------------------------
 
 const RUNS_WAVE: PortCaseSpec[] = [
