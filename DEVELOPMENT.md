@@ -154,8 +154,10 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 | **MCP agent evals** | `pnpm run evals:mcp-agent` | Two-tier Langfuse-backed suite (`pr`: fast tool-selection checks; `full`: judged multi-turn agent cases) — see `evals/mcp_agent/README.md`'s CI section |
 
 The `pr` tier runs automatically on same-repo, non-draft PRs that touch eval-relevant paths, and
-again (plus the `full` tier) on every push to `master`. To run the `pr` tier on a fork PR, or to
-re-run it manually on any PR, apply the **`validated`** label.
+again (plus the `full` tier, which is measurement-only for now) on every push to `master`. To
+re-run the `pr` tier on a same-repo PR the automatic trigger skipped, apply the **`validated`**
+label. Fork PRs cannot run either tier — GitHub withholds the secrets — so evaluating a fork's
+changes means pushing its branch into this repo.
 
 ### Test Actors
 

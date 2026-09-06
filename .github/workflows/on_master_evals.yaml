@@ -1,0 +1,45 @@
+name: CI (master evals)
+
+# Separate from on_master.yaml on purpose: that workflow holds the `release` concurrency group
+# for its whole run, so an eval job inside it would keep the next release queued behind up to
+# 90 minutes of evaluation it does not gate. Same push event, own groups.
+on:
+    push:
+        branches:
+            - master
+        tags-ignore:
+            - "**" # Ignore all tags, matching on_master.yaml.
+
+jobs:
+    evaluations_pr:
+        name: MCP agent evaluations (pr)
+        concurrency:
+            group: eval-pr-master
+            cancel-in-progress: false
+        uses: ./.github/workflows/_evaluations.yaml
+        with:
+            tier: pr
+        secrets:
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+            LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+            LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+            LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
+
+    evaluations_full:
+        name: MCP agent evaluations (full)
+        # cancel-in-progress stays false: the full tier seeds shared account fixtures, so two
+        # overlapping runs would fight over them.
+        concurrency:
+            group: eval-full-master
+            cancel-in-progress: false
+        uses: ./.github/workflows/_evaluations.yaml
+        with:
+            tier: full
+        secrets:
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+            LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+            LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+            LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
+            OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

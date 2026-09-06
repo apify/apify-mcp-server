@@ -39,9 +39,17 @@ jobs:
     evaluations:
         needs: [ wait_for_checks ]
         name: MCP agent evaluations (pr)
-        # Run when PR is labeled with 'validated' — the manual/fork override for the
-        # automatic on_pull_request_evals.yaml trigger (forks can't read secrets there).
-        if: github.event.action == 'labeled' && github.event.label.name == 'validated'
+        # Run when PR is labeled with 'validated' — the manual re-run for a same-repo PR the
+        # automatic on_pull_request_evals.yaml trigger skipped (a draft, or a later push, which
+        # that workflow deliberately ignores).
+        #
+        # Same-repo only, and NOT a fork override: this workflow is `pull_request` too, and
+        # GitHub withholds repo secrets from any `pull_request` run on a fork whatever labels it
+        # carries, so a fork run here would start and then fail on missing credentials. To
+        # evaluate a fork's changes, push its branch into this repo and open a PR from there.
+        if: |
+            github.event.action == 'labeled' && github.event.label.name == 'validated' &&
+            github.event.pull_request.head.repo.full_name == github.repository
         concurrency:
             group: eval-pr-${{ github.event.pull_request.number }}
             cancel-in-progress: true
