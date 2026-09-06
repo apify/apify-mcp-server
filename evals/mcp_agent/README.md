@@ -409,12 +409,16 @@ zero network, so a stale matrix (a new tool, a changed schema, an unregenerated 
 the same comparison from the CLI, for local use before committing.
 
 **`--experiment <id>`** fetches that experiment's dataset-item traces and their `TOOL`-type
-observation spans from Langfuse (needs `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_BASE_URL`;
-the default run needs none of this and never calls Langfuse). No full-tier experiment has ever run
-against `mcp-server-evals` yet (confirmed live while designing this script — every experiment on this
-dataset so far is a `pr`-tier selection run), so this path is unit-tested against a fixture of
-captured observations (`tests/unit/fixtures/evals_coverage_observations.json`), not exercised against
-a real full-tier run. The committed `coverage_matrix.md` is always the snapshot-only version
+observation spans from Langfuse (needs `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_BASE_URL`,
+loaded from a `.env` file at the repo root the same as every other script in this directory; the
+default run needs none of this and never calls Langfuse). A bad or nonexistent experiment id fails
+with a `❌ --experiment failed: ...` message and a non-zero exit, not an unhandled rejection. No
+full-tier experiment has ever run against `mcp-server-evals` yet (confirmed live while designing this
+script — every experiment on this dataset so far is a `pr`-tier selection run), so this path is
+unit-tested against a fixture of captured observations
+(`tests/unit/fixtures/evals_coverage_observations.json`) and against fake Langfuse clients (pagination,
+error propagation), not exercised against a real full-tier run. The committed `coverage_matrix.md` is
+always the snapshot-only version
 (generated without `--experiment`) so it stays reproducible offline.
 
 **Known gaps this matrix exposes, not fixed here** (this PR is the measurement, not the gap fill;

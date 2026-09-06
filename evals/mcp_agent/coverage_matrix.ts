@@ -42,6 +42,11 @@
  *   pnpm run evals:coverage -- --experiment <id>   # also fill in "exercised" from observed spans
  */
 
+// Must be the first import: config modules read process.env at load time. Loading dotenv here
+// only populates process.env from a `.env` file if one exists — it does not read any variable
+// itself, so the default (no `--experiment`) run's behavior is unchanged.
+import 'dotenv/config';
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +65,7 @@ import { compileSchema } from '../../src/utils/ajv.js';
 import { readJsonFile } from '../../src/utils/generic.js';
 import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
 import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
+import { sanitizeProcessEnv } from './config.js';
 import type { McpAgentTestCase } from './langfuse_dataset.js';
 
 /** Name of the committed dataset snapshot this script reads (mirrors `MCP_AGENT_DATASET_NAME`). */
@@ -79,7 +85,7 @@ const WIDGET_CATEGORY_LABEL = 'widgets';
 // ---------------------------------------------------------------------------------------------
 
 /** The 25 in-scope tool identifiers: non-widget, non-retired `HELPER_TOOLS` plus the 2 default direct-Actor tools. */
-export function computeInScopeToolIdentifiers(): string[] {
+export function resolveInScopeToolIdentifiers(): string[] {
     const helperToolNames = Object.values(HELPER_TOOLS).filter(
         (name) => !name.endsWith('-widget') && !RETIRED_SELECTOR_NAMES.has(name),
     );
@@ -88,14 +94,14 @@ export function computeInScopeToolIdentifiers(): string[] {
 }
 
 /** The 4 `*-widget` tool identifiers — excluded rows, never counted as covered. */
-export function computeWidgetToolIdentifiers(): string[] {
+export function getWidgetToolIdentifiers(): string[] {
     return Object.values(HELPER_TOOLS)
         .filter((name) => name.endsWith('-widget'))
         .sort((a, b) => a.localeCompare(b));
 }
 
 /** Identifiers of the 2 tools whose schema is built at runtime from a live Actor definition. */
-export function computeDynamicToolIdentifiers(): string[] {
+export function getDynamicToolIdentifiers(): string[] {
     return defaults.actors.map((actorName) => actorNameToToolName(actorName)).sort((a, b) => a.localeCompare(b));
 }
 
@@ -186,17 +192,17 @@ function actorStubsForReachability(tools: readonly string[] | undefined): ToolEn
 }
 
 /** Tool names served to one `kind: "agent"` case, per the server's own tool-loading resolver. */
-export function computeReachableToolNames(tools: readonly string[] | undefined): Set<string> {
+export function resolveReachableToolNames(tools: readonly string[] | undefined): Set<string> {
     const input: Input = tools === undefined ? {} : { tools: [...tools] };
     const resolved = getToolsForServerMode(input, actorStubsForReachability(tools), SERVER_MODE.DEFAULT);
     return new Set(resolved.map((tool) => tool.name));
 }
 
 /** How many `kind: "agent"` cases would serve each tool name, across the whole snapshot. */
-function computeReachableCounts(agentCases: readonly McpAgentTestCase[]): Map<string, number> {
+function resolveReachableCounts(agentCases: readonly McpAgentTestCase[]): Map<string, number> {
     const counts = new Map<string, number>();
     for (const testCase of agentCases) {
-        for (const name of computeReachableToolNames(testCase.tools)) {
+        for (const name of resolveReachableToolNames(testCase.tools)) {
             counts.set(name, (counts.get(name) ?? 0) + 1);
         }
     }
@@ -239,7 +245,7 @@ export function countExercisedSpans(spans: readonly ObservedToolSpan[], toolIden
  * present as a top-level key on any matching span's input; a nested `parent.child` group is
  * exercised if `parent` was sent and its own value carried `child`.
  */
-export function computeExercisedArgumentGroups(
+export function resolveExercisedArgumentGroups(
     spans: readonly ObservedToolSpan[],
     toolIdentifier: string,
     argumentGroups: readonly string[],
@@ -274,35 +280,42 @@ export function computeExercisedArgumentGroups(
 
 /**
  * Network glue for `--experiment <id>`: list the experiment's dataset-item traces, then fetch
- * each trace's `TOOL`-type observations. Not unit-tested directly (no full-tier experiment has
- * ever run against `mcp-server-evals` to test it against) — `countExercisedSpans` and
- * `computeExercisedArgumentGroups` above are the tested, pure half of this feature, exercised
- * against a captured fixture.
+ * each trace's `TOOL`-type observations, paginating both the experiment-items listing and each
+ * trace's own observations page the same way (loop on `meta.cursor` until absent). Exercised in
+ * tests against fake `LangfuseClient` objects (rejection propagation, multi-page observations) —
+ * not against a real experiment, since no full-tier run has ever happened against
+ * `mcp-server-evals`; `countExercisedSpans` and `resolveExercisedArgumentGroups` above are the
+ * pure half of this feature, tested against a captured fixture.
  */
 export async function fetchExperimentToolObservations(
     langfuse: LangfuseClient,
     experimentId: string,
 ): Promise<ObservedToolSpan[]> {
     const spans: ObservedToolSpan[] = [];
-    let cursor: string | undefined;
+    let itemsCursor: string | undefined;
     do {
         const page = await langfuse.api.experiments.listItems({
             experimentId,
             fromStartTime: '1970-01-01T00:00:00Z',
-            cursor,
+            cursor: itemsCursor,
         });
         for (const item of page.data) {
-            const observations = await langfuse.api.observations.getMany({
-                traceId: item.traceId,
-                type: 'TOOL',
-                fields: 'basic,io',
-            });
-            for (const observation of observations.data) {
-                if (observation.name) spans.push({ name: observation.name, input: observation.input });
-            }
+            let observationsCursor: string | undefined;
+            do {
+                const observations = await langfuse.api.observations.getMany({
+                    traceId: item.traceId,
+                    type: 'TOOL',
+                    fields: 'basic,io',
+                    cursor: observationsCursor,
+                });
+                for (const observation of observations.data) {
+                    if (observation.name) spans.push({ name: observation.name, input: observation.input });
+                }
+                observationsCursor = observations.meta.cursor ?? undefined;
+            } while (observationsCursor !== undefined);
         }
-        cursor = page.meta.cursor ?? undefined;
-    } while (cursor !== undefined);
+        itemsCursor = page.meta.cursor ?? undefined;
+    } while (itemsCursor !== undefined);
     return spans;
 }
 
@@ -354,15 +367,15 @@ function isArgumentGroupCoveredBySelection(
 }
 
 /** Build the full coverage matrix from the dataset snapshot and (optionally) observed experiment spans. */
-export function computeCoverageMatrix(
+export function buildCoverageMatrix(
     snapshot: readonly McpAgentTestCase[],
     experiment?: { experimentId: string; spans: readonly ObservedToolSpan[] },
 ): CoverageMatrix {
     const selectionCases = snapshot.filter((testCase) => testCase.kind === 'selection');
     const agentCases = snapshot.filter((testCase) => testCase.kind === 'agent');
-    const reachableCounts = computeReachableCounts(agentCases);
+    const reachableCounts = resolveReachableCounts(agentCases);
     const categoryByHelperToolName = buildCategoryByHelperToolName();
-    const dynamicToolIdentifiers = new Set(computeDynamicToolIdentifiers());
+    const dynamicToolIdentifiers = new Set(getDynamicToolIdentifiers());
     const categories = getCategoryTools(SERVER_MODE.DEFAULT);
     const toolByName = new Map<string, ToolEntry>();
     for (const categoryName of CATEGORY_NAMES) {
@@ -371,7 +384,7 @@ export function computeCoverageMatrix(
 
     const rows: CoverageMatrixRow[] = [];
 
-    for (const identifier of computeInScopeToolIdentifiers()) {
+    for (const identifier of resolveInScopeToolIdentifiers()) {
         const matchingSelectionCases = selectionCasesFor(identifier, selectionCases);
         const isCovered = matchingSelectionCases.length > 0;
         const isDynamic = dynamicToolIdentifiers.has(identifier);
@@ -383,7 +396,7 @@ export function computeCoverageMatrix(
             const groups = tool === undefined ? [] : deriveArgumentGroups(tool.inputSchema);
             argumentGroups = groups;
             const exercisedGroups = experiment
-                ? computeExercisedArgumentGroups(experiment.spans, identifier, groups)
+                ? resolveExercisedArgumentGroups(experiment.spans, identifier, groups)
                 : new Set<string>();
             coveredArgumentGroups = groups.filter(
                 (group) =>
@@ -403,7 +416,7 @@ export function computeCoverageMatrix(
         });
     }
 
-    for (const identifier of computeWidgetToolIdentifiers()) {
+    for (const identifier of getWidgetToolIdentifiers()) {
         rows.push({
             identifier,
             category: WIDGET_CATEGORY_LABEL,
@@ -573,6 +586,7 @@ async function main() {
 
     let experiment: { experimentId: string; spans: ObservedToolSpan[] } | undefined;
     if (argv.experiment !== undefined) {
+        // Only the --experiment path needs Langfuse credentials — the default run stays env-free.
         const missing = findMissingEnvVars(LANGFUSE_ENV_VARS);
         if (missing.length > 0) {
             console.error(
@@ -581,12 +595,21 @@ async function main() {
             process.exit(1);
             return;
         }
+        // The Langfuse SDK reads process.env itself and passes it to node:http, which throws
+        // ERR_INVALID_CHAR on a CI secret with a newline. Must run before the client is built.
+        sanitizeProcessEnv();
         const { LangfuseClient } = await import('@langfuse/client');
-        const spans = await fetchExperimentToolObservations(new LangfuseClient(), argv.experiment);
-        experiment = { experimentId: argv.experiment, spans };
+        try {
+            const spans = await fetchExperimentToolObservations(new LangfuseClient(), argv.experiment);
+            experiment = { experimentId: argv.experiment, spans };
+        } catch (error) {
+            console.error(`❌ --experiment failed: ${error instanceof Error ? error.message : String(error)}`);
+            process.exit(1);
+            return;
+        }
     }
 
-    const matrix = computeCoverageMatrix(readSnapshot(), experiment);
+    const matrix = buildCoverageMatrix(readSnapshot(), experiment);
     const rendered = renderCoverageMatrixMarkdown(matrix);
     const outPath = path.resolve(argv.out);
     const relativeOutPath = path.relative(process.cwd(), outPath);
