@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
     buildMigratedItem,
@@ -9,6 +9,31 @@ import {
     parseLegacyMcpAgentItem,
     SOURCE_DATASETS,
 } from '../../evals/mcp_agent/migrate_unified_dataset.js';
+
+describe('module entrypoint guard', () => {
+    it('does not run the CLI on import: no process.exit, no LangfuseClient construction', async () => {
+        const langfuseCtor = vi.fn();
+        vi.doMock('@langfuse/client', () => ({ LangfuseClient: langfuseCtor }));
+        const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+        const originalEnv = { ...process.env };
+        delete process.env.LANGFUSE_PUBLIC_KEY;
+        delete process.env.LANGFUSE_SECRET_KEY;
+        delete process.env.LANGFUSE_BASE_URL;
+
+        try {
+            vi.resetModules();
+            await import('../../evals/mcp_agent/migrate_unified_dataset.js');
+        } finally {
+            process.env = originalEnv;
+            vi.doUnmock('@langfuse/client');
+            vi.resetModules();
+            exitSpy.mockRestore();
+        }
+
+        expect(exitSpy).not.toHaveBeenCalled();
+        expect(langfuseCtor).not.toHaveBeenCalled();
+    });
+});
 
 describe('deriveNewId()', () => {
     it('strips the singular family-name prefix', () => {
