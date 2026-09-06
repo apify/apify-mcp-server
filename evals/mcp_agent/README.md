@@ -407,8 +407,8 @@ pnpm run evals:coverage -- --experiment <id> --out somewhere.md   # ...or write 
 `--check` and `--experiment` cannot be combined (`--check` compares only the committed,
 snapshot-only matrix; passing `--experiment` alongside it is rejected with a `❌` message and a
 non-zero exit, before any Langfuse call). `--experiment` without `--out` prints to stdout instead of
-writing anywhere — this is structural, not a convention to remember: the committed
-`coverage_matrix.md` can only ever be touched by passing `--out` explicitly (see below).
+writing anywhere — this is structural, not a convention to remember: with `--experiment`, the
+committed `coverage_matrix.md` can only be touched by passing `--out` explicitly.
 
 **Freshness.** `tests/unit/evals.coverage_matrix.test.ts` regenerates the matrix from the committed
 snapshot and the live registry and asserts byte-equality with the committed `coverage_matrix.md` —
@@ -422,11 +422,14 @@ observation spans from Langfuse (needs `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KE
 loaded from a `.env` file at the repo root the same as every other script in this directory; the
 default run needs none of this and never calls Langfuse). A span whose output is the selection-mode
 deny-all hook's canned text is always skipped, so a denied call is never counted as "exercised". There
-are two real outcomes, not one: an API error (bad credentials, an unreachable id filter, ...) fails
+are two real outcomes, not one: an API error (bad credentials, an unreachable host, ...) fails
 with a `❌ --experiment failed: ...` message and a non-zero exit, not an unhandled rejection; an id
-that exists but resolves to zero `kind: "agent"` items — every `pr`-tier selection experiment does,
-since selection items don't execute — prints a `⚠️ --experiment "<id>" contains no kind: agent items —
-the exercised column stays n/a` warning and renders `n/a`, not a false `0`, in every "exercised" cell.
+that resolves to zero `kind: "agent"` items prints a `⚠️ --experiment "<id>" contains no items with
+kind: agent metadata — the exercised column stays n/a` warning and renders `n/a`, not a false `0`, in
+every "exercised" cell. `experimentId` is a filter on a list endpoint, so this second outcome covers
+both a real `pr`-tier selection experiment (every one of which resolves to zero agent items, since
+selection items don't execute) and a typo'd or nonexistent experiment id — both look identical from
+this script's side: an empty item list, the `⚠️` line, and `n/a` everywhere, not an error.
 No full-tier experiment has ever run against `mcp-server-evals` (confirmed 2026-09-06 — every
 experiment on this dataset so far is a `pr`-tier selection run), so the "exercised" path is unit-tested
 against a fixture of captured observations

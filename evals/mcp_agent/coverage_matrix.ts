@@ -272,15 +272,6 @@ function isSelectionDenialOutput(output: unknown): boolean {
     return typeof output === 'string' && output.includes(SELECTION_DENY_REASON);
 }
 
-/**
- * Whether an experiment item's own dataset metadata (when the API returned it) says it is not a
- * `kind: "agent"` item. `undefined`/`null` metadata means "unknown" (not requested, or an older
- * item predating this field) and is never treated as non-agent — see module docstring.
- */
-function isNonAgentItem(item: { experimentItemMetadata?: Record<string, unknown> | null }): boolean {
-    return item.experimentItemMetadata != null && item.experimentItemMetadata.kind !== 'agent';
-}
-
 /** How many observed spans named this tool, across the fetched experiment. */
 export function countExercisedSpans(spans: readonly ObservedToolSpan[], toolIdentifier: string): number {
     return spans.filter((span) => span.name === toolIdentifier).length;
@@ -334,7 +325,8 @@ export function resolveExercisedArgumentGroups(
  * in tests against fake `LangfuseClient` objects (rejection propagation, multi-page observations,
  * filtering) — not against a real experiment, since no full-tier run has ever happened against
  * `mcp-server-evals`; `countExercisedSpans` and `resolveExercisedArgumentGroups` above are the
- * pure half of this feature, tested against a captured fixture.
+ * pure half of this feature, tested against a fixture of spans captured from a real `pr`-tier
+ * selection run's denial observations (same `name`/`input` shape as an agent span carries).
  */
 export async function fetchExperimentToolObservations(
     langfuse: LangfuseClient,
@@ -351,8 +343,8 @@ export async function fetchExperimentToolObservations(
             cursor: itemsCursor,
         });
         for (const item of page.data) {
-            if (item.experimentItemMetadata?.kind === 'agent') agentItemCount += 1;
-            if (isNonAgentItem(item)) continue;
+            if (item.experimentItemMetadata?.kind !== 'agent') continue;
+            agentItemCount += 1;
 
             let observationsCursor: string | undefined;
             do {
@@ -539,8 +531,8 @@ const REPORT_PROBLEM_FOOTNOTE =
 const DYNAMIC_TOOLS_FOOTNOTE =
     '`apify--rag-web-browser` and `apify--web-fetch` argument groups read `dynamic`: their `inputSchema` is built ' +
     "at runtime from the live Actor's own input schema (`actor_tools_factory.ts`), not from a schema in this " +
-    'repo, so they cannot be measured offline. They are excluded from the argument-group totals below, not ' +
-    'silently scored zero.';
+    'repo, so they cannot be measured offline. They are excluded from the argument-group totals in the summary, ' +
+    'not silently scored zero.';
 
 function padLabel(label: string): string {
     return label.padEnd(17);
@@ -578,7 +570,10 @@ function renderAgentKindLine(matrix: CoverageMatrix): string {
         );
     }
     if ((matrix.experimentAgentItemCount ?? 0) === 0) {
-        return `⚠️ --experiment "${matrix.experimentId}" contains no kind: agent items — the exercised column stays n/a`;
+        return (
+            `⚠️ --experiment "${matrix.experimentId}" contains no items with \`kind: agent\` metadata — the ` +
+            'exercised column stays n/a'
+        );
     }
     return (
         `Agent kind (full tier): reachable + exercised — experiment "${matrix.experimentId}", ` +

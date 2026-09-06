@@ -319,7 +319,7 @@ describe('renderSummaryLines() — agent-kind line', () => {
     it('--experiment with zero kind: agent items: warns instead of claiming exercised coverage', () => {
         const matrix = buildCoverageMatrix([], { experimentId: 'exp1', spans: [], agentItemCount: 0 });
         expect(renderSummaryLines(matrix)[2]).toBe(
-            '⚠️ --experiment "exp1" contains no kind: agent items — the exercised column stays n/a',
+            '⚠️ --experiment "exp1" contains no items with `kind: agent` metadata — the exercised column stays n/a',
         );
     });
 
@@ -363,7 +363,7 @@ describe('--experiment env precondition', () => {
 describe('fetchExperimentToolObservations()', () => {
     /** Minimal fake Langfuse client: only the two `.api.*` methods this reader calls. */
     function fakeLangfuseClient(overrides: {
-        listItems: (args: { cursor?: string }) => Promise<{
+        listItems: (args: { cursor?: string; fromStartTime?: string; fields?: string }) => Promise<{
             data: { traceId: string; experimentItemMetadata?: Record<string, unknown> | null }[];
             meta: { cursor?: string };
         }>;
@@ -394,7 +394,11 @@ describe('fetchExperimentToolObservations()', () => {
     it("paginates one trace's observations across multiple pages instead of dropping the rest", async () => {
         let getManyCallCount = 0;
         const client = fakeLangfuseClient({
-            listItems: () => Promise.resolve({ data: [{ traceId: 't1' }], meta: {} }),
+            listItems: () =>
+                Promise.resolve({
+                    data: [{ traceId: 't1', experimentItemMetadata: { kind: 'agent' } }],
+                    meta: {},
+                }),
             getMany: ({ cursor }) => {
                 getManyCallCount += 1;
                 if (cursor === undefined) {
@@ -415,13 +419,21 @@ describe('fetchExperimentToolObservations()', () => {
 
     it('paginates the experiment-items listing across multiple pages', async () => {
         let listItemsCallCount = 0;
+        const listItemsCalls: { cursor?: string; fromStartTime?: string; fields?: string }[] = [];
         const client = fakeLangfuseClient({
-            listItems: ({ cursor }) => {
+            listItems: ({ cursor, fromStartTime, fields }) => {
                 listItemsCallCount += 1;
+                listItemsCalls.push({ cursor, fromStartTime, fields });
                 if (cursor === undefined) {
-                    return Promise.resolve({ data: [{ traceId: 't1' }], meta: { cursor: 'items-page-2' } });
+                    return Promise.resolve({
+                        data: [{ traceId: 't1', experimentItemMetadata: { kind: 'agent' } }],
+                        meta: { cursor: 'items-page-2' },
+                    });
                 }
-                return Promise.resolve({ data: [{ traceId: 't2' }], meta: {} });
+                return Promise.resolve({
+                    data: [{ traceId: 't2', experimentItemMetadata: { kind: 'agent' } }],
+                    meta: {},
+                });
             },
             getMany: ({ traceId }) =>
                 Promise.resolve({ data: [{ name: `tool-for-${traceId}`, input: '{}' }], meta: {} }),
@@ -431,6 +443,13 @@ describe('fetchExperimentToolObservations()', () => {
 
         expect(listItemsCallCount).toBe(2);
         expect(spans.map((span) => span.name)).toEqual(['tool-for-t1', 'tool-for-t2']);
+        // Regression guard: the API 500s (or silently returns 0 items) for a `fromStartTime` too close to the
+        // epoch — see coverage_matrix.ts's EXPERIMENT_ITEMS_FROM_START_TIME comment. Assert every page requests
+        // the same fixed lower bound and the item-metadata field group, not just the first.
+        for (const call of listItemsCalls) {
+            expect(call.fromStartTime).toBe('2000-01-01T00:00:00Z');
+            expect(call.fields).toBe('core,itemMetadata');
+        }
     });
 
     it('skips a TOOL observation whose output is the selection-mode denial text', async () => {
@@ -488,6 +507,39 @@ describe('fetchExperimentToolObservations()', () => {
 
         expect(agentItemCount).toBe(0);
     });
+
+    it('skips an item with no experimentItemMetadata at all — unknown is not agent, yields zero spans', async () => {
+        let getManyCallCount = 0;
+        const client = fakeLangfuseClient({
+            listItems: () => Promise.resolve({ data: [{ traceId: 't1' }], meta: {} }),
+            getMany: () => {
+                getManyCallCount += 1;
+                return Promise.resolve({ data: [{ name: 'search-actors', input: '{}' }], meta: {} });
+            },
+        });
+
+        const { spans, agentItemCount } = await fetchExperimentToolObservations(client, 'exp1');
+
+        expect(getManyCallCount).toBe(0);
+        expect(spans).toEqual([]);
+        expect(agentItemCount).toBe(0);
+    });
+
+    it('fetches observations for a kind: "agent" item', async () => {
+        const client = fakeLangfuseClient({
+            listItems: () =>
+                Promise.resolve({
+                    data: [{ traceId: 't1', experimentItemMetadata: { kind: 'agent' } }],
+                    meta: {},
+                }),
+            getMany: () => Promise.resolve({ data: [{ name: 'search-actors', input: '{}' }], meta: {} }),
+        });
+
+        const { spans, agentItemCount } = await fetchExperimentToolObservations(client, 'exp1');
+
+        expect(spans.map((span) => span.name)).toEqual(['search-actors']);
+        expect(agentItemCount).toBe(1);
+    });
 });
 
 describe('countExercisedSpans() / resolveExercisedArgumentGroups()', () => {
@@ -499,7 +551,7 @@ describe('countExercisedSpans() / resolveExercisedArgumentGroups()', () => {
         expect(countExercisedSpans(fixture, 'get-actor-run')).toBe(0);
     });
 
-    it('derives exercised top-level and nested argument groups from a real captured span', () => {
+    it("derives exercised top-level and nested argument groups from a real captured span (a selection run's denial span, same name/input shape as an agent span)", () => {
         const groups = deriveArgumentGroups({
             type: 'object',
             properties: {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { resolveInScopeToolIdentifiers } from '../../evals/mcp_agent/coverage_matrix.js';
 import { parseMcpAgentItem } from '../../evals/mcp_agent/langfuse_dataset.js';
 import {
     BURNED_LIVE_IDS,
@@ -8,7 +9,7 @@ import {
     findUnsafeCollisions,
 } from '../../evals/mcp_agent/port_selection_cases.js';
 import { ARCHIVED_CASES, PORT_SELECTION_CASES } from '../../evals/mcp_agent/port_selection_cases_data.js';
-import { HELPER_TOOLS, RETIRED_SELECTOR_NAMES, defaults, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { readJsonFile } from '../../src/utils/generic.js';
 
@@ -45,15 +46,6 @@ const testCasesJson = readJsonFile<{ version: string; testCases: { id: string }[
     import.meta.url,
     '../../evals/test_cases.json',
 );
-
-/** All 25 non-widget tool identifiers a `pr`-tier selection case must cover, derived from the registry. */
-function computeRequiredToolIdentifiers(): string[] {
-    const helperToolNames = Object.values(HELPER_TOOLS).filter(
-        (name) => !name.endsWith('-widget') && !RETIRED_SELECTOR_NAMES.has(name),
-    );
-    const defaultActorToolNames = defaults.actors.map((actorName) => actorNameToToolName(actorName));
-    return [...helperToolNames, ...defaultActorToolNames];
-}
 
 describe('buildPortItem()', () => {
     it('builds a kind: selection, tier: [pr] item from a minimal row', () => {
@@ -179,7 +171,7 @@ describe('findUnsafeCollisions()', () => {
 
 describe('PORT_SELECTION_CASES: id scheme', () => {
     it('every id has exactly one "/" and the prefix is a real tool family', () => {
-        const requiredToolIdentifiers = new Set(computeRequiredToolIdentifiers());
+        const requiredToolIdentifiers = new Set(resolveInScopeToolIdentifiers());
         for (const row of PORT_SELECTION_CASES) {
             const parts = row.id.split('/');
             expect(parts, `id "${row.id}" must have exactly one "/"`).toHaveLength(2);
@@ -252,7 +244,7 @@ const KNOWN_UNCOVERED_TOOL_IDENTIFIERS: readonly string[] = [HELPER_TOOLS.PROBLE
 
 describe('PORT_SELECTION_CASES: coverage', () => {
     it('every one of the 25 tool identifiers, derived from the registry, has >= 1 case, except the documented report-problem gap', () => {
-        const requiredToolIdentifiers = computeRequiredToolIdentifiers();
+        const requiredToolIdentifiers = resolveInScopeToolIdentifiers();
         expect(requiredToolIdentifiers).toHaveLength(25);
 
         const coveredTools = new Set([

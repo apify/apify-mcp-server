@@ -36,10 +36,6 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - **Reference tool names via the `HELPER_TOOLS` `as const` object**, never hardcoded strings
   (exception: integration tests).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.
-- Adding a tool or changing an `inputSchema` here can make the committed
-  `evals/mcp_agent/coverage_matrix.md` stale (it's derived from this directory's tool registry).
-  Enforced by `tests/unit/evals.coverage_matrix.test.ts`'s freshness test — regenerate it with
-  `pnpm run evals:coverage` and commit the result.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool
 returns, then a disambiguation line naming the sibling tool(s) it's confused with via
