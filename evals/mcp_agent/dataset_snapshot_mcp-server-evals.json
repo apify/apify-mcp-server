@@ -478,7 +478,7 @@
     "tier": [
       "pr"
     ],
-    "query": "Get configuration info from: https://docs.apify.com/platform/integrations/mcp",
+    "query": "What does the Apify docs page at https://docs.apify.com/platform/integrations/mcp say?",
     "expectedTools": [
       "fetch-apify-docs"
     ],
@@ -493,7 +493,7 @@
     "tier": [
       "pr"
     ],
-    "query": "Get content from: https://docs.apify.com/nonexistent-page",
+    "query": "Check the Apify docs for this page: https://docs.apify.com/nonexistent-page",
     "expectedTools": [
       "fetch-apify-docs"
     ],
@@ -1652,7 +1652,7 @@
     "tier": [
       "pr"
     ],
-    "query": "Search for Playwright browser MCP server",
+    "query": "Find an Actor that can automate a headless browser using Playwright.",
     "expectedTools": [
       "search-actors"
     ]
