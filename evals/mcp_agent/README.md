@@ -162,6 +162,128 @@ Scoring (`first_tool_match`, 1 or 0):
 A denied selection call still shows as a failed (ERROR) MCP tool span in its trace - harmless
 (`tool_errors` never runs for selection items), but expected; don't "fix" it.
 
+### The `pr` tier: port, coverage, and calibration (apify/ai-team#240)
+
+The `pr` tier is 116 `kind: "selection"` items: 5 from #260's original set plus 111 from
+apify/ai-team#240's port of `evals/test_cases.json` (the old Phoenix runner's 106-case
+next-tool-prediction suite, now archived for deletion under #262) — 103 kept/rephrased/widened
+old cases, a 4-case coverage wave for the tools the old suite never exercised
+(`abort-actor-run`, `get-actor-log`, `get-actor-run-list`, `report-problem`), and a 4-case
+lazy-user wave (typo, vague goal, missing parameter, wrong Actor name). 3 of the 106 old ids are
+archived as exact-duplicate queries, not ported; every one of the 106 is accounted for
+(ported id or archive reason) in `evals/mcp_agent/port_selection_cases_data.ts`.
+
+**Per-tool coverage** (count of `pr`-tier selection cases whose `expectedTools` includes it;
+every one of the 25 non-widget tool identifiers has at least 1):
+
+| tool | count | tool | count |
+|---|---|---|---|
+| `call-actor` | 7 | `get-key-value-store-list` | 2 |
+| `fetch-actor-details` | 18 | `get-key-value-store` | 2 |
+| `abort-actor-run` | 1 | `get-key-value-store-keys` | 2 |
+| `get-actor-run` | 1 | `get-key-value-store-record` | 3 |
+| `get-actor-log` | 2 | `search-actors` | 34 |
+| `get-actor-run-list` | 1 | `search-apify-docs` | 10 |
+| `get-actor-task` | 12 | `fetch-apify-docs` | 2 |
+| `create-actor-task` | 2 | `report-problem` | 1 |
+| `update-actor-task` | 5 | `apify--rag-web-browser` | 13 |
+| `publish-actor-task` | 3 | `apify--web-fetch` | 1 |
+| `unpublish-actor-task` | 2 | | |
+| `get-dataset` | 3 | | |
+| `get-dataset-list` | 3 | | |
+| `get-dataset-items` | 7 | | |
+| `get-dataset-schema` | 3 | | |
+
+**Calibration.** Per the `creating-mcp-agent-evals` skill: calibrate on the strongest model
+first (a failure there is a case defect, never a description problem), then read the target
+model's floor off 3 separate runs. This took 4 `claude-opus-5` runs, not 1 — 2 more case defects
+surfaced only once concurrency dropped from 3 to 2 (see the "Environment note" below for why
+that change was made), each fixed and re-verified before moving on to Haiku:
+
+- `claude-opus-5 --tier pr --subscription --claude-judge`, 4 runs, concurrency 3 then 2:
+  1. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/81f3c87b9ed35263) —
+     82/116, 22 `first_tool_match` failures, all genuine case defects, fixed (widened
+     `call-actor`/task-mutation families, rephrased 3 queries, strengthened 2 — see
+     `.shepherd/iter-1/claim.md` for the per-pattern table).
+  2. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/36b77364009dfc3b) —
+     102/116, 5 failures (`create-actor-task` ×2 + 3 single-occurrence items), fixed.
+  3. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/f78b94021c957533)
+     (concurrency 2) — 105/116, 2 new failures: `search-actors/playwright-mcp-server`
+     ("MCP server" in the query was self-referential in this harness and sent both Opus and
+     Haiku down a ToolSearch detour) and `fetch-apify-docs/nonexistent-page` (read as a generic
+     "fetch this URL," which is `apify--web-fetch`'s job, with nothing marking it as Apify's own
+     docs). Both fixed by rephrasing.
+  4. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/da9628881cb03392) —
+     104/116, 1 failure: `report-problem/known-bug-tiktok-scraper` ("no tool call attempted" —
+     recurs on every Opus run that includes it, run 2 and both concurrency-2 runs). Already
+     strengthened twice; not fixed further — see Follow-up findings below. **Accepted as the
+     clean Opus baseline** with this one documented, structural exception.
+- `claude-haiku-4-5 --tier pr --subscription --claude-judge`, 3 separate runs at concurrency 2
+  (not `--iterations 3`, each its own dataset run), after all of the above fixes, with **no case
+  edits between the three**:
+  1. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/d155b6b39b63b070) —
+     96/116 raw (0.83), 16 dropped, completed-only 96/100 = **0.96**
+  2. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/e7020e82972345f9) —
+     95/116 raw (0.82), 14 dropped, completed-only 95/102 = **0.93**
+  3. [run](https://langfuse.apify.dev/project/cmshkde21000krg07shb46d8g/datasets/cmtovvphw0072tm07k6x1wxb4/runs/f0c552eb7a1e5a4a) —
+     103/116 raw (0.89), 11 dropped, completed-only 103/105 = **0.98**
+
+  Every failure across the 3 runs is a documented Haiku-only weakness (not flagged by Opus after
+  the fixes above) or the same `report-problem` residual — see Follow-up findings. None required
+  a case edit, so the series stands as run (no restart).
+- `PR_TIER_PASS_THRESHOLD` (`config.ts`) = **0.93** — the floor of the 3 runs' *completed-only*
+  rates (0.96, 0.93, 0.98), rounded down to 2 decimals, **marked PROVISIONAL in `config.ts`'s
+  comment**. Not the floor of the raw rates (0.83, 0.82, 0.89): those are dominated by the sandbox
+  TLS fault below, not case quality — see `.shepherd/iter-1/claim.md` for the full per-run drop
+  breakdown. It is not wired as `run_mcp_agent_evals.ts`'s `--pass-threshold` CLI default (that
+  default applies to every tier and every run); apify/ai-team#261's CI workflow is expected to
+  read it explicitly and re-pin it once measured in an environment without this fault.
+
+**Cost and time.** 9 full `--tier pr` runs (116 items each) across this calibration: 4
+`claude-opus-5` + 1 discarded + 3 official `claude-haiku-4-5` (plus 1 further-discarded Haiku
+attempt killed for unrelated sandbox CPU contention at the default concurrency). Each run took
+roughly 10-18 minutes wall-clock (build + 116 trials at `--concurrency 2` or `3`, `--claude-judge`
+on the Claude Agent SDK, `--subscription` billing so no per-token API cost was metered in this
+session).
+
+**Environment note (this sandbox only):** at the default `--concurrency 8`, a `pr`-tier run of
+116 items on this session's runner saturated the sandbox (a 4-core box briefly hit a load
+average above 80) and had to be killed. Dropping to `--concurrency 3` fixed *that* problem, but
+a second, separate one remained: trials dropped with `API Error: Unable to connect to API:
+Self-signed certificate detected` — a direct, unproxied TLS handshake failure against
+`api.anthropic.com` (it's in the proxy's own `noProxy` list, so this is not a proxy
+misconfiguration). The rate climbed from ~10% (first Opus run) to ~50-79% (the worst
+concurrency-3 Haiku runs) over the session, then settled at ~9-14% per run once every run moved
+to `--concurrency 2` (a handful of drops are `Reached maximum number of turns (2)` instead —
+a distinct SDK-level drop, itself a known ToolSearch-exhaustion pattern, not the TLS fault).
+Concurrency 2 reduced the rate but never reached zero, so the brief's "rerun until zero dropped
+trials" guidance stayed infeasible to satisfy literally; the calibration numbers report both the
+raw pass rate (dropped trials counted as failed, per the metric's definition) and a
+*completed-only* rate (passed / (requested - dropped)) so the two effects — case quality vs.
+sandbox network health — aren't conflated, and `PR_TIER_PASS_THRESHOLD` is pinned PROVISIONAL off
+the latter. This is a note about this sandbox's condition during this task, not a change to the
+documented default (`--concurrency` still defaults to 8; override it only if a run shows the
+same batch-stall symptom) and not evidence about case quality — see `.shepherd/iter-1/claim.md`
+for the full per-run drop breakdown and stderr samples.
+
+**Adding a `pr`-tier selection case:**
+1. Add a row to `evals/mcp_agent/port_selection_cases_data.ts`'s `PORT_SELECTION_CASES` array:
+   `id` (`<category>/<slug>`, `<category>` a real tool identifier), `query` (self-contained user
+   language, no tool names in easy/medium cases), `category`, `expectedTools`, and — only when
+   `expectedTools` names exactly one tool and the query pins an argument — `expectedArgs`. Add
+   `tools: ["runs" | "storage" | "tasks"]` if the tool isn't default-served (see the coverage
+   table's tools above `get-dataset-items`/`get-key-value-store-record`, which are
+   auto-injected). Add `mcpToolsOnly: true` only for an MCP-vs-MCP axis case (see
+   `apify--rag-web-browser/*` above).
+2. `pnpm run evals:mcp-agent:port-selection-cases -- --dry-run` — validates every row and
+   prints the plan; touches nothing, needs no network.
+3. `pnpm run evals:mcp-agent:port-selection-cases` — upserts by id (idempotent; re-running is a
+   no-op replay of unchanged rows).
+4. `pnpm run evals:mcp-agent:export-dataset` — re-export the committed snapshot so the diff
+   shows the new case.
+5. `pnpm run test:unit -- evals.port_selection_cases` — the coverage/collision/validation
+   assertions run against the updated table.
+
 ### Permission path, and running under root
 
 Every item runs with `canUseTool` granting every tool call, not `bypassPermissions` +
