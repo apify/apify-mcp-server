@@ -44,6 +44,7 @@ import {
     formatRunSummary,
     makeTask,
     resolveExitCode,
+    resolveGitBranch,
     validateConcurrency,
     validateIterations,
     validatePassThreshold,
@@ -73,13 +74,18 @@ type CliArgs = {
     passThreshold: number;
 };
 
-/** Current git branch, or 'unknown' if it can't be resolved. */
+/**
+ * Current git branch, falling back to the CI env when git can't name one (detached HEAD, or
+ * the command itself fails). See `resolveGitBranch()` for the fallback order.
+ */
 function getGitBranch(): string {
+    let rawBranch = '';
     try {
-        return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim() || 'unknown';
+        rawBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' });
     } catch {
-        return 'unknown';
+        // rawBranch stays '', resolveGitBranch() falls through to the env vars below.
     }
+    return resolveGitBranch(rawBranch, process.env);
 }
 
 /**

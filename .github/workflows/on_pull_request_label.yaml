@@ -36,10 +36,19 @@ jobs:
 
     evaluations:
         needs: [ wait_for_checks ]
-        name: MCP tool calling evaluations
-        # Run when PR is labeled with 'validated'
+        name: MCP agent evaluations (pr)
+        # Run when PR is labeled with 'validated' — the manual/fork override for the
+        # automatic on_pull_request_evals.yaml trigger (forks can't read secrets there).
         if: github.event.action == 'labeled' && github.event.label.name == 'validated'
+        concurrency:
+            group: eval-pr-${{ github.event.pull_request.number }}
+            cancel-in-progress: true
         uses: ./.github/workflows/_evaluations.yaml
-        secrets: inherit
         with:
-            pr_number: ${{ github.event.pull_request.number }}
+            tier: pr
+        secrets:
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+            LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+            LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+            LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}

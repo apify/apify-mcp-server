@@ -1,20 +1,42 @@
-# Reusable workflow for MCP tool calling evaluations.
-# Evaluates AI models' ability to correctly identify and call MCP tools.
+# Reusable workflow for MCP agent evaluations (Langfuse-backed): the `pr` tier (fast,
+# deterministic tool-selection cases) and the `full` tier (judged multi-turn agent cases).
+# See evals/mcp_agent/README.md's CI section.
 
 on:
     workflow_call:
         inputs:
-            pr_number:
-                description: Pull request number
+            tier:
+                description: 'Which eval tier to run'
                 required: true
-                type: string
+                type: string # 'pr' | 'full'
+        secrets:
+            ANTHROPIC_API_KEY:
+                required: true
+            LANGFUSE_PUBLIC_KEY:
+                required: true
+            LANGFUSE_SECRET_KEY:
+                required: true
+            LANGFUSE_BASE_URL:
+                required: true
+            APIFY_TOKEN:
+                required: true
+            OPENROUTER_API_KEY:
+                description: 'Judge model on OpenRouter. Only used by tier: full.'
+                required: false
 
 jobs:
     evaluations:
-        name: MCP tool calling evaluations
+        name: MCP agent evaluations (${{ inputs.tier }})
         runs-on: ubuntu-latest
-
+        timeout-minutes: 20
         steps:
+            -   name: Validate tier input
+                run: |
+                    if [ "${{ inputs.tier }}" != "pr" ] && [ "${{ inputs.tier }}" != "full" ]; then
+                        echo "::error::inputs.tier must be 'pr' or 'full', got '${{ inputs.tier }}'"
+                        exit 1
+                    fi
+
             -   name: Checkout code
                 uses: actions/checkout@v6
 
@@ -26,14 +48,39 @@ jobs:
             -   name: Install pnpm and dependencies
                 uses: apify/actions/pnpm-install@v1.1.2
 
-            -   name: Build project
-                run: pnpm run build
-
-            -   name: Run evaluations
-                run: pnpm run evals:run
+            -   name: Seed task fixtures (full tier only)
+                if: inputs.tier == 'full'
+                run: pnpm run evals:mcp-agent:tasks-fixtures
                 env:
-                    GITHUB_PR_NUMBER: ${{ inputs.pr_number }}
-                    PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
-                    PHOENIX_BASE_URL: ${{ secrets.PHOENIX_BASE_URL }}
-                    OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+
+            -   name: Read PR tier pass threshold
+                if: inputs.tier == 'pr'
+                id: threshold
+                run: |
+                    value=$(pnpm exec tsx -e "import { PR_TIER_PASS_THRESHOLD } from './evals/mcp_agent/config.ts'; console.log(PR_TIER_PASS_THRESHOLD);")
+                    echo "value=$value" >> "$GITHUB_OUTPUT"
+
+            -   name: Run pr-tier evals
+                if: inputs.tier == 'pr'
+                run: >
+                    pnpm run evals:mcp-agent -- --tier pr
+                    --pass-threshold ${{ steps.threshold.outputs.value }}
+                    --agent-model claude-haiku-4-5 --claude-judge
+                env:
+                    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+                    LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+                    LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+                    LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+
+            -   name: Run full-tier evals
+                if: inputs.tier == 'full'
+                run: pnpm run evals:mcp-agent -- --tier full
+                env:
+                    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+                    LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+                    LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+                    LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
                     OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

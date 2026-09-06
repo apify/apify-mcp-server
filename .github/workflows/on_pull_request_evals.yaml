@@ -1,0 +1,51 @@
+name: CI (PR evals)
+
+# Only opened/reopened/ready_for_review — never synchronize, so a normal push to an
+# already-open PR (e.g. addressing a review comment) doesn't re-spend the eval budget.
+on:
+    pull_request:
+        types: [opened, reopened, ready_for_review]
+
+jobs:
+    changes:
+        name: Detect eval-relevant changes
+        runs-on: ubuntu-latest
+        outputs:
+            run_evals: ${{ steps.filter.outputs.evals }}
+        steps:
+            -   uses: dorny/paths-filter@v3
+                id: filter
+                with:
+                    filters: |
+                        evals:
+                            - 'src/**'
+                            - 'evals/**'
+                            - 'package.json'
+                            - 'pnpm-lock.yaml'
+                            - 'pnpm-workspace.yaml'
+                            - 'tsconfig.json'
+                            - '.nvmrc'
+                            - '.github/workflows/_evaluations.yaml'
+                            - '.github/workflows/on_pull_request_evals.yaml'
+
+    evaluations:
+        needs: [ changes ]
+        name: MCP agent evaluations (pr)
+        # Fork PRs don't have access to repo secrets, and a draft PR isn't ready to gate yet —
+        # use the `validated` label (on_pull_request_label.yaml) for either case instead.
+        if: |
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.draft == false &&
+            needs.changes.outputs.run_evals == 'true'
+        concurrency:
+            group: eval-pr-${{ github.event.pull_request.number }}
+            cancel-in-progress: true
+        uses: ./.github/workflows/_evaluations.yaml
+        with:
+            tier: pr
+        secrets:
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+            LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+            LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+            LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
