@@ -8,6 +8,7 @@ import {
     isTransientAgentError,
     makeTask,
     resolveExitCode,
+    resolveGitBranch,
     validateConcurrency,
     validateIterations,
     validatePassThreshold,
@@ -741,5 +742,27 @@ describe('validateConcurrency()', () => {
         expect(() => validateConcurrency(-1)).toThrow('--concurrency must be a positive integer');
         expect(() => validateConcurrency(1.5)).toThrow('--concurrency must be a positive integer');
         expect(() => validateConcurrency(NaN)).toThrow('--concurrency must be a positive integer');
+    });
+});
+
+describe('resolveGitBranch()', () => {
+    it('returns a real branch name unchanged, ignoring the env fallbacks', () => {
+        expect(resolveGitBranch('chore/ci-two-tier-eval-gates\n', { GITHUB_HEAD_REF: 'other' })).toBe(
+            'chore/ci-two-tier-eval-gates',
+        );
+    });
+
+    it('falls back to GITHUB_HEAD_REF when git reports the literal "HEAD" (detached checkout)', () => {
+        expect(resolveGitBranch('HEAD\n', { GITHUB_HEAD_REF: 'feat/my-pr', GITHUB_REF_NAME: 'master' })).toBe(
+            'feat/my-pr',
+        );
+    });
+
+    it('falls back to GITHUB_REF_NAME when GITHUB_HEAD_REF is unset (e.g. a push event)', () => {
+        expect(resolveGitBranch('HEAD\n', { GITHUB_REF_NAME: 'master' })).toBe('master');
+    });
+
+    it('falls back to "unknown" when git output is empty and neither env var is set', () => {
+        expect(resolveGitBranch('', {})).toBe('unknown');
     });
 });

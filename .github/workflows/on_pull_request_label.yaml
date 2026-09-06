@@ -5,10 +5,6 @@ on:
     pull_request:
         types: [labeled, synchronize, reopened]
 
-concurrency:
-    group: release
-    cancel-in-progress: false
-
 jobs:
     wait_for_checks:
         name: Wait for code checks to pass
@@ -30,16 +26,39 @@ jobs:
         # Run ONLY when PR has the "beta" label
         if: contains(github.event.pull_request.labels.*.name, 'beta')
         name: Push to pkg.pr.new
+        # Serializes the pkg.pr.new publish with the release pipeline in on_master.yaml.
+        # Only this job takes the release lock, so the evaluations job below never
+        # queues behind a master run.
+        concurrency:
+            group: release
+            cancel-in-progress: false
         uses: ./.github/workflows/_publish_to_pkg_pr_new.yaml
         with:
             ref: ${{ github.event.pull_request.head.ref }}
 
     evaluations:
         needs: [ wait_for_checks ]
-        name: MCP tool calling evaluations
-        # Run when PR is labeled with 'validated'
-        if: github.event.action == 'labeled' && github.event.label.name == 'validated'
+        name: MCP agent evaluations (pr)
+        # Run when PR is labeled with 'validated' — the manual re-run for a same-repo PR the
+        # automatic on_pull_request_evals.yaml trigger skipped (a draft, or a later push, which
+        # that workflow deliberately ignores).
+        #
+        # Same-repo only, and NOT a fork override: this workflow is `pull_request` too, and
+        # GitHub withholds repo secrets from any `pull_request` run on a fork whatever labels it
+        # carries, so a fork run here would start and then fail on missing credentials. To
+        # evaluate a fork's changes, push its branch into this repo and open a PR from there.
+        if: |
+            github.event.action == 'labeled' && github.event.label.name == 'validated' &&
+            github.event.pull_request.head.repo.full_name == github.repository
+        concurrency:
+            group: eval-pr-${{ github.event.pull_request.number }}
+            cancel-in-progress: true
         uses: ./.github/workflows/_evaluations.yaml
-        secrets: inherit
         with:
-            pr_number: ${{ github.event.pull_request.number }}
+            tier: pr
+        secrets:
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+            LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+            LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+            LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
