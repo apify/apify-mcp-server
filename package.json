@@ -145,7 +145,8 @@
     "evals:mcp-agent": "pnpm run build && tsx evals/mcp_agent/run_mcp_agent_evals.ts",
     "evals:mcp-agent:export-dataset": "tsx evals/mcp_agent/export_dataset.ts",
     "evals:mcp-agent:tasks-fixtures": "tsx evals/mcp_agent/tasks_fixtures.ts",
-    "evals:mcp-agent:migrate-unified-dataset": "tsx evals/mcp_agent/migrate_unified_dataset.ts"
+    "evals:mcp-agent:migrate-unified-dataset": "tsx evals/mcp_agent/migrate_unified_dataset.ts",
+    "evals:mcp-agent:port-selection-cases": "tsx evals/mcp_agent/port_selection_cases.ts"
   },
   "author": "Apify",
   "license": "MIT"

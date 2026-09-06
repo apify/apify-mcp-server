@@ -1,5 +1,233 @@
 [
   {
+    "id": "abort-actor-run/stuck-run",
+    "category": "abort-actor-run",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "My Actor run y2h7sK3Wc has been running way longer than it should — stop it.",
+    "expectedTools": [
+      "abort-actor-run"
+    ]
+  },
+  {
+    "id": "apify--rag-web-browser/ai-articles-tech-blogs",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get recent AI articles on tech blogs",
+    "expectedTools": [
+      "apify--rag-web-browser",
+      "search-actors"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "apify--rag-web-browser/ai-articles-wired-verge",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get current articles about AI from Wired and The Verge",
+    "expectedTools": [
+      "apify--rag-web-browser",
+      "search-actors"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "apify--rag-web-browser/ai-blog-articles",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get recent articles about AI from tech blogs",
+    "expectedTools": [
+      "apify--rag-web-browser"
+    ]
+  },
+  {
+    "id": "apify--rag-web-browser/ai-news-current",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Fetch current news articles on AI",
+    "expectedTools": [
+      "apify--rag-web-browser",
+      "search-actors"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "apify--rag-web-browser/climate-change-articles",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Fetch recent articles about climate change",
+    "expectedTools": [
+      "apify--rag-web-browser"
+    ]
+  },
+  {
+    "id": "apify--rag-web-browser/flight-prices-nyc-london",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get flight prices from New York to London for tomorrow",
+    "expectedTools": [
+      "apify--rag-web-browser",
+      "search-actors"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "apify--rag-web-browser/iphone-launch-reactions",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find out what people are saying online about the new iPhone launch",
+    "expectedTools": [
+      "apify--rag-web-browser"
+    ]
+  },
+  {
+    "id": "apify--rag-web-browser/news-cnn-bbc",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Fetch AI-related news from CNN and BBC",
+    "expectedTools": [
+      "apify--rag-web-browser",
+      "search-actors"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "apify--rag-web-browser/ny-weather-forecast",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get the latest weather forecast for New York",
+    "expectedTools": [
+      "apify--rag-web-browser",
+      "search-actors"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "apify--rag-web-browser/sf-weather-forecast",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get the latest weather forecast for San Francisco",
+    "expectedTools": [
+      "apify--rag-web-browser"
+    ]
+  },
+  {
+    "id": "apify--rag-web-browser/sf-weather-today",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What's the weather like today in San Francisco?",
+    "expectedTools": [
+      "apify--rag-web-browser"
+    ]
+  },
+  {
+    "id": "apify--rag-web-browser/tech-industry-news",
+    "category": "apify--rag-web-browser",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get the latest tech industry news",
+    "expectedTools": [
+      "apify--rag-web-browser"
+    ]
+  },
+  {
+    "id": "call-actor/ecommerce-scraper-iphone",
+    "category": "call-actor",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Scrape iPhone15 at Amazon using apify/e-commerce-scraping-tool",
+    "expectedTools": [
+      "call-actor"
+    ],
+    "expectedArgs": {
+      "actor": "apify/e-commerce-scraping-tool"
+    }
+  },
+  {
+    "id": "call-actor/google-search-restaurants",
+    "category": "call-actor",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Call apify/google-search-scraper to find restaurants in London",
+    "expectedTools": [
+      "call-actor"
+    ],
+    "expectedArgs": {
+      "actor": "apify/google-search-scraper"
+    }
+  },
+  {
+    "id": "call-actor/hashtag-research-ai",
+    "category": "call-actor",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Run apify/social-media-hashtag-research for #AI",
+    "expectedTools": [
+      "call-actor"
+    ],
+    "expectedArgs": {
+      "actor": "apify/social-media-hashtag-research"
+    }
+  },
+  {
+    "id": "call-actor/instagram-scraper-hashtag",
+    "category": "call-actor",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Run apify/instagram-scraper to scrape #dwaynejohnson",
+    "expectedTools": [
+      "call-actor"
+    ],
+    "expectedArgs": {
+      "actor": "apify/instagram-scraper"
+    }
+  },
+  {
     "id": "call-actor/rag-web-browser",
     "category": "call-actor",
     "kind": "selection",
@@ -11,6 +239,103 @@
       "apify--rag-web-browser",
       "call-actor"
     ]
+  },
+  {
+    "id": "call-actor/tweet-scraper-profiles",
+    "category": "call-actor",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Run apidojo/tweet-scraper to scrape twitter profiles",
+    "expectedTools": [
+      "call-actor"
+    ],
+    "expectedArgs": {
+      "actor": "apidojo/tweet-scraper"
+    }
+  },
+  {
+    "id": "call-actor/weather-scraper-nyc",
+    "category": "call-actor",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Call epctex/weather-scraper for New York",
+    "expectedTools": [
+      "call-actor"
+    ],
+    "expectedArgs": {
+      "actor": "epctex/weather-scraper"
+    }
+  },
+  {
+    "id": "create-actor-task/google-search-pizza",
+    "category": "create-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Create a task for apify/google-search-scraper that searches for pizza",
+    "expectedTools": [
+      "create-actor-task"
+    ],
+    "expectedArgs": {
+      "actorId": "apify/google-search-scraper"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "create-actor-task/instagram-insta-daily",
+    "category": "create-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Save my apify/instagram-scraper settings as a task called insta-daily",
+    "expectedTools": [
+      "create-actor-task"
+    ],
+    "expectedArgs": {
+      "name": "insta-daily",
+      "actorId": "apify/instagram-scraper"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "fetch-actor-details/google-search-scraper",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Scrape details of apify/google-search-scraper",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/google-search-scraper"
+    }
+  },
+  {
+    "id": "fetch-actor-details/hashtag-research-features",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Tell me about apify/social-media-hashtag-research features",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/social-media-hashtag-research"
+    }
   },
   {
     "id": "fetch-actor-details/input-schema",
@@ -28,6 +353,210 @@
     }
   },
   {
+    "id": "fetch-actor-details/instagram-scraper-capabilities",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What can apify/instagram-scraper do?",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/instagram-scraper"
+    }
+  },
+  {
+    "id": "fetch-actor-details/instagram-scraper-overview",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What are the details of apify/instagram-scraper?",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/instagram-scraper"
+    }
+  },
+  {
+    "id": "fetch-actor-details/instagram-scraper-parameters",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What parameters does apify/instagram-scraper accept?",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/instagram-scraper"
+    }
+  },
+  {
+    "id": "fetch-actor-details/instagram-scraper-pricing",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "How much does apify/instagram-scraper cost?",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/instagram-scraper"
+    }
+  },
+  {
+    "id": "fetch-actor-details/nonexistent-actor",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What does apify/totally-made-up-actor-xyz do?",
+    "expectedTools": [
+      "fetch-actor-details"
+    ]
+  },
+  {
+    "id": "fetch-actor-details/rag-web-browser-docs",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Give me the documentation for apify/rag-web-browser",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/rag-web-browser"
+    }
+  },
+  {
+    "id": "fetch-actor-details/rag-web-browser-how-it-works",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "How does apify/rag-web-browser work?",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/rag-web-browser"
+    }
+  },
+  {
+    "id": "fetch-actor-details/rag-web-browser-pricing",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What's the pricing model for apify/rag-web-browser?",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/rag-web-browser"
+    }
+  },
+  {
+    "id": "fetch-actor-details/typo-actor-name",
+    "category": "fetch-actor-details",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What can apify/instagarm-scraper do?",
+    "expectedTools": [
+      "fetch-actor-details"
+    ]
+  },
+  {
+    "id": "fetch-apify-docs/mcp-integration-page",
+    "category": "fetch-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get configuration info from: https://docs.apify.com/platform/integrations/mcp",
+    "expectedTools": [
+      "fetch-apify-docs"
+    ],
+    "expectedArgs": {
+      "url": "https://docs.apify.com/platform/integrations/mcp"
+    }
+  },
+  {
+    "id": "fetch-apify-docs/nonexistent-page",
+    "category": "fetch-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get content from: https://docs.apify.com/nonexistent-page",
+    "expectedTools": [
+      "fetch-apify-docs"
+    ],
+    "expectedArgs": {
+      "url": "https://docs.apify.com/nonexistent-page"
+    }
+  },
+  {
+    "id": "get-actor-log/debug-failed-run",
+    "category": "get-actor-log",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me the last 20 log lines for Actor run y2h7sK3Wc — I need to see why it failed.",
+    "expectedTools": [
+      "get-actor-log"
+    ],
+    "tools": [
+      "runs"
+    ]
+  },
+  {
+    "id": "get-actor-log/missing-line-count",
+    "category": "get-actor-log",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me the log for Actor run y2h7sK3Wc.",
+    "expectedTools": [
+      "get-actor-log"
+    ],
+    "tools": [
+      "runs"
+    ]
+  },
+  {
+    "id": "get-actor-run-list/recent-runs",
+    "category": "get-actor-run-list",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "List my last 10 Actor runs, most recent first.",
+    "expectedTools": [
+      "get-actor-run-list"
+    ],
+    "tools": [
+      "runs"
+    ]
+  },
+  {
     "id": "get-actor-run/status",
     "category": "get-actor-run",
     "kind": "selection",
@@ -37,6 +566,451 @@
     "query": "What is the status of my Actor run with ID abc123XYZ456?",
     "expectedTools": [
       "get-actor-run"
+    ]
+  },
+  {
+    "id": "get-actor-task/insta-daily-config",
+    "category": "get-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What is the configuration of my task insta-daily?",
+    "expectedTools": [
+      "get-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "get-actor-task/insta-daily-published",
+    "category": "get-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Is my task insta-daily published?",
+    "expectedTools": [
+      "get-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "get-dataset-items/all-web-scraper-results",
+    "category": "get-dataset-items",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Retrieve all results from my web scraper with datasetID abc123",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "abc123"
+    }
+  },
+  {
+    "id": "get-dataset-items/first-50-items",
+    "category": "get-dataset-items",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get the first 50 items from my datasetId abc123",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "abc123"
+    }
+  },
+  {
+    "id": "get-dataset-items/instagram-run-data",
+    "category": "get-dataset-items",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me the data from my Instagram scraper run with datasetId d23d2",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "d23d2"
+    }
+  },
+  {
+    "id": "get-dataset-items/latest-run-output",
+    "category": "get-dataset-items",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get output from my latest actor with datasetId des32s",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "des32s"
+    }
+  },
+  {
+    "id": "get-dataset-items/query-markdown-fields",
+    "category": "get-dataset-items",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get query and markdown fields from dataset UvsU",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "UvsU"
+    }
+  },
+  {
+    "id": "get-dataset-items/retrieve-results",
+    "category": "get-dataset-items",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Retrieve results from dataset abc123",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "abc123"
+    }
+  },
+  {
+    "id": "get-dataset-items/select-title-url-fields",
+    "category": "get-dataset-items",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Retrieve only the title and url fields from dataset UvsU",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "UvsU"
+    }
+  },
+  {
+    "id": "get-dataset-list/account-datasets",
+    "category": "get-dataset-list",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What datasets do I have in my account?",
+    "expectedTools": [
+      "get-dataset-list"
+    ],
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-dataset-list/last-10-newest-first",
+    "category": "get-dataset-list",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me my last 10 datasets, newest first",
+    "expectedTools": [
+      "get-dataset-list"
+    ],
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-dataset-list/list-all",
+    "category": "get-dataset-list",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "List all my datasets",
+    "expectedTools": [
+      "get-dataset-list"
+    ],
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-dataset-schema/basic-schema",
+    "category": "get-dataset-schema",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What is the schema of dataset abc123?",
+    "expectedTools": [
+      "get-dataset-schema"
+    ],
+    "expectedArgs": {
+      "datasetId": "abc123"
+    },
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-dataset-schema/generate-from-10-items",
+    "category": "get-dataset-schema",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Generate a JSON schema for dataset des32s using 10 items",
+    "expectedTools": [
+      "get-dataset-schema"
+    ],
+    "expectedArgs": {
+      "limit": 10,
+      "datasetId": "des32s"
+    },
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-dataset-schema/infer-structure",
+    "category": "get-dataset-schema",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Infer the structure of the items in dataset UvsU",
+    "expectedTools": [
+      "get-dataset-schema"
+    ],
+    "expectedArgs": {
+      "datasetId": "UvsU"
+    },
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-dataset/fields-list",
+    "category": "get-dataset",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What fields does dataset UvsU contain?",
+    "expectedTools": [
+      "get-dataset"
+    ],
+    "expectedArgs": {
+      "datasetId": "UvsU"
+    },
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-dataset/item-count",
+    "category": "get-dataset",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "How many items are in dataset abc123?",
+    "expectedTools": [
+      "get-dataset"
+    ],
+    "expectedArgs": {
+      "datasetId": "abc123"
+    },
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-dataset/metadata-stats",
+    "category": "get-dataset",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me the metadata and stats for dataset des32s",
+    "expectedTools": [
+      "get-dataset"
+    ],
+    "expectedArgs": {
+      "datasetId": "des32s"
+    },
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-key-value-store-keys/list-keys",
+    "category": "get-key-value-store-keys",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "List the keys in key-value store abc123",
+    "expectedTools": [
+      "get-key-value-store-keys"
+    ],
+    "expectedArgs": {
+      "keyValueStoreId": "abc123"
+    },
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-key-value-store-keys/which-keys-stored",
+    "category": "get-key-value-store-keys",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What keys are stored in my key-value store des32s?",
+    "expectedTools": [
+      "get-key-value-store-keys"
+    ],
+    "expectedArgs": {
+      "keyValueStoreId": "des32s"
+    },
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-key-value-store-list/account-stores",
+    "category": "get-key-value-store-list",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What key-value stores do I have in my account?",
+    "expectedTools": [
+      "get-key-value-store-list"
+    ],
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-key-value-store-list/list-all",
+    "category": "get-key-value-store-list",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "List all my key-value stores",
+    "expectedTools": [
+      "get-key-value-store-list"
+    ],
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-key-value-store-record/data-json-record",
+    "category": "get-key-value-store-record",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Fetch the contents of key data.json from store UvsU",
+    "expectedTools": [
+      "get-key-value-store-record"
+    ],
+    "expectedArgs": {
+      "recordKey": "data.json",
+      "keyValueStoreId": "UvsU"
+    }
+  },
+  {
+    "id": "get-key-value-store-record/input-record",
+    "category": "get-key-value-store-record",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get record INPUT from key-value store abc123",
+    "expectedTools": [
+      "get-key-value-store-record"
+    ],
+    "expectedArgs": {
+      "recordKey": "INPUT",
+      "keyValueStoreId": "abc123"
+    }
+  },
+  {
+    "id": "get-key-value-store-record/output-record",
+    "category": "get-key-value-store-record",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Read the value under key OUTPUT in key-value store des32s",
+    "expectedTools": [
+      "get-key-value-store-record"
+    ],
+    "expectedArgs": {
+      "recordKey": "OUTPUT",
+      "keyValueStoreId": "des32s"
+    }
+  },
+  {
+    "id": "get-key-value-store/details",
+    "category": "get-key-value-store",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Get details about key-value store des32s",
+    "expectedTools": [
+      "get-key-value-store"
+    ],
+    "expectedArgs": {
+      "keyValueStoreId": "des32s"
+    },
+    "tools": [
+      "storage"
+    ]
+  },
+  {
+    "id": "get-key-value-store/metadata",
+    "category": "get-key-value-store",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me the metadata for key-value store abc123",
+    "expectedTools": [
+      "get-key-value-store"
+    ],
+    "expectedArgs": {
+      "keyValueStoreId": "abc123"
+    },
+    "tools": [
+      "storage"
     ]
   },
   {
@@ -426,6 +1400,339 @@
     "reference": "The agent must: 1) use search-actors to find TikTok scraper, 2) use fetch-actor-details with output={ inputSchema: true } to get required input, 3) use call-actor with proper input. This tests the complete new workflow pattern."
   },
   {
+    "id": "publish-actor-task/insta-daily",
+    "category": "publish-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Publish my task insta-daily",
+    "expectedTools": [
+      "publish-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "publish-actor-task/insta-daily-make-public",
+    "category": "publish-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Make my task insta-daily public",
+    "expectedTools": [
+      "publish-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "publish-actor-task/query-input-overview-view",
+    "category": "publish-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Set up my task insta-daily's public page with the query input field and the overview dataset view before I publish it.",
+    "expectedTools": [
+      "update-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "publish-actor-task/write-access-granted",
+    "category": "publish-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "I now have write access to my task insta-daily and its Actor now — publish it.",
+    "expectedTools": [
+      "publish-actor-task"
+    ],
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "report-problem/known-bug-tiktok-scraper",
+    "category": "report-problem",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "The TikTok scraper Actor keeps returning empty results no matter what I search for. Don't retry it — just flag this as a bug for the Apify team.",
+    "expectedTools": [
+      "report-problem"
+    ]
+  },
+  {
+    "id": "search-actors/amazon-product-details",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "I need to find solution to scrape details of Amazon products",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/amazon-product-scrapers",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me Amazon product scrapers",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/data-extraction-tasks",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find actors for data extraction tasks",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/ecommerce-data-extraction",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What tools can extract data from e-commerce sites?",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/facebook-data",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find an Actor to get Facebook data",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/flight-data-booking-sites",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find an Actor that scrapes flight data from booking sites",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/flight-data-extraction",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find actors for flight data extraction",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/instagram-ai-posts",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find posts about AI on Instagram",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/instagram-posts",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What Actors can scrape Instagram posts?",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/instagram-posts-ai",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Scrape Instagram posts about AI",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/instagram-posts-generic",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find an Actor to get instagram posts",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/instagram-posts-the-rock",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find posts about the Rock on Instagram",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/instagram-profile-scraping",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "I need to find Actor for instagram profile scraping",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/instagram-scrapers-best",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What are the best Instagram scrapers?",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/news-articles",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find actors that can scrape news articles",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/playwright-mcp-server",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Search for Playwright browser MCP server",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/skyscanner-flights",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find an Actor to get flight information from Skyscanner",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/social-media-scraping",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find actors for scraping social media",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/stackoverflow-quicksort",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Use Apify to scrape StackOverflow for the top 10 most upvoted quicksort implementations in Python",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/tiktok-comments-lazy-budget",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "I'm new to Apify, I can't really code, I need data from my project, I need tiktok comments. I'm also price sensitive",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/tiktok-content",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "What actors can scrape TikTok content?",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
     "id": "search-actors/tiktok-scraper",
     "category": "search-actors",
     "kind": "selection",
@@ -435,6 +1742,186 @@
     "query": "What is the best TikTok scraper on Apify?",
     "expectedTools": [
       "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/twitter-ai-posts",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Find an Actor to fetch posts from Twitter about AI",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/twitter-scraping-tools",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me Twitter scraping tools",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/vague-scraping-need",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "I need some kind of tool to pull data off the web, I'm not sure exactly what.",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/weather-data-scraping",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Can you find actors to scrape weather data?",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-actors/weather-scraping-tools",
+    "category": "search-actors",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Search for weather data scraping tools",
+    "expectedTools": [
+      "search-actors"
+    ]
+  },
+  {
+    "id": "search-apify-docs/actor-docs-overview",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Show me Apify Actor documentation",
+    "expectedTools": [
+      "search-apify-docs"
+    ]
+  },
+  {
+    "id": "search-apify-docs/api-integration-guide",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Apify API integration guide",
+    "expectedTools": [
+      "search-apify-docs"
+    ]
+  },
+  {
+    "id": "search-apify-docs/apify-proxy-usage",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "How to use Apify Proxy",
+    "expectedTools": [
+      "search-apify-docs"
+    ]
+  },
+  {
+    "id": "search-apify-docs/build-actor-from-scratch",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "How do I build my own Apify Actor from scratch?",
+    "expectedTools": [
+      "search-apify-docs"
+    ]
+  },
+  {
+    "id": "search-apify-docs/build-actor-guide",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "How to build an Apify Actor",
+    "expectedTools": [
+      "search-apify-docs"
+    ]
+  },
+  {
+    "id": "search-apify-docs/crawlee-web-scraping",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "How to do web scraping with Crawlee in the Apify docs",
+    "expectedTools": [
+      "search-apify-docs"
+    ]
+  },
+  {
+    "id": "search-apify-docs/error-handling-actors",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Error handling in Actors",
+    "expectedTools": [
+      "search-apify-docs"
+    ]
+  },
+  {
+    "id": "search-apify-docs/input-schema-examples",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Ho to define Actor input schema, provide examples",
+    "expectedTools": [
+      "search-apify-docs"
+    ]
+  },
+  {
+    "id": "search-apify-docs/mcp-server-docs",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Is there documentation for the Apify MCP server?",
+    "expectedTools": [
+      "search-apify-docs"
+    ]
+  },
+  {
+    "id": "search-apify-docs/playwright-with-apify",
+    "category": "search-apify-docs",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "How to use Playwright library with Apify",
+    "expectedTools": [
+      "search-apify-docs"
     ]
   },
   {
@@ -592,6 +2079,115 @@
     "tools": [
       "tasks",
       "actors"
+    ]
+  },
+  {
+    "id": "unpublish-actor-task/insta-daily",
+    "category": "unpublish-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Unpublish my task insta-daily",
+    "expectedTools": [
+      "unpublish-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "unpublish-actor-task/insta-daily-keep-display-settings",
+    "category": "unpublish-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Take my task insta-daily off its public page but keep its display settings",
+    "expectedTools": [
+      "unpublish-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "update-actor-task/insta-daily-beta-build",
+    "category": "update-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Change my task insta-daily to use the beta build",
+    "expectedTools": [
+      "update-actor-task"
+    ],
+    "expectedArgs": {
+      "build": "beta",
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "update-actor-task/insta-daily-change-input",
+    "category": "update-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "I already have a task called insta-daily, change its input to search for cats instead",
+    "expectedTools": [
+      "update-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "update-actor-task/insta-daily-landing-title",
+    "category": "update-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Set the landing page title of my task insta-daily to 'Daily Instagram scraper'",
+    "expectedTools": [
+      "update-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
+    ]
+  },
+  {
+    "id": "update-actor-task/publish-view-setup",
+    "category": "update-actor-task",
+    "kind": "selection",
+    "tier": [
+      "pr"
+    ],
+    "query": "Set up my task insta-daily for publishing, using the overview dataset view",
+    "expectedTools": [
+      "update-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "insta-daily"
+    },
+    "tools": [
+      "tasks"
     ]
   },
   {
