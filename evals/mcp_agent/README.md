@@ -273,7 +273,7 @@ model's floor off 3 separate runs.
   flags it" rule these are Haiku-only weaknesses, not case defects; see Follow-up findings below.
 
 - `PR_TIER_PASS_THRESHOLD` (`config.ts`) = **0.93** — the floor of the 3 runs' honest rates
-  (0.94, 0.94, 0.93), rounded down to 2 decimals, **marked PROVISIONAL in `config.ts`'s
+  (0.9434, 0.9381, 0.9429), rounded down to 2 decimals, **marked PROVISIONAL in `config.ts`'s
   comment**. Not the floor of the raw rates (0.87, 0.92, 0.86): those fold in the sandbox TLS
   fault's drops, which is not case quality. Not wired as `run_mcp_agent_evals.ts`'s
   `--pass-threshold` CLI default (that default applies to every tier and every run);
