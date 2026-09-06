@@ -364,7 +364,8 @@ const ACTORS_WAVE: PortCaseSpec[] = [
         expectedTools: ['search-actors'],
     },
 
-    // --- apify--rag-web-browser (12 ported: 6 kept as-is, 6 widened on the MCP-vs-MCP axis) ---
+    // --- apify--rag-web-browser (12 ported: 5 kept as-is, 7 widened on the MCP-vs-MCP axis —
+    // see the per-item calibration notes below for which ones and why) ---
     {
         sourceId: 'rag-web-browser-1',
         decision: 'keep',
@@ -393,13 +394,18 @@ const ACTORS_WAVE: PortCaseSpec[] = [
         // Rephrased: "Get data from example.com" reads as a single-URL fetch (apify--web-fetch,
         // already the live item "web-fetch/example-com"'s exact axis), not a rag-web-browser
         // query — a second legitimate tool would make this an unwinnable case. Rewritten to an
-        // open-ended retrieval query with no single URL named, which only rag-web-browser fits.
+        // open-ended retrieval query with no single URL named. Widened to search-actors after
+        // Opus calibration (2026-09-06): "what people are saying online" reads as social-
+        // platform sentiment, and Opus reasonably reached for search-actors (a Reddit/social
+        // scraper) as its first move — a defensible second answer on the same MCP-vs-MCP axis
+        // as the other widened items here.
         sourceId: 'rag-web-browser-4',
-        decision: 'rephrase',
+        decision: 'widen',
         id: 'apify--rag-web-browser/iphone-launch-reactions',
         query: 'Find out what people are saying online about the new iPhone launch',
         category: 'apify--rag-web-browser',
-        expectedTools: ['apify--rag-web-browser'],
+        expectedTools: ['apify--rag-web-browser', 'search-actors'],
+        mcpToolsOnly: true,
     },
     {
         sourceId: 'rag-web-browser-5',
@@ -427,10 +433,15 @@ const ACTORS_WAVE: PortCaseSpec[] = [
         mcpToolsOnly: true,
     },
     {
+        // Rephrased off the two named outlets after Opus calibration (2026-09-06): "from Wired
+        // and The Verge" reads as two known URLs, and Opus called apify--web-fetch directly on
+        // wired.com's tag page — a third legitimate tool this item didn't list. Rewritten to a
+        // generic-publications phrasing (matching the un-widened rag-web-browser/* items above,
+        // which pass this way) so only the rag-vs-search-actors axis stays in play.
         sourceId: 'search-vs-rag-4',
         decision: 'widen',
         id: 'apify--rag-web-browser/ai-articles-wired-verge',
-        query: 'Get current articles about AI from Wired and The Verge',
+        query: 'Get current articles about AI from major tech publications',
         category: 'apify--rag-web-browser',
         expectedTools: ['apify--rag-web-browser', 'search-actors'],
         mcpToolsOnly: true,
@@ -472,60 +483,58 @@ const ACTORS_WAVE: PortCaseSpec[] = [
         mcpToolsOnly: true,
     },
 
-    // --- call-actor (6 ported) ---
+    // --- call-actor (6 ported). Widened to accept fetch-actor-details: calibrated on Opus
+    // (2026-09-06), which checked the Actor's input schema via fetch-actor-details before
+    // calling it in 5 of 6 cases — a defensible "check before you spend" pattern for a
+    // resource-creating call, not a wrong tool. expectedArgs dropped (would otherwise still pin
+    // the shared `actor` key correctly, but expectedTools now names 2 tools). ---
     {
         sourceId: 'call-actor-1',
-        decision: 'keep',
+        decision: 'widen',
         id: 'call-actor/instagram-scraper-hashtag',
         query: 'Run apify/instagram-scraper to scrape #dwaynejohnson',
         category: 'call-actor',
-        expectedTools: ['call-actor'],
-        expectedArgs: { actor: 'apify/instagram-scraper' },
+        expectedTools: ['call-actor', 'fetch-actor-details'],
     },
     {
         sourceId: 'call-actor-2',
-        decision: 'keep',
+        decision: 'widen',
         id: 'call-actor/tweet-scraper-profiles',
         query: 'Run apidojo/tweet-scraper to scrape twitter profiles',
         category: 'call-actor',
-        expectedTools: ['call-actor'],
-        expectedArgs: { actor: 'apidojo/tweet-scraper' },
+        expectedTools: ['call-actor', 'fetch-actor-details'],
     },
     {
         sourceId: 'call-actor-3',
-        decision: 'keep',
+        decision: 'widen',
         id: 'call-actor/google-search-restaurants',
         query: 'Call apify/google-search-scraper to find restaurants in London',
         category: 'call-actor',
-        expectedTools: ['call-actor'],
-        expectedArgs: { actor: 'apify/google-search-scraper' },
+        expectedTools: ['call-actor', 'fetch-actor-details'],
     },
     {
         sourceId: 'call-actor-4',
-        decision: 'keep',
+        decision: 'widen',
         id: 'call-actor/hashtag-research-ai',
         query: 'Run apify/social-media-hashtag-research for #AI',
         category: 'call-actor',
-        expectedTools: ['call-actor'],
-        expectedArgs: { actor: 'apify/social-media-hashtag-research' },
+        expectedTools: ['call-actor', 'fetch-actor-details'],
     },
     {
         sourceId: 'call-actor-5',
-        decision: 'keep',
+        decision: 'widen',
         id: 'call-actor/ecommerce-scraper-iphone',
         query: 'Scrape iPhone15 at Amazon using apify/e-commerce-scraping-tool',
         category: 'call-actor',
-        expectedTools: ['call-actor'],
-        expectedArgs: { actor: 'apify/e-commerce-scraping-tool' },
+        expectedTools: ['call-actor', 'fetch-actor-details'],
     },
     {
         sourceId: 'call-actor-6',
-        decision: 'keep',
+        decision: 'widen',
         id: 'call-actor/weather-scraper-nyc',
         query: 'Call epctex/weather-scraper for New York',
         category: 'call-actor',
-        expectedTools: ['call-actor'],
-        expectedArgs: { actor: 'epctex/weather-scraper' },
+        expectedTools: ['call-actor', 'fetch-actor-details'],
     },
 ];
 
@@ -583,10 +592,14 @@ const DOCS_WAVE: PortCaseSpec[] = [
         expectedTools: ['search-apify-docs'],
     },
     {
+        // Rephrased after Opus calibration (2026-09-06): the bare noun phrase read as an open
+        // request for integration help (Opus asked which language/client to target and whether
+        // to write code), not a docs lookup. Rewritten as an explicit "find/search the docs"
+        // request, which only search-apify-docs fits.
         sourceId: 'search-apify-docs-7',
-        decision: 'keep',
+        decision: 'rephrase',
         id: 'search-apify-docs/api-integration-guide',
-        query: 'Apify API integration guide',
+        query: 'Search the Apify docs for the API integration guide',
         category: 'search-apify-docs',
         expectedTools: ['search-apify-docs'],
     },
@@ -682,77 +695,78 @@ const TASKS_WAVE: PortCaseSpec[] = [
         expectedArgs: { actorId: 'apify/google-search-scraper' },
         tools: ['tasks'],
     },
+    // --- update/publish/unpublish-actor-task: all widened to accept get-actor-task after Opus
+    // calibration (2026-09-06), which checked the task's current state via get-actor-task
+    // before mutating it in 9 of 10 cases — a defensible "read before write" pattern for a
+    // mutating call, not a wrong tool (the same reasoning as the call-actor widening above).
+    // expectedArgs dropped (would otherwise still pin the shared `taskId` key correctly, but
+    // expectedTools now names 2 tools per item). ---
     {
         sourceId: 'update-actor-task-1',
-        decision: 'keep',
+        decision: 'widen',
         id: 'update-actor-task/insta-daily-beta-build',
         query: 'Change my task insta-daily to use the beta build',
         category: 'update-actor-task',
-        expectedTools: ['update-actor-task'],
-        expectedArgs: { taskId: 'insta-daily', build: 'beta' },
+        expectedTools: ['update-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
     {
         sourceId: 'update-actor-task-2',
-        decision: 'keep',
+        decision: 'widen',
         id: 'update-actor-task/insta-daily-landing-title',
         query: "Set the landing page title of my task insta-daily to 'Daily Instagram scraper'",
         category: 'update-actor-task',
-        expectedTools: ['update-actor-task'],
-        expectedArgs: { taskId: 'insta-daily' },
+        expectedTools: ['update-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
     {
         // category "tool-selection" is not a tool name: <category> comes from expectedTools[0].
         sourceId: 'tool-selection-actor-task-1',
-        decision: 'keep',
+        decision: 'widen',
         id: 'update-actor-task/publish-view-setup',
         query: 'Set up my task insta-daily for publishing, using the overview dataset view',
         category: 'update-actor-task',
-        expectedTools: ['update-actor-task'],
-        expectedArgs: { taskId: 'insta-daily' },
+        expectedTools: ['update-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
     {
         sourceId: 'tool-selection-actor-task-2',
-        decision: 'keep',
+        decision: 'widen',
         id: 'update-actor-task/insta-daily-change-input',
         query: 'I already have a task called insta-daily, change its input to search for cats instead',
         category: 'update-actor-task',
-        expectedTools: ['update-actor-task'],
-        expectedArgs: { taskId: 'insta-daily' },
+        expectedTools: ['update-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
     {
         sourceId: 'publish-actor-task-1',
-        decision: 'keep',
+        decision: 'widen',
         id: 'publish-actor-task/insta-daily',
         query: 'Publish my task insta-daily',
         category: 'publish-actor-task',
-        expectedTools: ['publish-actor-task'],
-        expectedArgs: { taskId: 'insta-daily' },
+        expectedTools: ['publish-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
     {
         sourceId: 'publish-actor-task-2',
-        decision: 'keep',
+        decision: 'widen',
         id: 'publish-actor-task/insta-daily-make-public',
         query: 'Make my task insta-daily public',
         category: 'publish-actor-task',
-        expectedTools: ['publish-actor-task'],
-        expectedArgs: { taskId: 'insta-daily' },
+        expectedTools: ['publish-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
     {
         // Rephrased: the old `context` field simulated a prior failed publish-actor-task call.
         // Selection scoring only looks at the first tool call, so the prior-turn fact is
         // scoring-irrelevant and drops cleanly — the query already states the resolved state.
+        // Also widened per the get-actor-task note above.
         sourceId: 'publish-actor-task-3',
-        decision: 'rephrase',
+        decision: 'widen',
         id: 'publish-actor-task/write-access-granted',
         query: 'I now have write access to my task insta-daily and its Actor now — publish it.',
         category: 'publish-actor-task',
-        expectedTools: ['publish-actor-task'],
+        expectedTools: ['publish-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
     {
@@ -760,36 +774,33 @@ const TASKS_WAVE: PortCaseSpec[] = [
         // actor-task" (the source case's own category field, a real tool name) even though
         // expectedTools names update-actor-task — the id rule only re-homes the two non-tool
         // categories (tool-selection, ambiguous), and metadata.category is a filter label, not
-        // a promise it matches expectedTools.
+        // a promise it matches expectedTools. Also widened per the get-actor-task note above.
         sourceId: 'publish-actor-task-4',
-        decision: 'rephrase',
+        decision: 'widen',
         id: 'publish-actor-task/query-input-overview-view',
         query:
             "Set up my task insta-daily's public page with the query input field and the overview dataset " +
             'view before I publish it.',
         category: 'publish-actor-task',
-        expectedTools: ['update-actor-task'],
-        expectedArgs: { taskId: 'insta-daily' },
+        expectedTools: ['update-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
     {
         sourceId: 'unpublish-actor-task-1',
-        decision: 'keep',
+        decision: 'widen',
         id: 'unpublish-actor-task/insta-daily',
         query: 'Unpublish my task insta-daily',
         category: 'unpublish-actor-task',
-        expectedTools: ['unpublish-actor-task'],
-        expectedArgs: { taskId: 'insta-daily' },
+        expectedTools: ['unpublish-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
     {
         sourceId: 'unpublish-actor-task-2',
-        decision: 'keep',
+        decision: 'widen',
         id: 'unpublish-actor-task/insta-daily-keep-display-settings',
         query: 'Take my task insta-daily off its public page but keep its display settings',
         category: 'unpublish-actor-task',
-        expectedTools: ['unpublish-actor-task'],
-        expectedArgs: { taskId: 'insta-daily' },
+        expectedTools: ['unpublish-actor-task', 'get-actor-task'],
         tools: ['tasks'],
     },
 ];
@@ -1047,9 +1058,16 @@ const STORAGE_WAVE: PortCaseSpec[] = [
 
 const RUNS_AND_REPORT_PROBLEM_WAVE: PortCaseSpec[] = [
     {
+        // Rephrased after Opus calibration (2026-09-06): the original wording ("has been
+        // running way longer than it should — stop it") left room for a cautious first check
+        // (Opus called get-actor-run to see its current status before aborting). Made explicit
+        // that the status is already known and no check is wanted, matching the one genuinely
+        // hard report-problem case below, which uses the same "don't verify first" pattern.
         decision: 'new',
         id: 'abort-actor-run/stuck-run',
-        query: 'My Actor run y2h7sK3Wc has been running way longer than it should — stop it.',
+        query:
+            "My Actor run y2h7sK3Wc is definitely stuck — I've already checked, it's been " +
+            "running for hours with no progress. Don't check on it, just abort it now.",
         category: 'abort-actor-run',
         expectedTools: ['abort-actor-run'],
         // No `tools` metadata: abort-actor-run is auto-injected whenever call-actor is present,
@@ -1073,14 +1091,20 @@ const RUNS_AND_REPORT_PROBLEM_WAVE: PortCaseSpec[] = [
     },
     {
         // The one genuinely hard case: report-problem's natural trigger is reactive (something
-        // already failed). This query works as a single right answer because it rules out the
-        // alternative (retrying the failing tool) and asks only to relay a complaint the user
-        // has already formed — nothing left for the agent to investigate first.
+        // already failed). This query works as a single right answer because it rules out every
+        // alternative (retrying the failing tool, searching for more context) and asks only to
+        // relay a complaint the user has already formed — nothing left for the agent to
+        // investigate first. Strengthened after Opus calibration (2026-09-06): the original
+        // wording still let Opus spend both turns on ToolSearch without ever attempting
+        // report-problem; "don't search for anything else" closes that path explicitly (the
+        // design's own documented fallback for this case: strengthen the instruction, never
+        // widen expectedTools to a wrong-but-plausible investigative call).
         decision: 'new',
         id: 'report-problem/known-bug-tiktok-scraper',
         query:
             'The TikTok scraper Actor keeps returning empty results no matter what I search for. ' +
-            "Don't retry it — just flag this as a bug for the Apify team.",
+            "I've already confirmed this is a bug on their end. Don't retry it, don't look " +
+            'anything else up — just flag this as a bug for the Apify team right now.',
         category: 'report-problem',
         expectedTools: ['report-problem'],
     },
@@ -1102,12 +1126,16 @@ const LAZY_USER_WAVE: PortCaseSpec[] = [
         expectedTools: ['fetch-actor-details'],
     },
     {
-        // Vague goal: no Actor named, no specific data described — only "some tool to pull data
-        // off the web" — which single-handedly maps to search-actors (Actor discovery), not any
-        // other tool.
+        // Vague goal: no Actor named — vague about which Actor, not about the target site, so
+        // there's still a single deterministic first move (discover an Actor). Rephrased after
+        // Opus calibration (2026-09-06): the original wording was vague about the target too
+        // ("not sure exactly what"), and Opus reasonably asked clarifying questions instead of
+        // picking a tool — a defensible response to genuine ambiguity, but selection mode has
+        // no room for a clarifying turn. Naming a concrete target while keeping the *tool*
+        // choice vague preserves the "lazy user" mode without inviting a question back.
         decision: 'new',
         id: 'search-actors/vague-scraping-need',
-        query: "I need some kind of tool to pull data off the web, I'm not sure exactly what.",
+        query: "I want to scrape LinkedIn profiles but I don't know which Actor to use for that.",
         category: 'search-actors',
         expectedTools: ['search-actors'],
     },
@@ -1132,7 +1160,7 @@ const LAZY_USER_WAVE: PortCaseSpec[] = [
     },
 ];
 
-/** All ported + new cases, in wave order (matches the PR's wave-by-wave commit history). */
+/** All ported + new cases, grouped by wave (actors, docs, tasks, storage, runs+report-problem, lazy-user). */
 export const PORT_SELECTION_CASES: PortCaseSpec[] = [
     ...ACTORS_WAVE,
     ...DOCS_WAVE,

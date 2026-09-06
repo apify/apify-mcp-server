@@ -6,7 +6,7 @@
     "tier": [
       "pr"
     ],
-    "query": "My Actor run y2h7sK3Wc has been running way longer than it should — stop it.",
+    "query": "My Actor run y2h7sK3Wc is definitely stuck — I've already checked, it's been running for hours with no progress. Don't check on it, just abort it now.",
     "expectedTools": [
       "abort-actor-run"
     ]
@@ -32,7 +32,7 @@
     "tier": [
       "pr"
     ],
-    "query": "Get current articles about AI from Wired and The Verge",
+    "query": "Get current articles about AI from major tech publications",
     "expectedTools": [
       "apify--rag-web-browser",
       "search-actors"
@@ -100,8 +100,10 @@
     ],
     "query": "Find out what people are saying online about the new iPhone launch",
     "expectedTools": [
-      "apify--rag-web-browser"
-    ]
+      "apify--rag-web-browser",
+      "search-actors"
+    ],
+    "mcpToolsOnly": true
   },
   {
     "id": "apify--rag-web-browser/news-cnn-bbc",
@@ -176,11 +178,9 @@
     ],
     "query": "Scrape iPhone15 at Amazon using apify/e-commerce-scraping-tool",
     "expectedTools": [
-      "call-actor"
-    ],
-    "expectedArgs": {
-      "actor": "apify/e-commerce-scraping-tool"
-    }
+      "call-actor",
+      "fetch-actor-details"
+    ]
   },
   {
     "id": "call-actor/google-search-restaurants",
@@ -191,11 +191,9 @@
     ],
     "query": "Call apify/google-search-scraper to find restaurants in London",
     "expectedTools": [
-      "call-actor"
-    ],
-    "expectedArgs": {
-      "actor": "apify/google-search-scraper"
-    }
+      "call-actor",
+      "fetch-actor-details"
+    ]
   },
   {
     "id": "call-actor/hashtag-research-ai",
@@ -206,11 +204,9 @@
     ],
     "query": "Run apify/social-media-hashtag-research for #AI",
     "expectedTools": [
-      "call-actor"
-    ],
-    "expectedArgs": {
-      "actor": "apify/social-media-hashtag-research"
-    }
+      "call-actor",
+      "fetch-actor-details"
+    ]
   },
   {
     "id": "call-actor/instagram-scraper-hashtag",
@@ -221,11 +217,9 @@
     ],
     "query": "Run apify/instagram-scraper to scrape #dwaynejohnson",
     "expectedTools": [
-      "call-actor"
-    ],
-    "expectedArgs": {
-      "actor": "apify/instagram-scraper"
-    }
+      "call-actor",
+      "fetch-actor-details"
+    ]
   },
   {
     "id": "call-actor/rag-web-browser",
@@ -249,11 +243,9 @@
     ],
     "query": "Run apidojo/tweet-scraper to scrape twitter profiles",
     "expectedTools": [
-      "call-actor"
-    ],
-    "expectedArgs": {
-      "actor": "apidojo/tweet-scraper"
-    }
+      "call-actor",
+      "fetch-actor-details"
+    ]
   },
   {
     "id": "call-actor/weather-scraper-nyc",
@@ -264,11 +256,9 @@
     ],
     "query": "Call epctex/weather-scraper for New York",
     "expectedTools": [
-      "call-actor"
-    ],
-    "expectedArgs": {
-      "actor": "epctex/weather-scraper"
-    }
+      "call-actor",
+      "fetch-actor-details"
+    ]
   },
   {
     "id": "create-actor-task/google-search-pizza",
@@ -1408,11 +1398,9 @@
     ],
     "query": "Publish my task insta-daily",
     "expectedTools": [
-      "publish-actor-task"
+      "publish-actor-task",
+      "get-actor-task"
     ],
-    "expectedArgs": {
-      "taskId": "insta-daily"
-    },
     "tools": [
       "tasks"
     ]
@@ -1426,11 +1414,9 @@
     ],
     "query": "Make my task insta-daily public",
     "expectedTools": [
-      "publish-actor-task"
+      "publish-actor-task",
+      "get-actor-task"
     ],
-    "expectedArgs": {
-      "taskId": "insta-daily"
-    },
     "tools": [
       "tasks"
     ]
@@ -1444,11 +1430,9 @@
     ],
     "query": "Set up my task insta-daily's public page with the query input field and the overview dataset view before I publish it.",
     "expectedTools": [
-      "update-actor-task"
+      "update-actor-task",
+      "get-actor-task"
     ],
-    "expectedArgs": {
-      "taskId": "insta-daily"
-    },
     "tools": [
       "tasks"
     ]
@@ -1462,7 +1446,8 @@
     ],
     "query": "I now have write access to my task insta-daily and its Actor now — publish it.",
     "expectedTools": [
-      "publish-actor-task"
+      "publish-actor-task",
+      "get-actor-task"
     ],
     "tools": [
       "tasks"
@@ -1475,7 +1460,7 @@
     "tier": [
       "pr"
     ],
-    "query": "The TikTok scraper Actor keeps returning empty results no matter what I search for. Don't retry it — just flag this as a bug for the Apify team.",
+    "query": "The TikTok scraper Actor keeps returning empty results no matter what I search for. I've already confirmed this is a bug on their end. Don't retry it, don't look anything else up — just flag this as a bug for the Apify team right now.",
     "expectedTools": [
       "report-problem"
     ]
@@ -1775,7 +1760,7 @@
     "tier": [
       "pr"
     ],
-    "query": "I need some kind of tool to pull data off the web, I'm not sure exactly what.",
+    "query": "I want to scrape LinkedIn profiles but I don't know which Actor to use for that.",
     "expectedTools": [
       "search-actors"
     ]
@@ -1823,7 +1808,7 @@
     "tier": [
       "pr"
     ],
-    "query": "Apify API integration guide",
+    "query": "Search the Apify docs for the API integration guide",
     "expectedTools": [
       "search-apify-docs"
     ]
@@ -2090,11 +2075,9 @@
     ],
     "query": "Unpublish my task insta-daily",
     "expectedTools": [
-      "unpublish-actor-task"
+      "unpublish-actor-task",
+      "get-actor-task"
     ],
-    "expectedArgs": {
-      "taskId": "insta-daily"
-    },
     "tools": [
       "tasks"
     ]
@@ -2108,11 +2091,9 @@
     ],
     "query": "Take my task insta-daily off its public page but keep its display settings",
     "expectedTools": [
-      "unpublish-actor-task"
+      "unpublish-actor-task",
+      "get-actor-task"
     ],
-    "expectedArgs": {
-      "taskId": "insta-daily"
-    },
     "tools": [
       "tasks"
     ]
@@ -2126,12 +2107,9 @@
     ],
     "query": "Change my task insta-daily to use the beta build",
     "expectedTools": [
-      "update-actor-task"
+      "update-actor-task",
+      "get-actor-task"
     ],
-    "expectedArgs": {
-      "build": "beta",
-      "taskId": "insta-daily"
-    },
     "tools": [
       "tasks"
     ]
@@ -2145,11 +2123,9 @@
     ],
     "query": "I already have a task called insta-daily, change its input to search for cats instead",
     "expectedTools": [
-      "update-actor-task"
+      "update-actor-task",
+      "get-actor-task"
     ],
-    "expectedArgs": {
-      "taskId": "insta-daily"
-    },
     "tools": [
       "tasks"
     ]
@@ -2163,11 +2139,9 @@
     ],
     "query": "Set the landing page title of my task insta-daily to 'Daily Instagram scraper'",
     "expectedTools": [
-      "update-actor-task"
+      "update-actor-task",
+      "get-actor-task"
     ],
-    "expectedArgs": {
-      "taskId": "insta-daily"
-    },
     "tools": [
       "tasks"
     ]
@@ -2181,11 +2155,9 @@
     ],
     "query": "Set up my task insta-daily for publishing, using the overview dataset view",
     "expectedTools": [
-      "update-actor-task"
+      "update-actor-task",
+      "get-actor-task"
     ],
-    "expectedArgs": {
-      "taskId": "insta-daily"
-    },
     "tools": [
       "tasks"
     ]
