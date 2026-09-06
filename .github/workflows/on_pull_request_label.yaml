@@ -9,12 +9,6 @@ jobs:
     wait_for_checks:
         name: Wait for code checks to pass
         runs-on: ubuntu-latest
-        # Job-level (not workflow-level) so this group only serializes this job and
-        # push_pkg_pr_new against the release pipeline in on_master.yaml — it no longer
-        # gates the evaluations job below, which needs its own eval-pr-<PR#> group instead.
-        concurrency:
-            group: release
-            cancel-in-progress: false
         steps:
             -   name: Wait for existing checks or skip if none
                 uses: lewagon/wait-on-check-action@v1.3.4
@@ -32,6 +26,9 @@ jobs:
         # Run ONLY when PR has the "beta" label
         if: contains(github.event.pull_request.labels.*.name, 'beta')
         name: Push to pkg.pr.new
+        # Serializes the pkg.pr.new publish with the release pipeline in on_master.yaml.
+        # Only this job takes the release lock, so the evaluations job below never
+        # queues behind a master run.
         concurrency:
             group: release
             cancel-in-progress: false
