@@ -387,12 +387,12 @@ export const actorTaskOutputSchema = {
 };
 
 /**
- * Schema for get-actor-log. The log API returns plain text for both runs and builds, so the schema wraps it in a single field.
+ * Schema for get-actor-log. The log API returns plain text, so the schema wraps it in a single field.
  */
 export const getActorRunLogToolOutputSchema = {
     type: 'object' as const,
     properties: {
-        log: { type: 'string', description: 'The last N lines of the run or build log, as plain text' },
+        log: { type: 'string', description: 'The last N lines of the run log, as plain text' },
     },
     required: ['log'],
 };
