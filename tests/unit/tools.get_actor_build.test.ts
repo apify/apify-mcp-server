@@ -150,29 +150,29 @@ describe('get-actor-build', () => {
         });
 
         it.each(['FAILED', 'TIMED-OUT', 'ABORTED'])(
-            'points a %s build at get-actor-log when that tool is loaded',
+            'points a %s build at get-actor-build-log when that tool is loaded',
             async (status) => {
                 getMock.mockResolvedValue(mockBuild({ status }));
 
-                const { content } = await callTool({ buildId: 'build-1' }, [HELPER_TOOLS.ACTOR_RUNS_LOG]);
+                const { content } = await callTool({ buildId: 'build-1' }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
 
                 expect(content[1].text).toBe(
-                    `Build 0.1.12 of Actor actor-1 is ${status}.\nRead the build log with ${HELPER_TOOLS.ACTOR_RUNS_LOG} using buildId build-1; pass lines 0 for the whole log.`,
+                    `Build 0.1.12 of Actor actor-1 is ${status}.\nRead the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-1; pass lines 0 for the whole log.`,
                 );
             },
         );
 
         it.each(['FAILED', 'TIMED-OUT', 'ABORTED'])(
-            'names no tool for a %s build when get-actor-log is not loaded',
+            'names no tool for a %s build when get-actor-build-log is not loaded',
             async (status) => {
                 getMock.mockResolvedValue(mockBuild({ status }));
 
                 const { content } = await callTool({ buildId: 'build-1' }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
 
                 expect(content[1].text).toBe(
-                    `Build 0.1.12 of Actor actor-1 is ${status}.\nEnable the runs tool category to read the build log, then fix the source and build again.`,
+                    `Build 0.1.12 of Actor actor-1 is ${status}.\nRead the build log for the error, fix the source, and build again.`,
                 );
-                expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_RUNS_LOG);
+                expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD_LOG);
             },
         );
 
