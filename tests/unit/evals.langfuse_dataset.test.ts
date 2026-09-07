@@ -91,6 +91,16 @@ describe('parseMcpAgentItem()', () => {
         expect(parseMcpAgentItem(selection).expectedOutput).toBeUndefined();
     });
 
+    it('rejects a kind: selection item carrying an expectedOutput, which nothing would judge', () => {
+        const selection = {
+            id: 'b',
+            input: { query: 'q' },
+            expectedOutput: 'a reference no judge ever reads',
+            metadata: { category: 'search', kind: 'selection', tier: ['pr'], expectedTools: ['search-actors'] },
+        };
+        expect(() => parseMcpAgentItem(selection)).toThrow(/expectedOutput is not valid on a kind/);
+    });
+
     it('rejects a kind: selection item with no expectedTools, naming the missing field', () => {
         const selection = {
             id: 'b',
