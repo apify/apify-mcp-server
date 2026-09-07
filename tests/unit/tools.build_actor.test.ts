@@ -224,6 +224,16 @@ describe('build-actor', () => {
             );
         });
 
+        // The shared helper names the build number, not the tag; call-actor accepts either as callOptions.build.
+        it('names the build number, not the tag, for a SUCCEEDED build that was tagged', async () => {
+            const { content } = await callTool({ actor: 'actor-1', tag: 'latest' }, [HELPER_TOOLS.ACTOR_CALL]);
+
+            expect(content[1].text).toBe(
+                `${summary} SUCCEEDED.\nRun the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to 0.1.12.`,
+            );
+            expect(content[1].text).not.toContain('latest');
+        });
+
         it('names no tool for a SUCCEEDED build when call-actor is not loaded', async () => {
             const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD]);
 
