@@ -312,7 +312,7 @@ export function resolveToolNamesFromInput(input: Input, mode: SERVER_MODE = SERV
     toolNames.delete(ACTOR_PLACEHOLDER_NAME);
 
     for (const actorName of actorNames) {
-        if (actorName.includes('/')) toolNames.add(actorNameToToolName(actorName));
+        if (actorName.includes('/') || actorName.includes('~')) toolNames.add(actorNameToToolName(actorName));
     }
     return toolNames;
 }

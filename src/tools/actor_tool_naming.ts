@@ -55,7 +55,8 @@ export function parseActorFullName(actorFullName: string): { escapedUsername: st
 }
 
 export function actorNameToToolName(actorFullName: string): string {
-    const { escapedUsername, actorName } = parseActorFullName(actorFullName);
+    const normalizedActorFullName = actorFullName.replace('~', '/');
+    const { escapedUsername, actorName } = parseActorFullName(normalizedActorFullName);
     const fullName = escapedUsername === null ? actorName : `${escapedUsername}--${actorName}`;
 
     if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
@@ -63,7 +64,7 @@ export function actorNameToToolName(actorFullName: string): string {
     }
 
     // Truncate and add hash for uniqueness
-    const hash = createHash('sha256').update(actorFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
+    const hash = createHash('sha256').update(normalizedActorFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
     return `${fullName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
 }
 

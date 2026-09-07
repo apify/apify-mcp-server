@@ -150,6 +150,13 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
 });
 
 describe('resolveToolNamesFromInput()', () => {
+    it('resolves tilde-separated Actor names to their served tool names', () => {
+        const toolNames = resolveToolNamesFromInput({ actors: ['apify~rag-web-browser'] }, 'apps');
+
+        expect(toolNames).toContain('apify--rag-web-browser');
+        expect(toolNames).not.toContain('apify~rag-web-browser');
+    });
+
     it('excludes opaque Actor IDs while retaining their auto-injected tools', () => {
         const toolNames = resolveToolNamesFromInput({ actors: ['3ox4R101TgZz67sLr'] }, 'apps');
 
