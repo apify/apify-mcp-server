@@ -190,12 +190,7 @@ rather than blocked in code: measuring an agent item's flakiness (e.g. `tasks/ch
 - `1` = the pass rate falls short of the threshold, or setup failed ❌
 
 **Editing test cases:** edit the items in the Langfuse UI. The next run picks them up; there is nothing to commit
-in the dataset itself — but re-run the export below so the committed snapshot reflects the edit.
-```bash
-pnpm run evals:mcp-agent:export-dataset   # writes dataset_snapshot_mcp-server-evals.json (no build, no Apify/OpenRouter keys)
-```
-`dataset_snapshot_mcp-server-evals.json` is committed, so a UI edit shows as a diff on the next export; `--dataset <name>`
-exports any other dataset to its own `dataset_snapshot_<dataset>.json`, which stays gitignored.
+in the dataset itself. Use `pnpm run evals:mcp-agent:export-dataset` for an optional local snapshot; exports are gitignored.
 
 ---
 
@@ -218,7 +213,7 @@ exports any other dataset to its own `dataset_snapshot_<dataset>.json`, which st
 **Why:**
 - A UI edit takes effect on the next run. An earlier version synced a local file into the dataset first, which silently overwrote UI edits
 - `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when given real dataset items
-- A snapshot is a second copy that no code reads and nothing keeps in sync automatically, so most are gitignored. `dataset_snapshot_mcp-server-evals.json` is the one exception, committed so a git reviewer sees dataset edits as a diff. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
+- A snapshot is a second copy that no code reads and nothing keeps in sync automatically, so snapshots are gitignored
 
 Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
 
@@ -359,8 +354,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `run_mcp_agent_evals.ts` - Main CLI entry
 - `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
 - `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
-- `migrate_unified_dataset.ts` - One-off migration into `mcp-server-evals` from the old per-family datasets (#259); not part of the regular workflow
-- `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime. Gitignored except `dataset_snapshot_mcp-server-evals.json`, which is committed
+- `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime and gitignored
 
 ## Configuration
 
