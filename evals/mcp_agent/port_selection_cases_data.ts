@@ -4,8 +4,7 @@
  * "selection", tier: ["pr"]` items, plus a coverage wave (the tools the old suite never
  * exercised) and a lazy-user wave (typos, vague goals, missing parameters, wrong Actor names).
  *
- * This is a one-off, committed table (like `migrate_unified_dataset.ts`'s `SOURCE_DATASETS` /
- * `EXPECTED_ERRORS_BY_NEW_ID`), read by `port_selection_cases.ts` — not a generic importer.
+ * This is a one-off, committed table read by `port_selection_cases.ts` — not a generic importer.
  * Every row here becomes exactly one upserted dataset item.
  *
  * Id scheme: `<category>/<slug>`. `<category>` is the source case's own `category` field for
