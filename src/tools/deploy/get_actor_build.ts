@@ -1,4 +1,3 @@
-import type { Build } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -8,11 +7,10 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 import { getActorBuildToolOutputSchema } from '../structured_output_schemas.js';
-import { toBuildResult } from './build_helpers.js';
+import { buildNextStepForBuild, toBuildResult } from './build_helpers.js';
 
 /** Default `waitSecs` for `get-actor-build`. Intentionally non-zero so polling callers wait briefly by default. */
 const WAIT_SECS_DEFAULT = 30;
@@ -24,20 +22,6 @@ const getActorBuildArgs = z.object({
             0 returns immediately with the current status. Cap: ${WAIT_SECS_MAX}. Default: ${WAIT_SECS_DEFAULT}.
         `),
 });
-
-function buildNextStep(build: Build, loadedToolNames: readonly string[]): string {
-    if (build.status === 'SUCCEEDED') {
-        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)
-            ? `Run the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to ${build.buildNumber}.`
-            : 'The build is ready to run.';
-    }
-    if (TERMINAL_RUN_STATUSES.has(build.status)) {
-        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_LOG)
-            ? `Read the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId ${build.id}; pass lines 0 for the whole log.`
-            : 'Read the build log for the error, fix the source, and build again.';
-    }
-    return `Call this tool again with waitSecs ${WAIT_SECS_MAX} to keep waiting.`;
-}
 
 /**
  * https://docs.apify.com/api/v2/actor-build-get
@@ -82,11 +66,15 @@ USAGE EXAMPLES:
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const structuredContent = { build: toBuildResult(build, linkContext) };
         const summary = `Build ${build.buildNumber} of Actor ${build.actId} is ${build.status}.`;
+        const nextStep = buildNextStepForBuild(build, {
+            loadedToolNames,
+            nonTerminalNextStep: `Call this tool again with waitSecs ${WAIT_SECS_MAX} to keep waiting.`,
+        });
         const consoleLinkText = apifyConsoleLinkText(structuredContent.build.apifyConsoleUrl);
         return respondOk(
             [
                 JSON.stringify(structuredContent),
-                `${summary}\n${buildNextStep(build, loadedToolNames)}`,
+                `${summary}\n${nextStep}`,
                 ...(consoleLinkText ? [consoleLinkText] : []),
             ],
             { structuredContent },
