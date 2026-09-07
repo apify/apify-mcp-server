@@ -115,6 +115,40 @@ describe('getServerInstructions()', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(actorNameToToolName(RAG_WEB_BROWSER)));
         expect(instructions).not.toContain(HELPER_TOOLS.STORE_SEARCH);
     });
+
+    // The apps + call-actor render is what every hosted apps session gets, and the only untested
+    // combination: the other apps cases omit call-actor, the other full-tool-set cases use default mode.
+    it('keeps every call-actor mention in apps mode when the session has call-actor', () => {
+        const instructions = getServerInstructions(SERVER_MODE.APPS, ALL_TOOLS_PRESENT);
+        expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        expect(instructions).toContain(
+            `Polling \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` after \`${HELPER_TOOLS.ACTOR_CALL}\` is fine`,
+        );
+        expect(instructions).toContain('### Tool dependencies');
+        expect(instructions).toContain('Prefer dedicated tools when available');
+    });
+
+    describe('"Tool dependencies and disambiguation" section', () => {
+        const HEADING = '## Tool dependencies and disambiguation';
+
+        it('omits the heading when every subsection is gated away', () => {
+            // A session with only Actor tools plus auto-injected run/storage helpers, no widgets:
+            // nothing under the heading renders, so the heading itself must not be emitted.
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_RUNS_GET));
+            expect(instructions).not.toContain(HEADING);
+        });
+
+        it('separates the two subsections with a blank line', () => {
+            expect(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT)).toContain(
+                '\n\n### Tool disambiguation',
+            );
+        });
+
+        it('keeps a blank line after the heading when only bullets render', () => {
+            const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.ACTOR_RUNS_GET));
+            expect(instructions).toContain(`${HEADING}\n\n- **Data vs widget Actor tools`);
+        });
+    });
 });
 
 /** Pins the Claude-connector tool surface (no call-actor). Offline — no network, no fixture. */
