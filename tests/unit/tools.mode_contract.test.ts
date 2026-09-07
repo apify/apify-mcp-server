@@ -82,7 +82,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
 
         it('should have correct tools in deploy category (both modes)', () => {
-            const expected = [HELPER_TOOLS.ACTOR_BUILD_GET, HELPER_TOOLS.ACTOR_BUILD, HELPER_TOOLS.ACTOR_SOURCE_PUSH];
+            const expected = [
+                HELPER_TOOLS.ACTOR_BUILD_GET,
+                HELPER_TOOLS.ACTOR_BUILD_LOG,
+                HELPER_TOOLS.ACTOR_BUILD,
+                HELPER_TOOLS.ACTOR_SOURCE_PUSH,
+            ];
             expect(toolNames(defaultCategories.deploy)).toEqual(expected);
             expect(toolNames(appsCategories.deploy)).toEqual(expected);
         });

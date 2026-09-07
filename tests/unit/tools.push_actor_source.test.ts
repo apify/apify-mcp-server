@@ -522,14 +522,27 @@ describe('push-actor-source', () => {
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_CALL);
         });
 
-        it('points a FAILED build at get-actor-build for the log when that tool is loaded', async () => {
+        it('points a FAILED build at get-actor-build-log when that tool is loaded', async () => {
             buildMock.mockResolvedValue(mockBuild({ status: 'FAILED' }));
 
+            const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
+
+            expect(content[1].text).toBe(
+                `${summary}\nRead the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-1; pass lines 0 for the whole log.`,
+            );
+        });
+
+        it('names no tool for a FAILED build when get-actor-build-log is not loaded', async () => {
+            buildMock.mockResolvedValue(mockBuild({ status: 'FAILED' }));
+
+            // get-actor-build is loaded but is not the log tool; the hint must not fall back to it.
             const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
 
             expect(content[1].text).toBe(
-                `${summary}\nFetch the build log with ${HELPER_TOOLS.ACTOR_BUILD_GET} (buildId build-1, lines 50) to see the error.`,
+                `${summary}\nRead the build log for the error, fix the source, and build again.`,
             );
+            expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD_LOG);
+            expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD_GET);
         });
 
         it('names no tool for a still-running build when get-actor-build is not loaded', async () => {
