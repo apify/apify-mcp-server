@@ -238,28 +238,36 @@ describe('build-actor', () => {
         });
 
         it.each(['FAILED', 'TIMED-OUT', 'ABORTED'])(
-            'points a %s build at get-actor-build for the log when that tool is loaded',
+            'points a %s build at get-actor-log when that tool is loaded',
             async (status) => {
                 buildMock.mockResolvedValue(mockBuild({ status }));
 
-                const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
+                const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_RUNS_LOG]);
 
                 expect(content[1].text).toBe(
-                    `${summary} ${status}.\nFetch the build log with ${HELPER_TOOLS.ACTOR_BUILD_GET} (buildId build-1, lines 50) to see the error.`,
+                    `${summary} ${status}.\nRead the build log with ${HELPER_TOOLS.ACTOR_RUNS_LOG} using buildId build-1; pass lines 0 for the whole log.`,
                 );
             },
         );
 
-        it('names no tool for a FAILED build when get-actor-build is not loaded', async () => {
-            buildMock.mockResolvedValue(mockBuild({ status: 'FAILED' }));
+        it.each(['FAILED', 'TIMED-OUT', 'ABORTED'])(
+            'names no tool for a %s build when get-actor-log is not loaded',
+            async (status) => {
+                buildMock.mockResolvedValue(mockBuild({ status }));
 
-            const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD]);
+                // get-actor-build is loaded but is not the log tool; the hint must not fall back to it.
+                const { content } = await callTool({ actor: 'actor-1' }, [
+                    HELPER_TOOLS.ACTOR_BUILD,
+                    HELPER_TOOLS.ACTOR_BUILD_GET,
+                ]);
 
-            expect(content[1].text).toBe(
-                `${summary} FAILED.\nInspect the build log for the error, fix the source, and build again.`,
-            );
-            expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD_GET);
-        });
+                expect(content[1].text).toBe(
+                    `${summary} ${status}.\nEnable the runs tool category to read the build log, then fix the source and build again.`,
+                );
+                expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_RUNS_LOG);
+                expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD_GET);
+            },
+        );
 
         it('points a still-running build at get-actor-build when that tool is loaded', async () => {
             buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));

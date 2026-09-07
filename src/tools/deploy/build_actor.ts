@@ -56,13 +56,12 @@ function buildNextStep(build: Build, tag: string | undefined, loadedToolNames: r
             ? `Run the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to ${tag ?? build.buildNumber}.`
             : 'The build is ready to run.';
     }
-    const hasGetBuild = loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET);
     if (TERMINAL_RUN_STATUSES.has(build.status)) {
-        return hasGetBuild
-            ? `Fetch the build log with ${HELPER_TOOLS.ACTOR_BUILD_GET} (buildId ${build.id}, lines 50) to see the error.`
-            : 'Inspect the build log for the error, fix the source, and build again.';
+        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_RUNS_LOG)
+            ? `Read the build log with ${HELPER_TOOLS.ACTOR_RUNS_LOG} using buildId ${build.id}; pass lines 0 for the whole log.`
+            : 'Enable the runs tool category to read the build log, then fix the source and build again.';
     }
-    return hasGetBuild
+    return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET)
         ? `Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId ${build.id}.`
         : 'The build is still running; check its status again in a few seconds.';
 }
