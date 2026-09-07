@@ -285,7 +285,7 @@ Legend for the **Enabled by default** column:
 | `update-actor-task` | tasks | Update a task's input, run options, or public display configuration. |  |
 | `publish-actor-task` | tasks | Publish a task on its public landing page. |  |
 | `unpublish-actor-task` | tasks | Unpublish a task from its public landing page. |  |
-| `get-actor-build` | deploy | Get an Actor build's status and the last lines of its build log. |  |
+| `get-actor-build` | deploy | Get an Actor build's status. |  |
 
 > **Note:**
 >

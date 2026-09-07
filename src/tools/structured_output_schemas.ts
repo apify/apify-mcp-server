@@ -398,7 +398,7 @@ export const getActorRunLogToolOutputSchema = {
 };
 
 /**
- * Schema for get-actor-build: the allowlisted build subset (`toBuildResult`) plus the log tail.
+ * Schema for get-actor-build: the allowlisted build subset (`toBuildResult`).
  */
 export const getActorBuildToolOutputSchema = {
     type: 'object' as const,
@@ -419,13 +419,8 @@ export const getActorBuildToolOutputSchema = {
             },
             required: ['id', 'actorId', 'buildNumber', 'status', 'startedAt', 'finishedAt'],
         },
-        logTail: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'The last N lines of the build log; empty when lines=0 or the log is empty',
-        },
     },
-    required: ['build', 'logTail'],
+    required: ['build'],
 };
 
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
