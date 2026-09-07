@@ -273,7 +273,8 @@ function formatBuildStartFailure(errMessage: string, loadedToolNames: readonly s
     const retry = loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
         ? `Retry the build with ${HELPER_TOOLS.ACTOR_BUILD}.`
         : 'Retry building this version to make it runnable.';
-    return `The files were pushed, but the build could not be started: ${errMessage} ${retry}`;
+    // API messages rarely end with a period; give the message its own sentence so the retry hint does not run into it.
+    return `The files were pushed, but the build could not be started: ${errMessage.replace(/\.?$/, '.')} ${retry}`;
 }
 
 /**

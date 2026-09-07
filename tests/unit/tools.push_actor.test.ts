@@ -446,7 +446,7 @@ describe('push-actor', () => {
             });
             expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
             expect(result.content[1].text).toBe(
-                `${summary}\nThe files were pushed, but the build could not be started: Build quota exceeded Retry the build with ${HELPER_TOOLS.ACTOR_BUILD}.`,
+                `${summary}\nThe files were pushed, but the build could not be started: Build quota exceeded. Retry the build with ${HELPER_TOOLS.ACTOR_BUILD}.`,
             );
         });
 
@@ -456,7 +456,7 @@ describe('push-actor', () => {
             const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_PUSH]);
 
             expect(content[1].text).toBe(
-                `${summary}\nThe files were pushed, but the build could not be started: socket hang up Retry building this version to make it runnable.`,
+                `${summary}\nThe files were pushed, but the build could not be started: socket hang up. Retry building this version to make it runnable.`,
             );
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
         });
