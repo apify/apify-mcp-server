@@ -98,11 +98,17 @@ export const buildActor: ToolEntry = Object.freeze({
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const structuredContent = { build: toBuildResult(build, linkContext) };
         const summary = `Started build ${build.buildNumber} of Actor ${build.actId} (version ${versionNumber}); status ${build.status}.`;
+        const nextStep = buildNextStepForBuild(build, {
+            loadedToolNames,
+            nonTerminalNextStep: loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET)
+                ? `Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId ${build.id} (it waits up to ${WAIT_SECS_MAX} seconds per call).`
+                : 'The build is still running; check its status again in a few seconds.',
+        });
         const consoleLinkText = apifyConsoleLinkText(structuredContent.build.apifyConsoleUrl);
         return respondOk(
             [
                 JSON.stringify(structuredContent),
-                `${summary}\n${buildNextStepForBuild(build, parsed.tag, loadedToolNames)}`,
+                `${summary}\n${nextStep}`,
                 ...(consoleLinkText ? [consoleLinkText] : []),
             ],
             { structuredContent },

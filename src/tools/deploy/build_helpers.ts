@@ -25,26 +25,6 @@ export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | un
     };
 }
 
-/**
- * The one next step after a build was started, by build status. Tool names appear only when the
- * session loaded them; `tag` is what `callOptions.build` should be set to once the build succeeded.
- */
-export function buildNextStepForBuild(build: Build, tag: string | undefined, loadedToolNames: readonly string[]): string {
-    if (build.status === 'SUCCEEDED') {
-        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)
-            ? `Run the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to ${tag ?? build.buildNumber}.`
-            : 'The build is ready to run.';
-    }
-    if (TERMINAL_RUN_STATUSES.has(build.status)) {
-        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_LOG)
-            ? `Read the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId ${build.id}; pass lines 0 for the whole log.`
-            : 'Read the build log for the error, fix the source, and build again.';
-    }
-    return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET)
-        ? `Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId ${build.id}.`
-        : 'The build is still running; check its status again in a few seconds.';
-}
-
 /** Starts a build of an Actor version and waits up to `waitSecs` for it to finish. */
 export async function startBuild(
     client: ApifyClient,
@@ -58,4 +38,28 @@ export async function startBuild(
         useCache,
         waitForFinish: waitSecs,
     } satisfies ActorBuildOptions);
+}
+
+/**
+ * The one next step after a build reaches `status`, shared by every deploy tool that reports a build.
+ * Sibling tools are named only when the session was served them (`loadedToolNames`), and each hint
+ * keeps a fallback so the text is never a dead end. `nonTerminalNextStep` comes from the caller
+ * because only the calling tool may name itself ("call this tool again").
+ */
+export function buildNextStepForBuild(
+    build: Pick<Build, 'id' | 'buildNumber' | 'status'>,
+    options: { loadedToolNames: readonly string[]; nonTerminalNextStep: string },
+): string {
+    const { loadedToolNames, nonTerminalNextStep } = options;
+    if (build.status === 'SUCCEEDED') {
+        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)
+            ? `Run the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to ${build.buildNumber}.`
+            : 'The build is ready to run.';
+    }
+    if (TERMINAL_RUN_STATUSES.has(build.status)) {
+        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_LOG)
+            ? `Read the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId ${build.id}; pass lines 0 for the whole log.`
+            : 'Read the build log for the error, fix the source, and build again.';
+    }
+    return nonTerminalNextStep;
 }

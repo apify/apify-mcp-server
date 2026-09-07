@@ -197,8 +197,15 @@ function describeOutcome({ created, versionCreated }: PushSourceFilesResult): st
     return 'updated the version';
 }
 
-function buildNextStep(build: Build | undefined, buildTag: string, loadedToolNames: readonly string[]): string {
-    if (build) return buildNextStepForBuild(build, buildTag, loadedToolNames);
+function buildNextStep(build: Build | undefined, loadedToolNames: readonly string[]): string {
+    if (build) {
+        return buildNextStepForBuild(build, {
+            loadedToolNames,
+            nonTerminalNextStep: loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET)
+                ? `Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId ${build.id} (it waits up to ${WAIT_SECS_MAX} seconds per call).`
+                : 'The build is still running; check its status again in a few seconds.',
+        });
+    }
     return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
         ? `Trigger a build with ${HELPER_TOOLS.ACTOR_BUILD} to make this version runnable.`
         : 'Build this version to make it runnable.';
@@ -305,7 +312,7 @@ export const pushActor: ToolEntry = Object.freeze({
         return respondOk(
             [
                 JSON.stringify(structuredContent),
-                `${summary}\n${buildNextStep(build, pushed.buildTag, loadedToolNames)}`,
+                `${summary}\n${buildNextStep(build, loadedToolNames)}`,
                 ...(consoleLinkText ? [consoleLinkText] : []),
             ],
             { structuredContent },

@@ -507,11 +507,21 @@ describe('push-actor', () => {
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
         });
 
-        it("points a SUCCEEDED build at call-actor with the version's build tag when that tool is loaded", async () => {
+        it('points a SUCCEEDED build at call-actor with the build number when that tool is loaded', async () => {
             const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_CALL]);
 
             expect(content[1].text).toBe(
-                `${summary}\nRun the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to beta.`,
+                `${summary}\nRun the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to 0.0.3.`,
+            );
+        });
+
+        it('points a still-running build at get-actor-build when that tool is loaded', async () => {
+            buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
+
+            const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
+
+            expect(content[1].text).toBe(
+                `${summary}\nCheck progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId build-1 (it waits up to ${WAIT_SECS_MAX} seconds per call).`,
             );
         });
 
