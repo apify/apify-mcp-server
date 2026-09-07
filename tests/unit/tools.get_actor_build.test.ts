@@ -67,6 +67,7 @@ describe('get-actor-build', () => {
             },
         });
         expect(buildMock).toHaveBeenCalledWith('build-1');
+        expect(getMock).toHaveBeenLastCalledWith({ waitForFinish: 30 });
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         // content: [0] data, [1] summary/nextStep; no Console link for an API token session.
         expect(content).toHaveLength(2);
@@ -129,6 +130,26 @@ describe('get-actor-build', () => {
         expect(tool.ajvValidate({ buildId: 'build-1' })).toBe(true);
     });
 
+    describe('waitSecs', () => {
+        it.each([0, 45])('forwards an explicit waitSecs of %i to the client', async (waitSecs) => {
+            getMock.mockResolvedValue(mockBuild());
+
+            await callTool({ buildId: 'build-1', waitSecs });
+
+            expect(getMock).toHaveBeenLastCalledWith({ waitForFinish: waitSecs });
+        });
+
+        it('rejects waitSecs above 45 via ajv validation', () => {
+            const tool = getActorBuild as HelperTool;
+            expect(tool.ajvValidate({ buildId: 'build-1', waitSecs: 46 })).toBe(false);
+            expect(tool.ajvValidate({ buildId: 'build-1', waitSecs: 45 })).toBe(true);
+        });
+
+        it('keeps only buildId required in the input schema', () => {
+            expect(getActorBuild.inputSchema.required).toEqual(['buildId']);
+        });
+    });
+
     describe('nextStep', () => {
         it('points a SUCCEEDED build at call-actor when that tool is loaded', async () => {
             getMock.mockResolvedValue(mockBuild());
@@ -176,13 +197,13 @@ describe('get-actor-build', () => {
             },
         );
 
-        it('asks for a retry while the build is not terminal', async () => {
+        it('asks to keep waiting while the build is not terminal', async () => {
             getMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
 
             const { content } = await callTool({ buildId: 'build-1' });
 
             expect(content[1].text).toBe(
-                'Build 0.1.12 of Actor actor-1 is RUNNING.\nCall this tool again in about 10 seconds.',
+                'Build 0.1.12 of Actor actor-1 is RUNNING.\nCall this tool again with waitSecs 45 to keep waiting.',
             );
         });
     });
