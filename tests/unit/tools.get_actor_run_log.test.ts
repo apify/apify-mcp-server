@@ -13,13 +13,8 @@ import {
 } from './helpers/tool_context.js';
 
 const getMock = vi.fn();
-const buildLogGetMock = vi.fn();
-const buildMock = vi.fn(() => ({ log: () => ({ get: buildLogGetMock }) }));
 
-const stubClient = {
-    run: () => ({ log: () => ({ get: getMock }) }),
-    build: buildMock,
-} as unknown as InternalToolArgs['apifyClient'];
+const stubClient = { run: () => ({ log: () => ({ get: getMock }) }) } as unknown as InternalToolArgs['apifyClient'];
 
 const numberedLog = (count: number) => Array.from({ length: count }, (_, i) => `line ${i + 1}`).join('\n');
 
@@ -153,97 +148,5 @@ describe('get-actor-log', () => {
         expect(logResult.isError).toBe(true);
         expect(runResult.isError).toBe(true);
         expect(logResult.content[0].text).toBe(runResult.content[0].text);
-    });
-
-    describe('buildId', () => {
-        it('returns the requested number of trailing lines of the build log', async () => {
-            buildMock.mockClear();
-            getMock.mockClear();
-            buildLogGetMock.mockResolvedValue(`${numberedLog(20)}\n`);
-
-            const { content } = await callTool({ buildId: 'build-1', lines: 3 });
-
-            expect(buildMock).toHaveBeenCalledWith('build-1');
-            expect(getMock).not.toHaveBeenCalled();
-            expect(content[0].text.split('\n')).toEqual(['line 18', 'line 19', 'line 20']);
-        });
-
-        it('returns the default 10 lines of the build log when lines is omitted', async () => {
-            buildLogGetMock.mockResolvedValue(numberedLog(50));
-
-            const { content } = await callTool({ buildId: 'build-1' });
-
-            expect(content[0].text.split('\n')).toHaveLength(10);
-        });
-
-        it('returns the entire build log when lines is 0', async () => {
-            buildLogGetMock.mockResolvedValue(numberedLog(50));
-
-            const { content } = await callTool({ buildId: 'build-1', lines: 0 });
-            const returned = content[0].text.split('\n');
-
-            expect(returned).toHaveLength(50);
-            expect(returned[0]).toBe('line 1');
-            expect(returned[49]).toBe('line 50');
-        });
-
-        it('mirrors the build log in structuredContent that conforms to the outputSchema', async () => {
-            buildLogGetMock.mockResolvedValue(numberedLog(20));
-
-            const result = await callTool({ buildId: 'build-1', lines: 5 });
-
-            expect(result.structuredContent).toEqual({ log: result.content[0].text });
-            expectSchemaConformingStructuredContent(result, getActorRunLogToolOutputSchema);
-        });
-
-        it('returns a not-found error when the build does not exist', async () => {
-            buildLogGetMock.mockResolvedValue(undefined);
-
-            const result = await (getActorRunLog as HelperTool).call(
-                stubToolCallContext({ buildId: 'missing-build', lines: 10 }, stubClient),
-            );
-            const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
-
-            expectSoftFailInvalidInput(result);
-            expect(content[0].text).toBe("Build with ID 'missing-build' not found.");
-            expect(structuredContent).toBeUndefined();
-        });
-    });
-
-    describe('runId / buildId exclusivity', () => {
-        it('rejects a call with both runId and buildId without fetching a log', async () => {
-            getMock.mockClear();
-            buildMock.mockClear();
-
-            const result = await (getActorRunLog as HelperTool).call(
-                stubToolCallContext({ runId: 'run-1', buildId: 'build-1' }, stubClient),
-            );
-            const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
-
-            expectSoftFailInvalidInput(result);
-            expect(content[0].text).toBe('Provide exactly one of runId or buildId.');
-            expect(structuredContent).toBeUndefined();
-            expect(getMock).not.toHaveBeenCalled();
-            expect(buildMock).not.toHaveBeenCalled();
-        });
-
-        it('rejects a call with neither runId nor buildId', async () => {
-            const result = await (getActorRunLog as HelperTool).call(stubToolCallContext({ lines: 10 }, stubClient));
-            const { content } = result as TextToolResult;
-
-            expectSoftFailInvalidInput(result);
-            expect(content[0].text).toBe('Provide exactly one of runId or buildId.');
-        });
-
-        it('accepts either id alone and still caps lines at 50 via ajv validation', () => {
-            const tool = getActorRunLog as HelperTool;
-            expect(tool.ajvValidate({ runId: 'run-1' })).toBe(true);
-            expect(tool.ajvValidate({ buildId: 'build-1' })).toBe(true);
-            expect(tool.ajvValidate({ buildId: 'build-1', lines: 51 })).toBe(false);
-        });
-
-        it('rejects an empty buildId via ajv validation', () => {
-            expect((getActorRunLog as HelperTool).ajvValidate({ buildId: '' })).toBe(false);
-        });
     });
 });

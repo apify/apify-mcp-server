@@ -23,9 +23,9 @@ function buildNextStep(build: Build, loadedToolNames: readonly string[]): string
             : 'The build is ready to run.';
     }
     if (TERMINAL_RUN_STATUSES.has(build.status)) {
-        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_RUNS_LOG)
-            ? `Read the build log with ${HELPER_TOOLS.ACTOR_RUNS_LOG} using buildId ${build.id}; pass lines 0 for the whole log.`
-            : 'Enable the runs tool category to read the build log, then fix the source and build again.';
+        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_LOG)
+            ? `Read the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId ${build.id}; pass lines 0 for the whole log.`
+            : 'Read the build log for the error, fix the source, and build again.';
     }
     return 'Call this tool again in about 10 seconds.';
 }
