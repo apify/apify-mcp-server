@@ -1,6 +1,6 @@
 // Actor input const
 export const ACTOR_README_MAX_LENGTH = 5_000;
-// Max total chars for an enum/items.enum to show in full; over this it's dropped entirely (#1253).
+// Max total chars for an enum/items.enum to show in full; over this it's dropped entirely.
 export const ACTOR_ENUM_MAX_LENGTH = 2000;
 export const ACTOR_MAX_DESCRIPTION_LENGTH = 500;
 

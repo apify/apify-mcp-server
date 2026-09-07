@@ -266,11 +266,14 @@ export function inferArrayItemType(property: SchemaProperties): string | null {
     }
 }
 
-/** Adds prefill/default values to descriptions as examples, for clients that ignore JSON Schema `examples`. */
-export function addExampleValuesToDescriptions(
+/** Adds retained enums and prefill/default values to descriptions for clients that ignore JSON Schema annotations. */
+export function addEnumsToDescriptionsWithExamples(
     properties: Record<string, SchemaProperties>,
 ): Record<string, SchemaProperties> {
     for (const property of Object.values(properties)) {
+        if (property.enum && property.enum.length > 0) {
+            property.description = `${property.description}\nPossible values: ${property.enum.slice(0, 20).join(',')}`;
+        }
         const value = property.prefill ?? property.default;
         if (value && !(Array.isArray(value) && value.length === 0)) {
             property.examples = Array.isArray(value) ? value : [value];
@@ -280,31 +283,53 @@ export function addExampleValuesToDescriptions(
     return properties;
 }
 
-const ENUM_DROPPED_NOTE_EXAMPLE_COUNT = 3;
+const ENUM_DROPPED_NOTE_EXAMPLE_COUNT = 10;
 const ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH = 60;
 
-/** Note for a dropped enum — the field still accepts these values, just too many to list. */
+/** Note for a dropped enum, with complete examples that remain valid inputs. */
 function buildEnumDroppedNote(rawValues: string[]): string {
     const examples = rawValues
-        .filter((value) => value !== '')
-        .slice(0, ENUM_DROPPED_NOTE_EXAMPLE_COUNT)
-        .map((value) =>
-            value.length > ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH
-                ? `${value.slice(0, ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH)}...`
-                : value,
-        );
-    return `\nMore values accepted than shown (e.g. ${examples.join(', ')}, ...) — list too long to include.`;
+        .filter((value) => value !== '' && value.length <= ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH)
+        .slice(0, ENUM_DROPPED_NOTE_EXAMPLE_COUNT);
+    const exampleText = examples.length > 0 ? ` Examples: ${examples.join(', ')}.` : '';
+    return `\n\nThe complete list of accepted values is too long to include.${exampleText}`;
 }
 
 /**
- * Blanks removed, kept whole if it fits ACTOR_ENUM_MAX_LENGTH; otherwise dropped entirely (#1253)
+ * Blanks removed, kept whole if it fits ACTOR_ENUM_MAX_LENGTH; otherwise dropped entirely
  * — a partially-cut enum falsely implies exhaustiveness to both the LLM and AJV.
  */
-export function filterAndShortenEnum(enumList: string[]): string[] | undefined {
+function getEnumIfFits(enumList: string[]): string[] | undefined {
     const nonEmpty = enumList.filter((value) => value !== '');
     if (nonEmpty.length === 0) return undefined;
     const charCount = nonEmpty.reduce((sum, value) => sum + value.length, 0);
     return charCount <= ACTOR_ENUM_MAX_LENGTH ? nonEmpty : undefined;
+}
+
+/** Cut at the last complete sentence in the cap, or the last complete word if there is none. */
+function shortenDescription(description: string): string {
+    const truncated = description.slice(0, ACTOR_MAX_DESCRIPTION_LENGTH);
+    const remainder = description.slice(ACTOR_MAX_DESCRIPTION_LENGTH);
+    const sentenceEnd =
+        [...truncated.matchAll(/[.!?](?=\s)/g)].at(-1)?.index ??
+        (/[.!?]$/.test(truncated) && /^\s/.test(remainder) ? truncated.length - 1 : undefined);
+    const shortened =
+        sentenceEnd === undefined
+            ? `${/^\s/.test(remainder) ? truncated.trimEnd() : truncated.replace(/\s+\S*$/, '')}…`
+            : truncated.slice(0, sentenceEnd + 1);
+    return `${shortened}\n\n[Description truncated]`;
+}
+
+function applyEnumLimit(holder: { enum?: string[] }, descriptionHost: SchemaProperties, rawEnum: string[]): void {
+    const enumValues = getEnumIfFits(rawEnum);
+    if (enumValues) {
+        holder.enum = enumValues;
+        return;
+    }
+    delete holder.enum;
+    if (rawEnum.some((value) => value !== '')) {
+        descriptionHost.description += buildEnumDroppedNote(rawEnum);
+    }
 }
 
 /** Caps description length; drops (not truncates) an oversized enum/items.enum, noting examples instead. */
@@ -313,23 +338,15 @@ export function shortenProperties(properties: { [key: string]: SchemaProperties 
 } {
     for (const property of Object.values(properties)) {
         if (property.description.length > ACTOR_MAX_DESCRIPTION_LENGTH) {
-            property.description = `${property.description.slice(0, ACTOR_MAX_DESCRIPTION_LENGTH)}...`;
+            property.description = shortenDescription(property.description);
         }
 
         if (property.enum && property.enum.length > 0) {
-            const rawEnum = property.enum;
-            property.enum = filterAndShortenEnum(rawEnum);
-            if (property.enum === undefined) {
-                property.description += buildEnumDroppedNote(rawEnum);
-            }
+            applyEnumLimit(property, property, property.enum);
         }
 
         if (property.items?.enum && property.items.enum.length > 0) {
-            const rawEnum = property.items.enum;
-            property.items.enum = filterAndShortenEnum(rawEnum);
-            if (property.items.enum === undefined) {
-                property.description += buildEnumDroppedNote(rawEnum);
-            }
+            applyEnumLimit(property.items, property, property.items.enum);
         }
     }
 
@@ -373,38 +390,6 @@ export function decodeDotPropertyNames(properties: Record<string, unknown>): Rec
     return decodedProperties;
 }
 
-/** True if a non-empty enum existed on the raw side but shortenProperties() dropped it entirely. */
-function enumWasDropped(displayEnum: string[] | undefined, rawEnum: string[] | undefined): boolean {
-    if (displayEnum !== undefined) return false;
-    return (rawEnum ?? []).some((value) => value !== '');
-}
-
-/**
- * Keys (post dot-encoding) whose enum/items.enum shortenProperties() dropped — used to gate the
- * per-session fetch-actor-details addendum. A key missing from `rawProperties` (e.g. `waitSecs`) is skipped.
- */
-export function findDroppedEnumProperties(
-    displayProperties: Record<string, SchemaProperties>,
-    rawProperties: Record<string, SchemaProperties>,
-): string[] {
-    const rawEncoded = encodeDotPropertyNames(rawProperties);
-    const dropped: string[] = [];
-
-    for (const [key, property] of Object.entries(displayProperties)) {
-        const rawProperty = rawEncoded[key];
-        if (!rawProperty) continue;
-
-        if (
-            enumWasDropped(property.enum, rawProperty.enum) ||
-            enumWasDropped(property.items?.enum, rawProperty.items?.enum)
-        ) {
-            dropped.push(key);
-        }
-    }
-
-    return dropped;
-}
-
 export function transformActorInputSchemaProperties(input: Readonly<ActorInputSchema>): ActorInputSchemaProperties {
     // Deep clone input to avoid mutating the original object
     const inputClone: ActorInputSchema = structuredClone(input);
@@ -413,7 +398,7 @@ export function transformActorInputSchemaProperties(input: Readonly<ActorInputSc
     transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
     transformedProperties = filterSchemaProperties(transformedProperties);
     transformedProperties = shortenProperties(transformedProperties);
-    transformedProperties = addExampleValuesToDescriptions(transformedProperties);
+    transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
     transformedProperties = encodeDotPropertyNames(transformedProperties);
     return transformedProperties;
 }

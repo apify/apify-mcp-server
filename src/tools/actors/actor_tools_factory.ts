@@ -23,8 +23,6 @@ import {
     type ActorStore,
     type ActorTool,
     type ApifyToken,
-    type SchemaProperties,
-    type ToolDescriptionContext,
     type ToolEntry,
     type ToolInputSchema,
     ACTOR_TOOL_MODE,
@@ -34,7 +32,7 @@ import { getActorDefinitionCached } from '../../utils/actor.js';
 import { ajv } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildActorInputSchema, findDroppedEnumProperties, fixedAjvCompile } from '../actor_input_schema.js';
+import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolMode } from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
@@ -99,7 +97,7 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
  * 2. Nested properties are built by analyzing editor type (proxy, requestListSources) using buildNestedProperties()
  * 3. Properties are filtered using filterSchemaProperties()
  * 4. Properties are shortened using shortenProperties()
- * 5. Prefill/default values are added to descriptions as examples using addExampleValuesToDescriptions()
+ * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
  * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and Actor.
  * @param options - Optional settings: mcpSessionId for telemetry correlation, actorStore for per-Actor itemsSchema enrichment.
@@ -141,12 +139,6 @@ Actor description: ${definition.description}`;
             ACTOR_MAX_MEMORY_MBYTES,
         );
 
-        // shortenProperties() already drops an oversized enum — single schema, no AJV-only copy.
-        const droppedEnumKeys = findDroppedEnumProperties(
-            (inputSchemaWithWaitSecs.properties ?? {}) as Record<string, SchemaProperties>,
-            definition.input?.properties ?? {},
-        );
-
         let ajvValidate;
         try {
             // Unknown properties are silently stripped by AJV's removeAdditional option.
@@ -162,24 +154,6 @@ Actor description: ${definition.description}`;
             continue;
         }
 
-        // Generic note by default; names fetch-actor-details only when this session's tools/list
-        // has it (see src/tools/AGENTS.md). Clones every render — callers may mutate it in place.
-        const buildInputSchema: ((ctx: ToolDescriptionContext) => ToolInputSchema) | undefined =
-            droppedEnumKeys.length > 0
-                ? (ctx) => {
-                      const rendered = structuredClone(inputSchema) as { properties: Record<string, SchemaProperties> };
-                      if (ctx.hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)) {
-                          for (const key of droppedEnumKeys) {
-                              const property = rendered.properties[key];
-                              if (property) {
-                                  property.description += ` See ${HELPER_TOOLS.ACTOR_GET_DETAILS} for more on this Actor.`;
-                              }
-                          }
-                      }
-                      return rendered as ToolInputSchema;
-                  }
-                : undefined;
-
         tools.push({
             type: TOOL_TYPE.ACTOR,
             name: actorNameToToolName(definition.actorFullName),
@@ -188,7 +162,6 @@ Actor description: ${definition.description}`;
             actorFullName: definition.actorFullName,
             description,
             inputSchema: inputSchema as ToolInputSchema,
-            ...(buildInputSchema ? { buildInputSchema } : {}),
             // Canonical RunResponse shape — same as call-actor and get-actor-run.
             outputSchema: actorRunOutputSchema,
             ajvValidate,

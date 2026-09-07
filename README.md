@@ -541,8 +541,8 @@ For step-by-step troubleshooting, see the [Claude Desktop integration guide](htt
 ## 💡 Limitations
 
 The Actor input schema is processed to be compatible with most MCP clients while adhering to [JSON Schema](https://json-schema.org/) standards. The processing includes:
-- **Descriptions** are truncated to 500 characters (as defined in `MAX_DESCRIPTION_LENGTH`).
-- **Enum fields** are truncated to a maximum combined length of 2000 characters for all elements (as defined in `ACTOR_ENUM_MAX_LENGTH`).
+- **Descriptions** longer than 500 characters (as defined in `ACTOR_MAX_DESCRIPTION_LENGTH`) are cut at the last complete sentence in that window, or the last complete word if there is no sentence break, and marked `[Description truncated]`.
+- **Enum fields** that fit within 2000 combined characters (as defined in `ACTOR_ENUM_MAX_LENGTH`) are kept in full; larger enums are omitted, with a short note and a few example values in the description instead.
 - **Required fields** are explicitly marked with a `REQUIRED` prefix in their descriptions for compatibility with frameworks that may not handle the JSON schema properly.
 - **Nested properties** are built for special cases like proxy configuration and request list sources to ensure the correct input structure.
 - **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
