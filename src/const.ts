@@ -41,6 +41,7 @@ export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
 export const HELPER_TOOLS = {
     ACTOR_BUILD_GET: 'get-actor-build',
+    ACTOR_BUILD_LOG: 'get-actor-build-log',
     ACTOR_CALL: 'call-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
     ACTOR_GET_DETAILS: 'fetch-actor-details',

@@ -398,6 +398,17 @@ export const getActorRunLogToolOutputSchema = {
 };
 
 /**
+ * Schema for get-actor-build-log. The log API returns plain text, so the schema wraps it in a single field.
+ */
+export const getActorBuildLogToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        log: { type: 'string', description: 'The last N lines of the build log, as plain text' },
+    },
+    required: ['log'],
+};
+
+/**
  * Schema for get-actor-build: the allowlisted build subset (`toBuildResult`).
  */
 export const getActorBuildToolOutputSchema = {
