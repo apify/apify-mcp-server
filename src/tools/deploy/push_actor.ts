@@ -11,7 +11,7 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
-import { pushActorSourceToolOutputSchema } from '../structured_output_schemas.js';
+import { pushActorToolOutputSchema } from '../structured_output_schemas.js';
 import { buildNextStepForBuild, startBuild, toBuildResult } from './build_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
@@ -26,7 +26,7 @@ import {
 /** `apify push` defaults to this tag too, because the platform complains when an Actor has no `latest` build. */
 const DEFAULT_BUILD_TAG = 'latest';
 
-const pushActorSourceArgs = z.object({
+const pushActorArgs = z.object({
     actorName: z
         .string()
         .min(3)
@@ -216,19 +216,19 @@ function buildNextStep(build: Build | undefined, buildTag: string, loadedToolNam
  * versions().create). The documented tarball `/source-files` route returns 4xx
  * (apify/apify-core#29044), so it is not used. Resolves apify/apify-mcp-server#1217.
  */
-export const pushActorSource: ToolEntry = Object.freeze({
+export const pushActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.ACTOR_SOURCE_PUSH,
-    title: 'Push Actor source',
+    name: HELPER_TOOLS.ACTOR_PUSH,
+    title: 'Push Actor',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
     // `fixZodSchemaRequired` strips `versionNumber`, `mode`, `build` and `waitSecs` from `required` because they have defaults.
-    inputSchema: fixZodSchemaRequired(z.toJSONSchema(pushActorSourceArgs)) as ToolInputSchema,
-    outputSchema: pushActorSourceToolOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(pushActorSourceArgs)),
+    inputSchema: fixZodSchemaRequired(z.toJSONSchema(pushActorArgs)) as ToolInputSchema,
+    outputSchema: pushActorToolOutputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(pushActorArgs)),
     paymentRequired: true,
     annotations: {
-        title: 'Push Actor source',
+        title: 'Push Actor',
         readOnlyHint: false,
         // mode replace overwrites the version's files.
         destructiveHint: true,
@@ -240,7 +240,7 @@ export const pushActorSource: ToolEntry = Object.freeze({
         const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         // `safeParse` rather than `parse`: the repo's AJV drops `pattern` (see `src/utils/ajv.ts`), so
         // the regex fields are enforced here, as a soft fail instead of a thrown ZodError.
-        const parsedArgs = pushActorSourceArgs.safeParse(args);
+        const parsedArgs = pushActorArgs.safeParse(args);
         if (!parsedArgs.success) {
             return respondUserError(
                 parsedArgs.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '),

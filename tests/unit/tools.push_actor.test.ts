@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
-import { pushActorSource } from '../../src/tools/deploy/push_actor_source.js';
+import { pushActor } from '../../src/tools/deploy/push_actor.js';
 import { MULTIFILE_SOURCE_MAX_BYTES } from '../../src/tools/deploy/source_files.js';
-import { pushActorSourceToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { pushActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
@@ -94,12 +94,12 @@ function apiError(status: number): ApifyApiError {
 const callTool = async (args: Record<string, unknown>, loadedToolNames?: readonly string[]) => {
     const context = stubToolCallContext({ actorName: 'my-actor', ...args }, stubClient);
     if (loadedToolNames) context.loadedToolNames = loadedToolNames;
-    return (await (pushActorSource as HelperTool).call(context)) as TextToolResult;
+    return (await (pushActor as HelperTool).call(context)) as TextToolResult;
 };
 
 /** Calls the tool expecting a soft-fail result and returns its first text block plus the raw result. */
 const callToolExpectingUserError = async (args: Record<string, unknown>) => {
-    const result = await (pushActorSource as HelperTool).call(
+    const result = await (pushActor as HelperTool).call(
         stubToolCallContext({ actorName: 'my-actor', ...args }, stubClient),
     );
     expectSoftFailInvalidInput(result);
@@ -114,7 +114,7 @@ const expectNoWrite = () => {
     expect(buildMock).not.toHaveBeenCalled();
 };
 
-describe('push-actor-source', () => {
+describe('push-actor', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         userGetMock.mockResolvedValue({ username: 'john', id: 'user-secret' });
@@ -127,7 +127,7 @@ describe('push-actor-source', () => {
     });
 
     it('has the expected tool name', () => {
-        expect(pushActorSource.name).toBe(HELPER_TOOLS.ACTOR_SOURCE_PUSH);
+        expect(pushActor.name).toBe(HELPER_TOOLS.ACTOR_PUSH);
     });
 
     it('creates the Actor with the files inline when it does not exist, then builds it', async () => {
@@ -305,7 +305,7 @@ describe('push-actor-source', () => {
 
         expect(buildMock).not.toHaveBeenCalled();
         expect(result.structuredContent).not.toHaveProperty('build');
-        expectSchemaConformingStructuredContent(result, pushActorSourceToolOutputSchema);
+        expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
     });
 
     it('forwards waitSecs to the build call', async () => {
@@ -317,7 +317,7 @@ describe('push-actor-source', () => {
     it('adds the build Console link for Console UI token sessions', async () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
-        const result = (await (pushActorSource as HelperTool).call({
+        const result = (await (pushActor as HelperTool).call({
             ...stubToolCallContext({ actorName: 'my-actor', files: [MAIN_JS] }, stubClient),
             apifyToken: 'apify_ui_test',
         })) as TextToolResult;
@@ -327,7 +327,7 @@ describe('push-actor-source', () => {
         expect((structuredContent as { build: { apifyConsoleUrl?: string } }).build.apifyConsoleUrl).toBe(consoleUrl);
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(`Apify Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}`);
-        expectSchemaConformingStructuredContent(result, pushActorSourceToolOutputSchema);
+        expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
     });
 
     it('emits structuredContent that validates against the outputSchema', async () => {
@@ -335,8 +335,8 @@ describe('push-actor-source', () => {
 
         const result = await callTool({ files: [MAIN_JS] });
 
-        expect((pushActorSource as HelperTool).outputSchema).toBe(pushActorSourceToolOutputSchema);
-        expectSchemaConformingStructuredContent(result, pushActorSourceToolOutputSchema);
+        expect((pushActor as HelperTool).outputSchema).toBe(pushActorToolOutputSchema);
+        expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
     });
 
     describe('validation', () => {
@@ -436,7 +436,7 @@ describe('push-actor-source', () => {
         });
 
         it('rejects an empty file list, a short name and waitSecs above the cap via ajv validation', () => {
-            const tool = pushActorSource as HelperTool;
+            const tool = pushActor as HelperTool;
             expect(tool.ajvValidate({ actorName: 'my-actor', files: [] })).toBe(false);
             expect(tool.ajvValidate({ actorName: 'ab', files: [MAIN_JS] })).toBe(false);
             expect(tool.ajvValidate({ actorName: 'my-actor', files: [MAIN_JS], waitSecs: WAIT_SECS_MAX + 1 })).toBe(
@@ -446,7 +446,7 @@ describe('push-actor-source', () => {
         });
 
         it('marks the fields with defaults optional in the input schema', () => {
-            expect((pushActorSource as HelperTool).inputSchema.required).toEqual(['actorName', 'files']);
+            expect((pushActor as HelperTool).inputSchema.required).toEqual(['actorName', 'files']);
         });
     });
 
@@ -480,7 +480,7 @@ describe('push-actor-source', () => {
 
     describe('description', () => {
         it('names build-actor and get-actor-build only when those tools are in the session', () => {
-            const tool = pushActorSource as HelperTool;
+            const tool = pushActor as HelperTool;
             expect(tool.description).toContain(HELPER_TOOLS.ACTOR_BUILD);
             expect(tool.description).toContain(HELPER_TOOLS.ACTOR_BUILD_GET);
             const withoutSiblings = tool.buildDescription?.({ hasTool: () => false });
@@ -501,7 +501,7 @@ describe('push-actor-source', () => {
         });
 
         it('names no tool when the build was skipped and build-actor is not loaded', async () => {
-            const { content } = await callTool({ files: [MAIN_JS], build: false }, [HELPER_TOOLS.ACTOR_SOURCE_PUSH]);
+            const { content } = await callTool({ files: [MAIN_JS], build: false }, [HELPER_TOOLS.ACTOR_PUSH]);
 
             expect(content[1].text).toBe(`${summary}\nBuild this version to make it runnable.`);
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
@@ -516,7 +516,7 @@ describe('push-actor-source', () => {
         });
 
         it('names no tool for a SUCCEEDED build when call-actor is not loaded', async () => {
-            const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_SOURCE_PUSH]);
+            const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_PUSH]);
 
             expect(content[1].text).toBe(`${summary}\nThe build is ready to run.`);
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_CALL);
@@ -548,7 +548,7 @@ describe('push-actor-source', () => {
         it('names no tool for a still-running build when get-actor-build is not loaded', async () => {
             buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
 
-            const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_SOURCE_PUSH]);
+            const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_PUSH]);
 
             expect(content[1].text).toBe(
                 `${summary}\nThe build is still running; check its status again in a few seconds.`,

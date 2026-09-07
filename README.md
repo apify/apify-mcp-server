@@ -288,7 +288,7 @@ Legend for the **Enabled by default** column:
 | `get-actor-build` | deploy | Get an Actor build's status. |  |
 | `get-actor-build-log` | deploy | Retrieve the logs for a specific Actor build. |  |
 | `build-actor` | deploy | Build an Actor version and wait a bounded time for the build to finish. |  |
-| `push-actor-source` | deploy | Push source files to an Actor in your account, creating the Actor if needed, and build the version. |  |
+| `push-actor` | deploy | Push source files to an Actor in your account, creating the Actor if needed, and build the version. |  |
 
 > **Note:**
 >

@@ -26,7 +26,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
   - `deploy/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail), `build-actor`
-    (start a build of one version and wait for it) and `push-actor-source` (create the Actor if needed,
+    (start a build of one version and wait for it) and `push-actor` (create the Actor if needed,
     upload or merge a version's source files, build); `build_helpers.ts` holds the allowlisted build
     result shape, the build start call and the shared by-status next step; `source_files.ts` holds path
     normalization, size accounting and merge-by-name for the pushed files.

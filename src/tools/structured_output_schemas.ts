@@ -446,10 +446,10 @@ export const buildActorToolOutputSchema = {
 };
 
 /**
- * Schema for push-actor-source: what was pushed where, plus the build when one was started
+ * Schema for push-actor: what was pushed where, plus the build when one was started
  * (the same allowlisted build subset, `toBuildResult`, as get-actor-build).
  */
-export const pushActorSourceToolOutputSchema = {
+export const pushActorToolOutputSchema = {
     type: 'object' as const,
     properties: {
         actorId: { type: 'string', description: 'ID of the Actor the files were pushed to' },
