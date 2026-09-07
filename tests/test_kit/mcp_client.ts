@@ -22,6 +22,10 @@ export interface SuiteClientOptions {
     };
     serverMode?: string; // ?ui=
     payment?: string; // ?payment=
+    /** Attribution tag for `?client=`. A space encodes as `+` on the wire (e.g. 'claude connector' -> `?client=claude+connector`). */
+    client?: string;
+    /** Skip appending `?telemetry-enabled=` entirely — matches a real URL that never sets it (server default applies). */
+    omitTelemetryParam?: boolean;
     clientCapabilities?: ClientCapabilities;
     /** Bearer token. Omitted → `APIFY_TOKEN`. `null` → no Authorization header. */
     token?: string | null;
@@ -49,13 +53,16 @@ function buildAuthHeaders(options?: SuiteClientOptions): Record<string, string> 
 }
 
 function appendSearchParams(url: URL, options?: SuiteClientOptions): void {
-    const { actors, tools, telemetry, serverMode, payment } = options ?? {};
+    const { actors, tools, telemetry, serverMode, payment, client, omitTelemetryParam } = options ?? {};
     if (actors !== undefined) url.searchParams.append('actors', actors.join(','));
     if (tools !== undefined) url.searchParams.append('tools', tools.join(','));
-    // Default to false for tests when not explicitly set.
-    url.searchParams.append('telemetry-enabled', (telemetry?.enabled ?? false).toString());
+    if (!omitTelemetryParam) {
+        // Default to false for tests when not explicitly set.
+        url.searchParams.append('telemetry-enabled', (telemetry?.enabled ?? false).toString());
+    }
     if (serverMode !== undefined) url.searchParams.append('ui', serverMode);
     if (payment) url.searchParams.append('payment', payment);
+    if (client !== undefined) url.searchParams.append('client', client);
 }
 
 export async function createMcpStreamableClient(serverUrl: string, options?: SuiteClientOptions): Promise<Client> {

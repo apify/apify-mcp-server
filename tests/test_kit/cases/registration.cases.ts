@@ -29,7 +29,11 @@ const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
 const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
-// Claude-connector `?tools=` allowlist (no call-actor); Actor entries use slash names, served names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
+// Claude-connector `?tools=` allowlist. No call-actor. Actor entries use their slash name here;
+// served tool names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
+// NOTE: does not mirror the actual URL submitted to Anthropic for AUP review (ai-team#214) — that
+// one excludes report-problem and uses a different Actor/tool set. This fixture pins the server's
+// own tools/list behavior for a hypothetical selection, not the live, reviewed connector surface.
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
@@ -50,6 +54,7 @@ const CLAUDE_CONNECTOR_TOOLS = [
     'get-key-value-store-record',
     'apify/rag-web-browser',
     'apify/web-fetch',
+    HELPER_TOOLS.PROBLEM_REPORT,
 ];
 const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selector) =>
     selector.includes('/') ? actorNameToToolName(selector) : selector,
@@ -98,14 +103,15 @@ export const registrationCases: Case[] = [
         }),
     },
     {
-        // Pinned ?tools= wins even with telemetry on, which would otherwise auto-inject report-problem.
-        name: 'Claude connector: pinned tool surface excludes call-actor and report-problem even with telemetry enabled',
+        // Pinned ?tools= wins for call-actor even with the report-problem auto-inject path live
+        // (telemetry defaults on here — no ?telemetry-enabled= override, matching a real URL).
+        name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude+connector',
         isDeploymentTest: true,
         run: withClient(
-            { tools: CLAUDE_CONNECTOR_TOOLS, serverMode: 'apps', telemetry: { enabled: true } },
+            { tools: CLAUDE_CONNECTOR_TOOLS, serverMode: 'apps', client: 'claude connector', omitTelemetryParam: true },
             async (client) => {
                 const names = getToolNames(await client.listTools());
-                expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                expect(names).toContain(HELPER_TOOLS.PROBLEM_REPORT);
                 expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL);
                 expect(new Set(names)).toEqual(new Set(CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES));
             },
