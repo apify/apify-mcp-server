@@ -25,6 +25,10 @@ describe('actors', () => {
             );
         });
 
+        it('does not invent an owner for a current-user Actor name', () => {
+            expect(actorNameToToolName('~my-actor')).toBe('~my-actor');
+        });
+
         it('should handle tool names longer than 64 characters by truncating with a hash', () => {
             const longName = 'apify/website-content-crawler-very-long-name-that-exceeds-the-limit';
             const result = actorNameToToolName(longName);

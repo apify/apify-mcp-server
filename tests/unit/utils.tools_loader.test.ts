@@ -157,6 +157,14 @@ describe('resolveToolNamesFromInput()', () => {
         expect(toolNames).not.toContain('apify~rag-web-browser');
     });
 
+    it('leaves current-user Actor names unresolved while retaining their auto-injected tools', () => {
+        const toolNames = resolveToolNamesFromInput({ actors: ['~my-actor'] }, 'apps');
+
+        expect(toolNames).not.toContain('--my-actor');
+        expect(toolNames).not.toContain('~my-actor');
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+    });
+
     it('excludes opaque Actor IDs while retaining their auto-injected tools', () => {
         const toolNames = resolveToolNamesFromInput({ actors: ['3ox4R101TgZz67sLr'] }, 'apps');
 

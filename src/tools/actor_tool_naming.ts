@@ -55,7 +55,7 @@ export function parseActorFullName(actorFullName: string): { escapedUsername: st
 }
 
 export function actorNameToToolName(actorFullName: string): string {
-    const normalizedActorFullName = actorFullName.replace('~', '/');
+    const normalizedActorFullName = actorFullName.replace(/^([^~]+)~/, '$1/');
     const { escapedUsername, actorName } = parseActorFullName(normalizedActorFullName);
     const fullName = escapedUsername === null ? actorName : `${escapedUsername}--${actorName}`;
 
