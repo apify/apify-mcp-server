@@ -27,7 +27,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
   - `deploy/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail) and
     `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
-    allowlisted build result shape and the build start call.
+    allowlisted build result shape, the build start call and the by-status next-step text.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
