@@ -40,6 +40,7 @@ export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
 export const HELPER_TOOLS = {
+    ACTOR_BUILD: 'build-actor',
     ACTOR_BUILD_GET: 'get-actor-build',
     ACTOR_BUILD_LOG: 'get-actor-build-log',
     ACTOR_CALL: 'call-actor',

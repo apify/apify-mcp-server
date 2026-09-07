@@ -1,5 +1,6 @@
-import type { Build } from 'apify-client';
+import type { ActorBuildOptions, Build } from 'apify-client';
 
+import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS } from '../../const.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import { buildConsoleBuildUrl } from '../../utils/console_link.js';
@@ -22,6 +23,21 @@ export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | un
         finishedAt: toIsoString(build.finishedAt) ?? null,
         apifyConsoleUrl: buildConsoleBuildUrl(linkContext, build.actId, build.id),
     };
+}
+
+/** Starts a build of an Actor version and waits up to `waitSecs` for it to finish. */
+export async function startBuild(
+    client: ApifyClient,
+    actorId: string,
+    versionNumber: string,
+    options: { tag?: string; useCache: boolean; waitSecs: number },
+): Promise<Build> {
+    const { tag, useCache, waitSecs } = options;
+    return await client.actor(actorId).build(versionNumber, {
+        ...(tag !== undefined && { tag }),
+        useCache,
+        waitForFinish: waitSecs,
+    } satisfies ActorBuildOptions);
 }
 
 /**
