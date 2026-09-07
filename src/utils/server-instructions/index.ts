@@ -54,8 +54,7 @@ ${
             : '';
 
     const toolDependencies = hasCall
-        ? `
-### Tool dependencies
+        ? `### Tool dependencies
 - \`${HELPER_TOOLS.ACTOR_CALL}\`:
   - ${hasDetails ? `Use \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema.` : `Check the Actor's input schema first.`}
   - Then call with proper input to execute the Actor.
@@ -89,6 +88,48 @@ ${
             ? `- **Data vs widget Actor tools (when the client supports widgets):**
 ${hasSearch ? `  - \`${HELPER_TOOLS.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HELPER_TOOLS.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.\n` : ''}${hasDetails ? `  - \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.\n` : ''}${hasCall ? `  - \`${HELPER_TOOLS.ACTOR_CALL}\` runs the Actor and returns its run status and storage IDs (no UI); \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.\n` : ''}${hasRunsGet ? `  - \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.\n` : ''}${hasSearch && hasDetails ? `  - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.\n` : ''}`
             : '';
+
+    const searchVsRagWebBrowser =
+        hasSearch && hasTool(RAG_WEB_BROWSER_TOOL)
+            ? `- **\`${HELPER_TOOLS.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
+  \`${HELPER_TOOLS.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
+`
+            : '';
+
+    const webFetchVsRagWebBrowser =
+        hasTool(WEB_FETCH_TOOL) && hasTool(RAG_WEB_BROWSER_TOOL)
+            ? `- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**
+  ${WEB_FETCH} fetches one specific URL and returns its full content verbatim; ${RAG_WEB_BROWSER} searches the web by query and returns content from the top results.
+`
+            : '';
+
+    const dedicatedToolsVsCallActor = hasCall
+        ? `- **Dedicated Actor tools${hasTool(RAG_WEB_BROWSER_TOOL) ? ` (e.g. ${RAG_WEB_BROWSER})` : ''} vs \`${HELPER_TOOLS.ACTOR_CALL}\`:**
+  Prefer dedicated tools when available; use \`${HELPER_TOOLS.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.
+`
+        : '';
+
+    /**
+     * The section renders only when something under it survives gating — a session whose whole tool
+     * set is gated away (e.g. one Actor tool, no widgets) would otherwise end on a bare heading.
+     * `###` subsections keep a blank line before them; consecutive bullets stay contiguous.
+     */
+    const renderedBlocks = [
+        toolDependencies,
+        searchVsDetailsDisambiguation,
+        widgetToolDisambiguation,
+        searchVsRagWebBrowser,
+        webFetchVsRagWebBrowser,
+        dedicatedToolsVsCallActor,
+    ].filter((block) => block !== '');
+
+    const dependenciesAndDisambiguation =
+        renderedBlocks.length === 0
+            ? ''
+            : `
+## Tool dependencies and disambiguation
+
+${renderedBlocks.map((block, index) => (index > 0 && block.startsWith('###') ? `\n${block}` : block)).join('')}`;
 
     return `
 Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.
@@ -128,27 +169,7 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`${apiBaseUrl}/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
 - Reads inline up to ~256 KB; a larger response is not downloaded — it returns a short notice with a download URL instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap.
 - Examples: \`${apiBaseUrl}/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`${apiBaseUrl}/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
-${widgetWorkflowSection}
-## Tool dependencies and disambiguation
-${toolDependencies}${searchVsDetailsDisambiguation}${widgetToolDisambiguation}${
-        hasSearch && hasTool(RAG_WEB_BROWSER_TOOL)
-            ? `- **\`${HELPER_TOOLS.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
-  \`${HELPER_TOOLS.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
-`
-            : ''
-    }${
-        hasTool(WEB_FETCH_TOOL) && hasTool(RAG_WEB_BROWSER_TOOL)
-            ? `- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**
-  ${WEB_FETCH} fetches one specific URL and returns its full content verbatim; ${RAG_WEB_BROWSER} searches the web by query and returns content from the top results.
-`
-            : ''
-    }${
-        hasCall
-            ? `- **Dedicated Actor tools${hasTool(RAG_WEB_BROWSER_TOOL) ? ` (e.g. ${RAG_WEB_BROWSER})` : ''} vs \`${HELPER_TOOLS.ACTOR_CALL}\`:**
-  Prefer dedicated tools when available; use \`${HELPER_TOOLS.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.
-`
-            : ''
-    }${
+${widgetWorkflowSection}${dependenciesAndDisambiguation}${
         hasTool(HELPER_TOOLS.PROBLEM_REPORT)
             ? `
 If a tool or Actor fails and you cannot resolve it, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.
