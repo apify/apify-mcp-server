@@ -8,6 +8,7 @@ import {
     AUTO_INJECTED_TOOLS,
     getToolsForServerMode,
     loadToolsFromInput,
+    resolveToolNamesFromInput,
     toolNamesToInput,
 } from '../../src/utils/tools_loader.js';
 
@@ -146,6 +147,16 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
             for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
         },
     );
+});
+
+describe('resolveToolNamesFromInput()', () => {
+    it('excludes opaque Actor IDs while retaining their auto-injected tools', () => {
+        const toolNames = resolveToolNamesFromInput({ actors: ['3ox4R101TgZz67sLr'] }, 'apps');
+
+        expect(toolNames).not.toContain('3ox4R101TgZz67sLr');
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+    });
 });
 
 describe('getToolsForServerMode report-problem default injection', () => {

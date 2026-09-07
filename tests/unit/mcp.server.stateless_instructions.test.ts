@@ -5,11 +5,11 @@ import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { SERVER_MODE } from '../../src/types.js';
 
-function makeServer(): ActorsMcpServer {
+function makeServer(serverMode: SERVER_MODE = SERVER_MODE.DEFAULT): ActorsMcpServer {
     return new ActorsMcpServer({
         taskStore: new InMemoryTaskStore(),
         setupSigintHandler: false,
-        serverMode: SERVER_MODE.DEFAULT,
+        serverMode,
         telemetry: { enabled: false },
     });
 }
@@ -49,6 +49,14 @@ describe('ActorsMcpServer.getStatelessServerInstructions()', () => {
             'http://localhost/?tools=search-actors,apify/web-fetch',
         );
         expect(instructions).not.toContain(RAG_WEB_BROWSER);
+    });
+
+    it('includes widget workflow when an Actor tool auto-injects get-actor-run-widget', () => {
+        const instructions = makeServer(SERVER_MODE.APPS).getStatelessServerInstructions(
+            'http://localhost/?ui=apps&tools=apify/rag-web-browser',
+        );
+        expect(instructions).toContain('## Widget workflow');
+        expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
     it('pins the Claude-connector tool surface: call-actor absent, its own dedicated Actor tools present', () => {

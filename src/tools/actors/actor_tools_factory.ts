@@ -117,7 +117,9 @@ export async function getNormalActorsAsTools(
 
         if (!definition) continue;
 
-        const isRag = definition.actorFullName === RAG_WEB_BROWSER;
+        const { actorFullName, description: actorDescription } = definition;
+        const isRag = actorFullName === RAG_WEB_BROWSER;
+        const isWebFetch = actorFullName === WEB_FETCH;
         const { inputSchema } = buildActorInputSchema(definition.actorFullName, definition.input, isRag);
 
         // Inject the MCP-only `waitSecs` opt-in before AJV compile so the LLM can cap the wait.
@@ -129,11 +131,11 @@ export async function getNormalActorsAsTools(
 
         // Names call-actor only when the session actually has it.
         const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
-            let description = `This tool calls the Actor "${definition.actorFullName}" and retrieves its output results.
-${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${definition.description}`;
+            let description = `This tool calls the Actor "${actorFullName}" and retrieves its output results.
+${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
             if (isRag) {
                 description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
-            } else if (definition.actorFullName === WEB_FETCH) {
+            } else if (isWebFetch) {
                 description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
             }
             return description;

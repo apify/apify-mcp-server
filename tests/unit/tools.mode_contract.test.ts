@@ -458,6 +458,15 @@ describe('tool descriptions never name a tool absent from the session', () => {
         );
     });
 
+    it('snapshots Actor fields used by the description builder', async () => {
+        const actorInfo = buildFixtureActorInfo('apify/test-actor');
+        const [actorTool] = await getNormalActorsAsTools([actorInfo]);
+        actorInfo.definition.actorFullName = 'apify/changed-actor';
+        actorInfo.definition.description = 'Changed description.';
+
+        expect(actorTool.buildDescription?.({ hasTool: () => true })).toBe(actorTool.description);
+    });
+
     const ALL_TOOL_NAMES: string[] = [...Object.values(HELPER_TOOLS), actorToolStub.name];
 
     const sessions: { label: string; input: Input; actorTools: ToolEntry[] }[] = [
