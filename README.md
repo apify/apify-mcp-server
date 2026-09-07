@@ -286,7 +286,7 @@ Legend for the **Enabled by default** column:
 | `publish-actor-task` | tasks | Publish a task on its public landing page. |  |
 | `unpublish-actor-task` | tasks | Unpublish a task from its public landing page. |  |
 | `get-actor-build` | deploy | Get an Actor build's status. |  |
-| `get-actor-build-log` | deploy | Retrieve the log for a specific Actor build. |  |
+| `get-actor-build-log` | deploy | Retrieve the logs for a specific Actor build. |  |
 
 > **Note:**
 >
