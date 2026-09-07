@@ -148,6 +148,20 @@ describe('get-actor-build', () => {
         it('keeps only buildId required in the input schema', () => {
             expect(getActorBuild.inputSchema.required).toEqual(['buildId']);
         });
+
+        it('returns the empty aborted response when the request signal is already aborted', async () => {
+            getMock.mockResolvedValue(mockBuild());
+            const controller = new AbortController();
+            controller.abort();
+
+            const result = await (getActorBuild as HelperTool).call({
+                ...stubToolCallContext({ buildId: 'build-1' }, stubClient),
+                signal: controller.signal,
+            });
+
+            // Per MCP spec a cancelled request gets no response body, even though the build resolved.
+            expect(result).toEqual({});
+        });
     });
 
     describe('nextStep', () => {

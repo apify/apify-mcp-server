@@ -6,8 +6,8 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
-import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
+import { ABORT, raceAbort, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 import { getActorBuildToolOutputSchema } from '../structured_output_schemas.js';
 import { buildNextStepForBuild, toBuildResult } from './build_helpers.js';
@@ -57,9 +57,12 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
         const parsed = getActorBuildArgs.parse(args);
-        const build = await client.build(parsed.buildId).get({ waitForFinish: parsed.waitSecs });
+        // Race the wait against the request signal so a cancelled call returns promptly instead of
+        // blocking up to `waitSecs`. Per MCP spec, receivers SHOULD NOT respond to a cancelled request.
+        const build = await raceAbort(client.build(parsed.buildId).get({ waitForFinish: parsed.waitSecs }), signal);
+        if (build === ABORT) return respondAborted();
         if (!build) {
             return respondUserError(`Build with ID '${parsed.buildId}' not found.`);
         }
