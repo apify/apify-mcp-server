@@ -241,5 +241,9 @@ describe('get-actor-log', () => {
             expect(tool.ajvValidate({ buildId: 'build-1' })).toBe(true);
             expect(tool.ajvValidate({ buildId: 'build-1', lines: 51 })).toBe(false);
         });
+
+        it('rejects an empty buildId via ajv validation', () => {
+            expect((getActorRunLog as HelperTool).ajvValidate({ buildId: '' })).toBe(false);
+        });
     });
 });

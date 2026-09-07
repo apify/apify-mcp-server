@@ -9,7 +9,7 @@ import { getActorRunLogToolOutputSchema } from '../structured_output_schemas.js'
 
 const GetLogArgs = z.object({
     runId: z.string().optional().describe('The ID of the Actor run. Provide either runId or buildId.'),
-    buildId: z.string().optional().describe('The ID of the Actor build. Provide either runId or buildId.'),
+    buildId: z.string().min(1).optional().describe('The ID of the Actor build. Provide either runId or buildId.'),
     lines: z
         .number()
         .max(50)
@@ -61,7 +61,7 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = GetLogArgs.parse(args);
-        // Checked here, not in the schema: the JSON Schema AJV validates before call() cannot express "exactly one of".
+        // Checked here, not in the schema: the JSON Schema that AJV validates before call() cannot express "exactly one of".
         const source = toLogSource(parsed);
         if (!source) {
             return respondUserError('Provide exactly one of runId or buildId.');
