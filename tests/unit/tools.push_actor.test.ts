@@ -47,10 +47,17 @@ const ACTOR_JSON = { path: '.actor/actor.json', content: '{"actorSpecification":
 const MAIN_JS = { path: 'src/main.js', content: 'console.log("hi");' };
 const ACTOR_JSON_SOURCE = { name: '.actor/actor.json', format: 'TEXT', content: ACTOR_JSON.content };
 const MAIN_JS_SOURCE = { name: 'src/main.js', format: 'TEXT', content: MAIN_JS.content };
+const ACTOR_CONFIG_MISSING_TEXT = 'The files must include .actor/actor.json; the platform needs it to build the Actor.';
 
 /** An Actor API document; `userId` is an internal field the tool must not leak. */
-function mockActor() {
-    return { id: 'actor-1', userId: 'user-secret', name: 'my-actor', username: 'john', versions: [] };
+function mockActor(versionNumbers: string[] = ['0.0']) {
+    return {
+        id: 'actor-1',
+        userId: 'user-secret',
+        name: 'my-actor',
+        username: 'john',
+        versions: versionNumbers.map((versionNumber) => ({ versionNumber, sourceType: 'SOURCE_FILES' })),
+    };
 }
 
 /** An existing SOURCE_FILES version with a file the pushed set overwrites and one it does not. */
@@ -84,11 +91,8 @@ function mockBuild(overrides: Record<string, unknown> = {}) {
     };
 }
 
-function apiError(status: number): ApifyApiError {
-    return new ApifyApiError(
-        { data: { error: { type: 'forbidden', message: 'Forbidden' } }, status } as AxiosResponse,
-        1,
-    );
+function apiError(status: number, message = 'Forbidden'): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type: 'forbidden', message } }, status } as AxiosResponse, 1);
 }
 
 const callTool = async (args: Record<string, unknown>, loadedToolNames?: readonly string[]) => {
@@ -171,7 +175,9 @@ describe('push-actor', () => {
         });
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content).toHaveLength(2);
-        expect(content[1].text).toContain('Pushed 2 files to john/my-actor version 0.0 (created the Actor).');
+        expect(content[1].text).toContain(
+            'Pushed 2 files to john/my-actor version 0.0 (created the Actor); the version now has 2 files.',
+        );
         expect(JSON.stringify(structuredContent)).not.toContain('user-secret');
     });
 
@@ -200,7 +206,10 @@ describe('push-actor', () => {
             buildTag: 'beta',
             filesPushed: 3,
         });
-        expect(content[1].text).toContain('Pushed 3 files to john/my-actor version 0.0 (updated the version).');
+        // The summary separates the files sent from the files the version holds after the merge.
+        expect(content[1].text).toContain(
+            'Pushed 1 file to john/my-actor version 0.0 (updated the version); the version now has 3 files.',
+        );
     });
 
     it('replaces the version files in replace mode and forwards the build tag', async () => {
@@ -244,7 +253,84 @@ describe('push-actor', () => {
             buildTag: 'latest',
             filesPushed: 2,
         });
-        expect(content[1].text).toContain('Pushed 2 files to john/my-actor version 0.2 (created the version).');
+        expect(content[1].text).toContain(
+            'Pushed 2 files to john/my-actor version 0.2 (created version 0.2); the version now has 2 files.',
+        );
+    });
+
+    describe('versionNumber resolution', () => {
+        it('pushes to the only version of an existing Actor when versionNumber is omitted', async () => {
+            actorGetMock.mockResolvedValue(mockActor(['0.1']));
+            versionGetMock.mockResolvedValue(mockVersion({ versionNumber: '0.1' }));
+
+            const { structuredContent } = await callTool({ files: [MAIN_JS], build: false });
+
+            expect(versionMock).toHaveBeenCalledWith('0.1');
+            expect(versionUpdateMock).toHaveBeenCalled();
+            expect(versionsCreateMock).not.toHaveBeenCalled();
+            expect(structuredContent).toMatchObject({ versionNumber: '0.1' });
+        });
+
+        it('asks for versionNumber when the Actor has several versions', async () => {
+            actorGetMock.mockResolvedValue(mockActor(['0.1', '0.2']));
+
+            const { text } = await callToolExpectingUserError({ files: [MAIN_JS] });
+
+            expect(text).toBe('Specify versionNumber; this Actor has versions: 0.1, 0.2.');
+            expect(versionGetMock).not.toHaveBeenCalled();
+            expectNoWrite();
+        });
+
+        it('creates version 0.0 when the Actor exists but has no versions and versionNumber is omitted', async () => {
+            actorGetMock.mockResolvedValue(mockActor([]));
+            versionGetMock.mockResolvedValue(undefined);
+
+            const { structuredContent } = await callTool({ files: [ACTOR_JSON, MAIN_JS], build: false });
+
+            expect(versionsCreateMock).toHaveBeenCalledWith(expect.objectContaining({ versionNumber: '0.0' }));
+            expect(structuredContent).toMatchObject({ versionNumber: '0.0' });
+        });
+
+        it('pushes to the requested version when the Actor has several', async () => {
+            actorGetMock.mockResolvedValue(mockActor(['0.1', '0.2']));
+            versionGetMock.mockResolvedValue(mockVersion({ versionNumber: '0.2' }));
+
+            const { structuredContent } = await callTool({ files: [MAIN_JS], versionNumber: '0.2', build: false });
+
+            expect(versionMock).toHaveBeenCalledWith('0.2');
+            expect(structuredContent).toMatchObject({ versionNumber: '0.2' });
+        });
+    });
+
+    describe('actorName', () => {
+        it('accepts the username/name form returned as actorName and pushes to the same Actor', async () => {
+            const { structuredContent } = await callTool({
+                actorName: 'john/my-actor',
+                files: [MAIN_JS],
+                build: false,
+            });
+
+            expect(actorMock).toHaveBeenCalledWith('john/my-actor');
+            expect(structuredContent).toMatchObject({ actorName: 'john/my-actor' });
+        });
+
+        it('creates the Actor under its bare name when the username/name form is given', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+
+            await callTool({ actorName: 'john/my-actor', files: [ACTOR_JSON], build: false });
+
+            expect(actorsCreateMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-actor' }));
+        });
+
+        it("refuses a username prefix that is not the caller's", async () => {
+            const { text } = await callToolExpectingUserError({ actorName: 'jane/my-actor', files: [MAIN_JS] });
+
+            expect(text).toBe(
+                "This tool pushes only to your own account (john); 'jane/my-actor' names another account.",
+            );
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expectNoWrite();
+        });
     });
 
     it('refuses to merge onto a version that does not use source files', async () => {
@@ -275,7 +361,7 @@ describe('push-actor', () => {
         await callTool({
             files: [
                 { path: './.actor/actor.json', content: ACTOR_JSON.content },
-                { path: '/src\\.//main.js', content: MAIN_JS.content },
+                { path: 'src\\.//main.js', content: MAIN_JS.content },
             ],
             mode: 'replace',
             build: false,
@@ -339,15 +425,60 @@ describe('push-actor', () => {
         expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
     });
 
-    describe('validation', () => {
-        it('rejects a path with a .. segment', async () => {
-            const { text } = await callToolExpectingUserError({
-                files: [ACTOR_JSON, { path: '../etc/passwd', content: 'x' }],
-            });
+    describe('build start failure', () => {
+        const summary =
+            'Pushed 1 file to john/my-actor version 0.0 (updated the version); the version now has 3 files.';
 
-            expect(text).toBe("File path '../etc/passwd' must not contain '..' segments.");
+        it('returns the push result in a normal response when the build request fails', async () => {
+            buildMock.mockRejectedValue(apiError(500, 'Build quota exceeded'));
+
+            const result = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_BUILD]);
+
+            expect(result.isError).not.toBe(true);
+            expect(versionUpdateMock).toHaveBeenCalled();
+            expect(result.structuredContent).toEqual({
+                actorId: 'actor-1',
+                actorName: 'john/my-actor',
+                created: false,
+                versionNumber: '0.0',
+                buildTag: 'beta',
+                filesPushed: 3,
+            });
+            expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
+            expect(result.content[1].text).toBe(
+                `${summary}\nThe files were pushed, but the build could not be started: Build quota exceeded Retry the build with ${HELPER_TOOLS.ACTOR_BUILD}.`,
+            );
+        });
+
+        it('names no tool in the retry hint when build-actor is not loaded', async () => {
+            buildMock.mockRejectedValue(new Error('socket hang up'));
+
+            const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_PUSH]);
+
+            expect(content[1].text).toBe(
+                `${summary}\nThe files were pushed, but the build could not be started: socket hang up Retry building this version to make it runnable.`,
+            );
+            expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
+        });
+    });
+
+    describe('validation', () => {
+        it.each(['../etc/passwd', 'src/../../etc/passwd', 'src\\..\\x', 'a/./../b'])(
+            'rejects the path %s because it contains a .. segment',
+            async (path) => {
+                const { text } = await callToolExpectingUserError({ files: [ACTOR_JSON, { path, content: 'x' }] });
+
+                expect(text).toBe(`File path '${path}' must not contain '..' segments.`);
+                expectNoWrite();
+                expect(userGetMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each(['/abs/file.js', 'C:\\x'])('rejects the absolute path %s', async (path) => {
+            const { text } = await callToolExpectingUserError({ files: [ACTOR_JSON, { path, content: 'x' }] });
+
+            expect(text).toBe(`File path '${path}' must be relative to the Actor root, not absolute.`);
             expectNoWrite();
-            expect(userGetMock).not.toHaveBeenCalled();
         });
 
         it('rejects a path that is empty after normalization', async () => {
@@ -373,13 +504,34 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
-        it('rejects files whose decoded size exceeds 3 MiB', async () => {
+        it('rejects base64 content that is not valid base64', async () => {
             const { text } = await callToolExpectingUserError({
-                files: [ACTOR_JSON, { path: 'big.txt', content: 'a'.repeat(MULTIFILE_SOURCE_MAX_BYTES) }],
+                files: [{ path: 'blob.bin', content: 'not base64!', encoding: 'base64' }],
             });
 
-            expect(text).toContain(`the limit is ${MULTIFILE_SOURCE_MAX_BYTES} bytes (3 MiB)`);
-            expect(text).toContain('Use the Apify CLI (apify push) for larger projects.');
+            expect(text).toBe("File 'blob.bin' has encoding base64 but its content is not valid base64.");
+            expectNoWrite();
+        });
+
+        // The boundary is on decoded bytes, not characters: 'é' is two utf8 bytes.
+        it('accepts files whose decoded size is exactly the limit', async () => {
+            const content = `${'a'.repeat(MULTIFILE_SOURCE_MAX_BYTES - 2)}é`;
+            expect(Buffer.byteLength(content, 'utf8')).toBe(MULTIFILE_SOURCE_MAX_BYTES);
+
+            await callTool({ files: [{ path: 'big.txt', content }], build: false });
+
+            expect(versionUpdateMock).toHaveBeenCalled();
+        });
+
+        it('rejects files whose decoded size exceeds the limit by one byte', async () => {
+            const content = `${'a'.repeat(MULTIFILE_SOURCE_MAX_BYTES - 1)}é`;
+            expect(Buffer.byteLength(content, 'utf8')).toBe(MULTIFILE_SOURCE_MAX_BYTES + 1);
+
+            const { text } = await callToolExpectingUserError({ files: [{ path: 'big.txt', content }] });
+
+            expect(text).toBe(
+                `The files total ${MULTIFILE_SOURCE_MAX_BYTES + 1} bytes; the limit is ${MULTIFILE_SOURCE_MAX_BYTES} bytes (3 MiB). Use the Apify CLI (apify push) for larger projects.`,
+            );
             expectNoWrite();
         });
 
@@ -396,37 +548,54 @@ describe('push-actor', () => {
 
             const { text } = await callToolExpectingUserError({ files: [MAIN_JS] });
 
-            expect(text).toBe('The files must include .actor/actor.json; the platform needs it to build the Actor.');
+            expect(text).toBe(ACTOR_CONFIG_MISSING_TEXT);
             expectNoWrite();
         });
 
         it('requires .actor/actor.json in replace mode before any API call', async () => {
             const { text } = await callToolExpectingUserError({ files: [MAIN_JS], mode: 'replace' });
 
-            expect(text).toBe('The files must include .actor/actor.json; the platform needs it to build the Actor.');
+            expect(text).toBe(ACTOR_CONFIG_MISSING_TEXT);
             expectNoWrite();
             expect(userGetMock).not.toHaveBeenCalled();
             expect(actorGetMock).not.toHaveBeenCalled();
         });
 
-        it('requires .actor/actor.json when creating a version', async () => {
+        it('requires .actor/actor.json when merging into a version that lacks it too', async () => {
+            versionGetMock.mockResolvedValue(
+                mockVersion({ sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: 'old' }] }),
+            );
+
+            const { text } = await callToolExpectingUserError({ files: [MAIN_JS] });
+
+            expect(text).toBe(ACTOR_CONFIG_MISSING_TEXT);
+            expectNoWrite();
+        });
+
+        it('lists the existing versions when a merge would create a version without .actor/actor.json', async () => {
+            actorGetMock.mockResolvedValue(mockActor(['0.0', '0.1']));
             versionGetMock.mockResolvedValue(undefined);
 
             const { text } = await callToolExpectingUserError({ files: [MAIN_JS], versionNumber: '0.2' });
 
-            expect(text).toBe('The files must include .actor/actor.json; the platform needs it to build the Actor.');
+            expect(text).toBe(
+                `Version 0.2 does not exist and would be created (this Actor has versions: 0.0, 0.1). ${ACTOR_CONFIG_MISSING_TEXT}`,
+            );
             expectNoWrite();
         });
 
         // The repo's AJV drops `pattern` (see `src/utils/ajv.ts`), so the regex fields soft-fail in the tool.
-        it('soft-fails an Actor name that is not DNS-safe', async () => {
-            const { text } = await callToolExpectingUserError({ actorName: 'my_actor', files: [ACTOR_JSON] });
+        it.each(['my_actor', 'john/my_actor', 'john/jane/my-actor', '-my-actor'])(
+            'soft-fails the Actor name %s',
+            async (actorName) => {
+                const { text } = await callToolExpectingUserError({ actorName, files: [ACTOR_JSON] });
 
-            expect(text).toBe(
-                'actorName: Actor name may contain only letters, digits and dashes, and cannot start or end with a dash',
-            );
-            expectNoWrite();
-        });
+                expect(text).toBe(
+                    'actorName: Actor name must be 3 to 63 letters, digits and dashes, cannot start or end with a dash, and may be prefixed with your username and a slash',
+                );
+                expectNoWrite();
+            },
+        );
 
         it('soft-fails a versionNumber that is not MAJOR.MINOR', async () => {
             const { text } = await callToolExpectingUserError({ files: [ACTOR_JSON], versionNumber: '0.1.5' });
@@ -435,24 +604,26 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
-        it('rejects an empty file list, a short name and waitSecs above the cap via ajv validation', () => {
+        it('rejects an empty file list, a short name, an empty buildTag and waitSecs above the cap via ajv validation', () => {
             const tool = pushActor as HelperTool;
             expect(tool.ajvValidate({ actorName: 'my-actor', files: [] })).toBe(false);
             expect(tool.ajvValidate({ actorName: 'ab', files: [MAIN_JS] })).toBe(false);
+            expect(tool.ajvValidate({ actorName: 'my-actor', files: [MAIN_JS], buildTag: '' })).toBe(false);
             expect(tool.ajvValidate({ actorName: 'my-actor', files: [MAIN_JS], waitSecs: WAIT_SECS_MAX + 1 })).toBe(
                 false,
             );
             expect(tool.ajvValidate({ actorName: 'my-actor', files: [MAIN_JS] })).toBe(true);
         });
 
-        it('marks the fields with defaults optional in the input schema', () => {
+        it('requires only actorName and files in the input schema', () => {
             expect((pushActor as HelperTool).inputSchema.required).toEqual(['actorName', 'files']);
         });
     });
 
     it.each([
-        ['version update', versionUpdateMock],
+        ['user lookup', userGetMock],
         ['Actor lookup', actorGetMock],
+        ['version update', versionUpdateMock],
     ])('maps a 403 from the %s to a permission error', async (_label, mock) => {
         mock.mockRejectedValue(apiError(403));
 
@@ -479,18 +650,31 @@ describe('push-actor', () => {
     });
 
     describe('description', () => {
-        it('names build-actor and get-actor-build only when those tools are in the session', () => {
+        it('names build-actor, call-actor and get-actor-build only when those tools are in the session', () => {
             const tool = pushActor as HelperTool;
-            expect(tool.description).toContain(HELPER_TOOLS.ACTOR_BUILD);
+            expect(tool.description).toContain(
+                `Pass the returned actorId as actor to ${HELPER_TOOLS.ACTOR_BUILD} and ${HELPER_TOOLS.ACTOR_CALL}.`,
+            );
             expect(tool.description).toContain(HELPER_TOOLS.ACTOR_BUILD_GET);
             const withoutSiblings = tool.buildDescription?.({ hasTool: () => false });
             expect(withoutSiblings).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
             expect(withoutSiblings).not.toContain(HELPER_TOOLS.ACTOR_BUILD_GET);
+            expect(withoutSiblings).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(withoutSiblings).not.toContain('Pass the returned actorId');
+        });
+
+        it('names only the loaded actorId taker', () => {
+            const onlyCall = (pushActor as HelperTool).buildDescription?.({
+                hasTool: (name) => name === HELPER_TOOLS.ACTOR_CALL,
+            });
+            expect(onlyCall).toContain(`Pass the returned actorId as actor to ${HELPER_TOOLS.ACTOR_CALL}.`);
+            expect(onlyCall).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
         });
     });
 
     describe('nextStep', () => {
-        const summary = 'Pushed 3 files to john/my-actor version 0.0 (updated the version).';
+        const summary =
+            'Pushed 1 file to john/my-actor version 0.0 (updated the version); the version now has 3 files.';
 
         it('points at build-actor when the build was skipped and that tool is loaded', async () => {
             const { content } = await callTool({ files: [MAIN_JS], build: false }, [HELPER_TOOLS.ACTOR_BUILD]);
@@ -512,16 +696,6 @@ describe('push-actor', () => {
 
             expect(content[1].text).toBe(
                 `${summary}\nRun the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to 0.0.3.`,
-            );
-        });
-
-        it('points a still-running build at get-actor-build when that tool is loaded', async () => {
-            buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
-
-            const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
-
-            expect(content[1].text).toBe(
-                `${summary}\nCheck progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId build-1 (it waits up to ${WAIT_SECS_MAX} seconds per call).`,
             );
         });
 
@@ -553,6 +727,16 @@ describe('push-actor', () => {
             );
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD_LOG);
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD_GET);
+        });
+
+        it('points a still-running build at get-actor-build when that tool is loaded', async () => {
+            buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
+
+            const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
+
+            expect(content[1].text).toBe(
+                `${summary}\nCheck progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId build-1 (it waits up to ${WAIT_SECS_MAX} seconds per call).`,
+            );
         });
 
         it('names no tool for a still-running build when get-actor-build is not loaded', async () => {
