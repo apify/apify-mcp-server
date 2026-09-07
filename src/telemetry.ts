@@ -116,6 +116,7 @@ export function buildReportedProblemProperties(
         mcp_protocol_version: context.mcp_protocol_version,
         mcp_session_id: context.mcp_session_id,
         transport_type: context.transport_type,
+        mcp_url_client: context.mcp_url_client,
         message,
         ...(actorId !== undefined && { actor_id: actorId }),
         ...(actorRunId !== undefined && { actor_run_id: actorRunId }),

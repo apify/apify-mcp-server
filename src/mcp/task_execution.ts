@@ -81,6 +81,7 @@ export async function emitTaskStatusNotification(
  * @param params.mcpSessionId - MCP session ID for telemetry
  * @param params.actorName - Actor name, used for telemetry and error diagnostics
  * @param params.actorId - Actor ID, used for telemetry and error diagnostics
+ * @param params.clientParam - Raw `?client=` URL query-param value, for Segment attribution
  * @param params.taskStore - Task store (legacy) for status/result persistence
  * @param params.server - v1 SDK server (legacy) for task-status notifications and logging
  * @param params.sendNotification - Progress-notification sink for the running tool
@@ -100,6 +101,8 @@ export async function executeToolAndUpdateTask(params: {
     actorName?: string;
     actorId?: string;
     clientContext: McpClientContext | undefined;
+    /** Raw `?client=` URL query-param value for this connection, if any. */
+    clientParam?: string;
     taskStore: TaskStore;
     server: Server;
     tools: Map<string, ToolEntry>;
@@ -122,6 +125,7 @@ export async function executeToolAndUpdateTask(params: {
         actorName,
         actorId,
         clientContext,
+        clientParam,
         taskStore,
         server,
         tools,
@@ -154,6 +158,7 @@ export async function executeToolAndUpdateTask(params: {
         telemetryEnabled,
         transportType,
         clientContext,
+        clientParam,
     });
 
     const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, result?: unknown) => {

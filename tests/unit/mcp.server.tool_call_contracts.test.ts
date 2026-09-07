@@ -122,6 +122,7 @@ const BASE_TELEMETRY_KEYS = [
     'mcp_client_version',
     'mcp_protocol_version',
     'mcp_session_id',
+    'mcp_url_client',
     'tool_exec_time_ms',
     'tool_name',
     'tool_response_content_bytes',
@@ -361,6 +362,30 @@ describe('CallToolRequestSchema handler', () => {
 
         expect(trackSpy.mock.calls).toHaveLength(1);
         expectClientContextTelemetry(trackSpy.mock.calls[0][2]);
+    });
+
+    it('carries the ?client= query-param value into telemetry as mcp_url_client', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                await runSync(server, makeRecorderTool('client-param-tool').tool);
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true, clientParam: 'cursor' },
+        );
+
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({ mcp_url_client: 'cursor' });
+    });
+
+    it('defaults mcp_url_client to an empty string when no ?client= was given', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                await runSync(server, makeRecorderTool('no-client-param-tool').tool);
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({ mcp_url_client: '' });
     });
 });
 

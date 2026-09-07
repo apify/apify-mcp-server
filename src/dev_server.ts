@@ -163,6 +163,7 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
     const uiParam = urlParams.get('ui');
     const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
     const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
+    const clientParam = urlParams.get('client') ?? undefined;
 
     // No token required in payment mode, mirroring `resolveRequestAuth`.
     const apifyToken = paymentProvider ? undefined : extractApiTokenFromRequest(req);
@@ -191,6 +192,7 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
                 serverMode,
                 paymentProvider,
                 token: apifyToken,
+                clientParam,
             });
             // Client identity arrives per request in the `_meta` envelope (there is no initialize
             // handshake), so this fetch carries no request-origin tag.
@@ -303,6 +305,9 @@ export function createExpressApp(): express.Express {
                 // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
                 const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
 
+                // Client attribution tag (e.g. ?client=cursor), for Segment — see mcp_url_client.
+                const clientParam = urlParams.get('client') ?? undefined;
+
                 // Mirror production: no token required in payment mode, else require Bearer header
                 const auth = resolveRequestAuth(req, res, paymentProvider);
                 if (!auth) return;
@@ -318,6 +323,7 @@ export function createExpressApp(): express.Express {
                     serverMode,
                     paymentProvider,
                     token: apifyToken,
+                    clientParam,
                 });
 
                 // Client info is already available here — unlike stdio.ts, which loads tools
