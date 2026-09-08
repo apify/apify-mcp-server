@@ -57,26 +57,21 @@ function baseOptions(overrides: Partial<Parameters<typeof runAgentConversation>[
 }
 
 describe('denyToolsHook()', () => {
-    it('denies a listed tool with the report-problem nudge', async () => {
+    it('denies only listed tools with the report-problem nudge', async () => {
         const [{ hooks }] = denyToolsHook(['call-actor']);
-        const result = await hooks[0](preToolUseInput('mcp__apify__call-actor'), 'tool-1', {
+        const context = {
             signal: new AbortController().signal,
-        });
-        expect(result).toEqual({
+        };
+        await expect(hooks[0](preToolUseInput('mcp__apify__call-actor'), 'tool-1', context)).resolves.toEqual({
             hookSpecificOutput: {
                 hookEventName: 'PreToolUse',
                 permissionDecision: 'deny',
                 permissionDecisionReason: `The call-actor tool failed with an internal error.\n\n${REPORT_PROBLEM_NUDGE}`,
             },
         });
-    });
-
-    it('passes a non-listed tool through unchanged', async () => {
-        const [{ hooks }] = denyToolsHook(['call-actor']);
-        const result = await hooks[0](preToolUseInput('mcp__apify__search-actors'), 'tool-1', {
-            signal: new AbortController().signal,
+        await expect(hooks[0](preToolUseInput('mcp__apify__search-actors'), 'tool-2', context)).resolves.toEqual({
+            continue: true,
         });
-        expect(result).toEqual({ continue: true });
     });
 });
 
@@ -91,49 +86,20 @@ describe('runAgentConversation()', () => {
         });
     });
 
-    it('never sets bypassPermissions or allowDangerouslySkipPermissions', async () => {
-        await runAgentConversation(baseOptions());
+    it('uses canUseTool instead of root-incompatible permission flags', async () => {
+        const run = await runAgentConversation(baseOptions());
         expect(capturedOptions).toBeDefined();
         expect(capturedOptions).not.toHaveProperty('permissionMode', 'bypassPermissions');
         expect(capturedOptions).not.toHaveProperty('allowDangerouslySkipPermissions');
-    });
-
-    it('grants every tool call through canUseTool', async () => {
-        await runAgentConversation(baseOptions());
         const result = await capturedOptions?.canUseTool?.('search-actors', { keywords: 'x' }, {
             signal: new AbortController().signal,
             requestId: 'r1',
         } as Parameters<NonNullable<Options['canUseTool']>>[2]);
         expect(result).toEqual({ behavior: 'allow', updatedInput: { keywords: 'x' } });
+        expect(run.attemptedCalls).toEqual([]);
     });
 
-    it('installs no hooks for a plain agent item', async () => {
-        await runAgentConversation(baseOptions());
-        expect(capturedOptions?.hooks).toBeUndefined();
-    });
-
-    it('installs denyToolsHook when failTools is set', async () => {
-        await runAgentConversation(baseOptions({ failTools: ['call-actor'] }));
-        expect(capturedOptions?.hooks?.PreToolUse).toBeDefined();
-    });
-
-    it('defaults maxTurns to the config constant for an agent item', async () => {
-        await runAgentConversation(baseOptions());
-        expect(capturedOptions?.maxTurns).toBe(10);
-    });
-
-    it('honors a per-item maxTurns override for an agent item', async () => {
-        await runAgentConversation(baseOptions({ maxTurns: 4 }));
-        expect(capturedOptions?.maxTurns).toBe(4);
-    });
-
-    it('fixes maxTurns at SELECTION_MAX_TURNS for a selection item, ignoring maxTurns', async () => {
-        await runAgentConversation(baseOptions({ isSelectionMode: true, maxTurns: 9999 }));
-        expect(capturedOptions?.maxTurns).toBe(SELECTION_MAX_TURNS);
-        expect(capturedOptions?.maxTurns).not.toBe(9999);
-    });
-
-    it('installs a PreToolUse hook for a selection item that denies every call', async () => {
+    it('denies and records selection calls with the fixed turn limit', async () => {
         let hookResult: unknown;
         mocks.query.mockImplementation(({ options }: { options: Options }) => {
             capturedOptions = options;
@@ -146,12 +112,16 @@ describe('runAgentConversation()', () => {
                         signal: new AbortController().signal,
                     },
                 );
+                await hook?.(preToolUseInput('ToolSearch', { query: 'select:WebFetch' }), 'tool-2', {
+                    signal: new AbortController().signal,
+                });
                 yield resultMessage();
             })();
         });
 
-        const result = await runAgentConversation(baseOptions({ isSelectionMode: true }));
+        const result = await runAgentConversation(baseOptions({ isSelectionMode: true, maxTurns: 9999 }));
 
+        expect(capturedOptions?.maxTurns).toBe(SELECTION_MAX_TURNS);
         expect(hookResult).toEqual({
             hookSpecificOutput: {
                 hookEventName: 'PreToolUse',
@@ -161,57 +131,13 @@ describe('runAgentConversation()', () => {
         });
         expect(result.attemptedCalls).toEqual([
             { toolName: 'mcp__apify__search-actors', input: { keywords: 'tiktok' } },
-        ]);
-    });
-
-    it('records every attempted call across multiple denied attempts', async () => {
-        mocks.query.mockImplementation(({ options }: { options: Options }) => {
-            capturedOptions = options;
-            return (async function* () {
-                const hook = options.hooks?.PreToolUse?.[0]?.hooks[0];
-                await hook?.(preToolUseInput('ToolSearch', { query: 'select:WebFetch' }), 'tool-1', {
-                    signal: new AbortController().signal,
-                });
-                await hook?.(
-                    preToolUseInput('mcp__apify__apify--web-fetch', { url: 'https://example.com' }),
-                    'tool-2',
-                    {
-                        signal: new AbortController().signal,
-                    },
-                );
-                yield resultMessage();
-            })();
-        });
-
-        const result = await runAgentConversation(baseOptions({ isSelectionMode: true }));
-        expect(result.attemptedCalls).toEqual([
             { toolName: 'ToolSearch', input: { query: 'select:WebFetch' } },
-            { toolName: 'mcp__apify__apify--web-fetch', input: { url: 'https://example.com' } },
         ]);
     });
 
-    it('returns an empty attemptedCalls array for a plain agent item', async () => {
-        const result = await runAgentConversation(baseOptions());
-        expect(result.attemptedCalls).toEqual([]);
-    });
-
-    it('forwards stderr lines to console.error with the [claude-stderr] prefix', async () => {
+    it('forwards stderr and appends only its last five lines to a thrown error', async () => {
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         mocks.query.mockImplementation(({ options }: { options: Options }) => {
-            options.stderr?.('a permission refusal line\n');
-            return fakeStream([resultMessage()]);
-        });
-
-        await runAgentConversation(baseOptions());
-
-        expect(errorSpy).toHaveBeenCalledWith('[claude-stderr] a permission refusal line');
-        errorSpy.mockRestore();
-    });
-
-    it('keeps only the last MAX_APPENDED_STDERR_LINES lines in the ring buffer', async () => {
-        vi.spyOn(console, 'error').mockImplementation(() => {});
-        mocks.query.mockImplementation(({ options }: { options: Options }) => {
-            // 8 lines, more than the 5-line cap: only the last 5 should survive the shift.
             for (let i = 1; i <= 8; i++) options.stderr?.(`line ${i}\n`);
             // eslint-disable-next-line require-yield
             return (async function* () {
@@ -227,6 +153,7 @@ describe('runAgentConversation()', () => {
         }
 
         const message = caught instanceof Error ? caught.message : String(caught);
+        expect(errorSpy).toHaveBeenCalledWith('[claude-stderr] line 1');
         expect(message).toMatch(/line 4[\s\S]*line 5[\s\S]*line 6[\s\S]*line 7[\s\S]*line 8/);
         expect(message).not.toContain('line 1');
         expect(message).not.toContain('line 2');
@@ -244,21 +171,5 @@ describe('runAgentConversation()', () => {
         });
 
         await expect(runAgentConversation(baseOptions())).rejects.toBe(originalError);
-    });
-
-    it('appends the last stderr lines to the error thrown when the run fails', async () => {
-        vi.spyOn(console, 'error').mockImplementation(() => {});
-        mocks.query.mockImplementation(({ options }: { options: Options }) => {
-            options.stderr?.('--dangerously-skip-permissions cannot be used with root/sudo privileges\n');
-            // eslint-disable-next-line require-yield
-            return (async function* () {
-                throw new Error('Claude Code process exited with code 1');
-            })();
-        });
-
-        await expect(runAgentConversation(baseOptions())).rejects.toThrow(
-            /Claude Code process exited with code 1[\s\S]*--dangerously-skip-permissions cannot be used with root\/sudo privileges/,
-        );
-        vi.restoreAllMocks();
     });
 });

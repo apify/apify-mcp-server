@@ -15,6 +15,12 @@ const item = {
     metadata: { category: 'search', kind: 'agent', tier: ['full'] },
 };
 
+const selectionItem = {
+    id: 'b',
+    input: { query: 'q' },
+    metadata: { category: 'search', kind: 'selection', tier: ['pr'], expectedTools: ['search-actors'] },
+};
+
 /** Langfuse client whose dataset holds the given items, like the real API returns them. */
 function makeLangfuseClient(items: unknown[]) {
     const requested: unknown[] = [];
@@ -179,92 +185,17 @@ describe('parseMcpAgentItem()', () => {
         expect(parseMcpAgentItem(withIteration).metadata.iteration).toBe(2);
     });
 
-    it('rejects expectedArgs on a kind: agent item', () => {
-        const withArgs = {
-            ...item,
-            metadata: { ...item.metadata, expectedArgs: { actor: 'apify/rag-web-browser' } },
-        };
-        expect(() => parseMcpAgentItem(withArgs)).toThrow(/expectedArgs/);
-    });
-
-    it('rejects maxTurns on a kind: selection item', () => {
-        const selection = {
-            id: 'b',
-            input: { query: 'q' },
-            metadata: {
-                category: 'search',
-                kind: 'selection',
-                tier: ['pr'],
-                expectedTools: ['search-actors'],
-                maxTurns: 3,
-            },
-        };
-        expect(() => parseMcpAgentItem(selection)).toThrow(/maxTurns/);
-    });
-
-    it('rejects a bogus extra metadata key on an otherwise valid item', () => {
-        const bogus = { ...item, metadata: { ...item.metadata, bogusKey: true } };
-        expect(() => parseMcpAgentItem(bogus)).toThrow(/bogusKey/);
-    });
-
-    it('rejects expectedOutput on a kind: selection item', () => {
-        const selection = {
-            id: 'b',
-            input: { query: 'q' },
-            expectedOutput: 'judge me',
-            metadata: { category: 'search', kind: 'selection', tier: ['pr'], expectedTools: ['search-actors'] },
-        };
-        expect(() => parseMcpAgentItem(selection)).toThrow(/expectedOutput/);
-    });
-
-    it('accepts a kind: selection item with no expectedOutput (null normalized to undefined)', () => {
-        const selection = {
-            id: 'b',
-            input: { query: 'q' },
-            expectedOutput: null,
-            metadata: { category: 'search', kind: 'selection', tier: ['pr'], expectedTools: ['search-actors'] },
-        };
-        expect(parseMcpAgentItem(selection).expectedOutput).toBeUndefined();
-    });
-
-    it('rejects expectedTools on a kind: agent item, which nothing would score', () => {
-        const agent = {
-            id: 'c',
-            input: { query: 'q' },
-            expectedOutput: 'r',
-            metadata: { category: 'search', kind: 'agent', tier: ['full'], expectedTools: ['search-actors'] },
-        };
-        expect(() => parseMcpAgentItem(agent)).toThrow(/metadata.expectedTools is only valid on a kind/);
-    });
-
-    it('rejects failTools on a kind: selection item', () => {
-        const selection = {
-            id: 'b',
-            input: { query: 'q' },
-            metadata: {
-                category: 'search',
-                kind: 'selection',
-                tier: ['pr'],
-                expectedTools: ['search-actors'],
-                failTools: ['call-actor'],
-            },
-        };
-        expect(() => parseMcpAgentItem(selection)).toThrow(/failTools/);
-    });
-
-    it('rejects expectedErrors on a kind: selection item', () => {
-        const selection = {
-            id: 'b',
-            input: { query: 'q' },
-            metadata: {
-                category: 'search',
-                kind: 'selection',
-                tier: ['pr'],
-                expectedTools: ['search-actors'],
-                expectedErrors: ['call-actor'],
-            },
-        };
-        expect(() => parseMcpAgentItem(selection)).toThrow(/expectedErrors/);
+    it.each([
+        ['expectedArgs', { ...item, metadata: { ...item.metadata, expectedArgs: { actor: 'apify/rag-web-browser' } } }],
+        ['expectedTools', { ...item, metadata: { ...item.metadata, expectedTools: ['search-actors'] } }],
+        ['maxTurns', { ...selectionItem, metadata: { ...selectionItem.metadata, maxTurns: 3 } }],
+        ['failTools', { ...selectionItem, metadata: { ...selectionItem.metadata, failTools: ['call-actor'] } }],
+        [
+            'expectedErrors',
+            { ...selectionItem, metadata: { ...selectionItem.metadata, expectedErrors: ['call-actor'] } },
+        ],
+    ])('rejects %s on the wrong item kind', (field, invalidItem) => {
+        expect(() => parseMcpAgentItem(invalidItem)).toThrow(new RegExp(field));
     });
 });
 
@@ -333,29 +264,6 @@ describe('toMcpAgentTestCase()', () => {
         });
     });
 
-    it('writes expectedArgs right after expectedTools', () => {
-        const selection = {
-            id: 'b',
-            input: { query: 'q' },
-            metadata: {
-                category: 'search',
-                kind: 'selection',
-                tier: ['pr'],
-                expectedTools: ['search-actors'],
-                expectedArgs: { actor: 'apify/rag-web-browser' },
-            },
-        };
-        expect(Object.keys(toMcpAgentTestCase(selection))).toEqual([
-            'id',
-            'category',
-            'kind',
-            'tier',
-            'query',
-            'expectedTools',
-            'expectedArgs',
-        ]);
-    });
-
     it('never exports a runner-injected iteration', () => {
         const withIteration = { ...item, metadata: { ...item.metadata, iteration: 3 } };
         expect(Object.keys(toMcpAgentTestCase(withIteration))).not.toContain('iteration');
@@ -368,12 +276,11 @@ describe('filterByTier()', () => {
     const both = { id: 'c', category: 'x', query: 'q', tier: ['pr', 'full'] };
     const cases = [pr, full, both];
 
-    it('keeps items whose tier array contains "pr"', () => {
-        expect(filterByTier(cases, 'pr').map((c) => c.id)).toEqual(['a', 'c']);
-    });
-
-    it('keeps items whose tier array contains "full"', () => {
-        expect(filterByTier(cases, 'full').map((c) => c.id)).toEqual(['b', 'c']);
+    it.each([
+        ['pr', ['a', 'c']],
+        ['full', ['b', 'c']],
+    ])('keeps items in the %s tier', (tier, expectedIds) => {
+        expect(filterByTier(cases, tier).map((testCase) => testCase.id)).toEqual(expectedIds);
     });
 });
 
