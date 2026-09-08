@@ -7,7 +7,7 @@ import type { ToolDescriptionContext } from '../../src/types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { getServerInstructions } from '../../src/utils/server-instructions/index.js';
 import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
-import { CLAUDE_CONNECTOR_TOOLS } from '../test_kit/cases/registration.cases.js';
+import { CLAUDE_CONNECTOR_TOOLS } from './helpers/claude_connector_tools.js';
 
 /** Context reporting every named tool present, everything else absent. */
 function only(...present: string[]): ToolDescriptionContext {

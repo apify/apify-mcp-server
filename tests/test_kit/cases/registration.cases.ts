@@ -34,31 +34,33 @@ const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
 const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
-// Claude-connector `?tools=` allowlist (ai-team#214/#229). No call-actor. Actor entries use their
-// slash name here; served tool names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
-export const CLAUDE_CONNECTOR_TOOLS = [
-    'search-actors',
-    'search-actors-widget',
-    'fetch-actor-details',
-    'fetch-actor-details-widget',
-    'search-apify-docs',
-    'fetch-apify-docs',
-    'get-actor-run',
-    'get-actor-run-list',
-    'get-actor-log',
-    'abort-actor-run',
-    'get-dataset',
-    'get-dataset-items',
-    'get-dataset-schema',
-    'get-dataset-list',
-    'get-key-value-store',
-    'get-key-value-store-keys',
-    'get-key-value-store-record',
-    'get-key-value-store-list',
+// Claude-connector `?tools=` allowlist (ai-team#214/#229). No call-actor. Duplicated in
+// tests/unit/helpers/claude_connector_tools.ts, not imported from there: tests/test_kit is its own
+// `tsc -b` project (see its tsconfig's `rootDir`) and cannot import outside itself.
+const CLAUDE_CONNECTOR_TOOLS = [
+    HELPER_TOOLS.STORE_SEARCH,
+    HELPER_TOOLS.STORE_SEARCH_WIDGET,
+    HELPER_TOOLS.ACTOR_GET_DETAILS,
+    HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
+    HELPER_TOOLS.DOCS_SEARCH,
+    HELPER_TOOLS.DOCS_FETCH,
+    HELPER_TOOLS.ACTOR_RUNS_GET,
+    HELPER_TOOLS.ACTOR_RUN_LIST_GET,
+    HELPER_TOOLS.ACTOR_RUNS_LOG,
+    HELPER_TOOLS.ACTOR_RUNS_ABORT,
+    HELPER_TOOLS.DATASET_GET,
+    HELPER_TOOLS.DATASET_GET_ITEMS,
+    HELPER_TOOLS.DATASET_SCHEMA_GET,
+    HELPER_TOOLS.DATASET_LIST_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
     'apify/rag-web-browser',
     'apify/web-fetch',
     HELPER_TOOLS.PROBLEM_REPORT,
 ];
+// Served tool names differ from CLAUDE_CONNECTOR_TOOLS's Actor selectors — map them here.
 const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selector) =>
     selector.includes('/') ? actorNameToToolName(selector) : selector,
 );
