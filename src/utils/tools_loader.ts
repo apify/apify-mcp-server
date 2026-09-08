@@ -278,14 +278,15 @@ export function getToolsForServerMode(
     // Non-widget entrypoints have standing to pull in get-actor-run itself; widgets alone don't.
     const hasHardRunTrigger = hasCallActor || hasActorTools || hasGetActorRun;
     const hasWidgetRunTrigger = hasCallActorWidget || hasGetActorRunWidget;
-    // get-actor-run-widget is get-actor-run's own widget sibling — while it's present, only a hard
-    // trigger may still pull the base in, or a widget would silently auto-bring its own base.
-    const excludeGetActorRun = hasGetActorRunWidget && !hasHardRunTrigger;
 
-    const toolsToInject: ToolEntry[] =
-        hasHardRunTrigger || hasWidgetRunTrigger
-            ? AUTO_INJECTED_TOOLS.filter((tool) => tool.name !== HELPER_TOOLS.ACTOR_RUNS_GET || !excludeGetActorRun)
-            : [];
+    let toolsToInject: ToolEntry[] = [];
+    if (hasHardRunTrigger) {
+        toolsToInject = [...AUTO_INJECTED_TOOLS];
+    } else if (hasWidgetRunTrigger) {
+        toolsToInject = AUTO_INJECTED_TOOLS.filter(
+            (tool) => tool.name !== HELPER_TOOLS.ACTOR_RUNS_GET || !hasGetActorRunWidget,
+        );
+    }
 
     if (toolsToInject.length > 0) {
         const callActorIndex = result.findIndex((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);

@@ -7,6 +7,7 @@ import type { ToolDescriptionContext } from '../../src/types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { getServerInstructions } from '../../src/utils/server-instructions/index.js';
 import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
+import { CLAUDE_CONNECTOR_TOOLS } from '../test_kit/cases/registration.cases.js';
 
 /** Context reporting every named tool present, everything else absent. */
 function only(...present: string[]): ToolDescriptionContext {
@@ -241,28 +242,10 @@ describe('getServerInstructions()', () => {
 
 /** Pins the Claude-connector tool surface (no call-actor); offline, no network or fixture. */
 describe('Claude-connector tool surface (no call-actor)', () => {
-    const url =
-        'https://mcp.apify.com/?tools=search-actors,search-actors-widget,fetch-actor-details,fetch-actor-details-widget,search-apify-docs,fetch-apify-docs,get-actor-run,get-actor-run-list,get-actor-log,abort-actor-run,get-dataset-list,get-dataset,get-dataset-items,get-key-value-store-list,get-key-value-store,get-key-value-store-record,apify/rag-web-browser,apify/web-fetch';
+    const url = `https://mcp.apify.com/?tools=${CLAUDE_CONNECTOR_TOOLS.join(',')}`;
 
-    // Actor-tool selectors need a live fetch to resolve; checks the internal-tool subset only.
-    const expectedInternalToolNames = [
-        HELPER_TOOLS.STORE_SEARCH,
-        HELPER_TOOLS.STORE_SEARCH_WIDGET,
-        HELPER_TOOLS.ACTOR_GET_DETAILS,
-        HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
-        HELPER_TOOLS.DOCS_SEARCH,
-        HELPER_TOOLS.DOCS_FETCH,
-        HELPER_TOOLS.ACTOR_RUNS_GET,
-        HELPER_TOOLS.ACTOR_RUN_LIST_GET,
-        HELPER_TOOLS.ACTOR_RUNS_LOG,
-        HELPER_TOOLS.ACTOR_RUNS_ABORT,
-        HELPER_TOOLS.DATASET_LIST_GET,
-        HELPER_TOOLS.DATASET_GET,
-        HELPER_TOOLS.DATASET_GET_ITEMS,
-        HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
-        HELPER_TOOLS.KEY_VALUE_STORE_GET,
-        HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
-    ];
+    // Actor-tool selectors (contain '/') need a live fetch to resolve; checks the internal-tool subset only.
+    const expectedInternalToolNames = CLAUDE_CONNECTOR_TOOLS.filter((tool) => !tool.includes('/'));
 
     it('resolves to exactly the expected internal tools, no call-actor, and instructions mention it nowhere', () => {
         const resolved = new Set(
