@@ -7,8 +7,8 @@ You can find the results here: https://app.phoenix.arize.com/s/apify
 ## CI Workflow
 
 This runner (Phoenix) no longer runs in CI (apify/ai-team#261) — its files stay for now, pending
-deletion under #262. CI now runs the Langfuse-backed suites in `evals/mcp_agent/` (gating PRs,
-measurement-only after merges); see [`evals/mcp_agent/README.md`'s CI section](./mcp_agent/README.md#ci-apifyai-team261).
+deletion under #262. CI now runs the Langfuse-backed suites in `evals/mcp_agent/` (gating PRs
+and merges); see [`evals/mcp_agent/README.md`'s CI section](./mcp_agent/README.md#ci-apifyai-team261).
 
 ## Two evaluation methods
 

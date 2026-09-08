@@ -73,12 +73,12 @@ jobs:
                     --pass-threshold 0.93
                     --agent-model claude-haiku-4-5 --claude-judge
 
-            # Measurement-only until a merge-tier threshold is calibrated: without --pass-threshold
-            # the CLI falls back to DEFAULT_PASS_THRESHOLD, calibrated on the pr tier, and the
-            # README documents merge-tier cases claude-haiku-4-5 fails by design (README CI
-            # section). continue-on-error must sit on the step: a caller job that `uses:` a
-            # reusable workflow does not support it.
-            -   name: Run merge-tier evals (not gating)
+            # --pass-threshold 0.73 is the floor of 3 claude-haiku-4-5 merge-tier runs (0.80, 0.73,
+            # 0.80) on 2026-09-08, run locally with the OpenRouter judge. Deliberately low: 9 of the
+            # 60 items fail on every run (README CI section); raise it as those are fixed.
+            -   name: Run merge-tier evals
                 if: inputs.tier == 'merge'
-                continue-on-error: true
-                run: pnpm run evals:mcp-agent -- --tier merge
+                run: >
+                    pnpm run evals:mcp-agent -- --tier merge
+                    --pass-threshold 0.73
+                    --agent-model claude-haiku-4-5

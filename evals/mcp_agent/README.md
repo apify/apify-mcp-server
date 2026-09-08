@@ -520,8 +520,13 @@ it fails differs, and neither is a required status check today:
 - the `pr` tier **fails its job** on a pass rate below the `--pass-threshold` the workflow passes
   (`0.93`, the floor of 3 `claude-haiku-4-5` runs calibrated in apify/ai-team#240; provisional
   until re-pinned from real CI runs), so it shows red on the PR;
-- the `merge` tier runs **after** a merge and is currently `continue-on-error` — measurement only
-  until a merge-tier threshold is calibrated.
+- the `merge` tier runs **after** a merge and fails its job below `0.73`, the floor of 3
+  `claude-haiku-4-5` runs on 2026-09-08 (pass rates 0.80, 0.73, 0.80; OpenRouter judge,
+  concurrency 4, 16-25 min each). Deliberately low: 9 of the 60 items failed on all 3 runs —
+  4 storage items where Haiku sends `url` instead of `query` to `apify/rag-web-browser` and
+  trips the zero-tool-error gate, `report-problem-on-tool-error`, `search-generic-scrapers`,
+  `tasks/chain-hard-1`, `web-fetch/format-discovery`, `web-fetch/status-hard-1`. Raise the
+  threshold as those are fixed or accepted.
 
 `.github/workflows/_evaluations.yaml` is the reusable workflow both tiers run through
 (`inputs.tier: pr | merge`); three workflows call it:
