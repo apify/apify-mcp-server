@@ -251,16 +251,13 @@ export function validateConcurrency(value: number): void {
 }
 
 /**
- * Resolves the branch name used in a run's name, from `git rev-parse --abbrev-ref HEAD`'s raw
- * output and the environment. That command prints the literal string `HEAD` (not an error, and
- * not `unknown`) on a detached checkout — exactly what `actions/checkout` produces by default for
- * a `pull_request` event — so an unrecognized or missing branch falls back to the GitHub Actions
- * env vars that carry it instead: `GITHUB_HEAD_REF` (the PR's source branch) first, then
- * `GITHUB_REF_NAME` (e.g. `master` on a push event).
+ * Branch name for a run's name. `git rev-parse --abbrev-ref HEAD` prints the literal `HEAD` on
+ * a detached checkout (the `actions/checkout` default for a `pull_request` event), so fall back
+ * to `GITHUB_HEAD_REF` (the PR's source branch), then `GITHUB_REF_NAME` (e.g. `master` on push).
  */
 export function resolveGitBranch(
     rawBranch: string,
-    env: Partial<Pick<NodeJS.ProcessEnv, 'GITHUB_HEAD_REF' | 'GITHUB_REF_NAME'>>,
+    env: { GITHUB_HEAD_REF?: string; GITHUB_REF_NAME?: string },
 ): string {
     const branch = rawBranch.trim();
     if (branch && branch !== 'HEAD') return branch;

@@ -73,16 +73,13 @@ type CliArgs = {
     passThreshold: number;
 };
 
-/**
- * Current git branch, falling back to the CI env when git can't name one (detached HEAD, or
- * the command itself fails). See `resolveGitBranch()` for the fallback order.
- */
+/** Current git branch, with `resolveGitBranch()`'s CI env fallbacks when git can't name one. */
 function getGitBranch(): string {
     let rawBranch = '';
     try {
         rawBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' });
     } catch {
-        // rawBranch stays '', resolveGitBranch() falls through to the env vars below.
+        // Not a git checkout; the env fallbacks decide.
     }
     return resolveGitBranch(rawBranch, process.env);
 }

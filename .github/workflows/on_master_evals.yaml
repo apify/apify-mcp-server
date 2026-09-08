@@ -1,8 +1,7 @@
 name: CI (master evals)
 
-# Separate from on_master.yaml on purpose: that workflow holds the `release` concurrency group
-# for its whole run, so an eval job inside it would keep the next release queued behind up to
-# 90 minutes of evaluation it does not gate. Same push event, own groups.
+# Not in on_master.yaml: that workflow holds the `release` lock for its whole run, and evals
+# gate no release (README CI section).
 on:
     push:
         branches:

@@ -516,10 +516,9 @@ run does when it fails differs, and neither is a required status check today:
 
 - the `pr` tier **fails its job** on a pass rate below the `--pass-threshold` the workflow passes
   (`0.93`, the floor of 3 `claude-haiku-4-5` runs calibrated in apify/ai-team#240; provisional
-  until re-pinned from real CI runs), so it shows red on the PR, but no branch-protection rule
-  requires it (see "Not a required check" below);
+  until re-pinned from real CI runs), so it shows red on the PR;
 - the `full` tier runs **after** a merge and is currently `continue-on-error` — measurement only
-  until a full-tier threshold is calibrated. It cannot block anything.
+  until a full-tier threshold is calibrated.
 
 `.github/workflows/_evaluations.yaml` is the reusable workflow both tiers run through
 (`inputs.tier: pr | full`); four workflows call it:
@@ -576,11 +575,9 @@ after this PR exists is what settles it. `_evaluations.yaml`'s job `timeout-minu
 labeled run gives a real number, the same "measure then tune" treatment as the pr-tier
 `--pass-threshold` and `--concurrency` above.
 
-**MCP-handshake race.** See "Common issues" above: a fast model can read the SDK's
-still-connecting notice and fall back to a built-in tool instead of waiting. A CI run retries a
-transient agent-run failure once automatically (`isTransientAgentError` in
-`langfuse_experiment.ts`); if this race reproduces on GitHub-hosted runners at a higher rate than
-in local calibration, both tiers could see spurious failures until observed and, if needed, tuned.
+**MCP-handshake race.** See "Common issues" above. A CI run retries a transient agent-run
+failure once automatically (`isTransientAgentError` in `langfuse_experiment.ts`); if the race
+reproduces more often on GitHub-hosted runners than locally, both tiers can see spurious failures.
 
 ## References
 

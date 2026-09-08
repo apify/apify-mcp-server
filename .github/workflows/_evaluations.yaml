@@ -28,11 +28,15 @@ jobs:
     evaluations:
         name: MCP agent evaluations (${{ inputs.tier }})
         runs-on: ubuntu-latest
-        # Generous, provisional ceilings — neither tier has been timed on a real runner yet.
-        # The labeled run measures actual durations; tighten these once real numbers exist
-        # (see evals/mcp_agent/README.md's CI section, same "measure then tune" treatment as
-        # the pr-tier --pass-threshold and --concurrency).
+        # Provisional; tighten once a real runner has timed each tier (README CI section).
         timeout-minutes: ${{ inputs.tier == 'pr' && 30 || 90 }}
+        env:
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+            LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+            LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+            LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+            APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+            OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         steps:
             -   name: Validate tier input
                 run: |
@@ -55,8 +59,6 @@ jobs:
             -   name: Seed task fixtures (full tier only)
                 if: inputs.tier == 'full'
                 run: pnpm run evals:mcp-agent:tasks-fixtures
-                env:
-                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 
             # --pass-threshold 0.93 is the floor of 3 claude-haiku-4-5 pr-tier runs (0.9434,
             # 0.9381, 0.9429), calibrated in apify/ai-team#240. Provisional: those runs were in a
@@ -67,28 +69,13 @@ jobs:
                     pnpm run evals:mcp-agent -- --tier pr
                     --pass-threshold 0.93
                     --agent-model claude-haiku-4-5 --claude-judge
-                env:
-                    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-                    LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
-                    LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
-                    LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
-                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 
-            # Measurement-only until a full-tier threshold exists. With no --pass-threshold the
-            # CLI falls back to DEFAULT_PASS_THRESHOLD, calibrated on the 115-item pr tier, not
-            # on the 60 judged full-tier items — and the README documents full-tier cases
-            # claude-haiku-4-5 fails by design, so a blocking job here would red every merge.
-            # Set FULL_TIER_PASS_THRESHOLD from the first runs, pass it here, then drop this.
-            # continue-on-error belongs on the step: a caller job that uses: a reusable workflow
-            # does not support it.
+            # Measurement-only until a full-tier threshold is calibrated: without --pass-threshold
+            # the CLI falls back to DEFAULT_PASS_THRESHOLD, calibrated on the pr tier, and the
+            # README documents full-tier cases claude-haiku-4-5 fails by design (README CI
+            # section). continue-on-error must sit on the step: a caller job that `uses:` a
+            # reusable workflow does not support it.
             -   name: Run full-tier evals (not gating)
                 if: inputs.tier == 'full'
                 continue-on-error: true
                 run: pnpm run evals:mcp-agent -- --tier full
-                env:
-                    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-                    LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
-                    LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
-                    LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
-                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-                    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
