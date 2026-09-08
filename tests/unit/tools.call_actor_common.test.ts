@@ -19,7 +19,7 @@ import {
     handleMcpToolCall,
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
-import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { textOf, type TextToolResult } from './helpers/tool_context.js';
 
@@ -46,6 +46,34 @@ describe('call_actor_common', () => {
         // reaches buildRunDataset, so the field-metadata promise must stay tied to waitSecs > 0.
         it('promises dataset field metadata only for a non-zero wait', () => {
             expect(buildCallActorDescription()).toContain('with waitSecs > 0 also reports dataset field metadata');
+        });
+
+        // call-actor-widget is not auto-paired — gate strictly on its own presence, not on
+        // ALL_TOOLS_PRESENT happening to include everything.
+        function only(...present: string[]): ToolDescriptionContext {
+            const set = new Set(present);
+            return { hasTool: (name) => set.has(name) };
+        }
+
+        it('omits the widget addendum when call-actor-widget is absent from the session', () => {
+            const description = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.STORE_SEARCH),
+            );
+            expect(description).not.toContain('WIDGET ALTERNATIVE');
+            expect(description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        });
+
+        it('includes the widget addendum when call-actor-widget is present, and gates its own sub-bullet on search-actors', () => {
+            const withSearch = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.STORE_SEARCH),
+            );
+            expect(withSearch).toContain('WIDGET ALTERNATIVE');
+            expect(withSearch).toContain(`call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead`);
+            expect(withSearch).toContain(`use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}`);
+
+            const withoutSearch = buildCallActorDescription(only(HELPER_TOOLS.ACTOR_CALL_WIDGET));
+            expect(withoutSearch).toContain('WIDGET ALTERNATIVE');
+            expect(withoutSearch).not.toContain(HELPER_TOOLS.STORE_SEARCH);
         });
     });
 

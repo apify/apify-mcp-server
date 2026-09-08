@@ -45,7 +45,9 @@ import { getActorTask } from './tasks/get_actor_task.js';
 import { publishActorTask } from './tasks/publish_actor_task.js';
 import { unpublishActorTask } from './tasks/unpublish_actor_task.js';
 import { updateActorTask } from './tasks/update_actor_task.js';
+import { callActorWidget } from './widgets/call_actor_widget.js';
 import { fetchActorDetailsWidget } from './widgets/fetch_actor_details_widget.js';
+import { getActorRunWidget } from './widgets/get_actor_run_widget.js';
 import { searchActorsWidget } from './widgets/search_actors_widget.js';
 
 type ModeMap = Partial<Record<SERVER_MODE, ToolEntry>>;
@@ -135,16 +137,29 @@ export function getCategoryTools(mode: SERVER_MODE = SERVER_MODE.DEFAULT): ToolC
 export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] = ['actors', 'docs'];
 
 /**
- * Apps-mode pairing: each base tool name maps to its widget sibling.
- * In apps mode, a widget is added to the resolved tool list iff its base
- * tool is already present — see `getToolsForServerMode` in tools_loader.ts.
+ * All widget tools, regardless of auto-pairing. Every widget is always directly selectable via
+ * `?tools=<widget-name>` and always counts as a known internal tool (never misclassified as an
+ * Actor ID) — see `ALL_INTERNAL_TOOL_NAMES` and the direct-selection lookup in tools_loader.ts.
+ * Selecting a widget alone never auto-brings its base tool (pairing, below, is one-way and only
+ * covers two of these four).
+ */
+export const ALL_WIDGET_TOOLS: readonly ToolEntry[] = [
+    searchActorsWidget,
+    fetchActorDetailsWidget,
+    callActorWidget,
+    getActorRunWidget,
+];
+
+/**
+ * Apps-mode auto-pairing: each base tool name maps to its widget sibling. In apps mode, a widget
+ * is added to the resolved tool list automatically iff its base tool is already present — see
+ * `getToolsForServerMode` in tools_loader.ts. Only these two tools auto-pair; `call-actor` and
+ * `get-actor-run` do not (low usage) — their widgets remain directly selectable (`ALL_WIDGET_TOOLS`
+ * above), just never auto-added.
  *
- * Pairing is intentionally one-way (base → widget). Selecting a widget alone
- * does NOT auto-bring its base; callers asking for widget-only get a UI without
+ * Pairing is intentionally one-way (base → widget) even for the two tools that do pair. Selecting
+ * a widget alone does NOT auto-bring its base; callers asking for widget-only get a UI without
  * the programmatic data tool. To get both, select the base (or both explicitly).
- *
- * `call-actor` and `get-actor-run` are deliberately left unpaired — this map also gates
- * direct `?tools=` selection, so removing an entry makes that widget fully unreachable.
  */
 export const WIDGET_BY_BASE_TOOL: ReadonlyMap<HelperToolName, ToolEntry> = new Map([
     [HELPER_TOOLS.STORE_SEARCH, searchActorsWidget],

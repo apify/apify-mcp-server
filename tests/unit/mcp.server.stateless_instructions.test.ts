@@ -49,7 +49,7 @@ describe('ActorsMcpServer.getStatelessServerInstructions()', () => {
         expect(instructions).not.toContain(RAG_WEB_BROWSER);
     });
 
-    it('names no widget for get-actor-run when an Actor tool auto-injects it — it has no widget sibling', () => {
+    it('names no widget for get-actor-run when an Actor tool auto-injects it — its widget was never selected', () => {
         const instructions = makeServer(SERVER_MODE.APPS).getStatelessServerInstructions(
             'http://localhost/?ui=apps&tools=apify/rag-web-browser',
         );

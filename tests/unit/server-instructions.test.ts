@@ -98,7 +98,7 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain('Data vs widget Actor tools');
     });
 
-    it('omits the data-vs-widget section for get-actor-run alone — it has no widget sibling', () => {
+    it('omits the data-vs-widget section for get-actor-run alone — its widget is not auto-paired', () => {
         const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.ACTOR_RUNS_GET));
         expect(instructions).not.toContain('Data vs widget Actor tools');
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
@@ -134,14 +134,83 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain(HELPER_TOOLS.STORE_SEARCH);
     });
 
-    // Apps mode with call-actor: every hosted apps session, and the one combination other cases don't cover.
-    it('keeps every call-actor mention in apps mode when the session has call-actor, and names no widget for it', () => {
+    // Apps mode with everything loaded: every hosted apps session, and the one combination other cases don't cover.
+    it('keeps every call-actor mention in apps mode when the session has call-actor, and includes both widgets when they are also loaded', () => {
         const instructions = getServerInstructions(SERVER_MODE.APPS, ALL_TOOLS_PRESENT);
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
         expect(instructions).toContain('### Tool dependencies');
         expect(instructions).toContain('Prefer dedicated tools when available');
+    });
+
+    describe('call-actor-widget / get-actor-run-widget (not auto-paired — explicit ?tools= only)', () => {
+        it('call-actor-widget alone: no bare "Widget workflow" heading (nothing to warn against), but the data-vs-widget bullet renders standalone', () => {
+            const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.ACTOR_CALL_WIDGET));
+            expect(instructions).not.toContain('Widget workflow');
+            expect(instructions).toContain(
+                '- `call-actor-widget` renders an interactive UI element (widget) that starts an Actor run and tracks its live progress',
+            );
+            expect(instructions).not.toContain('`call-actor` runs the Actor'); // absent tool, never named
+        });
+
+        it('get-actor-run-widget alone: self-referential duplicate-poll warning renders, names no absent tool', () => {
+            const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET));
+            expect(instructions).toContain('## Widget workflow');
+            expect(instructions).toContain(
+                '**After `get-actor-run-widget`, never call `get-actor-run-widget` for the same run.**',
+            );
+            expect(instructions).not.toContain('`get-actor-run` is a silent data lookup'); // absent tool
+            expect(instructions).toContain(
+                '- `get-actor-run-widget` renders an interactive UI element (widget) showing live run progress',
+            );
+        });
+
+        it('call-actor + call-actor-widget together: comparison bullet, and "never call" omits get-actor-run-widget (absent)', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.APPS,
+                only(HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.ACTOR_RUNS_GET, HELPER_TOOLS.ACTOR_CALL_WIDGET),
+            );
+            expect(instructions).toContain(
+                '**After `call-actor-widget`, never call `get-actor-run` for the same run.**',
+            );
+            expect(instructions).not.toContain('get-actor-run-widget'); // not in this session
+            expect(instructions).toContain('Polling `get-actor-run` after `call-actor` is fine');
+            expect(instructions).toContain(
+                '`call-actor` runs the Actor and returns its run status and storage IDs (no UI); `call-actor-widget` renders',
+            );
+        });
+
+        it('get-actor-run + get-actor-run-widget together: comparison bullet, full duplicate-poll warning', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.APPS,
+                only(HELPER_TOOLS.ACTOR_RUNS_GET, HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET),
+            );
+            expect(instructions).toContain(
+                '**After `get-actor-run-widget`, never call `get-actor-run` or `get-actor-run-widget` for the same run.**',
+            );
+            expect(instructions).toContain(
+                '`get-actor-run` is a silent data lookup (run status, dataset IDs, stats) with no UI; `get-actor-run-widget` renders',
+            );
+        });
+
+        it('both widgets, neither base tool: combined warning, correct plural grammar, both standalone bullets', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.APPS,
+                only(HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET),
+            );
+            expect(instructions).toContain(
+                '**After `call-actor-widget` or `get-actor-run-widget`, never call `get-actor-run-widget` for the same run.** Both widgets render live progress and poll themselves',
+            );
+            expect(instructions).not.toContain('`call-actor` runs the Actor');
+            expect(instructions).not.toContain('`get-actor-run` is a silent data lookup');
+        });
+
+        it('default mode never mentions either widget, even with everything loaded', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
+            expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        });
     });
 
     describe('"Tool dependencies and disambiguation" section', () => {

@@ -13,6 +13,7 @@ import { actorNameToToolName } from '../tools/actor_tool_naming.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
+    ALL_WIDGET_TOOLS,
     CATEGORY_NAME_SET,
     CATEGORY_NAMES,
     getCategoryTools,
@@ -52,8 +53,8 @@ const ALL_INTERNAL_TOOL_NAMES: Set<string> = (() => {
             for (const tool of categories[name]) names.add(tool.name);
         }
     }
-    // Widgets live only in WIDGET_BY_BASE_TOOL, not in any category
-    for (const widget of WIDGET_BY_BASE_TOOL.values()) names.add(widget.name);
+    // Widgets live in no category — ALL_WIDGET_TOOLS covers every widget, paired or not.
+    for (const widget of ALL_WIDGET_TOOLS) names.add(widget.name);
     return names;
 })();
 
@@ -200,9 +201,10 @@ export function getToolsForServerMode(
             toolsByName.set(tool.name, tool);
         }
     }
-    // Widgets are apps-only and not in any category; include it for direct selection
+    // Widgets are apps-only and not in any category; include every widget (paired or not) for
+    // direct `?tools=` selection.
     if (mode === SERVER_MODE.APPS) {
-        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+        for (const widget of ALL_WIDGET_TOOLS) {
             toolsByName.set(widget.name, widget);
         }
     }
@@ -270,12 +272,22 @@ export function getToolsForServerMode(
     // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session
     // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
     const hasGetActorRun = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_RUNS_GET);
+    // call-actor-widget starts a run, same as call-actor, so it wants the full bundle too (it is not
+    // itself a bundle member, so including get-actor-run raises no widget-only-purity issue).
+    const hasCallActorWidget = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL_WIDGET);
+    // get-actor-run-widget calls get-dataset-items internally for its preview, but IS itself the
+    // widget sibling of get-actor-run (a bundle member) — injecting the full bundle for it alone
+    // would silently add the base tool, contradicting one-way pairing (selecting a widget never
+    // auto-brings its base). Only get-dataset-items/-record/abort are genuinely needed here.
+    const hasGetActorRunWidget = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
 
     // Inject run-workflow helpers whenever any actor-running entrypoint is present; de-dup pass below drops repeats.
-    const toolsToInject: ToolEntry[] = [];
-    if (hasCallActor || hasActorTools || hasGetActorRun) {
-        toolsToInject.push(...AUTO_INJECTED_TOOLS);
-    }
+    const wantsFullBundle = hasCallActor || hasActorTools || hasGetActorRun || hasCallActorWidget;
+    const toolsToInject: ToolEntry[] = wantsFullBundle
+        ? [...AUTO_INJECTED_TOOLS]
+        : hasGetActorRunWidget
+          ? AUTO_INJECTED_TOOLS.filter((tool) => tool.name !== HELPER_TOOLS.ACTOR_RUNS_GET)
+          : [];
 
     if (toolsToInject.length > 0) {
         const callActorIndex = result.findIndex((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);

@@ -1,7 +1,11 @@
 /**
  * Server instructions — mode-aware text served to clients.
  *
- * Widget tool disambiguation renders only in apps mode, so default-mode clients are never told to call a tool absent from `tools/list`.
+ * Widget-related sections render only when the specific widget they name is actually in this
+ * session's tools/list — never from apps mode alone, never from the base tool's presence alone.
+ * Widget pairing with a base tool is optional (see `WIDGET_BY_BASE_TOOL` in `tools/registry.ts`):
+ * a widget can be loaded standalone via explicit `?tools=`, so every clause here is gated on the
+ * exact tool name it mentions.
  */
 
 import { getApifyAPIBaseUrl } from '../../apify_client.js';
@@ -27,6 +31,46 @@ export function getServerInstructions(
     const hasSearch = hasTool(HELPER_TOOLS.STORE_SEARCH);
     const hasDetails = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS);
     const hasCall = hasTool(HELPER_TOOLS.ACTOR_CALL);
+    const hasRunsGet = hasTool(HELPER_TOOLS.ACTOR_RUNS_GET);
+    const hasCallWidget = hasTool(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+    const hasRunsGetWidget = hasTool(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+
+    // call-actor-widget/get-actor-run-widget are not auto-paired with their base tool (unlike
+    // search-actors/fetch-actor-details); each is gated on its own presence only.
+    const widgetWorkflowSection = (() => {
+        if (!isApps || (!hasCallWidget && !hasRunsGetWidget)) return '';
+
+        const renderers: (string | false)[] = [
+            hasCallWidget && HELPER_TOOLS.ACTOR_CALL_WIDGET,
+            hasRunsGetWidget && HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET,
+        ];
+        const renderersFiltered = renderers.filter((n): n is string => Boolean(n));
+        // Nothing to warn against re-calling if neither get-actor-run nor get-actor-run-widget is loaded.
+        const dontCallAgain: (string | false)[] = [
+            hasRunsGet && HELPER_TOOLS.ACTOR_RUNS_GET,
+            hasRunsGetWidget && HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET,
+        ];
+        const dontCallAgainFiltered = dontCallAgain.filter((n): n is string => Boolean(n));
+
+        const dupWarning =
+            dontCallAgainFiltered.length > 0
+                ? `- **After ${renderersFiltered.map((n) => `\`${n}\``).join(' or ')}, never call ${dontCallAgainFiltered.map((n) => `\`${n}\``).join(' or ')} for the same run.** ${renderersFiltered.length > 1 ? 'Both widgets render live progress and poll themselves' : 'It renders live progress and polls itself'} — stop after the widget response and defer to it for run status.${hasRunsGetWidget ? ` Re-rendering the same run via \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` is a duplicate.` : ''}\n`
+                : '';
+        const pollOkLine =
+            hasCall && hasRunsGet
+                ? `- Polling \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` after \`${HELPER_TOOLS.ACTOR_CALL}\` is fine — that tool renders no UI, so polling is expected when the run is non-terminal and you need the latest status.\n`
+                : '';
+
+        // Nothing actionable to say (e.g. call-actor-widget alone, no get-actor-run/-widget in the
+        // session at all) — suppress the whole section rather than a heading with no bullets under it.
+        if (dupWarning === '' && pollOkLine === '') return '';
+
+        return `
+## Widget workflow (applies when tool responses include widget metadata)
+Some clients render widget-backed Actor tools: the response includes a live UI that automatically polls run status. When a widget is rendered, follow-up status polling by the model is a forbidden duplicate.
+
+${dupWarning}${pollOkLine}`;
+    })();
 
     const toolDependencies = hasCall
         ? `### Tool dependencies
@@ -57,15 +101,25 @@ export function getServerInstructions(
 `
                 : '';
 
-    // Gates on BOTH the base tool and its widget being loaded — naming either one when only the
-    // other is present would tell the model to call a tool absent from this session's tools/list.
-    // call-actor and get-actor-run have no widget sibling, so they never qualify here.
+    // search-actors/fetch-actor-details auto-pair with their widget, so require both before
+    // comparing them. call-actor/get-actor-run don't auto-pair — a widget-only session is the
+    // expected case there, so their bullets render from the widget alone, standalone-worded.
     const hasSearchPair = hasSearch && hasTool(HELPER_TOOLS.STORE_SEARCH_WIDGET);
     const hasDetailsPair = hasDetails && hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+    const callWidgetBullet = hasCallWidget
+        ? hasCall
+            ? `  - \`${HELPER_TOOLS.ACTOR_CALL}\` runs the Actor and returns its run status and storage IDs (no UI); \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.\n`
+            : `  - \`${HELPER_TOOLS.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that starts an Actor run and tracks its live progress — use it only when the user explicitly asks to see progress.\n`
+        : '';
+    const runsGetWidgetBullet = hasRunsGetWidget
+        ? hasRunsGet
+            ? `  - \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.\n`
+            : `  - \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.\n`
+        : '';
     const widgetToolDisambiguation =
-        isApps && (hasSearchPair || hasDetailsPair)
+        isApps && (hasSearchPair || hasDetailsPair || hasCallWidget || hasRunsGetWidget)
             ? `- **Data vs widget Actor tools (when the client supports widgets):**
-${hasSearchPair ? `  - \`${HELPER_TOOLS.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HELPER_TOOLS.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.\n` : ''}${hasDetailsPair ? `  - \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.\n` : ''}${hasSearchPair && hasDetailsPair ? `  - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.\n` : ''}`
+${hasSearchPair ? `  - \`${HELPER_TOOLS.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HELPER_TOOLS.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.\n` : ''}${hasDetailsPair ? `  - \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.\n` : ''}${callWidgetBullet}${runsGetWidgetBullet}${hasSearchPair && hasDetailsPair ? `  - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.\n` : ''}`
             : '';
 
     const searchVsRagWebBrowser =
@@ -144,7 +198,7 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`${apiBaseUrl}/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
 - Reads inline up to ~256 KB; a larger response is not downloaded — it returns a short notice with a download URL instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap.
 - Examples: \`${apiBaseUrl}/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`${apiBaseUrl}/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
-${dependenciesAndDisambiguation}${
+${widgetWorkflowSection}${dependenciesAndDisambiguation}${
         hasTool(HELPER_TOOLS.PROBLEM_REPORT)
             ? `
 If a tool or Actor fails and you cannot resolve it, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.

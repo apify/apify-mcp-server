@@ -186,7 +186,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
     });
 
-    describe('call-actor is mode-agnostic (no widget sibling)', () => {
+    describe('call-actor is mode-agnostic (its widget addendum is session-gated, not mode-gated)', () => {
         it('is the exact same tool entry in both modes', () => {
             const appsCallActor = appsCategories.actors.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
             const defaultCallActor = defaultCategories.actors.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
@@ -281,7 +281,8 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
     });
 
-    // call-actor and get-actor-run have no widget siblings.
+    // call-actor and get-actor-run don't auto-pair with their widget (unlike search-actors/
+    // fetch-actor-details) — the widget must be selected explicitly.
     it('tools: ["call-actor"] in apps mode auto-injects get-actor-run but pairs no widgets', () => {
         const names = namesFor({ tools: ['call-actor'] }, SERVER_MODE.APPS);
         expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
@@ -304,6 +305,40 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
         const names = namesFor({ tools: ['actors'] }, SERVER_MODE.DEFAULT);
         expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+    });
+
+    describe('explicit ?tools= selection of the unpaired widgets', () => {
+        it('call-actor-widget alone: selectable, and auto-injects the same run-workflow helpers call-actor gets', () => {
+            const names = namesFor({ tools: ['call-actor-widget'] }, SERVER_MODE.APPS);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL); // widget-only, no base auto-added
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+            expect(names).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+            expect(names).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
+        });
+
+        it('get-actor-run-widget alone: selectable, auto-injects get-dataset-items but NOT get-actor-run itself (a bundle member)', () => {
+            const names = namesFor({ tools: ['get-actor-run-widget'] }, SERVER_MODE.APPS);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET); // widget-only, no base auto-added
+            expect(names).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+            expect(names).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
+        });
+
+        it('call-actor + call-actor-widget together: both present, no duplicate auto-injection', () => {
+            const names = namesFor({ tools: ['call-actor', 'call-actor-widget'] }, SERVER_MODE.APPS);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(names.filter((n) => n === HELPER_TOOLS.ACTOR_RUNS_GET)).toHaveLength(1);
+        });
+
+        it('call-actor-widget/get-actor-run-widget selectors are silently dropped in default mode', () => {
+            const names = namesFor({ tools: ['call-actor-widget', 'get-actor-run-widget'] }, SERVER_MODE.DEFAULT);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        });
     });
 });
 

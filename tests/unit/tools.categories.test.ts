@@ -38,7 +38,7 @@ describe('getCategoryTools', () => {
         }
     });
 
-    it('should share the same call-actor tool across modes (mode-independent, no widget sibling)', () => {
+    it('should share the same call-actor tool across modes (mode-independent object; widget addendum is session-gated)', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 

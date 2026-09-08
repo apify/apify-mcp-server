@@ -112,6 +112,16 @@ function buildCallFailureRecoveryHint(loadedToolNames: readonly string[]): strin
     return hints.length ? `You can ${hints.join(', or ')}.` : '';
 }
 
+// call-actor-widget is not auto-paired (see WIDGET_BY_BASE_TOOL) but stays directly selectable via
+// ?tools=call-actor-widget — gate strictly on its own presence, never on apps mode alone.
+function buildWidgetAddendum({ hasTool }: ToolDescriptionContext): string {
+    return dedent`
+        WIDGET ALTERNATIVE (apps mode):
+        - If the user explicitly asks to see live progress, call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead — it renders an interactive UI that tracks the run.
+        ${hasTool(HELPER_TOOLS.STORE_SEARCH) ? `- For silent name resolution before this call, use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}, which renders UI).` : ''}
+    `;
+}
+
 function buildCallActorDescriptionSections(ctx: ToolDescriptionContext): string {
     const { hasTool } = ctx;
     const workflowSection = [
@@ -145,6 +155,8 @@ function buildCallActorDescriptionSections(ctx: ToolDescriptionContext): string 
         `,
         CALL_ACTOR_EXAMPLES_SECTION,
     ];
+
+    if (hasTool(HELPER_TOOLS.ACTOR_CALL_WIDGET)) sections.push(buildWidgetAddendum(ctx));
 
     return sections.join('\n\n');
 }
@@ -709,7 +721,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
     }
 }
 
-/** Mode-agnostic — call-actor-widget exists but is unpaired, so this description must not reference it. */
+/** Mode-agnostic — the widget addendum renders only when call-actor-widget is actually in this session (`hasTool`), not from a mode check. */
 export const callActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_CALL,

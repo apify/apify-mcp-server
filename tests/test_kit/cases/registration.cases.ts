@@ -36,7 +36,6 @@ const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory
 // Claude-connector `?tools=` allowlist. No call-actor. Actor entries use their slash name here;
 // served tool names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
 // NOTE: hypothetical selection, not the actual reviewed connector URL (ai-team#214).
-// get-actor-run-widget is unreachable — get-actor-run has no widget sibling (see WIDGET_BY_BASE_TOOL).
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
