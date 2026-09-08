@@ -637,12 +637,7 @@ export type ActorsMcpServerOptions = {
      * - 'http': Remote HTTP streamable connection
      */
     transportType?: TransportType;
-    /**
-     * Raw `?client=` query-param value from the connecting URL, for Segment attribution.
-     * An explicit tag for which setup/connector path was used (e.g. `cursor`, `chatgpt`),
-     * independent of the MCP handshake's self-reported `clientInfo.name`. HTTP transport only;
-     * always undefined on stdio (no URL to read it from).
-     */
+    /** Raw `?client=` value from the connecting URL, for Segment attribution; independent of `clientInfo.name`, HTTP-only (undefined on stdio). */
     clientParam?: string;
     /**
      * Apify API token for authentication

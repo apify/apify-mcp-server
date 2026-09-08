@@ -35,13 +35,8 @@ const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory
 
 // Claude-connector `?tools=` allowlist. No call-actor. Actor entries use their slash name here;
 // served tool names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
-// NOTE: does not mirror the actual URL submitted to Anthropic for AUP review (ai-team#214) — that
-// one excludes report-problem and uses a different Actor/tool set. This fixture pins the server's
-// own tools/list behavior for a hypothetical selection, not the live, reviewed connector surface.
-// get-actor-run-widget is NOT listed as its own selector: getToolsForServerMode auto-pairs every
-// base tool with its widget sibling in apps mode, unconditionally (tools_loader.ts) — leaving it
-// out of ?tools= has no effect while get-actor-run stays and apps mode is on. Its low Mixpanel
-// usage (0.1% of get-actor-run calls) has no lever here without also dropping get-actor-run itself.
+// NOTE: hypothetical selection, not the actual reviewed connector URL (ai-team#214).
+// get-actor-run-widget omitted deliberately: apps mode auto-pairs it with get-actor-run regardless of ?tools= (tools_loader.ts).
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
@@ -111,12 +106,9 @@ export const registrationCases: Case[] = [
         }),
     },
     {
-        // Pinned ?tools= wins for call-actor even with the report-problem auto-inject path live.
-        // telemetry must be explicit here: the deployed target this runs against defaults it off
-        // (confirmed by CI — omitting the param served no report-problem there), unlike this
-        // package's own DEFAULT_TELEMETRY_ENABLED=true.
-        // No ?ui= either: apps mode comes from the client's own UI-capability advertisement
-        // (serverMode 'auto' default), same as a real MCP-Apps client — not a URL override.
+        // Pinned ?tools= wins for call-actor even with report-problem auto-inject live.
+        // telemetry: true is explicit — the deployed target defaults it off (confirmed by CI), unlike this package's own default.
+        // No ?ui=: apps mode comes from the client's own UI-capability advertisement (serverMode 'auto'), not a URL override.
         name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude+connector',
         isDeploymentTest: true,
         skipIf: () => !SERVER_MODE_AUTO_DETECTION_ENABLED,

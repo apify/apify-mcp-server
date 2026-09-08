@@ -22,7 +22,7 @@ export interface SuiteClientOptions {
     };
     serverMode?: string; // ?ui=
     payment?: string; // ?payment=
-    /** Attribution tag for `?client=`. A space encodes as `+` on the wire (e.g. 'claude connector' -> `?client=claude+connector`). */
+    /** Attribution tag for `?client=`; a space encodes as `+` on the wire (e.g. 'claude connector' -> `?client=claude+connector`). */
     client?: string;
     clientCapabilities?: ClientCapabilities;
     /** Bearer token. Omitted → `APIFY_TOKEN`. `null` → no Authorization header. */
