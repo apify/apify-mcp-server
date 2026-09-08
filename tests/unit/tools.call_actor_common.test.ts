@@ -63,17 +63,24 @@ describe('call_actor_common', () => {
             expect(description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
         });
 
-        it('includes the widget addendum when call-actor-widget is present, and gates its own sub-bullet on search-actors', () => {
-            const withSearch = buildCallActorDescription(
-                only(HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.STORE_SEARCH),
+        it('includes the widget addendum when call-actor-widget is present, and gates its own sub-bullet on search-actors AND its widget', () => {
+            const withPair = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.STORE_SEARCH_WIDGET),
             );
-            expect(withSearch).toContain('WIDGET ALTERNATIVE');
-            expect(withSearch).toContain(`call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead`);
-            expect(withSearch).toContain(`use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}`);
+            expect(withPair).toContain('WIDGET ALTERNATIVE');
+            expect(withPair).toContain(`call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead`);
+            expect(withPair).toContain(`use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}`);
 
             const withoutSearch = buildCallActorDescription(only(HELPER_TOOLS.ACTOR_CALL_WIDGET));
             expect(withoutSearch).toContain('WIDGET ALTERNATIVE');
             expect(withoutSearch).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+
+            // search-actors alone must not recommend its widget — the bug this gates.
+            const searchOnlyNoWidget = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.STORE_SEARCH),
+            );
+            expect(searchOnlyNoWidget).toContain('WIDGET ALTERNATIVE');
+            expect(searchOnlyNoWidget).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         });
     });
 
