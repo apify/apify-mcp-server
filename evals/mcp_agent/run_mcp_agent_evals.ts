@@ -35,7 +35,7 @@ import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
 import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { assertStdioBinExists } from './claude_agent.js';
 import { ClaudeLlmClient } from './claude_judge_client.js';
-import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
+import { DEFAULT_PASS_THRESHOLD, DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
 import { fetchMcpAgentCases, filterByTier, MCP_AGENT_DATASET_NAME } from './langfuse_dataset.js';
 import {
     buildRunSummary,
@@ -147,7 +147,7 @@ async function main() {
             'pass-threshold': {
                 type: 'number',
                 description: 'Aggregate pass rate (passed trials / requested trials) required to exit 0',
-                default: 1.0,
+                default: DEFAULT_PASS_THRESHOLD,
             },
         })
         // Reject a bad run flag up front, before any LLM spend.

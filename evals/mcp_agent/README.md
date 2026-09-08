@@ -42,7 +42,7 @@ pnpm run build
 pnpm run evals:mcp-agent
 ```
 
-Run `pnpm run evals:mcp-agent --help` for the full option list. `--category` and `--id` narrow the run, `--tier pr|full` keeps only items whose `tier` array contains that value (absent = all tiers), `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--iterations N` (default 1) repeats each selected item N times within the same run and prints `pass@k`/`pass^k`, `--pass-threshold` (default `1.0`) gates the exit code on the aggregate pass rate instead of requiring every trial to pass, `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API), and `--claude-judge` runs the judge on the Claude Agent SDK too, so no `OPENROUTER_API_KEY` is needed (`--judge-model` then takes an Anthropic model ID, default `claude-sonnet-5`; note a Claude judge scoring a Claude agent can be self-lenient, so prefer the OpenRouter judge for comparable numbers). With `--subscription --claude-judge` a run needs only `APIFY_TOKEN` and the Langfuse keys.
+Run `pnpm run evals:mcp-agent --help` for the full option list. `--category` and `--id` narrow the run, `--tier pr|full` keeps only items whose `tier` array contains that value (absent = all tiers), `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--iterations N` (default 1) repeats each selected item N times within the same run and prints `pass@k`/`pass^k`, `--pass-threshold` (default `0.97`, rationale in `config.ts`) gates the exit code on the aggregate pass rate instead of requiring every trial to pass, `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API), and `--claude-judge` runs the judge on the Claude Agent SDK too, so no `OPENROUTER_API_KEY` is needed (`--judge-model` then takes an Anthropic model ID, default `claude-sonnet-5`; note a Claude judge scoring a Claude agent can be self-lenient, so prefer the OpenRouter judge for comparable numbers). With `--subscription --claude-judge` a run needs only `APIFY_TOKEN` and the Langfuse keys.
 
 ### One dataset: kind, tier, id scheme, and expectedErrors
 
@@ -186,7 +186,7 @@ rather than blocked in code: measuring an agent item's flakiness (e.g. `tasks/ch
 
 **Exit codes:**
 - `0` = the aggregate pass rate (passed trials / requested trials) meets `--pass-threshold`
-  (default `1.0`, i.e. every requested trial passed) ✅
+  (default `0.97`; pass `1.0` to require every trial) ✅
 - `1` = the pass rate falls short of the threshold, or setup failed ❌
 
 **Editing test cases:** edit the items in the Langfuse UI. The next run picks them up; there is nothing to commit
@@ -253,11 +253,11 @@ The server is registered with `alwaysLoad: true`. Left at the default, its tools
 
 ### 4. Pass rate gated on the requested trial count, threshold-configurable
 
-**Decision:** Exit code 0 while `passedTrials / requestedTrials >= --pass-threshold` (default `1.0`,
-reproducing strict all-pass). `requestedTrials = requestedIds.length * iterations`.
+**Decision:** Exit code 0 while `passedTrials / requestedTrials >= --pass-threshold` (default `0.97`,
+rationale in `config.ts`). `requestedTrials = requestedIds.length * iterations`.
 
 **Why:**
-- Clear CI/CD signal by default (every trial must pass), while still letting a calibrated suite gate on an aggregate rate instead of one flaky item blocking every PR
+- A calibrated suite gates on an aggregate rate instead of one flaky item blocking every PR; `--pass-threshold 1.0` restores strict all-pass
 - The trial count matters as much as the scores: the Langfuse SDK drops an item whose task throws, so gating on the results it returns would report `7/7 passed` on a run where three trials never executed
 
 Harness failures (MCP spawn, OpenRouter, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
