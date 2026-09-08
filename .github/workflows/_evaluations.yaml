@@ -64,6 +64,8 @@ jobs:
             # --pass-threshold 0.93 is the floor of 3 claude-haiku-4-5 pr-tier runs (0.9434,
             # 0.9381, 0.9429), calibrated in apify/ai-team#240. Provisional: those runs were in a
             # sandbox with a flaky TLS proxy; re-pin from the first real CI runs.
+            # No judge runs on tool-call items; --claude-judge only lifts the CLI's
+            # OPENROUTER_API_KEY requirement.
             -   name: Run pr-tier evals
                 if: inputs.tier == 'pr'
                 run: >

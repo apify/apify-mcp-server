@@ -524,7 +524,7 @@ it fails differs, and neither is a required status check today:
   until a merge-tier threshold is calibrated.
 
 `.github/workflows/_evaluations.yaml` is the reusable workflow both tiers run through
-(`inputs.tier: pr | merge`); four workflows call it:
+(`inputs.tier: pr | merge`); three workflows call it:
 
 | Surface | Tier(s) | Firing event | Workflow file |
 |---|---|---|---|
@@ -555,7 +555,7 @@ extra runs.
 
 | Secret | Used by |
 |---|---|
-| `ANTHROPIC_API_KEY` | both tiers (the agent; the `pr` tier's judge too, via `--claude-judge`) |
+| `ANTHROPIC_API_KEY` | both tiers (the agent). The `pr` tier passes `--claude-judge` only so the CLI stops requiring `OPENROUTER_API_KEY`; its tool-call items never run a judge |
 | `OPENROUTER_API_KEY` | `merge` tier only (the judge) |
 | `LANGFUSE_PUBLIC_KEY` | both tiers |
 | `LANGFUSE_SECRET_KEY` | both tiers |
