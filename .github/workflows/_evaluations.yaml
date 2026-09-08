@@ -1,6 +1,7 @@
-# Reusable workflow for MCP agent evaluations (Langfuse-backed): the `pr` tier (fast,
-# deterministic tool-selection cases) and the `full` tier (judged multi-turn agent cases).
-# See evals/mcp_agent/README.md's CI section.
+# Reusable workflow for MCP agent evaluations (Langfuse-backed). The `pr` tier runs the
+# `kind: tool-call` items (no judge, nothing executes) and gates PRs; the `merge` tier runs
+# the `kind: agent` items (judged, live account) after a merge. See evals/mcp_agent/README.md's
+# CI section.
 
 on:
     workflow_call:
@@ -8,7 +9,7 @@ on:
             tier:
                 description: 'Which eval tier to run'
                 required: true
-                type: string # 'pr' | 'full'
+                type: string # 'pr' | 'merge'
         secrets:
             ANTHROPIC_API_KEY:
                 required: true
@@ -21,7 +22,7 @@ on:
             APIFY_TOKEN:
                 required: true
             OPENROUTER_API_KEY:
-                description: 'Judge model on OpenRouter. Only used by tier: full.'
+                description: 'Judge model on OpenRouter. Only used by tier: merge.'
                 required: false
 
 jobs:
@@ -40,8 +41,8 @@ jobs:
         steps:
             -   name: Validate tier input
                 run: |
-                    if [ "${{ inputs.tier }}" != "pr" ] && [ "${{ inputs.tier }}" != "full" ]; then
-                        echo "::error::inputs.tier must be 'pr' or 'full', got '${{ inputs.tier }}'"
+                    if [ "${{ inputs.tier }}" != "pr" ] && [ "${{ inputs.tier }}" != "merge" ]; then
+                        echo "::error::inputs.tier must be 'pr' or 'merge', got '${{ inputs.tier }}'"
                         exit 1
                     fi
 
@@ -56,8 +57,8 @@ jobs:
             -   name: Install pnpm and dependencies
                 uses: apify/actions/pnpm-install@v1.1.2
 
-            -   name: Seed task fixtures (full tier only)
-                if: inputs.tier == 'full'
+            -   name: Seed task fixtures (merge tier only)
+                if: inputs.tier == 'merge'
                 run: pnpm run evals:mcp-agent:tasks-fixtures
 
             # --pass-threshold 0.93 is the floor of 3 claude-haiku-4-5 pr-tier runs (0.9434,
@@ -70,12 +71,12 @@ jobs:
                     --pass-threshold 0.93
                     --agent-model claude-haiku-4-5 --claude-judge
 
-            # Measurement-only until a full-tier threshold is calibrated: without --pass-threshold
+            # Measurement-only until a merge-tier threshold is calibrated: without --pass-threshold
             # the CLI falls back to DEFAULT_PASS_THRESHOLD, calibrated on the pr tier, and the
-            # README documents full-tier cases claude-haiku-4-5 fails by design (README CI
+            # README documents merge-tier cases claude-haiku-4-5 fails by design (README CI
             # section). continue-on-error must sit on the step: a caller job that `uses:` a
             # reusable workflow does not support it.
-            -   name: Run full-tier evals (not gating)
-                if: inputs.tier == 'full'
+            -   name: Run merge-tier evals (not gating)
+                if: inputs.tier == 'merge'
                 continue-on-error: true
-                run: pnpm run evals:mcp-agent -- --tier full
+                run: pnpm run evals:mcp-agent -- --tier merge

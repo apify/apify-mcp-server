@@ -151,10 +151,10 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 | **Integration tests** | `pnpm run test:integration` | Full server over stdio, streamable HTTP and the `2026-07-28` stateless HTTP dimension against real Apify API (requires `APIFY_TOKEN` + `pnpm run build`) |
 | **Conformance tests** | `pnpm run test:conformance` | Official MCP conformance runner (`--suite all`) against a compiled dev server, run once per protocol era — spec versions `2026-07-28` and `2025-11-25`, in that order. The command builds first, runs both eras, and exits with the first non-zero code. `_conformance_tests.yaml`, called by `_integration_tests.yaml`, runs the same coverage in CI. Excluded scenarios and their reasons live in `scripts/conformance_expected_failures_2026_07_28.yaml` and `scripts/conformance_expected_failures_2025_11_25.yaml` (requires `APIFY_TOKEN`; set `PORT` to override port 3001) |
 | **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development |
-| **MCP agent evals** | `pnpm run evals:mcp-agent` | Two-tier Langfuse-backed suite (`pr`: fast tool-selection checks; `full`: judged multi-turn agent cases) — see `evals/mcp_agent/README.md`'s CI section |
+| **MCP agent evals** | `pnpm run evals:mcp-agent` | Two-tier Langfuse-backed suite (`pr`: `kind: tool-call` items, no judge; `merge`: `kind: agent` items, judged) — see `evals/mcp_agent/README.md`'s CI section |
 
 The `pr` tier runs automatically on same-repo, non-draft PRs that touch eval-relevant paths, and
-again (plus the `full` tier, which is measurement-only for now) on every push to `master`. To
+again (plus the `merge` tier, which is measurement-only for now) on every push to `master`. To
 re-run the `pr` tier on a same-repo PR the automatic trigger skipped, apply the **`validated`**
 label. Fork PRs cannot run either tier — GitHub withholds the secrets — so evaluating a fork's
 changes means pushing its branch into this repo.

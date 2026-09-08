@@ -510,24 +510,27 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 
 ## CI (apify/ai-team#261)
 
-CI runs these two suites, replacing the old Phoenix runner (`evals/run_evaluation.ts`, scheduled
-for deletion under #262 — its own `evals/README.md` no longer describes CI behavior). What each
-run does when it fails differs, and neither is a required status check today:
+CI runs the one `mcp-server-evals` dataset in two tiers, replacing the old Phoenix runner
+(`evals/run_evaluation.ts`, scheduled for deletion under #262 — its own `evals/README.md` no longer
+describes CI behavior). A tier is a filter on each item's `tier` metadata, independent of its
+`kind`; today every `pr` item is `kind: "tool-call"` (no judge, nothing executes), which is what
+keeps the gate fast, and every `merge` item is `kind: "agent"` (judged). What each run does when
+it fails differs, and neither is a required status check today:
 
 - the `pr` tier **fails its job** on a pass rate below the `--pass-threshold` the workflow passes
   (`0.93`, the floor of 3 `claude-haiku-4-5` runs calibrated in apify/ai-team#240; provisional
   until re-pinned from real CI runs), so it shows red on the PR;
-- the `full` tier runs **after** a merge and is currently `continue-on-error` — measurement only
-  until a full-tier threshold is calibrated.
+- the `merge` tier runs **after** a merge and is currently `continue-on-error` — measurement only
+  until a merge-tier threshold is calibrated.
 
 `.github/workflows/_evaluations.yaml` is the reusable workflow both tiers run through
-(`inputs.tier: pr | full`); four workflows call it:
+(`inputs.tier: pr | merge`); four workflows call it:
 
 | Surface | Tier(s) | Firing event | Workflow file |
 |---|---|---|---|
 | Same-repo, non-draft PR, eval-relevant paths changed | `pr` | `opened` / `reopened` / `ready_for_review` (never `synchronize`, so pushing a review fix doesn't re-spend the budget) | `on_pull_request_evals.yaml` |
 | `validated` label added to a same-repo PR | `pr` | `labeled` | `on_pull_request_label.yaml` |
-| Push to `master` (i.e. a merge) | `pr` **and** `full` | `push` | `on_master_evals.yaml` |
+| Push to `master` (i.e. a merge) | `pr` **and** `merge` | `push` | `on_master_evals.yaml` |
 
 `on_master_evals.yaml` is deliberately separate from `on_master.yaml`: that workflow holds the
 `release` concurrency group for its entire run, so an eval job inside it would keep the next
@@ -553,7 +556,7 @@ extra runs.
 | Secret | Used by |
 |---|---|
 | `ANTHROPIC_API_KEY` | both tiers (the agent; the `pr` tier's judge too, via `--claude-judge`) |
-| `OPENROUTER_API_KEY` | `full` tier only (the judge) |
+| `OPENROUTER_API_KEY` | `merge` tier only (the judge) |
 | `LANGFUSE_PUBLIC_KEY` | both tiers |
 | `LANGFUSE_SECRET_KEY` | both tiers |
 | `LANGFUSE_BASE_URL` | both tiers |
@@ -561,7 +564,7 @@ extra runs.
 `OPENROUTER_API_KEY` already exists at repository level (the pre-#261 workflow consumed it
 through `secrets: inherit`); the other four are new. `APIFY_TOKEN` is not a new secret either:
 both tiers reuse the existing `APIFY_TEST_USER_API_TOKEN` (available through the organization),
-mapped to the `APIFY_TOKEN` env var the CLI reads. The `full` tier's
+mapped to the `APIFY_TOKEN` env var the CLI reads. The `merge` tier's
 `tasks-fixtures` step and its `tasks/publish-*` cases additionally need that token's account to
 have write/collaborator access on `jiri.spilka/actor-troubleshooter` — without it, those cases
 fail regardless of code correctness.
@@ -571,7 +574,7 @@ measured on a real CI runner — the calibration runs in apify/ai-team#240 ran a
 `--concurrency 2` in a resource-constrained sandbox (12-15 min), which is not a valid estimate for
 a GitHub-hosted runner at the CLI's default `--concurrency 8`. The first `validated`-labeled run
 after this PR exists is what settles it. `_evaluations.yaml`'s job `timeout-minutes` (30 for `pr`,
-90 for `full`) is a generous, provisional safety net, not the target — it gets tightened once the
+90 for `merge`) is a generous, provisional safety net, not the target — it gets tightened once the
 labeled run gives a real number, the same "measure then tune" treatment as the pr-tier
 `--pass-threshold` and `--concurrency` above.
 

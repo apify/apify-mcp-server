@@ -25,16 +25,16 @@ jobs:
             LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
             APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
 
-    evaluations_full:
-        name: MCP agent evaluations (full)
-        # cancel-in-progress stays false: the full tier seeds shared account fixtures, so two
+    evaluations_merge:
+        name: MCP agent evaluations (merge)
+        # cancel-in-progress stays false: the merge tier seeds shared account fixtures, so two
         # overlapping runs would fight over them.
         concurrency:
-            group: eval-full-master
+            group: eval-merge-master
             cancel-in-progress: false
         uses: ./.github/workflows/_evaluations.yaml
         with:
-            tier: full
+            tier: merge
         secrets:
             ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
             LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
