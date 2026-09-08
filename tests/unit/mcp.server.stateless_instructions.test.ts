@@ -57,8 +57,7 @@ describe('ActorsMcpServer.getStatelessServerInstructions()', () => {
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
-    // report-problem is identity-dependent, never derivable from the URL alone; ?tools=dev puts
-    // it in the candidate set so this actually exercises the filter, not an always-true check.
+    // ?tools=dev seeds report-problem into the candidate set so this exercises the filter, not an always-true check.
     it('never mentions report-problem via a requestUrl, even when explicitly selected', () => {
         const instructions = makeServer().getStatelessServerInstructions('http://localhost/?tools=dev');
         expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);

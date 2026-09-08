@@ -82,10 +82,7 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
-/**
- * Whether this session can run this Actor: call-actor loaded, or the Actor's own tool loaded
- * (direct or Actor-MCP). Soft check for a guidance hint, not a hard gate.
- */
+/** Whether this session can run this Actor (call-actor, or the Actor's own tool, loaded); soft check for a guidance hint, not a hard gate. */
 export function canRunActor(
     actorId: string,
     loadedToolNames: readonly string[],
