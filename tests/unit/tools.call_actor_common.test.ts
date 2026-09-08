@@ -13,7 +13,6 @@ import { ActorLoadError } from '../../src/errors.js';
 import * as mcpClient from '../../src/mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import {
-    buildCallActorAppsDescription,
     buildCallActorDescription,
     buildCallActorErrorResponse,
     callActorArgs,
@@ -41,24 +40,12 @@ describe('call_actor_common', () => {
             expect(description).toContain('waitSecs');
             expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
-            expect(description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
         });
 
         // The waitSecs: 0 path (buildStartRunSharedContent) returns id-only storages and never
         // reaches buildRunDataset, so the field-metadata promise must stay tied to waitSecs > 0.
         it('promises dataset field metadata only for a non-zero wait', () => {
             expect(buildCallActorDescription()).toContain('with waitSecs > 0 also reports dataset field metadata');
-        });
-    });
-
-    describe('buildCallActorAppsDescription', () => {
-        it('appends widget guidance to the shared description', () => {
-            const description = buildCallActorAppsDescription();
-
-            expect(description).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-            expect(description).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-            expect(description).toContain('waitSecs');
-            expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         });
     });
 

@@ -49,12 +49,11 @@ describe('ActorsMcpServer.getStatelessServerInstructions()', () => {
         expect(instructions).not.toContain(RAG_WEB_BROWSER);
     });
 
-    it('includes widget workflow when an Actor tool auto-injects get-actor-run-widget', () => {
+    it('names no widget for get-actor-run when an Actor tool auto-injects it — it has no widget sibling', () => {
         const instructions = makeServer(SERVER_MODE.APPS).getStatelessServerInstructions(
             'http://localhost/?ui=apps&tools=apify/rag-web-browser',
         );
-        expect(instructions).toContain('## Widget workflow');
-        expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
     // ?tools=dev seeds report-problem into the candidate set so this exercises the filter, not an always-true check.

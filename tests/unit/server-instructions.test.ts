@@ -93,22 +93,21 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
 
-    it('omits both apps-mode Actor-run sections when get-actor-run is absent', () => {
+    it('omits the apps-mode data-vs-widget section when neither search-actors nor fetch-actor-details is loaded', () => {
         const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.DOCS_SEARCH));
-        expect(instructions).not.toContain('Widget workflow');
         expect(instructions).not.toContain('Data vs widget Actor tools');
     });
 
-    it('renders the apps-mode widget-workflow block when get-actor-run is loaded', () => {
+    it('omits the data-vs-widget section for get-actor-run alone — it has no widget sibling', () => {
         const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.ACTOR_RUNS_GET));
-        expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        expect(instructions).not.toContain('Data vs widget Actor tools');
+        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
     it('renders only the data-vs-widget bullets for tools actually loaded, in apps mode', () => {
         const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.STORE_SEARCH));
         expect(instructions).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
     it('omits the search-actors-vs-rag-web-browser comparison when search-actors is absent', () => {
@@ -117,12 +116,11 @@ describe('getServerInstructions()', () => {
     });
 
     // Apps mode with call-actor: every hosted apps session, and the one combination other cases don't cover.
-    it('keeps every call-actor mention in apps mode when the session has call-actor', () => {
+    it('keeps every call-actor mention in apps mode when the session has call-actor, and names no widget for it', () => {
         const instructions = getServerInstructions(SERVER_MODE.APPS, ALL_TOOLS_PRESENT);
-        expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-        expect(instructions).toContain(
-            `Polling \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` after \`${HELPER_TOOLS.ACTOR_CALL}\` is fine`,
-        );
+        expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
         expect(instructions).toContain('### Tool dependencies');
         expect(instructions).toContain('Prefer dedicated tools when available');
     });
@@ -143,8 +141,12 @@ describe('getServerInstructions()', () => {
         });
 
         it('keeps a blank line after the heading when only bullets render', () => {
-            const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.ACTOR_RUNS_GET));
-            expect(instructions).toContain(`${HEADING}\n\n- **Data vs widget Actor tools`);
+            // Only subsection with no `###` heading and no search/details/call dependency, so it renders alone.
+            const instructions = getServerInstructions(
+                SERVER_MODE.DEFAULT,
+                only(actorNameToToolName(WEB_FETCH), actorNameToToolName(RAG_WEB_BROWSER)),
+            );
+            expect(instructions).toContain(`${HEADING}\n\n- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**`);
         });
     });
 });
@@ -152,7 +154,7 @@ describe('getServerInstructions()', () => {
 /** Pins the Claude-connector tool surface (no call-actor); offline, no network or fixture. */
 describe('Claude-connector tool surface (no call-actor)', () => {
     const url =
-        'https://mcp.apify.com/?tools=search-actors,search-actors-widget,fetch-actor-details,fetch-actor-details-widget,search-apify-docs,fetch-apify-docs,get-actor-run,get-actor-run-widget,get-actor-run-list,get-actor-log,abort-actor-run,get-dataset-list,get-dataset,get-dataset-items,get-key-value-store-list,get-key-value-store,get-key-value-store-record,apify/rag-web-browser,apify/web-fetch';
+        'https://mcp.apify.com/?tools=search-actors,search-actors-widget,fetch-actor-details,fetch-actor-details-widget,search-apify-docs,fetch-apify-docs,get-actor-run,get-actor-run-list,get-actor-log,abort-actor-run,get-dataset-list,get-dataset,get-dataset-items,get-key-value-store-list,get-key-value-store,get-key-value-store-record,apify/rag-web-browser,apify/web-fetch';
 
     // Actor-tool selectors need a live fetch to resolve; checks the internal-tool subset only.
     const expectedInternalToolNames = [
@@ -163,7 +165,6 @@ describe('Claude-connector tool surface (no call-actor)', () => {
         HELPER_TOOLS.DOCS_SEARCH,
         HELPER_TOOLS.DOCS_FETCH,
         HELPER_TOOLS.ACTOR_RUNS_GET,
-        HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET,
         HELPER_TOOLS.ACTOR_RUN_LIST_GET,
         HELPER_TOOLS.ACTOR_RUNS_LOG,
         HELPER_TOOLS.ACTOR_RUNS_ABORT,

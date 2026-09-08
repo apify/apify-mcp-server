@@ -186,19 +186,13 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
     });
 
-    describe('mode-specific call-actor behavior guidance', () => {
-        it('apps call-actor description points to the widget sibling and warns against search-actors-widget for name resolution', () => {
+    describe('call-actor is mode-agnostic (no widget sibling)', () => {
+        it('is the exact same tool entry in both modes', () => {
             const appsCallActor = appsCategories.actors.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
             const defaultCallActor = defaultCategories.actors.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
 
             expect(appsCallActor).toBeDefined();
-            expect(appsCallActor!.description).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-            expect(appsCallActor!.description).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-
-            // Widget guidance must not leak into default mode where those tools don't exist.
-            expect(defaultCallActor).toBeDefined();
-            expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-            expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+            expect(appsCallActor).toBe(defaultCallActor);
         });
     });
 
@@ -278,8 +272,6 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
         expect(names).toContain(HELPER_TOOLS.DOCS_FETCH);
         expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
     it('tools: ["search-actors"] in apps mode pairs only the search-actors widget', () => {
@@ -287,33 +279,31 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
         expect(names).toContain(HELPER_TOOLS.STORE_SEARCH);
         expect(names).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
     });
 
-    it('tools: ["call-actor"] in apps mode pairs call-actor-widget and the auto-injected get-actor-run-widget', () => {
+    // call-actor and get-actor-run have no widget siblings.
+    it('tools: ["call-actor"] in apps mode auto-injects get-actor-run but pairs no widgets', () => {
         const names = namesFor({ tools: ['call-actor'] }, SERVER_MODE.APPS);
         expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
         expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-        expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
     });
 
-    it('tools: ["actors"] category in apps mode pairs all four actor widgets', () => {
+    it('tools: ["actors"] category in apps mode pairs the search and details widgets only', () => {
         const names = namesFor({ tools: ['actors'] }, SERVER_MODE.APPS);
         expect(names).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-        expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
     });
 
     it('default mode adds no widget tools regardless of selection', () => {
         const names = namesFor({ tools: ['actors'] }, SERVER_MODE.DEFAULT);
         expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 });
 

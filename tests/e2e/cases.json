@@ -956,47 +956,6 @@
       "assert": ".isError != true and (._meta | has(\"ui\")) and (.structuredContent | has(\"actorDetails\"))"
     },
     {
-      "id": "calls the call-actor widget",
-      "configs": [
-        "full-apps"
-      ],
-      "args": [
-        "tools-call",
-        "call-actor-widget",
-        "actor:=\"apify/normal-mode-test-actor\"",
-        "input:={\"firstNumber\":1,\"secondNumber\":2}"
-      ],
-      "capture": {
-        "widgetRunId": ".structuredContent.runId"
-      },
-      "assert": ".isError != true and (._meta | has(\"ui\")) and (.structuredContent | has(\"runId\") and has(\"status\"))"
-    },
-    {
-      "id": "waits for the widget run to finish",
-      "configs": [
-        "full-apps"
-      ],
-      "args": [
-        "tools-call",
-        "get-actor-run",
-        "runId:=\"{{widgetRunId}}\"",
-        "waitSecs:=45"
-      ],
-      "assert": ".isError != true and .structuredContent.status == \"SUCCEEDED\""
-    },
-    {
-      "id": "calls the get-actor-run widget",
-      "configs": [
-        "full-apps"
-      ],
-      "args": [
-        "tools-call",
-        "get-actor-run-widget",
-        "runId:=\"{{widgetRunId}}\""
-      ],
-      "assert": ".isError != true and (._meta | has(\"ui\")) and .structuredContent.status == \"SUCCEEDED\""
-    },
-    {
       "id": "calls report-problem",
       "configs": [
         "category-dev"

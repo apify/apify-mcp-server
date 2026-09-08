@@ -162,7 +162,7 @@ describe('resolveToolNamesFromInput()', () => {
 
         expect(toolNames).not.toContain('--my-actor');
         expect(toolNames).not.toContain('~my-actor');
-        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
     });
 
     it('excludes opaque Actor IDs while retaining their auto-injected tools', () => {
@@ -170,7 +170,6 @@ describe('resolveToolNamesFromInput()', () => {
 
         expect(toolNames).not.toContain('3ox4R101TgZz67sLr');
         expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 });
 

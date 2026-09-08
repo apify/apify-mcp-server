@@ -22,7 +22,7 @@
 import { HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { SERVER_MODE } from '../types.js';
-import { callActorApps, callActorDefault } from './actors/call_actor.js';
+import { callActor } from './actors/call_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
 import { searchActors } from './actors/search_actors.js';
 import { reportProblem } from './dev/report_problem.js';
@@ -45,9 +45,7 @@ import { getActorTask } from './tasks/get_actor_task.js';
 import { publishActorTask } from './tasks/publish_actor_task.js';
 import { unpublishActorTask } from './tasks/unpublish_actor_task.js';
 import { updateActorTask } from './tasks/update_actor_task.js';
-import { callActorWidget } from './widgets/call_actor_widget.js';
 import { fetchActorDetailsWidget } from './widgets/fetch_actor_details_widget.js';
-import { getActorRunWidget } from './widgets/get_actor_run_widget.js';
 import { searchActorsWidget } from './widgets/search_actors_widget.js';
 
 type ModeMap = Partial<Record<SERVER_MODE, ToolEntry>>;
@@ -69,12 +67,7 @@ function isModeMap(entry: CategoryToolEntry): entry is ModeMap {
  * Use {@link getCategoryTools} to resolve entries into concrete ToolEntry arrays for a given mode.
  */
 export const toolCategories = {
-    actors: [
-        searchActors,
-        fetchActorDetails,
-        // call-actor is identical between modes; apps mode appends a widget addendum to the description.
-        { default: callActorDefault, apps: callActorApps },
-    ],
+    actors: [searchActors, fetchActorDetails, callActor],
     docs: [searchApifyDocs, fetchApifyDocs],
     runs: [getActorRun, getActorRunList, getActorRunLog, abortActorRun],
     storage: [
@@ -149,10 +142,11 @@ export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] =
  * Pairing is intentionally one-way (base → widget). Selecting a widget alone
  * does NOT auto-bring its base; callers asking for widget-only get a UI without
  * the programmatic data tool. To get both, select the base (or both explicitly).
+ *
+ * `call-actor` and `get-actor-run` are deliberately left unpaired — this map also gates
+ * direct `?tools=` selection, so removing an entry makes that widget fully unreachable.
  */
 export const WIDGET_BY_BASE_TOOL: ReadonlyMap<HelperToolName, ToolEntry> = new Map([
     [HELPER_TOOLS.STORE_SEARCH, searchActorsWidget],
     [HELPER_TOOLS.ACTOR_GET_DETAILS, fetchActorDetailsWidget],
-    [HELPER_TOOLS.ACTOR_CALL, callActorWidget],
-    [HELPER_TOOLS.ACTOR_RUNS_GET, getActorRunWidget],
 ]);

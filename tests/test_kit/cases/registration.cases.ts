@@ -36,7 +36,7 @@ const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory
 // Claude-connector `?tools=` allowlist. No call-actor. Actor entries use their slash name here;
 // served tool names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
 // NOTE: hypothetical selection, not the actual reviewed connector URL (ai-team#214).
-// get-actor-run-widget omitted deliberately: apps mode auto-pairs it with get-actor-run regardless of ?tools= (tools_loader.ts).
+// get-actor-run-widget is unreachable — get-actor-run has no widget sibling (see WIDGET_BY_BASE_TOOL).
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
@@ -45,7 +45,6 @@ const CLAUDE_CONNECTOR_TOOLS = [
     'search-apify-docs',
     'fetch-apify-docs',
     'get-actor-run',
-    'get-actor-run-widget',
     'get-actor-run-list',
     'get-actor-log',
     'abort-actor-run',
@@ -464,7 +463,6 @@ export const registrationCases: Case[] = [
                 // Verify that apps-only internal tools are present in apps mode
                 expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
                 expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
 
                 // Verify that tools have widget metadata when UI mode is enabled
                 expectWidgetToolMeta(tools);
@@ -483,7 +481,6 @@ export const registrationCases: Case[] = [
 
             expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
 
             // Verify that tools have widget metadata when UI mode is enabled via URL parameter
             expectWidgetToolMeta(tools);
@@ -499,7 +496,6 @@ export const registrationCases: Case[] = [
 
             expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
             expectWidgetToolMeta(tools);
         }),
     },

@@ -112,16 +112,7 @@ function buildCallFailureRecoveryHint(loadedToolNames: readonly string[]): strin
     return hints.length ? `You can ${hints.join(', or ')}.` : '';
 }
 
-// call-actor-widget needs no hasTool gate: apps mode appends it whenever call-actor is served.
-function buildWidgetAddendum({ hasTool }: ToolDescriptionContext): string {
-    return dedent`
-        WIDGET ALTERNATIVE (apps mode):
-        - If the user explicitly asks to see live progress, call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead — it renders an interactive UI that tracks the run.
-        ${hasTool(HELPER_TOOLS.STORE_SEARCH) ? `- For silent name resolution before this call, use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}, which renders UI).` : ''}
-    `;
-}
-
-function buildCallActorDescriptionSections(includeWidget: boolean, ctx: ToolDescriptionContext): string {
+function buildCallActorDescriptionSections(ctx: ToolDescriptionContext): string {
     const { hasTool } = ctx;
     const workflowSection = [
         'WORKFLOW:',
@@ -155,17 +146,11 @@ function buildCallActorDescriptionSections(includeWidget: boolean, ctx: ToolDesc
         CALL_ACTOR_EXAMPLES_SECTION,
     ];
 
-    if (includeWidget) sections.push(buildWidgetAddendum(ctx));
-
     return sections.join('\n\n');
 }
 
 export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOLS_PRESENT): string {
-    return buildCallActorDescriptionSections(false, ctx);
-}
-
-export function buildCallActorAppsDescription(ctx: ToolDescriptionContext = ALL_TOOLS_PRESENT): string {
-    return buildCallActorDescriptionSections(true, ctx);
+    return buildCallActorDescriptionSections(ctx);
 }
 
 /**
@@ -724,40 +709,26 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
     }
 }
 
-/**
- * Single call-actor definition shared by both modes — only the description differs
- * (apps mode appends a widget addendum).
- */
-function createCallActorTool(buildDescription: (ctx: ToolDescriptionContext) => string): ToolEntry {
-    return Object.freeze({
-        type: TOOL_TYPE.INTERNAL,
-        name: HELPER_TOOLS.ACTOR_CALL,
+/** Mode-agnostic — call-actor-widget exists but is unpaired, so this description must not reference it. */
+export const callActor: ToolEntry = Object.freeze({
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.ACTOR_CALL,
+    title: 'Call Actor',
+    description: buildCallActorDescription(ALL_TOOLS_PRESENT),
+    buildDescription: buildCallActorDescription,
+    inputSchema: callActorInputSchema,
+    outputSchema: actorRunOutputSchema,
+    ajvValidate: callActorAjvValidate,
+    paymentRequired: true,
+    annotations: {
         title: 'Call Actor',
-        description: buildDescription(ALL_TOOLS_PRESENT),
-        buildDescription,
-        inputSchema: callActorInputSchema,
-        outputSchema: actorRunOutputSchema,
-        ajvValidate: callActorAjvValidate,
-        paymentRequired: true,
-        annotations: {
-            title: 'Call Actor',
-            readOnlyHint: false,
-            destructiveHint: true,
-            idempotentHint: false,
-            openWorldHint: true,
-        },
-        execution: {
-            taskSupport: 'optional',
-        },
-        call: async (toolArgs: InternalToolArgs) => executeCallActor(toolArgs),
-    } as const);
-}
-
-/** Default mode call-actor tool. */
-export const callActorDefault: ToolEntry = createCallActorTool(buildCallActorDescription);
-
-/**
- * Apps mode call-actor tool.
- * Renders no widget; for a live progress UI, use the call-actor-widget sibling.
- */
-export const callActorApps: ToolEntry = createCallActorTool(buildCallActorAppsDescription);
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+    },
+    execution: {
+        taskSupport: 'optional',
+    },
+    call: async (toolArgs: InternalToolArgs) => executeCallActor(toolArgs),
+} as const);
