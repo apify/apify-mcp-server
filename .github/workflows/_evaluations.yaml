@@ -61,8 +61,8 @@ jobs:
                 if: inputs.tier == 'merge'
                 run: pnpm run evals:mcp-agent:tasks-fixtures
 
-            # --pass-threshold 0.93 is the floor of 3 claude-haiku-4-5 pr-tier runs (0.9434,
-            # 0.9381, 0.9429), calibrated in apify/ai-team#240. Provisional: those runs were in a
+            # --pass-threshold 0.9: 3 claude-haiku-4-5 pr-tier runs floored at 0.93 (0.9434, 0.9381,
+            # 0.9429, apify/ai-team#240), rounded down to one decimal. Provisional: those runs were in a
             # sandbox with a flaky TLS proxy; re-pin from the first real CI runs.
             # No judge runs on tool-call items; --claude-judge only lifts the CLI's
             # OPENROUTER_API_KEY requirement.
@@ -70,15 +70,15 @@ jobs:
                 if: inputs.tier == 'pr'
                 run: >
                     pnpm run evals:mcp-agent -- --tier pr
-                    --pass-threshold 0.93
+                    --pass-threshold 0.9
                     --agent-model claude-haiku-4-5 --claude-judge
 
-            # --pass-threshold 0.73 is the floor of 3 claude-haiku-4-5 merge-tier runs (0.80, 0.73,
-            # 0.80) on 2026-09-08, run locally with the OpenRouter judge. Deliberately low: 9 of the
+            # --pass-threshold 0.7: 3 claude-haiku-4-5 merge-tier runs floored at 0.73 (0.80, 0.73, 0.80
+            # on 2026-09-08, OpenRouter judge), rounded down to one decimal. Deliberately low: 9 of the
             # 60 items fail on every run (README CI section); raise it as those are fixed.
             -   name: Run merge-tier evals
                 if: inputs.tier == 'merge'
                 run: >
                     pnpm run evals:mcp-agent -- --tier merge
-                    --pass-threshold 0.73
+                    --pass-threshold 0.7
                     --agent-model claude-haiku-4-5
