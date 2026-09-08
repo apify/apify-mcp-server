@@ -38,6 +38,10 @@ const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory
 // NOTE: does not mirror the actual URL submitted to Anthropic for AUP review (ai-team#214) — that
 // one excludes report-problem and uses a different Actor/tool set. This fixture pins the server's
 // own tools/list behavior for a hypothetical selection, not the live, reviewed connector surface.
+// get-actor-run-widget is NOT listed as its own selector: getToolsForServerMode auto-pairs every
+// base tool with its widget sibling in apps mode, unconditionally (tools_loader.ts) — leaving it
+// out of ?tools= has no effect while get-actor-run stays and apps mode is on. Its low Mixpanel
+// usage (0.1% of get-actor-run calls) has no lever here without also dropping get-actor-run itself.
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
@@ -46,6 +50,7 @@ const CLAUDE_CONNECTOR_TOOLS = [
     'search-apify-docs',
     'fetch-apify-docs',
     'get-actor-run',
+    'get-actor-run-widget',
     'get-actor-run-list',
     'get-actor-log',
     'abort-actor-run',
@@ -106,8 +111,10 @@ export const registrationCases: Case[] = [
         }),
     },
     {
-        // Pinned ?tools= wins for call-actor even with the report-problem auto-inject path live
-        // (telemetry defaults on here — no ?telemetry-enabled= override, matching a real URL).
+        // Pinned ?tools= wins for call-actor even with the report-problem auto-inject path live.
+        // telemetry must be explicit here: the deployed target this runs against defaults it off
+        // (confirmed by CI — omitting the param served no report-problem there), unlike this
+        // package's own DEFAULT_TELEMETRY_ENABLED=true.
         // No ?ui= either: apps mode comes from the client's own UI-capability advertisement
         // (serverMode 'auto' default), same as a real MCP-Apps client — not a URL override.
         name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude+connector',
@@ -117,7 +124,7 @@ export const registrationCases: Case[] = [
             {
                 tools: CLAUDE_CONNECTOR_TOOLS,
                 client: 'claude connector',
-                omitTelemetryParam: true,
+                telemetry: { enabled: true },
                 clientCapabilities: {
                     extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] } },
                 },
