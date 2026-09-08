@@ -179,17 +179,24 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
               : {}),
     };
 
+    const messages: SDKMessage[] = [];
+    // Arrival times, so the tool spans have real durations. The SDK stream carries no
+    // timestamps and the messages are only folded once the run is over.
+    const receivedAt: number[] = [];
     try {
-        const messages: SDKMessage[] = [];
-        // Arrival times, so the tool spans have real durations. The SDK stream carries no
-        // timestamps and the messages are only folded once the run is over.
-        const receivedAt: number[] = [];
         for await (const message of query({ prompt, options: sdkOptions })) {
             messages.push(message);
             receivedAt.push(Date.now());
         }
         return { ...adaptSdkConversation(prompt, messages, receivedAt), attemptedCalls };
     } catch (error) {
+        // On error_max_turns the CLI exits non-zero after streaming its result message, and
+        // the SDK rethrows that exit as "Claude Code returned an error result". The run is
+        // complete from the model's side, so fold what arrived: the adapter keeps a max-turns
+        // result and still throws on any other error subtype.
+        if (messages.some((message) => message.type === 'result')) {
+            return { ...adaptSdkConversation(prompt, messages, receivedAt), attemptedCalls };
+        }
         if (stderrLines.length === 0) throw error;
         const message = error instanceof Error ? error.message : String(error);
         const suffix = stderrLines.map((line) => `  [claude-stderr] ${line}`).join('\n');

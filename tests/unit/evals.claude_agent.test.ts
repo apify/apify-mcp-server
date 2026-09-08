@@ -135,6 +135,29 @@ describe('runAgentConversation()', () => {
         ]);
     });
 
+    it('keeps the recorded attempts when the SDK throws after a max-turns result', async () => {
+        // The CLI exits non-zero on error_max_turns, and the SDK rewraps that exit as a thrown
+        // error after it has already streamed the result message. The attempts the hook
+        // recorded up to then are the selection score; they must not be lost with the throw.
+        mocks.query.mockImplementation(({ options }: { options: Options }) => {
+            return (async function* () {
+                const hook = options.hooks?.PreToolUse?.[0]?.hooks[0];
+                await hook?.(preToolUseInput('mcp__apify__publish-actor-task', { taskId: 'insta-daily' }), 'tool-1', {
+                    signal: new AbortController().signal,
+                });
+                yield resultMessage({ subtype: 'error_max_turns', result: undefined, errors: [], num_turns: 2 });
+                throw new Error('Claude Code returned an error result: Reached maximum number of turns (2)');
+            })();
+        });
+
+        const result = await runAgentConversation(baseOptions({ isSelectionMode: true }));
+
+        expect(result.hitMaxTurns).toBe(true);
+        expect(result.attemptedCalls).toEqual([
+            { toolName: 'mcp__apify__publish-actor-task', input: { taskId: 'insta-daily' } },
+        ]);
+    });
+
     it('forwards stderr and appends only its last five lines to a thrown error', async () => {
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         mocks.query.mockImplementation(({ options }: { options: Options }) => {
