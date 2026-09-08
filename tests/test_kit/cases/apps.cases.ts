@@ -140,4 +140,45 @@ export const appsCases: Case[] = [
             expect(details.actorInfo).toHaveProperty('description');
         }),
     },
+    {
+        // call-actor-widget/get-actor-run-widget are not auto-paired (unlike search/details); confirm
+        // each still loads and renders its instruction text via explicit ?tools= selection alone.
+        name: '?tools=get-actor-run-widget alone: widget tool loads, server instructions carry its paragraph',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['get-actor-run-widget'], serverMode: 'apps' }, async (client) => {
+            const toolNames = getToolNames(await client.listTools());
+            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+            expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET); // widget-only, no base auto-added
+
+            const instructions = client.getInstructions();
+            expect(instructions).toContain('Widget workflow');
+            expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        }),
+    },
+    {
+        name: '?tools=call-actor,call-actor-widget: call-actor description carries the WIDGET ALTERNATIVE text',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['call-actor', 'call-actor-widget'], serverMode: 'apps' }, async (client) => {
+            const tools = await client.listTools();
+            const toolNames = getToolNames(tools);
+            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+
+            const callActorTool = tools.tools.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
+            expect(callActorTool?.description).toContain('WIDGET ALTERNATIVE');
+            expect(callActorTool?.description).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        }),
+    },
+    {
+        name: '?tools=call-actor-widget alone: call-actor absent, widget tool still selectable and functional-shaped',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['call-actor-widget'], serverMode: 'apps' }, async (client) => {
+            const toolNames = getToolNames(await client.listTools());
+            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL); // widget-only, no base auto-added
+
+            const instructions = client.getInstructions();
+            expect(instructions).not.toContain('WIDGET ALTERNATIVE'); // that bullet lives on call-actor's own description, absent here
+        }),
+    },
 ];
