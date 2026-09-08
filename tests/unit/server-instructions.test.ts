@@ -116,8 +116,7 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain(HELPER_TOOLS.STORE_SEARCH);
     });
 
-    // The apps + call-actor render is what every hosted apps session gets, and the only untested
-    // combination: the other apps cases omit call-actor, the other full-tool-set cases use default mode.
+    // Apps mode with call-actor: every hosted apps session, and the one combination other cases don't cover.
     it('keeps every call-actor mention in apps mode when the session has call-actor', () => {
         const instructions = getServerInstructions(SERVER_MODE.APPS, ALL_TOOLS_PRESENT);
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
@@ -132,8 +131,7 @@ describe('getServerInstructions()', () => {
         const HEADING = '## Tool dependencies and disambiguation';
 
         it('omits the heading when every subsection is gated away', () => {
-            // A session with only Actor tools plus auto-injected run/storage helpers, no widgets:
-            // nothing under the heading renders, so the heading itself must not be emitted.
+            // Only run/storage helpers, no widgets: nothing under the heading renders, so it must not be emitted either.
             const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_RUNS_GET));
             expect(instructions).not.toContain(HEADING);
         });

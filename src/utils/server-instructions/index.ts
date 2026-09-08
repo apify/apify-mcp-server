@@ -105,11 +105,7 @@ ${hasSearch ? `  - \`${HELPER_TOOLS.STORE_SEARCH}\` is a silent data lookup (Act
 `
         : '';
 
-    /**
-     * The section renders only when something under it survives gating — a session whose whole tool
-     * set is gated away (e.g. one Actor tool, no widgets) would otherwise end on a bare heading.
-     * `###` subsections keep a blank line before them; consecutive bullets stay contiguous.
-     */
+    /** Renders only if a subsection survives gating, to avoid a bare heading; `###` subsections get a blank line before them, bullets stay contiguous. */
     const renderedBlocks = [
         toolDependencies,
         searchVsDetailsDisambiguation,
