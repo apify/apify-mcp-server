@@ -1,20 +1,4 @@
-/**
- * Experiment task, evaluators, run summary/gate, iteration expansion, run-flag validation,
- * and console formatting for the Langfuse mcp-agent-evals port.
- *
- * Dispatches per item on `metadata.kind`. A `kind: "agent"` item runs a fresh Claude Code
- * agent conversation (the Agent SDK spawns its own MCP server, so state is isolated per
- * item), then the LLM judge and the zero-tool-error gate (exempting tools named in the
- * item's `expectedErrors`). A `kind: "selection"` item runs the same agent under a
- * deny-all hook - nothing executes, no judge runs - and is scored on `first_tool_match`
- * alone: does the first attempted tool call match `expectedTools`/`expectedArgs`.
- *
- * Also owns what the CLI (`run_mcp_agent_evals.ts`) needs testable and can't test itself,
- * since that file ends in `void main()` and cannot be imported: `expandIterations` (the
- * `--iterations` flat `data` array), `validateIterations`/`validatePassThreshold`/
- * `validateConcurrency` (run-flag checks), and `formatRunSummary` (the printed run summary).
- * The CLI itself stays thin wiring over these.
- */
+/** Tasks, evaluators, and run summaries for the Langfuse MCP agent experiment. */
 
 import type { Evaluation } from '@langfuse/client';
 
@@ -164,25 +148,11 @@ function failureReason(result: ScoredItem): string {
 }
 
 export type RunSummary = {
-    /**
-     * One entry per requested id, its trials in iteration order (1..iterations), plus the
-     * pass@k/pass^k predicates for that item - computed once here so `formatRunSummary` and
-     * the `passAtK`/`passHatK` aggregates below always agree with what `items` itself shows.
-     */
-    items: { id: string; trials: { iteration: number; passed: boolean }[]; anyPassed: boolean; allPassed: boolean }[];
-    /** Trials that passed the gate. */
+    items: { id: string; trials: { iteration: number; passed: boolean }[] }[];
     passedTrials: number;
-    /** `requestedIds.length * iterations` - the fixed denominator, dropped trials included. */
     requestedTrials: number;
-    /** `passedTrials / requestedTrials`, 0 when nothing was requested. */
     passRate: number;
-    /** Items where at least one trial passed (pass@k). */
-    passAtK: number;
-    /** Items where every trial passed (pass^k). */
-    passHatK: number;
-    /** Trials that completed but did not pass, with the reason. */
     failures: { id: string; iteration: number; reason: string }[];
-    /** Requested (id, iteration) trials with no result at all: the task threw. */
     droppedTrials: { id: string; iteration: number }[];
 };
 
@@ -207,20 +177,14 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
     const failures: RunSummary['failures'] = [];
     const droppedTrials: RunSummary['droppedTrials'] = [];
     let passedTrials = 0;
-    let passAtK = 0;
-    let passHatK = 0;
-
     for (const id of requestedIds) {
         const byIteration = byId.get(id) ?? new Map<number, ScoredItem>();
         const trials: { iteration: number; passed: boolean }[] = [];
-        let anyPassed = false;
-        let allPassed = true;
 
         for (let iteration = 1; iteration <= iterations; iteration++) {
             const result = byIteration.get(iteration);
             if (!result) {
                 droppedTrials.push({ id, iteration });
-                allPassed = false;
                 trials.push({ iteration, passed: false });
                 continue;
             }
@@ -229,16 +193,12 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
             trials.push({ iteration, passed });
             if (passed) {
                 passedTrials++;
-                anyPassed = true;
             } else {
-                allPassed = false;
                 failures.push({ id, iteration, reason: failureReason(result) });
             }
         }
 
-        if (anyPassed) passAtK++;
-        if (allPassed) passHatK++;
-        items.push({ id, trials, anyPassed, allPassed });
+        items.push({ id, trials });
     }
 
     const requestedTrials = requestedIds.length * iterations;
@@ -247,8 +207,6 @@ export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[
         passedTrials,
         requestedTrials,
         passRate: requestedTrials > 0 ? passedTrials / requestedTrials : 0,
-        passAtK,
-        passHatK,
         failures,
         droppedTrials,
     };
@@ -259,7 +217,6 @@ export function resolveExitCode(summary: RunSummary, passThreshold: number): num
     return summary.passRate >= passThreshold ? 0 : 1;
 }
 
-/** One dataset item repeated for `--iterations`, tagged with its 1-based trial index. */
 function withIteration(item: DatasetItem, iteration: number): DatasetItem {
     return { ...item, metadata: { ...(item.metadata as Record<string, unknown> | undefined), iteration } };
 }
@@ -274,14 +231,12 @@ export function expandIterations(items: DatasetItem[], iterations: number): Data
     return items.flatMap((item) => Array.from({ length: iterations }, (_, index) => withIteration(item, index + 1)));
 }
 
-/** `--iterations` must be a positive integer: anything else can't index a 1-based trial run. */
 export function validateIterations(value: number): void {
     if (!Number.isInteger(value) || value < 1) {
         throw new Error(`--iterations must be a positive integer, got "${value}"`);
     }
 }
 
-/** `--pass-threshold` gates a rate (`passedTrials / requestedTrials`), so it must fall in [0, 1]. */
 export function validatePassThreshold(value: number): void {
     if (!Number.isFinite(value) || value < 0 || value > 1) {
         throw new Error(`--pass-threshold must be between 0 and 1, got "${value}"`);
@@ -295,27 +250,22 @@ export function validateConcurrency(value: number): void {
     }
 }
 
-/** One line of run-summary output, tagged with the console stream it belongs on. */
 export type RunSummaryLine = { stream: 'log' | 'error'; text: string };
 
-/**
- * Console lines for a finished run, in print order: per-item trial outcomes (`🔁`, only when
- * `iterations > 1`), one `❌` line per failed trial, a `🔥` line for trials the SDK dropped
- * (stderr, since the failure detail already went to stderr above it), the `📊` pass-rate
- * line, and `📈` pass@k/pass^k (only when `iterations > 1`). Pure so the CLI's print block is
- * just "loop over this and route each line to its stream".
- */
+/** Build console lines separately so the CLI does not need side effects in its tests. */
 export function formatRunSummary(summary: RunSummary, passThreshold: number, iterations: number): RunSummaryLine[] {
     const lines: RunSummaryLine[] = [];
 
     if (iterations > 1) {
         for (const item of summary.items) {
             const outcomes = item.trials.map((trial) => (trial.passed ? '✅' : '❌')).join(' ');
+            const anyPassed = item.trials.some((trial) => trial.passed);
+            const allPassed = item.trials.every((trial) => trial.passed);
             lines.push({
                 stream: 'log',
                 text:
-                    `🔁 ${item.id}   ${outcomes}   pass@${iterations} ${item.anyPassed ? '✅' : '❌'}  ` +
-                    `pass^${iterations} ${item.allPassed ? '✅' : '❌'}`,
+                    `🔁 ${item.id}   ${outcomes}   pass@${iterations} ${anyPassed ? '✅' : '❌'}  ` +
+                    `pass^${iterations} ${allPassed ? '✅' : '❌'}`,
             });
         }
     }
@@ -342,11 +292,13 @@ export function formatRunSummary(summary: RunSummary, passThreshold: number, ite
             `(pass_rate ${summary.passRate.toFixed(2)}, threshold ${passThreshold.toFixed(2)})`,
     });
     if (iterations > 1) {
+        const passedAtLeastOnce = summary.items.filter((item) => item.trials.some((trial) => trial.passed)).length;
+        const passedEveryTime = summary.items.filter((item) => item.trials.every((trial) => trial.passed)).length;
         lines.push({
             stream: 'log',
             text:
-                `📈 pass@${iterations} ${summary.passAtK}/${summary.items.length} items · ` +
-                `pass^${iterations} ${summary.passHatK}/${summary.items.length} items`,
+                `📈 pass@${iterations} ${passedAtLeastOnce}/${summary.items.length} items · ` +
+                `pass^${iterations} ${passedEveryTime}/${summary.items.length} items`,
         });
     }
 
@@ -387,6 +339,8 @@ export type McpAgentTaskOptions = {
     toolTimeout: number;
     /** Restrict the agent to MCP tools only, dropping Claude Code's built-in toolset. */
     mcpToolsOnly: boolean;
+    /** Requested items x iterations, for the per-item progress line. */
+    totalTrials: number;
 };
 
 /**
@@ -454,79 +408,99 @@ function emitTrace(
  * Errors are prefixed with the item id because the SDK's own log line carries none.
  */
 export function makeTask(options: McpAgentTaskOptions) {
-    const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout, mcpToolsOnly } = options;
+    const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout, mcpToolsOnly, totalTrials } = options;
+
+    // Progress, one line per finished trial. The scored verdict comes later from the
+    // evaluators; this reads the task output, which carries the same pass/fail signal.
+    let completedTrials = 0;
+    const logProgress = (id: string, marker: string) => {
+        completedTrials++;
+        // eslint-disable-next-line no-console
+        console.log(`[${completedTrials}/${totalTrials}] ${marker} ${id}`);
+    };
+    const outputPassed = (output: McpAgentTaskOutput) =>
+        output.kind === 'selection'
+            ? output.firstToolMatch.isMatch
+            : output.judgeResult.verdict === 'PASS' && output.toolErrors.every((error) => error.expected);
 
     return async (rawItem: unknown): Promise<McpAgentTaskOutput> => {
         const item = parseMcpAgentItem(rawItem);
-        const { iteration } = item.metadata;
         const itemMcpToolsOnly = mcpToolsOnly || (item.metadata.mcpToolsOnly ?? false);
 
+        let output: McpAgentTaskOutput;
         try {
-            if (item.metadata.kind === 'selection') {
-                return await runSelectionItem(item, {
-                    agentModel,
-                    apifyToken,
-                    toolTimeout,
-                    mcpToolsOnly: itemMcpToolsOnly,
-                });
-            }
-
-            // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
-            // "agent" items; this task only runs those in this branch, so a missing
-            // expectedOutput here is a caller bug.
-            if (item.expectedOutput === undefined) {
-                throw new Error('kind "agent" item has no expectedOutput; this task only runs agent items');
-            }
-
-            const runOptions = {
-                prompt: item.input.query,
-                model: agentModel,
-                apifyToken,
-                tools: item.metadata.tools,
-                failTools: item.metadata.failTools,
-                maxTurns: item.metadata.maxTurns,
-                toolTimeoutSeconds: toolTimeout,
-                mcpToolsOnly: itemMcpToolsOnly,
-            };
-            const { adapted, startedAt } = await runAgentWithRetry(item.id, runOptions);
-            emitTrace(item.id, item.input.query, agentModel, itemMcpToolsOnly, adapted, startedAt);
-
-            const { conversation, transcript } = adapted;
-            const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
-
-            // Server tools only: a failed Claude Code built-in (Bash, WebFetch) says nothing
-            // about the server under test. Failures of tools the harness force-failed itself
-            // are not errors of the run either. First line only: the full text already sits
-            // on the tool span. Known blind spot: the adapter drops subagent activity, so a
-            // server tool failing inside a Task-spawned subagent never reaches this gate.
-            const expectedErrorTools = new Set(item.metadata.expectedErrors ?? []);
-            const injected = new Set(item.metadata.failTools ?? []);
-            const toolErrors: ToolError[] = adapted.toolInvocations
-                .filter(
-                    (invocation) =>
-                        invocation.isMcpTool && !invocation.result.success && !injected.has(invocation.name),
-                )
-                .map((invocation) => ({
-                    tool: invocation.name,
-                    error: invocation.result.error?.split('\n')[0] || 'unknown error',
-                    expected: expectedErrorTools.has(invocation.name),
-                }));
-
-            return {
-                kind: 'agent',
-                id: item.id,
-                ...(iteration !== undefined && { iteration }),
-                judgeResult,
-                totalTokens: conversation.totalTokens,
-                transcript,
-                toolErrors,
-            };
+            output = await runItem(item, itemMcpToolsOnly);
         } catch (error) {
+            logProgress(item.id, '🔥');
             throw new Error(`Item "${item.id}": ${error instanceof Error ? error.message : String(error)}`, {
                 cause: error,
             });
         }
+        logProgress(item.id, outputPassed(output) ? '✅' : '❌');
+        return output;
     };
+
+    async function runItem(item: McpAgentItem, itemMcpToolsOnly: boolean): Promise<McpAgentTaskOutput> {
+        const { iteration } = item.metadata;
+        if (item.metadata.kind === 'selection') {
+            return await runSelectionItem(item, {
+                agentModel,
+                apifyToken,
+                toolTimeout,
+                mcpToolsOnly: itemMcpToolsOnly,
+            });
+        }
+
+        // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
+        // "agent" items; this task only runs those in this branch, so a missing
+        // expectedOutput here is a caller bug.
+        if (item.expectedOutput === undefined) {
+            throw new Error('kind "agent" item has no expectedOutput; this task only runs agent items');
+        }
+
+        const runOptions = {
+            prompt: item.input.query,
+            model: agentModel,
+            apifyToken,
+            tools: item.metadata.tools,
+            failTools: item.metadata.failTools,
+            maxTurns: item.metadata.maxTurns,
+            toolTimeoutSeconds: toolTimeout,
+            mcpToolsOnly: itemMcpToolsOnly,
+        };
+        const { adapted, startedAt } = await runAgentWithRetry(item.id, runOptions);
+        emitTrace(item.id, item.input.query, agentModel, itemMcpToolsOnly, adapted, startedAt);
+
+        const { conversation, transcript } = adapted;
+        const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
+
+        // Server tools only: a failed Claude Code built-in (Bash, WebFetch) says nothing
+        // about the server under test. Failures of tools the harness force-failed itself
+        // are not errors of the run either. First line only: the full text already sits
+        // on the tool span. Known blind spot: the adapter drops subagent activity, so a
+        // server tool failing inside a Task-spawned subagent never reaches this gate.
+        const expectedErrorTools = new Set(item.metadata.expectedErrors ?? []);
+        const injected = new Set(item.metadata.failTools ?? []);
+        const toolErrors: ToolError[] = adapted.toolInvocations
+            .filter(
+                (invocation) => invocation.isMcpTool && !invocation.result.success && !injected.has(invocation.name),
+            )
+            .map((invocation) => ({
+                tool: invocation.name,
+                error: invocation.result.error?.split('\n')[0] || 'unknown error',
+                expected: expectedErrorTools.has(invocation.name),
+            }));
+
+        return {
+            kind: 'agent',
+            id: item.id,
+            ...(iteration !== undefined && { iteration }),
+            judgeResult,
+            totalTokens: conversation.totalTokens,
+            transcript,
+            toolErrors,
+        };
+    }
 }
 
 /**

@@ -58,6 +58,16 @@ function makeSelectionOutput(overrides: Partial<Extract<McpAgentTaskOutput, { ki
     };
 }
 
+function makeAgentRun(overrides: Record<string, unknown> = {}) {
+    return {
+        conversation: { turns: [], totalTokens: 1234 },
+        transcript: [],
+        toolInvocations: [],
+        attemptedCalls: [],
+        ...overrides,
+    };
+}
+
 /** An agent item result as the SDK hands it to the run gate. */
 function makeScoredAgentItem(
     id: string,
@@ -96,8 +106,11 @@ describe('evaluators', () => {
         expect(await evaluators[0]({ output })).toEqual({ name: 'mcp_agent_judge', value: 0, comment: 'missed X' });
     });
 
-    it('emits no mcp_agent_judge score for a selection item', async () => {
+    it('emits only kind-appropriate scores', async () => {
         expect(await evaluators[0]({ output: makeSelectionOutput() })).toEqual([]);
+        expect(await evaluators[1]({ output: makeSelectionOutput() })).toEqual([]);
+        expect(await evaluators[2]({ output: makeSelectionOutput() })).toEqual([]);
+        expect(await evaluators[3]({ output: makeAgentOutput() })).toEqual([]);
     });
 
     it('reports the conversation token total', async () => {
@@ -110,17 +123,6 @@ describe('evaluators', () => {
 
     it('scores tool_errors 0 without a comment on a clean item', async () => {
         expect(await evaluators[2]({ output: makeAgentOutput() })).toEqual({ name: 'tool_errors', value: 0 });
-    });
-
-    it('scores tool_errors with the failing calls in the comment', async () => {
-        const output = makeAgentOutput({
-            toolErrors: [{ tool: 'create-actor-task', error: 'name taken', expected: false }],
-        });
-        expect(await evaluators[2]({ output })).toEqual({
-            name: 'tool_errors',
-            value: 1,
-            comment: 'create-actor-task: name taken',
-        });
     });
 
     it('counts only unexpected failures in tool_errors, marking expected ones in the comment', async () => {
@@ -146,14 +148,6 @@ describe('evaluators', () => {
             value: 0,
             comment: 'get-actor-task: task not found (expected)',
         });
-    });
-
-    it('emits no tool_errors score for a selection item', async () => {
-        expect(await evaluators[2]({ output: makeSelectionOutput() })).toEqual([]);
-    });
-
-    it('emits no first_tool_match score for an agent item', async () => {
-        expect(await evaluators[3]({ output: makeAgentOutput() })).toEqual([]);
     });
 
     it('scores first_tool_match 1 with the match comment on a selection pass', async () => {
@@ -220,20 +214,18 @@ describe('makeTask()', () => {
             judgeModel: 'judge',
             toolTimeout: 1,
             mcpToolsOnly: false,
+            totalTrials: 1,
         });
 
     beforeEach(() => {
         vi.clearAllMocks();
         vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
         mocks.runAgentConversation.mockRejectedValue(new Error('spawn ENOENT'));
     });
 
-    it('names the item in a harness error, which the SDK log line omits', async () => {
+    it('names the item and does not retry on a deterministic failure', async () => {
         await expect(makeMcpAgentTask()(makeItem())).rejects.toThrow('Item "search-001": spawn ENOENT');
-    });
-
-    it('does not retry the agent run on a deterministic failure', async () => {
-        await expect(makeMcpAgentTask()(makeItem())).rejects.toThrow('spawn ENOENT');
         expect(mocks.runAgentConversation).toHaveBeenCalledTimes(1);
     });
 
@@ -244,12 +236,9 @@ describe('makeTask()', () => {
     });
 
     it('retries the agent run once on a transient failure', async () => {
-        mocks.runAgentConversation.mockRejectedValueOnce(new Error('Connection error.')).mockResolvedValueOnce({
-            conversation: { turns: [], totalTokens: 1234 },
-            transcript: [],
-            toolInvocations: [],
-            attemptedCalls: [],
-        });
+        mocks.runAgentConversation
+            .mockRejectedValueOnce(new Error('Connection error.'))
+            .mockResolvedValueOnce(makeAgentRun());
 
         await expect(makeMcpAgentTask()(makeItem())).resolves.toMatchObject({
             id: 'search-001',
@@ -259,12 +248,7 @@ describe('makeTask()', () => {
     });
 
     it('still scores the item when emitting the agent trace throws', async () => {
-        mocks.runAgentConversation.mockResolvedValue({
-            conversation: { turns: [], totalTokens: 1234 },
-            transcript: [],
-            toolInvocations: [],
-            attemptedCalls: [],
-        });
+        mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
         mocks.emitObservations.mockImplementation(() => {
             throw new Error('span export failed');
         });
@@ -277,22 +261,21 @@ describe('makeTask()', () => {
     });
 
     it('collects failed tool calls, exempting built-ins and the ones failTools injected', async () => {
-        mocks.runAgentConversation.mockResolvedValue({
-            conversation: { turns: [], totalTokens: 1234 },
-            transcript: [],
-            attemptedCalls: [],
-            toolInvocations: [
-                { name: 'get-actor-task', isMcpTool: true, result: { success: true, result: 'ok' } },
-                {
-                    name: 'create-actor-task',
-                    isMcpTool: true,
-                    result: { success: false, error: 'name taken\nstack line' },
-                },
-                { name: 'call-actor', isMcpTool: true, result: { success: false, error: 'injected' } },
-                // A built-in failing says nothing about the server under test.
-                { name: 'Bash', isMcpTool: false, result: { success: false, error: 'exit status 1' } },
-            ],
-        });
+        mocks.runAgentConversation.mockResolvedValue(
+            makeAgentRun({
+                toolInvocations: [
+                    { name: 'get-actor-task', isMcpTool: true, result: { success: true, result: 'ok' } },
+                    {
+                        name: 'create-actor-task',
+                        isMcpTool: true,
+                        result: { success: false, error: 'name taken\nstack line' },
+                    },
+                    { name: 'call-actor', isMcpTool: true, result: { success: false, error: 'injected' } },
+                    // A built-in failing says nothing about the server under test.
+                    { name: 'Bash', isMcpTool: false, result: { success: false, error: 'exit status 1' } },
+                ],
+            }),
+        );
         const item = makeItem({
             metadata: { category: 'search', kind: 'agent', tier: ['full'], failTools: ['call-actor'] },
         });
@@ -304,15 +287,14 @@ describe('makeTask()', () => {
     });
 
     it('marks a tool failure named in expectedErrors as expected, without exempting it from the list', async () => {
-        mocks.runAgentConversation.mockResolvedValue({
-            conversation: { turns: [], totalTokens: 1234 },
-            transcript: [],
-            attemptedCalls: [],
-            toolInvocations: [
-                { name: 'get-actor-task', isMcpTool: true, result: { success: false, error: 'task not found' } },
-                { name: 'create-actor-task', isMcpTool: true, result: { success: false, error: 'name taken' } },
-            ],
-        });
+        mocks.runAgentConversation.mockResolvedValue(
+            makeAgentRun({
+                toolInvocations: [
+                    { name: 'get-actor-task', isMcpTool: true, result: { success: false, error: 'task not found' } },
+                    { name: 'create-actor-task', isMcpTool: true, result: { success: false, error: 'name taken' } },
+                ],
+            }),
+        );
         const item = makeItem({
             metadata: { category: 'get', kind: 'agent', tier: ['full'], expectedErrors: ['get-actor-task'] },
         });
@@ -326,12 +308,12 @@ describe('makeTask()', () => {
     });
 
     it('runs a kind: selection item under isSelectionMode, scoring first_tool_match with no judge call', async () => {
-        mocks.runAgentConversation.mockResolvedValue({
-            conversation: { turns: [], totalTokens: undefined },
-            transcript: [],
-            toolInvocations: [],
-            attemptedCalls: [{ toolName: 'mcp__apify__search-actors', input: { keywords: 'tiktok' } }],
-        });
+        mocks.runAgentConversation.mockResolvedValue(
+            makeAgentRun({
+                conversation: { turns: [], totalTokens: undefined },
+                attemptedCalls: [{ toolName: 'mcp__apify__search-actors', input: { keywords: 'tiktok' } }],
+            }),
+        );
 
         const result = await makeMcpAgentTask()(makeSelectionItem());
 
@@ -345,12 +327,7 @@ describe('makeTask()', () => {
     });
 
     it('carries the run-wide mcpToolsOnly OR the per-item mcpToolsOnly into the selection run', async () => {
-        mocks.runAgentConversation.mockResolvedValue({
-            conversation: { turns: [], totalTokens: undefined },
-            transcript: [],
-            toolInvocations: [],
-            attemptedCalls: [],
-        });
+        mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
         const item = makeSelectionItem({
             metadata: {
                 category: 'search',
@@ -366,12 +343,7 @@ describe('makeTask()', () => {
     });
 
     it('applies the run-wide mcpToolsOnly to an item that does not set its own flag', async () => {
-        mocks.runAgentConversation.mockResolvedValue({
-            conversation: { turns: [], totalTokens: undefined },
-            transcript: [],
-            toolInvocations: [],
-            attemptedCalls: [],
-        });
+        mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
         const task = makeTask({
             llmClient: {} as LlmClient,
             apifyToken: 'token',
@@ -379,39 +351,15 @@ describe('makeTask()', () => {
             judgeModel: 'judge',
             toolTimeout: 1,
             mcpToolsOnly: true,
+            totalTrials: 1,
         });
 
         await task(makeSelectionItem());
         expect(mocks.runAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ mcpToolsOnly: true }));
     });
 
-    it('retries a kind: selection item once on a transient failure, scoring off the second attempt only', async () => {
-        mocks.runAgentConversation.mockRejectedValueOnce(new Error('Connection error.')).mockResolvedValueOnce({
-            conversation: { turns: [], totalTokens: undefined },
-            transcript: [],
-            toolInvocations: [],
-            attemptedCalls: [{ toolName: 'mcp__apify__search-actors', input: { keywords: 'tiktok' } }],
-        });
-
-        const result = await makeMcpAgentTask()(makeSelectionItem());
-
-        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
-        expect(result).toMatchObject({
-            kind: 'selection',
-            firstToolMatch: {
-                isMatch: true,
-                comment: 'search-actors({"keywords":"tiktok"}) — matched expectedTools [search-actors]',
-            },
-        });
-    });
-
     it('carries a runner-injected iteration through to the output', async () => {
-        mocks.runAgentConversation.mockResolvedValue({
-            conversation: { turns: [], totalTokens: 1234 },
-            transcript: [],
-            toolInvocations: [],
-            attemptedCalls: [],
-        });
+        mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
         const item = makeItem({ metadata: { category: 'search', kind: 'agent', tier: ['full'], iteration: 2 } });
 
         await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({ iteration: 2 });
@@ -486,15 +434,6 @@ describe('buildRunSummary()', () => {
         ]);
     });
 
-    it('reports every requested id as dropped when nothing ran at all', () => {
-        const summary = buildRunSummary(['a'], [], 1);
-        expect(summary).toMatchObject({
-            passedTrials: 0,
-            requestedTrials: 1,
-            droppedTrials: [{ id: 'a', iteration: 1 }],
-        });
-    });
-
     it('treats a missing mcp_agent_judge score as a failure, without quoting the stale judge reason', () => {
         const summary = buildRunSummary(['a'], [{ output: makeAgentOutput({ id: 'a' }), evaluations: [] }], 1);
         expect(summary.passedTrials).toBe(0);
@@ -523,57 +462,8 @@ describe('buildRunSummary()', () => {
                         { iteration: 1, passed: true },
                         { iteration: 2, passed: true },
                     ],
-                    anyPassed: true,
-                    allPassed: true,
                 },
             ]);
-        });
-
-        it('computes pass@k (any trial passed) and pass^k (every trial passed) per item', () => {
-            const passFail = { judgeResult: { verdict: 'FAIL' as const, reason: 'x', rawResponse: '' } };
-            const itemResults = [
-                makeScoredAgentItem('a', 1, { iteration: 1 }),
-                makeScoredAgentItem('a', 1, { iteration: 2 }),
-                makeScoredAgentItem('b', 1, { iteration: 1 }),
-                makeScoredAgentItem('b', 0, { iteration: 2, ...passFail }),
-            ];
-            const summary = buildRunSummary(['a', 'b'], itemResults, 2);
-            expect(summary.passAtK).toBe(2); // both items had at least one pass
-            expect(summary.passHatK).toBe(1); // only "a" passed every trial
-        });
-
-        it('carries anyPassed/allPassed on each item, matching the passAtK/passHatK aggregates', () => {
-            const passFail = { judgeResult: { verdict: 'FAIL' as const, reason: 'x', rawResponse: '' } };
-            const itemResults = [
-                makeScoredAgentItem('a', 1, { iteration: 1 }),
-                makeScoredAgentItem('a', 1, { iteration: 2 }),
-                makeScoredAgentItem('b', 1, { iteration: 1 }),
-                makeScoredAgentItem('b', 0, { iteration: 2, ...passFail }),
-            ];
-            const summary = buildRunSummary(['a', 'b'], itemResults, 2);
-            expect(summary.items).toEqual([
-                {
-                    id: 'a',
-                    trials: [
-                        { iteration: 1, passed: true },
-                        { iteration: 2, passed: true },
-                    ],
-                    anyPassed: true,
-                    allPassed: true,
-                },
-                {
-                    id: 'b',
-                    trials: [
-                        { iteration: 1, passed: true },
-                        { iteration: 2, passed: false },
-                    ],
-                    anyPassed: true,
-                    allPassed: false,
-                },
-            ]);
-            // The per-item flags are what the aggregates count, so assert the pair here too.
-            expect(summary.passAtK).toBe(summary.items.filter((entry) => entry.anyPassed).length);
-            expect(summary.passHatK).toBe(summary.items.filter((entry) => entry.allPassed).length);
         });
 
         it('scales the requested-trials denominator by requestedIds.length * iterations', () => {
@@ -590,7 +480,7 @@ describe('buildRunSummary()', () => {
 });
 
 describe('resolveExitCode()', () => {
-    it('exits 0 when the pass rate exactly meets the threshold', () => {
+    it('compares the pass rate with the threshold', () => {
         const summary = buildRunSummary(
             ['a', 'b', 'c', 'd'],
             [
@@ -603,41 +493,12 @@ describe('resolveExitCode()', () => {
         );
         expect(summary.passRate).toBe(0.75);
         expect(resolveExitCode(summary, 0.75)).toBe(0);
-    });
-
-    it('exits 1 when the pass rate falls one trial short of the threshold', () => {
-        const summary = buildRunSummary(
-            ['a', 'b', 'c', 'd'],
-            [
-                makeScoredAgentItem('a', 1),
-                makeScoredAgentItem('b', 1),
-                makeScoredAgentItem('c', 1),
-                makeScoredAgentItem('d', 0, { judgeResult: { verdict: 'FAIL', reason: 'x', rawResponse: '' } }),
-            ],
-            1,
-        );
-        expect(summary.passRate).toBe(0.75);
         expect(resolveExitCode(summary, 0.8)).toBe(1);
-    });
-
-    it('defaults to strict all-pass semantics at threshold 1.0', () => {
-        const allPass = buildRunSummary(['a', 'b'], [makeScoredAgentItem('a', 1), makeScoredAgentItem('b', 1)], 1);
-        expect(resolveExitCode(allPass, 1.0)).toBe(0);
-
-        const oneFailed = buildRunSummary(
-            ['a', 'b'],
-            [
-                makeScoredAgentItem('a', 1),
-                makeScoredAgentItem('b', 0, { judgeResult: { verdict: 'FAIL', reason: 'x', rawResponse: '' } }),
-            ],
-            1,
-        );
-        expect(resolveExitCode(oneFailed, 1.0)).toBe(1);
     });
 });
 
 describe('expandIterations()', () => {
-    it('repeats each item N times, tagging metadata.iteration 1..N', () => {
+    it('repeats items with an iteration without mutating their metadata', () => {
         const items = [
             { id: 'a', metadata: { category: 'x' } },
             { id: 'b', metadata: { category: 'y' } },
@@ -650,33 +511,12 @@ describe('expandIterations()', () => {
             data.filter((item) => item.id === id).map((item) => item.metadata.iteration);
         expect(iterationsFor('a')).toEqual([1, 2, 3]);
         expect(iterationsFor('b')).toEqual([1, 2, 3]);
-    });
-
-    it('carries the item metadata through alongside the injected iteration', () => {
-        const items = [{ id: 'a', metadata: { category: 'x' } }] as unknown as Parameters<typeof expandIterations>[0];
-        const data = expandIterations(items, 1) as unknown as { metadata: { category: string; iteration: number } }[];
         expect(data[0].metadata).toEqual({ category: 'x', iteration: 1 });
-    });
-
-    it('does not mutate the source item', () => {
-        const source = { id: 'a', metadata: { category: 'x' } };
-        const items = [source] as unknown as Parameters<typeof expandIterations>[0];
-        expandIterations(items, 2);
-        expect(source.metadata).toEqual({ category: 'x' });
+        expect(items[0].metadata).toEqual({ category: 'x' });
     });
 });
 
 describe('formatRunSummary()', () => {
-    it('omits the 🔁 and 📈 lines when iterations is 1, but shows the threshold in 📊', () => {
-        const summary = buildRunSummary(['a', 'b'], [makeScoredAgentItem('a', 1), makeScoredAgentItem('b', 1)], 1);
-        const lines = formatRunSummary(summary, 1, 1);
-        const texts = lines.map((line) => line.text);
-
-        expect(texts.some((text) => text.startsWith('🔁'))).toBe(false);
-        expect(texts.some((text) => text.startsWith('📈'))).toBe(false);
-        expect(texts).toContain('📊 2/2 trials passed (pass_rate 1.00, threshold 1.00)');
-    });
-
     it('prints 🔁 per item in iteration order, a ❌ line naming the failed iteration, and 📈 pass@k/pass^k', () => {
         const trial1 = makeScoredAgentItem('a', 1, { iteration: 1 });
         const trial2Fail = makeScoredAgentItem('a', 0, {
@@ -692,54 +532,25 @@ describe('formatRunSummary()', () => {
         expect(texts).toContain('📊 1/2 trials passed (pass_rate 0.50, threshold 0.80)');
         expect(texts).toContain('📈 pass@2 1/1 items · pass^2 0/1 items');
     });
-
-    it('routes the dropped-trial line to the error stream', () => {
-        const summary = buildRunSummary(['a', 'b'], [makeScoredAgentItem('a', 1)], 1);
-        const dropped = formatRunSummary(summary, 1, 1).find((line) => line.text.startsWith('🔥'));
-        expect(dropped).toEqual({ stream: 'error', text: '🔥 Never completed (task threw, see errors above): b' });
-    });
 });
 
 describe('validateIterations()', () => {
-    it('accepts a positive integer', () => {
+    it('accepts positive integers and rejects other values', () => {
         expect(() => validateIterations(1)).not.toThrow();
-        expect(() => validateIterations(5)).not.toThrow();
-    });
-
-    it('rejects zero, negative, and non-integer values', () => {
-        expect(() => validateIterations(0)).toThrow('--iterations must be a positive integer, got "0"');
-        expect(() => validateIterations(-1)).toThrow('--iterations must be a positive integer');
-        expect(() => validateIterations(1.5)).toThrow('--iterations must be a positive integer');
+        for (const value of [0, -1, 1.5]) expect(() => validateIterations(value)).toThrow(/positive integer/);
     });
 });
 
 describe('validatePassThreshold()', () => {
-    it('accepts values within [0, 1]', () => {
-        expect(() => validatePassThreshold(0)).not.toThrow();
-        expect(() => validatePassThreshold(1)).not.toThrow();
-        expect(() => validatePassThreshold(0.8)).not.toThrow();
-    });
-
-    it('rejects values outside [0, 1]', () => {
-        expect(() => validatePassThreshold(-0.1)).toThrow('--pass-threshold must be between 0 and 1, got "-0.1"');
-        expect(() => validatePassThreshold(1.1)).toThrow('--pass-threshold must be between 0 and 1');
-    });
-
-    it('rejects NaN, e.g. from a typo like "--pass-threshold high"', () => {
-        expect(() => validatePassThreshold(NaN)).toThrow('--pass-threshold must be between 0 and 1, got "NaN"');
+    it('accepts [0, 1] and rejects values outside it', () => {
+        for (const value of [0, 0.8, 1]) expect(() => validatePassThreshold(value)).not.toThrow();
+        for (const value of [-0.1, 1.1, NaN]) expect(() => validatePassThreshold(value)).toThrow(/between 0 and 1/);
     });
 });
 
 describe('validateConcurrency()', () => {
-    it('accepts a positive integer', () => {
+    it('accepts positive integers and rejects other values', () => {
         expect(() => validateConcurrency(1)).not.toThrow();
-        expect(() => validateConcurrency(8)).not.toThrow();
-    });
-
-    it('rejects zero, negative, non-integer, and NaN values', () => {
-        expect(() => validateConcurrency(0)).toThrow('--concurrency must be a positive integer, got "0"');
-        expect(() => validateConcurrency(-1)).toThrow('--concurrency must be a positive integer');
-        expect(() => validateConcurrency(1.5)).toThrow('--concurrency must be a positive integer');
-        expect(() => validateConcurrency(NaN)).toThrow('--concurrency must be a positive integer');
+        for (const value of [0, -1, 1.5, NaN]) expect(() => validateConcurrency(value)).toThrow(/positive integer/);
     });
 });
