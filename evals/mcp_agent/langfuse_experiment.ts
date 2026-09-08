@@ -194,6 +194,16 @@ export function makeTask(options: McpAgentTaskOptions) {
         const item = parseMcpAgentItem(rawItem);
 
         try {
+            // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
+            // "agent" items; this task only runs those, so a missing expectedOutput here is
+            // a caller bug. Checked before the agent run so a kind: "selection" item (not
+            // executed until #260) fails fast instead of spending an agent conversation it
+            // cannot be scored on.
+            if (item.expectedOutput === undefined) {
+                throw new Error(
+                    `kind "${item.metadata.kind}" item has no expectedOutput; this task only runs agent items`,
+                );
+            }
             const runOptions = {
                 prompt: item.input.query,
                 model: agentModel,

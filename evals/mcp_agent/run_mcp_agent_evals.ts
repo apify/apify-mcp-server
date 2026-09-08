@@ -12,11 +12,11 @@
  * Usage:
  *   pnpm run evals:mcp-agent
  *   pnpm run evals:mcp-agent -- --category search
- *   pnpm run evals:mcp-agent -- --id search-google-maps
+ *   pnpm run evals:mcp-agent -- --id '^tasks/'     # one family, matched by its id prefix
  *   pnpm run evals:mcp-agent -- --concurrency 8
  *   pnpm run evals:mcp-agent -- --mcp-tools-only   # drop Claude Code's built-in tools
  *   pnpm run evals:mcp-agent -- --subscription     # bill the local Claude Code login, not the API
- *   pnpm run evals:mcp-agent -- --dataset tasks-evals-errors --allow-tool-errors
+ *   pnpm run evals:mcp-agent -- --allow-tool-errors # until #260 lands, needed for items with expectedErrors
  */
 
 // Must be the first import: config modules read process.env at load time.
