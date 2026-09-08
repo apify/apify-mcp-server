@@ -9,8 +9,8 @@
  * The authoring table (every decision, and the 3 archived source ids) lives in
  * `port_selection_cases_data.ts`, reviewable as a diff. This script only builds each row's
  * `kind: "selection", tier: ["pr"]` metadata, validates it through the same strict validator the
- * runner uses, guards against id collisions, and upserts by id — mirroring
- * `migrate_unified_dataset.ts`'s shape, not a generic importer.
+ * runner uses, guards against id collisions, and upserts by id — a one-off script, not a
+ * generic importer.
  *
  * Idempotent: upserting is by id, so a re-run replays the same content, never duplicates.
  *

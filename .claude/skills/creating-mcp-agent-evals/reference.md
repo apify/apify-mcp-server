@@ -74,8 +74,7 @@ npx -y langfuse-cli api dataset-items get <id>
 npx -y langfuse-cli api dataset-items delete <id>          # irreversible, frees nothing (id stays burned) — archive instead (status: "ARCHIVED")
 ```
 
-The edit loop per case: upsert item → `pnpm run evals:mcp-agent:export-dataset --dataset <name>` →
-re-run just that item with `--id '<substring-regex>'` → read the transcript.
+The edit loop per case: upsert item → re-run just that item with `--id '<substring-regex>'` → read the transcript.
 
 Read failing transcripts (judge reason + per-turn tool calls). `--from-start-time` is **required**;
 the item's `output` field is a JSON **string** — pipe through `fromjson`:
@@ -95,12 +94,6 @@ call it is measuring), and selection items cannot declare `expectedErrors`.
 ```bash
 npx -y langfuse-cli api observations list --level ERROR \
   --from-start-time "<run start ISO>" --fields core,basic,io --limit 100
-```
-
-## Snapshot to git (after every dataset edit)
-
-```bash
-pnpm run evals:mcp-agent:export-dataset   # writes dataset_snapshot_mcp-server-evals.json, committed
 ```
 
 ## API probe pattern (before writing platform-dependent cases)

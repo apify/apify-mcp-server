@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { filterById } from '../../evals/shared/test_case_loader.js';
 import type { BaseTestCase } from '../../evals/shared/types.js';
 
-/** Mirrors the post-migration id scheme: <category>/<slug>, one family per source dataset. */
+/** Mirrors the unified dataset id scheme: <category>/<slug>. */
 const CASES: BaseTestCase[] = [
     { id: 'tasks/create-explicit-1', category: 'create', query: 'q' },
     { id: 'tasks/create-collision', category: 'create', query: 'q' },

@@ -389,9 +389,7 @@ runner (apify/ai-team#261) where this fault is not expected to reproduce.
    prints the plan; touches nothing, needs no network.
 3. `pnpm run evals:mcp-agent:port-selection-cases` — upserts by id (idempotent; re-running is a
    no-op replay of unchanged rows).
-4. `pnpm run evals:mcp-agent:export-dataset` — re-export the committed snapshot so the diff
-   shows the new case.
-5. `pnpm run test:unit -- evals.port_selection_cases` — the coverage/collision/validation
+4. `pnpm run test:unit -- evals.port_selection_cases` — the coverage/collision/validation
    assertions run against the updated table.
 
 ### Coverage matrix (apify/ai-team#265)
@@ -399,10 +397,10 @@ runner (apify/ai-team#261) where this fault is not expected to reproduce.
 `pnpm run evals:coverage` measures — and writes to the committed `evals/mcp_agent/coverage_matrix.md`
 — which tools and which argument groups the dataset actually exercises, per the
 `creating-mcp-agent-evals` skill's per-tool/per-argument-group definition of done and #236's "proven
-by a generated coverage matrix, not by memory". It reads two offline inputs only — the live tool
-registry (`src/tools/**`) and the committed `dataset_snapshot_mcp-server-evals.json` — so it needs no
-env vars and makes no network call by default; the same inputs always produce the same file, byte for
-byte.
+by a generated coverage matrix, not by memory". It reads two inputs — the live tool registry
+(`src/tools/**`) and the `mcp-server-evals` dataset's active items — so every run needs Langfuse
+credentials. There are no timestamps, so the same registry and the same dataset always produce the
+same file, byte for byte; the dataset is UI-mutable, so the output can change without a code change.
 
 **What it measures, per tool:**
 - **`pr` selection cases** — how many `kind: "selection"` items name this tool in `expectedTools`.
@@ -436,17 +434,17 @@ pnpm run evals:coverage -- --experiment <id>   # prints the experiment-augmented
 pnpm run evals:coverage -- --experiment <id> --out somewhere.md   # ...or write it there instead, explicitly
 ```
 
-`--check` and `--experiment` cannot be combined (`--check` compares only the committed,
-snapshot-only matrix; passing `--experiment` alongside it is rejected with a `❌` message and a
-non-zero exit, before any Langfuse call). `--experiment` without `--out` prints to stdout instead of
+`--check` and `--experiment` cannot be combined (`--check` compares only the dataset-only matrix;
+passing `--experiment` alongside it is rejected with a `❌` message and a non-zero exit, before any
+Langfuse call). `--experiment` without `--out` prints to stdout instead of
 writing anywhere — this is structural, not a convention to remember: with `--experiment`, the
 committed `coverage_matrix.md` can only be touched by passing `--out` explicitly.
 
-**Freshness.** `tests/unit/evals.coverage_matrix.test.ts` regenerates the matrix from the committed
-snapshot and the live registry and asserts byte-equality with the committed `coverage_matrix.md` —
-zero network, so a stale matrix (a new tool, a changed schema, an unregenerated snapshot) fails
-`pnpm run test:unit` on every PR that causes it, not just ones that touch this script. `--check` runs
-the same comparison from the CLI, for local use before committing.
+**Freshness.** The dataset half needs Langfuse, so the byte-for-byte check lives in the CLI:
+`--check` regenerates and compares, for local use before committing. What still runs offline on every
+PR is `tests/unit/evals.coverage_matrix.test.ts`'s registry check — the committed table must hold
+exactly one row per in-scope and widget tool, so adding, renaming or retiring a tool without
+regenerating fails `pnpm run test:unit`.
 
 **`--experiment <id>`** fetches that experiment's dataset-item traces (and their dataset-item
 metadata, to tell `kind: "agent"` items from `kind: "selection"` ones) and the agent items' `TOOL`-type
@@ -509,12 +507,7 @@ rather than blocked in code: measuring an agent item's flakiness (e.g. `tasks/ch
 - `1` = the pass rate falls short of the threshold, or setup failed ❌
 
 **Editing test cases:** edit the items in the Langfuse UI. The next run picks them up; there is nothing to commit
-in the dataset itself — but re-run the export below so the committed snapshot reflects the edit.
-```bash
-pnpm run evals:mcp-agent:export-dataset   # writes dataset_snapshot_mcp-server-evals.json (no build, no Apify/OpenRouter keys)
-```
-`dataset_snapshot_mcp-server-evals.json` is committed, so a UI edit shows as a diff on the next export; `--dataset <name>`
-exports any other dataset to its own `dataset_snapshot_<dataset>.json`, which stays gitignored.
+in the dataset itself. Use `pnpm run evals:mcp-agent:export-dataset` for an optional local snapshot; exports are gitignored.
 
 ---
 
@@ -532,12 +525,12 @@ exports any other dataset to its own `dataset_snapshot_<dataset>.json`, which st
 
 ### 1. The Langfuse dataset is the source of truth
 
-**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy a run reads: `evals:mcp-agent:export-dataset` dumps the active items to `dataset_snapshot_<dataset>.json` for reading them outside the UI, and there is no importer. The snapshot is not dead weight — `evals:coverage` and the unit tests read it precisely because it is offline and committed — but no eval run reads it.
+**Decision:** A run reads its test cases from the Langfuse dataset and never writes to it. Langfuse is the only copy anything reads: `evals:mcp-agent:export-dataset` dumps the active items to a gitignored `dataset_snapshot_<dataset>.json` for reading them outside the UI, and there is no importer.
 
 **Why:**
 - A UI edit takes effect on the next run. An earlier version synced a local file into the dataset first, which silently overwrote UI edits
 - `experiment.run` only records a comparable **dataset run** (with a shareable run URL) when given real dataset items
-- A snapshot is a second copy that no eval run reads and nothing keeps in sync automatically, so most are gitignored. `dataset_snapshot_mcp-server-evals.json` is the one exception, committed so a git reviewer sees dataset edits as a diff and so `evals:coverage` can measure coverage without network access. Its output is byte-stable, so two exports diff cleanly when you want to see what changed in the UI
+- A snapshot is a second copy that no code reads and nothing keeps in sync automatically, so snapshots are gitignored
 
 Every active item is validated when the dataset is fetched, so a bad UI edit fails the run before any LLM spend. Archived items are skipped, which is how a case is retired.
 
@@ -680,9 +673,8 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
 - `port_selection_cases.ts` - One-off port of the old Phoenix `pr`-tier selection cases into `mcp-server-evals` CLI entry (`pnpm run evals:mcp-agent:port-selection-cases`); validates, dedupes, and upserts by id
 - `port_selection_cases_data.ts` - The authoring table `port_selection_cases.ts` ports: every row, decision, and archived source id, reviewable as a diff
-- `migrate_unified_dataset.ts` - One-off migration into `mcp-server-evals` from the old per-family datasets (#259); not part of the regular workflow
 - `coverage_matrix.ts` - Tool + argument coverage matrix CLI entry (`pnpm run evals:coverage`, apify/ai-team#265); see "Coverage matrix" above
-- `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime. Gitignored except `dataset_snapshot_mcp-server-evals.json`, which is committed
+- `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime and gitignored
 - `coverage_matrix.md` - Committed, generated output of `coverage_matrix.ts`; do not edit by hand
 
 ## Configuration
@@ -717,7 +709,7 @@ Results are recorded in Langfuse, not to a local file. Each run:
 ### Test case format
 
 A test case is a dataset item: `input.query`, `expectedOutput`, and the rest in `metadata`. The id is
-`<category>/<slug>` (see "One dataset: kind, tier, id scheme, and expectedErrors" above). The snapshot
+`<category>/<slug>` (see "One dataset: kind, tier, id scheme, and expectedErrors" above). An export
 holds the same fields flattened, one object per case, in this fixed key order:
 
 ```json

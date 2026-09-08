@@ -169,41 +169,6 @@ describe('findUnsafeCollisions()', () => {
     });
 });
 
-/**
- * Offline collision check against the real non-selection (`kind: agent`) ids, read from the
- * committed dataset snapshot rather than Langfuse, so this stays zero-network. This is the same
- * check `port_selection_cases.ts`'s CLI runs live against `liveNonSelectionIds` before any write
- * — here it runs against a fixed, checked-in set instead.
- */
-describe('findUnsafeCollisions() against the committed snapshot', () => {
-    const snapshotRows = readJsonFile<{ id: string; kind: string }[]>(
-        import.meta.url,
-        '../../evals/mcp_agent/dataset_snapshot_mcp-server-evals.json',
-    );
-    const agentIds = snapshotRows.filter((row) => row.kind === 'agent').map((row) => row.id);
-
-    it('the snapshot has exactly 60 kind: agent ids', () => {
-        expect(agentIds).toHaveLength(60);
-    });
-
-    it('the real authoring table collides with none of the live kind: agent ids', () => {
-        expect(findUnsafeCollisions(PORT_SELECTION_CASES, new Set(agentIds))).toEqual([]);
-    });
-
-    it('flags a fabricated row whose id equals a real kind: agent id', () => {
-        const rows = [
-            {
-                decision: 'new' as const,
-                id: agentIds[0],
-                query: 'q',
-                category: 'x',
-                expectedTools: ['x'],
-            },
-        ];
-        expect(findUnsafeCollisions(rows, new Set(agentIds))).toEqual([agentIds[0]]);
-    });
-});
-
 describe('PORT_SELECTION_CASES: id scheme', () => {
     it('every id has exactly one "/" and the prefix is a real tool family', () => {
         const requiredToolIdentifiers = new Set(resolveInScopeToolIdentifiers());
