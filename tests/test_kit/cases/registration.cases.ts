@@ -7,7 +7,11 @@ import {
     getCategoryTools,
     getExpectedToolNamesByCategories,
 } from '@apify/actors-mcp-server/internals.js';
-import { HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
+import {
+    HELPER_TOOLS,
+    RESOURCE_MIME_TYPE,
+    SERVER_MODE_AUTO_DETECTION_ENABLED,
+} from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_NORMAL_MODE,
@@ -42,7 +46,6 @@ const CLAUDE_CONNECTOR_TOOLS = [
     'search-apify-docs',
     'fetch-apify-docs',
     'get-actor-run',
-    'get-actor-run-widget',
     'get-actor-run-list',
     'get-actor-log',
     'abort-actor-run',
@@ -105,10 +108,20 @@ export const registrationCases: Case[] = [
     {
         // Pinned ?tools= wins for call-actor even with the report-problem auto-inject path live
         // (telemetry defaults on here — no ?telemetry-enabled= override, matching a real URL).
+        // No ?ui= either: apps mode comes from the client's own UI-capability advertisement
+        // (serverMode 'auto' default), same as a real MCP-Apps client — not a URL override.
         name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude+connector',
         isDeploymentTest: true,
+        skipIf: () => !SERVER_MODE_AUTO_DETECTION_ENABLED,
         run: withClient(
-            { tools: CLAUDE_CONNECTOR_TOOLS, serverMode: 'apps', client: 'claude connector', omitTelemetryParam: true },
+            {
+                tools: CLAUDE_CONNECTOR_TOOLS,
+                client: 'claude connector',
+                omitTelemetryParam: true,
+                clientCapabilities: {
+                    extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] } },
+                },
+            },
             async (client) => {
                 const names = getToolNames(await client.listTools());
                 expect(names).toContain(HELPER_TOOLS.PROBLEM_REPORT);
