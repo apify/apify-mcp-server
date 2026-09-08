@@ -16,7 +16,7 @@ import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
-import { WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';
+import { ALL_WIDGET_TOOLS, WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';
 import type { ActorInfo, Input, ToolBase, ToolEntry } from '../../src/types.js';
 import { SERVER_MODES, SERVER_MODE } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -231,7 +231,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             }
         }
 
-        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+        for (const widget of ALL_WIDGET_TOOLS) {
             it(`${widget.name} widget should be frozen`, () => {
                 expect(Object.isFrozen(widget)).toBe(true);
             });
@@ -253,7 +253,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             }
         }
 
-        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+        for (const widget of ALL_WIDGET_TOOLS) {
             it(`${widget.name} widget should be a known HELPER_TOOLS value`, () => {
                 expect(allHelperToolNames.has(widget.name as HelperToolName)).toBe(true);
             });
@@ -390,7 +390,7 @@ describe('taskSupport contract across tool categories', () => {
     // Widgets render their own progress UI; they MUST NOT participate in the MCP task lifecycle,
     // otherwise a `request.params.task` call would be accepted and would duplicate the widget's
     // live-progress channel.
-    for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+    for (const widget of ALL_WIDGET_TOOLS) {
         it(`${widget.name} widget must not declare taskSupport`, () => {
             expect(widget.execution?.taskSupport).toBeUndefined();
         });
