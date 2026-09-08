@@ -1,6 +1,7 @@
-# Reusable workflow for MCP agent evaluations (Langfuse-backed). The `pr` tier runs the
-# `kind: tool-call` items (no judge, nothing executes) and gates PRs; the `merge` tier runs
-# the `kind: agent` items (judged, live account) after a merge. See evals/mcp_agent/README.md's
+# Reusable workflow for MCP agent evaluations (Langfuse-backed), one dataset per tier. The `pr`
+# tier runs `mcp-server-evals-pr` (`kind: tool-call` items: no judge, nothing executes) and
+# gates PRs; the `merge` tier runs `mcp-server-evals-merge` (`kind: agent` items: judged, live
+# account) after a merge. See evals/mcp_agent/README.md's
 # CI section.
 
 on:
@@ -69,7 +70,7 @@ jobs:
             -   name: Run pr-tier evals
                 if: inputs.tier == 'pr'
                 run: >
-                    pnpm run evals:mcp-agent -- --tier pr
+                    pnpm run evals:mcp-agent -- --dataset mcp-server-evals-pr
                     --pass-threshold 0.9
                     --agent-model claude-haiku-4-5 --claude-judge
 
@@ -79,6 +80,6 @@ jobs:
             -   name: Run merge-tier evals
                 if: inputs.tier == 'merge'
                 run: >
-                    pnpm run evals:mcp-agent -- --tier merge
+                    pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge
                     --pass-threshold 0.7
                     --agent-model claude-haiku-4-5

@@ -510,12 +510,12 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 
 ## CI (apify/ai-team#261)
 
-CI runs the one `mcp-server-evals` dataset in two tiers, replacing the old Phoenix runner
-(`evals/run_evaluation.ts`, scheduled for deletion under #262 — its own `evals/README.md` no longer
-describes CI behavior). A tier is a filter on each item's `tier` metadata, independent of its
-`kind`; today every `pr` item is `kind: "tool-call"` (no judge, nothing executes), which is what
-keeps the gate fast, and every `merge` item is `kind: "agent"` (judged). What each run does when
-it fails differs, and neither is a required status check today:
+CI runs the two datasets from "Two datasets" above, one per tier, replacing the old Phoenix
+runner (`evals/run_evaluation.ts`, scheduled for deletion under #262 — its own `evals/README.md`
+no longer describes CI behavior). The `pr` tier is `mcp-server-evals-pr` (`kind: "tool-call"`: no
+judge, nothing executes, which is what keeps the gate fast); the `merge` tier is
+`mcp-server-evals-merge` (`kind: "agent"`: judged). What each run does when it fails differs, and
+neither is a required status check today:
 
 - the `pr` tier **fails its job** on a pass rate below the `--pass-threshold` the workflow passes
   (`0.9`: the floor of 3 `claude-haiku-4-5` runs was 0.93, apify/ai-team#240, rounded down; provisional
