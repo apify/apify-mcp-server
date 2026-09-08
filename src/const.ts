@@ -72,11 +72,19 @@ export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
 
 /**
  * Retired tool selectors: `add-actor` and `experimental` (add-actor was deleted in the stateless
- * migration) and the deprecated `preview` pseudo-category. They name neither a registry category
- * nor a real tool anymore, so they resolve to nothing — never loaded, never treated as an Actor ID,
- * never requiring a token by themselves.
+ * migration), the deprecated `preview` pseudo-category, and `call-actor-widget`/`get-actor-run-widget`
+ * (widget tools that stopped being servable when `WIDGET_BY_BASE_TOOL` dropped their pairing — without
+ * this, `resolveActorsToLoad` would misclassify either name as an Actor ID and fetch it as one).
+ * None of these name a registry category or a real tool anymore, so they resolve to nothing — never
+ * loaded, never treated as an Actor ID, never requiring a token by themselves.
  */
-export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set(['add-actor', 'experimental', 'preview']);
+export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
+    'add-actor',
+    'experimental',
+    'preview',
+    'call-actor-widget',
+    'get-actor-run-widget',
+]);
 
 /**
  * Client-name substrings (lowercased, matched against `clientInfo.name`) that `report-problem` is
