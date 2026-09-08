@@ -268,26 +268,24 @@ export function getToolsForServerMode(
      */
     const hasCallActor = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === TOOL_TYPE.ACTOR);
-    // `get-actor-run`'s nextStep templates point at `get-dataset-items` / `get-key-value-store-record`,
-    // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session
-    // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
+    // get-actor-run's nextStep templates point at get-dataset-items/get-key-value-store-record.
     const hasGetActorRun = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_RUNS_GET);
-    // call-actor-widget starts a run, same as call-actor, so it wants the full bundle too (it is not
-    // itself a bundle member, so including get-actor-run raises no widget-only-purity issue).
+    // call-actor-widget starts a run, same as call-actor, so it also wants the bundle.
     const hasCallActorWidget = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL_WIDGET);
-    // get-actor-run-widget calls get-dataset-items internally for its preview, but IS itself the
-    // widget sibling of get-actor-run (a bundle member) — injecting the full bundle for it alone
-    // would silently add the base tool, contradicting one-way pairing (selecting a widget never
-    // auto-brings its base). Only get-dataset-items/-record/abort are genuinely needed here.
+    // get-actor-run-widget calls get-dataset-items internally for its own preview fetch.
     const hasGetActorRunWidget = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
 
-    // Inject run-workflow helpers whenever any actor-running entrypoint is present; de-dup pass below drops repeats.
-    const wantsFullBundle = hasCallActor || hasActorTools || hasGetActorRun || hasCallActorWidget;
-    const toolsToInject: ToolEntry[] = wantsFullBundle
-        ? [...AUTO_INJECTED_TOOLS]
-        : hasGetActorRunWidget
-          ? AUTO_INJECTED_TOOLS.filter((tool) => tool.name !== HELPER_TOOLS.ACTOR_RUNS_GET)
-          : [];
+    // Non-widget entrypoints have standing to pull in get-actor-run itself; widgets alone don't.
+    const hasHardRunTrigger = hasCallActor || hasActorTools || hasGetActorRun;
+    const hasWidgetRunTrigger = hasCallActorWidget || hasGetActorRunWidget;
+    // get-actor-run-widget is get-actor-run's own widget sibling — while it's present, only a hard
+    // trigger may still pull the base in, or a widget would silently auto-bring its own base.
+    const excludeGetActorRun = hasGetActorRunWidget && !hasHardRunTrigger;
+
+    const toolsToInject: ToolEntry[] =
+        hasHardRunTrigger || hasWidgetRunTrigger
+            ? AUTO_INJECTED_TOOLS.filter((tool) => tool.name !== HELPER_TOOLS.ACTOR_RUNS_GET || !excludeGetActorRun)
+            : [];
 
     if (toolsToInject.length > 0) {
         const callActorIndex = result.findIndex((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);

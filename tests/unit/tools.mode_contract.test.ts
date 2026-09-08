@@ -334,6 +334,26 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
             expect(names.filter((n) => n === HELPER_TOOLS.ACTOR_RUNS_GET)).toHaveLength(1);
         });
 
+        it('call-actor-widget + get-actor-run-widget together, no bases: neither widget pulls in get-actor-run', () => {
+            const names = namesFor({ tools: ['call-actor-widget', 'get-actor-run-widget'] }, SERVER_MODE.APPS);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET); // neither widget alone has standing to add it
+            expect(names).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+            expect(names).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
+        });
+
+        it('call-actor + call-actor-widget + get-actor-run-widget: hard trigger still wins, get-actor-run included', () => {
+            const names = namesFor(
+                { tools: ['call-actor', 'call-actor-widget', 'get-actor-run-widget'] },
+                SERVER_MODE.APPS,
+            );
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET); // call-actor is a hard trigger, unaffected by the widget
+        });
+
         it('call-actor-widget/get-actor-run-widget selectors are silently dropped in default mode', () => {
             const names = namesFor({ tools: ['call-actor-widget', 'get-actor-run-widget'] }, SERVER_MODE.DEFAULT);
             expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
