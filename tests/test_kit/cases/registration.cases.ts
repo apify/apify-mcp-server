@@ -26,6 +26,7 @@ import {
     skipUnlessStdio,
     withClient,
 } from '../helpers.js';
+import { buildClientUrl } from '../mcp_client.js';
 import type { Case } from '../types.js';
 
 const TWO_TEST_ACTORS = ['apify/python-example', 'apify/rag-web-browser'];
@@ -33,9 +34,8 @@ const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
 const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
-// Claude-connector `?tools=` allowlist. No call-actor. Actor entries use their slash name here;
-// served tool names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
-// NOTE: hypothetical selection, not the actual reviewed connector URL (ai-team#214).
+// Claude-connector `?tools=` allowlist (ai-team#214/#229). No call-actor. Actor entries use their
+// slash name here; served tool names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
@@ -47,12 +47,14 @@ const CLAUDE_CONNECTOR_TOOLS = [
     'get-actor-run-list',
     'get-actor-log',
     'abort-actor-run',
-    'get-dataset-list',
     'get-dataset',
     'get-dataset-items',
-    'get-key-value-store-list',
+    'get-dataset-schema',
+    'get-dataset-list',
     'get-key-value-store',
+    'get-key-value-store-keys',
     'get-key-value-store-record',
+    'get-key-value-store-list',
     'apify/rag-web-browser',
     'apify/web-fetch',
     HELPER_TOOLS.PROBLEM_REPORT,
@@ -121,9 +123,15 @@ export const registrationCases: Case[] = [
             },
             async (client) => {
                 const names = getToolNames(await client.listTools());
-                expect(names).toContain(HELPER_TOOLS.PROBLEM_REPORT);
-                expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+                // Exact set, not superset: this pinned URL serves these tools and nothing else.
                 expect(new Set(names)).toEqual(new Set(CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES));
+
+                const url = buildClientUrl('http://placeholder/', {
+                    tools: CLAUDE_CONNECTOR_TOOLS,
+                    client: 'claude connector',
+                    telemetry: { enabled: true },
+                });
+                expect(url.search.endsWith('client=claude+connector')).toBe(true);
             },
         ),
     },

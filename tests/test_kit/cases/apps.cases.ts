@@ -181,4 +181,27 @@ export const appsCases: Case[] = [
             expect(instructions).not.toContain('WIDGET ALTERNATIVE'); // that bullet lives on call-actor's own description, absent here
         }),
     },
+    {
+        // Regression: call-actor-widget's own bundle claim used to short-circuit past
+        // get-actor-run-widget's exclusion, silently adding get-actor-run to this exact combination.
+        name: '?tools=call-actor-widget,get-actor-run-widget: neither base auto-added, run-workflow helpers still load',
+        isDeploymentTest: false,
+        run: withClient(
+            { tools: ['call-actor-widget', 'get-actor-run-widget'], serverMode: 'apps' },
+            async (client) => {
+                const toolNames = getToolNames(await client.listTools());
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+                expect(toolNames).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+                expect(toolNames).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
+
+                const instructions = client.getInstructions();
+                expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+                expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+            },
+        ),
+    },
 ];
