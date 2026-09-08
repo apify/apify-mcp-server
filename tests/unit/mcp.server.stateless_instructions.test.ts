@@ -31,10 +31,8 @@ describe('ActorsMcpServer.getStatelessServerInstructions()', () => {
         expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
     });
 
-    // Regression for the gap check-work caught: resolving only call-actor from the URL left
-    // rag-web-browser/web-fetch always absent, even when explicitly selected. resolveActorsToLoad
-    // (zero-fetch, same as getToolsForServerMode) closes it. The web-fetch-vs-rag-web-browser
-    // comparison needs both sides, so select both.
+    // Regression: resolving only call-actor left rag-web-browser/web-fetch absent even when selected;
+    // resolveActorsToLoad (zero-fetch) fixes it. Selects both since their comparison needs both sides.
     it('resolves explicitly selected Actor tools from the URL, with no fetch', () => {
         const instructions = makeServer().getStatelessServerInstructions(
             'http://localhost/?tools=search-actors,apify/rag-web-browser,apify/web-fetch',

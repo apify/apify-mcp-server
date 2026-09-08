@@ -284,14 +284,13 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Instructions for a stateless serving unit, answered from `server/discover` before any request
-     * is seen — configuration-level only. Reads `serverModeOption`, never `_serverMode` (a legacy
-     * `initialize` must not leak its mode into later stateless requests).
+     * Instructions for a stateless serving unit, answered from `server/discover` before any request is
+     * seen — configuration-level only, reading `serverModeOption` (never `_serverMode`, so a legacy
+     * `initialize` can't leak its mode into stateless requests).
      *
-     * `requestUrl`, when given, resolves every cross-tool mention except `report-problem` from
-     * `?tools=`/`?actors=` with no fetch. `report-problem` is excluded either way: its final
-     * servability is per-request-identity-dependent, not derivable from the URL alone. Without
-     * `requestUrl`, falls back to the same "everything but report-problem" shape.
+     * `requestUrl`, when given, resolves cross-tool mentions from `?tools=`/`?actors=` with no fetch;
+     * omit it for the same "everything but report-problem" fallback. `report-problem` is always
+     * excluded — its servability is per-request-identity-dependent, not derivable from the URL.
      */
     public getStatelessServerInstructions(requestUrl?: string): string {
         const mode = resolveServerMode(this.serverModeOption, false);

@@ -29,8 +29,7 @@ const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
 const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
-// Claude-connector `?tools=` allowlist. No call-actor. Actor entries use their slash name here;
-// served tool names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
+// Claude-connector `?tools=` allowlist (no call-actor); Actor entries use slash names, served names differ — see CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES.
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
