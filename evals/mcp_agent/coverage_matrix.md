@@ -26,7 +26,7 @@ Source: 115 selection + 60 agent cases in mcp-server-evals
 | `get-dataset` | storage | 3 | 1 | n/a | 1/1 | — | covered |
 | `get-dataset-items` | storage | 7 | 57 | n/a | 1/8 | clean, offset, limit, fields, omit, desc, flatten | covered |
 | `get-dataset-list` | storage | 3 | 0 | n/a | 0/4 | offset, limit, desc, unnamed | covered |
-| `get-dataset-schema` | storage | 3 | 1 | n/a | 2/3 | clean | covered |
+| `get-dataset-schema` | storage | 4 | 1 | n/a | 2/3 | clean | covered |
 | `get-key-value-store` | storage | 2 | 0 | n/a | 1/1 | — | covered |
 | `get-key-value-store-keys` | storage | 2 | 1 | n/a | 1/3 | exclusiveStartKey, limit | covered |
 | `get-key-value-store-list` | storage | 2 | 0 | n/a | 0/4 | offset, limit, desc, unnamed | covered |
