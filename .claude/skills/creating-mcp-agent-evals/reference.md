@@ -6,10 +6,10 @@ Repo: `apify-mcp-server`. Harness docs: `evals/mcp_agent/README.md` (read it fir
 
 ```bash
 # The default dataset, mcp-server-evals; strict gate (judge PASS and tool_errors == 0)
-pnpm run evals:mcp-agent --agent-model claude-opus-5 --subscription
+pnpm run evals:mcp-agent --agent-model <m> --subscription
 
 # One family, by its id prefix
-pnpm run evals:mcp-agent --id '^<family>/' --agent-model claude-opus-5 --subscription
+pnpm run evals:mcp-agent --id '^<family>/' --agent-model <m> --subscription
 
 # A case with metadata.expectedErrors: until #260, the runner doesn't consume that field yet,
 # so a plain run fails it on the zero-tool-error gate. --allow-tool-errors works around that
@@ -21,7 +21,7 @@ pnpm run evals:mcp-agent --id '<case-id>' --allow-tool-errors --agent-model <m> 
 
 - `--subscription` deletes `ANTHROPIC_API_KEY` from the process env so the Agent SDK's Claude Code subprocess uses the local login. Without it the run bills the API key.
 - `--claude-judge` runs the judge on the Agent SDK too (`--judge-model` then takes an Anthropic ID, default `claude-sonnet-5`); with `--subscription --claude-judge` a run needs only `APIFY_TOKEN` + Langfuse keys. Caveat: a Claude judge scoring a Claude agent can be self-lenient — prefer the OpenRouter judge for comparable numbers.
-- Ladder: `claude-opus-5` (calibration) → `claude-sonnet-5` → `claude-haiku-4-5` (default; the sensitive probe). A chained shell command's exit code is the LAST run's — read each log's `📊` line, not the chain status.
+- `<m>` above is any agent model; pick it off this ladder rather than a default in the examples: `claude-opus-5` (calibration) → `claude-sonnet-5` → `claude-haiku-4-5` (the CLI default, and the sensitive probe). A chained shell command's exit code is the LAST run's — read each log's `📊` line, not the chain status.
 - Known flakes, retry the single item once before diagnosing: `🔥 Never completed (task threw)` (harness/SDK spawn); in remote/sandboxed environments, the agent reading "MCP servers still connecting" and falling back to built-ins (doesn't reproduce locally).
 - Between runs of suites that create named resources: `pnpm run evals:mcp-agent:tasks-fixtures` (adapt per family) deletes leftover `eval-*` resources and reseeds the permanent fixture. Web-target families that create no named state need no fixtures script — say so in the README instead.
 
