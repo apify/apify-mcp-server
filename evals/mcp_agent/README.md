@@ -514,8 +514,10 @@ CI runs these two suites, replacing the old Phoenix runner (`evals/run_evaluatio
 for deletion under #262 — its own `evals/README.md` no longer describes CI behavior). What each
 run does when it fails differs, and neither is a required status check today:
 
-- the `pr` tier **fails its job** on a pass rate below `PR_TIER_PASS_THRESHOLD`, so it shows red
-  on the PR, but no branch-protection rule requires it (see "Not a required check" below);
+- the `pr` tier **fails its job** on a pass rate below the `--pass-threshold` the workflow passes
+  (`0.93`, the floor of 3 `claude-haiku-4-5` runs calibrated in apify/ai-team#240; provisional
+  until re-pinned from real CI runs), so it shows red on the PR, but no branch-protection rule
+  requires it (see "Not a required check" below);
 - the `full` tier runs **after** a merge and is currently `continue-on-error` — measurement only
   until a full-tier threshold is calibrated. It cannot block anything.
 
@@ -566,13 +568,13 @@ have write/collaborator access on `jiri.spilka/actor-troubleshooter` — without
 fail regardless of code correctness.
 
 **Budget.** The issue's acceptance bar for the `pr` tier is **≤10 minutes**. This is not yet
-measured on a real CI runner — the calibration in "The `pr` tier" section above ran at
+measured on a real CI runner — the calibration runs in apify/ai-team#240 ran at
 `--concurrency 2` in a resource-constrained sandbox (12-15 min), which is not a valid estimate for
 a GitHub-hosted runner at the CLI's default `--concurrency 8`. The first `validated`-labeled run
 after this PR exists is what settles it. `_evaluations.yaml`'s job `timeout-minutes` (30 for `pr`,
 90 for `full`) is a generous, provisional safety net, not the target — it gets tightened once the
-labeled run gives a real number, the same "measure then tune" treatment as
-`PR_TIER_PASS_THRESHOLD` and `--concurrency` above.
+labeled run gives a real number, the same "measure then tune" treatment as the pr-tier
+`--pass-threshold` and `--concurrency` above.
 
 **MCP-handshake race.** See "Common issues" above: a fast model can read the SDK's
 still-connecting notice and fall back to a built-in tool instead of waiting. A CI run retries a

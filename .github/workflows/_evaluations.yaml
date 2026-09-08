@@ -31,7 +31,7 @@ jobs:
         # Generous, provisional ceilings — neither tier has been timed on a real runner yet.
         # The labeled run measures actual durations; tighten these once real numbers exist
         # (see evals/mcp_agent/README.md's CI section, same "measure then tune" treatment as
-        # PR_TIER_PASS_THRESHOLD and --concurrency).
+        # the pr-tier --pass-threshold and --concurrency).
         timeout-minutes: ${{ inputs.tier == 'pr' && 30 || 90 }}
         steps:
             -   name: Validate tier input
@@ -58,18 +58,14 @@ jobs:
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 
-            -   name: Read PR tier pass threshold
-                if: inputs.tier == 'pr'
-                id: threshold
-                run: |
-                    value=$(pnpm exec tsx -e "import { PR_TIER_PASS_THRESHOLD } from './evals/mcp_agent/config.ts'; console.log(PR_TIER_PASS_THRESHOLD);")
-                    echo "value=$value" >> "$GITHUB_OUTPUT"
-
+            # --pass-threshold 0.93 is the floor of 3 claude-haiku-4-5 pr-tier runs (0.9434,
+            # 0.9381, 0.9429), calibrated in apify/ai-team#240. Provisional: those runs were in a
+            # sandbox with a flaky TLS proxy; re-pin from the first real CI runs.
             -   name: Run pr-tier evals
                 if: inputs.tier == 'pr'
                 run: >
                     pnpm run evals:mcp-agent -- --tier pr
-                    --pass-threshold ${{ steps.threshold.outputs.value }}
+                    --pass-threshold 0.93
                     --agent-model claude-haiku-4-5 --claude-judge
                 env:
                     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
