@@ -2,7 +2,7 @@ import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
 import type { Options, PreToolUseHookInput, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { SELECTION_DENY_REASON, SELECTION_MAX_TURNS } from '../../evals/mcp_agent/selection_mode.js';
+import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from '../../evals/mcp_agent/tool_call_mode.js';
 import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
 
 // The SDK spawns a real Claude Code subprocess; capture what runAgentConversation builds
@@ -99,7 +99,7 @@ describe('runAgentConversation()', () => {
         expect(run.attemptedCalls).toEqual([]);
     });
 
-    it('denies and records selection calls with the fixed turn limit', async () => {
+    it('denies and records tool-call attempts with the fixed turn limit', async () => {
         let hookResult: unknown;
         mocks.query.mockImplementation(({ options }: { options: Options }) => {
             capturedOptions = options;
@@ -119,14 +119,14 @@ describe('runAgentConversation()', () => {
             })();
         });
 
-        const result = await runAgentConversation(baseOptions({ isSelectionMode: true, maxTurns: 9999 }));
+        const result = await runAgentConversation(baseOptions({ isToolCallMode: true, maxTurns: 9999 }));
 
-        expect(capturedOptions?.maxTurns).toBe(SELECTION_MAX_TURNS);
+        expect(capturedOptions?.maxTurns).toBe(TOOL_CALL_MAX_TURNS);
         expect(hookResult).toEqual({
             hookSpecificOutput: {
                 hookEventName: 'PreToolUse',
                 permissionDecision: 'deny',
-                permissionDecisionReason: SELECTION_DENY_REASON,
+                permissionDecisionReason: TOOL_CALL_DENY_REASON,
             },
         });
         expect(result.attemptedCalls).toEqual([
@@ -138,7 +138,7 @@ describe('runAgentConversation()', () => {
     it('keeps the recorded attempts when the SDK throws after a max-turns result', async () => {
         // The CLI exits non-zero on error_max_turns, and the SDK rewraps that exit as a thrown
         // error after it has already streamed the result message. The attempts the hook
-        // recorded up to then are the selection score; they must not be lost with the throw.
+        // recorded up to then are the tool-call score; they must not be lost with the throw.
         mocks.query.mockImplementation(({ options }: { options: Options }) => {
             return (async function* () {
                 const hook = options.hooks?.PreToolUse?.[0]?.hooks[0];
@@ -150,7 +150,7 @@ describe('runAgentConversation()', () => {
             })();
         });
 
-        const result = await runAgentConversation(baseOptions({ isSelectionMode: true }));
+        const result = await runAgentConversation(baseOptions({ isToolCallMode: true }));
 
         expect(result.hitMaxTurns).toBe(true);
         expect(result.attemptedCalls).toEqual([

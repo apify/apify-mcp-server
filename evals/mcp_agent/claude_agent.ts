@@ -18,8 +18,8 @@ import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
 import { MAX_CONVERSATION_TURNS, MCP_SERVER_NAME, stripToolPrefix } from './config.js';
 import type { AdaptedConversation } from './sdk_conversation_adapter.js';
 import { adaptSdkConversation } from './sdk_conversation_adapter.js';
-import type { AttemptedToolCall } from './selection_mode.js';
-import { SELECTION_DENY_REASON, SELECTION_MAX_TURNS } from './selection_mode.js';
+import type { AttemptedToolCall } from './tool_call_mode.js';
+import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from './tool_call_mode.js';
 
 export type AgentRunOptions = {
     prompt: string;
@@ -33,13 +33,13 @@ export type AgentRunOptions = {
     toolTimeoutSeconds: number;
     /** Restrict the agent to MCP tools only, dropping Claude Code's built-in toolset. */
     mcpToolsOnly: boolean;
-    /** `kind: "selection"` items: deny every tool call and record the attempts, nothing executes. */
-    isSelectionMode?: boolean;
+    /** `kind: "tool-call"` items: deny every tool call and record the attempts, nothing executes. */
+    isToolCallMode?: boolean;
 };
 
 /** What `runAgentConversation` returns: the folded conversation plus every attempted tool call. */
 export type AgentRunResult = AdaptedConversation & {
-    /** Calls the deny-all hook recorded. Empty for a non-selection item, which installs no hook. */
+    /** Calls the deny-all hook recorded. Empty for a `kind: "agent"` item; only the tool-call hook records. */
     attemptedCalls: AttemptedToolCall[];
 };
 
@@ -58,7 +58,7 @@ export function assertStdioBinExists(): void {
 /**
  * Build a `PreToolUse` hook from a decision callback: return a deny reason to refuse the
  * call, or `undefined` to let it through. The one hook shape both `denyToolsHook()` and the
- * selection-mode deny-all hook sit on.
+ * tool-call deny-all hook sit on.
  */
 function preToolUseHook(decide: (toolName: string, toolInput: unknown) => string | undefined): HookCallbackMatcher[] {
     return [
@@ -102,21 +102,21 @@ export function denyToolsHook(failTools: string[]): HookCallbackMatcher[] {
 }
 
 /**
- * Selection mode's deny-all hook: refuses every call with `SELECTION_DENY_REASON` and
+ * Tool-call mode's deny-all hook: refuses every call with `TOOL_CALL_DENY_REASON` and
  * records `{ toolName, input }` for each attempt into `attemptedCalls`, so the measurement
- * (`resolveFirstToolMatch()` in `selection_mode.ts`) has the full attempt sequence to read,
+ * (`resolveFirstToolMatch()` in `tool_call_mode.ts`) has the full attempt sequence to read,
  * `ToolSearch` captures included.
  */
-function selectionDenyAllHook(attemptedCalls: AttemptedToolCall[]): HookCallbackMatcher[] {
+function toolCallDenyAllHook(attemptedCalls: AttemptedToolCall[]): HookCallbackMatcher[] {
     return preToolUseHook((toolName, toolInput) => {
         attemptedCalls.push({ toolName, input: toolInput });
-        return SELECTION_DENY_REASON;
+        return TOOL_CALL_DENY_REASON;
     });
 }
 
 /** Run one test case to completion and fold the whole SDK stream into the judge's shape. */
 export async function runAgentConversation(options: AgentRunOptions): Promise<AgentRunResult> {
-    const { prompt, model, apifyToken, tools, failTools, maxTurns, toolTimeoutSeconds, mcpToolsOnly, isSelectionMode } =
+    const { prompt, model, apifyToken, tools, failTools, maxTurns, toolTimeoutSeconds, mcpToolsOnly, isToolCallMode } =
         options;
 
     const serverArgs = [STDIO_BIN_PATH];
@@ -153,13 +153,13 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
         },
         // Headless: never prompt for tool permission. Root refuses bypassPermissions +
         // allowDangerouslySkipPermissions outright ("cannot be used with root/sudo
-        // privileges"), so every call is allowed here instead; a selection item's deny-all
+        // privileges"), so every call is allowed here instead; a tool-call item's deny-all
         // PreToolUse hook (below) still fires first and denies before this is ever reached.
         canUseTool: async (_toolName, input) => ({ behavior: 'allow', updatedInput: input }),
         // Isolation: ignore this repo's settings and .mcp.json; configure everything in code.
         settingSources: [],
         strictMcpConfig: true,
-        maxTurns: isSelectionMode ? SELECTION_MAX_TURNS : (maxTurns ?? MAX_CONVERSATION_TURNS),
+        maxTurns: isToolCallMode ? TOOL_CALL_MAX_TURNS : (maxTurns ?? MAX_CONVERSATION_TURNS),
         // Away from the repo: the built-in tools must not read or write this checkout.
         cwd: tmpdir(),
         abortController,
@@ -172,8 +172,8 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
                 if (stderrLines.length > MAX_APPENDED_STDERR_LINES) stderrLines.shift();
             }
         },
-        ...(isSelectionMode
-            ? { hooks: { PreToolUse: selectionDenyAllHook(attemptedCalls) } }
+        ...(isToolCallMode
+            ? { hooks: { PreToolUse: toolCallDenyAllHook(attemptedCalls) } }
             : failTools && failTools.length > 0
               ? { hooks: { PreToolUse: denyToolsHook(failTools) } }
               : {}),

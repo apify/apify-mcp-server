@@ -49,9 +49,9 @@ function makeAgentOutput(overrides: Partial<Extract<McpAgentTaskOutput, { kind: 
     };
 }
 
-function makeSelectionOutput(overrides: Partial<Extract<McpAgentTaskOutput, { kind: 'selection' }>> = {}) {
+function makeToolCallOutput(overrides: Partial<Extract<McpAgentTaskOutput, { kind: 'tool-call' }>> = {}) {
     return {
-        kind: 'selection' as const,
+        kind: 'tool-call' as const,
         id: 'search-001',
         firstToolMatch: { isMatch: true, comment: 'search-actors({}) — matched expectedTools [search-actors]' },
         ...overrides,
@@ -80,14 +80,14 @@ function makeScoredAgentItem(
     };
 }
 
-/** A selection item result as the SDK hands it to the run gate. */
-function makeScoredSelectionItem(
+/** A tool-call item result as the SDK hands it to the run gate. */
+function makeScoredToolCallItem(
     id: string,
     matchValue: number,
-    output: Partial<Extract<McpAgentTaskOutput, { kind: 'selection' }>> = {},
+    output: Partial<Extract<McpAgentTaskOutput, { kind: 'tool-call' }>> = {},
 ) {
     return {
-        output: makeSelectionOutput({ id, ...output }),
+        output: makeToolCallOutput({ id, ...output }),
         evaluations: [{ name: 'first_tool_match', value: matchValue }],
     };
 }
@@ -107,9 +107,9 @@ describe('evaluators', () => {
     });
 
     it('emits only kind-appropriate scores', async () => {
-        expect(await evaluators[0]({ output: makeSelectionOutput() })).toEqual([]);
-        expect(await evaluators[1]({ output: makeSelectionOutput() })).toEqual([]);
-        expect(await evaluators[2]({ output: makeSelectionOutput() })).toEqual([]);
+        expect(await evaluators[0]({ output: makeToolCallOutput() })).toEqual([]);
+        expect(await evaluators[1]({ output: makeToolCallOutput() })).toEqual([]);
+        expect(await evaluators[2]({ output: makeToolCallOutput() })).toEqual([]);
         expect(await evaluators[3]({ output: makeAgentOutput() })).toEqual([]);
     });
 
@@ -150,16 +150,16 @@ describe('evaluators', () => {
         });
     });
 
-    it('scores first_tool_match 1 with the match comment on a selection pass', async () => {
-        expect(await evaluators[3]({ output: makeSelectionOutput() })).toEqual({
+    it('scores first_tool_match 1 with the match comment on a tool-call pass', async () => {
+        expect(await evaluators[3]({ output: makeToolCallOutput() })).toEqual({
             name: 'first_tool_match',
             value: 1,
             comment: 'search-actors({}) — matched expectedTools [search-actors]',
         });
     });
 
-    it('scores first_tool_match 0 on a selection mismatch', async () => {
-        const output = makeSelectionOutput({
+    it('scores first_tool_match 0 on a tool-call mismatch', async () => {
+        const output = makeToolCallOutput({
             firstToolMatch: { isMatch: false, comment: 'no tool call attempted' },
         });
         expect(await evaluators[3]({ output })).toEqual({
@@ -195,14 +195,14 @@ describe('makeTask()', () => {
         id: 'search-001',
         input: { query: 'q' },
         expectedOutput: 'r',
-        metadata: { category: 'search', kind: 'agent', tier: ['full'] },
+        metadata: { category: 'search', kind: 'agent', tier: ['merge'] },
         ...overrides,
     });
 
-    const makeSelectionItem = (overrides: Record<string, unknown> = {}) => ({
+    const makeToolCallItem = (overrides: Record<string, unknown> = {}) => ({
         id: 'search-001',
         input: { query: 'q' },
-        metadata: { category: 'search', kind: 'selection', tier: ['pr'], expectedTools: ['search-actors'] },
+        metadata: { category: 'search', kind: 'tool-call', tier: ['pr'], expectedTools: ['search-actors'] },
         ...overrides,
     });
 
@@ -277,7 +277,7 @@ describe('makeTask()', () => {
             }),
         );
         const item = makeItem({
-            metadata: { category: 'search', kind: 'agent', tier: ['full'], failTools: ['call-actor'] },
+            metadata: { category: 'search', kind: 'agent', tier: ['merge'], failTools: ['call-actor'] },
         });
 
         // First line only: the full text already sits on the tool span, so nothing re-uploads it.
@@ -296,7 +296,7 @@ describe('makeTask()', () => {
             }),
         );
         const item = makeItem({
-            metadata: { category: 'get', kind: 'agent', tier: ['full'], expectedErrors: ['get-actor-task'] },
+            metadata: { category: 'get', kind: 'agent', tier: ['merge'], expectedErrors: ['get-actor-task'] },
         });
 
         await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({
@@ -307,7 +307,7 @@ describe('makeTask()', () => {
         });
     });
 
-    it('runs a kind: selection item under isSelectionMode, scoring first_tool_match with no judge call', async () => {
+    it('runs a kind: tool-call item under isToolCallMode, scoring first_tool_match with no judge call', async () => {
         mocks.runAgentConversation.mockResolvedValue(
             makeAgentRun({
                 conversation: { turns: [], totalTokens: undefined },
@@ -315,23 +315,23 @@ describe('makeTask()', () => {
             }),
         );
 
-        const result = await makeMcpAgentTask()(makeSelectionItem());
+        const result = await makeMcpAgentTask()(makeToolCallItem());
 
         expect(result).toMatchObject({
-            kind: 'selection',
+            kind: 'tool-call',
             id: 'search-001',
             firstToolMatch: { isMatch: true },
         });
         expect(mocks.evaluateConversation).not.toHaveBeenCalled();
-        expect(mocks.runAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ isSelectionMode: true }));
+        expect(mocks.runAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ isToolCallMode: true }));
     });
 
-    it('carries the run-wide mcpToolsOnly OR the per-item mcpToolsOnly into the selection run', async () => {
+    it('carries the run-wide mcpToolsOnly OR the per-item mcpToolsOnly into the tool-call run', async () => {
         mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
-        const item = makeSelectionItem({
+        const item = makeToolCallItem({
             metadata: {
                 category: 'search',
-                kind: 'selection',
+                kind: 'tool-call',
                 tier: ['pr'],
                 expectedTools: ['search-actors'],
                 mcpToolsOnly: true,
@@ -354,13 +354,13 @@ describe('makeTask()', () => {
             totalTrials: 1,
         });
 
-        await task(makeSelectionItem());
+        await task(makeToolCallItem());
         expect(mocks.runAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ mcpToolsOnly: true }));
     });
 
     it('carries a runner-injected iteration through to the output', async () => {
         mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
-        const item = makeItem({ metadata: { category: 'search', kind: 'agent', tier: ['full'], iteration: 2 } });
+        const item = makeItem({ metadata: { category: 'search', kind: 'agent', tier: ['merge'], iteration: 2 } });
 
         await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({ iteration: 2 });
     });
@@ -409,12 +409,12 @@ describe('buildRunSummary()', () => {
         expect(summary.failures).toEqual([]);
     });
 
-    it('scores a selection item on first_tool_match alone', () => {
-        expect(buildRunSummary(['a'], [makeScoredSelectionItem('a', 1)], 1).passedTrials).toBe(1);
+    it('scores a tool-call item on first_tool_match alone', () => {
+        expect(buildRunSummary(['a'], [makeScoredToolCallItem('a', 1)], 1).passedTrials).toBe(1);
     });
 
-    it('names a selection mismatch failure with the first_tool_match comment', () => {
-        const output = makeSelectionOutput({
+    it('names a tool-call mismatch failure with the first_tool_match comment', () => {
+        const output = makeToolCallOutput({
             id: 'a',
             firstToolMatch: { isMatch: false, comment: 'no tool call attempted' },
         });
@@ -442,8 +442,8 @@ describe('buildRunSummary()', () => {
         ]);
     });
 
-    it('treats a missing first_tool_match score on a selection item as a failure', () => {
-        const summary = buildRunSummary(['a'], [{ output: makeSelectionOutput({ id: 'a' }), evaluations: [] }], 1);
+    it('treats a missing first_tool_match score on a tool-call item as a failure', () => {
+        const summary = buildRunSummary(['a'], [{ output: makeToolCallOutput({ id: 'a' }), evaluations: [] }], 1);
         expect(summary.passedTrials).toBe(0);
         expect(summary.failures).toEqual([
             { id: 'a', iteration: 1, reason: 'no first_tool_match score (the evaluator threw)' },

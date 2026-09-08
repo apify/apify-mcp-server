@@ -24,20 +24,24 @@ export type DatasetItem = Awaited<ReturnType<LangfuseClient['dataset']['get']>>[
 const McpAgentMetadataValidator = z.strictObject({
     /** Grouping key, e.g. "search-actors". What `--category` matches on. */
     category: z.string().min(1),
-    /** What this item measures: a single-turn tool pick, or a full judged conversation. */
-    kind: z.enum(['selection', 'agent']),
-    /** When this item runs: a fast PR-gating set, the full set, or both. */
-    tier: z.array(z.enum(['pr', 'full'])).min(1),
-    /** `kind: "selection"` only: tool names the first tool call must match. */
+    /**
+     * What this item measures. `tool-call`: only the first attempted tool call is asserted,
+     * by name and optional args; no judge, nothing executes. `agent`: full multi-turn run,
+     * an LLM judge scores against `expectedOutput`.
+     */
+    kind: z.enum(['tool-call', 'agent']),
+    /** Which CI run includes the item: `pr` or `merge`. */
+    tier: z.array(z.enum(['pr', 'merge'])).min(1),
+    /** `kind: "tool-call"` only: tool names the first tool call must match. */
     expectedTools: z.array(z.string()).optional(),
     /**
-     * `kind: "selection"` only: a flat subset of the captured call's arguments. Every key
+     * `kind: "tool-call"` only: a flat subset of the captured call's arguments. Every key
      * here must deep-equal the same key of the captured input; keys not listed are ignored.
      */
     expectedArgs: z.record(z.string(), z.unknown()).optional(),
     /** Tool names allowed to fail on this item without failing the zero-tool-error gate. */
     expectedErrors: z.array(z.string()).optional(),
-    /** Defaults to the config value. Not valid on `kind: "selection"`, which is fixed at 2. */
+    /** Defaults to the config value. Not valid on `kind: "tool-call"`, which is fixed at 2. */
     maxTurns: z.number().int().positive().optional(),
     /** Tools to enable, e.g. ["actors", "docs", "apify/rag-web-browser"] */
     tools: z.array(z.string()).optional(),
@@ -54,9 +58,9 @@ const McpAgentItemValidator = z
         id: z.string().min(1),
         input: z.object({ query: z.string().min(1) }),
         /**
-         * Required for `kind: "agent"` (the judge's reference); absent for `kind: "selection"`.
+         * Required for `kind: "agent"` (the judge's reference); absent for `kind: "tool-call"`.
          * The dataset-items API returns `null`, not a missing key, for an item that never set
-         * it - every `kind: "selection"` item in practice - so `null` is normalized to `undefined`.
+         * it - every `kind: "tool-call"` item in practice - so `null` is normalized to `undefined`.
          */
         expectedOutput: z
             .string()
@@ -66,10 +70,10 @@ const McpAgentItemValidator = z
         metadata: McpAgentMetadataValidator,
     })
     .superRefine((item, ctx) => {
-        if (item.metadata.kind === 'selection' && (item.metadata.expectedTools?.length ?? 0) === 0) {
+        if (item.metadata.kind === 'tool-call' && (item.metadata.expectedTools?.length ?? 0) === 0) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: 'metadata.kind "selection" requires a non-empty "expectedTools" array',
+                message: 'metadata.kind "tool-call" requires a non-empty "expectedTools" array',
                 path: ['metadata', 'expectedTools'],
             });
         }
@@ -80,45 +84,44 @@ const McpAgentItemValidator = z
                 path: ['expectedOutput'],
             });
         }
-        if (item.metadata.kind !== 'selection' && item.metadata.expectedArgs !== undefined) {
+        if (item.metadata.kind !== 'tool-call' && item.metadata.expectedArgs !== undefined) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: 'metadata.expectedArgs is only valid on a kind: "selection" item',
+                message: 'metadata.expectedArgs is only valid on a kind: "tool-call" item',
                 path: ['metadata', 'expectedArgs'],
             });
         }
         // Nothing scores expectedTools on an agent item, so accepting one would silently drop
         // the assertion its author wrote.
-        if (item.metadata.kind !== 'selection' && item.metadata.expectedTools !== undefined) {
+        if (item.metadata.kind !== 'tool-call' && item.metadata.expectedTools !== undefined) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: 'metadata.expectedTools is only valid on a kind: "selection" item',
+                message: 'metadata.expectedTools is only valid on a kind: "tool-call" item',
                 path: ['metadata', 'expectedTools'],
             });
         }
-        if (item.metadata.kind === 'selection' && item.metadata.maxTurns !== undefined) {
+        if (item.metadata.kind === 'tool-call' && item.metadata.maxTurns !== undefined) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: 'metadata.maxTurns is not valid on a kind: "selection" item; turns are fixed at 2',
+                message: 'metadata.maxTurns is not valid on a kind: "tool-call" item; turns are fixed at 2',
                 path: ['metadata', 'maxTurns'],
             });
         }
-        if (item.metadata.kind === 'selection' && item.expectedOutput !== undefined) {
+        if (item.metadata.kind === 'tool-call' && item.expectedOutput !== undefined) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message:
-                    'expectedOutput is not valid on a kind: "selection" item; nothing executes, so nothing is judged',
+                message: 'expectedOutput is not valid on a kind: "tool-call" item; there is no judge to read it',
                 path: ['expectedOutput'],
             });
         }
-        if (item.metadata.kind === 'selection' && item.metadata.failTools !== undefined) {
+        if (item.metadata.kind === 'tool-call' && item.metadata.failTools !== undefined) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: 'metadata.failTools is only valid on a kind: "agent" item',
                 path: ['metadata', 'failTools'],
             });
         }
-        if (item.metadata.kind === 'selection' && item.metadata.expectedErrors !== undefined) {
+        if (item.metadata.kind === 'tool-call' && item.metadata.expectedErrors !== undefined) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: 'metadata.expectedErrors is only valid on a kind: "agent" item',
@@ -134,7 +137,7 @@ export type McpAgentItem = z.infer<typeof McpAgentItemValidator>;
 export type McpAgentTestCase = z.infer<typeof McpAgentMetadataValidator> & {
     id: string;
     query: string;
-    /** Absent for `kind: "selection"`, which nothing executes and no judge scores. */
+    /** Absent for `kind: "tool-call"`, which nothing executes and no judge scores. */
     reference?: string;
 };
 

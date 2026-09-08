@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
     resolveFirstToolMatch,
-    SELECTION_DENY_REASON,
+    TOOL_CALL_DENY_REASON,
     type AttemptedToolCall,
-} from '../../evals/mcp_agent/selection_mode.js';
+} from '../../evals/mcp_agent/tool_call_mode.js';
 
-describe('SELECTION_DENY_REASON', () => {
+describe('TOOL_CALL_DENY_REASON', () => {
     it('keeps the spike-calibrated wording', () => {
-        expect(SELECTION_DENY_REASON).toBe(
+        expect(TOOL_CALL_DENY_REASON).toBe(
             'Tool calls are disabled in this evaluation. Do not retry with a different tool or ' +
                 'arguments — report to the user, in your final answer, which tool you would have ' +
                 'called and with what arguments, then stop.',

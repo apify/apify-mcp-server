@@ -60,7 +60,7 @@ sanitizeProcessEnv();
 type CliArgs = {
     category?: string;
     id?: string;
-    tier?: 'pr' | 'full';
+    tier?: 'pr' | 'merge';
     dataset: string;
     agentModel: string;
     judgeModel?: string;
@@ -103,8 +103,10 @@ async function main() {
             id: { type: 'string', description: 'Run test cases whose ID matches this regex' },
             tier: {
                 type: 'string',
-                choices: ['pr', 'full'] as const,
-                description: 'Only run items whose tier includes this value (default: all tiers)',
+                choices: ['pr', 'merge'] as const,
+                description:
+                    'Only run items whose tier includes this value: pr (the PR gate) or merge ' +
+                    '(after a merge to master); default: all',
             },
             dataset: {
                 type: 'string',
@@ -238,7 +240,7 @@ async function main() {
         const result = await langfuse.experiment.run({
             name: datasetName,
             runName,
-            description: 'MCP agent evals for the Apify MCP server (agent + selection items).',
+            description: 'MCP agent evals for the Apify MCP server (agent + tool-call items).',
             data,
             task: makeTask({
                 llmClient,

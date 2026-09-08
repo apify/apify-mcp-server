@@ -1,19 +1,19 @@
-/** Selection-mode scoring. Calls are captured by the deny-all hook in `claude_agent.ts`. */
+/** Tool-call mode scoring. Calls are captured by the deny-all hook in `claude_agent.ts`. */
 
 import { stripToolPrefix } from './config.js';
 
 /**
- * Denial wording for selection-mode items, calibrated by spike (2026-09-04): stops the
+ * Denial wording for tool-call items, calibrated by spike (2026-09-04): stops the
  * agent cleanly after exactly one denied call on every sample query. The `failTools`
  * nudge (`REPORT_PROBLEM_NUDGE`) reads as "work around this" and measurably causes
  * retries instead — do not reuse it here.
  */
-export const SELECTION_DENY_REASON =
+export const TOOL_CALL_DENY_REASON =
     'Tool calls are disabled in this evaluation. Do not retry with a different tool or ' +
     'arguments — report to the user, in your final answer, which tool you would have ' +
     'called and with what arguments, then stop.';
 
-export const SELECTION_MAX_TURNS = 2;
+export const TOOL_CALL_MAX_TURNS = 2;
 
 export const TOOL_SEARCH_TOOL_NAME = 'ToolSearch';
 
@@ -59,7 +59,7 @@ function resolveArgMismatch(
     return undefined;
 }
 
-/** Match the selected tool name and the listed argument subset. */
+/** Match the attempted tool name and the listed argument subset. */
 export function resolveFirstToolMatch(
     attempts: AttemptedToolCall[],
     expectedTools: string[],

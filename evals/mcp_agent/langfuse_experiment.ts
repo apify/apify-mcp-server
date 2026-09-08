@@ -11,14 +11,14 @@ import type { JudgeLlmClient } from './llm_client.js';
 import type { JudgeResult } from './mcp_agent_judge.js';
 import { evaluateConversation } from './mcp_agent_judge.js';
 import type { TranscriptEntry } from './sdk_conversation_adapter.js';
-import { resolveFirstToolMatch } from './selection_mode.js';
+import { resolveFirstToolMatch } from './tool_call_mode.js';
 
 /** One failed server tool call. `expected` is true when the item's `expectedErrors` names it. */
 export type ToolError = { tool: string; error: string; expected: boolean };
 
 /**
  * Output produced by the experiment task for a single dataset item, discriminated by
- * `kind` so an agent-only field (the judge result, tool errors) or a selection-only field
+ * `kind` so an agent-only field (the judge result, tool errors) or a tool-call-only field
  * (`firstToolMatch`) can never be read against the wrong kind of result.
  *
  * The SDK writes whatever the task returns to the item's root span, so this stays a
@@ -41,7 +41,7 @@ export type McpAgentTaskOutput =
           toolErrors: ToolError[];
       }
     | {
-          kind: 'selection';
+          kind: 'tool-call';
           id: string;
           /** `--iterations` trial index (1-based). Always set by the runner; `1` on a default run. */
           iteration?: number;
@@ -98,9 +98,9 @@ export const evaluators: McpAgentEvaluator[] = [
                   comment: formatToolErrors(output.toolErrors) || undefined,
               }
             : [],
-    // Selection items only: nothing executes, so there is no judge and no tool_errors.
+    // Tool-call items only: nothing executes, so there is no judge and no tool_errors.
     async ({ output }) =>
-        output.kind === 'selection'
+        output.kind === 'tool-call'
             ? {
                   name: SCORE_NAMES.FIRST_TOOL_MATCH,
                   value: output.firstToolMatch.isMatch ? 1 : 0,
@@ -116,9 +116,9 @@ function scoreValue(result: ScoredItem, name: string): unknown {
     return result.evaluations.find((evaluation) => evaluation.name === name)?.value;
 }
 
-/** Whether one item passes its gate: `first_tool_match` for selection, judge + zero unexpected tool errors for agent. */
+/** Whether one item passes its gate: `first_tool_match` for tool-call, judge + zero unexpected tool errors for agent. */
 function itemPassed(result: ScoredItem): boolean {
-    if (result.output.kind === 'selection') {
+    if (result.output.kind === 'tool-call') {
         return scoreValue(result, SCORE_NAMES.FIRST_TOOL_MATCH) === 1;
     }
     return (
@@ -130,7 +130,7 @@ function itemPassed(result: ScoredItem): boolean {
 /** Why one item's trial did not pass, for the failure line in the run summary. */
 function failureReason(result: ScoredItem): string {
     const { output } = result;
-    if (output.kind === 'selection') {
+    if (output.kind === 'tool-call') {
         const score = scoreValue(result, SCORE_NAMES.FIRST_TOOL_MATCH);
         if (score === undefined) return `no ${SCORE_NAMES.FIRST_TOOL_MATCH} score (the evaluator threw)`;
         return `${SCORE_NAMES.FIRST_TOOL_MATCH} 0 — ${output.firstToolMatch.comment}`;
@@ -370,7 +370,7 @@ async function runAgentWithRetry(
 /**
  * The agent ran in a subprocess, so its conversation reaches Langfuse only if we send it.
  * Guarded separately from the run itself: losing the trace costs debuggability, not the
- * item's result. A selection item's denied calls still show as ERROR tool spans here - see
+ * item's result. A tool-call item's denied calls still show as ERROR tool spans here - see
  * the README - because nothing about a `PreToolUse` denial changes how the adapter pairs a
  * `tool_use`/`tool_result`.
  */
@@ -419,7 +419,7 @@ export function makeTask(options: McpAgentTaskOptions) {
         console.log(`[${completedTrials}/${totalTrials}] ${marker} ${id}`);
     };
     const outputPassed = (output: McpAgentTaskOutput) =>
-        output.kind === 'selection'
+        output.kind === 'tool-call'
             ? output.firstToolMatch.isMatch
             : output.judgeResult.verdict === 'PASS' && output.toolErrors.every((error) => error.expected);
 
@@ -442,8 +442,8 @@ export function makeTask(options: McpAgentTaskOptions) {
 
     async function runItem(item: McpAgentItem, itemMcpToolsOnly: boolean): Promise<McpAgentTaskOutput> {
         const { iteration } = item.metadata;
-        if (item.metadata.kind === 'selection') {
-            return await runSelectionItem(item, {
+        if (item.metadata.kind === 'tool-call') {
+            return await runToolCallItem(item, {
                 agentModel,
                 apifyToken,
                 toolTimeout,
@@ -504,11 +504,11 @@ export function makeTask(options: McpAgentTaskOptions) {
 }
 
 /**
- * The selection-mode branch: same agent, run under a deny-all hook via `isSelectionMode`.
+ * The tool-call branch: same agent, run under a deny-all hook via `isToolCallMode`.
  * Nothing executes, no judge runs; the score is `first_tool_match` over the attempted calls
  * the hook recorded.
  */
-async function runSelectionItem(
+async function runToolCallItem(
     item: McpAgentItem,
     options: { agentModel: string; apifyToken: string; toolTimeout: number; mcpToolsOnly: boolean },
 ): Promise<McpAgentTaskOutput> {
@@ -520,7 +520,7 @@ async function runSelectionItem(
         tools: item.metadata.tools,
         toolTimeoutSeconds: toolTimeout,
         mcpToolsOnly,
-        isSelectionMode: true,
+        isToolCallMode: true,
     };
     const { adapted, startedAt } = await runAgentWithRetry(item.id, runOptions);
     emitTrace(item.id, item.input.query, agentModel, mcpToolsOnly, adapted, startedAt);
@@ -532,7 +532,7 @@ async function runSelectionItem(
     );
 
     return {
-        kind: 'selection',
+        kind: 'tool-call',
         id: item.id,
         ...(item.metadata.iteration !== undefined && { iteration: item.metadata.iteration }),
         firstToolMatch,

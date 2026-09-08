@@ -1,6 +1,6 @@
 # MCP agent evaluation system
 
-Tests Claude Code driving Apify MCP tools, through two tiers: a fast, deterministic tool-pick check (`kind: "selection"`) and a full multi-turn conversation evaluated by an LLM judge (`kind: "agent"`). The agent under test is the real Claude Code harness, driven headlessly through the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview), so a run exercises the server the way a Claude Code user does. Results (traces, scores, dataset, experiment runs) are recorded in **Langfuse**: the self-hosted instance at [langfuse.apify.dev](https://langfuse.apify.dev), project `MCP Workflow`.
+Tests Claude Code driving Apify MCP tools, through two item kinds: a fast, deterministic first-tool-call check with no judge (`kind: "tool-call"`) and a multi-turn conversation run to completion and scored by an LLM judge (`kind: "agent"`). The agent under test is the real Claude Code harness, driven headlessly through the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview), so a run exercises the server the way a Claude Code user does. Results (traces, scores, dataset, experiment runs) are recorded in **Langfuse**: the self-hosted instance at [langfuse.apify.dev](https://langfuse.apify.dev), project `MCP Workflow`.
 
 ## The flow
 
@@ -10,9 +10,9 @@ dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge (a
 
 1. **Dataset.** Test cases live in the Langfuse dataset `mcp-server-evals` and are edited in its UI. A run reads them and never writes back.
 2. **Experiment.** The run executes the active items matching `--id`/`--category`/`--tier` as one Langfuse experiment, `--concurrency` items at a time; `--iterations N` repeats each selected item N times within that one experiment.
-3. **Conversation.** Each item runs a Claude Code agent (Claude Agent SDK) that spawns its own fresh Apify MCP server. A `kind: "agent"` item drives it to a final answer; a `kind: "selection"` item denies every tool call before it executes and records only the first attempted one.
-4. **Judge.** `kind: "agent"` only: an LLM judge scores the finished conversation against the item's `expectedOutput`. `kind: "selection"` items are scored deterministically instead - see below.
-5. **Scores.** Agent items: `mcp_agent_judge` (the judge verdict) and `tool_errors` (unexpected failed server calls) form the gate, plus `total_tokens`. Selection items: `first_tool_match` alone is the gate. The run also gets `pass_rate` (passed trials / requested trials). The console prints one `[n/total] ✅|❌|🔥 <id>` line per finished trial, then failures, `pass@k`/`pass^k` with `--iterations`, and the run URL; per-item detail is in Langfuse.
+3. **Conversation.** Each item runs a Claude Code agent (Claude Agent SDK) that spawns its own fresh Apify MCP server. A `kind: "agent"` item drives it to a final answer; a `kind: "tool-call"` item denies every tool call before it executes and records only the first attempted one.
+4. **Judge.** `kind: "agent"` only: an LLM judge scores the finished conversation against the item's `expectedOutput`. `kind: "tool-call"` items are scored deterministically instead - see below.
+5. **Scores.** Agent items: `mcp_agent_judge` (the judge verdict) and `tool_errors` (unexpected failed server calls) form the gate, plus `total_tokens`. Tool-call items: `first_tool_match` alone is the gate. The run also gets `pass_rate` (passed trials / requested trials). The console prints one `[n/total] ✅|❌|🔥 <id>` line per finished trial, then failures, `pass@k`/`pass^k` with `--iterations`, and the run URL; per-item detail is in Langfuse.
 
 ---
 
@@ -42,18 +42,22 @@ pnpm run build
 pnpm run evals:mcp-agent
 ```
 
-Run `pnpm run evals:mcp-agent --help` for the full option list. `--category` and `--id` narrow the run, `--tier pr|full` keeps only items whose `tier` array contains that value (absent = all tiers), `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--iterations N` (default 1) repeats each selected item N times within the same run and prints `pass@k`/`pass^k`, `--pass-threshold` (default `0.97`, rationale in `config.ts`) gates the exit code on the aggregate pass rate instead of requiring every trial to pass, `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API), and `--claude-judge` runs the judge on the Claude Agent SDK too, so no `OPENROUTER_API_KEY` is needed (`--judge-model` then takes an Anthropic model ID, default `claude-sonnet-5`; note a Claude judge scoring a Claude agent can be self-lenient, so prefer the OpenRouter judge for comparable numbers). With `--subscription --claude-judge` a run needs only `APIFY_TOKEN` and the Langfuse keys.
+Run `pnpm run evals:mcp-agent --help` for the full option list. `--category` and `--id` narrow the run, `--tier pr|merge` keeps only items whose `tier` array contains that value (absent = all tiers), `--dataset` picks another Langfuse dataset, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--iterations N` (default 1) repeats each selected item N times within the same run and prints `pass@k`/`pass^k`, `--pass-threshold` (default `0.97`, rationale in `config.ts`) gates the exit code on the aggregate pass rate instead of requiring every trial to pass, `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API), and `--claude-judge` runs the judge on the Claude Agent SDK too, so no `OPENROUTER_API_KEY` is needed (`--judge-model` then takes an Anthropic model ID, default `claude-sonnet-5`; note a Claude judge scoring a Claude agent can be self-lenient, so prefer the OpenRouter judge for comparable numbers). With `--subscription --claude-judge` a run needs only `APIFY_TOKEN` and the Langfuse keys.
 
 ### One dataset: kind, tier, id scheme, and expectedErrors
 
 Every item is `mcp-server-evals`, no per-family or per-suite dataset split. Each item's
 `metadata` says what it is and when it runs:
 
-- `kind`: `"agent"` (a multi-turn conversation, judged) or `"selection"` (a single-turn tool
-  pick, no judge, nothing executes - see "Selection mode" below).
-- `tier`: `["pr"]`, `["full"]`, or both — which run(s) include the item (`--tier` filters on
-  this). Everything migrated from the old per-family datasets is `tier: ["full"]`; new
-  `pr`-tier items are `kind: "selection"`, so a PR gate can run in seconds, not minutes.
+- `kind`: what the item asserts.
+  - `"tool-call"`: only the first tool call the agent attempts, by name and optionally
+    arguments. No judge, nothing executes - see "Tool-call mode" below.
+  - `"agent"`: the agent runs to completion and an LLM judge scores the result against the
+    item's `reference`/`expectedOutput`.
+- `tier`: which CI run includes the item (`--tier` filters on this) - `["pr"]` (on PR
+  open/reopen, or the `validated` label), `["merge"]` (on push to master), or both. Items
+  migrated from the old per-family datasets are `tier: ["merge"]`; new `pr`-tier items are
+  `kind: "tool-call"`, so a PR gate can run in seconds, not minutes.
 - `expectedErrors` (optional, `kind: "agent"` only): tool names allowed to fail on this item
   without failing the zero-tool-error gate below. The gate exempts only the named tools; any
   other tool's failure still fails the item.
@@ -128,9 +132,9 @@ claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without tellin
 despite the scheme note in both the tool description and the `url` parameter — a model-level
 limit the case documents on purpose; stronger models pass.
 
-### Selection mode
+### Tool-call mode
 
-A `kind: "selection"` item measures only which tool the agent would have called, and with what
+A `kind: "tool-call"` item measures only which tool the agent would have called, and with what
 arguments — no judge, nothing executes, no account state. The agent runs exactly as an agent item
 does (same MCP server, same prompt), but a per-item `PreToolUse` hook denies every tool call with:
 
@@ -141,12 +145,12 @@ does (same MCP server, same prompt), but a per-item `PreToolUse` hook denies eve
 This exact wording matters: it was calibrated against a spike that also tried reusing the
 `failTools`/`report-problem` nudge text, which reads as "work around this" and measurably caused
 the model to retry (and once exhausted `maxTurns`) instead of stopping cleanly after one denied
-call. `maxTurns` is fixed at 2 for selection items for the same reason - the validator rejects a
-`maxTurns` on a selection item rather than silently ignoring it.
+call. `maxTurns` is fixed at 2 for tool-call items for the same reason - the validator rejects a
+`maxTurns` on a tool-call item rather than silently ignoring it.
 
 The hook records every attempted call. The measurement is the first attempt that is not
 `ToolSearch` (Claude Code's own tool-search meta-tool, which can be the true first call once
-built-in tools sit behind it - see the `ToolSearch` skip note in `selection_mode.ts`). Set
+built-in tools sit behind it - see the `ToolSearch` skip note in `tool_call_mode.ts`). Set
 `mcpToolsOnly: true` on an item (or run with `--mcp-tools-only`) to remove the built-ins, and
 `ToolSearch` with them, for a case that must isolate MCP-vs-MCP tool choice.
 
@@ -159,15 +163,15 @@ Scoring (`first_tool_match`, 1 or 0):
   `fetch-actor-details({"actor":"rag-web-browser"})` against an item expecting the resolved
   `apify/rag-web-browser`; `expectedArgs: { actor: "apify/rag-web-browser" }` catches it.
 
-A denied selection call still shows as a failed (ERROR) MCP tool span in its trace - harmless
-(`tool_errors` never runs for selection items), but expected; don't "fix" it.
+A tool-call item's denied call still shows as a failed (ERROR) MCP tool span in its trace - harmless
+(`tool_errors` never runs for tool-call items), but expected; don't "fix" it.
 
 ### Permission path, and running under root
 
 Every item runs with `canUseTool` granting every tool call, not `bypassPermissions` +
 `allowDangerouslySkipPermissions` - the Claude Code CLI refuses that combination outright under
 root/sudo ("cannot be used with root/sudo privileges for security reasons"), which is how this
-harness runs in some sandboxes. A selection item's deny-all `PreToolUse` hook still fires first
+harness runs in some sandboxes. A tool-call item's deny-all `PreToolUse` hook still fires first
 regardless, so its denial is unaffected either way. If a run does die with an opaque "Claude Code
 process exited with code 1," check the console for `[claude-stderr] ...` lines - `claude_agent.ts`
 forwards the subprocess's stderr and appends the last few lines to the thrown error.
@@ -176,7 +180,7 @@ forwards the subprocess's stderr and appends the last few lines to the thrown er
 
 `--iterations N` repeats each selected item N times within the same run (one Langfuse experiment,
 not N separate runs) and reports `pass@k` (at least one trial passed) and `pass^k` (every trial
-passed) per item, plus in the `📈` summary line. This is safe and useful for `kind: "selection"`
+passed) per item, plus in the `📈` summary line. This is safe and useful for `kind: "tool-call"`
 items (nothing executes, so trials are fully independent) and for stateless agent items. For a
 stateful family with fixed resource names (e.g. `tasks/*`'s `eval-*` task names), a second trial
 can collide with the first trial's leftovers within the same run - the same collision the
@@ -198,7 +202,7 @@ in the dataset itself. Use `pnpm run evals:mcp-agent:export-dataset` for an opti
 
 **Core features:**
 - Multi-turn conversations run by the real Claude Code harness (system prompt, built-in tools, MCP handling)
-- Two scoring tiers: deterministic tool-pick (`kind: "selection"`) and LLM-based evaluation against requirements (`kind: "agent"`)
+- Two item kinds: a deterministic first-tool-call check with no judge (`kind: "tool-call"`) and LLM-judge evaluation against requirements (`kind: "agent"`)
 - Isolated agent + MCP server per test
 - Configurable tool call timeout (default: 60 seconds)
 - Deterministic tool-failure injection (`failTools`), and per-item error exemption (`expectedErrors`)
@@ -342,15 +346,15 @@ experiment-item-run     Langfuse SDK, holds the scores
 
 - `types.ts` - Type definitions
 - `config.ts` - Models, prompts, constants
-- `claude_agent.ts` - The agent under test: Claude Agent SDK options, MCP server registration, failure injection, the selection-mode deny-all hook, `canUseTool`, stderr forwarding
-- `selection_mode.ts` - Selection-mode scoring: the deny wording, `ToolSearch` skip, `first_tool_match` name/args matching
+- `claude_agent.ts` - The agent under test: Claude Agent SDK options, MCP server registration, failure injection, the tool-call-mode deny-all hook, `canUseTool`, stderr forwarding
+- `tool_call_mode.ts` - Tool-call-mode scoring: the deny wording, `ToolSearch` skip, `first_tool_match` name/args matching
 - `sdk_conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
 - `llm_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
 - `langfuse_observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
 - `mcp_agent_judge.ts` - Judge evaluation
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
 - `langfuse_dataset.ts` - Test case schema, dataset item mapping and validation, dataset fetch, `filterByTier`
-- `langfuse_experiment.ts` - Experiment task (agent + selection dispatch), evaluators, run summary, exit gate
+- `langfuse_experiment.ts` - Experiment task (agent + tool-call dispatch), evaluators, run summary, exit gate
 - `run_mcp_agent_evals.ts` - Main CLI entry
 - `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
 - `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
@@ -377,8 +381,8 @@ Results are recorded in Langfuse, not to a local file. Each run:
 
 - **Reads the dataset** `mcp-server-evals` (override with `--dataset`) and matches its active items against `--id`/`--category`/`--tier`. For a variant set of cases, clone the dataset in the UI and pass `--dataset`; a run stays recorded against the dataset it used.
 - **Runs an experiment** named `<git-branch>-<agent-model>-<timestamp>`, with metadata `{ agentModel, judgeModel, toolTimeout, mcpToolsOnly, agentSdkVersion, agentAuth, tier, iterations, passThreshold }`. With `--iterations N > 1`, each selected item appears N times in the same experiment, tagged `metadata.iteration` (1-based) - still one Langfuse **dataset run**, whose URL the console prints.
-- **Traces** every item as one trace. Its root output is the judge verdict (agent items) or the first-attempted-call comment (selection items) plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed or was denied), and - agent items only - a generation for the judge call. See design decision 9.
-- **Scores** each agent item: `mcp_agent_judge` (`1` on a PASS verdict, comment = judge reason) and `tool_errors` (count of unexpected failed tool calls, comment lists every failure with expected ones marked, `0` on a clean item) together form the gate, and `total_tokens` is the agent tokens billed (omitted when the provider reported no usage so an unmeasured run cannot look like a free one; an item whose agent run was retried reports only the second attempt). Each selection item scores `first_tool_match` alone (`1`/`0`, comment names the captured call and the verdict).
+- **Traces** every item as one trace. Its root output is the judge verdict (agent items) or the first-attempted-call comment (tool-call items) plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed or was denied), and - agent items only - a generation for the judge call. See design decision 9.
+- **Scores** each agent item: `mcp_agent_judge` (`1` on a PASS verdict, comment = judge reason) and `tool_errors` (count of unexpected failed tool calls, comment lists every failure with expected ones marked, `0` on a clean item) together form the gate, and `total_tokens` is the agent tokens billed (omitted when the provider reported no usage so an unmeasured run cannot look like a free one; an item whose agent run was retried reports only the second attempt). Each tool-call item scores `first_tool_match` alone (`1`/`0`, comment names the captured call and the verdict).
 - **Scores the run** with `pass_rate`: passed trials over requested trials (`requestedIds.length * iterations`), so runs stay comparable even when trials were dropped.
 
 ### Concurrency
@@ -397,7 +401,7 @@ holds the same fields flattened, one object per case, in this fixed key order:
     "id": "tasks/create-explicit-1",
     "category": "create",
     "kind": "agent",
-    "tier": ["full"],
+    "tier": ["merge"],
     "query": "User prompt for agent",
     "reference": "What agent must do to pass",
     "maxTurns": 10,
@@ -407,7 +411,7 @@ holds the same fields flattened, one object per case, in this fixed key order:
     "id": "tasks/get-not-found",
     "category": "get",
     "kind": "agent",
-    "tier": ["full"],
+    "tier": ["merge"],
     "query": "What Actor does my task eval-video-digest run?",
     "reference": "PASS if get-actor-task reports the task does not exist and the agent says so.",
     "expectedErrors": ["get-actor-task"]
@@ -415,7 +419,7 @@ holds the same fields flattened, one object per case, in this fixed key order:
   {
     "id": "fetch-actor-details/input-schema",
     "category": "fetch-actor-details",
-    "kind": "selection",
+    "kind": "tool-call",
     "tier": ["pr"],
     "query": "Show me the input schema for apify/rag-web-browser",
     "expectedTools": ["fetch-actor-details"],
@@ -427,19 +431,19 @@ holds the same fields flattened, one object per case, in this fixed key order:
 **Required fields:**
 - `id` - Unique identifier, `<category>/<slug>`
 - `category` - For `--category` filtering (fine-grained, e.g. `create`, `get`, `search-actors` — not the same as the id's coarse `<category>` prefix)
-- `kind` - `"agent"` (multi-turn, judged) or `"selection"` (single-turn tool pick, no judge, nothing executes)
-- `tier` - Array of `"pr"` and/or `"full"`: which run(s) include the item (`--tier` filters on it)
+- `kind` - `"tool-call"` (asserts only the first tool call the agent attempts, by name and optionally arguments; no judge, nothing executes) or `"agent"` (the agent runs to completion and an LLM judge scores the result against `reference`)
+- `tier` - Array of `"pr"` (on PR open/reopen, or the `validated` label) and/or `"merge"` (on push to master): which CI run includes the item (`--tier` filters on it)
 - `query` - User request
-- `reference` (`expectedOutput` in the dataset) - Success criteria for the judge. Required for `kind: "agent"`; not accepted for `kind: "selection"` (nothing executes, so there's nothing to judge)
+- `reference` (`expectedOutput` in the dataset) - Success criteria for the judge. Required for `kind: "agent"`; not accepted for `kind: "tool-call"` (nothing executes, so there's nothing to judge)
 
 **Optional:**
-- `expectedTools` - `kind: "selection"` only, required for that kind: tool names the first attempted (non-`ToolSearch`) call must match
-- `expectedArgs` - `kind: "selection"` only: a flat object; every key in it must deep-equal the same key of the captured call's arguments, keys not listed are ignored. Omit for a name-only check
-- `expectedErrors` - `kind: "agent"` only: tool names allowed to fail on this item without failing the zero-tool-error gate (see "Selection mode" above and the "One dataset" section). Not accepted on `kind: "selection"`
-- `maxTurns` - `kind: "agent"` only: override the default (10). Not accepted on `kind: "selection"`, which is fixed at 2
+- `expectedTools` - `kind: "tool-call"` only, required for that kind: tool names the first attempted (non-`ToolSearch`) call must match
+- `expectedArgs` - `kind: "tool-call"` only: a flat object; every key in it must deep-equal the same key of the captured call's arguments, keys not listed are ignored. Omit for a name-only check
+- `expectedErrors` - `kind: "agent"` only: tool names allowed to fail on this item without failing the zero-tool-error gate (see "Tool-call mode" above and the "One dataset" section). Not accepted on `kind: "tool-call"`
+- `maxTurns` - `kind: "agent"` only: override the default (10). Not accepted on `kind: "tool-call"`, which is fixed at 2
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
-- `mcpToolsOnly` - Force MCP-tools-only for this item, dropping Claude Code's built-ins (OR-ed with the run-wide `--mcp-tools-only`). Useful on a selection item that must isolate MCP-vs-MCP tool choice
-- `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny (the same hook mechanism the selection-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `claude_agent.ts`. Not accepted on `kind: "selection"`.
+- `mcpToolsOnly` - Force MCP-tools-only for this item, dropping Claude Code's built-ins (OR-ed with the run-wide `--mcp-tools-only`). Useful on a tool-call item that must isolate MCP-vs-MCP tool choice
+- `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny (the same hook mechanism the tool-call-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `claude_agent.ts`. Not accepted on `kind: "tool-call"`.
 
 ## Key insights
 
