@@ -151,7 +151,7 @@ describe('getServerInstructions()', () => {
     });
 });
 
-/** Pins the Claude-connector tool surface (no call-actor). Offline — no network, no fixture. */
+/** Pins the Claude-connector tool surface (no call-actor); offline, no network or fixture. */
 describe('Claude-connector tool surface (no call-actor)', () => {
     const url =
         'https://mcp.apify.com/?tools=search-actors,search-actors-widget,fetch-actor-details,fetch-actor-details-widget,search-apify-docs,fetch-apify-docs,get-actor-run,get-actor-run-widget,get-actor-run-list,get-actor-log,abort-actor-run,get-dataset-list,get-dataset,get-dataset-items,get-key-value-store-list,get-key-value-store,get-key-value-store-record,apify/rag-web-browser,apify/web-fetch';

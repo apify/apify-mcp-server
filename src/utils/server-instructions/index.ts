@@ -17,10 +17,7 @@ import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../types.js';
 const RAG_WEB_BROWSER_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
 const WEB_FETCH_TOOL = actorNameToToolName(WEB_FETCH);
 
-/**
- * Build server instructions for the given mode. Every cross-tool mention is gated on
- * `ctx.hasTool(...)` so a session missing a tool is never told to call it.
- */
+/** Every cross-tool mention gates on `ctx.hasTool(...)`, so a session missing a tool is never told to call it. */
 export function getServerInstructions(
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
     { hasTool }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
@@ -35,8 +32,7 @@ export function getServerInstructions(
     const hasCall = hasTool(HELPER_TOOLS.ACTOR_CALL);
     const hasRunsGet = hasTool(HELPER_TOOLS.ACTOR_RUNS_GET);
 
-    // get-actor-run-widget is auto-added alongside get-actor-run in apps mode, so gating on the
-    // base tool alone is enough.
+    // get-actor-run-widget auto-loads with get-actor-run in apps mode; gating the base tool suffices.
     const widgetWorkflowSection =
         isApps && hasRunsGet
             ? `

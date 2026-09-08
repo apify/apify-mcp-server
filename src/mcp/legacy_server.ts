@@ -138,8 +138,7 @@ export class LegacyMcpServer {
                 prompts: {},
                 logging: {},
             },
-            // Placeholder, always overwritten below once the real tool set is known — matches
-            // the pre-gating default (everything but report-problem) rather than every mention.
+            // Placeholder overwritten below once the real tool set is known; matches the pre-gating default (all but report-problem).
             instructions: getServerInstructions(undefined, { hasTool: (name) => name !== HELPER_TOOLS.PROBLEM_REPORT }),
         });
         this.setupInitializeHandler();

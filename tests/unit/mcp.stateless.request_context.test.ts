@@ -390,8 +390,7 @@ describe('createStatelessServer() request context', () => {
             },
         );
 
-        // Regression: the pre-gating default is "everything but report-problem", not "nothing" —
-        // this configuration-level probe must still mention call-actor unconditionally.
+        // Regression: pre-gating default is "all but report-problem", not "nothing" — must still mention call-actor.
         it('mentions call-actor unconditionally, before any request establishes the real tool set', async () => {
             await withStatelessServer(async ({ call }) => {
                 const discovered = await call('server/discover', {}, { client: { name: 'test-client' } });
