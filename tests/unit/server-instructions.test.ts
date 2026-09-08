@@ -105,9 +105,28 @@ describe('getServerInstructions()', () => {
     });
 
     it('renders only the data-vs-widget bullets for tools actually loaded, in apps mode', () => {
-        const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.STORE_SEARCH));
+        const instructions = getServerInstructions(
+            SERVER_MODE.APPS,
+            only(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.STORE_SEARCH_WIDGET),
+        );
         expect(instructions).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
+    });
+
+    // Regression: the bullet must require BOTH tools, not just the base one — pairing could stop
+    // being unconditional for these two as well (as it already has for call-actor/get-actor-run).
+    it('omits the data-vs-widget bullet when the base tool is loaded but its widget is not', () => {
+        const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.STORE_SEARCH));
+        expect(instructions).not.toContain('Data vs widget Actor tools');
+        expect(instructions).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+    });
+
+    // Widget-only selection is possible (pairing is one-way, base -> widget) — naming the absent
+    // base tool would be just as wrong as naming the absent widget.
+    it('omits the data-vs-widget bullet when the widget is loaded but its base tool is not', () => {
+        const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.STORE_SEARCH_WIDGET));
+        expect(instructions).not.toContain('Data vs widget Actor tools');
+        expect(instructions).not.toContain(HELPER_TOOLS.STORE_SEARCH);
     });
 
     it('omits the search-actors-vs-rag-web-browser comparison when search-actors is absent', () => {

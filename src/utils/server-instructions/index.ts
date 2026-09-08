@@ -57,11 +57,15 @@ export function getServerInstructions(
 `
                 : '';
 
-    // Gates on its base tool; call-actor and get-actor-run have none, so no bullet for them.
+    // Gates on BOTH the base tool and its widget being loaded — naming either one when only the
+    // other is present would tell the model to call a tool absent from this session's tools/list.
+    // call-actor and get-actor-run have no widget sibling, so they never qualify here.
+    const hasSearchPair = hasSearch && hasTool(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+    const hasDetailsPair = hasDetails && hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
     const widgetToolDisambiguation =
-        isApps && (hasSearch || hasDetails)
+        isApps && (hasSearchPair || hasDetailsPair)
             ? `- **Data vs widget Actor tools (when the client supports widgets):**
-${hasSearch ? `  - \`${HELPER_TOOLS.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HELPER_TOOLS.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.\n` : ''}${hasDetails ? `  - \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.\n` : ''}${hasSearch && hasDetails ? `  - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.\n` : ''}`
+${hasSearchPair ? `  - \`${HELPER_TOOLS.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HELPER_TOOLS.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.\n` : ''}${hasDetailsPair ? `  - \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.\n` : ''}${hasSearchPair && hasDetailsPair ? `  - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.\n` : ''}`
             : '';
 
     const searchVsRagWebBrowser =
