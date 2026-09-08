@@ -214,11 +214,13 @@ describe('makeTask()', () => {
             judgeModel: 'judge',
             toolTimeout: 1,
             mcpToolsOnly: false,
+            totalTrials: 1,
         });
 
     beforeEach(() => {
         vi.clearAllMocks();
         vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
         mocks.runAgentConversation.mockRejectedValue(new Error('spawn ENOENT'));
     });
 
@@ -349,6 +351,7 @@ describe('makeTask()', () => {
             judgeModel: 'judge',
             toolTimeout: 1,
             mcpToolsOnly: true,
+            totalTrials: 1,
         });
 
         await task(makeSelectionItem());

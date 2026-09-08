@@ -230,7 +230,9 @@ async function main() {
             `▶️  Running experiment "${runName}" over ${requestedIds.length} item(s)` +
                 `${iterations > 1 ? ` x ${iterations} iteration(s)` : ''}, concurrency ${argv.concurrency} ` +
                 `(agent: ${argv.agentModel} via Claude Agent SDK ${agentSdkVersion}` +
-                `${argv.mcpToolsOnly ? ', MCP tools only' : ', +built-in tools'})`,
+                `${argv.subscription ? ', Claude Code login' : ', ANTHROPIC_API_KEY'}` +
+                `${argv.mcpToolsOnly ? ', MCP tools only' : ', +built-in tools'}` +
+                `; judge: ${judgeModel} via ${argv.claudeJudge ? 'Claude Code login' : 'OpenRouter'})`,
         );
 
         const result = await langfuse.experiment.run({
@@ -245,6 +247,7 @@ async function main() {
                 judgeModel,
                 toolTimeout: argv.toolTimeout,
                 mcpToolsOnly: argv.mcpToolsOnly,
+                totalTrials: requestedIds.length * iterations,
             }),
             evaluators,
             runEvaluators: [

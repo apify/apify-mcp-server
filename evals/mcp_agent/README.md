@@ -12,7 +12,7 @@ dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge (a
 2. **Experiment.** The run executes the active items matching `--id`/`--category`/`--tier` as one Langfuse experiment, `--concurrency` items at a time; `--iterations N` repeats each selected item N times within that one experiment.
 3. **Conversation.** Each item runs a Claude Code agent (Claude Agent SDK) that spawns its own fresh Apify MCP server. A `kind: "agent"` item drives it to a final answer; a `kind: "selection"` item denies every tool call before it executes and records only the first attempted one.
 4. **Judge.** `kind: "agent"` only: an LLM judge scores the finished conversation against the item's `expectedOutput`. `kind: "selection"` items are scored deterministically instead - see below.
-5. **Scores.** Agent items: `mcp_agent_judge` (the judge verdict) and `tool_errors` (unexpected failed server calls) form the gate, plus `total_tokens`. Selection items: `first_tool_match` alone is the gate. The run also gets `pass_rate` (passed trials / requested trials). The console prints failures, `pass@k`/`pass^k` with `--iterations`, and the run URL; per-item detail is in Langfuse.
+5. **Scores.** Agent items: `mcp_agent_judge` (the judge verdict) and `tool_errors` (unexpected failed server calls) form the gate, plus `total_tokens`. Selection items: `first_tool_match` alone is the gate. The run also gets `pass_rate` (passed trials / requested trials). The console prints one `[n/total] ✅|❌|🔥 <id>` line per finished trial, then failures, `pass@k`/`pass^k` with `--iterations`, and the run URL; per-item detail is in Langfuse.
 
 ---
 
