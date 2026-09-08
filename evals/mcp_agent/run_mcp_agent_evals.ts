@@ -10,13 +10,13 @@
  * Langfuse.
  *
  * Usage:
- *   pnpm run evals:mcp-agent
+ *   pnpm run evals:mcp-agent                       # the pr dataset
  *   pnpm run evals:mcp-agent -- --category search
- *   pnpm run evals:mcp-agent -- --id '^tasks/'     # one family, matched by its id prefix
+ *   pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge --id '^merge/tasks/'  # one family, by its id prefix
  *   pnpm run evals:mcp-agent -- --concurrency 8
  *   pnpm run evals:mcp-agent -- --mcp-tools-only   # drop Claude Code's built-in tools
  *   pnpm run evals:mcp-agent -- --subscription     # bill the local Claude Code login, not the API
- *   pnpm run evals:mcp-agent -- --tier pr           # the fast PR-gating set
+ *   pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge  # the judged agent items
  *   pnpm run evals:mcp-agent -- --iterations 3      # 3 trials per item, pass@k / pass^k in the summary
  *   pnpm run evals:mcp-agent -- --pass-threshold 0.9 # exit 0 while the aggregate pass rate is >= 0.9
  */
@@ -36,7 +36,7 @@ import { filterByCategory, filterById } from '../shared/test_case_loader.js';
 import { assertStdioBinExists } from './claude_agent.js';
 import { ClaudeLlmClient } from './claude_judge_client.js';
 import { DEFAULT_PASS_THRESHOLD, DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
-import { fetchMcpAgentCases, filterByTier, MCP_AGENT_DATASET_NAME } from './langfuse_dataset.js';
+import { fetchMcpAgentCases, MCP_AGENT_PR_DATASET_NAME } from './langfuse_dataset.js';
 import {
     buildRunSummary,
     evaluators,
@@ -60,7 +60,6 @@ sanitizeProcessEnv();
 type CliArgs = {
     category?: string;
     id?: string;
-    tier?: 'pr' | 'merge';
     dataset: string;
     agentModel: string;
     judgeModel?: string;
@@ -101,17 +100,10 @@ async function main() {
         .options({
             category: { type: 'string', description: 'Filter by test case category (supports * wildcard)' },
             id: { type: 'string', description: 'Run test cases whose ID matches this regex' },
-            tier: {
-                type: 'string',
-                choices: ['pr', 'merge'] as const,
-                description:
-                    'Only run items whose tier includes this value: pr (the PR gate) or merge ' +
-                    '(after a merge to master); default: all',
-            },
             dataset: {
                 type: 'string',
-                description: 'Langfuse dataset to run',
-                default: MCP_AGENT_DATASET_NAME,
+                description: 'Langfuse dataset to run; mcp-server-evals-merge holds the judged agent items',
+                default: MCP_AGENT_PR_DATASET_NAME,
             },
             'agent-model': { type: 'string', description: 'LLM model for the agent', default: MODELS.agent },
             'judge-model': {
@@ -206,10 +198,9 @@ async function main() {
         let selected = cases;
         if (argv.id) selected = filterById(selected, argv.id);
         if (argv.category) selected = filterByCategory(selected, argv.category);
-        if (argv.tier) selected = filterByTier(selected, argv.tier);
         if (selected.length === 0) {
             throw new Error(
-                `No active item in dataset "${datasetName}" (${cases.length} total) matches --id/--category/--tier`,
+                `No active item in dataset "${datasetName}" (${cases.length} total) matches --id/--category`,
             );
         }
         const requestedIds = selected.map((mcpAgentCase) => mcpAgentCase.id);
@@ -269,7 +260,6 @@ async function main() {
                 mcpToolsOnly: argv.mcpToolsOnly,
                 agentSdkVersion,
                 agentAuth: argv.subscription ? 'subscription' : 'api-key',
-                tier: argv.tier ?? 'all',
                 iterations,
                 passThreshold: argv.passThreshold,
             },

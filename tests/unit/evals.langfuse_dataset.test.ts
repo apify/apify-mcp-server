@@ -1,24 +1,19 @@
 import type { LangfuseClient } from '@langfuse/client';
 import { describe, expect, it } from 'vitest';
 
-import {
-    fetchMcpAgentCases,
-    filterByTier,
-    parseMcpAgentItem,
-    toMcpAgentTestCase,
-} from '../../evals/mcp_agent/langfuse_dataset.js';
+import { fetchMcpAgentCases, parseMcpAgentItem, toMcpAgentTestCase } from '../../evals/mcp_agent/langfuse_dataset.js';
 
 const item = {
     id: 'a',
     input: { query: 'q' },
     expectedOutput: 'r',
-    metadata: { category: 'search', kind: 'agent', tier: ['merge'] },
+    metadata: { category: 'search', kind: 'agent' },
 };
 
 const toolCallItem = {
     id: 'b',
     input: { query: 'q' },
-    metadata: { category: 'search', kind: 'tool-call', tier: ['pr'], expectedTools: ['search-actors'] },
+    metadata: { category: 'search', kind: 'tool-call', expectedTools: ['search-actors'] },
 };
 
 /** Langfuse client whose dataset holds the given items, like the real API returns them. */
@@ -43,7 +38,7 @@ describe('parseMcpAgentItem()', () => {
     it('keeps the optional harness knobs from metadata', () => {
         const withKnobs = {
             ...item,
-            metadata: { category: 'search', kind: 'agent', tier: ['merge'], maxTurns: 5, failTools: ['call-actor'] },
+            metadata: { category: 'search', kind: 'agent', maxTurns: 5, failTools: ['call-actor'] },
         };
         expect(parseMcpAgentItem(withKnobs).metadata).toEqual(withKnobs.metadata);
     });
@@ -51,7 +46,7 @@ describe('parseMcpAgentItem()', () => {
     it('rejects a misspelled knob instead of silently stripping it', () => {
         const typo = {
             ...item,
-            metadata: { category: 'search', kind: 'agent', tier: ['merge'], failTool: ['call-actor'] },
+            metadata: { category: 'search', kind: 'agent', failTool: ['call-actor'] },
         };
         expect(() => parseMcpAgentItem(typo)).toThrow(/failTool/);
     });
@@ -59,7 +54,7 @@ describe('parseMcpAgentItem()', () => {
     it('rejects a misspelled expectedErrors key instead of silently stripping it', () => {
         const typo = {
             ...item,
-            metadata: { category: 'search', kind: 'agent', tier: ['merge'], expectedErorrs: ['get-actor-task'] },
+            metadata: { category: 'search', kind: 'agent', expectedErorrs: ['get-actor-task'] },
         };
         expect(() => parseMcpAgentItem(typo)).toThrow(/expectedErorrs/);
     });
@@ -83,7 +78,7 @@ describe('parseMcpAgentItem()', () => {
     it('accepts a kind: agent item with a populated expectedErrors array', () => {
         const withErrors = {
             ...item,
-            metadata: { category: 'get', kind: 'agent', tier: ['merge'], expectedErrors: ['get-actor-task'] },
+            metadata: { category: 'get', kind: 'agent', expectedErrors: ['get-actor-task'] },
         };
         expect(parseMcpAgentItem(withErrors).metadata.expectedErrors).toEqual(['get-actor-task']);
     });
@@ -92,7 +87,7 @@ describe('parseMcpAgentItem()', () => {
         const toolCall = {
             id: 'b',
             input: { query: 'q' },
-            metadata: { category: 'search', kind: 'tool-call', tier: ['pr'], expectedTools: ['search-actors'] },
+            metadata: { category: 'search', kind: 'tool-call', expectedTools: ['search-actors'] },
         };
         expect(parseMcpAgentItem(toolCall).expectedOutput).toBeUndefined();
     });
@@ -102,7 +97,7 @@ describe('parseMcpAgentItem()', () => {
             id: 'b',
             input: { query: 'q' },
             expectedOutput: 'a reference no judge ever reads',
-            metadata: { category: 'search', kind: 'tool-call', tier: ['pr'], expectedTools: ['search-actors'] },
+            metadata: { category: 'search', kind: 'tool-call', expectedTools: ['search-actors'] },
         };
         expect(() => parseMcpAgentItem(toolCall)).toThrow(/expectedOutput is not valid on a kind/);
     });
@@ -111,7 +106,7 @@ describe('parseMcpAgentItem()', () => {
         const toolCall = {
             id: 'b',
             input: { query: 'q' },
-            metadata: { category: 'search', kind: 'tool-call', tier: ['pr'] },
+            metadata: { category: 'search', kind: 'tool-call' },
         };
         expect(() => parseMcpAgentItem(toolCall)).toThrow(
             /metadata\.kind \\"tool-call\\" requires a non-empty \\"expectedTools\\"/,
@@ -122,7 +117,7 @@ describe('parseMcpAgentItem()', () => {
         const toolCall = {
             id: 'b',
             input: { query: 'q' },
-            metadata: { category: 'search', kind: 'tool-call', tier: ['pr'], expectedTools: [] },
+            metadata: { category: 'search', kind: 'tool-call', expectedTools: [] },
         };
         expect(() => parseMcpAgentItem(toolCall)).toThrow(/expectedTools/);
     });
@@ -131,17 +126,15 @@ describe('parseMcpAgentItem()', () => {
         const noReference = {
             id: 'b',
             input: { query: 'q' },
-            metadata: { category: 'search', kind: 'agent', tier: ['merge'] },
+            metadata: { category: 'search', kind: 'agent' },
         };
         expect(() => parseMcpAgentItem(noReference)).toThrow(
             /metadata\.kind \\"agent\\" requires a non-empty \\"expectedOutput\\"/,
         );
     });
 
-    it('rejects an empty tier array', () => {
-        expect(() => parseMcpAgentItem({ ...item, metadata: { ...item.metadata, tier: [] } })).toThrow(
-            /not a usable MCP agent test case/,
-        );
+    it('rejects a tier key', () => {
+        expect(() => parseMcpAgentItem({ ...item, metadata: { ...item.metadata, tier: ['pr'] } })).toThrow(/tier/);
     });
 
     it('rejects an unknown kind value', () => {
@@ -157,7 +150,7 @@ describe('parseMcpAgentItem()', () => {
             id: 'b',
             input: { query: 'q' },
             expectedOutput: null,
-            metadata: { category: 'search', kind: 'tool-call', tier: ['pr'], expectedTools: ['search-actors'] },
+            metadata: { category: 'search', kind: 'tool-call', expectedTools: ['search-actors'] },
         };
         expect(parseMcpAgentItem(toolCall).expectedOutput).toBeUndefined();
     });
@@ -169,7 +162,6 @@ describe('parseMcpAgentItem()', () => {
             metadata: {
                 category: 'search',
                 kind: 'tool-call',
-                tier: ['pr'],
                 expectedTools: ['fetch-actor-details'],
                 expectedArgs: { actor: 'apify/rag-web-browser' },
                 mcpToolsOnly: true,
@@ -202,21 +194,19 @@ describe('toMcpAgentTestCase()', () => {
             id: 'a',
             category: 'search',
             kind: 'agent',
-            tier: ['merge'],
             query: 'q',
             reference: 'r',
         });
     });
 
     it('leaves out knobs the item does not set, so the snapshot stays minimal', () => {
-        expect(Object.keys(toMcpAgentTestCase(item))).toEqual(['id', 'category', 'kind', 'tier', 'query', 'reference']);
+        expect(Object.keys(toMcpAgentTestCase(item))).toEqual(['id', 'category', 'kind', 'query', 'reference']);
     });
 
     it('writes the keys in a fixed order whatever order metadata arrives in', () => {
         const knobs = {
             failTools: ['call-actor'],
             tools: ['actors'],
-            tier: ['merge'],
             maxTurns: 5,
             expectedErrors: ['get-actor-task'],
             category: 'search',
@@ -227,7 +217,6 @@ describe('toMcpAgentTestCase()', () => {
             'id',
             'category',
             'kind',
-            'tier',
             'query',
             'reference',
             'expectedErrors',
@@ -245,7 +234,6 @@ describe('toMcpAgentTestCase()', () => {
             metadata: {
                 category: 'search',
                 kind: 'tool-call',
-                tier: ['pr'],
                 expectedTools: ['search-actors'],
                 expectedArgs: { actor: 'apify/rag-web-browser' },
             },
@@ -254,7 +242,6 @@ describe('toMcpAgentTestCase()', () => {
             id: 'b',
             category: 'search',
             kind: 'tool-call',
-            tier: ['pr'],
             query: 'q',
             expectedTools: ['search-actors'],
             expectedArgs: { actor: 'apify/rag-web-browser' },
@@ -264,20 +251,6 @@ describe('toMcpAgentTestCase()', () => {
     it('never exports a runner-injected iteration', () => {
         const withIteration = { ...item, metadata: { ...item.metadata, iteration: 3 } };
         expect(Object.keys(toMcpAgentTestCase(withIteration))).not.toContain('iteration');
-    });
-});
-
-describe('filterByTier()', () => {
-    const pr = { id: 'a', category: 'x', query: 'q', tier: ['pr'] };
-    const merge = { id: 'b', category: 'x', query: 'q', tier: ['merge'] };
-    const both = { id: 'c', category: 'x', query: 'q', tier: ['pr', 'merge'] };
-    const cases = [pr, merge, both];
-
-    it.each([
-        ['pr', ['a', 'c']],
-        ['merge', ['b', 'c']],
-    ])('keeps items in the %s tier', (tier, expectedIds) => {
-        expect(filterByTier(cases, tier).map((testCase) => testCase.id)).toEqual(expectedIds);
     });
 });
 

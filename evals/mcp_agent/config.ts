@@ -61,10 +61,10 @@ export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
 /**
  * Default `--pass-threshold` (passed trials / requested trials) for exit code 0.
  *
- * Below 1.0 because two `pr`-tier tool-call items are kept although Haiku misses them about
- * one run in three: `call-actor/ecommerce-scraper-iphone` (searches for an Actor the query
- * names) and `search-apify-docs/error-handling-actors` (answers from memory). The miss is
- * the signal, not a case defect. On the 115-item PR tier 0.97 absorbs both plus one flake
+ * Below 1.0 because two tool-call items in the pr dataset are kept although Haiku misses them
+ * about one run in three: `pr/call-actor/ecommerce-scraper-iphone` (searches for an Actor the query
+ * names) and `pr/search-apify-docs/error-handling-actors` (answers from memory). The miss is
+ * the signal, not a case defect. On the 115-item pr dataset 0.97 absorbs both plus one flake
  * (112/115 = 0.974); a third miss fails the run.
  */
 export const DEFAULT_PASS_THRESHOLD = 0.97;

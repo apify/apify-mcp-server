@@ -195,14 +195,14 @@ describe('makeTask()', () => {
         id: 'search-001',
         input: { query: 'q' },
         expectedOutput: 'r',
-        metadata: { category: 'search', kind: 'agent', tier: ['merge'] },
+        metadata: { category: 'search', kind: 'agent' },
         ...overrides,
     });
 
     const makeToolCallItem = (overrides: Record<string, unknown> = {}) => ({
         id: 'search-001',
         input: { query: 'q' },
-        metadata: { category: 'search', kind: 'tool-call', tier: ['pr'], expectedTools: ['search-actors'] },
+        metadata: { category: 'search', kind: 'tool-call', expectedTools: ['search-actors'] },
         ...overrides,
     });
 
@@ -277,7 +277,7 @@ describe('makeTask()', () => {
             }),
         );
         const item = makeItem({
-            metadata: { category: 'search', kind: 'agent', tier: ['merge'], failTools: ['call-actor'] },
+            metadata: { category: 'search', kind: 'agent', failTools: ['call-actor'] },
         });
 
         // First line only: the full text already sits on the tool span, so nothing re-uploads it.
@@ -296,7 +296,7 @@ describe('makeTask()', () => {
             }),
         );
         const item = makeItem({
-            metadata: { category: 'get', kind: 'agent', tier: ['merge'], expectedErrors: ['get-actor-task'] },
+            metadata: { category: 'get', kind: 'agent', expectedErrors: ['get-actor-task'] },
         });
 
         await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({
@@ -332,7 +332,6 @@ describe('makeTask()', () => {
             metadata: {
                 category: 'search',
                 kind: 'tool-call',
-                tier: ['pr'],
                 expectedTools: ['search-actors'],
                 mcpToolsOnly: true,
             },
@@ -360,7 +359,7 @@ describe('makeTask()', () => {
 
     it('carries a runner-injected iteration through to the output', async () => {
         mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
-        const item = makeItem({ metadata: { category: 'search', kind: 'agent', tier: ['merge'], iteration: 2 } });
+        const item = makeItem({ metadata: { category: 'search', kind: 'agent', iteration: 2 } });
 
         await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({ iteration: 2 });
     });

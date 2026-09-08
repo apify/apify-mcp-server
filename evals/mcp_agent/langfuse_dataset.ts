@@ -9,8 +9,11 @@
 import type { LangfuseClient } from '@langfuse/client';
 import { z } from 'zod';
 
-/** Name of the Langfuse dataset holding the MCP agent test cases. */
-export const MCP_AGENT_DATASET_NAME = 'mcp-server-evals';
+/**
+ * The tool-call items that gate PRs, and the CLI's default. The judged agent items live in
+ * `mcp-server-evals-merge`, selected with `--dataset`.
+ */
+export const MCP_AGENT_PR_DATASET_NAME = 'mcp-server-evals-pr';
 
 /** Item shape returned by the client, derived so we don't depend on @langfuse/core. */
 export type DatasetItem = Awaited<ReturnType<LangfuseClient['dataset']['get']>>['items'][number];
@@ -30,8 +33,6 @@ const McpAgentMetadataValidator = z.strictObject({
      * an LLM judge scores against `expectedOutput`.
      */
     kind: z.enum(['tool-call', 'agent']),
-    /** Which CI run includes the item: `pr` or `merge`. */
-    tier: z.array(z.enum(['pr', 'merge'])).min(1),
     /** `kind: "tool-call"` only: tool names the first tool call must match. */
     expectedTools: z.array(z.string()).optional(),
     /**
@@ -167,7 +168,6 @@ export function toMcpAgentTestCase(item: unknown): McpAgentTestCase {
         id,
         category: metadata.category,
         kind: metadata.kind,
-        tier: metadata.tier,
         query: input.query,
         ...(expectedOutput !== undefined && { reference: expectedOutput }),
         ...(metadata.expectedTools !== undefined && { expectedTools: metadata.expectedTools }),
@@ -180,11 +180,6 @@ export function toMcpAgentTestCase(item: unknown): McpAgentTestCase {
         // metadata.iteration is runner-injected, never hand-authored in the dataset: left out
         // here so the committed snapshot (built from toMcpAgentTestCase) stays byte-stable.
     };
-}
-
-/** Items whose `tier` array contains the given value. `--tier` filters here; absent = all. */
-export function filterByTier<T extends { tier: readonly string[] }>(testCases: T[], tier: string): T[] {
-    return testCases.filter((testCase) => testCase.tier.includes(tier));
 }
 
 /**
