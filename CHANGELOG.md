@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.15.6 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Stop enforcing enum values dropped by input-schema truncation ([#1258](https://github.com/apify/apify-mcp-server/pull/1258)) ([3843245](https://github.com/apify/apify-mcp-server/commit/384324589f142b672db38a5d07624c5fb6c8ae12)) by [@MQ37](https://github.com/MQ37), closes [#1253](https://github.com/apify/apify-mcp-server/issues/1253)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.15.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.5) (2026-09-09)
 
 ### 🚀 Features
