@@ -3,17 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
-import type { ToolDescriptionContext } from '../../src/types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { getServerInstructions } from '../../src/utils/server-instructions/index.js';
 import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
 import { CLAUDE_CONNECTOR_TOOLS } from './helpers/claude_connector_tools.js';
-
-/** Context reporting every named tool present, everything else absent. */
-function only(...present: string[]): ToolDescriptionContext {
-    const set = new Set(present);
-    return { hasTool: (name) => set.has(name) };
-}
+import { only } from './helpers/tool_context.js';
 
 describe('getServerInstructions()', () => {
     it('defaults to ALL_TOOLS_PRESENT — no regression for the common case (every tool loaded)', () => {

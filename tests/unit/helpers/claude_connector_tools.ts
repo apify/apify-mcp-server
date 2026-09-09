@@ -1,9 +1,9 @@
 import { HELPER_TOOLS } from '../../../src/const.js';
 
 // Claude-connector `?tools=` allowlist (ai-team#214/#229). No call-actor. Actor entries use their
-// slash name here; served tool names differ from selector to selector for those two.
-// Shared by tests/unit (buildless, src-only imports) and tests/test_kit (built-package imports) —
-// keep this file's own imports src-only so unit tests never pull in the built package.
+// slash name; served tool names differ for those two. Duplicated in
+// tests/test_kit/cases/registration.cases.ts — test_kit is its own `tsc -b` project and cannot
+// import from here.
 export const CLAUDE_CONNECTOR_TOOLS = [
     HELPER_TOOLS.STORE_SEARCH,
     HELPER_TOOLS.STORE_SEARCH_WIDGET,

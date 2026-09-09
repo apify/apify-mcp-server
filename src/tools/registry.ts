@@ -75,24 +75,14 @@ export const CATEGORY_NAME_SET: ReadonlySet<string> = new Set<string>(CATEGORY_N
 /** Map from category name to an array of resolved tool entries. */
 export type ToolCategoryMap = Record<(typeof CATEGORY_NAMES)[number], ToolEntry[]>;
 
-/**
- * Resolve tool categories for a given server mode. No category tool currently varies by mode
- * (widgets are a separate, non-category surface — see ALL_WIDGET_TOOLS/WIDGET_BY_BASE_TOOL below);
- * `mode` stays part of the signature for API stability with apify-mcp-server-internal.
- */
+/** Fresh copy of every category's tools. `mode` is unused (no category tool varies by mode) but stays in the `internals.js` signature. */
 export function getCategoryTools(_mode: SERVER_MODE = SERVER_MODE.DEFAULT): ToolCategoryMap {
     return Object.fromEntries(CATEGORY_NAMES.map((name) => [name, [...toolCategories[name]]])) as ToolCategoryMap;
 }
 
 export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] = ['actors', 'docs'];
 
-/**
- * All widget tools, regardless of auto-pairing. Every widget is always directly selectable via
- * `?tools=<widget-name>` and always counts as a known internal tool (never misclassified as an
- * Actor ID) — see `ALL_INTERNAL_TOOL_NAMES` and the direct-selection lookup in tools_loader.ts.
- * Selecting a widget alone never auto-brings its base tool (pairing, below, is one-way and only
- * covers two of these four).
- */
+/** Every widget, paired or not — for direct `?tools=` selection and internal-name classification in tools_loader.ts. */
 export const ALL_WIDGET_TOOLS: readonly ToolEntry[] = [
     searchActorsWidget,
     fetchActorDetailsWidget,
@@ -101,15 +91,11 @@ export const ALL_WIDGET_TOOLS: readonly ToolEntry[] = [
 ];
 
 /**
- * Apps-mode auto-pairing: each base tool name maps to its widget sibling. In apps mode, a widget
- * is added to the resolved tool list automatically iff its base tool is already present — see
- * `getToolsForServerMode` in tools_loader.ts. Only these two tools auto-pair; `call-actor` and
- * `get-actor-run` do not (low usage) — their widgets remain directly selectable (`ALL_WIDGET_TOOLS`
- * above), just never auto-added.
+ * Apps-mode auto-pairing: a widget is added iff its base tool is present — see
+ * `getToolsForServerMode` in tools_loader.ts. `call-actor`/`get-actor-run` widgets don't pair (low
+ * usage); they stay directly selectable via `ALL_WIDGET_TOOLS`.
  *
- * Pairing is intentionally one-way (base → widget) even for the two tools that do pair. Selecting
- * a widget alone does NOT auto-bring its base; callers asking for widget-only get a UI without
- * the programmatic data tool. To get both, select the base (or both explicitly).
+ * Pairing is one-way (base → widget): selecting a widget alone never auto-brings its base.
  */
 export const WIDGET_BY_BASE_TOOL: ReadonlyMap<HelperToolName, ToolEntry> = new Map([
     [HELPER_TOOLS.STORE_SEARCH, searchActorsWidget],

@@ -124,7 +124,7 @@ function buildWidgetAddendum({ hasTool }: ToolDescriptionContext): string {
     `;
 }
 
-function buildCallActorDescriptionSections(ctx: ToolDescriptionContext): string {
+export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOLS_PRESENT): string {
     const { hasTool } = ctx;
     const workflowSection = [
         'WORKFLOW:',
@@ -161,10 +161,6 @@ function buildCallActorDescriptionSections(ctx: ToolDescriptionContext): string 
     if (hasTool(HELPER_TOOLS.ACTOR_CALL_WIDGET)) sections.push(buildWidgetAddendum(ctx));
 
     return sections.join('\n\n');
-}
-
-export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOLS_PRESENT): string {
-    return buildCallActorDescriptionSections(ctx);
 }
 
 /**

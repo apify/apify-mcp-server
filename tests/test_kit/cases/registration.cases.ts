@@ -26,7 +26,7 @@ import {
     skipUnlessStdio,
     withClient,
 } from '../helpers.js';
-import { buildClientUrl } from '../mcp_client.js';
+import { buildClientUrl, type SuiteClientOptions } from '../mcp_client.js';
 import type { Case } from '../types.js';
 
 const TWO_TEST_ACTORS = ['apify/python-example', 'apify/rag-web-browser'];
@@ -64,6 +64,12 @@ const CLAUDE_CONNECTOR_TOOLS = [
 const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selector) =>
     selector.includes('/') ? actorNameToToolName(selector) : selector,
 );
+// telemetry: true is explicit — the deployed target defaults it off, unlike this package's own default.
+const CLAUDE_CONNECTOR_CLIENT_OPTIONS: SuiteClientOptions = {
+    tools: CLAUDE_CONNECTOR_TOOLS,
+    client: 'claude connector',
+    telemetry: { enabled: true },
+};
 
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
@@ -109,16 +115,13 @@ export const registrationCases: Case[] = [
     },
     {
         // Pinned ?tools= wins for call-actor even with report-problem auto-inject live.
-        // telemetry: true is explicit — the deployed target defaults it off (confirmed by CI), unlike this package's own default.
         // No ?ui=: apps mode comes from the client's own UI-capability advertisement (serverMode 'auto'), not a URL override.
         name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude+connector',
         isDeploymentTest: true,
         skipIf: () => !SERVER_MODE_AUTO_DETECTION_ENABLED,
         run: withClient(
             {
-                tools: CLAUDE_CONNECTOR_TOOLS,
-                client: 'claude connector',
-                telemetry: { enabled: true },
+                ...CLAUDE_CONNECTOR_CLIENT_OPTIONS,
                 clientCapabilities: {
                     extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] } },
                 },
@@ -128,11 +131,7 @@ export const registrationCases: Case[] = [
                 // Exact set, not superset: this pinned URL serves these tools and nothing else.
                 expect(new Set(names)).toEqual(new Set(CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES));
 
-                const url = buildClientUrl('http://placeholder/', {
-                    tools: CLAUDE_CONNECTOR_TOOLS,
-                    client: 'claude connector',
-                    telemetry: { enabled: true },
-                });
+                const url = buildClientUrl('http://placeholder/', CLAUDE_CONNECTOR_CLIENT_OPTIONS);
                 expect(url.search.endsWith('client=claude+connector')).toBe(true);
             },
         ),

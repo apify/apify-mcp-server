@@ -19,9 +19,9 @@ import {
     handleMcpToolCall,
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
-import type { InternalToolArgs, ToolDescriptionContext, ToolEntry } from '../../src/types.js';
+import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
-import { textOf, type TextToolResult } from './helpers/tool_context.js';
+import { only, textOf, type TextToolResult } from './helpers/tool_context.js';
 
 vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/actors/actor_tools_factory.js');
@@ -50,11 +50,6 @@ describe('call_actor_common', () => {
 
         // call-actor-widget is not auto-paired — gate strictly on its own presence, not on
         // ALL_TOOLS_PRESENT happening to include everything.
-        function only(...present: string[]): ToolDescriptionContext {
-            const set = new Set(present);
-            return { hasTool: (name) => set.has(name) };
-        }
-
         it('omits the widget addendum when call-actor-widget is absent from the session', () => {
             const description = buildCallActorDescription(
                 only(HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.STORE_SEARCH),
