@@ -97,7 +97,7 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
  * 2. Nested properties are built by analyzing editor type (proxy, requestListSources) using buildNestedProperties()
  * 3. Properties are filtered using filterSchemaProperties()
  * 4. Properties are shortened using shortenProperties()
- * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
+ * 5. Prefill/default values are added to descriptions as examples using addExampleValuesToDescriptions()
  *
  * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and Actor.
  * @param options - Optional settings: mcpSessionId for telemetry correlation, actorStore for per-Actor itemsSchema enrichment.

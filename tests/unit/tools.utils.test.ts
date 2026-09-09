@@ -790,10 +790,10 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result.simpleString.type).toBe('string');
         expect(result.simpleString.description).toContain('**REQUIRED**');
 
-        // Enum String — kept in full and repeated in the description for clients that ignore `enum`.
+        // Enum String — kept in full (fits the cap); no "Possible values" duplication with `enum`.
         expect(result.enumString).toBeDefined();
         expect(result.enumString.enum).toEqual(['A', 'B', 'C']);
-        expect(result.enumString.description).toContain('Possible values: A,B,C');
+        expect(result.enumString.description).not.toContain('Possible values:');
         expect(result.enumString.description).toContain('Example values:');
         expect(result.enumString.description).toContain('**REQUIRED**');
 
@@ -862,8 +862,8 @@ describe('transformActorInputSchemaProperties', () => {
         // 4. shortenProperties: longDesc is truncated and the fitting enum stays whole.
         expect(result.longDesc.description.endsWith('…\n\n[Description truncated]')).toBe(true);
         expect(result.enumProp.enum).toEqual(input.properties.enumProp.enum);
-        // 5. addEnumsToDescriptionsWithExamples: the retained values are available to enum-blind clients.
-        expect(result.enumProp.description).toMatch(/Possible values:/);
+        // 5. Enum fits the cap (30 short values) — kept in full, no "Possible values" duplication.
+        expect(result.enumProp.description).not.toMatch(/Possible values:/);
         // 6. encodeDotPropertyNames: foo.bar becomes foo-dot-bar
         expect(result['foo-dot-bar']).toBeDefined();
         expect(result['foo.bar']).toBeUndefined();

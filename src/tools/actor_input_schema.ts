@@ -266,14 +266,15 @@ export function inferArrayItemType(property: SchemaProperties): string | null {
     }
 }
 
-/** Adds retained enums and prefill/default values to descriptions for clients that ignore JSON Schema annotations. */
-export function addEnumsToDescriptionsWithExamples(
+/**
+ * Adds prefill/default values to descriptions as examples, for clients that ignore JSON Schema
+ * `examples`. Never duplicates `enum` here — a kept enum already carries its values in the
+ * schema; only `shortenProperties()`'s dropped-enum note needs to spell them out in text.
+ */
+export function addExampleValuesToDescriptions(
     properties: Record<string, SchemaProperties>,
 ): Record<string, SchemaProperties> {
     for (const property of Object.values(properties)) {
-        if (property.enum && property.enum.length > 0) {
-            property.description = `${property.description}\nPossible values: ${property.enum.slice(0, 20).join(',')}`;
-        }
         const value = property.prefill ?? property.default;
         if (value && !(Array.isArray(value) && value.length === 0)) {
             property.examples = Array.isArray(value) ? value : [value];
@@ -398,7 +399,7 @@ export function transformActorInputSchemaProperties(input: Readonly<ActorInputSc
     transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
     transformedProperties = filterSchemaProperties(transformedProperties);
     transformedProperties = shortenProperties(transformedProperties);
-    transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
+    transformedProperties = addExampleValuesToDescriptions(transformedProperties);
     transformedProperties = encodeDotPropertyNames(transformedProperties);
     return transformedProperties;
 }
