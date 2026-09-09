@@ -267,21 +267,14 @@ export function inferArrayItemType(property: SchemaProperties): string | null {
 }
 
 /**
- * Add enum values as string to property descriptions, guarding against libraries/agent
- * frameworks that don't handle enums or examples via JSON Schema annotations.
- *
- * https://json-schema.org/understanding-json-schema/reference/enum
- * https://json-schema.org/understanding-json-schema/reference/annotations
- *
- * @param properties
+ * Adds prefill/default values to descriptions as examples, for clients that ignore JSON Schema
+ * `examples`. Never duplicates `enum` here — a kept enum already carries its values in the
+ * schema; only `shortenProperties()`'s dropped-enum note needs to spell them out in text.
  */
-export function addEnumsToDescriptionsWithExamples(
+export function addExampleValuesToDescriptions(
     properties: Record<string, SchemaProperties>,
 ): Record<string, SchemaProperties> {
     for (const property of Object.values(properties)) {
-        if (property.enum && property.enum.length > 0) {
-            property.description = `${property.description}\nPossible values: ${property.enum.slice(0, 20).join(',')}`;
-        }
         const value = property.prefill ?? property.default;
         if (value && !(Array.isArray(value) && value.length === 0)) {
             property.examples = Array.isArray(value) ? value : [value];
@@ -291,44 +284,70 @@ export function addEnumsToDescriptionsWithExamples(
     return properties;
 }
 
-/**
- * Helper function to filter and shorten the enum list.
- * Removes empty strings and truncates if the total character count exceeds the limit.
- *
- * @param {string[]} enumList - The list of enum values to be filtered and shortened.
- * @returns {string[] | undefined} - The filtered and shortened enum list or undefined if the list is too long.
- */
-export function filterAndShortenEnum(enumList: string[]): string[] | undefined {
-    let charCount = 0;
-    const resultEnumList = enumList.filter((enumValue) => {
-        if (enumValue === '') return false;
-        charCount += enumValue.length;
-        return charCount <= ACTOR_ENUM_MAX_LENGTH;
-    });
+const ENUM_DROPPED_NOTE_EXAMPLE_COUNT = 10;
+const ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH = 60;
 
-    return resultEnumList.length > 0 ? resultEnumList : undefined;
+/** Note for a dropped enum, with complete examples that remain valid inputs. */
+function buildEnumDroppedNote(rawValues: string[]): string {
+    const examples = rawValues
+        .filter((value) => value !== '' && value.length <= ENUM_DROPPED_NOTE_EXAMPLE_MAX_LENGTH)
+        .slice(0, ENUM_DROPPED_NOTE_EXAMPLE_COUNT);
+    const exampleText = examples.length > 0 ? ` Examples: ${examples.join(', ')}.` : '';
+    return `\n\nThe complete list of accepted values is too long to include.${exampleText}`;
 }
 
 /**
- * Shortens the description, enum, and items.enum properties of the schema properties.
- * This is mostly problem with compass/crawler-google-places, which has large number of categories
- * such as ( 'abbey', 'accountant', 'accounting',  'acupuncturist', .... )
- * @param properties
+ * Blanks removed, kept whole if it fits ACTOR_ENUM_MAX_LENGTH; otherwise dropped entirely
+ * — a partially-cut enum falsely implies exhaustiveness to both the LLM and AJV.
  */
+function getEnumIfFits(enumList: string[]): string[] | undefined {
+    const nonEmpty = enumList.filter((value) => value !== '');
+    if (nonEmpty.length === 0) return undefined;
+    const charCount = nonEmpty.reduce((sum, value) => sum + value.length, 0);
+    return charCount <= ACTOR_ENUM_MAX_LENGTH ? nonEmpty : undefined;
+}
+
+/** Cut at the last complete sentence in the cap, or the last complete word if there is none. */
+function shortenDescription(description: string): string {
+    const truncated = description.slice(0, ACTOR_MAX_DESCRIPTION_LENGTH);
+    const remainder = description.slice(ACTOR_MAX_DESCRIPTION_LENGTH);
+    const sentenceEnd =
+        [...truncated.matchAll(/[.!?](?=\s)/g)].at(-1)?.index ??
+        (/[.!?]$/.test(truncated) && /^\s/.test(remainder) ? truncated.length - 1 : undefined);
+    const shortened =
+        sentenceEnd === undefined
+            ? `${/^\s/.test(remainder) ? truncated.trimEnd() : truncated.replace(/\s+\S*$/, '')}…`
+            : truncated.slice(0, sentenceEnd + 1);
+    return `${shortened}\n\n[Description truncated]`;
+}
+
+function applyEnumLimit(holder: { enum?: string[] }, descriptionHost: SchemaProperties, rawEnum: string[]): void {
+    const enumValues = getEnumIfFits(rawEnum);
+    if (enumValues) {
+        holder.enum = enumValues;
+        return;
+    }
+    delete holder.enum;
+    if (rawEnum.some((value) => value !== '')) {
+        descriptionHost.description += buildEnumDroppedNote(rawEnum);
+    }
+}
+
+/** Caps description length; drops (not truncates) an oversized enum/items.enum, noting examples instead. */
 export function shortenProperties(properties: { [key: string]: SchemaProperties }): {
     [key: string]: SchemaProperties;
 } {
     for (const property of Object.values(properties)) {
         if (property.description.length > ACTOR_MAX_DESCRIPTION_LENGTH) {
-            property.description = `${property.description.slice(0, ACTOR_MAX_DESCRIPTION_LENGTH)}...`;
+            property.description = shortenDescription(property.description);
         }
 
-        if (property.enum && property.enum?.length > 0) {
-            property.enum = filterAndShortenEnum(property.enum);
+        if (property.enum && property.enum.length > 0) {
+            applyEnumLimit(property, property, property.enum);
         }
 
         if (property.items?.enum && property.items.enum.length > 0) {
-            property.items.enum = filterAndShortenEnum(property.items.enum);
+            applyEnumLimit(property.items, property, property.items.enum);
         }
     }
 
@@ -380,7 +399,7 @@ export function transformActorInputSchemaProperties(input: Readonly<ActorInputSc
     transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
     transformedProperties = filterSchemaProperties(transformedProperties);
     transformedProperties = shortenProperties(transformedProperties);
-    transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
+    transformedProperties = addExampleValuesToDescriptions(transformedProperties);
     transformedProperties = encodeDotPropertyNames(transformedProperties);
     return transformedProperties;
 }
