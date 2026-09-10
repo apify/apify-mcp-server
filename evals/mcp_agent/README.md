@@ -41,7 +41,7 @@ pnpm run build
 pnpm run evals:mcp-agent
 ```
 
-Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.97`); `--mcp-tools-only` removes Claude Code built-ins. Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
+Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--mcp-tools-only` removes Claude Code built-ins. Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
 
 ### Two datasets: kind, id scheme, and expectedErrors
 
@@ -143,7 +143,7 @@ The harness uses `canUseTool` instead of root-incompatible permission bypass fla
 
 **Exit codes:**
 - `0` = the aggregate pass rate (passed trials / requested trials) meets `--pass-threshold`
-  (default `0.97`; pass `1.0` to require every trial) ✅
+  (default `0.9`; pass `1.0` to require every trial) ✅
 - `1` = the pass rate falls short of the threshold, or setup failed ❌
 
 **Editing test cases:** edit the items in the Langfuse UI. The next run picks them up; there is nothing to commit
@@ -210,7 +210,7 @@ The server is registered with `alwaysLoad: true`. Left at the default, its tools
 
 ### 4. Pass rate gated on the requested trial count, threshold-configurable
 
-**Decision:** Exit code 0 while `passedTrials / requestedTrials >= --pass-threshold` (default `0.97`,
+**Decision:** Exit code 0 while `passedTrials / requestedTrials >= --pass-threshold` (default `0.9`,
 rationale in `config.ts`). `requestedTrials = requestedIds.length * iterations`.
 
 **Why:**
@@ -455,20 +455,20 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 - Reduce `maxTurns` to fail faster
 - Try a different agent model
 
-## CI (apify/ai-team#261)
+## CI
 
 CI replaces the Phoenix runner with two Langfuse tiers:
 
 - `pr`: `mcp-server-evals-pr` tool-call items. It fails below 0.9, based on a 0.93 local floor.
-- `merge`: `mcp-server-evals-merge` agent items. It fails below 0.7 because nine of 60 items still fail consistently.
+- `merge`: `mcp-server-evals-merge` agent items. It fails below 0.6, based on a 0.73 local floor; nine of 60 items fail consistently, and the ten-item tasks family fails outright unless `APIFY_TOKEN` can write to the publish target Actor.
 
-`_evaluations.yaml` runs a tier for three triggers: non-draft, same-repo PRs on relevant paths; the `validated` label; and every push to `master` (both tiers). It intentionally excludes `synchronize` to control cost, so it is not a required check. The master workflow is separate because evals must not hold the release lock.
+`_evaluations.yaml` runs a tier for three triggers: non-draft, same-repo PRs on relevant paths; the `validated` label; and every push to `master` touching the same paths (both tiers). The PR trigger intentionally excludes `synchronize` to control cost, so it is not a required check. The master workflow is separate because evals must not hold the release lock.
 
 Fork PRs cannot run evals because GitHub withholds repository secrets. Push the branch into this repository to evaluate fork changes.
 
-Add `ANTHROPIC_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL`. `OPENROUTER_API_KEY` already exists and is required only by the merge judge. Both tiers map `APIFY_TEST_USER_API_TOKEN` to `APIFY_TOKEN`; merge task cases also require write access to `jiri.spilka/actor-troubleshooter`.
+Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOKEN` (mapped from the `APIFY_TEST_USER_API_TOKEN` repository secret). `OPENROUTER_API_KEY` is required only by the merge judge. Merge task cases also need write access to `jiri.spilka/actor-troubleshooter`.
 
-The thresholds and 30/90-minute timeouts are provisional until the first CI runs. The PR target is at most ten minutes. Transient agent failures retry once, including the MCP handshake race.
+The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once; the handshake race above does not, because it produces a wrong answer rather than an error.
 
 ## References
 

@@ -557,9 +557,7 @@ describe('validateConcurrency()', () => {
 
 describe('resolveGitBranch()', () => {
     it('returns a real branch name unchanged, ignoring the env fallbacks', () => {
-        expect(resolveGitBranch('chore/ci-two-tier-eval-gates\n', { GITHUB_HEAD_REF: 'other' })).toBe(
-            'chore/ci-two-tier-eval-gates',
-        );
+        expect(resolveGitBranch('feat/some-branch\n', { GITHUB_HEAD_REF: 'other' })).toBe('feat/some-branch');
     });
 
     it('falls back to GITHUB_HEAD_REF when git reports the literal "HEAD" (detached checkout)', () => {
@@ -568,7 +566,12 @@ describe('resolveGitBranch()', () => {
         );
     });
 
-    it('falls back to GITHUB_REF_NAME when GITHUB_HEAD_REF is unset (e.g. a push event)', () => {
+    // A push event sets GITHUB_HEAD_REF to the empty string rather than leaving it unset.
+    it('falls back to GITHUB_REF_NAME when GITHUB_HEAD_REF is empty (a push event)', () => {
+        expect(resolveGitBranch('HEAD\n', { GITHUB_HEAD_REF: '', GITHUB_REF_NAME: 'master' })).toBe('master');
+    });
+
+    it('falls back to GITHUB_REF_NAME when GITHUB_HEAD_REF is unset', () => {
         expect(resolveGitBranch('HEAD\n', { GITHUB_REF_NAME: 'master' })).toBe('master');
     });
 

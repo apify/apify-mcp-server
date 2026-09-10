@@ -157,8 +157,9 @@ export type RunSummary = {
 };
 
 /**
- * Scores all requested trials. The denominator includes dropped SDK tasks so a task failure
- * cannot inflate the pass rate.
+ * Scores all requested trials. Trials of one item share its dataset id (Langfuse has no per-trial
+ * id), hence the keying by `output.iteration`. The denominator is `requestedIds x iterations`, so a
+ * task the SDK dropped counts as a failed trial instead of shrinking the rate.
  */
 export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[], iterations: number): RunSummary {
     const byId = new Map<string, Map<number, ScoredItem>>();
@@ -375,9 +376,7 @@ async function runAgentWithRetry(
     }
 }
 
-/**
- * Sends the subprocess conversation to Langfuse without affecting the item result if tracing fails.
- */
+/** Sends the subprocess conversation to Langfuse without affecting the item result if tracing fails. */
 function emitTrace(
     itemId: string,
     query: string,

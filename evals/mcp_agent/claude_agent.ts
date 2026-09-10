@@ -55,9 +55,7 @@ export function assertStdioBinExists(): void {
     }
 }
 
-/**
- * Creates a `PreToolUse` hook. A reason denies the call; `undefined` allows it.
- */
+/** Creates a `PreToolUse` hook. A reason denies the call; `undefined` allows it. */
 function preToolUseHook(decide: (toolName: string, toolInput: unknown) => string | undefined): HookCallbackMatcher[] {
     return [
         {
@@ -94,9 +92,7 @@ export function denyToolsHook(failTools: string[]): HookCallbackMatcher[] {
     });
 }
 
-/**
- * Denies and records every tool call in tool-call mode. The scorer skips `ToolSearch` later.
- */
+/** Denies and records every tool call in tool-call mode. The scorer skips `ToolSearch` later. */
 function toolCallDenyAllHook(attemptedCalls: AttemptedToolCall[]): HookCallbackMatcher[] {
     return preToolUseHook((toolName, toolInput) => {
         attemptedCalls.push({ toolName, input: toolInput });
@@ -133,11 +129,13 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
                 args: serverArgs,
                 env: { ...process.env, APIFY_TOKEN: apifyToken },
                 timeout: toolTimeoutSeconds * 1000,
-                // The server must load before tool search; otherwise the agent may never see its tools.
+                // Keep the server's tools in the prompt instead of behind tool search, or the
+                // eval measures tool search rather than our tool descriptions.
                 alwaysLoad: true,
             },
         },
-        // Avoid prompts without root-incompatible bypass flags. The deny-all hook still runs first.
+        // Allow every call so nothing prompts; `bypassPermissions` is not an option because the
+        // CLI refuses it under root. A tool-call item's deny-all hook still fires before this.
         canUseTool: async (_toolName, input) => ({ behavior: 'allow', updatedInput: input }),
         // Isolation: ignore this repo's settings and .mcp.json; configure everything in code.
         settingSources: [],

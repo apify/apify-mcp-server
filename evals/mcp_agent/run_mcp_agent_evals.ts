@@ -77,7 +77,11 @@ type CliArgs = {
 function getGitBranch(): string {
     let rawBranch = '';
     try {
-        rawBranch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' });
+        // stderr discarded: outside a checkout git's `fatal:` is noise, not a failure.
+        rawBranch = execSync('git rev-parse --abbrev-ref HEAD', {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+        });
     } catch {
         // Not a git checkout; the env fallbacks decide.
     }

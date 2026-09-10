@@ -7,6 +7,18 @@ on:
             - master
         tags-ignore:
             - "**" # Ignore all tags, matching on_master.yaml.
+        # Same set as on_pull_request_evals.yaml: a merge is re-gated on exactly what
+        # opened the PR gate. Docs, tests and release commits skip both tiers.
+        paths:
+            - 'src/**'
+            - 'evals/**'
+            - 'package.json'
+            - 'pnpm-lock.yaml'
+            - 'pnpm-workspace.yaml'
+            - 'tsconfig.json'
+            - '.nvmrc'
+            - '.github/workflows/_evaluations.yaml'
+            - '.github/workflows/on_master_evals.yaml'
 
 jobs:
     evaluations_pr:
@@ -26,7 +38,7 @@ jobs:
 
     evaluations_merge:
         name: MCP agent evaluations (merge)
-        # The merge tier uses shared fixtures.
+        # Serialized: the merge tier's `eval-*` task fixtures are shared per account.
         concurrency:
             group: eval-merge-master
             cancel-in-progress: false
@@ -40,3 +52,4 @@ jobs:
             LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
             APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
             OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+            OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
