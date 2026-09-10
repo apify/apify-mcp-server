@@ -2,8 +2,8 @@ import pluralize from 'pluralize';
 
 import type { StructuredPricingInfo } from '../types';
 
-const PER_THOUSAND_PRICING_THRESHOLD = 0.01;
 const PRICE_DISPLAY_UNIT_SIZE = 1000;
+const PAID_PLAN_HINT_SUFFIX = 'on paid plans';
 
 type FormatPriceUsdOptions = {
     decimals?: number;
@@ -51,59 +51,41 @@ export function formatPriceUsd(price: number, options: FormatPriceUsdOptions = {
     return formatNumberWithOptions(price, { style: 'currency', ...intlOptions }); // Intl will return the format we want: i.e. -$123,323.21;
 }
 
-function formatFlatPricePerMonth(pricePerUnit: number | undefined): string {
-    const monthlyPrice = pricePerUnit || 0;
-    return `${formatPriceUsd(monthlyPrice)}/month + usage`;
+/** Badge prices show 2 to 6 decimals so sub-cent per-1,000 prices ("$0.0945") are not rounded away. */
+function formatBadgePrice(price: number): string {
+    return formatPriceUsd(price, { maximumFractionDigits: 6 });
 }
 
+/**
+ * Appends the Store page's "from" price as an upgrade hint. The server sets the paid-plan price
+ * only when a paid plan is cheaper than what this user pays, so presence alone decides.
+ * See apify/apify-mcp-server#905.
+ */
+function formatWithPaidPlanHint(badge: string, paidPlanPrice: number | undefined, scale: number): string {
+    if (paidPlanPrice === undefined) return badge;
+    return `${badge} · from ${formatBadgePrice(paidPlanPrice * scale)} ${PAID_PLAN_HINT_SUFFIX}`;
+}
+
+function formatFlatPricePerMonth(pricing: StructuredPricingInfo): string {
+    const badge = `${formatBadgePrice(pricing.pricePerUnit || 0)}/month + usage`;
+    return formatWithPaidPlanHint(badge, pricing.paidPlanPricePerUnit, 1);
+}
+
+/** Repeatable events are quoted per 1,000 like the Store page; one-time events ("Actor start") per run. */
 function formatPayPerEventPricing(event: NonNullable<StructuredPricingInfo['events']>[0]): string {
+    if (typeof event.priceUsd !== 'number') return 'Pay per event';
+    if (event.isOneTimeEvent) {
+        return formatWithPaidPlanHint(`${formatBadgePrice(event.priceUsd)} per run`, event.paidPlanPriceUsd, 1);
+    }
     const title = event.title.toLowerCase() || 'result';
-
-    if (event.tieredPricing && event.tieredPricing.length > 0) {
-        const tieredPrices = event.tieredPricing
-            .filter((tier) => tier.tier !== 'FREE' && tier.priceUsd > 0)
-            .map((tier) => tier.priceUsd);
-
-        if (tieredPrices.length > 0) {
-            const minPrice = Math.min(...tieredPrices);
-            const pricePerThousand = minPrice * PRICE_DISPLAY_UNIT_SIZE;
-            return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
-        }
-    }
-
-    if (typeof event.priceUsd === 'number') {
-        const isPricedPerThousandResults = event.priceUsd < PER_THOUSAND_PRICING_THRESHOLD;
-
-        if (isPricedPerThousandResults) {
-            const pricePerThousand = event.priceUsd * PRICE_DISPLAY_UNIT_SIZE;
-            return `${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
-        }
-        return `${formatPriceUsd(event.priceUsd)} / ${title}`;
-    }
-
-    return 'Pay per event';
+    const badge = `${formatBadgePrice(event.priceUsd * PRICE_DISPLAY_UNIT_SIZE)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
+    return formatWithPaidPlanHint(badge, event.paidPlanPriceUsd, PRICE_DISPLAY_UNIT_SIZE);
 }
 
 function formatPricePerDatasetItem(pricing: StructuredPricingInfo): string {
-    const unitName = pricing.unitName || 'result';
-    const pluralUnitName = pluralize(unitName);
-
-    if (pricing.tieredPricing && pricing.tieredPricing.length > 0) {
-        const tieredPrices = pricing.tieredPricing
-            .filter((tier) => tier.tier !== 'FREE')
-            .map((tier) => tier.pricePerUnit)
-            .filter((price) => price > 0);
-
-        if (tieredPrices.length > 0) {
-            const minPrice = Math.min(...tieredPrices);
-            const pricePerThousand = minPrice * PRICE_DISPLAY_UNIT_SIZE;
-            return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralUnitName}`;
-        }
-    }
-
-    const pricePerUnit = pricing.pricePerUnit || 0;
-    const pricePerThousand = pricePerUnit * PRICE_DISPLAY_UNIT_SIZE;
-    return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralUnitName}`;
+    const pluralUnitName = pluralize(pricing.unitName || 'result');
+    const badge = `${formatBadgePrice((pricing.pricePerUnit || 0) * PRICE_DISPLAY_UNIT_SIZE)} / 1,000 ${pluralUnitName}`;
+    return formatWithPaidPlanHint(badge, pricing.paidPlanPricePerUnit, PRICE_DISPLAY_UNIT_SIZE);
 }
 
 export const formatPricing = (pricing: StructuredPricingInfo): string => {
@@ -112,7 +94,7 @@ export const formatPricing = (pricing: StructuredPricingInfo): string => {
     }
 
     if (pricing.model === 'FLAT_PRICE_PER_MONTH') {
-        return formatFlatPricePerMonth(pricing.pricePerUnit);
+        return formatFlatPricePerMonth(pricing);
     }
 
     if (pricing.model === 'PAY_PER_EVENT') {
@@ -120,11 +102,15 @@ export const formatPricing = (pricing: StructuredPricingInfo): string => {
             return 'Pay per event';
         }
 
-        if (pricing.events.length === 1) {
-            return formatPayPerEventPricing(pricing.events[0]);
-        }
+        // The Store badge shows the API's primary event, not a generic label; see apify/apify-mcp-server#905.
+        // Without the flag, the server marks the event it advertises in the pricing note with paidPlanPriceUsd.
+        const advertisedEvent =
+            pricing.events.length === 1
+                ? pricing.events[0]
+                : (pricing.events.find((event) => event.isPrimaryEvent) ??
+                  pricing.events.find((event) => event.paidPlanPriceUsd !== undefined));
 
-        return 'Pay per event';
+        return advertisedEvent ? formatPayPerEventPricing(advertisedEvent) : 'Pay per event';
     }
 
     if (pricing.model === 'PRICE_PER_DATASET_ITEM') {
