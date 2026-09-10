@@ -75,8 +75,8 @@ jobs:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 
             # Floor of three local runs was 0.73; nine of 60 items fail every run. 0.6 also absorbs the
-            # ten-item tasks family, which fails outright unless APIFY_TOKEN can write to the publish
-            # target Actor. Raise as those are fixed.
+            # three publish cases, which fail unless APIFY_TOKEN can write to their target Actor.
+            # Raise as those are fixed.
             -   name: Run merge-tier evals
                 if: inputs.tier == 'merge'
                 run: >

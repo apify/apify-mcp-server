@@ -72,26 +72,27 @@ task names, which are unique per account, and the create cases never clean up �
 leaves debris that collides on the next one. Run `pnpm run evals:mcp-agent:tasks-fixtures`
 before every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture task. It
 deletes on whatever account `APIFY_TOKEN` points at and prints that account first; pass
-`--dry-run` to see what it would delete before it does. The family publishes task examples on
-`jiri.spilka/actor-troubleshooter`, and publishing needs write access to the Actor, so those cases only
-pass on an account that has it.
+`--dry-run` to see what it would delete before it does. Three cases (`publish-discovery`,
+`publish-medium-1`, `chain-hard-1`) publish task examples on `apify/normal-mode-test-actor`, and
+publishing needs write access to the Actor, so only those three depend on an account that has it.
 
-Publishing requires all three of `publicConfig.inputSchemaFields`, `datasetView` and `seoDescription`
-(probed against the API), and the API reports the missing ones **non-exhaustively** — which is why
-`merge/tasks/publish-discovery` budgets turns for several fix-and-retry rounds rather than one.
+Publishing requires four things, not the three `publish-actor-task` lists: the task's own `description`,
+plus `publicConfig.inputSchemaFields`, `publicConfig.datasetView` and `publicConfig.seoDescription`
+(all probed against the API). The API reports the missing ones **non-exhaustively** — which is why
+`merge/tasks/publish-discovery` budgets turns for several fix-and-retry rounds rather than one, and why
+`merge/tasks/publish-medium-1` currently fails: it spells out every requirement the tool documents, so
+the agent has no reason to set a `description` and eats one `cannot-publish-actor-task` error fixing it.
 
-`merge/tasks/chain-hard-1` is the calibration edge, and it is calibrated: `claude-sonnet-4-5` passes it 3/3,
-`claude-haiku-4-5` about 5 runs in 8. Every Haiku failure is the same one — it constructs
-`jiri.spilka/troubleshooter` from the loose reference in the query instead of resolving the real
-`actor-troubleshooter` with `search-actors`, eats the not-found, then recovers. The judge passes those
-runs; only the zero-error gate catches them, which is exactly what that gate is for.
+`merge/tasks/chain-hard-1` names no tool or feature: the agent has to map "rerun with one click" to a
+saved task, "put it up on the Actor's public page" to publishing, and "take it down" to unpublishing.
+The input is fully specified, so the flow should complete without a single failed tool call.
 
-Do not try to close that gap by rewording descriptions. Both `create-actor-task` and
-`fetch-actor-details` already say, explicitly, to resolve a loose name with `search-actors` rather than
-guess, and `fetch-actor-details`' not-found response repeats it. Adding the `fetch-actor-details`
-wording was measured at 5/8 against ~7/10 without it — no change. Treat a shift in the ratio as the
-signal, not a single red run, and read a persistent drop as a description problem only after checking
-it still passes on Sonnet.
+It is **uncalibrated**. It previously referred to its target Actor loosely, and `claude-haiku-4-5` failed
+it about 3 runs in 8 by constructing a plausible slug instead of resolving the real one with
+`search-actors` — the judge passed those runs and only the zero-error gate caught them. Naming the
+Actor exactly retired that failure mode along with the 5/8 ratio, so re-measure before reading a red
+run as a regression. The lesson that outlived it: treat a shift in the ratio as the signal rather than a
+single red run, and blame a tool description only after checking the case still passes on Sonnet.
 
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
@@ -460,13 +461,13 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 CI replaces the Phoenix runner with two Langfuse tiers:
 
 - `pr`: `mcp-server-evals-pr` tool-call items. It fails below 0.9, based on a 0.93 local floor.
-- `merge`: `mcp-server-evals-merge` agent items. It fails below 0.6, based on a 0.73 local floor; nine of 60 items fail consistently, and the ten-item tasks family fails outright unless `APIFY_TOKEN` can write to the publish target Actor.
+- `merge`: `mcp-server-evals-merge` agent items. It fails below 0.6, based on a 0.73 local floor; nine of 60 items fail consistently, and three publish cases (`tasks/publish-discovery`, `tasks/publish-medium-1`, `tasks/chain-hard-1`) fail unless `APIFY_TOKEN` can write to their target Actor.
 
 `_evaluations.yaml` runs a tier for three triggers: non-draft, same-repo PRs on relevant paths; the `validated` label; and every push to `master` touching the same paths (both tiers). The PR trigger intentionally excludes `synchronize` to control cost, so it is not a required check. The master workflow is separate because evals must not hold the release lock.
 
 Fork PRs cannot run evals because GitHub withholds repository secrets. Push the branch into this repository to evaluate fork changes.
 
-Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOKEN` (mapped from the `APIFY_TEST_USER_API_TOKEN` repository secret). `OPENROUTER_API_KEY` is required only by the merge judge. Merge task cases also need write access to `jiri.spilka/actor-troubleshooter`.
+Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOKEN` (mapped from the `APIFY_TEST_USER_API_TOKEN` repository secret). `OPENROUTER_API_KEY` is required only by the merge judge. The three publish cases also need write access to `apify/normal-mode-test-actor`.
 
 The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once; the handshake race above does not, because it produces a wrong answer rather than an error.
 
