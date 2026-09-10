@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.15.6 - **not yet released**
+## [0.15.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.6) (2026-09-10)
 
 ### 🚀 Features
 
@@ -19,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - Stop pairing call-actor-widget and get-actor-run-widget ([#1357](https://github.com/apify/apify-mcp-server/pull/1357)) ([6355724](https://github.com/apify/apify-mcp-server/commit/63557245691f043fe9149b7ffd08c3cff54a3b99)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.15.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.5) (2026-09-09)
 
 ### 🚀 Features
