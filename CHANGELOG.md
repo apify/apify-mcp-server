@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.15.6 - **not yet released**
 
+### 🚀 Features
+
+- **evals:** Add tool-call mode and one dataset per CI gate ([#1337](https://github.com/apify/apify-mcp-server/pull/1337)) ([29685f9](https://github.com/apify/apify-mcp-server/commit/29685f944909c15aade6fa5564b473e9e218c368)) by [@jirispilka](https://github.com/jirispilka), closes [#260](https://github.com/apify/apify-mcp-server/issues/260)
+
 ### 🐛 Bug Fixes
 
 - Stop enforcing enum values dropped by input-schema truncation ([#1258](https://github.com/apify/apify-mcp-server/pull/1258)) ([3843245](https://github.com/apify/apify-mcp-server/commit/384324589f142b672db38a5d07624c5fb6c8ae12)) by [@MQ37](https://github.com/MQ37), closes [#1253](https://github.com/apify/apify-mcp-server/issues/1253)
