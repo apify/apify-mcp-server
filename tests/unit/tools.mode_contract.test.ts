@@ -16,7 +16,7 @@ import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
-import { WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';
+import { ALL_WIDGET_TOOLS, WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';
 import type { ActorInfo, Input, ToolBase, ToolEntry } from '../../src/types.js';
 import { SERVER_MODES, SERVER_MODE } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -186,19 +186,13 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
     });
 
-    describe('mode-specific call-actor behavior guidance', () => {
-        it('apps call-actor description points to the widget sibling and warns against search-actors-widget for name resolution', () => {
+    describe('call-actor is mode-agnostic (its widget addendum is session-gated, not mode-gated)', () => {
+        it('is the exact same tool entry in both modes', () => {
             const appsCallActor = appsCategories.actors.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
             const defaultCallActor = defaultCategories.actors.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
 
             expect(appsCallActor).toBeDefined();
-            expect(appsCallActor!.description).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-            expect(appsCallActor!.description).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-
-            // Widget guidance must not leak into default mode where those tools don't exist.
-            expect(defaultCallActor).toBeDefined();
-            expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-            expect(defaultCallActor!.description).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+            expect(appsCallActor).toBe(defaultCallActor);
         });
     });
 
@@ -237,7 +231,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             }
         }
 
-        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+        for (const widget of ALL_WIDGET_TOOLS) {
             it(`${widget.name} widget should be frozen`, () => {
                 expect(Object.isFrozen(widget)).toBe(true);
             });
@@ -259,7 +253,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             }
         }
 
-        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+        for (const widget of ALL_WIDGET_TOOLS) {
             it(`${widget.name} widget should be a known HELPER_TOOLS value`, () => {
                 expect(allHelperToolNames.has(widget.name as HelperToolName)).toBe(true);
             });
@@ -278,8 +272,6 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
         expect(names).toContain(HELPER_TOOLS.DOCS_FETCH);
         expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
     it('tools: ["search-actors"] in apps mode pairs only the search-actors widget', () => {
@@ -287,33 +279,86 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
         expect(names).toContain(HELPER_TOOLS.STORE_SEARCH);
         expect(names).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
     });
 
-    it('tools: ["call-actor"] in apps mode pairs call-actor-widget and the auto-injected get-actor-run-widget', () => {
+    // call-actor and get-actor-run don't auto-pair with their widget (unlike search-actors/
+    // fetch-actor-details) — the widget must be selected explicitly.
+    it('tools: ["call-actor"] in apps mode auto-injects get-actor-run but pairs no widgets', () => {
         const names = namesFor({ tools: ['call-actor'] }, SERVER_MODE.APPS);
         expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
         expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-        expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
     });
 
-    it('tools: ["actors"] category in apps mode pairs all four actor widgets', () => {
+    it('tools: ["actors"] category in apps mode pairs the search and details widgets only', () => {
         const names = namesFor({ tools: ['actors'] }, SERVER_MODE.APPS);
         expect(names).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-        expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
     });
 
     it('default mode adds no widget tools regardless of selection', () => {
         const names = namesFor({ tools: ['actors'] }, SERVER_MODE.DEFAULT);
         expect(names).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-        expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+    });
+
+    describe('explicit ?tools= selection of the unpaired widgets', () => {
+        it('call-actor-widget alone: selectable, and auto-injects the same run-workflow helpers call-actor gets', () => {
+            const names = namesFor({ tools: ['call-actor-widget'] }, SERVER_MODE.APPS);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL); // widget-only, no base auto-added
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+            expect(names).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+            expect(names).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
+        });
+
+        it('get-actor-run-widget alone: selectable, auto-injects get-dataset-items but NOT get-actor-run itself (a bundle member)', () => {
+            const names = namesFor({ tools: ['get-actor-run-widget'] }, SERVER_MODE.APPS);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET); // widget-only, no base auto-added
+            expect(names).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+            expect(names).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
+        });
+
+        it('call-actor + call-actor-widget together: both present, no duplicate auto-injection', () => {
+            const names = namesFor({ tools: ['call-actor', 'call-actor-widget'] }, SERVER_MODE.APPS);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(names.filter((n) => n === HELPER_TOOLS.ACTOR_RUNS_GET)).toHaveLength(1);
+        });
+
+        it('call-actor-widget + get-actor-run-widget together, no bases: neither widget pulls in get-actor-run', () => {
+            const names = namesFor({ tools: ['call-actor-widget', 'get-actor-run-widget'] }, SERVER_MODE.APPS);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET); // neither widget alone has standing to add it
+            expect(names).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+            expect(names).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
+        });
+
+        it('call-actor + call-actor-widget + get-actor-run-widget: hard trigger still wins, get-actor-run included', () => {
+            const names = namesFor(
+                { tools: ['call-actor', 'call-actor-widget', 'get-actor-run-widget'] },
+                SERVER_MODE.APPS,
+            );
+            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET); // call-actor is a hard trigger, unaffected by the widget
+        });
+
+        it('call-actor-widget/get-actor-run-widget selectors are silently dropped in default mode', () => {
+            const names = namesFor({ tools: ['call-actor-widget', 'get-actor-run-widget'] }, SERVER_MODE.DEFAULT);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+        });
     });
 });
 
@@ -345,7 +390,7 @@ describe('taskSupport contract across tool categories', () => {
     // Widgets render their own progress UI; they MUST NOT participate in the MCP task lifecycle,
     // otherwise a `request.params.task` call would be accepted and would duplicate the widget's
     // live-progress channel.
-    for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+    for (const widget of ALL_WIDGET_TOOLS) {
         it(`${widget.name} widget must not declare taskSupport`, () => {
             expect(widget.execution?.taskSupport).toBeUndefined();
         });

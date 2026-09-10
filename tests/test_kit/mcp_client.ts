@@ -61,10 +61,16 @@ function appendSearchParams(url: URL, options?: SuiteClientOptions): void {
     if (client !== undefined) url.searchParams.append('client', client);
 }
 
-export async function createMcpStreamableClient(serverUrl: string, options?: SuiteClientOptions): Promise<Client> {
-    checkToken(options);
+/** The exact URL a client with these options connects to — exported so tests can assert on it directly. */
+export function buildClientUrl(serverUrl: string, options?: SuiteClientOptions): URL {
     const url = new URL(serverUrl);
     appendSearchParams(url, options);
+    return url;
+}
+
+export async function createMcpStreamableClient(serverUrl: string, options?: SuiteClientOptions): Promise<Client> {
+    checkToken(options);
+    const url = buildClientUrl(serverUrl, options);
 
     const transport = new StreamableHTTPClientTransport(url, {
         requestInit: { headers: buildAuthHeaders(options) },
@@ -84,8 +90,7 @@ export async function createMcpStatelessClient(
     options?: SuiteClientOptions,
 ): Promise<StatelessClient> {
     checkToken(options);
-    const url = new URL(serverUrl);
-    appendSearchParams(url, options);
+    const url = buildClientUrl(serverUrl, options);
 
     const transport = new StatelessStreamableHTTPClientTransport(url, {
         requestInit: { headers: buildAuthHeaders(options) },

@@ -13,7 +13,6 @@ import { ActorLoadError } from '../../src/errors.js';
 import * as mcpClient from '../../src/mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import {
-    buildCallActorAppsDescription,
     buildCallActorDescription,
     buildCallActorErrorResponse,
     callActorArgs,
@@ -22,7 +21,7 @@ import {
 } from '../../src/tools/actors/call_actor.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
-import { textOf, type TextToolResult } from './helpers/tool_context.js';
+import { only, textOf, type TextToolResult } from './helpers/tool_context.js';
 
 vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/actors/actor_tools_factory.js');
@@ -41,7 +40,6 @@ describe('call_actor_common', () => {
             expect(description).toContain('waitSecs');
             expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
-            expect(description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
         });
 
         // The waitSecs: 0 path (buildStartRunSharedContent) returns id-only storages and never
@@ -49,16 +47,35 @@ describe('call_actor_common', () => {
         it('promises dataset field metadata only for a non-zero wait', () => {
             expect(buildCallActorDescription()).toContain('with waitSecs > 0 also reports dataset field metadata');
         });
-    });
 
-    describe('buildCallActorAppsDescription', () => {
-        it('appends widget guidance to the shared description', () => {
-            const description = buildCallActorAppsDescription();
+        // call-actor-widget is not auto-paired — gate strictly on its own presence, not on
+        // ALL_TOOLS_PRESENT happening to include everything.
+        it('omits the widget addendum when call-actor-widget is absent from the session', () => {
+            const description = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.STORE_SEARCH),
+            );
+            expect(description).not.toContain('WIDGET ALTERNATIVE');
+            expect(description).not.toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+        });
 
-            expect(description).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-            expect(description).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-            expect(description).toContain('waitSecs');
-            expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+        it('includes the widget addendum when call-actor-widget is present, and gates its own sub-bullet on search-actors AND its widget', () => {
+            const withPair = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.STORE_SEARCH_WIDGET),
+            );
+            expect(withPair).toContain('WIDGET ALTERNATIVE');
+            expect(withPair).toContain(`call ${HELPER_TOOLS.ACTOR_CALL_WIDGET} instead`);
+            expect(withPair).toContain(`use ${HELPER_TOOLS.STORE_SEARCH} (not ${HELPER_TOOLS.STORE_SEARCH_WIDGET}`);
+
+            const withoutSearch = buildCallActorDescription(only(HELPER_TOOLS.ACTOR_CALL_WIDGET));
+            expect(withoutSearch).toContain('WIDGET ALTERNATIVE');
+            expect(withoutSearch).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+
+            // search-actors alone must not recommend its widget — the bug this gates.
+            const searchOnlyNoWidget = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.STORE_SEARCH),
+            );
+            expect(searchOnlyNoWidget).toContain('WIDGET ALTERNATIVE');
+            expect(searchOnlyNoWidget).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
         });
     });
 

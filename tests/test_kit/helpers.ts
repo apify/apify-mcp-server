@@ -142,12 +142,7 @@ export function expectReadmeInStructuredContent(result: unknown, expectedActorFu
 
 /** Assert apps-mode widget tools carry MCP Apps `_meta.ui` (SEP-1865). */
 export function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
-    const toolNames = [
-        HELPER_TOOLS.STORE_SEARCH_WIDGET,
-        HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
-        HELPER_TOOLS.ACTOR_CALL_WIDGET,
-        HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET,
-    ];
+    const toolNames = [HELPER_TOOLS.STORE_SEARCH_WIDGET, HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET];
     for (const toolName of toolNames) {
         const tool = tools.tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
