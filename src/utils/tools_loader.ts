@@ -9,6 +9,7 @@ import log from '@apify/log';
 
 import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
+import { actorNameToToolName } from '../tools/actor_tool_naming.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
@@ -36,6 +37,8 @@ export const AUTO_INJECTED_TOOLS: readonly ToolEntry[] = [
     getKeyValueStoreRecord,
     abortActorRun,
 ] as const;
+
+const ACTOR_PLACEHOLDER_NAME = '__actor-placeholder__';
 
 // All internal tool names across all modes. Selectors matching these are not treated as Actor IDs.
 // Built eagerly at module load; inputs (SERVER_MODES, getCategoryTools, CATEGORY_NAMES,
@@ -99,7 +102,7 @@ function normalizeInput(input: Input): NormalizedInput {
  * If no selectors / no explicit actors: the defaults apply (or empty when
  * `actors` was explicitly set to empty).
  */
-function resolveActorsToLoad(input: Input): string[] {
+export function resolveActorsToLoad(input: Input): string[] {
     const { selectors, actorsExplicitlyEmpty } = normalizeInput(input);
 
     // Selectors that aren't retired, categories, or internal tools in any mode → Actor names.
@@ -297,6 +300,21 @@ export function getToolsForServerMode(
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
     return result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
+}
+
+/** Resolve the tool names composition will serve without fetching Actor metadata. */
+export function resolveToolNamesFromInput(input: Input, mode: SERVER_MODE = SERVER_MODE.DEFAULT): Set<string> {
+    const actorNames = resolveActorsToLoad(input);
+    // Composition reads only type and name from Actor entries; the placeholder triggers its shared injection rules.
+    const actorTools =
+        actorNames.length > 0 ? ([{ type: TOOL_TYPE.ACTOR, name: ACTOR_PLACEHOLDER_NAME }] as ToolEntry[]) : [];
+    const toolNames = new Set(getToolsForServerMode(input, actorTools, mode).map((tool) => tool.name));
+    toolNames.delete(ACTOR_PLACEHOLDER_NAME);
+
+    for (const actorName of actorNames) {
+        if (actorName.indexOf('/') > 0 || actorName.indexOf('~') > 0) toolNames.add(actorNameToToolName(actorName));
+    }
+    return toolNames;
 }
 
 /** Convenience wrapper: {@link getActors} + {@link getToolsForServerMode} in sequence. */

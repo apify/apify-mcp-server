@@ -25,7 +25,7 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `legacy_server.ts` — package-private v1 SDK adapter for handlers, Tasks, errors,
   notifications, logging, and transport lifecycle. It reads shared state through
   `LegacyMcpServerHost`.
-- `stateless_server.ts` — `createStatelessServer(host)`: the 2026-07-28 (v2 SDK) adapter,
+- `stateless_server.ts` — `createStatelessServer(host, requestUrl?)`: the 2026-07-28 (v2 SDK) adapter,
   one `Server` per request, reading shared state through `StatelessMcpServerHost`. Serves
   `tools/*`, `resources/*` and `prompts/*`; registers no Tasks (the SDK answers
   method-not-found) and declares no `logging`.
