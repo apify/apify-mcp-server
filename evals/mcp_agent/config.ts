@@ -59,6 +59,17 @@ export const MAX_CONVERSATION_TURNS = 10;
 export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
 
 /**
+ * Default `--pass-threshold` (passed trials / requested trials) for exit code 0.
+ *
+ * Below 1.0 because two tool-call items in the pr dataset are kept although Haiku misses them
+ * about one run in three: `pr/call-actor/ecommerce-scraper-iphone` (searches for an Actor the query
+ * names) and `pr/search-apify-docs/error-handling-actors` (answers from memory). The miss is
+ * the signal, not a case defect. On the 115-item pr dataset 0.97 absorbs both plus one flake
+ * (112/115 = 0.974); a third miss fails the run.
+ */
+export const DEFAULT_PASS_THRESHOLD = 0.97;
+
+/**
  * Judge prompt template for evaluating conversations
  * Uses structured output (JSON schema) - no format instructions needed
  *

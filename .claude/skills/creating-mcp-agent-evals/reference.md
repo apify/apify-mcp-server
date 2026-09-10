@@ -1,22 +1,23 @@
 # Reference: commands, shapes, probes
 
-Repo: `apify-mcp-server`. Harness docs: `evals/mcp_agent/README.md` (read it first; it documents the dataset, id scheme, `kind`/`tier`/`expectedErrors`, scores, and flags).
+Repo: `apify-mcp-server`. Harness docs: `evals/mcp_agent/README.md` (read it first; it documents the two datasets, `mcp-server-evals-pr` and `mcp-server-evals-merge`, the id scheme, `kind`/`expectedErrors`, scores, and flags).
 
 ## Running evals
 
 ```bash
-# The default dataset, mcp-server-evals; strict gate (judge PASS and tool_errors == 0)
-pnpm run evals:mcp-agent --agent-model <m> --subscription
+# The default dataset, mcp-server-evals-pr; the gate is the aggregate pass rate
+# >= DEFAULT_PASS_THRESHOLD (0.97, rationale in config.ts).
+# --pass-threshold 1.0 restores the strict all-pass gate.
+# A bare run is the fast PR-gating set: the kind: "tool-call" items.
+pnpm run evals:mcp-agent --agent-model claude-haiku-4-5 --subscription
+
+# The merge set: the kind: "agent" items, run on push to master
+pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --agent-model <m> --subscription
 
 # One family, by its id prefix
-pnpm run evals:mcp-agent --id '^<family>/' --agent-model <m> --subscription
+pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/' --agent-model <m> --subscription
 
-# A case with metadata.expectedErrors: until #260, the runner doesn't consume that field yet,
-# so a plain run fails it on the zero-tool-error gate. --allow-tool-errors works around that
-# for now, but tolerates ANY tool failing on the run, not just the named one.
-pnpm run evals:mcp-agent --id '<case-id>' --allow-tool-errors --agent-model <m> --subscription
-
-# Narrow further: --category <name>; --concurrency N; --tool-timeout secs
+# Narrow further: --category <name>; --concurrency N; --tool-timeout secs; --iterations N (pass@k/pass^k)
 ```
 
 - `--subscription` deletes `ANTHROPIC_API_KEY` from the process env so the Agent SDK's Claude Code subprocess uses the local login. Without it the run bills the API key.
@@ -29,19 +30,21 @@ pnpm run evals:mcp-agent --id '<case-id>' --allow-tool-errors --agent-model <m> 
 
 ```json
 {
-  "datasetName": "mcp-server-evals",
-  "id": "<family>/<tool>-<difficulty>-1",
+  "datasetName": "mcp-server-evals-merge",
+  "id": "merge/<family>/<tool>-<difficulty>-1",
   "input": { "query": "<user-language prompt, no tool names>" },
   "expectedOutput": "PASS only if <tool> was called with <args> and the final answer states <fact>. FAIL if <specific bad behavior>.",
-  "metadata": { "category": "<tool-or-chain>", "kind": "agent", "tier": ["full"], "maxTurns": 10, "tools": ["<family>", "actors"] }
+  "metadata": { "category": "<tool-or-chain>", "kind": "agent", "maxTurns": 10, "tools": ["<family>", "actors"] }
 }
 ```
 
-- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `tier`, `expectedTools`, `expectedErrors`, `maxTurns`, `tools`, `failTools`.
+- `datasetName` is one of the two: `mcp-server-evals-merge` for a `kind: "agent"` case, `mcp-server-evals-pr` for a `kind: "tool-call"` one.
+- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
 - `category` = tool under test (what `--category` filters); difficulty goes in the id's `<slug>` half.
-- `kind: "agent"` requires `expectedOutput`; `kind: "selection"` (not yet run by this harness, #260) requires a non-empty `expectedTools` instead and has no `expectedOutput`.
-- A case that provokes an error on purpose sets `expectedErrors: ["<tool-name>", ...]` — the tool(s) allowed to fail on that item.
-- The id is `<family>/<slug>`: `<family>` is the coarse dataset-migration category (`mcp-agent`, `tasks`, `web-fetch`, `web-selection`), distinct from the fine-grained `metadata.category` above. Filter one family with `--id '^<family>/'`.
+- `kind: "agent"` requires `expectedOutput` (multi-turn, judged, `expectedErrors`/`failTools`/`maxTurns` apply); `kind: "tool-call"` requires a non-empty `expectedTools` instead, and rejects `expectedOutput`, `expectedErrors`, `failTools`, and `maxTurns` (turns are fixed at 2). `expectedArgs` (optional, `kind: "tool-call"` only): a flat object, every key deep-equals the captured call's same key, unlisted keys ignored — use it to pin an argument the tool-name check alone would miss (e.g. a resolved vs. guessed Actor slug). Only pin `expectedArgs` when `expectedTools` names a single tool, or when every tool it lists shares the pinned keys with the same expected values — a flat object can't apply differently per tool. `pr/call-actor/rag-web-browser` is the example: `apify/rag-web-browser` resolves to either the generic `call-actor` tool (`{actor, input}`) or the direct `apify--rag-web-browser` tool (`{query, maxResults, ...}`), two incompatible argument shapes, so that item lists both tools in `expectedTools` and carries no `expectedArgs`.
+- A `kind: "agent"` case that provokes an error on purpose sets `expectedErrors: ["<tool-name>", ...]` — the tool(s) allowed to fail on that item; there is no run-wide error-tolerance flag.
+- `mcpToolsOnly: true` on a `kind: "tool-call"` item drops Claude Code's built-ins for that item alone (OR-ed with the run-wide `--mcp-tools-only`) — use it when a case must isolate MCP-vs-MCP tool choice, or when the built-in's own tool-search meta-tool (`ToolSearch`) would otherwise be a false first capture.
+- The id carries its dataset as the first segment: `pr/<tool>/<slug>` (e.g. `pr/search-actors/flight-data-booking-sites`) or `merge/<family>/<slug>` (e.g. `merge/tasks/chain-hard-1`), where the middle segment is the tool or the coarse family (`mcp-agent`, `tasks`, `web-fetch`, `web-selection`), distinct from the fine-grained `metadata.category` above. Filter one family with `--id '^merge/<family>/'`.
 - Items upsert on `id`. Ids are **project-unique forever**, even after archive/delete-and-recreate elsewhere. Retire a case by upserting `"status": "ARCHIVED"`.
 - `maxTurns` guide: single tool 6–8, create+verify 10, chains 12–18. Budget for the longest path the reference permits (explore → decline → fallback), not the happy path; Actor-run cases need headroom for a poll cycle when the run outlives the wait cap.
 
@@ -69,7 +72,7 @@ cd /tmp && export $(grep -E '^LANGFUSE' <repo>/.env | xargs) && export LANGFUSE_
 ```
 
 ```bash
-npx -y langfuse-cli api datasets list --json                # mcp-server-evals already exists; no need to create it
+npx -y langfuse-cli api datasets list --json                # both mcp-server-evals-pr and mcp-server-evals-merge already exist; no need to create them
 jq -c '.[0]' items.json | npx -y langfuse-cli api dataset-items create --body-file -   # create = UPSERT on id: iterate on a case by re-posting the same id
 npx -y langfuse-cli api dataset-items get <id>
 npx -y langfuse-cli api dataset-items delete <id>          # irreversible, frees nothing (id stays burned) — archive instead (status: "ARCHIVED")
@@ -87,7 +90,10 @@ npx -y langfuse-cli api experiment-items list \
       + ([$o.transcript[] | to_entries[] | "  " + .key + ": " + (.value | tostring | .[0:300])] | join("\n"))'
 ```
 
-Sweep for unexpected errors after a run (a run with no `expectedErrors` items must contribute zero rows):
+Sweep for unexpected errors after a run. Read this on `kind: "agent"` items only: an
+agent run with no `expectedErrors` items must contribute zero rows, but every passing
+`kind: "tool-call"` trial produces one ERROR span by design (the deny-all hook refuses the
+call it is measuring), and tool-call items cannot declare `expectedErrors`.
 
 ```bash
 npx -y langfuse-cli api observations list --level ERROR \
