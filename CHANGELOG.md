@@ -8,10 +8,15 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - **evals:** Add tool-call mode and one dataset per CI gate ([#1337](https://github.com/apify/apify-mcp-server/pull/1337)) ([29685f9](https://github.com/apify/apify-mcp-server/commit/29685f944909c15aade6fa5564b473e9e218c368)) by [@jirispilka](https://github.com/jirispilka), closes [#260](https://github.com/apify/apify-mcp-server/issues/260)
+- Warn when a discovered Actor cannot be run in this session ([#1327](https://github.com/apify/apify-mcp-server/pull/1327)) ([c27c7bd](https://github.com/apify/apify-mcp-server/commit/c27c7bd9959c8fb006aabe088b09076b68baa3cf)) by [@MQ37](https://github.com/MQ37), closes [#231](https://github.com/apify/apify-mcp-server/issues/231)
+- Track ?client= URL param in Segment telemetry ([#1344](https://github.com/apify/apify-mcp-server/pull/1344)) ([eeedb06](https://github.com/apify/apify-mcp-server/commit/eeedb06bb5fc1ee368b957b80f6cb29f52f9729e)) by [@MQ37](https://github.com/MQ37)
 
 ### 🐛 Bug Fixes
 
 - Stop enforcing enum values dropped by input-schema truncation ([#1258](https://github.com/apify/apify-mcp-server/pull/1258)) ([3843245](https://github.com/apify/apify-mcp-server/commit/384324589f142b672db38a5d07624c5fb6c8ae12)) by [@MQ37](https://github.com/MQ37), closes [#1253](https://github.com/apify/apify-mcp-server/issues/1253)
+- Gate every cross-tool mention in server instructions behind the session&#x27;s tool set ([#1334](https://github.com/apify/apify-mcp-server/pull/1334)) ([49243e9](https://github.com/apify/apify-mcp-server/commit/49243e97adf61b1e8ef4eb521aa3e5ed2e104708)) by [@MQ37](https://github.com/MQ37), closes [#266](https://github.com/apify/apify-mcp-server/issues/266)
+- Gate call-actor mentions when the tool is absent from the session ([#1326](https://github.com/apify/apify-mcp-server/pull/1326)) ([aa9f7b3](https://github.com/apify/apify-mcp-server/commit/aa9f7b377729f6b0fcb1c7ae40aaf845cc0b2c6b)) by [@MQ37](https://github.com/MQ37), closes [#232](https://github.com/apify/apify-mcp-server/issues/232)
+- Stop pairing call-actor-widget and get-actor-run-widget ([#1357](https://github.com/apify/apify-mcp-server/pull/1357)) ([6355724](https://github.com/apify/apify-mcp-server/commit/63557245691f043fe9149b7ffd08c3cff54a3b99)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
