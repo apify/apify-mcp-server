@@ -1,9 +1,6 @@
 name: CI (PR evals)
 
-# Only opened/reopened/ready_for_review — never synchronize, so a normal push to an
-# already-open PR (e.g. addressing a review comment) doesn't re-spend the eval budget.
-# The paths filter sits on the trigger: this workflow has no job that must run regardless,
-# and it is not a required check (README CI section), so skipping the whole run is fine.
+# Do not run on `synchronize`, which would re-spend the eval budget.
 on:
     pull_request:
         types: [opened, reopened, ready_for_review]
@@ -21,8 +18,7 @@ on:
 jobs:
     evaluations:
         name: MCP agent evaluations (pr)
-        # Fork PRs don't have access to repo secrets, and a draft PR isn't ready to gate yet —
-        # use the `validated` label (on_pull_request_label.yaml) for the draft case instead.
+        # Fork PRs do not receive repository secrets.
         if: |
             github.event.pull_request.head.repo.full_name == github.repository &&
             github.event.pull_request.draft == false

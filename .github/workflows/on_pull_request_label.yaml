@@ -26,9 +26,7 @@ jobs:
         # Run ONLY when PR has the "beta" label
         if: contains(github.event.pull_request.labels.*.name, 'beta')
         name: Push to pkg.pr.new
-        # Serializes the pkg.pr.new publish with the release pipeline in on_master.yaml.
-        # Only this job takes the release lock, so the evaluations job below never
-        # queues behind a master run.
+        # Only publishing shares the release lock with `on_master.yaml`.
         concurrency:
             group: release
             cancel-in-progress: false
@@ -39,9 +37,7 @@ jobs:
     evaluations:
         needs: [ wait_for_checks ]
         name: MCP agent evaluations (pr)
-        # Manual re-run of the pr tier for a same-repo PR the automatic on_pull_request_evals.yaml
-        # trigger skipped (a draft, or a later push). Not a fork override: GitHub withholds
-        # secrets from every `pull_request` run on a fork, label or not (README CI section).
+        # Reruns a skipped same-repo PR. Fork PRs do not receive secrets.
         if: |
             github.event.action == 'labeled' && github.event.label.name == 'validated' &&
             github.event.pull_request.head.repo.full_name == github.repository

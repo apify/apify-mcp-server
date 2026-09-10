@@ -37,7 +37,7 @@ export type AgentRunOptions = {
     isToolCallMode?: boolean;
 };
 
-/** What `runAgentConversation` returns: the folded conversation plus every attempted tool call. */
+/** Folded conversation and attempted tool calls. */
 export type AgentRunResult = AdaptedConversation & {
     /** Calls the deny-all hook recorded. Empty for a `kind: "agent"` item; only the tool-call hook records. */
     attemptedCalls: AttemptedToolCall[];
@@ -56,9 +56,7 @@ export function assertStdioBinExists(): void {
 }
 
 /**
- * Build a `PreToolUse` hook from a decision callback: return a deny reason to refuse the
- * call, or `undefined` to let it through. The one hook shape both `denyToolsHook()` and the
- * tool-call deny-all hook sit on.
+ * Creates a `PreToolUse` hook. A reason denies the call; `undefined` allows it.
  */
 function preToolUseHook(decide: (toolName: string, toolInput: unknown) => string | undefined): HookCallbackMatcher[] {
     return [
@@ -83,13 +81,8 @@ function preToolUseHook(decide: (toolName: string, toolInput: unknown) => string
 }
 
 /**
- * Force-fail the listed tools with the real server nudge, so evals for error-driven
- * behavior (e.g. report-problem) do not depend on the live server erroring on demand.
- *
- * `canUseTool` below unconditionally allows every call - the point of a `PreToolUse` deny is
- * that the SDK fires it before the permission layer regardless, so a denied call here never
- * reaches `canUseTool` or executes. The agent receives it as a refusal rather than an
- * INTERNAL_ERROR tool result.
+ * Force-fails selected tools with the server's report-problem nudge so error-path cases do
+ * not depend on a live server failure.
  */
 export function denyToolsHook(failTools: string[]): HookCallbackMatcher[] {
     const failing = new Set(failTools);
@@ -102,10 +95,7 @@ export function denyToolsHook(failTools: string[]): HookCallbackMatcher[] {
 }
 
 /**
- * Tool-call mode's deny-all hook: refuses every call with `TOOL_CALL_DENY_REASON` and
- * records `{ toolName, input }` for each attempt into `attemptedCalls`, so the measurement
- * (`resolveFirstToolMatch()` in `tool_call_mode.ts`) has the full attempt sequence to read,
- * `ToolSearch` captures included.
+ * Denies and records every tool call in tool-call mode. The scorer skips `ToolSearch` later.
  */
 function toolCallDenyAllHook(attemptedCalls: AttemptedToolCall[]): HookCallbackMatcher[] {
     return preToolUseHook((toolName, toolInput) => {
@@ -129,8 +119,7 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
 
     const attemptedCalls: AttemptedToolCall[] = [];
 
-    // Last few non-empty stderr lines, appended to a thrown error so a bare "process exited
-    // with code 1" (e.g. a root-sandbox permission refusal) carries the CLI's own message.
+    // Append recent stderr lines so opaque subprocess failures retain the CLI's message.
     const stderrLines: string[] = [];
 
     const sdkOptions: Options = {
@@ -144,17 +133,11 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
                 args: serverArgs,
                 env: { ...process.env, APIFY_TOKEN: apifyToken },
                 timeout: toolTimeoutSeconds * 1000,
-                // The server under test must be in the prompt. Left deferred behind tool
-                // search (the default once built-in tools are on), the agent never sees the
-                // Apify tools and answers from memory or Bash instead - the eval would then
-                // measure tool search, not our tool descriptions.
+                // The server must load before tool search; otherwise the agent may never see its tools.
                 alwaysLoad: true,
             },
         },
-        // Headless: never prompt for tool permission. Root refuses bypassPermissions +
-        // allowDangerouslySkipPermissions outright ("cannot be used with root/sudo
-        // privileges"), so every call is allowed here instead; a tool-call item's deny-all
-        // PreToolUse hook (below) still fires first and denies before this is ever reached.
+        // Avoid prompts without root-incompatible bypass flags. The deny-all hook still runs first.
         canUseTool: async (_toolName, input) => ({ behavior: 'allow', updatedInput: input }),
         // Isolation: ignore this repo's settings and .mcp.json; configure everything in code.
         settingSources: [],

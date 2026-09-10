@@ -1,8 +1,4 @@
-# Reusable workflow for MCP agent evaluations (Langfuse-backed), one dataset per tier. The `pr`
-# tier runs `mcp-server-evals-pr` (`kind: tool-call` items: no judge, nothing executes) and
-# gates PRs; the `merge` tier runs `mcp-server-evals-merge` (`kind: agent` items: judged, live
-# account) after a merge. See evals/mcp_agent/README.md's
-# CI section.
+# Reusable workflow for the `pr` (tool-call) and `merge` (agent) eval tiers.
 
 on:
     workflow_call:
@@ -30,7 +26,7 @@ jobs:
     evaluations:
         name: MCP agent evaluations (${{ inputs.tier }})
         runs-on: ubuntu-latest
-        # Provisional; tighten once a real runner has timed each tier (README CI section).
+        # Provisional; tighten after the first CI runs.
         timeout-minutes: ${{ inputs.tier == 'pr' && 30 || 90 }}
         env:
             ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -62,11 +58,8 @@ jobs:
                 if: inputs.tier == 'merge'
                 run: pnpm run evals:mcp-agent:tasks-fixtures
 
-            # --pass-threshold 0.9: 3 claude-haiku-4-5 pr-tier runs floored at 0.93 (0.9434, 0.9381,
-            # 0.9429, apify/ai-team#240), rounded down to one decimal. Provisional: those runs were in a
-            # sandbox with a flaky TLS proxy; re-pin from the first real CI runs.
-            # No judge runs on tool-call items; --claude-judge only lifts the CLI's
-            # OPENROUTER_API_KEY requirement.
+            # Floor of three local runs was 0.93; re-pin after the first CI runs.
+            # `--claude-judge` avoids the OpenRouter requirement; tool-call items are not judged.
             -   name: Run pr-tier evals
                 if: inputs.tier == 'pr'
                 run: >
@@ -74,9 +67,7 @@ jobs:
                     --pass-threshold 0.9
                     --agent-model claude-haiku-4-5 --claude-judge
 
-            # --pass-threshold 0.7: 3 claude-haiku-4-5 merge-tier runs floored at 0.73 (0.80, 0.73, 0.80
-            # on 2026-09-08, OpenRouter judge), rounded down to one decimal. Deliberately low: 9 of the
-            # 60 items fail on every run (README CI section); raise it as those are fixed.
+            # Nine items consistently fail; raise this threshold as they are fixed.
             -   name: Run merge-tier evals
                 if: inputs.tier == 'merge'
                 run: >

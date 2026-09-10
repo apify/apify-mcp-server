@@ -1,7 +1,6 @@
 name: CI (master evals)
 
-# Not in on_master.yaml: that workflow holds the `release` lock for its whole run, and evals
-# gate no release (README CI section).
+# Kept outside `on_master.yaml` so evals do not hold the release lock.
 on:
     push:
         branches:
@@ -27,8 +26,7 @@ jobs:
 
     evaluations_merge:
         name: MCP agent evaluations (merge)
-        # cancel-in-progress stays false: the merge tier seeds shared account fixtures, so two
-        # overlapping runs would fight over them.
+        # The merge tier uses shared fixtures.
         concurrency:
             group: eval-merge-master
             cancel-in-progress: false
