@@ -369,6 +369,8 @@ export type ToolCallTelemetryProperties = {
     mcp_client_capabilities: Record<string, unknown> | null;
     mcp_session_id: string;
     transport_type: string;
+    /** Raw `?client=` URL query-param value, when the connecting request carried one. */
+    mcp_url_client: string;
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
@@ -409,6 +411,7 @@ export type ReportedProblemTelemetryProperties = Pick<
     | 'mcp_protocol_version'
     | 'mcp_session_id'
     | 'transport_type'
+    | 'mcp_url_client'
 > & {
     message: string;
     actor_id?: string;
@@ -634,6 +637,8 @@ export type ActorsMcpServerOptions = {
      * - 'http': Remote HTTP streamable connection
      */
     transportType?: TransportType;
+    /** Raw `?client=` value from the connecting URL, for Segment attribution; independent of `clientInfo.name`, HTTP-only (undefined on stdio). */
+    clientParam?: string;
     /**
      * Apify API token for authentication
      * Primarily used by stdio transport when token is read from ~/.apify/auth.json file

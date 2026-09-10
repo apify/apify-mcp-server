@@ -205,6 +205,7 @@ class StatelessMcpServer {
                 mcpSessionId,
                 apifyToken,
                 clientContext,
+                clientParam: this.host.options.clientParam,
                 telemetryEnabled: this.host.telemetryEnabled,
                 transportType: this.host.options.transportType,
             });

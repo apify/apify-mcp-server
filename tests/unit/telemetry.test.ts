@@ -32,6 +32,7 @@ describe('telemetry', () => {
             mcp_client_capabilities: {},
             mcp_session_id: 'session-123',
             transport_type: 'stdio',
+            mcp_url_client: 'cursor',
             tool_name: 'test-tool',
             tool_status: 'SUCCEEDED' as const,
             tool_exec_time_ms: 100,
@@ -51,6 +52,7 @@ describe('telemetry', () => {
                 mcp_client_capabilities: {},
                 mcp_session_id: 'session-123',
                 transport_type: 'stdio',
+                mcp_url_client: 'cursor',
                 tool_name: 'test-tool',
                 tool_status: 'SUCCEEDED',
                 tool_exec_time_ms: 100,
@@ -68,6 +70,7 @@ describe('telemetry', () => {
             mcp_client_capabilities: {},
             mcp_session_id: 'session-123',
             transport_type: 'stdio',
+            mcp_url_client: 'cursor',
             tool_name: 'test-tool',
             tool_status: 'SUCCEEDED' as const,
             tool_exec_time_ms: 100,
@@ -95,6 +98,7 @@ describe('telemetry', () => {
             mcp_client_capabilities: {},
             mcp_session_id: '',
             transport_type: 'stdio',
+            mcp_url_client: 'cursor',
             tool_name: 'test-tool',
             tool_status: 'SUCCEEDED' as const,
             tool_exec_time_ms: 100,
@@ -118,6 +122,7 @@ describe('telemetry', () => {
             mcp_client_capabilities: {},
             mcp_session_id: 'session-123',
             transport_type: 'stdio',
+            mcp_url_client: 'cursor',
             tool_name: 'call-actor',
             tool_status: 'SOFT_FAIL' as const,
             tool_exec_time_ms: 100,
@@ -147,6 +152,7 @@ describe('buildReportedProblemProperties', () => {
         mcp_client_capabilities: {},
         mcp_session_id: 'session-123',
         transport_type: 'stdio',
+        mcp_url_client: 'cursor',
         tool_name: 'report-problem',
         tool_status: 'SUCCEEDED',
         tool_exec_time_ms: 5,
@@ -168,6 +174,7 @@ describe('buildReportedProblemProperties', () => {
             mcp_protocol_version: '2024-11-05',
             mcp_session_id: 'session-123',
             transport_type: 'stdio',
+            mcp_url_client: 'cursor',
             message: 'stuck on call-actor',
             actor_id: 'apify/rag-web-browser',
             actor_run_id: 'run-1',
@@ -186,6 +193,7 @@ describe('buildReportedProblemProperties', () => {
             mcp_protocol_version: '2024-11-05',
             mcp_session_id: 'session-123',
             transport_type: 'stdio',
+            mcp_url_client: 'cursor',
             message: 'just a note',
         });
         expect(properties).not.toHaveProperty('tool_name');
@@ -207,6 +215,7 @@ describe('trackReportedProblem', () => {
             mcp_protocol_version: '2024-11-05',
             mcp_session_id: 'session-123',
             transport_type: 'stdio',
+            mcp_url_client: 'cursor',
             message: 'stuck on call-actor',
         };
 
@@ -228,6 +237,7 @@ describe('trackReportedProblem', () => {
             mcp_protocol_version: '2024-11-05',
             mcp_session_id: 'session-123',
             transport_type: 'stdio',
+            mcp_url_client: 'cursor',
             message: 'stuck on call-actor',
         };
 

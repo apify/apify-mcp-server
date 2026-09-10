@@ -419,6 +419,7 @@ export class LegacyMcpServer {
                 mcpSessionId,
                 apifyToken,
                 clientContext,
+                clientParam: this.host.options.clientParam,
                 telemetryEnabled: this.host.telemetryEnabled,
                 transportType: this.host.options.transportType,
             });
@@ -566,6 +567,7 @@ export class LegacyMcpServer {
                             actorName,
                             actorId,
                             clientContext,
+                            clientParam: this.host.options.clientParam,
                             taskStore: this.taskStore,
                             server: this.server,
                             tools: this.host.tools,
