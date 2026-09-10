@@ -389,6 +389,14 @@ describe('createStatelessServer() request context', () => {
                 );
             },
         );
+
+        // Regression: pre-gating default is "all but report-problem", not "nothing" — must still mention call-actor.
+        it('mentions call-actor unconditionally, before any request establishes the real tool set', async () => {
+            await withStatelessServer(async ({ call }) => {
+                const discovered = await call('server/discover', {}, { client: { name: 'test-client' } });
+                expect(discovered.result?.instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
+            });
+        });
     });
 
     describe('retained tool sources', () => {
