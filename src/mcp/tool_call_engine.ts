@@ -131,6 +131,7 @@ export async function prepareToolCall(params: {
         allowUnauthMode,
     } = params;
     let { args } = params;
+    args = args ?? {};
 
     if (!apifyToken && !paymentProvider?.allowsUnauthenticated && !allowUnauthMode) {
         return {
@@ -167,21 +168,6 @@ export async function prepareToolCall(params: {
 
     const actorName = extractActorName(tool, args as Record<string, unknown>);
     const actorId = extractActorId(tool);
-
-    if (!args) {
-        return {
-            message: dedent`
-                Missing arguments for tool "${name}".
-                Please provide the required arguments for this tool. Check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool to see what parameters are required.
-            `,
-            toolStatus: TOOL_STATUS.SOFT_FAIL,
-            callDiagnostics: {
-                failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                ...buildActorFields(actorName, actorId),
-            },
-            resolvedToolName,
-        };
-    }
 
     // Preserve the raw value if decoding throws before reassignment.
     let decodedArgs = args as Record<string, unknown>;
