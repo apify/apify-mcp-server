@@ -291,7 +291,8 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      *
      * `requestUrl`, when given, resolves cross-tool mentions from `?tools=`/`?actors=` with no fetch;
      * omit it for the same "everything but report-problem" fallback. `report-problem` is always
-     * excluded — its servability is per-request-identity-dependent, not derivable from the URL.
+     * excluded here even when explicitly selected — telemetry state (the other bypass guard) isn't
+     * known yet at `server/discover` time, only at request time.
      */
     public getStatelessServerInstructions(requestUrl?: string): string {
         const mode = resolveServerMode(this.serverModeOption, false);
