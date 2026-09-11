@@ -7,12 +7,39 @@ import { TOOL_TYPE } from '../../src/types.js';
 import {
     AUTO_INJECTED_TOOLS,
     getToolsForServerMode,
+    isReportProblemExplicitlySelected,
     loadToolsFromInput,
     resolveToolNamesFromInput,
     toolNamesToInput,
 } from '../../src/utils/tools_loader.js';
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
+
+describe('isReportProblemExplicitlySelected()', () => {
+    it('is true for the literal tool name', () => {
+        expect(isReportProblemExplicitlySelected({ tools: [HELPER_TOOLS.PROBLEM_REPORT] })).toBe(true);
+    });
+
+    it('is true for the tool name given as a plain string (not an array)', () => {
+        expect(isReportProblemExplicitlySelected({ tools: HELPER_TOOLS.PROBLEM_REPORT })).toBe(true);
+    });
+
+    it('is true for the dev category, its only member', () => {
+        expect(isReportProblemExplicitlySelected({ tools: ['dev'] })).toBe(true);
+    });
+
+    it('is false for an un-split comma-joined string — selector composition never sees it as one name', () => {
+        expect(isReportProblemExplicitlySelected({ tools: 'storage,report-problem' })).toBe(false);
+    });
+
+    it('is false when tools is absent (default injection, not an explicit opt-in)', () => {
+        expect(isReportProblemExplicitlySelected({})).toBe(false);
+    });
+
+    it('is false for an unrelated selector', () => {
+        expect(isReportProblemExplicitlySelected({ tools: ['actors'] })).toBe(false);
+    });
+});
 
 describe('loadToolsFromInput explicit-empty semantics', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
