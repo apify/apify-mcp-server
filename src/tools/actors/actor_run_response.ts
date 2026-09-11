@@ -21,6 +21,9 @@ import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 /** Cap on `storages.keyValueStores.default.keys` array length. */
 const KV_KEYS_LIMIT = 50;
 
+/** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
+const TIP_KVS_KEY = 'TIP';
+
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
 export const WIDGET_NO_POLL_NEXT_STEP =
     'Widget is rendering live progress. Do NOT poll — the widget self-updates until completion.';
@@ -144,6 +147,8 @@ export type RunResponse = {
         memMaxBytes?: number;
     };
     storages: RunStorages;
+    /** Advisory guidance an Actor wrote under the reserved {@link TIP_KVS_KEY}, if any. */
+    tip?: { message: string; level: 'info' | 'warning' };
     summary: string;
     nextStep: string;
 };
@@ -307,6 +312,29 @@ async function fetchKvKeys(
             errMessage: errMessage(error),
         });
         return null;
+    }
+}
+
+/** Defensive parse of a TIP record's value: any Actor can write it, so shape isn't trusted. */
+function parseActorTip(value: unknown): RunResponse['tip'] {
+    if (!value || typeof value !== 'object') return undefined;
+    const { message, level } = value as { message?: unknown; level?: unknown };
+    if (typeof message !== 'string') return undefined;
+    return { message, level: level === 'warning' ? 'warning' : 'info' };
+}
+
+/** Fetch the run's advisory tip; a transient failure or malformed record logs and yields undefined. */
+async function fetchActorTip(
+    client: ApifyClient,
+    keyValueStoreId: string,
+    mcpSessionId?: string,
+): Promise<RunResponse['tip']> {
+    try {
+        const record = await client.keyValueStore(keyValueStoreId).getRecord(TIP_KVS_KEY);
+        return parseActorTip(record?.value);
+    } catch (error) {
+        log.warning('Failed to fetch Actor tip', { keyValueStoreId, mcpSessionId, errMessage: errMessage(error) });
+        return undefined;
     }
 }
 
@@ -894,6 +922,11 @@ export async function fetchActorRunData(params: {
         keyValueStore: keyValueStores?.default,
     });
 
+    // Only fetch the record when the key was actually listed — avoids a round trip on every run.
+    const tip = keyValueStores?.default?.keys?.includes(TIP_KVS_KEY)
+        ? await fetchActorTip(client, keyValueStores.default.id, mcpSessionId)
+        : undefined;
+
     const structuredContent: RunResponse = {
         runId: run.id,
         actorId: run.actId,
@@ -908,6 +941,7 @@ export async function fetchActorRunData(params: {
             ...(datasets && { datasets }),
             ...(keyValueStores && { keyValueStores }),
         },
+        tip,
         summary,
         nextStep,
     };
