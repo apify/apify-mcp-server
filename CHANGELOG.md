@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.15.7 - **not yet released**
+## [0.15.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.7) (2026-09-11)
 
 ### 🐛 Bug Fixes
 
 - Let explicit report-problem selection bypass the client blocklist ([#1368](https://github.com/apify/apify-mcp-server/pull/1368)) ([a4dafc4](https://github.com/apify/apify-mcp-server/commit/a4dafc4a95698fe2d3ff5420d58bcda65fbe97eb)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.15.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.6) (2026-09-10)
 
 ### 🚀 Features
