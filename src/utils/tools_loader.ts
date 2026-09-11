@@ -83,6 +83,18 @@ function normalizeInput(input: Input): NormalizedInput {
     };
 }
 
+/** report-problem's only category — selecting it is the same opt-in as the literal name. */
+const REPORT_PROBLEM_CATEGORY = 'dev' satisfies ToolCategory;
+
+/**
+ * True when `input` explicitly names report-problem or `dev` — lifts the client blocklist below.
+ * A `toolNamesToInput` restore counts: it can only list tools the session was already served.
+ */
+export function isReportProblemExplicitlySelected(input: Input): boolean {
+    const { selectors } = normalizeInput(input);
+    return selectors?.some((sel) => sel === HELPER_TOOLS.PROBLEM_REPORT || sel === REPORT_PROBLEM_CATEGORY) ?? false;
+}
+
 /**
  * Resolve the list of Actor names (`username/name`) to fetch from the input.
  *

@@ -1,11 +1,19 @@
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { SERVER_MODE } from '../../src/types.js';
+import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getLegacyServer } from './helpers/mcp_server.js';
+
+// Stub getActors so default-injection seeding needs no network.
+// Default-resolves to [] so tests that never call loadReportProblemByDefault still get a valid array.
+vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof ToolsLoaderModule>();
+    return { ...actual, getActors: vi.fn().mockResolvedValue([]) };
+});
 
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
 
@@ -42,10 +50,14 @@ async function dispatchInitialize(server: ActorsMcpServer, clientName: string): 
     await handler(makeInitializeRequest(clientName), {});
 }
 
-// report-problem carries no actor name, so getActors short-circuits and never touches the client —
-// this drives the real compose path (getToolsForServerMode + blocklist filter) without any network.
+// Restoring by name is explicit (toolNamesToInput builds {tools:[...]}) — bypasses the blocklist.
 async function loadReportProblemByName(server: ActorsMcpServer): Promise<void> {
     await server.loadToolsByName([HELPER_TOOLS.PROBLEM_REPORT], {} as never);
+}
+
+// Default (no tools=) injection — not an explicit opt-in, so the client blocklist still applies.
+async function loadReportProblemByDefault(server: ActorsMcpServer): Promise<void> {
+    await server.loadToolsFromInput({}, {} as never);
 }
 
 describe('report-problem client gating', () => {
@@ -66,8 +78,8 @@ describe('report-problem client gating', () => {
 
     it('hides report-problem from an Anthropic client when composed before initialize', async () => {
         const server = track(makeServer());
-        // Fixed mode: tools are requested before the client is known — they must wait for initialize.
-        await loadReportProblemByName(server);
+        // Default (non-explicit) seeding — blocklist still applies.
+        await loadReportProblemByDefault(server);
         expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(false);
 
         await dispatchInitialize(server, 'claude-ai');
@@ -84,13 +96,14 @@ describe('report-problem client gating', () => {
         expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
     });
 
-    it('hides report-problem from an Anthropic client loaded after initialize (recovery path)', async () => {
+    it('serves report-problem to an Anthropic client restored after initialize (recovery path)', async () => {
+        // Recovery counts as explicit — the session already had this tool.
         const server = track(makeServer());
         await dispatchInitialize(server, 'claude-ai');
 
         await loadReportProblemByName(server);
 
-        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(false);
+        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
     });
 
     it('serves report-problem to a non-Anthropic client loaded after initialize', async () => {
@@ -102,9 +115,10 @@ describe('report-problem client gating', () => {
         expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
     });
 
+    // Recovery is explicit — same reasoning as above.
     it.each([
         { clientName: 'test-client', isAvailable: true },
-        { clientName: 'claude-ai', isAvailable: false },
+        { clientName: 'claude-ai', isAvailable: true },
     ])(
         'uses constructor recovery data for client gating: $clientName available=$isAvailable',
         async ({ clientName, isAvailable }) => {

@@ -35,6 +35,7 @@ import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
     getActors,
     getToolsForServerMode,
+    isReportProblemExplicitlySelected,
     resolveToolNamesFromInput,
     toolNamesToInput,
 } from '../utils/tools_loader.js';
@@ -290,7 +291,8 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      *
      * `requestUrl`, when given, resolves cross-tool mentions from `?tools=`/`?actors=` with no fetch;
      * omit it for the same "everything but report-problem" fallback. `report-problem` is always
-     * excluded — its servability is per-request-identity-dependent, not derivable from the URL.
+     * excluded here even when explicitly selected — telemetry state (the other bypass guard) isn't
+     * known yet at `server/discover` time, only at request time.
      */
     public getStatelessServerInstructions(requestUrl?: string): string {
         const mode = resolveServerMode(this.serverModeOption, false);
@@ -351,10 +353,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * report-problem unless servable for that view ({@link isReportProblemServable}). Load paths
      * and the initialize flush pass the instance's own {@link servingContext};
      * {@link createRequestSnapshot} passes a view derived from one stateless request.
+     * An explicit opt-in in `source.input` applies to every request reusing this retained source.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
         const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
-        if (this.isReportProblemServable(view)) return tools;
+        if (this.isReportProblemServable(view, source.input)) return tools;
         return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
     }
 
@@ -363,14 +366,15 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * would vanish into the void) and never before a client context exists — on a stateful
      * connection the initialize flush re-adds it once the handshake supplies one.
      *
+     * Explicit selection ({@link isReportProblemExplicitlySelected}) bypasses the blocklist only.
+     *
      * The stateless envelope requires protocol and capability metadata but not `clientInfo`. A
      * request declaring no client name matches no blocked substring and is served the tool by
      * policy.
      */
-    private isReportProblemServable(view: ServingContext): boolean {
-        return (
-            this.telemetryEnabled && view.clientContext != null && !isReportProblemBlockedForClient(view.clientContext)
-        );
+    private isReportProblemServable(view: ServingContext, input: Input): boolean {
+        if (!this.telemetryEnabled || view.clientContext == null) return false;
+        return isReportProblemExplicitlySelected(input) || !isReportProblemBlockedForClient(view.clientContext);
     }
 
     private composePendingToolsForClient(): void {

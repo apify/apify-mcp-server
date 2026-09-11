@@ -85,7 +85,7 @@ export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set(['add-actor',
  * connection on the 2025 path, per request on the 2026-07-28 one. Stateless `client-info` is
  * optional; a request declaring no client name matches no blocked substring and is served the tool
  * by policy. Substring matching covers new client builds without a maintained allowlist;
- * over-matching only hides an optional tool.
+ * over-matching only hides an optional tool. Bypassed by explicit `?tools=report-problem`/`dev`.
  */
 export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
 
