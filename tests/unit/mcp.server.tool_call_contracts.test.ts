@@ -435,10 +435,13 @@ describe('CallToolRequestSchema handler — invalid-call rejections (characteriz
         });
     });
 
-    it('rejects a call with missing arguments as an InvalidParams protocol error', async () => {
+    it('rejects a call with missing required arguments as an InvalidParams protocol error', async () => {
         await withServer(async (server) => {
             silenceLogs();
             const { tool, received } = makeRecorderTool('missing-args-tool');
+            tool.ajvValidate = Object.assign(() => false, {
+                errors: [{ message: 'must have required property', instancePath: '/required_field' }],
+            }) as unknown as ToolEntry['ajvValidate'];
             server.upsertTools([tool]);
             vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
             const handler = getRequestHandler(server, 'tools/call');
@@ -449,7 +452,7 @@ describe('CallToolRequestSchema handler — invalid-call rejections (characteriz
                 ),
             ).rejects.toMatchObject({
                 code: ErrorCode.InvalidParams,
-                message: expect.stringContaining('Missing arguments'),
+                message: expect.stringContaining('Validation errors'),
             });
             expect(received.called).toBe(false);
         });
