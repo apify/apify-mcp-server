@@ -9,8 +9,7 @@ import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
 import { getLegacyServer } from './helpers/mcp_server.js';
 
-// Stub getActors so the default-injection path (used to seed report-problem without an explicit
-// ?tools= selector) never hits the network. The compose path stays real.
+// Stub getActors so default-injection seeding needs no network.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
     return { ...actual, getActors: vi.fn() };
@@ -52,10 +51,7 @@ async function dispatchInitialize(server: ActorsMcpServer, clientName: string): 
     await handler(makeInitializeRequest(clientName), {});
 }
 
-// report-problem carries no actor name, so getActors short-circuits and never touches the client —
-// this drives the real compose path (getToolsForServerMode + blocklist filter) without any network.
-// loadToolsByName restores tools by explicit name (toolNamesToInput builds `{tools: [...]}`), so
-// this seeds report-problem as an explicit selection — it bypasses the client blocklist by design.
+// Restoring by name is explicit (toolNamesToInput builds {tools:[...]}) — bypasses the blocklist.
 async function loadReportProblemByName(server: ActorsMcpServer): Promise<void> {
     await server.loadToolsByName([HELPER_TOOLS.PROBLEM_REPORT], {} as never);
 }
@@ -84,8 +80,7 @@ describe('report-problem client gating', () => {
 
     it('hides report-problem from an Anthropic client when composed before initialize', async () => {
         const server = track(makeServer());
-        // Fixed mode: tools are requested before the client is known — they must wait for initialize.
-        // Default (non-explicit) seeding: the blocklist must still apply.
+        // Default (non-explicit) seeding — blocklist still applies.
         await loadReportProblemByDefault(server);
         expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(false);
 
@@ -104,9 +99,7 @@ describe('report-problem client gating', () => {
     });
 
     it('serves report-problem to an Anthropic client restored after initialize (recovery path)', async () => {
-        // Recovery restores tools by name (loadToolsByName), which the session was already legitimately
-        // serving — treated as explicit, so it bypasses the blocklist regardless of the reconnecting
-        // client's declared name.
+        // Recovery counts as explicit — the session already had this tool.
         const server = track(makeServer());
         await dispatchInitialize(server, 'claude-ai');
 
@@ -124,8 +117,7 @@ describe('report-problem client gating', () => {
         expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
     });
 
-    // Recovery restore (loadReportProblemByName) is treated as explicit — available regardless of
-    // client, same reasoning as the recovery-path test above.
+    // Recovery is explicit — same reasoning as above.
     it.each([
         { clientName: 'test-client', isAvailable: true },
         { clientName: 'claude-ai', isAvailable: true },

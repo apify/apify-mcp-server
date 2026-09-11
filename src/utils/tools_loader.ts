@@ -83,16 +83,12 @@ function normalizeInput(input: Input): NormalizedInput {
     };
 }
 
-/** report-problem is the `dev` category's only member, so naming the category is the same opt-in. */
+/** report-problem's only category — selecting it is the same opt-in as the literal name. */
 const REPORT_PROBLEM_CATEGORY = 'dev' satisfies ToolCategory;
 
 /**
- * True when `input` names report-problem or its `dev` category — a deliberate opt-in that lifts the
- * client-name blocklist in the server's compose step (telemetry-off and unknown-client still
- * refuse). The default (no `tools=`) injection is not an opt-in. A restore input built by
- * `toolNamesToInput` counts as one: it can only list tools the session was already served.
- * Reuses `normalizeInput` so it never reports an opt-in for a selector composition ignores
- * (e.g. the un-split `'a,b'` string form).
+ * True when `input` explicitly names report-problem or `dev` — lifts the client blocklist below.
+ * A `toolNamesToInput` restore counts: it can only list tools the session was already served.
  */
 export function isReportProblemExplicitlySelected(input: Input): boolean {
     const { selectors } = normalizeInput(input);

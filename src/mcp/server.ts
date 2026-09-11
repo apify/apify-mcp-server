@@ -351,10 +351,8 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * Compose one source's tool list against `view`: resolve mode-specific tools, then drop
      * report-problem unless servable for that view ({@link isReportProblemServable}). Load paths
      * and the initialize flush pass the instance's own {@link servingContext};
-     * {@link createRequestSnapshot} passes a view derived from one stateless request — but
-     * `source.input` is the retained session-level input, shared across every request that reuses
-     * this source, so an explicit opt-in made under one identity applies to all of them if a host
-     * shares one facade across requests with different declared clients.
+     * {@link createRequestSnapshot} passes a view derived from one stateless request.
+     * An explicit opt-in in `source.input` applies to every request reusing this retained source.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
         const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
@@ -367,8 +365,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * would vanish into the void) and never before a client context exists — on a stateful
      * connection the initialize flush re-adds it once the handshake supplies one.
      *
-     * Explicitly selecting the tool ({@link isReportProblemExplicitlySelected}) lifts the
-     * client-name blocklist below — telemetry and client-known still apply unconditionally.
+     * Explicit selection ({@link isReportProblemExplicitlySelected}) bypasses the blocklist only.
      *
      * The stateless envelope requires protocol and capability metadata but not `clientInfo`. A
      * request declaring no client name matches no blocked substring and is served the tool by

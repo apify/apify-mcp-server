@@ -65,8 +65,7 @@ const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selecto
     selector.includes('/') ? actorNameToToolName(selector) : selector,
 );
 // telemetry: true is explicit — the deployed target defaults it off, unlike this package's own default.
-// clientName: a real Claude client's handshake name — report-problem's client blocklist matches on
-// this, not on the `client=` URL tag, so this is what actually exercises the explicit-select bypass.
+// clientName: real Claude handshake name — exercises the blocklist bypass (client= URL tag doesn't gate it).
 const CLAUDE_CONNECTOR_CLIENT_OPTIONS: SuiteClientOptions = {
     tools: CLAUDE_CONNECTOR_TOOLS,
     client: 'claude connector',

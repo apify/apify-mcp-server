@@ -451,8 +451,7 @@ describe('createStatelessServer() request context', () => {
         it('resolves each concurrent request from its own declared identity only', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {
-                    // Default injection (no tools=), not explicit — keeps report-problem subject to
-                    // the blocklist, so this still demonstrates per-request identity gating.
+                    // Default injection, not explicit — blocklist still applies here.
                     await loadSource(server, [], {});
 
                     const [uiClient, blockedClient] = await Promise.all([
