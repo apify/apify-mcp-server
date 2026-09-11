@@ -6,15 +6,14 @@ import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { SERVER_MODE } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
-import { getActors } from '../../src/utils/tools_loader.js';
 import { getLegacyServer } from './helpers/mcp_server.js';
 
 // Stub getActors so default-injection seeding needs no network.
+// Default-resolves to [] so tests that never call loadReportProblemByDefault still get a valid array.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
-    return { ...actual, getActors: vi.fn() };
+    return { ...actual, getActors: vi.fn().mockResolvedValue([]) };
 });
-const getActorsMock = vi.mocked(getActors);
 
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
 
@@ -58,7 +57,6 @@ async function loadReportProblemByName(server: ActorsMcpServer): Promise<void> {
 
 // Default (no tools=) injection — not an explicit opt-in, so the client blocklist still applies.
 async function loadReportProblemByDefault(server: ActorsMcpServer): Promise<void> {
-    getActorsMock.mockResolvedValue([]);
     await server.loadToolsFromInput({}, {} as never);
 }
 
