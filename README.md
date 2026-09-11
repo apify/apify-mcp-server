@@ -12,8 +12,7 @@
 <p align=center>
     <a href="https://www.npmjs.com/package/@apify/actors-mcp-server" rel="nofollow"><img src="https://img.shields.io/npm/v/@apify/actors-mcp-server.svg" alt="NPM latest version" data-canonical-src="https://img.shields.io/npm/v/@apify/actors-mcp-server.svg" style="max-width: 100%;"></a>
     <a href="https://www.npmjs.com/package/@apify/actors-mcp-server" rel="nofollow"><img src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" alt="Downloads" data-canonical-src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" style="max-width: 100%;"></a>
-    <a href="https://github.com/apify/actors-mcp-server/actions/workflows/check.yaml"><img src="https://github.com/apify/actors-mcp-server/actions/workflows/check.yaml/badge.svg?branch=master" alt="Build Status" style="max-width: 100%;"></a>
-    <a href="https://smithery.ai/server/@apify/mcp"><img src="https://smithery.ai/badge/@apify/mcp" alt="smithery badge"></a>
+    <a href="https://github.com/apify/apify-mcp-server/actions/workflows/check.yaml"><img src="https://github.com/apify/apify-mcp-server/actions/workflows/check.yaml/badge.svg?branch=master" alt="Build Status" style="max-width: 100%;"></a>
 </p>
 
 
@@ -77,7 +76,7 @@ You can use the Apify MCP Server in two ways:
 - Set the MCP client server command to `npx @apify/actors-mcp-server` and the `APIFY_TOKEN` environment variable to your Apify API token.
 - See `npx @apify/actors-mcp-server --help` for more options.
 
-You can find detailed instructions for setting up the MCP server in the [Apify documentation](https://docs.apify.com/platform/integrations/mcp).
+You can find detailed instructions for setting up the MCP server in the [Apify documentation](https://docs.apify.com/mcp).
 
 # 🤖 MCP clients
 
@@ -235,6 +234,7 @@ For example, for the `apify/rag-web-browser` Actor, the input parameters are:
 You don't need to manually specify which Actor to call or its input parameters; the LLM handles this automatically.
 When a tool is called, the arguments are automatically passed to the Actor by the LLM.
 You can refer to the specific Actor's documentation for a list of available arguments.
+When an Actor acts as an MCP server, its proxied tools are namespaced with the Actor tool prefix (`<actor-tool>__<tool-name>`) to avoid naming collisions across tools.
 
 ### Helper tools
 
@@ -547,6 +547,7 @@ The Actor input schema is processed to be compatible with most MCP clients while
 - **Nested properties** are built for special cases like proxy configuration and request list sources to ensure the correct input structure.
 - **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
 - **Enum values and examples** are added to property descriptions to ensure visibility, even if the client doesn't fully support the JSON schema.
+- **Self-correcting input errors**: When an Actor call fails due to invalid input, the error response includes the Actor's input schema so the LLM agent can inspect the required properties and self-correct on the next attempt.
 - **Rental Actors** are only available for use with the hosted MCP server at https://mcp.apify.com. When running the server locally via stdio, you can only access Actors that are already added to your local toolset. To dynamically search for and use any Actor from Apify Store—including rental Actors—connect to the hosted endpoint.
 
 # 🔒 Privacy policy

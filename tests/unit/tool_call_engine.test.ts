@@ -6,7 +6,7 @@ import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
 import { executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
-import type { ToolCallTelemetryProperties } from '../../src/types.js';
+import type { ToolCallTelemetryProperties, ToolEntry } from '../../src/types.js';
 import { makePaymentRequiredError, makeRecorderTool, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
 /** An abort signal for direct engine tests, optionally already aborted. */
@@ -79,9 +79,12 @@ describe('prepareToolCall()', () => {
         });
     });
 
-    it('returns InvalidToolCall for missing arguments', async () => {
+    it('returns InvalidToolCall for missing required arguments', async () => {
         await withServer(async (server) => {
             const { tool } = makeRecorderTool('recorder-tool');
+            tool.ajvValidate = Object.assign(() => false, {
+                errors: [{ message: 'must have required property', instancePath: '/required_field' }],
+            }) as unknown as ToolEntry['ajvValidate'];
             server.upsertTools([tool]);
             const result = await prepareToolCall({
                 ...prepareFields(server),
@@ -97,7 +100,7 @@ describe('prepareToolCall()', () => {
             });
             expect('message' in result).toBe(true);
             const invalid = result as InvalidToolCall;
-            expect(invalid.message).toContain('Missing arguments');
+            expect(invalid.message).toContain('Validation errors');
         });
     });
 
