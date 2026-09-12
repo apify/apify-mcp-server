@@ -157,12 +157,9 @@ export type RunSummary = {
 };
 
 /**
- * Score a finished experiment against the ids and iteration count that were requested.
- *
- * A repeated item keeps the same dataset id across trials (Langfuse has no per-trial id),
- * distinguished only by `output.iteration` - so the denominator is computed from
- * `requestedIds.length * iterations`, not `itemResults.length`: the SDK omits an item whose
- * task threw, and a naive count would silently shrink the rate instead of reporting the gap.
+ * Scores all requested trials. Trials of one item share its dataset id (Langfuse has no per-trial
+ * id), hence the keying by `output.iteration`. The denominator is `requestedIds x iterations`, so a
+ * task the SDK dropped counts as a failed trial instead of shrinking the rate.
  */
 export function buildRunSummary(requestedIds: string[], itemResults: ScoredItem[], iterations: number): RunSummary {
     const byId = new Map<string, Map<number, ScoredItem>>();
@@ -222,10 +219,8 @@ function withIteration(item: DatasetItem, iteration: number): DatasetItem {
 }
 
 /**
- * `--iterations N`: repeat each selected item N times into the flat `data` array a single
- * `experiment.run()` call takes, each repeat a shallow copy tagged `metadata.iteration`
- * (1-based). The Langfuse v4 API has no native iteration concept, so this is what turns one
- * requested item into `N` separately-scored trials without a second `experiment.run()` call.
+ * Repeats items in one experiment, tagging each copy with its one-based iteration because
+ * Langfuse has no native iteration field.
  */
 export function expandIterations(items: DatasetItem[], iterations: number): DatasetItem[] {
     return items.flatMap((item) => Array.from({ length: iterations }, (_, index) => withIteration(item, index + 1)));
@@ -248,6 +243,20 @@ export function validateConcurrency(value: number): void {
     if (!Number.isInteger(value) || value < 1) {
         throw new Error(`--concurrency must be a positive integer, got "${value}"`);
     }
+}
+
+/**
+ * Branch name for a run's name. `git rev-parse --abbrev-ref HEAD` prints the literal `HEAD` on
+ * a detached checkout (the `actions/checkout` default for a `pull_request` event), so fall back
+ * to `GITHUB_HEAD_REF` (the PR's source branch), then `GITHUB_REF_NAME` (e.g. `master` on push).
+ */
+export function resolveGitBranch(
+    rawBranch: string,
+    env: { GITHUB_HEAD_REF?: string; GITHUB_REF_NAME?: string },
+): string {
+    const branch = rawBranch.trim();
+    if (branch && branch !== 'HEAD') return branch;
+    return env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME || 'unknown';
 }
 
 export type RunSummaryLine = { stream: 'log' | 'error'; text: string };
@@ -367,13 +376,7 @@ async function runAgentWithRetry(
     }
 }
 
-/**
- * The agent ran in a subprocess, so its conversation reaches Langfuse only if we send it.
- * Guarded separately from the run itself: losing the trace costs debuggability, not the
- * item's result. A tool-call item's denied calls still show as ERROR tool spans here - see
- * the README - because nothing about a `PreToolUse` denial changes how the adapter pairs a
- * `tool_use`/`tool_result`.
- */
+/** Sends the subprocess conversation to Langfuse without affecting the item result if tracing fails. */
 function emitTrace(
     itemId: string,
     query: string,

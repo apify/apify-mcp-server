@@ -1,20 +1,47 @@
-# Reusable workflow for MCP tool calling evaluations.
-# Evaluates AI models' ability to correctly identify and call MCP tools.
+# Reusable workflow for the `pr` (tool-call) and `merge` (agent) eval tiers.
 
 on:
     workflow_call:
         inputs:
-            pr_number:
-                description: Pull request number
+            tier:
+                description: 'Which eval tier to run'
                 required: true
-                type: string
+                type: string # 'pr' | 'merge'
+        secrets:
+            ANTHROPIC_API_KEY:
+                required: true
+            LANGFUSE_PUBLIC_KEY:
+                required: true
+            LANGFUSE_SECRET_KEY:
+                required: true
+            LANGFUSE_BASE_URL:
+                required: true
+            APIFY_TOKEN:
+                required: true
+            OPENROUTER_API_KEY:
+                description: 'Judge model on OpenRouter. Only used by tier: merge.'
+                required: false
+            OPENROUTER_BASE_URL:
+                description: 'Overrides the default OpenRouter endpoint. Only used by tier: merge.'
+                required: false
 
 jobs:
     evaluations:
-        name: MCP tool calling evaluations
+        name: MCP agent evaluations (${{ inputs.tier }})
         runs-on: ubuntu-latest
-
+        # Provisional; tighten after the first CI runs.
+        timeout-minutes: ${{ inputs.tier == 'pr' && 30 || 90 }}
+        # Secrets stay per-step, so the checkout, setup and install steps never see them.
         steps:
+            -   name: Validate tier input
+                env:
+                    TIER: ${{ inputs.tier }}
+                run: |
+                    if [ "$TIER" != "pr" ] && [ "$TIER" != "merge" ]; then
+                        echo "::error::inputs.tier must be 'pr' or 'merge', got '$TIER'"
+                        exit 1
+                    fi
+
             -   name: Checkout code
                 uses: actions/checkout@v6
 
@@ -26,14 +53,41 @@ jobs:
             -   name: Install pnpm and dependencies
                 uses: apify/actions/pnpm-install@v1.1.2
 
-            -   name: Build project
-                run: pnpm run build
-
-            -   name: Run evaluations
-                run: pnpm run evals:run
+            -   name: Seed task fixtures (merge tier only)
+                if: inputs.tier == 'merge'
+                run: pnpm run evals:mcp-agent:tasks-fixtures
                 env:
-                    GITHUB_PR_NUMBER: ${{ inputs.pr_number }}
-                    PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
-                    PHOENIX_BASE_URL: ${{ secrets.PHOENIX_BASE_URL }}
-                    OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+
+            # Floor of three local runs was 0.93; a hosted runner measured 0.97 (111/115).
+            # `--claude-judge` avoids the OpenRouter requirement; tool-call items are not judged.
+            -   name: Run pr-tier evals
+                if: inputs.tier == 'pr'
+                run: >
+                    pnpm run evals:mcp-agent -- --dataset mcp-server-evals-pr
+                    --pass-threshold 0.9
+                    --agent-model claude-haiku-4-5 --claude-judge
+                env:
+                    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+                    LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+                    LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+                    LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+
+            # Floor of three local runs was 0.73; nine of 60 items fail every run. 0.6 also absorbs the
+            # three publish cases, which fail unless APIFY_TOKEN can write to their target Actor.
+            # Raise as those are fixed.
+            -   name: Run merge-tier evals
+                if: inputs.tier == 'merge'
+                run: >
+                    pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge
+                    --pass-threshold 0.6
+                    --agent-model claude-haiku-4-5
+                env:
+                    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+                    LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+                    LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+                    LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
                     OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+                    OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}

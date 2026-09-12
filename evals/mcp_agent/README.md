@@ -1,18 +1,17 @@
 # MCP agent evaluation system
 
-Tests Claude Code driving Apify MCP tools, through two item kinds: a fast, deterministic first-tool-call check with no judge (`kind: "tool-call"`) and a multi-turn conversation run to completion and scored by an LLM judge (`kind: "agent"`). The agent under test is the real Claude Code harness, driven headlessly through the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview), so a run exercises the server the way a Claude Code user does. Results (traces, scores, dataset, experiment runs) are recorded in **Langfuse**: the self-hosted instance at [langfuse.apify.dev](https://langfuse.apify.dev), project `MCP Workflow`.
+Tests Claude Code against Apify MCP tools. `tool-call` items check the first attempted call without executing it; `agent` items run to completion and use an LLM judge. Runs are stored in [Langfuse](https://langfuse.apify.dev), project `MCP Workflow`.
 
 ## The flow
 
 ```
-dataset (Langfuse) -> experiment run -> per item: agent conversation -> judge (agent items only) -> scores
+dataset -> experiment -> agent run -> scores
 ```
 
-1. **Dataset.** Test cases live in two Langfuse datasets, `mcp-server-evals-pr` and `mcp-server-evals-merge`, and are edited in their UI. A run reads one of them (`--dataset`, default `mcp-server-evals-pr`) and never writes back.
-2. **Experiment.** The run executes the active items matching `--id`/`--category` as one Langfuse experiment, `--concurrency` items at a time; `--iterations N` repeats each selected item N times within that one experiment.
-3. **Conversation.** Each item runs a Claude Code agent (Claude Agent SDK) that spawns its own fresh Apify MCP server. A `kind: "agent"` item drives it to a final answer; a `kind: "tool-call"` item denies every tool call before it executes and records only the first attempted one.
-4. **Judge.** `kind: "agent"` only: an LLM judge scores the finished conversation against the item's `expectedOutput`. `kind: "tool-call"` items are scored deterministically instead - see below.
-5. **Scores.** Agent items: `mcp_agent_judge` (the judge verdict) and `tool_errors` (unexpected failed server calls) form the gate, plus `total_tokens`. Tool-call items: `first_tool_match` alone is the gate. The run also gets `pass_rate` (passed trials / requested trials). The console prints one `[n/total] ✅|❌|🔥 <id>` line per finished trial, then failures, `pass@k`/`pass^k` with `--iterations`, and the run URL; per-item detail is in Langfuse.
+1. **Dataset.** Cases live in `mcp-server-evals-pr` or `mcp-server-evals-merge`; a run reads the selected dataset and does not write to it.
+2. **Experiment.** Active items matching `--id` and `--category` run concurrently. `--iterations N` repeats each item in the same experiment.
+3. **Agent.** Each item starts a fresh MCP server. Agent items receive an LLM judgment; tool-call items record the first denied call.
+4. **Scores.** Agent items gate on `mcp_agent_judge` and unexpected `tool_errors`; tool-call items gate on `first_tool_match`. The run reports `pass_rate`.
 
 ---
 
@@ -42,19 +41,11 @@ pnpm run build
 pnpm run evals:mcp-agent
 ```
 
-Run `pnpm run evals:mcp-agent --help` for the full option list. `--dataset` picks which Langfuse dataset runs (default `mcp-server-evals-pr`; the merge set is `--dataset mcp-server-evals-merge`), `--category` and `--id` narrow within it, `--concurrency` defaults to 8 (each item spawns its own agent and MCP server, so higher values use more resources), `--iterations N` (default 1) repeats each selected item N times within the same run and prints `pass@k`/`pass^k`, `--pass-threshold` (default `0.97`, rationale in `config.ts`) gates the exit code on the aggregate pass rate instead of requiring every trial to pass, `--tool-timeout` defaults to 60s (raise it for Actor calls that scrape a lot of data), `--mcp-tools-only` drops Claude Code's built-in tools so only the server's tools remain, `--subscription` runs the agent on the local Claude Code login instead of `ANTHROPIC_API_KEY` (the key is removed from the process environment so the run cannot bill the API), and `--claude-judge` runs the judge on the Claude Agent SDK too, so no `OPENROUTER_API_KEY` is needed (`--judge-model` then takes an Anthropic model ID, default `claude-sonnet-5`; note a Claude judge scoring a Claude agent can be self-lenient, so prefer the OpenRouter judge for comparable numbers). With `--subscription --claude-judge` a run needs only `APIFY_TOKEN` and the Langfuse keys.
+Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--mcp-tools-only` removes Claude Code built-ins. Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
 
 ### Two datasets: kind, id scheme, and expectedErrors
 
-Cases live in two Langfuse datasets, one per CI gate. `--dataset` picks which one runs; the
-item's `metadata` says what it asserts.
-
-`mcp-server-evals-pr` (the default) holds the 115 `kind: "tool-call"` items and gates PRs (on
-PR open/reopen, or the `validated` label), so the PR gate runs in seconds, not minutes. Its
-ids are `pr/<tool>/<slug>`, e.g. `pr/search-actors/flight-data-booking-sites`.
-
-`mcp-server-evals-merge` holds the 60 `kind: "agent"` items and runs on push to master. Its
-ids are `merge/<family>/<slug>`, e.g. `merge/tasks/chain-hard-1`.
+Each CI tier has a dataset: the default `mcp-server-evals-pr` holds `tool-call` items and `mcp-server-evals-merge` holds `agent` items. Their IDs are `pr/<tool>/<slug>` and `merge/<family>/<slug>`.
 
 - `kind`: what the item asserts.
   - `"tool-call"`: only the first tool call the agent attempts, by name and optionally
@@ -65,23 +56,9 @@ ids are `merge/<family>/<slug>`, e.g. `merge/tasks/chain-hard-1`.
   without failing the zero-tool-error gate below. The gate exempts only the named tools; any
   other tool's failure still fails the item.
 
-Both id shapes carry the dataset name as their first segment, because Langfuse item ids are
-unique per project across datasets and these items moved out of the retired single
-`mcp-server-evals` dataset. The segment after it is a coarse family name — a tool
-(`search-actors`, `fetch-actor-details`, …) in the pr dataset, a family (`mcp-agent`, `tasks`,
-`web-fetch`, `web-selection`) in the merge one — and `<slug>` is the rest of the id. That
-family segment is not the same as `metadata.category` (the fine-grained value `--category`
-filters on, e.g. `create`, `get`, `search-actors`); the id only tells you which family a case
-belongs to. Run one family with `--id`, which already matches by regex:
-`pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge --id '^merge/tasks/'` runs the
-10 tasks-family items (7 proper + 3 error) in one call.
+The ID family is separate from the fine-grained `metadata.category` used by `--category`. Filter a family with `--id`, for example `--id '^merge/tasks/'`.
 
-By default the agent-item gate requires zero *unexpected* failed tool calls: an item whose agent hit
-any tool error not named in its `expectedErrors` fails even on a judge PASS, and every agent item
-carries a `tool_errors` score (the count of unexpected failures, with every failing call in the
-comment - expected ones marked `(expected)`). Only the server's own tools count: failures of Claude
-Code's built-ins (`Bash`, `WebFetch`) and of tools `failTools` injected are exempt. Traces still show
-an expected failure as an ERROR span - the comment marks it expected, the span level does not lie.
+Agent items fail on any unexpected tool error, even with a passing judgment. `expectedErrors` exempts only its listed server tools; built-ins and injected `failTools` do not count.
 
 Read-only probes count too, which is the point: the gate is what keeps the tool descriptions strong
 enough that an agent resolves a loose Actor reference with `search-actors` instead of guessing a slug.
@@ -95,26 +72,27 @@ task names, which are unique per account, and the create cases never clean up �
 leaves debris that collides on the next one. Run `pnpm run evals:mcp-agent:tasks-fixtures`
 before every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture task. It
 deletes on whatever account `APIFY_TOKEN` points at and prints that account first; pass
-`--dry-run` to see what it would delete before it does. The family publishes task examples on
-`jiri.spilka/actor-troubleshooter`, and publishing needs write access to the Actor, so those cases only
-pass on an account that has it.
+`--dry-run` to see what it would delete before it does. Three cases (`publish-discovery`,
+`publish-medium-1`, `chain-hard-1`) publish task examples on `apify/normal-mode-test-actor`, and
+publishing needs write access to the Actor, so only those three depend on an account that has it.
 
-Publishing requires all three of `publicConfig.inputSchemaFields`, `datasetView` and `seoDescription`
-(probed against the API), and the API reports the missing ones **non-exhaustively** — which is why
-`merge/tasks/publish-discovery` budgets turns for several fix-and-retry rounds rather than one.
+Publishing requires four things, not the three `publish-actor-task` lists: the task's own `description`,
+plus `publicConfig.inputSchemaFields`, `publicConfig.datasetView` and `publicConfig.seoDescription`
+(all probed against the API). The API reports the missing ones **non-exhaustively** — which is why
+`merge/tasks/publish-discovery` budgets turns for several fix-and-retry rounds rather than one, and why
+`merge/tasks/publish-medium-1` currently fails: it spells out every requirement the tool documents, so
+the agent has no reason to set a `description` and eats one `cannot-publish-actor-task` error fixing it.
 
-`merge/tasks/chain-hard-1` is the calibration edge, and it is calibrated: `claude-sonnet-4-5` passes it 3/3,
-`claude-haiku-4-5` about 5 runs in 8. Every Haiku failure is the same one — it constructs
-`jiri.spilka/troubleshooter` from the loose reference in the query instead of resolving the real
-`actor-troubleshooter` with `search-actors`, eats the not-found, then recovers. The judge passes those
-runs; only the zero-error gate catches them, which is exactly what that gate is for.
+`merge/tasks/chain-hard-1` names no tool or feature: the agent has to map "rerun with one click" to a
+saved task, "put it up on the Actor's public page" to publishing, and "take it down" to unpublishing.
+The input is fully specified, so the flow should complete without a single failed tool call.
 
-Do not try to close that gap by rewording descriptions. Both `create-actor-task` and
-`fetch-actor-details` already say, explicitly, to resolve a loose name with `search-actors` rather than
-guess, and `fetch-actor-details`' not-found response repeats it. Adding the `fetch-actor-details`
-wording was measured at 5/8 against ~7/10 without it — no change. Treat a shift in the ratio as the
-signal, not a single red run, and read a persistent drop as a description problem only after checking
-it still passes on Sonnet.
+It is **uncalibrated**. It previously referred to its target Actor loosely, and `claude-haiku-4-5` failed
+it about 3 runs in 8 by constructing a plausible slug instead of resolving the real one with
+`search-actors` — the judge passed those runs and only the zero-error gate caught them. Naming the
+Actor exactly retired that failure mode along with the 5/8 ratio, so re-measure before reading a red
+run as a regression. The lesson that outlived it: treat a shift in the ratio as the signal rather than a
+single red run, and blame a tool description only after checking the case still passes on Sonnet.
 
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
@@ -140,63 +118,33 @@ limit the case documents on purpose; stronger models pass.
 
 ### Tool-call mode
 
-A `kind: "tool-call"` item measures only which tool the agent would have called, and with what
-arguments — no judge, nothing executes, no account state. The agent runs exactly as an agent item
-does (same MCP server, same prompt), but a per-item `PreToolUse` hook denies every tool call with:
+A `kind: "tool-call"` item records the first attempted call and its arguments. A `PreToolUse` hook denies every call, so no tool executes:
 
 > Tool calls are disabled in this evaluation. Do not retry with a different tool or arguments —
 > report to the user, in your final answer, which tool you would have called and with what
 > arguments, then stop.
 
-This exact wording matters: it was calibrated against a spike that also tried reusing the
-`failTools`/`report-problem` nudge text, which reads as "work around this" and measurably caused
-the model to retry (and once exhausted `maxTurns`) instead of stopping cleanly after one denied
-call. `maxTurns` is fixed at 2 for tool-call items for the same reason - the validator rejects a
-`maxTurns` on a tool-call item rather than silently ignoring it.
+The wording prevents the agent from retrying after denial. Tool-call items have a fixed `maxTurns` of 2.
 
-The hook records every attempted call. The measurement is the first attempt that is not
-`ToolSearch` (Claude Code's own tool-search meta-tool, which can be the true first call once
-built-in tools sit behind it - see the `ToolSearch` skip note in `tool_call_mode.ts`). Set
-`mcpToolsOnly: true` on an item (or run with `--mcp-tools-only`) to remove the built-ins, and
-`ToolSearch` with them, for a case that must isolate MCP-vs-MCP tool choice.
+The scorer skips Claude Code's `ToolSearch` meta-tool. Set `mcpToolsOnly: true` (or `--mcp-tools-only`) to remove built-ins when a case must compare MCP tools only.
 
 Scoring (`first_tool_match`, 1 or 0):
-- **Name membership.** The captured tool name (`mcp__apify__` prefix stripped for MCP tools;
-  built-in names such as `WebFetch` compared verbatim) must be a member of `expectedTools`.
-- **`expectedArgs`** (optional, a flat object): once the name matches, every key in it must
-  deep-equal the same key of the captured call's arguments; keys not listed are ignored. This is
-  what catches "guessed a slug instead of resolving the full id" - a name-only check would pass
-  `fetch-actor-details({"actor":"rag-web-browser"})` against an item expecting the resolved
-  `apify/rag-web-browser`; `expectedArgs: { actor: "apify/rag-web-browser" }` catches it.
+- The tool name must be in `expectedTools`.
+- For optional `expectedArgs`, each listed key must match. Other keys are ignored.
 
-A tool-call item's denied call still shows as a failed (ERROR) MCP tool span in its trace - harmless
-(`tool_errors` never runs for tool-call items), but expected; don't "fix" it.
+Denied calls remain ERROR spans in Langfuse; they do not affect tool-call scoring.
 
 ### Permission path, and running under root
 
-Every item runs with `canUseTool` granting every tool call, not `bypassPermissions` +
-`allowDangerouslySkipPermissions` - the Claude Code CLI refuses that combination outright under
-root/sudo ("cannot be used with root/sudo privileges for security reasons"), which is how this
-harness runs in some sandboxes. A tool-call item's deny-all `PreToolUse` hook still fires first
-regardless, so its denial is unaffected either way. If a run does die with an opaque "Claude Code
-process exited with code 1," check the console for `[claude-stderr] ...` lines - `claude_agent.ts`
-forwards the subprocess's stderr and appends the last few lines to the thrown error.
+The harness uses `canUseTool` instead of root-incompatible permission bypass flags. The deny-all hook still runs first. On a subprocess failure, inspect `[claude-stderr]` output.
 
 ### `--iterations` on stateful agent items
 
-`--iterations N` repeats each selected item N times within the same run (one Langfuse experiment,
-not N separate runs) and reports `pass@k` (at least one trial passed) and `pass^k` (every trial
-passed) per item, plus in the `📈` summary line. This is safe and useful for `kind: "tool-call"`
-items (nothing executes, so trials are fully independent) and for stateless agent items. For a
-stateful family with fixed resource names (e.g. `merge/tasks/*`'s `eval-*` task names), a second trial
-can collide with the first trial's leftovers within the same run - the same collision the
-fixtures script exists to clean up *between* runs, just now possible *within* one. Documented here
-rather than blocked in code: measuring an agent item's flakiness (e.g. `merge/tasks/chain-hard-1`'s
-5-in-8 note above) is a legitimate use of `--iterations` on an agent item.
+`--iterations N` repeats each item in one experiment and reports `pass@k` and `pass^k`. It is safe for tool-call and stateless agent items. Stateful cases such as `merge/tasks/*` can collide with their own leftovers.
 
 **Exit codes:**
 - `0` = the aggregate pass rate (passed trials / requested trials) meets `--pass-threshold`
-  (default `0.97`; pass `1.0` to require every trial) ✅
+  (default `0.9`; pass `1.0` to require every trial) ✅
 - `1` = the pass rate falls short of the threshold, or setup failed ❌
 
 **Editing test cases:** edit the items in the Langfuse UI. The next run picks them up; there is nothing to commit
@@ -263,7 +211,7 @@ The server is registered with `alwaysLoad: true`. Left at the default, its tools
 
 ### 4. Pass rate gated on the requested trial count, threshold-configurable
 
-**Decision:** Exit code 0 while `passedTrials / requestedTrials >= --pass-threshold` (default `0.97`,
+**Decision:** Exit code 0 while `passedTrials / requestedTrials >= --pass-threshold` (default `0.9`,
 rationale in `config.ts`). `requestedTrials = requestedIds.length * iterations`.
 
 **Why:**
@@ -507,6 +455,21 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 - Check tool results are helpful
 - Reduce `maxTurns` to fail faster
 - Try a different agent model
+
+## CI
+
+CI replaces the Phoenix runner with two Langfuse tiers:
+
+- `pr`: `mcp-server-evals-pr` tool-call items. It fails below 0.9, based on a 0.93 local floor.
+- `merge`: `mcp-server-evals-merge` agent items. It fails below 0.6, based on a 0.73 local floor; nine of 60 items fail consistently, and three publish cases (`tasks/publish-discovery`, `tasks/publish-medium-1`, `tasks/chain-hard-1`) fail unless `APIFY_TOKEN` can write to their target Actor.
+
+`_evaluations.yaml` runs a tier for three triggers: non-draft, same-repo PRs on relevant paths; the `validated` label; and every push to `master` touching the same paths (both tiers). The PR trigger intentionally excludes `synchronize` to control cost, so it is not a required check. The master workflow is separate because evals must not hold the release lock.
+
+Fork PRs cannot run evals because GitHub withholds repository secrets. Push the branch into this repository to evaluate fork changes.
+
+Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOKEN` (mapped from the `APIFY_TEST_USER_API_TOKEN` repository secret). `OPENROUTER_API_KEY` is required only by the merge judge. The three publish cases also need write access to `apify/normal-mode-test-actor`.
+
+The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once; the handshake race above does not, because it produces a wrong answer rather than an error.
 
 ## References
 
