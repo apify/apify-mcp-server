@@ -107,6 +107,17 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.tasks)).toEqual(expected);
         });
 
+        it('should have correct tools in schedules category (both modes)', () => {
+            const expected = [
+                HELPER_TOOLS.SCHEDULE_CREATE,
+                HELPER_TOOLS.SCHEDULE_GET,
+                HELPER_TOOLS.SCHEDULE_UPDATE,
+                HELPER_TOOLS.SCHEDULE_DELETE,
+            ];
+            expect(toolNames(defaultCategories.schedules)).toEqual(expected);
+            expect(toolNames(appsCategories.schedules)).toEqual(expected);
+        });
+
         it('should have correct tools in dev category (both modes)', () => {
             const expected = [HELPER_TOOLS.PROBLEM_REPORT];
             expect(toolNames(defaultCategories.dev)).toEqual(expected);
@@ -520,6 +531,7 @@ describe('tool descriptions never name a tool absent from the session', () => {
         { label: "tools: ['runs']", input: { tools: ['runs'] }, actorTools: [] },
         { label: "tools: ['storage']", input: { tools: ['storage'] }, actorTools: [] },
         { label: "tools: ['actors']", input: { tools: ['actors'] }, actorTools: [] },
+        { label: "tools: ['schedules']", input: { tools: ['schedules'] }, actorTools: [] },
         ...ALL_TOOL_NAMES.map((name) => ({
             label: `tools: ['${name}']`,
             input: { tools: [name] },

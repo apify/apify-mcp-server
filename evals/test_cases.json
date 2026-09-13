@@ -1,5 +1,5 @@
 {
-  "version": "1.11",
+  "version": "1.12",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
@@ -903,6 +903,114 @@
         "update-actor-task"
       ],
       "reference": "The task exists, so this is update-actor-task with a new input. Creating another task with create-actor-task is wrong."
+    },
+    {
+      "id": "create-schedule-1",
+      "category": "create-schedule",
+      "query": "Run my task insta-daily every day at 9am",
+      "expectedTools": [
+        "create-schedule"
+      ],
+      "reference": "It should call create-schedule with a taskId action for 'insta-daily', cronExpression '0 9 * * *'. Not @daily, which fires at a random offset."
+    },
+    {
+      "id": "create-schedule-2",
+      "category": "create-schedule",
+      "query": "Schedule apify/instagram-scraper every Monday morning",
+      "expectedTools": [
+        "create-schedule"
+      ],
+      "reference": "It should call create-schedule with an actorId action for 'apify/instagram-scraper' and a weekly Monday cron expression such as '0 9 * * 1'. create-actor-task is wrong; no task was requested."
+    },
+    {
+      "id": "get-schedule-1",
+      "category": "get-schedule",
+      "query": "Show me my schedule insta-daily",
+      "expectedTools": [
+        "get-schedule"
+      ],
+      "reference": "It should call get-schedule with the schedule name 'insta-daily'."
+    },
+    {
+      "id": "get-schedule-2",
+      "category": "get-schedule",
+      "query": "When does schedule insta-daily run next?",
+      "expectedTools": [
+        "get-schedule"
+      ],
+      "reference": "The next run time is nextRunAt on the schedule, returned by get-schedule for 'insta-daily'. Read-only; no update."
+    },
+    {
+      "id": "update-schedule-1",
+      "category": "update-schedule",
+      "query": "Pause my schedule insta-daily",
+      "expectedTools": [
+        "update-schedule"
+      ],
+      "reference": "Pausing is update-schedule with isEnabled false for 'insta-daily'. delete-schedule is wrong; the schedule must be kept."
+    },
+    {
+      "id": "update-schedule-2",
+      "category": "update-schedule",
+      "query": "Change schedule insta-daily to run every 6 hours",
+      "expectedTools": [
+        "update-schedule"
+      ],
+      "reference": "It should call update-schedule for 'insta-daily' with cronExpression '0 */6 * * *' and no other fields."
+    },
+    {
+      "id": "delete-schedule-1",
+      "category": "delete-schedule",
+      "query": "Delete my schedule insta-daily",
+      "expectedTools": [
+        "delete-schedule"
+      ],
+      "reference": "It should call delete-schedule with the schedule name 'insta-daily'."
+    },
+    {
+      "id": "delete-schedule-2",
+      "category": "delete-schedule",
+      "query": "Remove the schedule weekly-report",
+      "expectedTools": [
+        "delete-schedule"
+      ],
+      "reference": "Removing a schedule is delete-schedule with the schedule name 'weekly-report'. update-schedule with isEnabled false is wrong; the user asked for removal, not a pause."
+    },
+    {
+      "id": "tool-selection-schedule-1",
+      "category": "tool-selection",
+      "query": "Pause my daily schedule insta-daily",
+      "expectedTools": [
+        "update-schedule"
+      ],
+      "reference": "Pausing keeps the schedule, so this is update-schedule with isEnabled false. delete-schedule is wrong."
+    },
+    {
+      "id": "tool-selection-schedule-2",
+      "category": "tool-selection",
+      "query": "Schedule my task insta-daily every day at 9am",
+      "expectedTools": [
+        "create-schedule"
+      ],
+      "reference": "It should call create-schedule with cronExpression '0 9 * * *' and a taskId action for 'insta-daily'. @daily is wrong because it fires at a random offset, not at 9am."
+    },
+    {
+      "id": "tool-selection-schedule-3",
+      "category": "tool-selection",
+      "query": "Add my task weekly-report to schedule insta-daily",
+      "expectedTools": [
+        "get-schedule"
+      ],
+      "reference": "An update replaces all actions, so the current actions of 'insta-daily' must be read with get-schedule first, then update-schedule is called with the full list including 'weekly-report'. Calling update-schedule with only the new action is wrong."
+    },
+    {
+      "id": "tool-selection-schedule-4",
+      "category": "tool-selection",
+      "query": "Save this instagram-scraper configuration as a task called insta-daily",
+      "expectedTools": [
+        "create-actor-task"
+      ],
+      "reference": "Saving a configuration is create-actor-task. No schedule was requested, so create-schedule is wrong."
     }
   ]
 }

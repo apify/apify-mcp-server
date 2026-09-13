@@ -45,12 +45,12 @@ export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
 
 pnpm install --frozen-lockfile
 pnpm run evals:create-dataset  # one-time: creates dataset from test_cases.json
-pnpm run evals:run              # runs evaluation on default dataset (v1.11)
+pnpm run evals:run              # runs evaluation on default dataset (v1.12)
 ```
 
 ### Using a specific dataset version
 
-By default, the evaluation uses the dataset version from `test_cases.json` (`v1.11`). To use a different dataset:
+By default, the evaluation uses the dataset version from `test_cases.json` (`v1.12`). To use a different dataset:
 
 ```bash
 # Create a new dataset with custom name
@@ -62,7 +62,12 @@ pnpm run evals:run -- --dataset-name mcp_server_dataset_v1.3
 
 ## Test cases
 
-**Current version: v1.11**
+**Current version: v1.12**
+
+**Changes in v1.12:**
+- Added schedule cases: `create-schedule`, `get-schedule`, `update-schedule`, `delete-schedule`
+- Added four `tool-selection` cases: pause is update-schedule not delete-schedule, a named time is a cron expression not @daily, adding an action reads the schedule first, saving a configuration stays create-actor-task
+- Exposed the `schedules` category in `loadTools()` so these cases have their tools available
 
 **Changes in v1.11:**
 - Added publish recovery cases for resolved permission failures and incomplete public configuration
@@ -85,7 +90,7 @@ pnpm run evals:run -- --dataset-name mcp_server_dataset_v1.3
   - search-actors: Emphasizes finding/discovering what tools exist (informational intent)
   - apify--rag-web-browser: Emphasizes getting/retrieving actual data (data retrieval intent)
 
-Test categories: `fetch-actor-details`, `search-actors`, `apify--rag-web-browser`, `search-apify-docs`, `call-actor`, `get-dataset-items`, `fetch-apify-docs`, `get-dataset`, `get-dataset-schema`, `get-dataset-list`, `get-key-value-store-record`, `get-key-value-store-keys`, `get-key-value-store`, `get-key-value-store-list`
+Test categories: `fetch-actor-details`, `search-actors`, `apify--rag-web-browser`, `search-apify-docs`, `call-actor`, `get-dataset-items`, `fetch-apify-docs`, `get-dataset`, `get-dataset-schema`, `get-dataset-list`, `get-key-value-store-record`, `get-key-value-store-keys`, `get-key-value-store`, `get-key-value-store-list`, `create-schedule`, `get-schedule`, `update-schedule`, `delete-schedule`
 
 ## Output
 

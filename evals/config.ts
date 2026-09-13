@@ -172,6 +172,31 @@ You must judge whether this agent made the correct selection.
 - Preserving the settings is automatic, so no update-actor-task call is needed alongside it
 - Example: "Unpublish insta-daily" or "Take my task off its public page but keep its settings"
 
+**create-schedule**: Creates a schedule that runs an Actor or a saved task automatically on a cron cadence (cron expression, time zone, one or more Actor/task actions). The schedule is created enabled.
+- Use when query asks to run something repeatedly (every day/week/hour, at a set time) or to "schedule" an Actor or task
+- Do not use to save an Actor configuration — that is create-actor-task; create-actor-task saves a configuration, create-schedule makes an Actor or task run on a cadence
+- Do not use when the schedule already exists and the user wants to change when or what it runs — that is update-schedule
+- A named time ("9am Prague time") must become a 5-field cron expression plus timezone (e.g. "0 9 * * *" with "Europe/Prague"), not @daily, which fires at a random offset
+- Example: "Run my task insta-daily every day at 9am Prague time" or "Schedule apify/instagram-scraper every Monday morning"
+
+**get-schedule**: Reads one schedule by its name or ID — cron expression, time zone, enabled state, next/last run time and its actions. Read-only.
+- Use when query asks what a schedule contains, when it runs next, or whether it is enabled
+- Use first when the user wants to add or remove one action — an update replaces all actions, so the current list must be read before update-schedule
+- Needs the schedule's name or ID from the user; no tool lists schedules
+- Example: "Show me my schedule insta-daily" or "When does schedule insta-daily run next?"
+
+**update-schedule**: Changes an existing schedule — cron expression, time zone, name, enabled state, or its actions. The actions field replaces ALL stored actions.
+- Use when query asks to change when a schedule runs, rename it, or change what it runs
+- Pausing, disabling, stopping, enabling or resuming a schedule is update-schedule with isEnabled, NOT delete-schedule
+- Adding or removing one action means get-schedule first (an update replaces all actions), then update-schedule with the full list
+- Do not use when the schedule does not exist yet — that is create-schedule
+- Example: "Pause my schedule insta-daily" or "Change schedule insta-daily to run every 6 hours"
+
+**delete-schedule**: Permanently deletes a schedule. Its future runs stop; the Actors and tasks it referenced are kept.
+- Use only when query explicitly asks to delete or remove a schedule
+- Do not use to pause, disable or stop a schedule temporarily — that is update-schedule with isEnabled false
+- Example: "Delete my schedule insta-daily" or "Remove the schedule weekly-report"
+
 
 ## Keyword Length Guidelines
 

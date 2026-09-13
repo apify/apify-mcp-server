@@ -44,8 +44,9 @@ export async function loadTools(): Promise<ToolBase[]> {
     const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
     // Expose the storage category so dataset/KV tool-selection cases have their tools available;
     // the default toolset only auto-injects get-dataset-items and get-key-value-store-record.
-    // `tasks` is here for the same reason - without it the task cases have no tool to select.
-    const urlTools = await processParamsGetTools('?tools=actors,docs,storage,tasks', apifyClient);
+    // `tasks` and `schedules` are here for the same reason - without them the task and schedule cases
+    // have no tool to select.
+    const urlTools = await processParamsGetTools('?tools=actors,docs,storage,tasks,schedules', apifyClient);
     return urlTools.map((t: ToolEntry) => getToolPublicFieldOnly(t)) as ToolBase[];
 }
 

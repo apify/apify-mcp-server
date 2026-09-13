@@ -20,7 +20,7 @@ const APIFY_ID_REGEX = /^[a-zA-Z0-9]{17}$/;
  * resolved against the authenticated user's own resources. Ids that already carry a username, in either
  * the `username/name` or `username~name` format, and ids that are already IDs, are returned unchanged.
  *
- * Applies to both tasks and the Actor a task is created for, which the API resolves the same way.
+ * Applies to tasks, the Actor a task is created for, and schedules, which the API resolves the same way.
  */
 export function toSafeResourceId(idOrName: string): string {
     const trimmed = idOrName.trim();
@@ -35,20 +35,29 @@ export function isAmbiguousResourceId(idOrName: string): boolean {
 }
 
 /**
- * Fetches a task by ID, name, or `username/name`. An ambiguous value cannot be resolved by
- * inspection, so it is read as an ID first and, on a miss, retried as the caller's own task name.
+ * Fetches a resource by ID, name, or `username/name` through `fetch`, which receives the API-safe id.
+ * An ambiguous value cannot be resolved by inspection, so it is read as an ID first and, on a miss,
+ * retried as the caller's own resource name.
  */
+export async function getResourceByIdOrName<T>(
+    idOrName: string,
+    fetch: (safeId: string) => Promise<T | undefined>,
+): Promise<T | undefined> {
+    const resource = await fetch(toSafeResourceId(idOrName));
+    if (resource || !isAmbiguousResourceId(idOrName)) return resource;
+    return fetch(`~${idOrName.trim()}`);
+}
+
+/** Fetches a task by ID, name, or `username/name`. */
 export async function getTaskByIdOrName(client: ApifyClient, idOrName: string): Promise<Task | undefined> {
-    const task = await client.task(toSafeResourceId(idOrName)).get();
-    if (task || !isAmbiguousResourceId(idOrName)) return task;
-    return client.task(`~${idOrName.trim()}`).get();
+    return getResourceByIdOrName(idOrName, async (safeId) => client.task(safeId).get());
 }
 
 /**
  * Task names must be DNS-safe and 3-63 characters, as the API enforces. Validated here so the
  * caller gets a usable message instead of a 400.
  */
-const TASK_NAME_REGEX = /^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])$/;
+export const TASK_NAME_REGEX = /^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])$/;
 
 export const taskNameSchema = z
     .string()
