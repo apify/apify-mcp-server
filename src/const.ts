@@ -47,7 +47,7 @@ export const HELPER_TOOLS = {
     ACTOR_RUNS_ABORT: 'abort-actor-run',
     ACTOR_RUNS_GET: 'get-actor-run',
     ACTOR_RUNS_GET_WIDGET: 'get-actor-run-widget',
-    ACTOR_RUNS_LOG: 'get-actor-log',
+    ACTOR_RUNS_LOG: 'get-actor-run-log',
     ACTOR_RUN_LIST_GET: 'get-actor-run-list',
     ACTOR_TASK_GET: 'get-actor-task',
     ACTOR_TASK_CREATE: 'create-actor-task',
@@ -72,11 +72,17 @@ export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
 
 /**
  * Retired tool selectors: `add-actor` and `experimental` (add-actor was deleted in the stateless
- * migration) and the deprecated `preview` pseudo-category. They name neither a registry category
- * nor a real tool anymore, so they resolve to nothing — never loaded, never treated as an Actor ID,
- * never requiring a token by themselves.
+ * migration), the deprecated `preview` pseudo-category, and `get-actor-log` (renamed to
+ * `get-actor-run-log`). They name neither a registry category nor a real tool anymore, so they
+ * resolve to nothing — never loaded, never treated as an Actor ID, never requiring a token by
+ * themselves.
  */
-export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set(['add-actor', 'experimental', 'preview']);
+export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
+    'add-actor',
+    'experimental',
+    'preview',
+    'get-actor-log',
+]);
 
 /**
  * Client-name substrings (lowercased, matched against `clientInfo.name`) that `report-problem` is
