@@ -314,6 +314,17 @@ describe('push-actor', () => {
             expect(structuredContent).toMatchObject({ actorName: 'john/my-actor' });
         });
 
+        it('matches the username prefix case-insensitively and returns the account spelling', async () => {
+            const { structuredContent } = await callTool({
+                actorName: 'John/my-actor',
+                files: [MAIN_JS],
+                build: false,
+            });
+
+            expect(actorMock).toHaveBeenCalledWith('john/my-actor');
+            expect(structuredContent).toMatchObject({ actorName: 'john/my-actor' });
+        });
+
         it('creates the Actor under its bare name when the username/name form is given', async () => {
             actorGetMock.mockResolvedValue(undefined);
 
@@ -504,9 +515,17 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
-        it('rejects base64 content that is not valid base64', async () => {
+        // The check is strict on purpose: Buffer.from skips bad characters, so wrapped or truncated
+        // base64 would otherwise upload silently corrupted bytes.
+        it.each([
+            ['not base64!', 'invalid characters'],
+            ['YWJj\n', 'a trailing newline'],
+            ['YWJj ZA==', 'whitespace between quartets'],
+            ['YWJ', 'an incomplete quartet'],
+            ['YW=j', 'misplaced padding'],
+        ])('rejects base64 content %j (%s)', async (content, _reason) => {
             const { text } = await callToolExpectingUserError({
-                files: [{ path: 'blob.bin', content: 'not base64!', encoding: 'base64' }],
+                files: [{ path: 'blob.bin', content, encoding: 'base64' }],
             });
 
             expect(text).toBe("File 'blob.bin' has encoding base64 but its content is not valid base64.");
@@ -559,6 +578,20 @@ describe('push-actor', () => {
             expectNoWrite();
             expect(userGetMock).not.toHaveBeenCalled();
             expect(actorGetMock).not.toHaveBeenCalled();
+        });
+
+        it('accepts a merge that adds .actor/actor.json to a version that lacks it', async () => {
+            versionGetMock.mockResolvedValue(
+                mockVersion({ sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: 'old' }] }),
+            );
+
+            const { structuredContent } = await callTool({ files: [ACTOR_JSON, MAIN_JS], build: false });
+
+            expect(versionUpdateMock).toHaveBeenCalledWith({
+                sourceType: 'SOURCE_FILES',
+                sourceFiles: [ACTOR_JSON_SOURCE, MAIN_JS_SOURCE],
+            });
+            expect(structuredContent).toMatchObject({ filesPushed: 2 });
         });
 
         it('requires .actor/actor.json when merging into a version that lacks it too', async () => {
