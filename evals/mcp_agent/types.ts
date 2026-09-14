@@ -1,5 +1,5 @@
 /**
- * Type definitions for workflow evaluation system
+ * Type definitions for MCP agent evaluation system
  */
 
 /**

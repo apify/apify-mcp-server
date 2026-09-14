@@ -41,6 +41,24 @@ export type LlmResponse = {
 const TEMPERATURE = 0.15;
 
 /**
+ * What the judge needs from an LLM client. Implemented by {@link LlmClient} (OpenRouter)
+ * and `ClaudeLlmClient` (Claude Agent SDK, `--claude-judge`).
+ */
+export type JudgeLlmClient = Pick<LlmClient, 'callLlm'>;
+
+/** Langfuse generation-update fields for a usage report; empty when the provider sent none. */
+export function toUsageDetails(usage?: LlmUsage): { usageDetails?: { input: number; output: number; total: number } } {
+    if (!usage) return {};
+    return {
+        usageDetails: {
+            input: usage.promptTokens,
+            output: usage.completionTokens,
+            total: usage.totalTokens,
+        },
+    };
+}
+
+/**
  * LLM client for chat completions with optional tool support
  */
 export class LlmClient {
@@ -79,15 +97,7 @@ export class LlmClient {
                 const llmResponse = await this.sendRequest(messages, model, tools, responseFormat);
                 generation.update({
                     output: llmResponse.toolCalls ?? llmResponse.content,
-                    ...(llmResponse.usage
-                        ? {
-                              usageDetails: {
-                                  input: llmResponse.usage.promptTokens,
-                                  output: llmResponse.usage.completionTokens,
-                                  total: llmResponse.usage.totalTokens,
-                              },
-                          }
-                        : {}),
+                    ...toUsageDetails(llmResponse.usage),
                 });
                 return llmResponse;
             },

@@ -32,7 +32,13 @@ import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
-import { getActors, getToolsForServerMode, toolNamesToInput } from '../utils/tools_loader.js';
+import {
+    getActors,
+    getToolsForServerMode,
+    isReportProblemExplicitlySelected,
+    resolveToolNamesFromInput,
+    toolNamesToInput,
+} from '../utils/tools_loader.js';
 import { buildMcpClientContext, isUiSupportedByClient } from './client_context.js';
 import type { McpClientContext } from './client_context.js';
 import { LegacyMcpServer } from './legacy_server.js';
@@ -271,22 +277,31 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Server instructions for the current connection: mode plus whether report-problem is loaded.
+     * Server instructions for the current connection: mode plus the session's real tool set.
      * Read by the legacy adapter after `applyInitialize`, when the tool set is final.
      */
     public getServerInstructions(): string {
-        return getServerInstructions(this.serverMode, this.tools.has(HELPER_TOOLS.PROBLEM_REPORT));
+        return getServerInstructions(this.serverMode, { hasTool: (name) => this.tools.has(name) });
     }
 
     /**
-     * Instructions for a stateless serving unit. The SDK answers `server/discover` from them before
-     * any request's envelope is seen, so they are configuration-level: no report-problem mention
-     * (that tool's presence is decided per request) and the configured mode only. Reads
-     * `serverModeOption`, never `_serverMode` — one facade serves both eras, and a legacy
-     * `initialize` rewrites `_serverMode`, which must not leak into later stateless requests.
+     * Instructions for a stateless serving unit, answered from `server/discover` before any request is
+     * seen — configuration-level only, reading `serverModeOption` (never `_serverMode`, so a legacy
+     * `initialize` can't leak its mode into stateless requests).
+     *
+     * `requestUrl`, when given, resolves cross-tool mentions from `?tools=`/`?actors=` with no fetch;
+     * omit it for the same "everything but report-problem" fallback. `report-problem` is always
+     * excluded here even when explicitly selected — telemetry state (the other bypass guard) isn't
+     * known yet at `server/discover` time, only at request time.
      */
-    public getStatelessServerInstructions(): string {
-        return getServerInstructions(resolveServerMode(this.serverModeOption, false));
+    public getStatelessServerInstructions(requestUrl?: string): string {
+        const mode = resolveServerMode(this.serverModeOption, false);
+        const notReportProblem = (name: string) => name !== HELPER_TOOLS.PROBLEM_REPORT;
+        if (requestUrl === undefined) {
+            return getServerInstructions(mode, { hasTool: notReportProblem });
+        }
+        const toolNames = resolveToolNamesFromInput(parseInputParamsFromUrl(requestUrl), mode);
+        return getServerInstructions(mode, { hasTool: (name) => notReportProblem(name) && toolNames.has(name) });
     }
 
     /**
@@ -338,10 +353,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * report-problem unless servable for that view ({@link isReportProblemServable}). Load paths
      * and the initialize flush pass the instance's own {@link servingContext};
      * {@link createRequestSnapshot} passes a view derived from one stateless request.
+     * An explicit opt-in in `source.input` applies to every request reusing this retained source.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
         const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
-        if (this.isReportProblemServable(view)) return tools;
+        if (this.isReportProblemServable(view, source.input)) return tools;
         return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
     }
 
@@ -350,14 +366,15 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * would vanish into the void) and never before a client context exists — on a stateful
      * connection the initialize flush re-adds it once the handshake supplies one.
      *
+     * Explicit selection ({@link isReportProblemExplicitlySelected}) bypasses the blocklist only.
+     *
      * The stateless envelope requires protocol and capability metadata but not `clientInfo`. A
      * request declaring no client name matches no blocked substring and is served the tool by
      * policy.
      */
-    private isReportProblemServable(view: ServingContext): boolean {
-        return (
-            this.telemetryEnabled && view.clientContext != null && !isReportProblemBlockedForClient(view.clientContext)
-        );
+    private isReportProblemServable(view: ServingContext, input: Input): boolean {
+        if (!this.telemetryEnabled || view.clientContext == null) return false;
+        return isReportProblemExplicitlySelected(input) || !isReportProblemBlockedForClient(view.clientContext);
     }
 
     private composePendingToolsForClient(): void {
