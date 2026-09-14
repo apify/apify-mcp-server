@@ -512,15 +512,16 @@ operational limits explicitly.
 ### Improving a failing tool
 
 1. **Start with the `pr` tier.** Its tool-call items are unjudged — the item records the
-   first attempted call and nothing executes — so a failure is a plain wrong-tool signal,
-   easier to read than a `merge`-tier judge score.
+   first attempted call and nothing executes — so a failure is a plain wrong-tool or
+   wrong-args signal, easier to read than a `merge`-tier judge score.
 2. **Read the trace for what that tier records.** On a `pr` item, read the
    first-attempted-call comment: every tool span there is an ERROR by design (the deny-all
    hook), so red spans say nothing about pass or fail. On a `merge` item, read the judge's
-   reasoning. A run that crashed before the tree was emitted leaves no trace at all.
-3. **Confirm it is a regression** before touching a description: treat a shift in the pass
-   ratio as the signal rather than a single red run, and check the case still passes on
-   Sonnet — see [Two datasets](#two-datasets-kind-id-scheme-and-expectederrors).
+   reasoning. A run that crashed before the tree was emitted leaves no spans — only the
+   SDK's item-run root.
+3. **Confirm it is a regression** before touching a description — see
+   [Two datasets](#two-datasets-kind-id-scheme-and-expectederrors) for why a single red run
+   is not the signal.
 4. **Change one tool at a time.** Simultaneous edits are untraceable.
 5. **Iterate on a subset**, then re-run the full dataset — fixing one case often breaks
    another.
