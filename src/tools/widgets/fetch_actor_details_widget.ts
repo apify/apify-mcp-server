@@ -10,7 +10,11 @@ import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
-import { actorDetailsOutputDefaults, buildActorNotFoundResponse } from '../actors/fetch_actor_details.js';
+import {
+    actorDetailsOutputDefaults,
+    buildActorNotFoundResponse,
+    buildActorNotRunnableGuidance,
+} from '../actors/fetch_actor_details.js';
 import { actorDetailsWidgetOutputSchema } from '../structured_output_schemas.js';
 
 const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
@@ -63,7 +67,7 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { apifyToken, apifyClient, mcpSessionId, loadedToolNames } = toolArgs;
+        const { apifyToken, apifyClient, mcpSessionId, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = fetchActorDetailsWidgetArgsSchema.parse(toolArgs.args);
         const actorName = fixActorNameInputAndLog(parsed.actor, {
             mcpSessionId,
@@ -95,6 +99,9 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
             An interactive widget has been rendered with detailed Actor information.
         `,
         ];
+        // Resolved Actor ID, not the raw `actor` input.
+        const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
+        if (runnableGuidance) texts.push(runnableGuidance);
 
         return respondOk(texts, {
             structuredContent,

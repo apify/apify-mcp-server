@@ -22,6 +22,8 @@ export interface SuiteClientOptions {
     };
     serverMode?: string; // ?ui=
     payment?: string; // ?payment=
+    /** Attribution tag for `?client=`; a space encodes as `+` on the wire (e.g. 'claude connector' -> `?client=claude+connector`). */
+    client?: string;
     clientCapabilities?: ClientCapabilities;
     /** Bearer token. Omitted → `APIFY_TOKEN`. `null` → no Authorization header. */
     token?: string | null;
@@ -49,19 +51,26 @@ function buildAuthHeaders(options?: SuiteClientOptions): Record<string, string> 
 }
 
 function appendSearchParams(url: URL, options?: SuiteClientOptions): void {
-    const { actors, tools, telemetry, serverMode, payment } = options ?? {};
+    const { actors, tools, telemetry, serverMode, payment, client } = options ?? {};
     if (actors !== undefined) url.searchParams.append('actors', actors.join(','));
     if (tools !== undefined) url.searchParams.append('tools', tools.join(','));
     // Default to false for tests when not explicitly set.
     url.searchParams.append('telemetry-enabled', (telemetry?.enabled ?? false).toString());
     if (serverMode !== undefined) url.searchParams.append('ui', serverMode);
     if (payment) url.searchParams.append('payment', payment);
+    if (client !== undefined) url.searchParams.append('client', client);
+}
+
+/** The exact URL a client with these options connects to — exported so tests can assert on it directly. */
+export function buildClientUrl(serverUrl: string, options?: SuiteClientOptions): URL {
+    const url = new URL(serverUrl);
+    appendSearchParams(url, options);
+    return url;
 }
 
 export async function createMcpStreamableClient(serverUrl: string, options?: SuiteClientOptions): Promise<Client> {
     checkToken(options);
-    const url = new URL(serverUrl);
-    appendSearchParams(url, options);
+    const url = buildClientUrl(serverUrl, options);
 
     const transport = new StreamableHTTPClientTransport(url, {
         requestInit: { headers: buildAuthHeaders(options) },
@@ -81,8 +90,7 @@ export async function createMcpStatelessClient(
     options?: SuiteClientOptions,
 ): Promise<StatelessClient> {
     checkToken(options);
-    const url = new URL(serverUrl);
-    appendSearchParams(url, options);
+    const url = buildClientUrl(serverUrl, options);
 
     const transport = new StatelessStreamableHTTPClientTransport(url, {
         requestInit: { headers: buildAuthHeaders(options) },

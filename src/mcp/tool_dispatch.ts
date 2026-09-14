@@ -15,7 +15,7 @@ import { logHttpError } from '../utils/logging.js';
 import { respondErrorNoTelemetry } from '../utils/mcp.js';
 import type { createProgressTracker } from '../utils/progress.js';
 import { applyToolTelemetry, buildExecutionDiagnostics } from '../utils/tool_status.js';
-import { buildActorFields } from '../utils/tools.js';
+import { buildActorFields, extractActorId } from '../utils/tools.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import type { RemoteMcpCallOutcome } from './remote_tool_call.js';
 import { withRemoteMcpClient } from './remote_tool_call.js';
@@ -108,6 +108,9 @@ export async function dispatchToolCall(params: {
                     actorStore,
                     paymentProvider,
                     loadedToolNames: Array.from(tools.keys()),
+                    loadedActorIds: new Set(
+                        Array.from(tools.values(), extractActorId).filter((id): id is string => id !== undefined),
+                    ),
                     progressTracker,
                     mcpSessionId,
                     taskMode,

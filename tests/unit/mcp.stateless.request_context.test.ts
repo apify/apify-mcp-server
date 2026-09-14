@@ -292,14 +292,28 @@ describe('createStatelessServer() request context', () => {
             );
         });
 
-        it('hides report-problem from a blocklisted client', async () => {
+        it('hides report-problem from a blocklisted client when served via default injection (not explicit)', async () => {
+            await withStatelessServer(
+                async ({ server, call }) => {
+                    // Default (no tools=) injection, not an explicit opt-in — the blocklist applies.
+                    await loadSource(server, [], {});
+
+                    const response = await call('tools/list', {}, { client: { name: 'claude-ai' } });
+
+                    expect(toolNames(response.result)).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                },
+                { telemetry: { enabled: true } },
+            );
+        });
+
+        it('serves report-problem to a blocklisted client when explicitly selected via tools=', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {
                     await loadSource(server, [], { tools: [HELPER_TOOLS.PROBLEM_REPORT] });
 
                     const response = await call('tools/list', {}, { client: { name: 'claude-ai' } });
 
-                    expect(toolNames(response.result)).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                    expect(toolNames(response.result)).toContain(HELPER_TOOLS.PROBLEM_REPORT);
                 },
                 { telemetry: { enabled: true } },
             );
@@ -389,6 +403,14 @@ describe('createStatelessServer() request context', () => {
                 );
             },
         );
+
+        // Regression: pre-gating default is "all but report-problem", not "nothing" — must still mention call-actor.
+        it('mentions call-actor unconditionally, before any request establishes the real tool set', async () => {
+            await withStatelessServer(async ({ call }) => {
+                const discovered = await call('server/discover', {}, { client: { name: 'test-client' } });
+                expect(discovered.result?.instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
+            });
+        });
     });
 
     describe('retained tool sources', () => {
@@ -429,9 +451,8 @@ describe('createStatelessServer() request context', () => {
         it('resolves each concurrent request from its own declared identity only', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {
-                    await loadSource(server, [], {
-                        tools: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.PROBLEM_REPORT],
-                    });
+                    // Default injection, not explicit — blocklist still applies here.
+                    await loadSource(server, [], {});
 
                     const [uiClient, blockedClient] = await Promise.all([
                         call('tools/list', {}, { client: { name: 'ui-client', supportsUi: true } }),

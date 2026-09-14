@@ -1,6 +1,6 @@
 // Actor input const
 export const ACTOR_README_MAX_LENGTH = 5_000;
-// Actor enum property max length, we need to make sure that most of the enum values fit into the input (such as geocodes)
+// Max total chars for an enum/items.enum to show in full; over this it's dropped entirely.
 export const ACTOR_ENUM_MAX_LENGTH = 2000;
 export const ACTOR_MAX_DESCRIPTION_LENGTH = 500;
 
@@ -89,7 +89,7 @@ export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set(['add-actor',
  * connection on the 2025 path, per request on the 2026-07-28 one. Stateless `client-info` is
  * optional; a request declaring no client name matches no blocked substring and is served the tool
  * by policy. Substring matching covers new client builds without a maintained allowlist;
- * over-matching only hides an optional tool.
+ * over-matching only hides an optional tool. Bypassed by explicit `?tools=report-problem`/`dev`.
  */
 export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
 

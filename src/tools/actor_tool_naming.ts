@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import log from '@apify/log';
 
+import { HELPER_TOOLS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { ActorInfo } from '../types.js';
 import { ACTOR_TOOL_MODE } from '../types.js';
@@ -55,7 +56,8 @@ export function parseActorFullName(actorFullName: string): { escapedUsername: st
 }
 
 export function actorNameToToolName(actorFullName: string): string {
-    const { escapedUsername, actorName } = parseActorFullName(actorFullName);
+    const normalizedActorFullName = actorFullName.replace(/^([^~]+)~/, '$1/');
+    const { escapedUsername, actorName } = parseActorFullName(normalizedActorFullName);
     const fullName = escapedUsername === null ? actorName : `${escapedUsername}--${actorName}`;
 
     if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
@@ -63,7 +65,7 @@ export function actorNameToToolName(actorFullName: string): string {
     }
 
     // Truncate and add hash for uniqueness
-    const hash = createHash('sha256').update(actorFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
+    const hash = createHash('sha256').update(normalizedActorFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
     return `${fullName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
 }
 
@@ -78,4 +80,13 @@ export function legacyToolNameToNew(name: string): string | null {
 
 export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
+}
+
+/** Whether this session can run this Actor (call-actor, or the Actor's own tool, loaded); soft check for a guidance hint, not a hard gate. */
+export function canRunActor(
+    actorId: string,
+    loadedToolNames: readonly string[],
+    loadedActorIds: ReadonlySet<string>,
+): boolean {
+    return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL) || loadedActorIds.has(actorId);
 }

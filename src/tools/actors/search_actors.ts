@@ -20,6 +20,7 @@ import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
+import { canRunActor } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -130,6 +131,21 @@ export function buildNoActorsFoundInstructions(keywords: string): string {
     `;
 }
 
+/** Caveat for the whole result list — appended only when at least one result lacks a run path. */
+export function buildActorCallabilityCaveat(
+    actorIds: readonly string[],
+    loadedToolNames: readonly string[],
+    loadedActorIds: ReadonlySet<string>,
+): string {
+    const anyResultCannotRun = actorIds.some((id) => !canRunActor(id, loadedToolNames, loadedActorIds));
+    if (!anyResultCannotRun) return '';
+    return dedent`
+        This session can run only Actors already exposed as dedicated tools. Other Actors found
+        here are informational and cannot be run in this configuration. To use another Actor, open
+        its Apify page or configure it separately.
+    `;
+}
+
 /**
  * Builds the footer/instructions guidance for successful search results.
  * Interpolates the verbatim links nudge if applicable.
@@ -139,7 +155,12 @@ export function buildNoActorsFoundInstructions(keywords: string): string {
  * otherwise be told to call a tool absent from its own `tools/list`.
  * See apify/apify-mcp-server#1296.
  */
-export function buildSearchActorsFooter(verbatimLinksNudge: string, loadedToolNames: readonly string[]): string {
+export function buildSearchActorsFooter(
+    verbatimLinksNudge: string,
+    actorIds: readonly string[],
+    loadedToolNames: readonly string[],
+    loadedActorIds: ReadonlySet<string>,
+): string {
     const detailsHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? dedent`
             If you need more detailed information about any of these Actors, including their input
@@ -152,7 +173,8 @@ export function buildSearchActorsFooter(verbatimLinksNudge: string, loadedToolNa
         (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
         you haven't missed a better Actor.${verbatimLinksNudge}
     `;
-    return detailsHint ? `${detailsHint}\n${secondSearch}` : secondSearch;
+    const callabilityCaveat = buildActorCallabilityCaveat(actorIds, loadedToolNames, loadedActorIds);
+    return [detailsHint, secondSearch, callabilityCaveat].filter(Boolean).join('\n');
 }
 
 /**
@@ -176,7 +198,7 @@ export const searchActors: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames } = toolArgs;
+        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = searchActorsBaseArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
@@ -202,12 +224,14 @@ export const searchActors: ToolEntry = Object.freeze({
         const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
         const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, linkContext);
         const verbatimLinksNudge = linkContext ? `\n${VERBATIM_LINKS_NUDGE}` : '';
+        const actorIds = actors.map((actor) => actor.id);
+        const footer = buildSearchActorsFooter(verbatimLinksNudge, actorIds, loadedToolNames, loadedActorIds);
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,
             count: actors.length,
             userTier: userPlanTier,
-            instructions: buildSearchActorsFooter(verbatimLinksNudge, loadedToolNames),
+            instructions: footer,
         };
 
         // Build header and footer with separate `dedent` calls and concatenate around
@@ -221,7 +245,6 @@ export const searchActors: ToolEntry = Object.freeze({
 
             # Actors:
         `;
-        const footer = buildSearchActorsFooter(verbatimLinksNudge, loadedToolNames);
         return respondOk(`${header}\n\n${actorCardText}\n\n${footer}`, { structuredContent });
     },
 } as const satisfies HelperTool);
