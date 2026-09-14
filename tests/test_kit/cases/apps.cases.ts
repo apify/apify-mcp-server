@@ -218,6 +218,9 @@ export const appsCases: Case[] = [
                 expect(resource, `missing widget resource ${uri}`).toBeDefined();
                 expect(resource?.mimeType).toBe(RESOURCE_MIME_TYPE);
                 expect((resource?._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri).toBe(uri);
+                // Omitted on purpose: alongside `ui.resourceUri` it makes MCP Jam's detectUIType()
+                // pick the legacy ChatGPT renderer, which does not speak JSON-RPC. See widgets.ts.
+                expect(resource?._meta).not.toHaveProperty('openai/outputTemplate');
             }
         }),
     },
