@@ -611,13 +611,36 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
-        it('requires .actor/actor.json in replace mode before any API call', async () => {
+        it('requires .actor/actor.json when replacing the files of an existing version', async () => {
             const { text } = await callToolExpectingUserError({ files: [MAIN_JS], mode: 'replace' });
 
             expect(text).toBe(ACTOR_CONFIG_MISSING_TEXT);
             expectNoWrite();
-            expect(userGetMock).not.toHaveBeenCalled();
-            expect(actorGetMock).not.toHaveBeenCalled();
+        });
+
+        it('lists the existing versions when a replace would create a version without .actor/actor.json', async () => {
+            actorGetMock.mockResolvedValue(mockActor(['0.0', '0.1']));
+            versionGetMock.mockResolvedValue(undefined);
+
+            const { text } = await callToolExpectingUserError({
+                files: [MAIN_JS],
+                versionNumber: '0.2',
+                mode: 'replace',
+            });
+
+            expect(text).toBe(
+                `Version 0.2 does not exist and would be created (this Actor has versions: 0.0, 0.1). ${ACTOR_CONFIG_MISSING_TEXT}`,
+            );
+            expectNoWrite();
+        });
+
+        it('requires .actor/actor.json when creating the Actor in replace mode', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+
+            const { text } = await callToolExpectingUserError({ files: [MAIN_JS], mode: 'replace' });
+
+            expect(text).toBe(ACTOR_CONFIG_MISSING_TEXT);
+            expectNoWrite();
         });
 
         it('accepts a merge that adds .actor/actor.json to a version that lacks it', async () => {

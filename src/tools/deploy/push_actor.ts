@@ -1,4 +1,13 @@
-import type { ActorCollectionCreateOptions, ActorVersionSourceFile, ActorVersionSourceFiles, Build } from 'apify-client';
+import type {
+    Actor,
+    ActorClient,
+    ActorCollectionCreateOptions,
+    ActorVersion,
+    ActorVersionClient,
+    ActorVersionSourceFile,
+    ActorVersionSourceFiles,
+    Build,
+} from 'apify-client';
 import { ActorSourceType, ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
@@ -8,6 +17,7 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
+import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { ABORT, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
@@ -20,6 +30,7 @@ import {
     mergeSourceFiles,
     MULTIFILE_SOURCE_MAX_BYTES,
     MULTIFILE_SOURCE_MAX_MIB,
+    type SourceFileInput,
     toSourceFiles,
     validateSourceFiles,
 } from './source_files.js';
@@ -108,13 +119,18 @@ USAGE EXAMPLES:
 - user_input: Update src/main.js in my-scraper and rebuild it`;
 }
 
+/** A problem the user must fix; every step returns it instead of its data. */
+type UserErrorResult = { userError: string };
+
+type PushMode = 'merge' | 'replace';
+
 type PushActorFilesParams = {
     client: ApifyClient;
     /** As given by the caller: a bare name, `username/name`, or `username~name`. */
     actorName: string;
     versionNumber: string | undefined;
     buildTag: string | undefined;
-    mode: 'merge' | 'replace';
+    mode: PushMode;
     sourceFiles: ActorVersionSourceFile[];
 };
 
@@ -149,95 +165,179 @@ function formatVersionList(versionNumbers: readonly string[]): string {
 }
 
 /**
- * Creates the Actor with the files, or creates or updates the version of an existing Actor. Returns
- * `userError` for problems the user must fix; `envVars` is never sent so the version keeps its own.
+ * The files in the API shape, or the first problem with them: a bad path, a duplicate, invalid base64,
+ * or the total size. Mode-independent; whether the version ends up with `.actor/actor.json` is checked
+ * by the push step that knows the version.
  */
-async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFilesResult | { userError: string }> {
-    const { client, buildTag, mode, sourceFiles } = params;
+function resolveSourceFiles(
+    files: readonly SourceFileInput[],
+): { sourceFiles: ActorVersionSourceFile[] } | UserErrorResult {
+    const fileProblem = validateSourceFiles(files);
+    if (fileProblem) return { userError: fileProblem };
+    const sourceFiles = toSourceFiles(files);
+    const sizeBytes = getSourceFilesSizeBytes(sourceFiles);
+    if (sizeBytes > MULTIFILE_SOURCE_MAX_BYTES) {
+        return {
+            userError: `The files total ${sizeBytes} bytes; the limit is ${MULTIFILE_SOURCE_MAX_BYTES} bytes (${MULTIFILE_SOURCE_MAX_MIB} MiB). Use the Apify CLI (apify push) for larger projects.`,
+        };
+    }
+    return { sourceFiles };
+}
+
+type TargetActor = {
+    actorClient: ActorClient;
+    /** Full name in the `username/name` form, whichever separator the caller used. */
+    actorName: string;
+    bareName: string;
+    /** Undefined when the Actor does not exist yet. */
+    actor: Actor | undefined;
+};
+
+/** Looks up the caller's username and the Actor; a `username/` or `username~` prefix must name the caller's own account. */
+async function resolveTargetActor(client: ApifyClient, givenActorName: string): Promise<TargetActor | UserErrorResult> {
     const { username } = await client.user('me').get();
-    const { ownerPrefix, bareName } = parseActorName(params.actorName);
+    const { ownerPrefix, bareName } = parseActorName(givenActorName);
     if (ownerPrefix !== undefined && ownerPrefix.toLowerCase() !== username.toLowerCase()) {
         return {
-            userError: `This tool pushes only to your own account (${username}); '${params.actorName}' names another account.`,
+            userError: `This tool pushes only to your own account (${username}); '${givenActorName}' names another account.`,
         };
     }
     const actorName = `${username}/${bareName}`;
     const actorClient = client.actor(actorName);
-    const actor = await actorClient.get();
-    if (!actor) {
-        if (!hasActorConfig(sourceFiles)) return { userError: ACTOR_CONFIG_MISSING_TEXT };
-        const versionNumber = params.versionNumber ?? DEFAULT_VERSION_NUMBER;
-        const created = await client.actors().create({
-            name: bareName,
-            versions: [
-                {
-                    versionNumber,
-                    buildTag: buildTag ?? DEFAULT_BUILD_TAG,
-                    sourceType: ActorSourceType.SourceFiles,
-                    sourceFiles,
-                },
-            ],
-        } satisfies ActorCollectionCreateOptions);
-        return {
-            actorId: created.id,
-            actorName,
-            versionNumber,
-            created: true,
-            versionCreated: true,
-            buildTag: buildTag ?? DEFAULT_BUILD_TAG,
-            filesPushed: sourceFiles.length,
-        };
-    }
+    return { actorClient, actorName, bareName, actor: await actorClient.get() };
+}
 
+type CreateActorParams = {
+    client: ApifyClient;
+    actorName: string;
+    bareName: string;
+    versionNumber: string;
+    buildTag: string | undefined;
+    sourceFiles: ActorVersionSourceFile[];
+};
+
+/** The Actor does not exist yet: the pushed files are its whole first version, so they must carry the config. */
+async function createActorWithVersion(params: CreateActorParams): Promise<PushActorFilesResult | UserErrorResult> {
+    const { client, actorName, bareName, versionNumber, buildTag, sourceFiles } = params;
+    if (!hasActorConfig(sourceFiles)) return { userError: ACTOR_CONFIG_MISSING_TEXT };
+    const created = await client.actors().create({
+        name: bareName,
+        versions: [
+            {
+                versionNumber,
+                buildTag: buildTag ?? DEFAULT_BUILD_TAG,
+                sourceType: ActorSourceType.SourceFiles,
+                sourceFiles,
+            },
+        ],
+    } satisfies ActorCollectionCreateOptions);
+    return {
+        actorId: created.id,
+        actorName,
+        versionNumber,
+        created: true,
+        versionCreated: true,
+        buildTag: buildTag ?? DEFAULT_BUILD_TAG,
+        filesPushed: sourceFiles.length,
+    };
+}
+
+/** The requested version, or the only version of the Actor, or the default for an Actor with no versions. */
+function resolveVersionNumber(
+    actor: Pick<Actor, 'versions'>,
+    requestedVersionNumber: string | undefined,
+): { versionNumber: string } | UserErrorResult {
     const versionNumbers = listVersionNumbers(actor);
-    if (params.versionNumber === undefined && versionNumbers.length > 1) {
+    if (requestedVersionNumber === undefined && versionNumbers.length > 1) {
         return { userError: `Specify versionNumber; ${formatVersionList(versionNumbers)}.` };
     }
-    const versionNumber = params.versionNumber ?? versionNumbers[0] ?? DEFAULT_VERSION_NUMBER;
-    const versionClient = actorClient.version(versionNumber);
-    const existing = await versionClient.get();
-    if (!existing) {
-        // Only merge mode reaches this check; replace mode was checked before any API call. The version
-        // list tells the caller a new version is about to be created, in case that was not intended.
-        if (!hasActorConfig(sourceFiles)) {
-            return {
-                userError: `Version ${versionNumber} does not exist and would be created (${formatVersionList(versionNumbers)}). ${ACTOR_CONFIG_MISSING_TEXT}`,
-            };
-        }
-        await actorClient.versions().create({
-            versionNumber,
-            buildTag: buildTag ?? DEFAULT_BUILD_TAG,
-            sourceType: ActorSourceType.SourceFiles,
-            sourceFiles,
-        } satisfies ActorVersionSourceFiles);
+    return { versionNumber: requestedVersionNumber ?? versionNumbers[0] ?? DEFAULT_VERSION_NUMBER };
+}
+
+type CreateVersionParams = {
+    actor: Pick<Actor, 'id' | 'versions'>;
+    actorClient: ActorClient;
+    actorName: string;
+    versionNumber: string;
+    buildTag: string | undefined;
+    sourceFiles: ActorVersionSourceFile[];
+};
+
+/**
+ * With no existing version there is nothing to merge into, so the pushed files alone must carry the
+ * config, in either mode. The version list tells the caller a new version is about to be created, in
+ * case that was not intended.
+ */
+async function createVersion(params: CreateVersionParams): Promise<PushActorFilesResult | UserErrorResult> {
+    const { actor, actorClient, actorName, versionNumber, buildTag, sourceFiles } = params;
+    if (!hasActorConfig(sourceFiles)) {
         return {
-            actorId: actor.id,
-            actorName,
-            versionNumber,
-            created: false,
-            versionCreated: true,
-            buildTag: buildTag ?? DEFAULT_BUILD_TAG,
-            filesPushed: sourceFiles.length,
+            userError: `Version ${versionNumber} does not exist and would be created (${formatVersionList(listVersionNumbers(actor))}). ${ACTOR_CONFIG_MISSING_TEXT}`,
         };
     }
+    await actorClient.versions().create({
+        versionNumber,
+        buildTag: buildTag ?? DEFAULT_BUILD_TAG,
+        sourceType: ActorSourceType.SourceFiles,
+        sourceFiles,
+    } satisfies ActorVersionSourceFiles);
+    return {
+        actorId: actor.id,
+        actorName,
+        versionNumber,
+        created: false,
+        versionCreated: true,
+        buildTag: buildTag ?? DEFAULT_BUILD_TAG,
+        filesPushed: sourceFiles.length,
+    };
+}
 
-    let files = sourceFiles;
-    if (mode === 'merge') {
-        if (existing.sourceType !== ActorSourceType.SourceFiles) {
-            return {
-                userError: `Version ${versionNumber} uses source type ${existing.sourceType}; use mode 'replace' to overwrite it with source files.`,
-            };
-        }
-        files = mergeSourceFiles(existing.sourceFiles, sourceFiles);
-        if (!hasActorConfig(files)) return { userError: ACTOR_CONFIG_MISSING_TEXT };
+type UpdateVersionParams = {
+    actorId: string;
+    actorName: string;
+    versionClient: ActorVersionClient;
+    existing: ActorVersion;
+    versionNumber: string;
+    mode: PushMode;
+    buildTag: string | undefined;
+    sourceFiles: ActorVersionSourceFile[];
+};
+
+/**
+ * The files the version will hold. Replace: the pushed files are the whole version, so they must carry
+ * the config. Merge: existing files not listed are kept, so the merged set is what must carry it, and
+ * only a version that already uses source files has files to merge into.
+ */
+function resolveVersionFiles(
+    params: Pick<UpdateVersionParams, 'existing' | 'versionNumber' | 'mode' | 'sourceFiles'>,
+): { files: ActorVersionSourceFile[] } | UserErrorResult {
+    const { existing, versionNumber, mode, sourceFiles } = params;
+    if (mode === 'replace') {
+        if (!hasActorConfig(sourceFiles)) return { userError: ACTOR_CONFIG_MISSING_TEXT };
+        return { files: sourceFiles };
     }
+    if (existing.sourceType !== ActorSourceType.SourceFiles) {
+        return {
+            userError: `Version ${versionNumber} uses source type ${existing.sourceType}; use mode 'replace' to overwrite it with source files.`,
+        };
+    }
+    const files = mergeSourceFiles(existing.sourceFiles, sourceFiles);
+    if (!hasActorConfig(files)) return { userError: ACTOR_CONFIG_MISSING_TEXT };
+    return { files };
+}
+
+async function updateVersion(params: UpdateVersionParams): Promise<PushActorFilesResult | UserErrorResult> {
+    const { actorId, actorName, versionClient, existing, versionNumber, buildTag } = params;
+    const resolved = resolveVersionFiles(params);
+    if ('userError' in resolved) return resolved;
+    const { files } = resolved;
     await versionClient.update({
         sourceType: ActorSourceType.SourceFiles,
         sourceFiles: files,
         ...(buildTag !== undefined && { buildTag }),
     } satisfies ActorVersionSourceFiles);
     return {
-        actorId: actor.id,
+        actorId,
         actorName,
         versionNumber,
         created: false,
@@ -245,6 +345,60 @@ async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFi
         buildTag: buildTag ?? existing.buildTag ?? DEFAULT_BUILD_TAG,
         filesPushed: files.length,
     };
+}
+
+/**
+ * Creates the Actor with the files, or creates or updates the version of an existing Actor. Each write
+ * step checks that the version ends up containing `.actor/actor.json` before it writes, so a rejected
+ * push has made no write. Returns `userError` for problems the user must fix; `envVars` is never sent
+ * so the version keeps its own.
+ */
+async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFilesResult | UserErrorResult> {
+    const { client, buildTag, mode, sourceFiles } = params;
+    const target = await resolveTargetActor(client, params.actorName);
+    if ('userError' in target) return target;
+    const { actorClient, actorName, bareName, actor } = target;
+    if (!actor) {
+        return await createActorWithVersion({
+            client,
+            actorName,
+            bareName,
+            versionNumber: params.versionNumber ?? DEFAULT_VERSION_NUMBER,
+            buildTag,
+            sourceFiles,
+        });
+    }
+    const resolved = resolveVersionNumber(actor, params.versionNumber);
+    if ('userError' in resolved) return resolved;
+    const { versionNumber } = resolved;
+    const versionClient = actorClient.version(versionNumber);
+    const existing = await versionClient.get();
+    if (!existing) return await createVersion({ actor, actorClient, actorName, versionNumber, buildTag, sourceFiles });
+    return await updateVersion({ actorId: actor.id, actorName, versionClient, existing, versionNumber, mode, buildTag, sourceFiles });
+}
+
+/** `build` when one was started, `buildStartErrMessage` when the build request failed, neither when build was false. */
+type BuildOutcome = { build?: Build; buildStartErrMessage?: string };
+
+/**
+ * Starts the build and waits for it. The push is a completed write, so a failed build request is
+ * returned as a message for a normal response that still carries the push result, not thrown.
+ */
+async function resolveBuildOutcome(params: {
+    client: ApifyClient;
+    actorId: string;
+    versionNumber: string;
+    waitSecs: number;
+    signal: AbortSignal;
+}): Promise<BuildOutcome | typeof ABORT> {
+    const { client, actorId, versionNumber, waitSecs, signal } = params;
+    try {
+        // No tag is passed: the version's buildTag applies, the same as `apify push`.
+        const started = await startBuild(client, actorId, versionNumber, { useCache: true, waitSecs, signal });
+        return started === ABORT ? ABORT : { build: started };
+    } catch (error) {
+        return { buildStartErrMessage: error instanceof Error ? error.message : String(error) };
+    }
 }
 
 function formatOutcome({ created, versionCreated, versionNumber }: PushActorFilesResult): string {
@@ -271,6 +425,42 @@ function formatBuildStartFailure(errMessage: string, loadedToolNames: readonly s
         : 'Retry building this version to make it runnable.';
     // API messages rarely end with a period; give the message its own sentence so the retry hint does not run into it.
     return `The files were pushed, but the build could not be started: ${errMessage.replace(/\.?$/, '.')} ${retry}`;
+}
+
+type PushResponseParams = {
+    pushed: PushActorFilesResult;
+    /** Files sent in this call; `pushed.filesPushed` is what the version holds now. */
+    filesSent: number;
+    buildOutcome: BuildOutcome;
+    loadedToolNames: readonly string[];
+    apifyToken: string;
+    client: ApifyClient;
+};
+
+/** The push result as structuredContent and JSON text, a summary with one next step, and the build's Console link for Console UI token sessions. */
+async function buildPushResponse(params: PushResponseParams): Promise<ToolResponse> {
+    const { pushed, filesSent, buildOutcome, loadedToolNames, apifyToken, client } = params;
+    const { build, buildStartErrMessage } = buildOutcome;
+    const linkContext = build ? await getConsoleLinkContext(apifyToken, client) : undefined;
+    const structuredContent = {
+        actorId: pushed.actorId,
+        actorName: pushed.actorName,
+        created: pushed.created,
+        versionNumber: pushed.versionNumber,
+        buildTag: pushed.buildTag,
+        filesPushed: pushed.filesPushed,
+        ...(build !== undefined && { build: toBuildResult(build, linkContext) }),
+    };
+    const summary = `Pushed ${formatFileCount(filesSent)} to ${pushed.actorName} version ${pushed.versionNumber} (${formatOutcome(pushed)}); the version now has ${formatFileCount(pushed.filesPushed)}.`;
+    const nextStep =
+        buildStartErrMessage === undefined
+            ? buildNextStep(build, loadedToolNames)
+            : formatBuildStartFailure(buildStartErrMessage, loadedToolNames);
+    const consoleLinkText = apifyConsoleLinkText(structuredContent.build?.apifyConsoleUrl);
+    return respondOk(
+        [JSON.stringify(structuredContent), `${summary}\n${nextStep}`, ...(consoleLinkText ? [consoleLinkText] : [])],
+        { structuredContent },
+    );
 }
 
 /**
@@ -319,19 +509,11 @@ export const pushActor: ToolEntry = Object.freeze({
         }
         const parsed = parsedArgs.data;
 
-        const fileProblem = validateSourceFiles(parsed.files);
-        if (fileProblem) return respondUserError(fileProblem);
-        const sourceFiles = toSourceFiles(parsed.files);
-        const sizeBytes = getSourceFilesSizeBytes(sourceFiles);
-        if (sizeBytes > MULTIFILE_SOURCE_MAX_BYTES) {
-            return respondUserError(
-                `The files total ${sizeBytes} bytes; the limit is ${MULTIFILE_SOURCE_MAX_BYTES} bytes (${MULTIFILE_SOURCE_MAX_MIB} MiB). Use the Apify CLI (apify push) for larger projects.`,
-            );
-        }
-        // In replace mode the pushed files are the whole version, so this is known before any API call.
-        if (parsed.mode === 'replace' && !hasActorConfig(sourceFiles)) return respondUserError(ACTOR_CONFIG_MISSING_TEXT);
+        const files = resolveSourceFiles(parsed.files);
+        if ('userError' in files) return respondUserError(files.userError);
+        const { sourceFiles } = files;
 
-        let pushed: PushActorFilesResult | { userError: string };
+        let pushed: PushActorFilesResult | UserErrorResult;
         try {
             pushed = await pushActorFiles({
                 client,
@@ -353,45 +535,27 @@ export const pushActor: ToolEntry = Object.freeze({
         }
         if ('userError' in pushed) return respondUserError(pushed.userError);
 
-        // The push is a completed write, so a failed build request is reported inside a normal
-        // response that still carries the push result instead of a bare tool error.
-        let build: Build | undefined;
-        let buildStartErrMessage: string | undefined;
+        let buildOutcome: BuildOutcome = {};
         if (parsed.build) {
-            try {
-                // No tag is passed: the version's buildTag applies, the same as `apify push`.
-                const started = await startBuild(client, pushed.actorId, pushed.versionNumber, {
-                    useCache: true,
-                    waitSecs: parsed.waitSecs,
-                    signal,
-                });
-                // The push is already done, the same as get-actor-build aborting mid-wait. Per MCP
-                // spec a cancelled request gets no response, so the push result is not reported.
-                if (started === ABORT) return respondAborted();
-                build = started;
-            } catch (error) {
-                buildStartErrMessage = error instanceof Error ? error.message : String(error);
-            }
+            const outcome = await resolveBuildOutcome({
+                client,
+                actorId: pushed.actorId,
+                versionNumber: pushed.versionNumber,
+                waitSecs: parsed.waitSecs,
+                signal,
+            });
+            // The push is already done, the same as get-actor-build aborting mid-wait. Per MCP spec a
+            // cancelled request gets no response, so the push result is not reported.
+            if (outcome === ABORT) return respondAborted();
+            buildOutcome = outcome;
         }
-        const linkContext = build ? await getConsoleLinkContext(apifyToken, client) : undefined;
-        const structuredContent = {
-            actorId: pushed.actorId,
-            actorName: pushed.actorName,
-            created: pushed.created,
-            versionNumber: pushed.versionNumber,
-            buildTag: pushed.buildTag,
-            filesPushed: pushed.filesPushed,
-            ...(build !== undefined && { build: toBuildResult(build, linkContext) }),
-        };
-        const summary = `Pushed ${formatFileCount(sourceFiles.length)} to ${pushed.actorName} version ${pushed.versionNumber} (${formatOutcome(pushed)}); the version now has ${formatFileCount(pushed.filesPushed)}.`;
-        const nextStep =
-            buildStartErrMessage === undefined
-                ? buildNextStep(build, loadedToolNames)
-                : formatBuildStartFailure(buildStartErrMessage, loadedToolNames);
-        const consoleLinkText = apifyConsoleLinkText(structuredContent.build?.apifyConsoleUrl);
-        return respondOk(
-            [JSON.stringify(structuredContent), `${summary}\n${nextStep}`, ...(consoleLinkText ? [consoleLinkText] : [])],
-            { structuredContent },
-        );
+        return await buildPushResponse({
+            pushed,
+            filesSent: sourceFiles.length,
+            buildOutcome,
+            loadedToolNames,
+            apifyToken,
+            client,
+        });
     },
 } as const);
