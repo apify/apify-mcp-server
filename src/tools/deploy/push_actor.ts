@@ -278,16 +278,18 @@ function formatBuildStartFailure(errMessage: string, loadedToolNames: readonly s
 }
 
 /**
- * https://docs.apify.com/api/v2/acts-post
- *  /v2/acts
- * https://docs.apify.com/api/v2/act-version-put
- *  /v2/acts/{actorId}/versions/{versionNumber}
- * https://docs.apify.com/api/v2/act-versions-post
- *  /v2/acts/{actorId}/versions
+ * https://docs.apify.com/api/v2/actors-post
+ *  /v2/actors
+ * https://docs.apify.com/api/v2/actor-version-put
+ *  /v2/actors/{actorId}/versions/{versionNumber}
+ * https://docs.apify.com/api/v2/actor-versions-post
+ *  /v2/actors/{actorId}/versions
  *
- * Uses the same JSON `sourceFiles` contract as `apify push` (actors().create, version().update,
- * versions().create). The documented tarball `/source-files` route returns 4xx
- * (apify/apify-core#29044), so it is not used. Resolves apify/apify-mcp-server#1217.
+ * Uses the same JSON `sourceType: SOURCE_FILES` + `sourceFiles` contract as `apify push`
+ * (actors().create, version().update, versions().create), which is the contract the API
+ * reference documents for creating and updating a version. apify/apify-core#29044 reports a
+ * tarball upload route; no such route exists in the API reference and none is used here.
+ * Resolves apify/apify-mcp-server#1217.
  */
 export const pushActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
