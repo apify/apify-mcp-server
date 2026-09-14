@@ -436,6 +436,25 @@ describe('push-actor', () => {
         expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
     });
 
+    it('returns the empty aborted response when the request signal is already aborted after the push', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+        const controller = new AbortController();
+        controller.abort();
+
+        const result = await (pushActor as HelperTool).call({
+            ...stubToolCallContext({ actorName: 'my-actor', files: [MAIN_JS] }, stubClient),
+            apifyToken: 'apify_ui_test',
+            signal: controller.signal,
+        });
+
+        // The push is a completed write; only the build wait is cut short.
+        expect(versionUpdateMock).toHaveBeenCalled();
+        // Per MCP spec a cancelled request gets no response body, even though the build resolved.
+        expect(result).toEqual({});
+        // Nothing after the build call runs: no Console-link lookup for what would otherwise be a UI token session.
+        expect(getUserInfoCached).not.toHaveBeenCalled();
+    });
+
     describe('build start failure', () => {
         const summary =
             'Pushed 1 file to john/my-actor version 0.0 (updated the version); the version now has 3 files.';

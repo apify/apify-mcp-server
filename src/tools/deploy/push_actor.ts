@@ -8,8 +8,8 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
-import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
+import { ABORT, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 import { pushActorToolOutputSchema } from '../structured_output_schemas.js';
 import { buildNextStepForBuild, listVersionNumbers, startBuild, toBuildResult } from './build_helpers.js';
@@ -305,7 +305,7 @@ export const pushActor: ToolEntry = Object.freeze({
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
         // `safeParse` rather than `parse`: the repo's AJV drops `pattern` (see `src/utils/ajv.ts`), so
         // the regex fields are enforced here, as a soft fail instead of a thrown ZodError.
         const parsedArgs = pushActorArgs.safeParse(args);
@@ -357,10 +357,15 @@ export const pushActor: ToolEntry = Object.freeze({
         if (parsed.build) {
             try {
                 // No tag is passed: the version's buildTag applies, the same as `apify push`.
-                build = await startBuild(client, pushed.actorId, pushed.versionNumber, {
+                const started = await startBuild(client, pushed.actorId, pushed.versionNumber, {
                     useCache: true,
                     waitSecs: parsed.waitSecs,
+                    signal,
                 });
+                // The push is already done, the same as get-actor-build aborting mid-wait. Per MCP
+                // spec a cancelled request gets no response, so the push result is not reported.
+                if (started === ABORT) return respondAborted();
+                build = started;
             } catch (error) {
                 buildStartErrMessage = error instanceof Error ? error.message : String(error);
             }
