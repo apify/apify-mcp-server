@@ -680,19 +680,64 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
-        // The repo's AJV drops `pattern` (see `src/utils/ajv.ts`), so the regex fields soft-fail in the tool.
-        it.each(['my_actor', 'john/my_actor', 'john/jane/my-actor', '-my-actor'])(
-            'soft-fails the Actor name %s',
-            async (actorName) => {
+        // The name rules come from `@apify/consts`, the ones the API applies; a bad name never reaches the API.
+        describe('Actor name rules', () => {
+            const ACTOR_NAME_RULE_TEXT =
+                'Actor name must be 3 to 63 characters: letters, digits and dashes, not starting or ending with a dash.';
+
+            it.each([
+                { label: 'too short', actorName: 'ab' },
+                { label: 'too long', actorName: 'a'.repeat(64) },
+                { label: 'an underscore', actorName: 'my_scraper' },
+                { label: 'a leading dash', actorName: '-scraper' },
+                { label: 'a second separator', actorName: 'john/jane/my-actor' },
+            ])('rejects an Actor name with $label without calling the API', async ({ actorName }) => {
                 const { text } = await callToolExpectingUserError({ actorName, files: [ACTOR_JSON] });
 
-                expect(text).toBe(
-                    'actorName: Actor name must be 3 to 63 letters, digits and dashes, cannot start or end with a dash, and may be prefixed with your username and a slash or a tilde',
-                );
+                expect(text).toBe(ACTOR_NAME_RULE_TEXT);
+                expect(userGetMock).not.toHaveBeenCalled();
                 expectNoWrite();
-            },
-        );
+            });
 
+            it('rejects a username prefix with invalid characters without calling the API', async () => {
+                const { text } = await callToolExpectingUserError({ actorName: 'jo!hn/my-actor', files: [ACTOR_JSON] });
+
+                expect(text).toBe('Username prefix must be 3 to 30 letters, digits, dots, underscores or dashes.');
+                expect(userGetMock).not.toHaveBeenCalled();
+                expectNoWrite();
+            });
+
+            it('accepts a 63-character Actor name', async () => {
+                const actorName = 'a'.repeat(63);
+
+                await callTool({ actorName, files: [MAIN_JS], build: false });
+
+                expect(actorMock).toHaveBeenCalledWith(`john/${actorName}`);
+                expect(versionUpdateMock).toHaveBeenCalled();
+            });
+
+            it('accepts a username prefix with a dot in the tilde form', async () => {
+                userGetMock.mockResolvedValue({ username: 'john.doe', id: 'user-secret' });
+
+                const { structuredContent } = await callTool({
+                    actorName: 'john.doe~my-actor',
+                    files: [MAIN_JS],
+                    build: false,
+                });
+
+                expect(actorMock).toHaveBeenCalledWith('john.doe/my-actor');
+                expect(structuredContent).toMatchObject({ actorName: 'john.doe/my-actor' });
+            });
+
+            it('accepts the username/name form', async () => {
+                await callTool({ actorName: 'john/my-actor', files: [MAIN_JS], build: false });
+
+                expect(actorMock).toHaveBeenCalledWith('john/my-actor');
+                expect(versionUpdateMock).toHaveBeenCalled();
+            });
+        });
+
+        // The repo's AJV drops `pattern` (see `src/utils/ajv.ts`), so the versionNumber regex soft-fails in the tool.
         it('soft-fails a versionNumber that is not MAJOR.MINOR', async () => {
             const { text } = await callToolExpectingUserError({ files: [ACTOR_JSON], versionNumber: '0.1.5' });
 
@@ -700,10 +745,10 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
-        it('rejects an empty file list, a short name, an empty buildTag and waitSecs above the cap via ajv validation', () => {
+        it('rejects an empty file list, an empty name, an empty buildTag and waitSecs above the cap via ajv validation', () => {
             const tool = pushActor as HelperTool;
             expect(tool.ajvValidate({ actorName: 'my-actor', files: [] })).toBe(false);
-            expect(tool.ajvValidate({ actorName: 'ab', files: [MAIN_JS] })).toBe(false);
+            expect(tool.ajvValidate({ actorName: '', files: [MAIN_JS] })).toBe(false);
             expect(tool.ajvValidate({ actorName: 'my-actor', files: [MAIN_JS], buildTag: '' })).toBe(false);
             expect(tool.ajvValidate({ actorName: 'my-actor', files: [MAIN_JS], waitSecs: WAIT_SECS_MAX + 1 })).toBe(
                 false,

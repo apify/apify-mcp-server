@@ -211,6 +211,9 @@ importers:
 
   .:
     dependencies:
+      '@apify/consts':
+        specifier: ^2.53.1
+        version: 2.53.1
       '@apify/datastructures':
         specifier: ^2.0.3
         version: 2.0.6
