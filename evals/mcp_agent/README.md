@@ -458,7 +458,7 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 
 ## CI
 
-CI replaces the Phoenix runner with two Langfuse tiers:
+CI runs two Langfuse tiers:
 
 - `pr`: `mcp-server-evals-pr` tool-call items. It fails below 0.9, based on a 0.93 local floor.
 - `merge`: `mcp-server-evals-merge` agent items. It fails below 0.6, based on a 0.73 local floor; nine of 60 items fail consistently, and three publish cases (`tasks/publish-discovery`, `tasks/publish-medium-1`, `tasks/chain-hard-1`) fail unless `APIFY_TOKEN` can write to their target Actor.
@@ -471,9 +471,60 @@ Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOK
 
 The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once; the handshake race above does not, because it produces a wrong answer rather than an error.
 
+## Writing tool descriptions
+
+The tool description is the single biggest lever on eval scores.
+
+### Tool definitions (Anthropic guidelines)
+
+- **Be extremely detailed.** Explain what the tool does, when it should and should not be
+  used, what each parameter means, and any caveats — including what the tool does *not*
+  return when its name is misleading. Aim for 3-4 sentences, more for complex tools.
+- **Prioritize description over examples.** Add examples only after the description is
+  complete.
+
+### Metadata for OpenAI models
+
+- Name — pair the domain with the action (`calendar.create_event`).
+- Description — start with "Use this when..." and call out disallowed cases ("Do not use
+  for reminders").
+- Parameter docs — describe each argument, include examples, use enums for constrained
+  values.
+- Annotate `readOnlyHint: true` on tools that never mutate state so clients can skip the
+  confirmation prompt.
+
+### Tool description vs parameter description
+
+Based on [Cursor Agent Tools v1.0](https://raw.githubusercontent.com/x1xhlol/system-prompts-and-models-of-ai-tools/refs/heads/main/Cursor%20Prompts/Agent%20Tools%20v1.0.json),
+[Lovable Agent Tools](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Lovable/Agent%20Tools.json)
+and [Claude Code Tools](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Claude%20Code/claude-code-tools.json):
+
+**Tool description**: what the tool does, when to use it, key limitations, high-level
+behavior.
+
+**Parameter description**: what each parameter does, input constraints, per-parameter
+examples and guidance.
+
+Keep both concise but comprehensive, use language that matches user intent, and state
+operational limits explicitly.
+
+### Improving a failing tool
+
+1. **Read the trace.** Open the failing item's trace in Langfuse and check what the agent
+   actually called and why the judge scored it down.
+2. **Start with the `pr` tier.** Its tool-call items are unjudged, so a failure there is a
+   plain wrong-tool signal and far easier to debug than a `merge`-tier judge score.
+3. **Change one tool at a time.** Simultaneous edits are untraceable.
+4. **Iterate on a subset**, then re-run the full dataset — fixing one case often breaks
+   another.
+5. **Never let an LLM rewrite tool descriptions automatically.** Make the edit manually
+   from your own reading of the failure; automated rewrites usually make it worse.
+
 ## References
 
 - [MCP Protocol Spec](https://modelcontextprotocol.io/)
 - [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview)
 - [Apify API](https://docs.apify.com/api/v2)
 - [OpenRouter](https://openrouter.ai/)
+- [Example of a good tool description](https://docs.claude.com/en/docs/agents-and-tools/tool-use/implement-tool-use#example-of-a-good-tool-description)
+- [OpenAI optimize metadata](https://developers.openai.com/apps-sdk/guides/optimize-metadata)
