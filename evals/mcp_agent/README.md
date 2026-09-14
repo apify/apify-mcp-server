@@ -473,7 +473,8 @@ The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; t
 
 ## Writing tool descriptions
 
-The tool description is the single biggest lever on eval scores.
+Tool descriptions are the main lever on eval scores, but not the only one — some failures
+are model-level limits, not description bugs.
 
 ### Tool definitions (Anthropic guidelines)
 
@@ -510,15 +511,24 @@ operational limits explicitly.
 
 ### Improving a failing tool
 
-1. **Read the trace.** Open the failing item's trace in Langfuse and check what the agent
-   actually called and why the judge scored it down.
-2. **Start with the `pr` tier.** Its tool-call items are unjudged, so a failure there is a
-   plain wrong-tool signal and far easier to debug than a `merge`-tier judge score.
-3. **Change one tool at a time.** Simultaneous edits are untraceable.
-4. **Iterate on a subset**, then re-run the full dataset — fixing one case often breaks
+1. **Start with the `pr` tier.** Its tool-call items are unjudged — the item records the
+   first attempted call and nothing executes — so a failure is a plain wrong-tool signal,
+   easier to read than a `merge`-tier judge score.
+2. **Read the trace for what that tier records.** On a `pr` item, read the
+   first-attempted-call comment: every tool span there is an ERROR by design (the deny-all
+   hook), so red spans say nothing about pass or fail. On a `merge` item, read the judge's
+   reasoning. A run that crashed before the tree was emitted leaves no trace at all.
+3. **Confirm it is a regression** before touching a description: treat a shift in the pass
+   ratio as the signal rather than a single red run, and check the case still passes on
+   Sonnet — see [Two datasets](#two-datasets-kind-id-scheme-and-expectederrors).
+4. **Change one tool at a time.** Simultaneous edits are untraceable.
+5. **Iterate on a subset**, then re-run the full dataset — fixing one case often breaks
    another.
-5. **Never let an LLM rewrite tool descriptions automatically.** Make the edit manually
+6. **Never let an LLM rewrite tool descriptions automatically.** Make the edit manually
    from your own reading of the failure; automated rewrites usually make it worse.
+
+For runtime symptoms rather than description problems — agent shelling out, judge too
+strict, timeouts — see [Common issues](#common-issues).
 
 ## References
 
