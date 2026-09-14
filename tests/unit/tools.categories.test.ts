@@ -38,23 +38,15 @@ describe('getCategoryTools', () => {
         }
     });
 
-    it('should return different tool variants for actors category based on mode', () => {
+    it('should share the same call-actor tool across modes (mode-independent object; widget addendum is session-gated)', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
-        // Both modes should have the same tool names in actors category
-        const defaultNames = defaultResult.actors.map((t: ToolEntry) => t.name);
-        const appsNames = appsResult.actors.map((t: ToolEntry) => t.name);
-        expect(defaultNames).toEqual(appsNames);
-
-        // call-actor still has mode-specific variants — distinct objects differing only in
-        // description (apps mode appends a widget addendum).
-        // search-actors and fetch-actor-details are mode-independent and share the same object.
         const defaultCallActor = defaultResult.actors.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_CALL);
         const appsCallActor = appsResult.actors.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_CALL);
         expect(defaultCallActor).toBeDefined();
         expect(appsCallActor).toBeDefined();
-        expect(defaultCallActor).not.toBe(appsCallActor);
+        expect(defaultCallActor).toBe(appsCallActor);
     });
 
     it('should share the same get-actor-run tool across modes (mode-independent)', () => {

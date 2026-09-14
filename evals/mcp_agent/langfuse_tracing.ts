@@ -1,5 +1,5 @@
 /**
- * OpenTelemetry tracing setup for workflow evaluations.
+ * OpenTelemetry tracing setup for MCP agent evaluations.
  *
  * Credentials are read from the environment by the Langfuse SDK itself, so nothing
  * here passes them; the entry point only checks they are present.

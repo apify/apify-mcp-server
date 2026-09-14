@@ -9,9 +9,11 @@ import log from '@apify/log';
 
 import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
+import { actorNameToToolName } from '../tools/actor_tool_naming.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
+    ALL_WIDGET_TOOLS,
     CATEGORY_NAME_SET,
     CATEGORY_NAMES,
     getCategoryTools,
@@ -23,7 +25,7 @@ import { getActorRun } from '../tools/runs/get_actor_run.js';
 import { getDatasetItems } from '../tools/storage/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/storage/get_key_value_store_record.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
-import { SERVER_MODES, SERVER_MODE, TOOL_TYPE } from '../types.js';
+import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 
 /**
  * Tools auto-injected alongside any actor-running tool (call-actor / direct
@@ -37,20 +39,17 @@ export const AUTO_INJECTED_TOOLS: readonly ToolEntry[] = [
     abortActorRun,
 ] as const;
 
-// All internal tool names across all modes. Selectors matching these are not treated as Actor IDs.
-// Built eagerly at module load; inputs (SERVER_MODES, getCategoryTools, CATEGORY_NAMES,
-// WIDGET_BY_BASE_TOOL) are module-level constants available at import time.
+const ACTOR_PLACEHOLDER_NAME = '__actor-placeholder__';
+
+// All internal tool names. Selectors matching these are not treated as Actor IDs.
 const ALL_INTERNAL_TOOL_NAMES: Set<string> = (() => {
     const names = new Set<string>();
-    // Collect tool names from both modes to ensure complete classification
-    for (const mode of SERVER_MODES) {
-        const categories = getCategoryTools(mode);
-        for (const name of CATEGORY_NAMES) {
-            for (const tool of categories[name]) names.add(tool.name);
-        }
+    const categories = getCategoryTools();
+    for (const name of CATEGORY_NAMES) {
+        for (const tool of categories[name]) names.add(tool.name);
     }
-    // Widgets live only in WIDGET_BY_BASE_TOOL, not in any category
-    for (const widget of WIDGET_BY_BASE_TOOL.values()) names.add(widget.name);
+    // Widgets live in no category — ALL_WIDGET_TOOLS covers every widget, paired or not.
+    for (const widget of ALL_WIDGET_TOOLS) names.add(widget.name);
     return names;
 })();
 
@@ -84,6 +83,18 @@ function normalizeInput(input: Input): NormalizedInput {
     };
 }
 
+/** report-problem's only category — selecting it is the same opt-in as the literal name. */
+const REPORT_PROBLEM_CATEGORY = 'dev' satisfies ToolCategory;
+
+/**
+ * True when `input` explicitly names report-problem or `dev` — lifts the client blocklist below.
+ * A `toolNamesToInput` restore counts: it can only list tools the session was already served.
+ */
+export function isReportProblemExplicitlySelected(input: Input): boolean {
+    const { selectors } = normalizeInput(input);
+    return selectors?.some((sel) => sel === HELPER_TOOLS.PROBLEM_REPORT || sel === REPORT_PROBLEM_CATEGORY) ?? false;
+}
+
 /**
  * Resolve the list of Actor names (`username/name`) to fetch from the input.
  *
@@ -99,7 +110,7 @@ function normalizeInput(input: Input): NormalizedInput {
  * If no selectors / no explicit actors: the defaults apply (or empty when
  * `actors` was explicitly set to empty).
  */
-function resolveActorsToLoad(input: Input): string[] {
+export function resolveActorsToLoad(input: Input): string[] {
     const { selectors, actorsExplicitlyEmpty } = normalizeInput(input);
 
     // Selectors that aren't retired, categories, or internal tools in any mode → Actor names.
@@ -197,9 +208,10 @@ export function getToolsForServerMode(
             toolsByName.set(tool.name, tool);
         }
     }
-    // Widgets are apps-only and not in any category; include it for direct selection
+    // Widgets are apps-only and not in any category; include every widget (paired or not) for
+    // direct `?tools=` selection.
     if (mode === SERVER_MODE.APPS) {
-        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+        for (const widget of ALL_WIDGET_TOOLS) {
             toolsByName.set(widget.name, widget);
         }
     }
@@ -261,17 +273,26 @@ export function getToolsForServerMode(
      * get-key-value-store-record → abort-actor-run. If the user explicitly selected these tools
      * via category before `actors`, the de-dup pass below preserves their selector order.
      */
-    const hasCallActor = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_CALL);
+    const resultNames = new Set(result.map((entry) => entry.name));
     const hasActorTools = result.some((entry) => entry.type === TOOL_TYPE.ACTOR);
-    // `get-actor-run`'s nextStep templates point at `get-dataset-items` / `get-key-value-store-record`,
-    // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session
-    // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
-    const hasGetActorRun = result.some((entry) => entry.name === HELPER_TOOLS.ACTOR_RUNS_GET);
+    // get-actor-run's nextStep templates point at get-dataset-items/get-key-value-store-record.
+    const hasGetActorRun = resultNames.has(HELPER_TOOLS.ACTOR_RUNS_GET);
+    // call-actor-widget starts a run, same as call-actor, so it also wants the bundle.
+    const hasCallActorWidget = resultNames.has(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+    // get-actor-run-widget calls get-dataset-items internally for its own preview fetch.
+    const hasGetActorRunWidget = resultNames.has(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
 
-    // Inject run-workflow helpers whenever any actor-running entrypoint is present; de-dup pass below drops repeats.
-    const toolsToInject: ToolEntry[] = [];
-    if (hasCallActor || hasActorTools || hasGetActorRun) {
-        toolsToInject.push(...AUTO_INJECTED_TOOLS);
+    // call-actor, direct Actor tools and get-actor-run are the non-widget run tools; any of them
+    // justifies the full bundle. get-actor-run-widget alone skips get-actor-run (it polls itself);
+    // call-actor-widget alone still gets it.
+    const hasNonWidgetRunTool = resultNames.has(HELPER_TOOLS.ACTOR_CALL) || hasActorTools || hasGetActorRun;
+    let toolsToInject: readonly ToolEntry[] = [];
+    if (hasNonWidgetRunTool) {
+        toolsToInject = AUTO_INJECTED_TOOLS;
+    } else if (hasGetActorRunWidget) {
+        toolsToInject = AUTO_INJECTED_TOOLS.filter((tool) => tool.name !== HELPER_TOOLS.ACTOR_RUNS_GET);
+    } else if (hasCallActorWidget) {
+        toolsToInject = AUTO_INJECTED_TOOLS;
     }
 
     if (toolsToInject.length > 0) {
@@ -297,6 +318,21 @@ export function getToolsForServerMode(
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
     return result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
+}
+
+/** Resolve the tool names composition will serve without fetching Actor metadata. */
+export function resolveToolNamesFromInput(input: Input, mode: SERVER_MODE = SERVER_MODE.DEFAULT): Set<string> {
+    const actorNames = resolveActorsToLoad(input);
+    // Composition reads only type and name from Actor entries; the placeholder triggers its shared injection rules.
+    const actorTools =
+        actorNames.length > 0 ? ([{ type: TOOL_TYPE.ACTOR, name: ACTOR_PLACEHOLDER_NAME }] as ToolEntry[]) : [];
+    const toolNames = new Set(getToolsForServerMode(input, actorTools, mode).map((tool) => tool.name));
+    toolNames.delete(ACTOR_PLACEHOLDER_NAME);
+
+    for (const actorName of actorNames) {
+        if (actorName.indexOf('/') > 0 || actorName.indexOf('~') > 0) toolNames.add(actorNameToToolName(actorName));
+    }
+    return toolNames;
 }
 
 /** Convenience wrapper: {@link getActors} + {@link getToolsForServerMode} in sequence. */

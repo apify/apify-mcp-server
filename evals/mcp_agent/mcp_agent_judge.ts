@@ -8,7 +8,7 @@ import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 import { z } from 'zod';
 
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
-import type { LlmClient } from './llm_client.js';
+import type { JudgeLlmClient } from './llm_client.js';
 import type { ConversationHistory } from './types.js';
 
 /**
@@ -101,12 +101,23 @@ const JudgeResponseValidator = z.object({
 });
 
 /**
- * Parse structured JSON response from judge
+ * Some providers answer in prose that still opens with the verdict ("FAIL. The agent ...").
+ * Recover the verdict and use the rest as the reason before spending a retry call on it.
+ * Anything not opening with PASS/FAIL stays unparsed.
  */
-function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reason: string } {
+const PROSE_VERDICT_PATTERN = /^\s*(PASS|FAIL)\b[.:!-]?\s*(.*)$/is;
+
+/**
+ * Parse the judge response: strict JSON first, prose-verdict fallback second.
+ */
+export function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reason: string } {
     try {
         return JudgeResponseValidator.parse(JSON.parse(response));
     } catch (error) {
+        const prose = PROSE_VERDICT_PATTERN.exec(response);
+        if (prose) {
+            return JudgeResponseValidator.parse({ verdict: prose[1], reason: prose[2].trim() || 'no reason given' });
+        }
         // No raw response here: the retry loop's final throw already carries it.
         throw new Error(
             `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}`,
@@ -120,7 +131,7 @@ function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reaso
 export async function evaluateConversation(
     reference: string,
     conversation: ConversationHistory,
-    llmClient: LlmClient,
+    llmClient: JudgeLlmClient,
     judgeModel: string = MODELS.judge,
 ): Promise<JudgeResult> {
     // Format conversation for judge
@@ -134,9 +145,10 @@ export async function evaluateConversation(
         () => formattedConversation,
     );
 
-    // Some OpenRouter providers occasionally ignore the JSON schema and answer in plain
-    // text (e.g. "PASS: ..."). One fresh judge call recovers those without rerunning the
-    // far more expensive agent conversation; a second malformed answer still throws.
+    // parseJudgeResponse already recovers a prose verdict (e.g. "PASS: ..."); this retry
+    // is for answers that carry no parsable verdict at all. One fresh judge call recovers
+    // those without rerunning the far more expensive agent conversation; a second
+    // malformed answer still throws.
     let lastError: unknown;
     let lastRawResponse = '';
     for (let attempt = 1; attempt <= JUDGE_PARSE_ATTEMPTS; attempt++) {

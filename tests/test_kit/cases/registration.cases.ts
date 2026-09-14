@@ -7,7 +7,11 @@ import {
     getCategoryTools,
     getExpectedToolNamesByCategories,
 } from '@apify/actors-mcp-server/internals.js';
-import { HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
+import {
+    HELPER_TOOLS,
+    RESOURCE_MIME_TYPE,
+    SERVER_MODE_AUTO_DETECTION_ENABLED,
+} from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_NORMAL_MODE,
@@ -22,12 +26,52 @@ import {
     skipUnlessStdio,
     withClient,
 } from '../helpers.js';
+import { buildClientUrl, type SuiteClientOptions } from '../mcp_client.js';
 import type { Case } from '../types.js';
 
 const TWO_TEST_ACTORS = ['apify/python-example', 'apify/rag-web-browser'];
 const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
 const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
+
+// Claude-connector `?tools=` allowlist (ai-team#214/#229). No call-actor. Duplicated in
+// tests/unit/helpers/claude_connector_tools.ts, not imported from there: tests/test_kit is its own
+// `tsc -b` project (see its tsconfig's `rootDir`) and cannot import outside itself.
+const CLAUDE_CONNECTOR_TOOLS = [
+    HELPER_TOOLS.STORE_SEARCH,
+    HELPER_TOOLS.STORE_SEARCH_WIDGET,
+    HELPER_TOOLS.ACTOR_GET_DETAILS,
+    HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
+    HELPER_TOOLS.DOCS_SEARCH,
+    HELPER_TOOLS.DOCS_FETCH,
+    HELPER_TOOLS.ACTOR_RUNS_GET,
+    HELPER_TOOLS.ACTOR_RUN_LIST_GET,
+    HELPER_TOOLS.ACTOR_RUNS_LOG,
+    HELPER_TOOLS.ACTOR_RUNS_ABORT,
+    HELPER_TOOLS.DATASET_GET,
+    HELPER_TOOLS.DATASET_GET_ITEMS,
+    HELPER_TOOLS.DATASET_SCHEMA_GET,
+    HELPER_TOOLS.DATASET_LIST_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+    'apify/rag-web-browser',
+    'apify/web-fetch',
+    HELPER_TOOLS.PROBLEM_REPORT,
+];
+// Served tool names differ from CLAUDE_CONNECTOR_TOOLS's Actor selectors — map them here.
+const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selector) =>
+    selector.includes('/') ? actorNameToToolName(selector) : selector,
+);
+// telemetry: true is explicit — the deployed target defaults it off, unlike this package's own default.
+// clientName: real Claude handshake name — exercises the blocklist bypass (client= URL tag doesn't gate it).
+const CLAUDE_CONNECTOR_CLIENT_OPTIONS: SuiteClientOptions = {
+    tools: CLAUDE_CONNECTOR_TOOLS,
+    client: 'claude connector',
+    clientName: 'claude-ai',
+    telemetry: { enabled: true },
+};
 
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
@@ -70,6 +114,29 @@ export const registrationCases: Case[] = [
             const names = getToolNames(await client.listTools());
             expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
         }),
+    },
+    {
+        // Pinned ?tools= wins for call-actor even with report-problem auto-inject live.
+        // No ?ui=: apps mode comes from the client's own UI-capability advertisement (serverMode 'auto'), not a URL override.
+        name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude+connector',
+        isDeploymentTest: true,
+        skipIf: () => !SERVER_MODE_AUTO_DETECTION_ENABLED,
+        run: withClient(
+            {
+                ...CLAUDE_CONNECTOR_CLIENT_OPTIONS,
+                clientCapabilities: {
+                    extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] } },
+                },
+            },
+            async (client) => {
+                const names = getToolNames(await client.listTools());
+                // Exact set, not superset: this pinned URL serves these tools and nothing else.
+                expect(new Set(names)).toEqual(new Set(CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES));
+
+                const url = buildClientUrl('http://placeholder/', CLAUDE_CONNECTOR_CLIENT_OPTIONS);
+                expect(url.search.endsWith('client=claude+connector')).toBe(true);
+            },
+        ),
     },
     {
         // isDeploymentTest: default tool/Actor set.
@@ -406,7 +473,6 @@ export const registrationCases: Case[] = [
                 // Verify that apps-only internal tools are present in apps mode
                 expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
                 expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
 
                 // Verify that tools have widget metadata when UI mode is enabled
                 expectWidgetToolMeta(tools);
@@ -425,7 +491,6 @@ export const registrationCases: Case[] = [
 
             expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
 
             // Verify that tools have widget metadata when UI mode is enabled via URL parameter
             expectWidgetToolMeta(tools);
@@ -441,7 +506,6 @@ export const registrationCases: Case[] = [
 
             expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
             expectWidgetToolMeta(tools);
         }),
     },
