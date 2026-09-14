@@ -6,11 +6,9 @@ You can find the results here: https://app.phoenix.arize.com/s/apify
 
 ## CI Workflow
 
-The evaluation workflow runs automatically on:
-- **Master branch pushes** - for production evaluations (saves CI cycles)
-- **PRs with `validated` label** - for testing evaluation changes before merging
-
-To trigger evaluations on a PR, add the `validated` label to your pull request.
+The Phoenix runner no longer runs in CI — its files stay for now, pending deletion. CI now runs
+the Langfuse-backed suites in `evals/mcp_agent/` (gating PRs and merges); see
+[`evals/mcp_agent/README.md`'s CI section](./mcp_agent/README.md#ci).
 
 ## Two evaluation methods
 
