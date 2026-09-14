@@ -81,7 +81,7 @@ const pushActorArgs = z.object({
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const actorIdTakers = [HELPER_TOOLS.ACTOR_BUILD, HELPER_TOOLS.ACTOR_CALL].filter(hasTool);
-    return `Push source files to an Actor in your account and, by default, build the pushed version.
+    return `Push files to an Actor in your account and, by default, build the pushed version.
 Creates the Actor when it does not exist and creates or updates the version otherwise: the equivalent of the Apify CLI's apify push.
 Returns the Actor ID and name, the version, its build tag, the number of files now in the version, the build when one was started, and a summary with one next step.${
         actorIdTakers.length > 0 ? ` Pass the returned actorId as actor to ${actorIdTakers.join(' and ')}.` : ''
@@ -108,7 +108,7 @@ USAGE EXAMPLES:
 - user_input: Update src/main.js in my-scraper and rebuild it`;
 }
 
-type PushSourceFilesParams = {
+type PushActorFilesParams = {
     client: ApifyClient;
     /** As given by the caller: a bare name or `username/name`. */
     actorName: string;
@@ -118,7 +118,7 @@ type PushSourceFilesParams = {
     sourceFiles: ActorVersionSourceFile[];
 };
 
-type PushSourceFilesResult = {
+type PushActorFilesResult = {
     actorId: string;
     /** Full name, `username/name`. */
     actorName: string;
@@ -149,7 +149,7 @@ function formatVersionList(versionNumbers: readonly string[]): string {
  * Creates the Actor with the files, or creates or updates the version of an existing Actor. Returns
  * `userError` for problems the user must fix; `envVars` is never sent so the version keeps its own.
  */
-async function pushSourceFiles(params: PushSourceFilesParams): Promise<PushSourceFilesResult | { userError: string }> {
+async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFilesResult | { userError: string }> {
     const { client, buildTag, mode, sourceFiles } = params;
     const { username } = await client.user('me').get();
     const { ownerPrefix, bareName } = parseActorName(params.actorName);
@@ -244,7 +244,7 @@ async function pushSourceFiles(params: PushSourceFilesParams): Promise<PushSourc
     };
 }
 
-function formatOutcome({ created, versionCreated, versionNumber }: PushSourceFilesResult): string {
+function formatOutcome({ created, versionCreated, versionNumber }: PushActorFilesResult): string {
     if (created) return 'created the Actor';
     if (versionCreated) return `created version ${versionNumber}`;
     return 'updated the version';
@@ -328,9 +328,9 @@ export const pushActor: ToolEntry = Object.freeze({
         // In replace mode the pushed files are the whole version, so this is known before any API call.
         if (parsed.mode === 'replace' && !hasActorConfig(sourceFiles)) return respondUserError(ACTOR_CONFIG_MISSING_TEXT);
 
-        let pushed: PushSourceFilesResult | { userError: string };
+        let pushed: PushActorFilesResult | { userError: string };
         try {
-            pushed = await pushSourceFiles({
+            pushed = await pushActorFiles({
                 client,
                 actorName: parsed.actorName,
                 versionNumber: parsed.versionNumber,
