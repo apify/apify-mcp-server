@@ -2,15 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.15.5 - **not yet released**
+## [0.15.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.7) (2026-09-11)
+
+### 🐛 Bug Fixes
+
+- Let explicit report-problem selection bypass the client blocklist ([#1368](https://github.com/apify/apify-mcp-server/pull/1368)) ([a4dafc4](https://github.com/apify/apify-mcp-server/commit/a4dafc4a95698fe2d3ff5420d58bcda65fbe97eb)) by [@MQ37](https://github.com/MQ37)
+
+
+## [0.15.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.6) (2026-09-10)
+
+### 🚀 Features
+
+- **evals:** Add tool-call mode and one dataset per CI gate ([#1337](https://github.com/apify/apify-mcp-server/pull/1337)) ([29685f9](https://github.com/apify/apify-mcp-server/commit/29685f944909c15aade6fa5564b473e9e218c368)) by [@jirispilka](https://github.com/jirispilka), closes [#260](https://github.com/apify/apify-mcp-server/issues/260)
+- Warn when a discovered Actor cannot be run in this session ([#1327](https://github.com/apify/apify-mcp-server/pull/1327)) ([c27c7bd](https://github.com/apify/apify-mcp-server/commit/c27c7bd9959c8fb006aabe088b09076b68baa3cf)) by [@MQ37](https://github.com/MQ37), closes [#231](https://github.com/apify/apify-mcp-server/issues/231)
+- Track ?client= URL param in Segment telemetry ([#1344](https://github.com/apify/apify-mcp-server/pull/1344)) ([eeedb06](https://github.com/apify/apify-mcp-server/commit/eeedb06bb5fc1ee368b957b80f6cb29f52f9729e)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Stop enforcing enum values dropped by input-schema truncation ([#1258](https://github.com/apify/apify-mcp-server/pull/1258)) ([3843245](https://github.com/apify/apify-mcp-server/commit/384324589f142b672db38a5d07624c5fb6c8ae12)) by [@MQ37](https://github.com/MQ37), closes [#1253](https://github.com/apify/apify-mcp-server/issues/1253)
+- Gate every cross-tool mention in server instructions behind the session&#x27;s tool set ([#1334](https://github.com/apify/apify-mcp-server/pull/1334)) ([49243e9](https://github.com/apify/apify-mcp-server/commit/49243e97adf61b1e8ef4eb521aa3e5ed2e104708)) by [@MQ37](https://github.com/MQ37), closes [#266](https://github.com/apify/apify-mcp-server/issues/266)
+- Gate call-actor mentions when the tool is absent from the session ([#1326](https://github.com/apify/apify-mcp-server/pull/1326)) ([aa9f7b3](https://github.com/apify/apify-mcp-server/commit/aa9f7b377729f6b0fcb1c7ae40aaf845cc0b2c6b)) by [@MQ37](https://github.com/MQ37), closes [#232](https://github.com/apify/apify-mcp-server/issues/232)
+- Stop pairing call-actor-widget and get-actor-run-widget ([#1357](https://github.com/apify/apify-mcp-server/pull/1357)) ([6355724](https://github.com/apify/apify-mcp-server/commit/63557245691f043fe9149b7ffd08c3cff54a3b99)) by [@MQ37](https://github.com/MQ37)
+
+
+## [0.15.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.5) (2026-09-09)
+
+### 🚀 Features
+
+- **evals:** Add --claude-judge to run the judge on the Agent SDK ([#1299](https://github.com/apify/apify-mcp-server/pull/1299)) ([737b748](https://github.com/apify/apify-mcp-server/commit/737b748a9159ab5f4098535f51e34d2848dd6f1f)) by [@jirispilka](https://github.com/jirispilka)
+- **evals:** Add web-fetch and web-tools-selection eval suites ([#1300](https://github.com/apify/apify-mcp-server/pull/1300)) ([23b94c0](https://github.com/apify/apify-mcp-server/commit/23b94c07f7cc373ac2d1276f4e4fa67d6658fecd)) by [@jirispilka](https://github.com/jirispilka)
 
 ### 🐛 Bug Fixes
 
 - Use canonical Apify docs MCP URL in server card ([#1325](https://github.com/apify/apify-mcp-server/pull/1325)) ([2d1c6dc](https://github.com/apify/apify-mcp-server/commit/2d1c6dcace8ea75c30b056b14f78241f341ffc48)) by [@marekh19](https://github.com/marekh19)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.15.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.4) (2026-09-02)
 
 ### 🚀 Features

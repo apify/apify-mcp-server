@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HELPER_TOOLS, SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
-import { callActorApps } from '../../src/tools/actors/call_actor.js';
+import { callActor } from '../../src/tools/actors/call_actor.js';
 import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
 import type { ServerModeOption } from '../../src/types.js';
@@ -164,7 +164,7 @@ describe('ActorsMcpServer initialize handler', () => {
             await dispatchInitialize(server, makeInitializeRequest(true));
 
             expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH)).toBe(searchActors);
-            expect(server.tools.get(HELPER_TOOLS.ACTOR_CALL)).toBe(callActorApps);
+            expect(server.tools.get(HELPER_TOOLS.ACTOR_CALL)).toBe(callActor);
             expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
         },
     );
