@@ -12,7 +12,7 @@ import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 import { pushActorToolOutputSchema } from '../structured_output_schemas.js';
-import { buildNextStepForBuild, startBuild, toBuildResult } from './build_helpers.js';
+import { buildNextStepForBuild, listVersionNumbers, startBuild, toBuildResult } from './build_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
     getSourceFilesSizeBytes,
@@ -186,7 +186,7 @@ async function pushSourceFiles(params: PushSourceFilesParams): Promise<PushSourc
         };
     }
 
-    const versionNumbers = actor.versions.flatMap((version) => version.versionNumber ?? []);
+    const versionNumbers = listVersionNumbers(actor);
     if (params.versionNumber === undefined && versionNumbers.length > 1) {
         return { userError: `Specify versionNumber; ${formatVersionList(versionNumbers)}.` };
     }
@@ -255,14 +255,7 @@ function formatFileCount(count: number): string {
 }
 
 function buildNextStep(build: Build | undefined, loadedToolNames: readonly string[]): string {
-    if (build) {
-        return buildNextStepForBuild(build, {
-            loadedToolNames,
-            nonTerminalNextStep: loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET)
-                ? `Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId ${build.id} (it waits up to ${WAIT_SECS_MAX} seconds per call).`
-                : 'The build is still running; check its status again in a few seconds.',
-        });
-    }
+    if (build) return buildNextStepForBuild(build, { loadedToolNames });
     return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
         ? `Trigger a build with ${HELPER_TOOLS.ACTOR_BUILD} to make this version runnable.`
         : 'Build this version to make it runnable.';
