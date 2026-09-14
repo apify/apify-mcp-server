@@ -231,4 +231,17 @@ export const appsCases: Case[] = [
             expect(resources.filter((r) => r.uri.startsWith('ui://'))).toEqual([]);
         }),
     },
+    {
+        name: 'reads widget HTML via resources/read in apps mode',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors'], serverMode: 'apps' }, async (client) => {
+            const result = await client.readResource({ uri: 'ui://widget/search-actors.html' });
+            const contents = result.contents[0] as { mimeType?: string; text?: string };
+
+            // A missing widget JS file still resolves, as `text/plain` carrying "is not available".
+            // The mimeType assert is what separates a real widget from that placeholder.
+            expect(contents.mimeType).toBe(RESOURCE_MIME_TYPE);
+            expect(contents.text).toContain('<!DOCTYPE html>');
+        }),
+    },
 ];
