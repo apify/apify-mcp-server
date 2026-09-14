@@ -5,8 +5,8 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
-import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
+import { ABORT, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 import { buildActorToolOutputSchema } from '../structured_output_schemas.js';
 import { buildNextStepForBuild, listVersionNumbers, startBuild, toBuildResult } from './build_helpers.js';
@@ -71,7 +71,7 @@ export const buildActor: ToolEntry = Object.freeze({
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
         const parsed = buildActorArgs.parse(args);
         const actor = await client.actor(parsed.actor).get();
         if (!actor) {
@@ -90,11 +90,15 @@ export const buildActor: ToolEntry = Object.freeze({
             return respondUserError(`Specify versionNumber; this Actor has versions: ${versionNumbers.join(', ')}.`);
         }
         const versionNumber = parsed.versionNumber ?? versionNumbers[0];
+        // Race the wait against the request signal so a cancelled call returns promptly instead of
+        // blocking up to `waitSecs`. Per MCP spec, receivers SHOULD NOT respond to a cancelled request.
         const build = await startBuild(client, actor.id, versionNumber, {
             tag: parsed.tag,
             useCache: parsed.useCache,
             waitSecs: parsed.waitSecs,
+            signal,
         });
+        if (build === ABORT) return respondAborted();
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const structuredContent = { build: toBuildResult(build, linkContext) };
         const summary = `Started build ${build.buildNumber} of Actor ${build.actId} (version ${versionNumber}); status ${build.status}.`;
