@@ -49,7 +49,7 @@ USAGE EXAMPLES:
 }
 
 /**
- * https://docs.apify.com/api/v2/act-builds-post
+ * https://docs.apify.com/api/v2/actors-builds-post
  *  /v2/acts/{actorId}/builds
  */
 export const buildActor: ToolEntry = Object.freeze({
