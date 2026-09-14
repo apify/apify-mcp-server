@@ -325,6 +325,27 @@ describe('push-actor', () => {
             expect(structuredContent).toMatchObject({ actorName: 'john/my-actor' });
         });
 
+        it('accepts the API form username~name and returns the username/name form', async () => {
+            const { structuredContent } = await callTool({
+                actorName: 'john~my-actor',
+                files: [MAIN_JS],
+                build: false,
+            });
+
+            expect(actorMock).toHaveBeenCalledWith('john/my-actor');
+            expect(structuredContent).toMatchObject({ actorName: 'john/my-actor' });
+        });
+
+        it("refuses a tilde-separated username prefix that is not the caller's", async () => {
+            const { text } = await callToolExpectingUserError({ actorName: 'jane~my-actor', files: [MAIN_JS] });
+
+            expect(text).toBe(
+                "This tool pushes only to your own account (john); 'jane~my-actor' names another account.",
+            );
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expectNoWrite();
+        });
+
         it('creates the Actor under its bare name when the username/name form is given', async () => {
             actorGetMock.mockResolvedValue(undefined);
 
@@ -643,7 +664,7 @@ describe('push-actor', () => {
                 const { text } = await callToolExpectingUserError({ actorName, files: [ACTOR_JSON] });
 
                 expect(text).toBe(
-                    'actorName: Actor name must be 3 to 63 letters, digits and dashes, cannot start or end with a dash, and may be prefixed with your username and a slash',
+                    'actorName: Actor name must be 3 to 63 letters, digits and dashes, cannot start or end with a dash, and may be prefixed with your username and a slash or a tilde',
                 );
                 expectNoWrite();
             },

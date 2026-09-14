@@ -35,11 +35,11 @@ const pushActorArgs = z.object({
         .string()
         .min(3)
         .regex(
-            /^(?:[a-zA-Z0-9][a-zA-Z0-9._-]*\/)?[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]$/,
-            'Actor name must be 3 to 63 letters, digits and dashes, cannot start or end with a dash, and may be prefixed with your username and a slash',
+            /^(?:[a-zA-Z0-9][a-zA-Z0-9._-]*[/~])?[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]$/,
+            'Actor name must be 3 to 63 letters, digits and dashes, cannot start or end with a dash, and may be prefixed with your username and a slash or a tilde',
         )
         .describe(
-            'Actor name in your account, bare (my-scraper) or with your username (john/my-scraper); created if it does not exist. The returned actorId is the Actor ID the build and run tools take',
+            'Actor name in your account: bare (my-scraper) or with your username as john/my-scraper or john~my-scraper (the API form); created if it does not exist. The returned actorId is the Actor ID the build and run tools take',
         ),
     versionNumber: z
         .string()
@@ -110,7 +110,7 @@ USAGE EXAMPLES:
 
 type PushActorFilesParams = {
     client: ApifyClient;
-    /** As given by the caller: a bare name or `username/name`. */
+    /** As given by the caller: a bare name, `username/name`, or `username~name`. */
     actorName: string;
     versionNumber: string | undefined;
     buildTag: string | undefined;
@@ -120,7 +120,7 @@ type PushActorFilesParams = {
 
 type PushActorFilesResult = {
     actorId: string;
-    /** Full name, `username/name`. */
+    /** Full name in the `username/name` form, whichever separator the caller used. */
     actorName: string;
     versionNumber: string;
     /** The Actor was created; false when only the version was created or updated. */
@@ -133,11 +133,14 @@ type PushActorFilesResult = {
 
 const ACTOR_CONFIG_MISSING_TEXT = `The files must include ${ACTOR_CONFIG_PATH}; the platform needs it to build the Actor.`;
 
-/** Splits `username/name` into its parts; a bare name has no `ownerPrefix`. */
+/**
+ * Splits `username/name` or `username~name` (the separator the Apify API uses) into its parts; a bare
+ * name has no `ownerPrefix`.
+ */
 function parseActorName(actorName: string): { ownerPrefix: string | undefined; bareName: string } {
-    const slashIndex = actorName.indexOf('/');
-    if (slashIndex === -1) return { ownerPrefix: undefined, bareName: actorName };
-    return { ownerPrefix: actorName.slice(0, slashIndex), bareName: actorName.slice(slashIndex + 1) };
+    const separatorIndex = actorName.search(/[/~]/);
+    if (separatorIndex === -1) return { ownerPrefix: undefined, bareName: actorName };
+    return { ownerPrefix: actorName.slice(0, separatorIndex), bareName: actorName.slice(separatorIndex + 1) };
 }
 
 function formatVersionList(versionNumbers: readonly string[]): string {
