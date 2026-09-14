@@ -194,8 +194,8 @@ function formatVersionList(versionNumbers: readonly string[]): string {
 function resolveSourceFiles(
     files: readonly SourceFileInput[],
 ): { sourceFiles: ActorVersionSourceFile[] } | UserErrorResult {
-    const fileProblem = validateSourceFiles(files);
-    if (fileProblem) return { userError: fileProblem };
+    const validationError = validateSourceFiles(files);
+    if (validationError) return { userError: validationError };
     const sourceFiles = toSourceFiles(files);
     const sizeBytes = getSourceFilesSizeBytes(sourceFiles);
     if (sizeBytes > MULTIFILE_SOURCE_MAX_BYTES) {
