@@ -304,6 +304,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `tool_call_mode.ts` - Tool-call-mode scoring: the deny wording, `ToolSearch` skip, `first_tool_match` name/args matching
 - `sdk_conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
 - `llm_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
+- `claude_judge_client.ts` - Judge backed by the Claude Agent SDK (`--claude-judge`), for runs without an OpenRouter key
 - `langfuse_observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
 - `mcp_agent_judge.ts` - Judge evaluation
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
