@@ -5,7 +5,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import { buildConsoleBuildUrl } from '../../utils/console_link.js';
 import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
-import { toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { type ABORT, raceAbort, toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 
 /** The MAJOR.MINOR numbers of the Actor's versions; a version document without one is skipped. */
 export function listVersionNumbers(actor: Pick<Actor, 'versions'>): string[] {
@@ -30,19 +30,25 @@ export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | un
     };
 }
 
-/** Starts a build of an Actor version and waits up to `waitSecs` for it to finish. */
+/**
+ * Starts a build of an Actor version and waits up to `waitSecs` for it to finish.
+ * The wait is raced against `signal`, so a cancelled request resolves to {@link ABORT} instead of blocking.
+ */
 export async function startBuild(
     client: ApifyClient,
     actorId: string,
     versionNumber: string,
-    options: { tag?: string; useCache: boolean; waitSecs: number },
-): Promise<Build> {
-    const { tag, useCache, waitSecs } = options;
-    return await client.actor(actorId).build(versionNumber, {
-        ...(tag !== undefined && { tag }),
-        useCache,
-        waitForFinish: waitSecs,
-    } satisfies ActorBuildOptions);
+    options: { tag?: string; useCache: boolean; waitSecs: number; signal?: AbortSignal },
+): Promise<Build | typeof ABORT> {
+    const { tag, useCache, waitSecs, signal } = options;
+    return await raceAbort(
+        client.actor(actorId).build(versionNumber, {
+            ...(tag !== undefined && { tag }),
+            useCache,
+            waitForFinish: waitSecs,
+        } satisfies ActorBuildOptions),
+        signal,
+    );
 }
 
 /**

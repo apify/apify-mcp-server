@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
-import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
-import { buildNextStepForBuild, listVersionNumbers } from '../../src/tools/deploy/build_helpers.js';
+import { ABORT, WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
+import { buildNextStepForBuild, listVersionNumbers, startBuild } from '../../src/tools/deploy/build_helpers.js';
+import type { InternalToolArgs } from '../../src/types.js';
 
 // Cast because the client's `Build.status` type lists only terminal statuses; the API also returns RUNNING.
 const runningBuild = { id: 'build-1', buildNumber: '0.0.3', status: 'RUNNING' } as unknown as Parameters<
@@ -39,6 +40,25 @@ describe('buildNextStepForBuild', () => {
         );
 
         expect(nextStep).toBe('The build is ready to run.');
+    });
+});
+
+describe('startBuild', () => {
+    it('returns ABORT when the request signal is already aborted', async () => {
+        const buildMock = vi.fn().mockResolvedValue({ id: 'build-1', status: 'SUCCEEDED' });
+        const client = { actor: () => ({ build: buildMock }) } as unknown as InternalToolArgs['apifyClient'];
+        const controller = new AbortController();
+        controller.abort();
+
+        const result = await startBuild(client, 'actor-1', '0.1', {
+            useCache: true,
+            waitSecs: WAIT_SECS_MAX,
+            signal: controller.signal,
+        });
+
+        // The build was started, but the aborted signal wins the race even though the call resolved.
+        expect(result).toBe(ABORT);
+        expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true, waitForFinish: WAIT_SECS_MAX });
     });
 });
 

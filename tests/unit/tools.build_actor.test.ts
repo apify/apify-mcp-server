@@ -205,6 +205,23 @@ describe('build-actor', () => {
         expect((buildActor as HelperTool).inputSchema.required).toEqual(['actor']);
     });
 
+    it('returns the empty aborted response when the request signal is already aborted', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+        const controller = new AbortController();
+        controller.abort();
+
+        const result = await (buildActor as HelperTool).call({
+            ...stubToolCallContext({ actor: 'actor-1' }, stubClient),
+            apifyToken: 'apify_ui_test',
+            signal: controller.signal,
+        });
+
+        // Per MCP spec a cancelled request gets no response body, even though the build resolved.
+        expect(result).toEqual({});
+        // Nothing after the build call runs: no Console-link lookup for what would otherwise be a UI token session.
+        expect(getUserInfoCached).not.toHaveBeenCalled();
+    });
+
     describe('description', () => {
         it('names get-actor-build only when that tool is in the session', () => {
             const tool = buildActor as HelperTool;
