@@ -520,8 +520,8 @@ operational limits explicitly.
    reasoning. A run that crashed before the tree was emitted leaves no spans — only the
    SDK's item-run root.
 3. **Confirm it is a regression** before touching a description — see
-   [Two datasets](#two-datasets-kind-id-scheme-and-expectederrors) for why a single red run
-   is not the signal.
+   [Two datasets](#two-datasets-kind-id-scheme-and-expectederrors) for why a single failing
+   run is not the signal.
 4. **Change one tool at a time.** Simultaneous edits are untraceable.
 5. **Iterate on a subset**, then re-run the full dataset — fixing one case often breaks
    another.
