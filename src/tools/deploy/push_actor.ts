@@ -209,13 +209,18 @@ function formatVersionList(versionNumbers: readonly string[]): string {
 function resolveSourceFiles(files: readonly SourceFileInput[]): ActorVersionSourceFile[] {
     validateSourceFiles(files);
     const sourceFiles = toSourceFiles(files);
-    const sizeBytes = getSourceFilesSizeBytes(sourceFiles);
+    validateSourceSize(sourceFiles, 'The files');
+    return sourceFiles;
+}
+
+/** Throws `UserInputError` when the files exceed the platform's inline source cutoff; `subject` starts the message. */
+function validateSourceSize(files: readonly ActorVersionSourceFile[], subject: string): void {
+    const sizeBytes = getSourceFilesSizeBytes(files);
     if (sizeBytes > MAX_MULTIFILE_BYTES) {
         throw new UserInputError(
-            `The files total ${sizeBytes} bytes; the limit is ${MAX_MULTIFILE_BYTES} bytes (${MULTIFILE_SOURCE_MAX_MIB} MiB). Use the Apify CLI (apify push) for larger projects.`,
+            `${subject} total ${sizeBytes} bytes; the limit is ${MAX_MULTIFILE_BYTES} bytes (${MULTIFILE_SOURCE_MAX_MIB} MiB). Use the Apify CLI (apify push) for larger projects.`,
         );
     }
-    return sourceFiles;
 }
 
 type TargetActor = {
@@ -340,6 +345,7 @@ function resolveVersionFiles(
     }
     const files = mergeSourceFiles(existing.sourceFiles, sourceFiles);
     if (!hasActorConfig(files)) throw new UserInputError(ACTOR_CONFIG_MISSING_TEXT);
+    validateSourceSize(files, 'The merged version would');
     return files;
 }
 

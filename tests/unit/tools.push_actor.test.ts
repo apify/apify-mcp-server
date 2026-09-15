@@ -614,6 +614,16 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
+        it('rejects a merge whose kept plus pushed files exceed the limit', async () => {
+            const big = { name: 'big.txt', format: 'TEXT', content: 'a'.repeat(MAX_MULTIFILE_BYTES - 5) };
+            versionGetMock.mockResolvedValue(mockVersion({ sourceFiles: [ACTOR_JSON_SOURCE, big] }));
+
+            const { text } = await callToolExpectingUserError({ files: [MAIN_JS] });
+
+            expect(text).toMatch(/^The merged version would total \d+ bytes; the limit is /);
+            expectNoWrite();
+        });
+
         it('counts the decoded length of base64 files toward the limit', async () => {
             const content = Buffer.alloc(MAX_MULTIFILE_BYTES).toString('base64');
 
