@@ -634,12 +634,14 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
+        // The boundary tests push the config file itself in replace mode, so the merged-in files of the
+        // existing version do not add to the total and the cap is measured on the pushed set alone.
         // The boundary is on decoded bytes, not characters: 'é' is two utf8 bytes.
         it('accepts files whose decoded size is exactly the limit', async () => {
             const content = `${'a'.repeat(MAX_MULTIFILE_BYTES - 2)}é`;
             expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_MULTIFILE_BYTES);
 
-            await callTool({ files: [{ path: 'big.txt', content }], build: false });
+            await callTool({ files: [{ path: ACTOR_CONFIG_PATH, content }], mode: 'replace', build: false });
 
             expect(versionUpdateMock).toHaveBeenCalled();
         });
@@ -669,7 +671,11 @@ describe('push-actor', () => {
         it('counts the decoded length of base64 files toward the limit', async () => {
             const content = Buffer.alloc(MAX_MULTIFILE_BYTES).toString('base64');
 
-            await callTool({ files: [{ path: 'blob.bin', content, encoding: 'base64' }], build: false });
+            await callTool({
+                files: [{ path: ACTOR_CONFIG_PATH, content, encoding: 'base64' }],
+                mode: 'replace',
+                build: false,
+            });
 
             expect(versionUpdateMock).toHaveBeenCalled();
         });
