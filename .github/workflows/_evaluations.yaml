@@ -97,3 +97,12 @@ jobs:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
                     OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
                     OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
+
+            # The schedule cases leave enabled schedules behind, and an enabled schedule keeps firing
+            # on the eval account until something deletes it. Seeding at the start of the next run is
+            # too late, so tear them down here — `always()` so a failed or cancelled run still cleans up.
+            -   name: Tear down schedule fixtures (merge tier only)
+                if: always() && inputs.tier == 'merge'
+                run: pnpm run evals:mcp-agent:schedules-fixtures
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}

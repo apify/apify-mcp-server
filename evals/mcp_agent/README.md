@@ -104,6 +104,11 @@ run: the second script deletes leftover `eval-*` schedules and resets the fixtur
 UTC, one task action), since an eval agent may have enabled it or replaced its actions. The fixture stays
 disabled on purpose; an enabled one would start a run on the eval account every night.
 
+Run `evals:mcp-agent:schedules-fixtures` again **after** a run as well. The create cases leave enabled
+schedules behind, and an enabled schedule keeps firing on the eval account until something deletes it —
+seeding at the start of the next run is too late. CI does this in a `Tear down schedule fixtures` step
+guarded by `always()`, so a failed or cancelled run still cleans up.
+
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
 selection among the defaults, and multi-fetch chains. They create no named account state, so
