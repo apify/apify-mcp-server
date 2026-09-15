@@ -214,7 +214,7 @@ export const appsCases: Case[] = [
 
             for (const uri of ['ui://widget/search-actors.html', 'ui://widget/actor-run.html']) {
                 const resource = resources.find((r) => r.uri === uri);
-                // listResources skips a widget whose JS file is missing, so this also fails on an unbuilt src/web/dist.
+
                 expect(resource, `missing widget resource ${uri}`).toBeDefined();
                 expect(resource?.mimeType).toBe(RESOURCE_MIME_TYPE);
                 expect((resource?._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri).toBe(uri);
