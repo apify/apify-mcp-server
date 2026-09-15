@@ -200,8 +200,7 @@ function formatVersionList(versionNumbers: readonly string[]): string {
  * `.actor/actor.json` is checked by the push step that knows the version.
  */
 function resolveSourceFiles(files: readonly SourceFileInput[]): ActorVersionSourceFile[] {
-    const validationError = validateSourceFiles(files);
-    if (validationError) throw new UserInputError(validationError);
+    validateSourceFiles(files);
     const sourceFiles = toSourceFiles(files);
     const sizeBytes = getSourceFilesSizeBytes(sourceFiles);
     if (sizeBytes > MULTIFILE_SOURCE_MAX_BYTES) {

@@ -1,5 +1,7 @@
 import type { ActorVersionSourceFile } from 'apify-client';
 
+import { UserInputError } from '../../errors.js';
+
 export const MULTIFILE_SOURCE_MAX_MIB = 3;
 
 /** Same cutoff as apify push's MAX_MULTIFILE_BYTES; larger projects need the Apify CLI. */
@@ -32,24 +34,23 @@ export function normalizeSourcePath(path: string): string {
 }
 
 /**
- * The first problem with the files (an absolute path, a path empty after normalization, a directory,
- * a `..` segment, a duplicate, base64 content that is not base64), or undefined.
+ * Throws `UserInputError` on the first problem with the files: an absolute path, a path empty after
+ * normalization, a directory, a `..` segment, a duplicate, or base64 content that is not base64.
  */
-export function validateSourceFiles(files: readonly SourceFileInput[]): string | undefined {
+export function validateSourceFiles(files: readonly SourceFileInput[]): void {
     const seen = new Set<string>();
     for (const { path, content, encoding } of files) {
-        if (ABSOLUTE_PATH_REGEX.test(path)) return `File path '${path}' must be relative to the Actor root, not absolute.`;
+        if (ABSOLUTE_PATH_REGEX.test(path)) throw new UserInputError(`File path '${path}' must be relative to the Actor root, not absolute.`);
         const normalized = normalizeSourcePath(path);
-        if (normalized === '') return `File path '${path}' is empty after normalization.`;
-        if (/[\\/]$/.test(path)) return `File path '${path}' must name a file, not a directory.`;
-        if (normalized.split('/').includes('..')) return `File path '${path}' must not contain '..' segments.`;
-        if (seen.has(normalized)) return `File path '${normalized}' is listed more than once.`;
+        if (normalized === '') throw new UserInputError(`File path '${path}' is empty after normalization.`);
+        if (/[\\/]$/.test(path)) throw new UserInputError(`File path '${path}' must name a file, not a directory.`);
+        if (normalized.split('/').includes('..')) throw new UserInputError(`File path '${path}' must not contain '..' segments.`);
+        if (seen.has(normalized)) throw new UserInputError(`File path '${normalized}' is listed more than once.`);
         seen.add(normalized);
         if (encoding === 'base64' && !BASE64_REGEX.test(content)) {
-            return `File '${path}' has encoding base64 but its content is not valid base64.`;
+            throw new UserInputError(`File '${path}' has encoding base64 but its content is not valid base64.`);
         }
     }
-    return undefined;
 }
 
 /** Maps the tool's files to the `sourceFiles` shape the API takes: normalized name, TEXT or BASE64. */
