@@ -2,10 +2,11 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MAX_MULTIFILE_BYTES } from '@apify/consts';
+
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
 import { pushActor } from '../../src/tools/deploy/push_actor.js';
-import { MULTIFILE_SOURCE_MAX_BYTES } from '../../src/tools/deploy/source_files.js';
 import { pushActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -593,8 +594,8 @@ describe('push-actor', () => {
 
         // The boundary is on decoded bytes, not characters: 'é' is two utf8 bytes.
         it('accepts files whose decoded size is exactly the limit', async () => {
-            const content = `${'a'.repeat(MULTIFILE_SOURCE_MAX_BYTES - 2)}é`;
-            expect(Buffer.byteLength(content, 'utf8')).toBe(MULTIFILE_SOURCE_MAX_BYTES);
+            const content = `${'a'.repeat(MAX_MULTIFILE_BYTES - 2)}é`;
+            expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_MULTIFILE_BYTES);
 
             await callTool({ files: [{ path: 'big.txt', content }], build: false });
 
@@ -602,19 +603,19 @@ describe('push-actor', () => {
         });
 
         it('rejects files whose decoded size exceeds the limit by one byte', async () => {
-            const content = `${'a'.repeat(MULTIFILE_SOURCE_MAX_BYTES - 1)}é`;
-            expect(Buffer.byteLength(content, 'utf8')).toBe(MULTIFILE_SOURCE_MAX_BYTES + 1);
+            const content = `${'a'.repeat(MAX_MULTIFILE_BYTES - 1)}é`;
+            expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_MULTIFILE_BYTES + 1);
 
             const { text } = await callToolExpectingUserError({ files: [{ path: 'big.txt', content }] });
 
             expect(text).toBe(
-                `The files total ${MULTIFILE_SOURCE_MAX_BYTES + 1} bytes; the limit is ${MULTIFILE_SOURCE_MAX_BYTES} bytes (3 MiB). Use the Apify CLI (apify push) for larger projects.`,
+                `The files total ${MAX_MULTIFILE_BYTES + 1} bytes; the limit is ${MAX_MULTIFILE_BYTES} bytes (3 MiB). Use the Apify CLI (apify push) for larger projects.`,
             );
             expectNoWrite();
         });
 
         it('counts the decoded length of base64 files toward the limit', async () => {
-            const content = Buffer.alloc(MULTIFILE_SOURCE_MAX_BYTES).toString('base64');
+            const content = Buffer.alloc(MAX_MULTIFILE_BYTES).toString('base64');
 
             await callTool({ files: [{ path: 'blob.bin', content, encoding: 'base64' }], build: false });
 

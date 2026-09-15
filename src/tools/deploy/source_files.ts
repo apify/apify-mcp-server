@@ -2,11 +2,6 @@ import type { ActorVersionSourceFile } from 'apify-client';
 
 import { UserInputError } from '../../errors.js';
 
-export const MULTIFILE_SOURCE_MAX_MIB = 3;
-
-/** Same cutoff as apify push's MAX_MULTIFILE_BYTES; larger projects need the Apify CLI. */
-export const MULTIFILE_SOURCE_MAX_BYTES = MULTIFILE_SOURCE_MAX_MIB * 1024 * 1024;
-
 /** The platform needs this file to build an Actor; `apify push` refuses a directory without it. */
 export const ACTOR_CONFIG_PATH = '.actor/actor.json';
 

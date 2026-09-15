@@ -1,4 +1,4 @@
-import { ACTOR_NAME, USERNAME } from '@apify/consts';
+import { ACTOR_NAME, MAX_MULTIFILE_BYTES, USERNAME } from '@apify/consts';
 import type {
     Actor,
     ActorClient,
@@ -30,8 +30,6 @@ import {
     getSourceFilesSizeBytes,
     hasActorConfig,
     mergeSourceFiles,
-    MULTIFILE_SOURCE_MAX_BYTES,
-    MULTIFILE_SOURCE_MAX_MIB,
     type SourceFileInput,
     toSourceFiles,
     validateSourceFiles,
@@ -41,6 +39,9 @@ import {
 const DEFAULT_BUILD_TAG = 'latest';
 
 /** `apify push` starts a new Actor at this version. */
+/** The platform's inline source-files cutoff, the same one `apify push` uses; larger projects need the Apify CLI. */
+const MULTIFILE_SOURCE_MAX_MIB = MAX_MULTIFILE_BYTES / (1024 * 1024);
+
 const DEFAULT_VERSION_NUMBER = '0.0';
 
 const pushActorArgs = z.object({
@@ -209,9 +210,9 @@ function resolveSourceFiles(files: readonly SourceFileInput[]): ActorVersionSour
     validateSourceFiles(files);
     const sourceFiles = toSourceFiles(files);
     const sizeBytes = getSourceFilesSizeBytes(sourceFiles);
-    if (sizeBytes > MULTIFILE_SOURCE_MAX_BYTES) {
+    if (sizeBytes > MAX_MULTIFILE_BYTES) {
         throw new UserInputError(
-            `The files total ${sizeBytes} bytes; the limit is ${MULTIFILE_SOURCE_MAX_BYTES} bytes (${MULTIFILE_SOURCE_MAX_MIB} MiB). Use the Apify CLI (apify push) for larger projects.`,
+            `The files total ${sizeBytes} bytes; the limit is ${MAX_MULTIFILE_BYTES} bytes (${MULTIFILE_SOURCE_MAX_MIB} MiB). Use the Apify CLI (apify push) for larger projects.`,
         );
     }
     return sourceFiles;
