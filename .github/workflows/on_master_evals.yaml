@@ -52,4 +52,3 @@ jobs:
             LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
             APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
             OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-            OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
