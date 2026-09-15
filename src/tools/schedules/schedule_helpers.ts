@@ -130,7 +130,12 @@ export async function getScheduleByIdOrName(client: ApifyClient, idOrName: strin
  * Actor to any caller. Keying it by `~name` let one tenant's public Actor answer another tenant's
  * bare name — scheduling the wrong Actor, or succeeding where the answer is not-found. Every other
  * caller of that cache passes an absolute key (an ID or `username/name`), so the fix is to keep
- * caller-relative names out of it rather than to weaken the cache. Covered by
+ * caller-relative names out of it rather than to weaken the cache.
+ *
+ * That lookup is also the wrong shape for scheduling: it fetches the Actor's default build, and a
+ * never-built Actor schedules fine but has no build, so `defaultBuild()` raises `unknown-build-tag`
+ * (403). `getActorDefinition` maps only 404/400 to null, so that error surfaces to the user as a
+ * failed create. `actor(id).get()` resolves the ID without touching a build. Covered by
  * `tests/unit/tools.schedule_actor_resolution.test.ts`.
  */
 async function resolveActorId(client: ApifyClient, idOrName: string): Promise<string | undefined> {
