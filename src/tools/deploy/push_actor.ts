@@ -140,6 +140,9 @@ type PushActorFilesResult = {
     filesPushed: number;
 };
 
+/** What a version write produced; `pushActorFiles` adds the Actor identity around it. */
+type VersionWriteOutcome = Pick<PushActorFilesResult, 'versionCreated' | 'buildTag' | 'filesPushed'>;
+
 const ACTOR_CONFIG_MISSING_TEXT = `The files must include ${ACTOR_CONFIG_PATH}; the platform needs it to build the Actor.`;
 
 type ActorNameParts = { ownerPrefix: string | undefined; bareName: string };
@@ -237,7 +240,6 @@ async function resolveTargetActor(client: ApifyClient, { ownerPrefix, bareName }
 
 type CreateActorParams = {
     client: ApifyClient;
-    username: string;
     bareName: string;
     versionNumber: string;
     buildTag: string | undefined;
@@ -245,8 +247,8 @@ type CreateActorParams = {
 };
 
 /** The Actor does not exist yet: the pushed files are its whole first version, so they must carry the config. */
-async function createActorWithVersion(params: CreateActorParams): Promise<PushActorFilesResult> {
-    const { client, username, bareName, versionNumber, buildTag, sourceFiles } = params;
+async function createActorWithVersion(params: CreateActorParams): Promise<VersionWriteOutcome & { actorId: string }> {
+    const { client, bareName, versionNumber, buildTag, sourceFiles } = params;
     if (!hasActorConfig(sourceFiles)) throw new UserInputError(ACTOR_CONFIG_MISSING_TEXT);
     const created = await client.actors().create({
         name: bareName,
@@ -261,9 +263,6 @@ async function createActorWithVersion(params: CreateActorParams): Promise<PushAc
     } satisfies ActorCollectionCreateOptions);
     return {
         actorId: created.id,
-        actorName: formatActorFullName(username, bareName),
-        versionNumber,
-        created: true,
         versionCreated: true,
         buildTag: buildTag ?? DEFAULT_BUILD_TAG,
         filesPushed: sourceFiles.length,
@@ -283,9 +282,8 @@ function resolveVersionNumber(
 }
 
 type CreateVersionParams = {
-    actor: Pick<Actor, 'id' | 'versions'>;
+    actor: Pick<Actor, 'versions'>;
     actorClient: ActorClient;
-    actorName: string;
     versionNumber: string;
     buildTag: string | undefined;
     sourceFiles: ActorVersionSourceFile[];
@@ -296,8 +294,8 @@ type CreateVersionParams = {
  * config, in either mode. The version list tells the caller a new version is about to be created, in
  * case that was not intended.
  */
-async function createVersion(params: CreateVersionParams): Promise<PushActorFilesResult> {
-    const { actor, actorClient, actorName, versionNumber, buildTag, sourceFiles } = params;
+async function createVersion(params: CreateVersionParams): Promise<VersionWriteOutcome> {
+    const { actor, actorClient, versionNumber, buildTag, sourceFiles } = params;
     if (!hasActorConfig(sourceFiles)) {
         throw new UserInputError(
             `Version ${versionNumber} does not exist and would be created (${formatVersionList(listVersionNumbers(actor))}). ${ACTOR_CONFIG_MISSING_TEXT}`,
@@ -309,20 +307,10 @@ async function createVersion(params: CreateVersionParams): Promise<PushActorFile
         sourceType: ActorSourceType.SourceFiles,
         sourceFiles,
     } satisfies ActorVersionSourceFiles);
-    return {
-        actorId: actor.id,
-        actorName,
-        versionNumber,
-        created: false,
-        versionCreated: true,
-        buildTag: buildTag ?? DEFAULT_BUILD_TAG,
-        filesPushed: sourceFiles.length,
-    };
+    return { versionCreated: true, buildTag: buildTag ?? DEFAULT_BUILD_TAG, filesPushed: sourceFiles.length };
 }
 
 type UpdateVersionParams = {
-    actorId: string;
-    actorName: string;
     versionClient: ActorVersionClient;
     existing: ActorVersion;
     versionNumber: string;
@@ -354,8 +342,8 @@ function resolveVersionFiles(
     return files;
 }
 
-async function updateVersion(params: UpdateVersionParams): Promise<PushActorFilesResult> {
-    const { actorId, actorName, versionClient, existing, versionNumber, buildTag } = params;
+async function updateVersion(params: UpdateVersionParams): Promise<VersionWriteOutcome> {
+    const { versionClient, existing, buildTag } = params;
     const files = resolveVersionFiles(params);
     await versionClient.update({
         sourceType: ActorSourceType.SourceFiles,
@@ -363,10 +351,6 @@ async function updateVersion(params: UpdateVersionParams): Promise<PushActorFile
         ...(buildTag !== undefined && { buildTag }),
     } satisfies ActorVersionSourceFiles);
     return {
-        actorId,
-        actorName,
-        versionNumber,
-        created: false,
         versionCreated: false,
         buildTag: buildTag ?? existing.buildTag ?? DEFAULT_BUILD_TAG,
         filesPushed: files.length,
@@ -384,20 +368,17 @@ async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFi
     const { actorClient, username, bareName, actor } = await resolveTargetActor(client, params.actorNameParts);
     const actorName = formatActorFullName(username, bareName);
     if (!actor) {
-        return await createActorWithVersion({
-            client,
-            username,
-            bareName,
-            versionNumber: params.versionNumber ?? DEFAULT_VERSION_NUMBER,
-            buildTag,
-            sourceFiles,
-        });
+        const versionNumber = params.versionNumber ?? DEFAULT_VERSION_NUMBER;
+        const { actorId, ...outcome } = await createActorWithVersion({ client, bareName, versionNumber, buildTag, sourceFiles });
+        return { actorId, actorName, versionNumber, created: true, ...outcome };
     }
     const versionNumber = resolveVersionNumber(actor, params.versionNumber);
     const versionClient = actorClient.version(versionNumber);
     const existing = await versionClient.get();
-    if (!existing) return await createVersion({ actor, actorClient, actorName, versionNumber, buildTag, sourceFiles });
-    return await updateVersion({ actorId: actor.id, actorName, versionClient, existing, versionNumber, mode, buildTag, sourceFiles });
+    const outcome = existing
+        ? await updateVersion({ versionClient, existing, versionNumber, mode, buildTag, sourceFiles })
+        : await createVersion({ actor, actorClient, versionNumber, buildTag, sourceFiles });
+    return { actorId: actor.id, actorName, versionNumber, created: false, ...outcome };
 }
 
 /** `build` when one was started, `buildStartErrMessage` when the build request failed, neither when build was false. */
