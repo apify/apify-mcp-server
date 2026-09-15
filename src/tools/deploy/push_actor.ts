@@ -188,7 +188,7 @@ function resolveActorNameInput(actorName: string): ActorNameParts {
 // The platform stores versions as MAJOR.MINOR integers (see VERSION_INT_MAJOR_BASE and VERSION_INT_MINOR_BASE in @apify/consts); no shared regex exists there.
 const VERSION_NUMBER_REGEX = /^\d+\.\d+$/;
 
-/** The version number unchanged when omitted or in MAJOR.MINOR form; throws `UserInputError` otherwise, before any API call. */
+/** Throws `UserInputError` unless the version number is omitted or in MAJOR.MINOR form; runs before any API call. */
 function validateVersionNumber(versionNumber: string | undefined): void {
     if (versionNumber !== undefined && !VERSION_NUMBER_REGEX.test(versionNumber)) {
         throw new UserInputError('Version number must be MAJOR.MINOR, for example 0.1');
