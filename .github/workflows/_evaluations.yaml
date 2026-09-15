@@ -59,6 +59,12 @@ jobs:
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 
+            -   name: Seed schedule fixtures (merge tier only)
+                if: inputs.tier == 'merge'
+                run: pnpm run evals:mcp-agent:schedules-fixtures
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+
             # Floor of three local runs was 0.93; a hosted runner measured 0.97 (111/115).
             # `--claude-judge` avoids the OpenRouter requirement; tool-call items are not judged.
             -   name: Run pr-tier evals

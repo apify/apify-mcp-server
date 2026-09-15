@@ -94,6 +94,16 @@ Actor exactly retired that failure mode along with the 5/8 ratio, so re-measure 
 run as a regression. The lesson that outlived it: treat a shift in the ratio as the signal rather than a
 single red run, and blame a tool description only after checking the case still passes on Sonnet.
 
+The schedules family (`merge/schedules/*`, 10 items: 7 proper + 3 with `expectedErrors`) covers the
+schedule tools: create for a task and for an Actor, cron and time-zone translation from user language,
+pausing, adding an action (an update replaces the whole list), deleting, a name collision, and a
+not-found read. It uses fixed `eval-sched-*` names plus one permanent, disabled fixture schedule
+`eval-nightly-sum` that runs the `eval-sum-nightly` task fixture. Run
+`pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures` before every
+run: the second script deletes leftover `eval-*` schedules and resets the fixture (disabled, `0 3 * * *`
+UTC, one task action), since an eval agent may have enabled it or replaced its actions. The fixture stays
+disabled on purpose; an enabled one would start a run on the eval account every night.
+
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
 selection among the defaults, and multi-fetch chains. They create no named account state, so
@@ -312,6 +322,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `run_mcp_agent_evals.ts` - Main CLI entry
 - `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
 - `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
+- `schedules_fixtures.ts` - Schedule-suite fixture CLI entry (`pnpm run evals:mcp-agent:schedules-fixtures`)
 - `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime and gitignored
 
 ## Configuration
