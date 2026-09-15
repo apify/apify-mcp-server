@@ -460,7 +460,7 @@
       ],
       "args": [
         "tools-call",
-        "get-actor-log",
+        "get-actor-run-log",
         "runId:=\"{{runId}}\""
       ],
       "assert": ".isError != true and (.content[0].text | type == \"string\")"
@@ -1096,7 +1096,7 @@
       ],
       "args": [
         "tools-call",
-        "get-actor-log",
+        "get-actor-run-log",
         "runId:=\"{{runId}}\"",
         "lines:=5"
       ],

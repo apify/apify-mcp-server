@@ -1,0 +1,36 @@
+name: CI (PR evals)
+
+# Do not run on `synchronize`, which would re-spend the eval budget.
+on:
+    pull_request:
+        types: [opened, reopened, ready_for_review]
+        paths:
+            - 'src/**'
+            - 'evals/**'
+            - 'package.json'
+            - 'pnpm-lock.yaml'
+            - 'pnpm-workspace.yaml'
+            - 'tsconfig.json'
+            - '.nvmrc'
+            - '.github/workflows/_evaluations.yaml'
+            - '.github/workflows/on_pull_request_evals.yaml'
+
+jobs:
+    evaluations:
+        name: MCP agent evaluations (pr)
+        # Fork PRs do not receive repository secrets.
+        if: |
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.event.pull_request.draft == false
+        concurrency:
+            group: eval-pr-${{ github.event.pull_request.number }}
+            cancel-in-progress: true
+        uses: ./.github/workflows/_evaluations.yaml
+        with:
+            tier: pr
+        secrets:
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+            LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+            LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+            LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
