@@ -27,7 +27,7 @@ export const ACTOR_EXAMPLE_MCP_SERVER = 'apify/example-mcp-server';
 
 const STDIO_TRANSPORT: Transport = 'stdio';
 
-export const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview'] as const;
+export const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview', 'get-actor-log'] as const;
 export const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 export const DEFAULT_ACTOR_NAMES = defaults.actors.map((actor) => actorNameToToolName(actor));
 

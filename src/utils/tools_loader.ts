@@ -103,7 +103,7 @@ export function isReportProblemExplicitlySelected(input: Input): boolean {
  * the *internal* tool variants around it differ by mode.
  *
  * Selectors classified as "actor names":
- *   - NOT a retired selector (`RETIRED_SELECTOR_NAMES`: `'preview'`, `'experimental'`, `'add-actor'`)
+ *   - NOT a retired selector (`RETIRED_SELECTOR_NAMES`: `'preview'`, `'experimental'`, `'add-actor'`, `'get-actor-log'`)
  *   - NOT a category name (from `CATEGORY_NAME_SET`)
  *   - NOT the name of an internal tool in any mode (from `ALL_INTERNAL_TOOL_NAMES`)
  *
@@ -221,7 +221,7 @@ export function getToolsForServerMode(
     const internalSelections: ToolEntry[] = [];
     if (selectors !== undefined && selectors.length > 0) {
         for (const sel of selectors) {
-            // Retired selectors (add-actor, experimental, preview) are inert.
+            // Retired selectors (add-actor, experimental, preview, get-actor-log) are inert.
             if (RETIRED_SELECTOR_NAMES.has(sel)) continue;
 
             const categoryTools = categories[sel as ToolCategory];
