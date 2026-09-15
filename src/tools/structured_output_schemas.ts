@@ -458,9 +458,15 @@ export const pushActorToolOutputSchema = {
         versionNumber: { type: 'string', description: 'Version the files were pushed to, e.g. 0.1' },
         buildTag: { type: 'string', description: 'Build tag of the version, e.g. latest' },
         filesPushed: { type: 'integer', description: 'Number of files now in the version' },
+        sourceType: {
+            type: 'string',
+            enum: ['SOURCE_FILES', 'TARBALL'],
+            description:
+                'SOURCE_FILES when the version holds the files inline; TARBALL when they exceeded 3 MiB and the version points at their zip in a key-value store',
+        },
         build: getActorBuildToolOutputSchema.properties.build,
     },
-    required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed'],
+    required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed', 'sourceType'],
 };
 
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
