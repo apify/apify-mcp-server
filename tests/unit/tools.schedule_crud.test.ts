@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { getCategoryTools } from '../../src/tools/index.js';
@@ -16,9 +16,6 @@ import {
     type TextToolResult,
     type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
-
-// Actor names in actions resolve through the repo's cached lookup; the helper installs the implementation.
-vi.mock('../../src/utils/actor.js', () => ({ getActorDefinitionCached: vi.fn() }));
 
 type StructuredResult = TextToolResult & {
     structuredContent: Record<string, unknown>;

@@ -9,7 +9,6 @@ import {
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { getActorDefinitionCached } from '../../utils/actor.js';
 import { toIsoString } from '../actors/actor_run_response.js';
 import { getResourceByIdOrName, getTaskByIdOrName, TASK_NAME_REGEX } from '../tasks/task_helpers.js';
 
@@ -124,16 +123,19 @@ export async function getScheduleByIdOrName(client: ApifyClient, idOrName: strin
 }
 
 /**
- * Resolves the Actor an action runs to its ID, which is all the schedule API accepts. Goes through the
- * same cached, ownership-gated lookup as call-actor, so an Actor the model just inspected costs no
- * extra request; an Actor without a build resolves to nothing, and could not be scheduled anyway.
+ * Resolves the Actor an action runs to its ID, which is all the schedule API accepts.
+ *
+ * Deliberately NOT `getActorDefinitionCached`: a bare name is caller-relative (`~name` means "my own
+ * Actor called name"), while `actorDefinitionCache` is process-wide and serves any cached public
+ * Actor to any caller. Keying it by `~name` let one tenant's public Actor answer another tenant's
+ * bare name — scheduling the wrong Actor, or succeeding where the answer is not-found. Every other
+ * caller of that cache passes an absolute key (an ID or `username/name`), so the fix is to keep
+ * caller-relative names out of it rather than to weaken the cache. Covered by
+ * `tests/unit/tools.schedule_actor_resolution.test.ts`.
  */
 async function resolveActorId(client: ApifyClient, idOrName: string): Promise<string | undefined> {
-    const actor = await getResourceByIdOrName(
-        idOrName,
-        async (safeId) => (await getActorDefinitionCached(safeId, client)) ?? undefined,
-    );
-    return actor?.info.id;
+    const actor = await getResourceByIdOrName(idOrName, async (safeId) => client.actor(safeId).get());
+    return actor?.id;
 }
 
 /**

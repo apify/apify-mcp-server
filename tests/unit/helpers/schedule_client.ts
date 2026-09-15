@@ -1,8 +1,5 @@
-import { vi } from 'vitest';
-
 import { JSON_CONTENT_TYPE } from '../../../src/tools/schedules/schedule_helpers.js';
 import type { InternalToolArgs } from '../../../src/types.js';
-import { getActorDefinitionCached } from '../../../src/utils/actor.js';
 
 /**
  * A schedule as the client returns it: every `*At` field parsed into a Date (the client's
@@ -44,12 +41,10 @@ type Resolver = (id: string) => unknown;
 
 /**
  * Fake ApifyClient covering everything the schedule tools use: `schedule().get/update/delete()`,
- * `schedules().create()`, and the `task().get()` lookup that turns a task name into an ID. Actor names
- * resolve through `getActorDefinitionCached`, which the test file must `vi.mock`; this helper gives it
- * an implementation that records `{ fn: 'actor.get', actorId }` like the other lookups. Every call is
- * recorded into `calls`. The function form of `schedule` maps the requested id to the document the API
- * would return, so a test can make the ID reading miss and the `~name` reading hit; the `actor` and
- * `task` resolvers do the same for actions and default to a hit.
+ * `schedules().create()`, and the `actor().get()` / `task().get()` lookups that turn action names
+ * into IDs. Every call is recorded into `calls`. The function form of `schedule` maps the requested
+ * id to the document the API would return, so a test can make the ID reading miss and the `~name`
+ * reading hit; the `actor` and `task` resolvers do the same for actions and default to a hit.
  */
 export function mockScheduleApiClient(
     schedule: unknown | Resolver,
@@ -63,11 +58,6 @@ export function mockScheduleApiClient(
 } {
     const calls: RecordedCall[] = [];
     const resolve = (scheduleId: string) => (typeof schedule === 'function' ? schedule(scheduleId) : schedule);
-    vi.mocked(getActorDefinitionCached).mockImplementation(async (actorId: string) => {
-        calls.push({ fn: 'actor.get', actorId });
-        const info = actor(actorId);
-        return info ? ({ info, definition: {} } as never) : null;
-    });
     const apifyClient = {
         // `scheduleId` is recorded because the tools normalize a bare name to `~name` before the
         // call — the API would otherwise read the name as an ID and 404.
@@ -88,6 +78,12 @@ export function mockScheduleApiClient(
             create: async (payload: unknown) => {
                 calls.push({ fn: 'create', payload });
                 return schedule;
+            },
+        }),
+        actor: (actorId: string) => ({
+            get: async () => {
+                calls.push({ fn: 'actor.get', actorId });
+                return actor(actorId);
             },
         }),
         task: (taskId: string) => ({
