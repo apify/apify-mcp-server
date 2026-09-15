@@ -637,8 +637,8 @@ describe('push-actor', () => {
 
         // The boundary tests push the config file itself in replace mode, so the merged-in files of the
         // existing version do not add to the total and the cap is measured on the pushed set alone.
-        // The boundary is on decoded bytes, not characters: 'é' is two utf8 bytes.
-        it('accepts files whose decoded size is exactly the limit', async () => {
+        // The boundary is on utf8 bytes, not characters: 'é' is two bytes.
+        it('accepts files whose size is exactly the limit', async () => {
             const content = `${'a'.repeat(MAX_MULTIFILE_BYTES - 2)}é`;
             expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_MULTIFILE_BYTES);
 
@@ -647,7 +647,7 @@ describe('push-actor', () => {
             expect(versionUpdateMock).toHaveBeenCalled();
         });
 
-        it('rejects files whose decoded size exceeds the limit by one byte', async () => {
+        it('rejects files whose size exceeds the limit by one byte', async () => {
             const content = `${'a'.repeat(MAX_MULTIFILE_BYTES - 1)}é`;
             expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_MULTIFILE_BYTES + 1);
 
@@ -669,8 +669,10 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
-        it('counts the decoded length of base64 files toward the limit', async () => {
-            const content = Buffer.alloc(MAX_MULTIFILE_BYTES).toString('base64');
+        // The platform measures the base64 text, not the decoded bytes: 3 decoded bytes become 4 characters.
+        it('counts the encoded length of base64 files toward the limit', async () => {
+            const content = Buffer.alloc((MAX_MULTIFILE_BYTES / 4) * 3).toString('base64');
+            expect(content).toHaveLength(MAX_MULTIFILE_BYTES);
 
             await callTool({
                 files: [{ path: ACTOR_CONFIG_PATH, content, encoding: 'base64' }],
@@ -679,6 +681,21 @@ describe('push-actor', () => {
             });
 
             expect(versionUpdateMock).toHaveBeenCalled();
+        });
+
+        it('rejects base64 files whose encoded length exceeds the limit', async () => {
+            const content = Buffer.alloc((MAX_MULTIFILE_BYTES / 4) * 3 + 3).toString('base64');
+            expect(content).toHaveLength(MAX_MULTIFILE_BYTES + 4);
+
+            const { text } = await callToolExpectingUserError({
+                files: [{ path: ACTOR_CONFIG_PATH, content, encoding: 'base64' }],
+                mode: 'replace',
+            });
+
+            expect(text).toBe(
+                `The files total ${MAX_MULTIFILE_BYTES + 4} bytes; the limit is ${MAX_MULTIFILE_BYTES} bytes (3 MiB). Use the Apify CLI (apify push) for larger projects.`,
+            );
+            expectNoWrite();
         });
 
         it('requires .actor/actor.json when creating the Actor', async () => {

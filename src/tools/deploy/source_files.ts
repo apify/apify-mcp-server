@@ -57,13 +57,12 @@ export function toSourceFiles(files: readonly SourceFileInput[]): ActorVersionSo
     }));
 }
 
-/** Decoded size of the files: utf8 byte length for TEXT, decoded length for BASE64 (validated by `validateSourceFiles`). */
+/**
+ * Size of the files as the API receives them: the utf8 byte length of each `content` string. The platform applies
+ * its limit to the same measure, so a BASE64 file counts its encoded text, a third more than the decoded bytes.
+ */
 export function getSourceFilesSizeBytes(sourceFiles: readonly ActorVersionSourceFile[]): number {
-    return sourceFiles.reduce(
-        (total, { format, content }) =>
-            total + (format === 'BASE64' ? Buffer.from(content, 'base64').length : Buffer.byteLength(content, 'utf8')),
-        0,
-    );
+    return sourceFiles.reduce((total, { content }) => total + Buffer.byteLength(content, 'utf8'), 0);
 }
 
 /** Existing files not named in `incoming`, then `incoming`; a same-name file is replaced by the incoming one. */
