@@ -58,11 +58,27 @@ export function toSourceFiles(files: readonly SourceFileInput[]): ActorVersionSo
 }
 
 /**
- * Size of the files as the API receives them: the utf8 byte length of each `content` string. The platform applies
- * its limit to the same measure, so a BASE64 file counts its encoded text, a third more than the decoded bytes.
+ * Size of the files as the platform measures it before applying its limit: its byte count of each
+ * `content` string as sent, so a BASE64 file counts its encoded text, a third more than the decoded
+ * bytes. Counting the same way keeps the inline-or-zip decision on the platform's side of the boundary.
  */
 export function getSourceFilesSizeBytes(sourceFiles: readonly ActorVersionSourceFile[]): number {
-    return sourceFiles.reduce((total, { content }) => total + Buffer.byteLength(content, 'utf8'), 0);
+    return sourceFiles.reduce((total, { content }) => total + getPlatformStringByteLength(content), 0);
+}
+
+/**
+ * The platform's `stringByteLength`: the utf8 length, except that a surrogate pair counts 5 bytes rather
+ * than 4 (each half is counted as a 3-byte code unit, then the trail half gives one back).
+ */
+function getPlatformStringByteLength(text: string): number {
+    let { length } = text;
+    for (let i = 0; i < text.length; i++) {
+        const code = text.charCodeAt(i);
+        if (code > 0x7f && code <= 0x7ff) length += 1;
+        if (code > 0x7ff && code <= 0xffff) length += 2;
+        if (code >= 0xdc00 && code <= 0xdfff) length -= 1;
+    }
+    return length;
 }
 
 /** Existing files not named in `incoming`, then `incoming`; a same-name file is replaced by the incoming one. */
