@@ -66,7 +66,7 @@ describe('getCategoryTools', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
-        const modeIndependentCategories: ToolCategory[] = ['docs', 'storage', 'tasks', 'dev'];
+        const modeIndependentCategories: ToolCategory[] = ['docs', 'storage', 'tasks', 'deploy', 'dev'];
         for (const cat of modeIndependentCategories) {
             expect(defaultResult[cat]).toEqual(appsResult[cat]);
         }

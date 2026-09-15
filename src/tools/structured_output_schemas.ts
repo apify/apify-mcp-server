@@ -397,6 +397,43 @@ export const getActorRunLogToolOutputSchema = {
     required: ['log'],
 };
 
+/**
+ * Schema for get-actor-build-log. The log API returns plain text, so the schema wraps it in a single field.
+ */
+export const getActorBuildLogToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        log: { type: 'string', description: 'The last N lines of the build log, as plain text' },
+    },
+    required: ['log'],
+};
+
+/**
+ * Schema for get-actor-build: the allowlisted build subset (`toBuildResult`).
+ */
+export const getActorBuildToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        build: {
+            type: 'object',
+            properties: {
+                id: { type: 'string', description: 'Build ID' },
+                actorId: { type: 'string', description: 'ID of the Actor the build belongs to' },
+                buildNumber: { type: 'string', description: 'Build number, e.g. 0.1.12' },
+                status: { type: 'string', description: 'Build status, e.g. RUNNING, SUCCEEDED, FAILED' },
+                startedAt: { type: ['string', 'null'], description: 'ISO timestamp' },
+                finishedAt: { type: ['string', 'null'], description: 'ISO timestamp; null while the build is running' },
+                apifyConsoleUrl: {
+                    type: 'string',
+                    description: 'Personalized Apify Console link to the build; present only for Console sessions',
+                },
+            },
+            required: ['id', 'actorId', 'buildNumber', 'status', 'startedAt', 'finishedAt'],
+        },
+    },
+    required: ['build'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
