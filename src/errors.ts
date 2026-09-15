@@ -2,6 +2,11 @@ export class TimeoutError extends Error {
     override readonly name = 'TimeoutError';
 }
 
+/** An input or state problem the caller must fix; tools catch it and answer with `respondUserError`. */
+export class UserInputError extends Error {
+    override readonly name = 'UserInputError';
+}
+
 /**
  * Thrown by `fixedAjvCompile` when an untrusted Actor / proxied-MCP input schema exceeds the byte
  * cap that bounds AJV's synchronous codegen. It's a property of the schema, not a server fault, so
