@@ -339,9 +339,7 @@ describe('push-actor', () => {
         it("refuses a tilde-separated username prefix that is not the caller's", async () => {
             const { text } = await callToolExpectingUserError({ actorName: 'jane~my-actor', files: [MAIN_JS] });
 
-            expect(text).toBe(
-                "This tool pushes only to your own account (john); 'jane~my-actor' names another account.",
-            );
+            expect(text).toBe("This tool pushes only to your own account (john); 'jane' names another account.");
             expect(actorGetMock).not.toHaveBeenCalled();
             expectNoWrite();
         });
@@ -357,9 +355,7 @@ describe('push-actor', () => {
         it("refuses a username prefix that is not the caller's", async () => {
             const { text } = await callToolExpectingUserError({ actorName: 'jane/my-actor', files: [MAIN_JS] });
 
-            expect(text).toBe(
-                "This tool pushes only to your own account (john); 'jane/my-actor' names another account.",
-            );
+            expect(text).toBe("This tool pushes only to your own account (john); 'jane' names another account.");
             expect(actorGetMock).not.toHaveBeenCalled();
             expectNoWrite();
         });

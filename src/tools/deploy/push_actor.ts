@@ -120,8 +120,6 @@ type PushMode = 'merge' | 'replace';
 
 type PushActorFilesParams = {
     client: ApifyClient;
-    /** As given by the caller: a bare name, `username/name`, or `username~name`. */
-    actorName: string;
     actorNameParts: ActorNameParts;
     versionNumber: string | undefined;
     buildTag: string | undefined;
@@ -145,6 +143,11 @@ type PushActorFilesResult = {
 const ACTOR_CONFIG_MISSING_TEXT = `The files must include ${ACTOR_CONFIG_PATH}; the platform needs it to build the Actor.`;
 
 type ActorNameParts = { ownerPrefix: string | undefined; bareName: string };
+
+/** The `username/name` form the API and the responses use. */
+function formatActorFullName(username: string, bareName: string): string {
+    return `${username}/${bareName}`;
+}
 
 /**
  * Splits `username/name` or `username~name` (the separator the Apify API uses) into its parts; a bare
@@ -213,33 +216,28 @@ function resolveSourceFiles(files: readonly SourceFileInput[]): ActorVersionSour
 
 type TargetActor = {
     actorClient: ActorClient;
-    /** Full name in the `username/name` form, whichever separator the caller used. */
-    actorName: string;
+    /** The account the Actor lives in, in the platform's spelling. */
+    username: string;
     bareName: string;
     /** Undefined when the Actor does not exist yet. */
     actor: Actor | undefined;
 };
 
 /** Looks up the caller's username and the Actor; a `username/` or `username~` prefix must name the caller's own account. */
-async function resolveTargetActor(
-    client: ApifyClient,
-    givenActorName: string,
-    { ownerPrefix, bareName }: ActorNameParts,
-): Promise<TargetActor> {
+async function resolveTargetActor(client: ApifyClient, { ownerPrefix, bareName }: ActorNameParts): Promise<TargetActor> {
     const { username } = await client.user('me').get();
     if (ownerPrefix !== undefined && ownerPrefix.toLowerCase() !== username.toLowerCase()) {
         throw new UserInputError(
-            `This tool pushes only to your own account (${username}); '${givenActorName}' names another account.`,
+            `This tool pushes only to your own account (${username}); '${ownerPrefix}' names another account.`,
         );
     }
-    const actorName = `${username}/${bareName}`;
-    const actorClient = client.actor(actorName);
-    return { actorClient, actorName, bareName, actor: await actorClient.get() };
+    const actorClient = client.actor(formatActorFullName(username, bareName));
+    return { actorClient, username, bareName, actor: await actorClient.get() };
 }
 
 type CreateActorParams = {
     client: ApifyClient;
-    actorName: string;
+    username: string;
     bareName: string;
     versionNumber: string;
     buildTag: string | undefined;
@@ -248,7 +246,7 @@ type CreateActorParams = {
 
 /** The Actor does not exist yet: the pushed files are its whole first version, so they must carry the config. */
 async function createActorWithVersion(params: CreateActorParams): Promise<PushActorFilesResult> {
-    const { client, actorName, bareName, versionNumber, buildTag, sourceFiles } = params;
+    const { client, username, bareName, versionNumber, buildTag, sourceFiles } = params;
     if (!hasActorConfig(sourceFiles)) throw new UserInputError(ACTOR_CONFIG_MISSING_TEXT);
     const created = await client.actors().create({
         name: bareName,
@@ -263,7 +261,7 @@ async function createActorWithVersion(params: CreateActorParams): Promise<PushAc
     } satisfies ActorCollectionCreateOptions);
     return {
         actorId: created.id,
-        actorName,
+        actorName: formatActorFullName(username, bareName),
         versionNumber,
         created: true,
         versionCreated: true,
@@ -383,15 +381,12 @@ async function updateVersion(params: UpdateVersionParams): Promise<PushActorFile
  */
 async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFilesResult> {
     const { client, buildTag, mode, sourceFiles } = params;
-    const { actorClient, actorName, bareName, actor } = await resolveTargetActor(
-        client,
-        params.actorName,
-        params.actorNameParts,
-    );
+    const { actorClient, username, bareName, actor } = await resolveTargetActor(client, params.actorNameParts);
+    const actorName = formatActorFullName(username, bareName);
     if (!actor) {
         return await createActorWithVersion({
             client,
-            actorName,
+            username,
             bareName,
             versionNumber: params.versionNumber ?? DEFAULT_VERSION_NUMBER,
             buildTag,
@@ -534,7 +529,6 @@ export const pushActor: ToolEntry = Object.freeze({
             const sourceFiles = resolveSourceFiles(parsed.files);
             const pushed = await pushActorFiles({
                 client,
-                actorName: parsed.actorName,
                 actorNameParts,
                 versionNumber,
                 buildTag: parsed.buildTag,
