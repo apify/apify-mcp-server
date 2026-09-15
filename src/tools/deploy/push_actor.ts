@@ -38,10 +38,10 @@ import {
 /** `apify push` defaults to this tag too, because the platform complains when an Actor has no `latest` build. */
 const DEFAULT_BUILD_TAG = 'latest';
 
-/** `apify push` starts a new Actor at this version. */
 /** The platform's inline source-files cutoff, the same one `apify push` uses; larger projects need the Apify CLI. */
 const MULTIFILE_SOURCE_MAX_MIB = MAX_MULTIFILE_BYTES / (1024 * 1024);
 
+/** `apify push` starts a new Actor at this version. */
 const DEFAULT_VERSION_NUMBER = '0.0';
 
 const pushActorArgs = z.object({
@@ -189,11 +189,10 @@ function resolveActorNameInput(actorName: string): ActorNameParts {
 const VERSION_NUMBER_REGEX = /^\d+\.\d+$/;
 
 /** The version number unchanged when omitted or in MAJOR.MINOR form; throws `UserInputError` otherwise, before any API call. */
-function resolveVersionNumberInput(versionNumber: string | undefined): string | undefined {
+function validateVersionNumber(versionNumber: string | undefined): void {
     if (versionNumber !== undefined && !VERSION_NUMBER_REGEX.test(versionNumber)) {
         throw new UserInputError('Version number must be MAJOR.MINOR, for example 0.1');
     }
-    return versionNumber;
 }
 
 function formatVersionList(versionNumbers: readonly string[]): string {
@@ -527,12 +526,12 @@ export const pushActor: ToolEntry = Object.freeze({
         const responseContext = { filesSent: parsed.files.length, loadedToolNames, apifyToken, client };
         try {
             const actorNameParts = resolveActorNameInput(parsed.actorName);
-            const versionNumber = resolveVersionNumberInput(parsed.versionNumber);
+            validateVersionNumber(parsed.versionNumber);
             const sourceFiles = resolveSourceFiles(parsed.files);
             const pushed = await pushActorFiles({
                 client,
                 actorNameParts,
-                versionNumber,
+                versionNumber: parsed.versionNumber,
                 buildTag: parsed.buildTag,
                 mode: parsed.mode,
                 sourceFiles,

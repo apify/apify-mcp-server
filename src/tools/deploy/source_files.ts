@@ -20,7 +20,7 @@ export type SourceFileInput = { path: string; content: string; encoding?: 'utf8'
  * POSIX path relative to the Actor root: backslashes become `/`; empty and `.` segments (`./`, doubled
  * slashes, a trailing slash) are dropped. `..` segments are kept so the caller can reject them.
  */
-export function normalizeSourcePath(path: string): string {
+function normalizeSourcePath(path: string): string {
     return path
         .replace(/\\/g, '/')
         .split('/')
