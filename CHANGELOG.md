@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - [**breaking**] Rename get-actor-log tool to get-actor-run-log ([#1375](https://github.com/apify/apify-mcp-server/pull/1375)) ([e334b9a](https://github.com/apify/apify-mcp-server/commit/e334b9a0ba6af437107876c9ab8e484dc3d93c2b)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1374](https://github.com/apify/apify-mcp-server/issues/1374)
+- Add actorId filter to get-actor-run-list ([#1330](https://github.com/apify/apify-mcp-server/pull/1330)) ([5264fe6](https://github.com/apify/apify-mcp-server/commit/5264fe629a5200992c6af3e9176174e49ea35136)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1354](https://github.com/apify/apify-mcp-server/issues/1354)
 
 
 <!-- git-cliff-unreleased-end -->
