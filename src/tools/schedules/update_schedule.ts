@@ -14,6 +14,7 @@ import {
     formatRequestedActions,
     formatScheduleState,
     getScheduleByIdOrName,
+    MAX_ACTIONS_PER_TYPE,
     scheduleActionSchema,
     scheduleFieldsSchema,
     type ScheduleTimezone,
@@ -33,7 +34,7 @@ const updateScheduleArgs = z.object({
         .max(20)
         .optional()
         .describe(
-            'Replaces ALL stored actions, Actor and task actions alike: send every action to keep, the ones left out are deleted. Omit to leave the actions unchanged.',
+            `Replaces ALL stored actions, Actor and task actions alike: send every action to keep, the ones left out are deleted. Omit to leave the actions unchanged. At most ${MAX_ACTIONS_PER_TYPE} Actor entries and ${MAX_ACTIONS_PER_TYPE} task entries, counted separately.`,
         ),
 });
 

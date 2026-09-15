@@ -14,6 +14,7 @@ import {
     cronExpressionSchema,
     formatRequestedActions,
     formatScheduleState,
+    MAX_ACTIONS_PER_TYPE,
     scheduleActionSchema,
     scheduleFieldsSchema,
     type ScheduleTimezone,
@@ -32,7 +33,9 @@ const createScheduleArgs = z.object({
         .array(scheduleActionSchema)
         .min(1)
         .max(20)
-        .describe('What runs at each firing: one entry per Actor or task, up to 10 Actors and 10 tasks.'),
+        .describe(
+            `What runs at each firing: one entry per Actor or task. At most ${MAX_ACTIONS_PER_TYPE} Actor entries and ${MAX_ACTIONS_PER_TYPE} task entries, counted separately.`,
+        ),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {

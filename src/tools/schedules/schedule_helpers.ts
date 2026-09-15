@@ -20,6 +20,14 @@ export type ScheduleTimezone = Schedule['timezone'];
 
 export const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 
+/**
+ * The API caps Actor actions and task actions separately, not as one total
+ * (`MAX_ACTORS_PER_SCHEDULER` / `MAX_TASKS_PER_SCHEDULER`), and answers an over-limit list with
+ * `too-many-values` (403). Checked here because a schedule is only rejected after every action's
+ * Actor or task name has been resolved, one API call each.
+ */
+export const MAX_ACTIONS_PER_TYPE = 10;
+
 export const CRON_EXPRESSION_DESCRIPTION =
     'When the schedule fires, as a standard 5-field cron expression "minute hour day-of-month month day-of-week" ' +
     'evaluated in `timezone`. Examples: "0 9 * * *" daily at 09:00, "0 */6 * * *" every 6 hours, "0 9 * * 1" ' +
@@ -151,6 +159,19 @@ export async function buildApiActions(
     client: ApifyClient,
     actions: ScheduleActionInput[],
 ): Promise<{ actions: ApiScheduleAction[] } | { error: string }> {
+    // Counted before resolving anything: an over-limit list costs one lookup per action otherwise.
+    // Actions naming both kinds or neither are counted in neither and reported by the loop below.
+    const taskActionCount = actions.filter((action) => action.taskId !== undefined).length;
+    const actorActionCount = actions.filter(
+        (action) => action.taskId === undefined && action.actorId !== undefined,
+    ).length;
+    if (actorActionCount > MAX_ACTIONS_PER_TYPE) {
+        return { error: `A schedule runs at most ${MAX_ACTIONS_PER_TYPE} Actors; ${actorActionCount} were given.` };
+    }
+    if (taskActionCount > MAX_ACTIONS_PER_TYPE) {
+        return { error: `A schedule runs at most ${MAX_ACTIONS_PER_TYPE} tasks; ${taskActionCount} were given.` };
+    }
+
     const apiActions: ApiScheduleAction[] = [];
     for (const [
         index,

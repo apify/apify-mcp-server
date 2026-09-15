@@ -295,6 +295,31 @@ describe('update-schedule', () => {
         expect(sentActions(calls[calls.length - 1])).toEqual(storedApiActions);
     });
 
+    // The API caps the two kinds separately, so 11 Actors is over the limit even though the
+    // 20-entry total is not, and it rejects only after every name has cost a lookup.
+    it.each([
+        ['Actors', (i: number) => ({ actorId: `actor-${i}` }), 'at most 10 Actors; 11 were given'],
+        ['tasks', (i: number) => ({ taskId: `task-${i}` }), 'at most 10 tasks; 11 were given'],
+    ])('rejects more than 10 %s before resolving any name', async (_kind, build, message) => {
+        const { apifyClient, calls } = mockScheduleApiClient(mockSchedule());
+        const actions = Array.from({ length: 11 }, (_unused, index) => build(index));
+        const result = await run(createSchedule, { cronExpression: '0 9 * * *', actions }, apifyClient);
+
+        expect(result.content[0].text).toContain(message);
+        expect(calls).toEqual([]);
+    });
+
+    it('accepts 10 Actors and 10 tasks together', async () => {
+        const { apifyClient, calls } = mockScheduleApiClient(mockSchedule());
+        const actions = [
+            ...Array.from({ length: 10 }, (_unused, index) => ({ actorId: `actor-${index}` })),
+            ...Array.from({ length: 10 }, (_unused, index) => ({ taskId: `task-${index}` })),
+        ];
+        await run(createSchedule, { cronExpression: '0 9 * * *', actions }, apifyClient);
+
+        expect(sentActions(calls.at(-1)!)).toHaveLength(20);
+    });
+
     it('leaves name validation to the API instead of throwing a ZodError at the client', async () => {
         // The shared AJV instance strips the `pattern` keyword, so a regex here would not gate the
         // call — it would only throw inside the tool body and reach the client as serialised JSON.
