@@ -44,6 +44,7 @@ import {
     formatRunSummary,
     makeTask,
     resolveExitCode,
+    resolveGitBranch,
     validateConcurrency,
     validateIterations,
     validatePassThreshold,
@@ -72,13 +73,19 @@ type CliArgs = {
     passThreshold: number;
 };
 
-/** Current git branch, or 'unknown' if it can't be resolved. */
+/** Current git branch, with `resolveGitBranch()`'s CI env fallbacks when git can't name one. */
 function getGitBranch(): string {
+    let rawBranch = '';
     try {
-        return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim() || 'unknown';
+        // stderr discarded: outside a checkout git's `fatal:` is noise, not a failure.
+        rawBranch = execSync('git rev-parse --abbrev-ref HEAD', {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+        });
     } catch {
-        return 'unknown';
+        // Not a git checkout; the env fallbacks decide.
     }
+    return resolveGitBranch(rawBranch, process.env);
 }
 
 /**

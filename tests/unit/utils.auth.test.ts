@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { isApiTokenRequired } from '../../src/utils/auth.js';
 
-const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview'] as const;
+const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview', 'get-actor-log'] as const;
 
 describe('isApiTokenRequired', () => {
     it('should require token if no tools are specified', () => {
