@@ -27,6 +27,10 @@ import { abortActorRun } from './runs/abort_actor_run.js';
 import { getActorRun } from './runs/get_actor_run.js';
 import { getActorRunList } from './runs/get_actor_run_list.js';
 import { getActorRunLog } from './runs/get_actor_run_log.js';
+import { createSchedule } from './schedules/create_schedule.js';
+import { deleteSchedule } from './schedules/delete_schedule.js';
+import { getSchedule } from './schedules/get_schedule.js';
+import { updateSchedule } from './schedules/update_schedule.js';
 import { getDataset } from './storage/get_dataset.js';
 import { getDatasetItems } from './storage/get_dataset_items.js';
 import { getDatasetList } from './storage/get_dataset_list.js';
@@ -61,6 +65,7 @@ export const toolCategories = {
         getKeyValueStoreList,
     ],
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
+    schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 

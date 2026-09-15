@@ -208,6 +208,24 @@ describe('getServerInstructions()', () => {
         });
     });
 
+    describe('"## Schedules" section', () => {
+        const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
+
+        it('renders for ALL_TOOLS_PRESENT', () => {
+            expect(instructions).toContain('## Schedules');
+        });
+
+        // The section is static and ungated, so a tool name slipping in would reach sessions without that tool.
+        it('names no tool', () => {
+            const start = instructions.indexOf('## Schedules');
+            const end = instructions.indexOf('\n## ', start + 1);
+            const block = instructions.slice(start, end === -1 ? undefined : end);
+            for (const toolName of Object.values(HELPER_TOOLS)) {
+                expect(block).not.toContain(toolName);
+            }
+        });
+    });
+
     describe('"Tool dependencies and disambiguation" section', () => {
         const HEADING = '## Tool dependencies and disambiguation';
 
