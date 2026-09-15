@@ -6,7 +6,7 @@ Repo: `apify-mcp-server`. Harness docs: `evals/mcp_agent/README.md` (read it fir
 
 ```bash
 # The default dataset, mcp-server-evals-pr; the gate is the aggregate pass rate
-# >= DEFAULT_PASS_THRESHOLD (0.97, rationale in config.ts).
+# >= DEFAULT_PASS_THRESHOLD (0.9, rationale in config.ts).
 # --pass-threshold 1.0 restores the strict all-pass gate.
 # A bare run is the fast PR-gating set: the kind: "tool-call" items.
 pnpm run evals:mcp-agent --agent-model claude-haiku-4-5 --subscription

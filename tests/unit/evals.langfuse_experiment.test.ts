@@ -8,6 +8,7 @@ import {
     isTransientAgentError,
     makeTask,
     resolveExitCode,
+    resolveGitBranch,
     validateConcurrency,
     validateIterations,
     validatePassThreshold,
@@ -551,5 +552,30 @@ describe('validateConcurrency()', () => {
     it('accepts positive integers and rejects other values', () => {
         expect(() => validateConcurrency(1)).not.toThrow();
         for (const value of [0, -1, 1.5, NaN]) expect(() => validateConcurrency(value)).toThrow(/positive integer/);
+    });
+});
+
+describe('resolveGitBranch()', () => {
+    it('returns a real branch name unchanged, ignoring the env fallbacks', () => {
+        expect(resolveGitBranch('feat/some-branch\n', { GITHUB_HEAD_REF: 'other' })).toBe('feat/some-branch');
+    });
+
+    it('falls back to GITHUB_HEAD_REF when git reports the literal "HEAD" (detached checkout)', () => {
+        expect(resolveGitBranch('HEAD\n', { GITHUB_HEAD_REF: 'feat/my-pr', GITHUB_REF_NAME: 'master' })).toBe(
+            'feat/my-pr',
+        );
+    });
+
+    // A push event sets GITHUB_HEAD_REF to the empty string rather than leaving it unset.
+    it('falls back to GITHUB_REF_NAME when GITHUB_HEAD_REF is empty (a push event)', () => {
+        expect(resolveGitBranch('HEAD\n', { GITHUB_HEAD_REF: '', GITHUB_REF_NAME: 'master' })).toBe('master');
+    });
+
+    it('falls back to GITHUB_REF_NAME when GITHUB_HEAD_REF is unset', () => {
+        expect(resolveGitBranch('HEAD\n', { GITHUB_REF_NAME: 'master' })).toBe('master');
+    });
+
+    it('falls back to "unknown" when git output is empty and neither env var is set', () => {
+        expect(resolveGitBranch('', {})).toBe('unknown');
     });
 });

@@ -21,7 +21,7 @@ const numberedLog = (count: number) => Array.from({ length: count }, (_, i) => `
 const callTool = async (args: Record<string, unknown>) =>
     (await (getActorRunLog as HelperTool).call(stubToolCallContext(args, stubClient))) as TextToolResult;
 
-describe('get-actor-log', () => {
+describe('get-actor-run-log', () => {
     it('has the expected tool name', () => {
         expect(getActorRunLog.name).toBe(HELPER_TOOLS.ACTOR_RUNS_LOG);
     });

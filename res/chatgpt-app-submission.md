@@ -50,7 +50,7 @@ their base tool.
 | `fetch-actor-details` | true | false | false | Reads Actor metadata |
 | `get-actor-run` | true | false | false | Reads run status |
 | `get-actor-run-list` | true | false | false | Lists runs |
-| `get-actor-log` | true | false | false | Reads run logs |
+| `get-actor-run-log` | true | false | false | Reads run logs |
 | `get-dataset-items` | true | false | false | Reads dataset items |
 | `get-dataset` | true | false | false | Reads dataset metadata |
 | `get-dataset-schema` | true | false | false | Reads items for schema |
