@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.15.8 - **not yet released**
 
+### 🚀 Features
+
+- [**breaking**] Rename get-actor-log tool to get-actor-run-log ([#1375](https://github.com/apify/apify-mcp-server/pull/1375)) ([e334b9a](https://github.com/apify/apify-mcp-server/commit/e334b9a0ba6af437107876c9ab8e484dc3d93c2b)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1374](https://github.com/apify/apify-mcp-server/issues/1374)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.15.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.7) (2026-09-11)
