@@ -498,7 +498,7 @@ describe('push-actor', () => {
         });
 
         it('names no tool in the retry hint when build-actor is not loaded', async () => {
-            buildMock.mockRejectedValue(new Error('socket hang up'));
+            buildMock.mockRejectedValue(apiError(500, 'socket hang up'));
 
             const { content } = await callTool({ files: [MAIN_JS] }, [HELPER_TOOLS.ACTOR_PUSH]);
 
@@ -506,6 +506,24 @@ describe('push-actor', () => {
                 `${summary}\nThe files were pushed, but the build could not be started: socket hang up. Retry building this version to make it runnable.`,
             );
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
+        });
+
+        it('reports a 403 on the build request as a build start failure, not as a permission error', async () => {
+            buildMock.mockRejectedValue(apiError(403));
+
+            const result = await callTool({ files: [MAIN_JS] });
+
+            expect(result.isError).not.toBe(true);
+            expect(result.content[1].text).toContain(
+                'The files were pushed, but the build could not be started: Forbidden.',
+            );
+        });
+
+        it('rethrows a non-API error from the build request', async () => {
+            buildMock.mockRejectedValue(new TypeError('boom'));
+
+            await expect(callTool({ files: [MAIN_JS] })).rejects.toBeInstanceOf(TypeError);
+            expect(versionUpdateMock).toHaveBeenCalled();
         });
     });
 

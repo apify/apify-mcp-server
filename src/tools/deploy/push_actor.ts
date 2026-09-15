@@ -381,27 +381,32 @@ async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFi
     return { actorId: actor.id, actorName, versionNumber, created: false, ...outcome };
 }
 
-/** `build` when one was started, `buildStartErrMessage` when the build request failed, neither when build was false. */
-type BuildOutcome = { build?: Build; buildStartErrMessage?: string };
+/** The push is a completed write, so the caller answers with the push result plus this message instead of a tool error. */
+class BuildStartError extends Error {
+    override readonly name = 'BuildStartError';
 
-/**
- * Starts the build and waits for it. The push is a completed write, so a failed build request is
- * returned as a message for a normal response that still carries the push result, not thrown.
- */
-async function resolveBuildOutcome(params: {
+    constructor(
+        readonly pushed: PushActorFilesResult,
+        cause: ApifyApiError,
+    ) {
+        super(cause.message, { cause });
+    }
+}
+
+/** Starts a build of the pushed version and waits for it; throws `BuildStartError` when the API rejects the build request. */
+async function startPushedBuild(params: {
     client: ApifyClient;
-    actorId: string;
-    versionNumber: string;
+    pushed: PushActorFilesResult;
     waitSecs: number;
     signal: AbortSignal;
-}): Promise<BuildOutcome | typeof ABORT> {
-    const { client, actorId, versionNumber, waitSecs, signal } = params;
+}): Promise<Build | typeof ABORT> {
+    const { client, pushed, waitSecs, signal } = params;
     try {
         // No tag is passed: the version's buildTag applies, the same as `apify push`.
-        const started = await startBuild(client, actorId, versionNumber, { useCache: true, waitSecs, signal });
-        return started === ABORT ? ABORT : { build: started };
+        return await startBuild(client, pushed.actorId, pushed.versionNumber, { useCache: true, waitSecs, signal });
     } catch (error) {
-        return { buildStartErrMessage: error instanceof Error ? error.message : String(error) };
+        if (error instanceof ApifyApiError) throw new BuildStartError(pushed, error);
+        throw error;
     }
 }
 
@@ -435,7 +440,10 @@ type PushResponseParams = {
     pushed: PushActorFilesResult;
     /** Files sent in this call; `pushed.filesPushed` is what the version holds now. */
     filesSent: number;
-    buildOutcome: BuildOutcome;
+    /** The started build; undefined when build was false or the build request failed. */
+    build: Build | undefined;
+    /** The API message when the push succeeded but the build request failed. */
+    buildStartErrMessage: string | undefined;
     loadedToolNames: readonly string[];
     apifyToken: string;
     client: ApifyClient;
@@ -443,8 +451,7 @@ type PushResponseParams = {
 
 /** The push result as structuredContent and JSON text, a summary with one next step, and the build's Console link for Console UI token sessions. */
 async function buildPushResponse(params: PushResponseParams): Promise<ToolResponse> {
-    const { pushed, filesSent, buildOutcome, loadedToolNames, apifyToken, client } = params;
-    const { build, buildStartErrMessage } = buildOutcome;
+    const { pushed, filesSent, build, buildStartErrMessage, loadedToolNames, apifyToken, client } = params;
     const linkContext = build ? await getConsoleLinkContext(apifyToken, client) : undefined;
     const structuredContent = {
         actorId: pushed.actorId,
@@ -480,6 +487,9 @@ async function buildPushResponse(params: PushResponseParams): Promise<ToolRespon
  * reference documents for creating and updating a version. apify/apify-core#29044 reports a
  * tarball upload route; no such route exists in the API reference and none is used here.
  * Resolves apify/apify-mcp-server#1217.
+ *
+ * Steps throw `UserInputError` when the call is rejected and `BuildStartError` when the push succeeded
+ * but the build did not start; `call()` maps both to responses.
  */
 export const pushActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -503,8 +513,10 @@ export const pushActor: ToolEntry = Object.freeze({
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
+        const parsed = pushActorArgs.parse(args);
+        // `toSourceFiles` maps the input files one to one, so this is also the number of files sent.
+        const responseContext = { filesSent: parsed.files.length, loadedToolNames, apifyToken, client };
         try {
-            const parsed = pushActorArgs.parse(args);
             const actorNameParts = resolveActorNameInput(parsed.actorName);
             const versionNumber = resolveVersionNumberInput(parsed.versionNumber);
             const sourceFiles = resolveSourceFiles(parsed.files);
@@ -517,29 +529,25 @@ export const pushActor: ToolEntry = Object.freeze({
                 sourceFiles,
             });
 
-            let buildOutcome: BuildOutcome = {};
+            let build: Build | undefined;
             if (parsed.build) {
-                const outcome = await resolveBuildOutcome({
-                    client,
-                    actorId: pushed.actorId,
-                    versionNumber: pushed.versionNumber,
-                    waitSecs: parsed.waitSecs,
-                    signal,
-                });
+                const started = await startPushedBuild({ client, pushed, waitSecs: parsed.waitSecs, signal });
                 // The push is already done, the same as get-actor-build aborting mid-wait. Per MCP spec a
                 // cancelled request gets no response, so the push result is not reported.
-                if (outcome === ABORT) return respondAborted();
-                buildOutcome = outcome;
+                if (started === ABORT) return respondAborted();
+                build = started;
             }
-            return await buildPushResponse({
-                pushed,
-                filesSent: sourceFiles.length,
-                buildOutcome,
-                loadedToolNames,
-                apifyToken,
-                client,
-            });
+            return await buildPushResponse({ pushed, build, buildStartErrMessage: undefined, ...responseContext });
         } catch (error) {
+            // Checked first: a 403 on the build request is an ApifyApiError too, but the push has already been written.
+            if (error instanceof BuildStartError) {
+                return await buildPushResponse({
+                    pushed: error.pushed,
+                    build: undefined,
+                    buildStartErrMessage: error.message,
+                    ...responseContext,
+                });
+            }
             if (error instanceof UserInputError) return respondUserError(error.message);
             // Covers the reads too: a scoped token can be denied the user, Actor or version lookup as well as the write.
             if (error instanceof ApifyApiError && error.statusCode === 403) {
