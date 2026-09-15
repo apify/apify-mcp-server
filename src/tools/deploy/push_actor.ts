@@ -52,7 +52,6 @@ const pushActorArgs = z.object({
         ),
     versionNumber: z
         .string()
-        .regex(/^\d+\.\d+$/, 'Version number must be MAJOR.MINOR, for example 0.1')
         .optional()
         .describe(
             'Version to push the files to, in MAJOR.MINOR form. Defaults to the only version of an existing Actor, or to 0.0 for a new Actor; a version that does not exist yet is created',
@@ -177,6 +176,17 @@ function resolveActorNameInput(actorName: string): ActorNameParts {
         throw new UserInputError(USERNAME_PREFIX_RULE_TEXT);
     }
     return parts;
+}
+
+// The platform stores versions as MAJOR.MINOR integers (see VERSION_INT_MAJOR_BASE and VERSION_INT_MINOR_BASE in @apify/consts); no shared regex exists there.
+const VERSION_NUMBER_REGEX = /^\d+\.\d+$/;
+
+/** The version number unchanged when omitted or in MAJOR.MINOR form; throws `UserInputError` otherwise, before any API call. */
+function resolveVersionNumberInput(versionNumber: string | undefined): string | undefined {
+    if (versionNumber !== undefined && !VERSION_NUMBER_REGEX.test(versionNumber)) {
+        throw new UserInputError('Version number must be MAJOR.MINOR, for example 0.1');
+    }
+    return versionNumber;
 }
 
 function formatVersionList(versionNumbers: readonly string[]): string {
@@ -519,22 +529,15 @@ export const pushActor: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
         try {
-            // `safeParse` rather than `parse`: the repo's AJV drops `pattern` (see `src/utils/ajv.ts`), so
-            // the versionNumber regex is enforced here, as a soft fail instead of a thrown ZodError.
-            const parsedArgs = pushActorArgs.safeParse(args);
-            if (!parsedArgs.success) {
-                throw new UserInputError(
-                    parsedArgs.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '),
-                );
-            }
-            const parsed = parsedArgs.data;
+            const parsed = pushActorArgs.parse(args);
             const actorNameParts = resolveActorNameInput(parsed.actorName);
+            const versionNumber = resolveVersionNumberInput(parsed.versionNumber);
             const sourceFiles = resolveSourceFiles(parsed.files);
             const pushed = await pushActorFiles({
                 client,
                 actorName: parsed.actorName,
                 actorNameParts,
-                versionNumber: parsed.versionNumber,
+                versionNumber,
                 buildTag: parsed.buildTag,
                 mode: parsed.mode,
                 sourceFiles,

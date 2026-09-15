@@ -737,12 +737,26 @@ describe('push-actor', () => {
             });
         });
 
-        // The repo's AJV drops `pattern` (see `src/utils/ajv.ts`), so the versionNumber regex soft-fails in the tool.
-        it('soft-fails a versionNumber that is not MAJOR.MINOR', async () => {
-            const { text } = await callToolExpectingUserError({ files: [ACTOR_JSON], versionNumber: '0.1.5' });
+        describe('versionNumber rules', () => {
+            it.each(['0.1.5', '1', '1.2.3', ' 0.1'])(
+                "rejects versionNumber '%s' without calling the API",
+                async (versionNumber) => {
+                    const { text } = await callToolExpectingUserError({ files: [ACTOR_JSON], versionNumber });
 
-            expect(text).toBe('versionNumber: Version number must be MAJOR.MINOR, for example 0.1');
-            expectNoWrite();
+                    expect(text).toBe('Version number must be MAJOR.MINOR, for example 0.1');
+                    expect(userGetMock).not.toHaveBeenCalled();
+                    expectNoWrite();
+                },
+            );
+
+            it.each(['0.1', '12.3'])("accepts versionNumber '%s'", async (versionNumber) => {
+                versionGetMock.mockResolvedValue(mockVersion({ versionNumber }));
+
+                const { structuredContent } = await callTool({ files: [MAIN_JS], versionNumber, build: false });
+
+                expect(versionMock).toHaveBeenCalledWith(versionNumber);
+                expect(structuredContent).toMatchObject({ versionNumber });
+            });
         });
 
         it('rejects an empty file list, an empty name, an empty buildTag and waitSecs above the cap via ajv validation', () => {
