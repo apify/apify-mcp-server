@@ -213,20 +213,52 @@ describe('push-actor', () => {
         );
     });
 
+    it('creates the Actor at the requested version with the given build tag', async () => {
+        actorGetMock.mockResolvedValue(undefined);
+
+        const { structuredContent } = await callTool({
+            files: [ACTOR_JSON, MAIN_JS],
+            versionNumber: '1.0',
+            buildTag: 'beta',
+            build: false,
+        });
+
+        expect(actorsCreateMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                versions: [expect.objectContaining({ versionNumber: '1.0', buildTag: 'beta' })],
+            }),
+        );
+        expect(structuredContent).toMatchObject({ versionNumber: '1.0', buildTag: 'beta', created: true });
+    });
+
     it('replaces the version files in replace mode and forwards the build tag', async () => {
         const { structuredContent } = await callTool({
             files: [ACTOR_JSON, MAIN_JS],
             mode: 'replace',
-            buildTag: 'latest',
+            buildTag: 'beta',
             build: false,
         });
 
         expect(versionUpdateMock).toHaveBeenCalledWith({
             sourceType: 'SOURCE_FILES',
             sourceFiles: [ACTOR_JSON_SOURCE, MAIN_JS_SOURCE],
-            buildTag: 'latest',
+            buildTag: 'beta',
         });
-        expect(structuredContent).toMatchObject({ buildTag: 'latest', filesPushed: 2 });
+        expect(structuredContent).toMatchObject({ buildTag: 'beta', filesPushed: 2 });
+    });
+
+    it('creates the version with the given build tag', async () => {
+        versionGetMock.mockResolvedValue(undefined);
+
+        const { structuredContent } = await callTool({
+            files: [ACTOR_JSON, MAIN_JS],
+            versionNumber: '0.2',
+            buildTag: 'beta',
+            build: false,
+        });
+
+        expect(versionsCreateMock).toHaveBeenCalledWith(expect.objectContaining({ buildTag: 'beta' }));
+        expect(structuredContent).toMatchObject({ versionNumber: '0.2', buildTag: 'beta' });
     });
 
     it('creates the version when the Actor exists but the version does not', async () => {
@@ -411,6 +443,16 @@ describe('push-actor', () => {
                 sourceFiles: expect.arrayContaining([
                     { name: 'assets/logo.png', format: 'BASE64', content: png.content },
                 ]),
+            }),
+        );
+    });
+
+    it.each(['YQ==', 'YWI='])('accepts padded base64 content %s', async (content) => {
+        await callTool({ files: [{ path: 'blob.bin', content, encoding: 'base64' }], build: false });
+
+        expect(versionUpdateMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sourceFiles: expect.arrayContaining([{ name: 'blob.bin', format: 'BASE64', content }]),
             }),
         );
     });
