@@ -508,6 +508,14 @@ export const actorRunOutputSchema = {
                 },
             },
         },
+        tip: {
+            type: 'object' as const,
+            description: 'Advisory guidance an Actor wrote to its key-value store under the reserved "TIP" key',
+            properties: {
+                message: { type: 'string' },
+                level: { type: 'string', enum: ['info', 'warning'] },
+            },
+        },
         summary: { type: 'string', description: 'Past-tense summary of the run state' },
         nextStep: { type: 'string', description: 'One primary follow-up action with identifiers interpolated' },
     },
