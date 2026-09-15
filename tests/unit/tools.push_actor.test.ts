@@ -519,10 +519,15 @@ describe('push-actor', () => {
             );
         });
 
-        it('rethrows a non-API error from the build request', async () => {
+        it('reports a non-API error from the build request as a build start failure', async () => {
             buildMock.mockRejectedValue(new TypeError('boom'));
 
-            await expect(callTool({ files: [MAIN_JS] })).rejects.toBeInstanceOf(TypeError);
+            const result = await callTool({ files: [MAIN_JS] });
+
+            expect(result.isError).not.toBe(true);
+            expect(result.content[1].text).toContain(
+                'The files were pushed, but the build could not be started: boom.',
+            );
             expect(versionUpdateMock).toHaveBeenCalled();
         });
     });

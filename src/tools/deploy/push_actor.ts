@@ -381,19 +381,22 @@ async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFi
     return { actorId: actor.id, actorName, versionNumber, created: false, ...outcome };
 }
 
-/** The push is a completed write, so the caller answers with the push result plus this message instead of a tool error. */
+/**
+ * The push is a completed write, so whatever stops the build request (an API rejection, a network
+ * failure) is reported together with the push result instead of as a tool error that would hide it.
+ */
 class BuildStartError extends Error {
     override readonly name = 'BuildStartError';
 
     constructor(
         readonly pushed: PushActorFilesResult,
-        cause: ApifyApiError,
+        cause: unknown,
     ) {
-        super(cause.message, { cause });
+        super(cause instanceof Error ? cause.message : String(cause), { cause });
     }
 }
 
-/** Starts a build of the pushed version and waits for it; throws `BuildStartError` when the API rejects the build request. */
+/** Starts a build of the pushed version and waits for it; throws `BuildStartError` when the build request fails. */
 async function startPushedBuild(params: {
     client: ApifyClient;
     pushed: PushActorFilesResult;
@@ -405,8 +408,7 @@ async function startPushedBuild(params: {
         // No tag is passed: the version's buildTag applies, the same as `apify push`.
         return await startBuild(client, pushed.actorId, pushed.versionNumber, { useCache: true, waitSecs, signal });
     } catch (error) {
-        if (error instanceof ApifyApiError) throw new BuildStartError(pushed, error);
-        throw error;
+        throw new BuildStartError(pushed, error);
     }
 }
 
