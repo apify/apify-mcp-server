@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { toIsoString } from '../actors/actor_run_response.js';
-import { getResourceByIdOrName, getTaskByIdOrName, TASK_NAME_REGEX } from '../tasks/task_helpers.js';
+import { getResourceByIdOrName, getTaskByIdOrName } from '../tasks/task_helpers.js';
 
 /** A schedule action as the API accepts it on create and update (the server-assigned `id` is optional). */
 type ApiScheduleAction = NonNullable<ScheduleCreateOrUpdateData['actions']>[number];
@@ -30,15 +30,14 @@ export const CRON_EXPRESSION_DESCRIPTION =
 
 export const cronExpressionSchema = z.string().min(1).max(100);
 
-/** The DNS-safe rule the API applies to schedule names, same as task names; the message names the right resource. */
-const scheduleNameSchema = z
-    .string()
-    .min(3)
-    .max(63)
-    .regex(
-        TASK_NAME_REGEX,
-        'Schedule name may contain only letters, digits and dashes, and cannot start or end with a dash',
-    );
+/**
+ * Only the length caps the API enforces. No `pattern`: the shared AJV instance removes that keyword
+ * as a ReDoS mitigation (`utils/ajv.ts`), so a regex here never gates the call — it only fires in the
+ * tool body's `parse()`, which throws a raw ZodError that reaches the client as serialised JSON with
+ * the pattern in it. The API rejects the same name with a far better message, and the field's
+ * `.describe()` text states the rule for the model.
+ */
+const scheduleNameSchema = z.string().min(3).max(63);
 
 /**
  * One flat action shape for Actor and task actions alike. `buildApiActions` turns it into the API's

@@ -57,7 +57,7 @@ export async function getTaskByIdOrName(client: ApifyClient, idOrName: string): 
  * Task names must be DNS-safe and 3-63 characters, as the API enforces. Validated here so the
  * caller gets a usable message instead of a 400.
  */
-export const TASK_NAME_REGEX = /^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])$/;
+const TASK_NAME_REGEX = /^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])$/;
 
 export const taskNameSchema = z
     .string()

@@ -295,6 +295,19 @@ describe('update-schedule', () => {
         expect(sentActions(calls[calls.length - 1])).toEqual(storedApiActions);
     });
 
+    it('leaves name validation to the API instead of throwing a ZodError at the client', async () => {
+        // The shared AJV instance strips the `pattern` keyword, so a regex here would not gate the
+        // call — it would only throw inside the tool body and reach the client as serialised JSON.
+        const { apifyClient, calls } = mockScheduleApiClient(mockSchedule());
+        await run(
+            createSchedule,
+            { cronExpression: '0 9 * * *', name: '-bad-', actions: [{ taskId: 'my-task' }] },
+            apifyClient,
+        );
+
+        expect(calls.at(-1)).toMatchObject({ fn: 'create', payload: { name: '-bad-' } });
+    });
+
     it('rejects an empty actions list before any API call', async () => {
         // `actions: []` is truthy to the API and deletes every stored action.
         const { apifyClient, calls } = mockScheduleApiClient(mockSchedule());
