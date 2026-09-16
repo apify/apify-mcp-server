@@ -343,8 +343,8 @@ function resolveVersionNumber(
 
 type CreateVersionParams = {
     client: ApifyClient;
-    actor: Pick<Actor, 'id' | 'versions'>;
     actorClient: ActorClient;
+    actor: Pick<Actor, 'id' | 'versions'>;
     versionNumber: string;
     buildTag: string | undefined;
     sourceFiles: ActorVersionSourceFile[];
@@ -356,7 +356,7 @@ type CreateVersionParams = {
  * case that was not intended.
  */
 async function createVersion(params: CreateVersionParams): Promise<VersionWriteOutcome> {
-    const { client, actor, actorClient, versionNumber, buildTag, sourceFiles } = params;
+    const { client, actorClient, actor, versionNumber, buildTag, sourceFiles } = params;
     if (!hasActorConfig(sourceFiles)) {
         throw new UserInputError(
             `Version ${versionNumber} does not exist and would be created (${formatVersionList(listVersionNumbers(actor))}). ${ACTOR_CONFIG_MISSING_TEXT}`,
@@ -374,8 +374,8 @@ async function createVersion(params: CreateVersionParams): Promise<VersionWriteO
 
 type UpdateVersionParams = {
     client: ApifyClient;
-    actorId: string;
     versionClient: ActorVersionClient;
+    actorId: string;
     existing: ActorVersion;
     versionNumber: string;
     mode: PushMode;
@@ -411,7 +411,7 @@ function resolveVersionFiles(
  * `sourceType` alone; `apify push` leaves it the same way, so nothing is cleared here.
  */
 async function updateVersion(params: UpdateVersionParams): Promise<VersionWriteOutcome> {
-    const { client, actorId, versionClient, existing, versionNumber, buildTag } = params;
+    const { client, versionClient, actorId, existing, versionNumber, buildTag } = params;
     const files = resolveVersionFiles(params);
     const source = await resolveVersionSource({ client, actorId, versionNumber, files });
     await versionClient.update({ ...source, ...(buildTag !== undefined && { buildTag }) });
@@ -442,8 +442,8 @@ async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFi
     const versionClient = actorClient.version(versionNumber);
     const existing = await versionClient.get();
     const outcome = existing
-        ? await updateVersion({ client, actorId: actor.id, versionClient, existing, versionNumber, mode, buildTag, sourceFiles })
-        : await createVersion({ client, actor, actorClient, versionNumber, buildTag, sourceFiles });
+        ? await updateVersion({ client, versionClient, actorId: actor.id, existing, versionNumber, mode, buildTag, sourceFiles })
+        : await createVersion({ client, actorClient, actor, versionNumber, buildTag, sourceFiles });
     return { actorId: actor.id, actorName, versionNumber, created: false, ...outcome };
 }
 
