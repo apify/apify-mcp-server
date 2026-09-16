@@ -50,7 +50,7 @@ const stubClient = {
     actors: () => ({ create: actorsCreateMock }),
     keyValueStores: () => ({ getOrCreate: storesGetOrCreateMock }),
     keyValueStore: keyValueStoreMock,
-    baseUrl: 'https://api.apify.com/v2',
+    baseUrl: 'https://api.example.test/v2',
 } as unknown as InternalToolArgs['apifyClient'];
 
 const ACTOR_JSON = { path: '.actor/actor.json', content: '{"actorSpecification": 1, "name": "my-actor"}' };
@@ -413,7 +413,7 @@ describe('push-actor', () => {
         // One byte over the inline limit: 'é' is two utf8 bytes.
         const BIG_TEXT = `${'a'.repeat(MAX_MULTIFILE_BYTES - 1)}é`;
         const BIG_CONFIG = { path: ACTOR_CONFIG_PATH, content: BIG_TEXT };
-        const ARCHIVE_URL = 'https://api.apify.com/v2/key-value-stores/store-1/records/version-0.0.zip';
+        const ARCHIVE_URL = 'https://api.example.test/v2/key-value-stores/store-1/records/version-0.0.zip';
 
         /** The entries of the uploaded zip, path to bytes, in zip order. */
         const uploadedZipEntries = () => {
@@ -471,6 +471,15 @@ describe('push-actor', () => {
             });
         });
 
+        it('keeps the signed archive URL out of the response', async () => {
+            storesGetOrCreateMock.mockResolvedValue({ id: 'store-1', urlSigningSecretKey: 'secret' });
+
+            const result = await callTool({ files: [BIG_CONFIG], mode: 'replace', build: false });
+
+            expect(JSON.stringify(result)).not.toContain('signature=');
+            expect(JSON.stringify(result)).not.toContain('key-value-stores/store-1');
+        });
+
         it('zips the merged set when the kept and pushed files together exceed the limit', async () => {
             const kept = { name: 'big.txt', format: 'TEXT', content: 'a'.repeat(MAX_MULTIFILE_BYTES - 5) };
             versionGetMock.mockResolvedValue(mockVersion({ sourceFiles: [ACTOR_JSON_SOURCE, kept] }));
@@ -492,7 +501,7 @@ describe('push-actor', () => {
                 versionNumber: '0.2',
                 buildTag: 'beta',
                 sourceType: 'TARBALL',
-                tarballUrl: 'https://api.apify.com/v2/key-value-stores/store-1/records/version-0.2.zip',
+                tarballUrl: 'https://api.example.test/v2/key-value-stores/store-1/records/version-0.2.zip',
             });
             expect(actorsCreateMock).not.toHaveBeenCalled();
         });
@@ -514,7 +523,7 @@ describe('push-actor', () => {
             expect(actorMock).toHaveBeenCalledWith('actor-new');
             expect(versionUpdateMock).toHaveBeenCalledWith({
                 sourceType: 'TARBALL',
-                tarballUrl: 'https://api.apify.com/v2/key-value-stores/store-new/records/version-0.0.zip',
+                tarballUrl: 'https://api.example.test/v2/key-value-stores/store-new/records/version-0.0.zip',
                 buildTag: 'latest',
             });
             expect(structuredContent).toMatchObject({ created: true, sourceType: 'TARBALL', filesPushed: 1 });
@@ -580,7 +589,7 @@ describe('push-actor', () => {
             expect(versionMock).toHaveBeenCalledWith('1.0');
             expect(versionUpdateMock).toHaveBeenCalledWith({
                 sourceType: 'TARBALL',
-                tarballUrl: 'https://api.apify.com/v2/key-value-stores/store-1/records/version-1.0.zip',
+                tarballUrl: 'https://api.example.test/v2/key-value-stores/store-1/records/version-1.0.zip',
                 buildTag: 'beta',
             });
         });
@@ -838,6 +847,15 @@ describe('push-actor', () => {
             const { text } = await callToolExpectingUserError({ files: [ACTOR_JSON, { path: './', content: 'x' }] });
 
             expect(text).toBe("File path './' is empty after normalization.");
+            expectNoWrite();
+        });
+
+        it.each(['__proto__', './__proto__'])('rejects a root file named %s', async (path) => {
+            const { text } = await callToolExpectingUserError({
+                files: [ACTOR_JSON, { path, content: 'x' }],
+            });
+
+            expect(text).toBe(`File path '${path}' is not allowed.`);
             expectNoWrite();
         });
 
