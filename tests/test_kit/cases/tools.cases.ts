@@ -229,4 +229,21 @@ export const toolsCases: Case[] = [
             expect(response.isError).toBe(true);
         }),
     },
+    {
+        // Legacy era only: the stateless server prefers the header over `_meta`.
+        name: 'overrides the connection token with _meta.apifyToken',
+        isDeploymentTest: false,
+        skipIf: skipUnlessLegacyHttp,
+        run: withClient({ tools: ['storage'] }, async (client) => {
+            const response = await client.callTool({
+                name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+                arguments: {},
+                _meta: { apifyToken: 'apify_api_invalid_token' },
+            });
+
+            expect(response.isError).toBe(true);
+            const content = response.content as { text: string }[];
+            expect(content[0].text).toContain('Authentication failed');
+        }),
+    },
 ];
