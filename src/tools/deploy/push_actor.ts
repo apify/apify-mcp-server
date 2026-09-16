@@ -426,7 +426,8 @@ async function updateVersion(params: UpdateVersionParams): Promise<VersionWriteO
 /**
  * Creates the Actor with the files, or creates or updates the version of an existing Actor. Each write
  * step checks that the version ends up containing `.actor/actor.json` before it writes, so a rejected
- * push has made no write. Throws `UserInputError` for problems the user must fix; `envVars` is never
+ * push has made no write. Throws `UserInputError` for problems the user must fix and `ActorCreatedError`
+ * when a new Actor's zip could not be stored after the create call; `envVars` is never
  * sent so the version keeps its own.
  */
 async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFilesResult> {
@@ -567,8 +568,9 @@ async function buildPushResponse(params: PushResponseParams): Promise<ToolRespon
  * key-value store, with the version set to `sourceType: TARBALL` and the record URL.
  * Resolves apify/apify-mcp-server#1217.
  *
- * Steps throw `UserInputError` when the call is rejected and `BuildStartError` when the push succeeded
- * but the build did not start; `call()` maps both to responses.
+ * Steps throw `UserInputError` when the call is rejected, `ActorCreatedError` when a new Actor's zip could
+ * not be stored after the create call, and `BuildStartError` when the push succeeded but the build did not
+ * start; `call()` maps all three to responses.
  */
 export const pushActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
