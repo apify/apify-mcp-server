@@ -8,7 +8,9 @@ import {
     ACTOR_EXAMPLE_MCP_SERVER,
     buildExampleMcpServerAddToolContent,
     getToolNames,
+    skipOnStatefulEra,
     skipUnlessLegacyHttp,
+    skipUnlessStatefulEra,
     validateStructuredOutputForTool,
     withClient,
 } from '../helpers.js';
@@ -227,6 +229,48 @@ export const toolsCases: Case[] = [
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG);
             expect(response.isError).toBe(true);
+        }),
+    },
+    {
+        name: 'exposes serverInfo, instructions and the shared capability set',
+        isDeploymentTest: false,
+        run: withClient(undefined, async (client) => {
+            const serverInfo = client.getServerVersion();
+            expect(serverInfo?.name).toBe('apify-mcp-server');
+            expect(serverInfo?.version).toMatch(/^\d+\.\d+\.\d+/);
+            expect(client.getInstructions()).toContain(HELPER_TOOLS.ACTOR_CALL);
+
+            const capabilities = client.getServerCapabilities();
+            // #1232: `tools` must stay `{}` (no listChanged).
+            expect(capabilities?.tools).toEqual({});
+            expect(capabilities?.resources).toEqual({});
+            expect(capabilities?.prompts).toEqual({});
+        }),
+    },
+    {
+        name: 'declares tasks and logging capabilities on the stateful era',
+        isDeploymentTest: false,
+        skipIf: skipUnlessStatefulEra,
+        run: withClient(undefined, async (client) => {
+            const capabilities = client.getServerCapabilities();
+            expect(capabilities?.logging).toEqual({});
+            // `SuiteClient` is v1|v2; only v1 reaches here.
+            expect(capabilities?.tasks as unknown).toEqual({
+                list: {},
+                cancel: {},
+                requests: { tools: { call: {} } },
+            });
+        }),
+    },
+    {
+        // Complements the case above so a 2026-07-28 leak is not skipped away (SEP-2577).
+        name: 'omits tasks and logging capabilities on the stateless era',
+        isDeploymentTest: false,
+        skipIf: skipOnStatefulEra,
+        run: withClient(undefined, async (client) => {
+            const capabilities = client.getServerCapabilities();
+            expect(capabilities?.logging).toBeUndefined();
+            expect(capabilities?.tasks).toBeUndefined();
         }),
     },
 ];
