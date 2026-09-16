@@ -275,10 +275,11 @@ export const toolsCases: Case[] = [
         }),
     },
     {
-        name: 'answers ping',
+        // v2 client refuses ping; the request never reaches the server.
+        name: 'answers ping on the stateful era',
         isDeploymentTest: false,
+        skipIf: skipUnlessStatefulEra,
         run: withClient(undefined, async (client) => {
-            // Spec result is EmptyResult; exact so an accidental payload shows up here.
             await expect(client.ping()).resolves.toEqual({});
         }),
     },
