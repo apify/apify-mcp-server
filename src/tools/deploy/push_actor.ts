@@ -7,6 +7,7 @@ import type {
     ActorVersionClient,
     ActorVersionSourceFile,
     ActorVersionSourceFiles,
+    ActorVersionTarball,
     Build,
 } from 'apify-client';
 import { ActorSourceType, ApifyApiError } from 'apify-client';
@@ -20,11 +21,12 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import type { ToolResponse } from '../../utils/mcp.js';
-import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
+import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { ABORT, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 import { pushActorToolOutputSchema } from '../structured_output_schemas.js';
 import { buildNextStepForBuild, listVersionNumbers, startBuild, toBuildResult } from './build_helpers.js';
+import { buildSourceZip, formatSourceRecordKey, formatSourceStoreName, uploadSourceArchive } from './source_archive.js';
 import {
     ACTOR_CONFIG_PATH,
     getSourceFilesSizeBytes,
@@ -38,7 +40,7 @@ import {
 /** `apify push` defaults to this tag too, because the platform complains when an Actor has no `latest` build. */
 const DEFAULT_BUILD_TAG = 'latest';
 
-/** The platform's inline source-files cutoff, the same one `apify push` uses; larger projects need the Apify CLI. */
+/** The platform's inline source-files cutoff; above it the files go as a zip, the same switch `apify push` makes. */
 const MULTIFILE_SOURCE_MAX_MIB = MAX_MULTIFILE_BYTES / (1024 * 1024);
 
 /** `apify push` starts a new Actor at this version. */
@@ -92,11 +94,11 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const actorIdTakers = [HELPER_TOOLS.ACTOR_BUILD, HELPER_TOOLS.ACTOR_CALL].filter(hasTool);
     return `Push files to an Actor in your account and, by default, build the pushed version.
 Creates the Actor when it does not exist and creates or updates the version otherwise: the equivalent of the Apify CLI's apify push.
-Returns the Actor ID and name, the version, its build tag, the number of files now in the version, the build when one was started, and a summary with one next step.${
+Returns the Actor ID and name, the version, its build tag, the number of files now in the version, how it stores them (sourceType SOURCE_FILES inline or TARBALL as a zip), the build when one was started, and a summary with one next step.${
         actorIdTakers.length > 0 ? ` Pass the returned actorId as actor to ${actorIdTakers.join(' and ')}.` : ''
     }
 Files are text (utf8) or base64 for binaries; paths are relative to the Actor root and the version must end up containing ${ACTOR_CONFIG_PATH}.
-The files may total at most ${MULTIFILE_SOURCE_MAX_MIB} MiB; larger projects need the Apify CLI.
+Files up to ${MULTIFILE_SOURCE_MAX_MIB} MiB in total are stored as editable source files. A larger set is zipped into a key-value store the version points to, as apify push does; later pushes to that version must send all files with mode replace.
 Omit versionNumber to push to the only version of an existing Actor; an Actor with several versions needs it, and a version that does not exist yet is created.
 mode merge (default) keeps files already in the version that are not listed; mode replace makes the version contain exactly the listed files.${
         hasTool(HELPER_TOOLS.ACTOR_BUILD_GET)
@@ -139,10 +141,12 @@ type PushActorFilesResult = {
     buildTag: string;
     /** Files now in the version: the pushed files plus, in merge mode, the kept ones. */
     filesPushed: number;
+    /** SOURCE_FILES when the version holds the files inline, TARBALL when it points at their zip. */
+    sourceType: VersionSource['sourceType'];
 };
 
 /** What a version write produced; `pushActorFiles` adds the Actor identity around it. */
-type VersionWriteOutcome = Pick<PushActorFilesResult, 'versionCreated' | 'buildTag' | 'filesPushed'>;
+type VersionWriteOutcome = Pick<PushActorFilesResult, 'versionCreated' | 'buildTag' | 'filesPushed' | 'sourceType'>;
 
 const ACTOR_CONFIG_MISSING_TEXT = `The files must include ${ACTOR_CONFIG_PATH}; the platform needs it to build the Actor.`;
 
@@ -202,24 +206,39 @@ function formatVersionList(versionNumbers: readonly string[]): string {
 
 /**
  * The files in the API shape; throws `UserInputError` for the first problem with them: a bad path, a
- * duplicate, invalid base64, or the total size. Mode-independent; whether the version ends up with
- * `.actor/actor.json` is checked by the push step that knows the version.
+ * duplicate, or invalid base64. Mode-independent; whether the version ends up with `.actor/actor.json`
+ * is checked by the push step that knows the version.
  */
 function resolveSourceFiles(files: readonly SourceFileInput[]): ActorVersionSourceFile[] {
     validateSourceFiles(files);
-    const sourceFiles = toSourceFiles(files);
-    validateSourceSize(sourceFiles, 'The files');
-    return sourceFiles;
+    return toSourceFiles(files);
 }
 
-/** Throws `UserInputError` when the files exceed the platform's inline source cutoff; `subject` starts the message. */
-function validateSourceSize(files: readonly ActorVersionSourceFile[], subject: string): void {
-    const sizeBytes = getSourceFilesSizeBytes(files);
-    if (sizeBytes > MAX_MULTIFILE_BYTES) {
-        throw new UserInputError(
-            `${subject} total ${sizeBytes} bytes; the limit is ${MAX_MULTIFILE_BYTES} bytes (${MULTIFILE_SOURCE_MAX_MIB} MiB). Use the Apify CLI (apify push) for larger projects.`,
-        );
-    }
+type VersionSource =
+    | Pick<ActorVersionSourceFiles, 'sourceType' | 'sourceFiles'>
+    | Pick<ActorVersionTarball, 'sourceType' | 'tarballUrl'>;
+
+/** The platform accepts a set of exactly the limit inline, so only a larger one goes as a zip. */
+function isOverInlineSourceLimit(files: readonly ActorVersionSourceFile[]): boolean {
+    return getSourceFilesSizeBytes(files) > MAX_MULTIFILE_BYTES;
+}
+
+type ResolveVersionSourceParams = {
+    client: ApifyClient;
+    actorId: string;
+    versionNumber: string;
+    files: ActorVersionSourceFile[];
+};
+
+/**
+ * What the version will point at: the files themselves up to the inline limit, otherwise the URL of
+ * their zip uploaded to the Actor's source store, the same switch `apify push` makes.
+ */
+async function resolveVersionSource(params: ResolveVersionSourceParams): Promise<VersionSource> {
+    const { client, actorId, versionNumber, files } = params;
+    if (!isOverInlineSourceLimit(files)) return { sourceType: ActorSourceType.SourceFiles, sourceFiles: files };
+    const tarballUrl = await uploadSourceArchive(client, { actorId, versionNumber, zip: buildSourceZip(files) });
+    return { sourceType: ActorSourceType.Tarball, tarballUrl };
 }
 
 type TargetActor = {
@@ -251,27 +270,63 @@ type CreateActorParams = {
     sourceFiles: ActorVersionSourceFile[];
 };
 
-/** The Actor does not exist yet: the pushed files are its whole first version, so they must carry the config. */
+/**
+ * The Actor exists, but the zip upload or the switch to it failed after the create call. Reported with
+ * the Actor ID, the same way `BuildStartError` reports a completed push, so the agent pushes again
+ * instead of retrying the create.
+ */
+class ActorCreatedError extends Error {
+    override readonly name = 'ActorCreatedError';
+
+    constructor(
+        readonly actorId: string,
+        versionNumber: string,
+        cause: unknown,
+    ) {
+        const reason = cause instanceof Error ? cause.message : String(cause);
+        // API messages rarely end with a period; give the reason its own sentence so the retry hint does not run into it.
+        super(
+            `The Actor was created (ID ${actorId}), but storing its files failed: ${reason.replace(/\.?$/, '.')} Push again to fill version ${versionNumber}.`,
+            { cause },
+        );
+    }
+}
+
+/**
+ * The Actor does not exist yet: the pushed files are its whole first version, so they must carry the
+ * config. A set over the inline limit is stored under the Actor's ID, so the Actor is created first
+ * with an empty version, the placeholder `apify push` creates too, and the version is then switched to
+ * the uploaded zip. If that upload fails the empty version stays; pushing again fills it.
+ */
 async function createActorWithVersion(params: CreateActorParams): Promise<VersionWriteOutcome & { actorId: string }> {
-    const { client, bareName, versionNumber, buildTag, sourceFiles } = params;
+    const { client, bareName, versionNumber, sourceFiles } = params;
     if (!hasActorConfig(sourceFiles)) throw new UserInputError(ACTOR_CONFIG_MISSING_TEXT);
+    const buildTag = params.buildTag ?? DEFAULT_BUILD_TAG;
+    const isInline = !isOverInlineSourceLimit(sourceFiles);
     const created = await client.actors().create({
         name: bareName,
         versions: [
             {
                 versionNumber,
-                buildTag: buildTag ?? DEFAULT_BUILD_TAG,
+                buildTag,
                 sourceType: ActorSourceType.SourceFiles,
-                sourceFiles,
+                sourceFiles: isInline ? sourceFiles : [],
             },
         ],
     } satisfies ActorCollectionCreateOptions);
-    return {
-        actorId: created.id,
-        versionCreated: true,
-        buildTag: buildTag ?? DEFAULT_BUILD_TAG,
-        filesPushed: sourceFiles.length,
-    };
+    const outcome = { actorId: created.id, versionCreated: true, buildTag, filesPushed: sourceFiles.length };
+    if (isInline) return { ...outcome, sourceType: ActorSourceType.SourceFiles };
+    try {
+        const zip = buildSourceZip(sourceFiles);
+        const tarballUrl = await uploadSourceArchive(client, { actorId: created.id, versionNumber, zip });
+        await client
+            .actor(created.id)
+            .version(versionNumber)
+            .update({ sourceType: ActorSourceType.Tarball, tarballUrl, buildTag } satisfies ActorVersionTarball);
+        return { ...outcome, sourceType: ActorSourceType.Tarball };
+    } catch (error) {
+        throw new ActorCreatedError(created.id, versionNumber, error);
+    }
 }
 
 /** The requested version, or the only version of the Actor, or the default for an Actor with no versions. */
@@ -287,8 +342,9 @@ function resolveVersionNumber(
 }
 
 type CreateVersionParams = {
-    actor: Pick<Actor, 'versions'>;
+    client: ApifyClient;
     actorClient: ActorClient;
+    actor: Pick<Actor, 'id' | 'versions'>;
     versionNumber: string;
     buildTag: string | undefined;
     sourceFiles: ActorVersionSourceFile[];
@@ -300,23 +356,26 @@ type CreateVersionParams = {
  * case that was not intended.
  */
 async function createVersion(params: CreateVersionParams): Promise<VersionWriteOutcome> {
-    const { actor, actorClient, versionNumber, buildTag, sourceFiles } = params;
+    const { client, actorClient, actor, versionNumber, buildTag, sourceFiles } = params;
     if (!hasActorConfig(sourceFiles)) {
         throw new UserInputError(
             `Version ${versionNumber} does not exist and would be created (${formatVersionList(listVersionNumbers(actor))}). ${ACTOR_CONFIG_MISSING_TEXT}`,
         );
     }
-    await actorClient.versions().create({
-        versionNumber,
+    const source = await resolveVersionSource({ client, actorId: actor.id, versionNumber, files: sourceFiles });
+    await actorClient.versions().create({ versionNumber, buildTag: buildTag ?? DEFAULT_BUILD_TAG, ...source });
+    return {
+        versionCreated: true,
         buildTag: buildTag ?? DEFAULT_BUILD_TAG,
-        sourceType: ActorSourceType.SourceFiles,
-        sourceFiles,
-    } satisfies ActorVersionSourceFiles);
-    return { versionCreated: true, buildTag: buildTag ?? DEFAULT_BUILD_TAG, filesPushed: sourceFiles.length };
+        filesPushed: sourceFiles.length,
+        sourceType: source.sourceType,
+    };
 }
 
 type UpdateVersionParams = {
+    client: ApifyClient;
     versionClient: ActorVersionClient;
+    actorId: string;
     existing: ActorVersion;
     versionNumber: string;
     mode: PushMode;
@@ -339,34 +398,36 @@ function resolveVersionFiles(
     }
     if (existing.sourceType !== ActorSourceType.SourceFiles) {
         throw new UserInputError(
-            `Version ${versionNumber} uses source type ${existing.sourceType}; use mode 'replace' to overwrite it with source files.`,
+            `Version ${versionNumber} uses source type ${existing.sourceType}, which mode 'merge' cannot add to; use mode 'replace' and send all files.`,
         );
     }
     const files = mergeSourceFiles(existing.sourceFiles, sourceFiles);
     if (!hasActorConfig(files)) throw new UserInputError(ACTOR_CONFIG_MISSING_TEXT);
-    validateSourceSize(files, 'The merged version would');
     return files;
 }
 
+/**
+ * A version switched to a zip keeps its old `sourceFiles` array on the platform, which builds from
+ * `sourceType` alone; `apify push` leaves it the same way, so nothing is cleared here.
+ */
 async function updateVersion(params: UpdateVersionParams): Promise<VersionWriteOutcome> {
-    const { versionClient, existing, buildTag } = params;
+    const { client, versionClient, actorId, existing, versionNumber, buildTag } = params;
     const files = resolveVersionFiles(params);
-    await versionClient.update({
-        sourceType: ActorSourceType.SourceFiles,
-        sourceFiles: files,
-        ...(buildTag !== undefined && { buildTag }),
-    } satisfies ActorVersionSourceFiles);
+    const source = await resolveVersionSource({ client, actorId, versionNumber, files });
+    await versionClient.update({ ...source, ...(buildTag !== undefined && { buildTag }) });
     return {
         versionCreated: false,
         buildTag: buildTag ?? existing.buildTag ?? DEFAULT_BUILD_TAG,
         filesPushed: files.length,
+        sourceType: source.sourceType,
     };
 }
 
 /**
  * Creates the Actor with the files, or creates or updates the version of an existing Actor. Each write
  * step checks that the version ends up containing `.actor/actor.json` before it writes, so a rejected
- * push has made no write. Throws `UserInputError` for problems the user must fix; `envVars` is never
+ * push has made no write. Throws `UserInputError` for problems the user must fix and `ActorCreatedError`
+ * when a new Actor's zip could not be stored after the create call; `envVars` is never
  * sent so the version keeps its own.
  */
 async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFilesResult> {
@@ -382,8 +443,8 @@ async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFi
     const versionClient = actorClient.version(versionNumber);
     const existing = await versionClient.get();
     const outcome = existing
-        ? await updateVersion({ versionClient, existing, versionNumber, mode, buildTag, sourceFiles })
-        : await createVersion({ actor, actorClient, versionNumber, buildTag, sourceFiles });
+        ? await updateVersion({ client, versionClient, actorId: actor.id, existing, versionNumber, mode, buildTag, sourceFiles })
+        : await createVersion({ client, actorClient, actor, versionNumber, buildTag, sourceFiles });
     return { actorId: actor.id, actorName, versionNumber, created: false, ...outcome };
 }
 
@@ -428,6 +489,11 @@ function formatFileCount(count: number): string {
     return `${count} ${count === 1 ? 'file' : 'files'}`;
 }
 
+/** A zip-stored version shows no files in Console and has nothing merge mode can add to. */
+function formatArchiveNote({ actorId, versionNumber }: Pick<PushActorFilesResult, 'actorId' | 'versionNumber'>): string {
+    return `The files total more than ${MULTIFILE_SOURCE_MAX_MIB} MiB, so they are stored as a zip in key-value store ${formatSourceStoreName(actorId)} (record ${formatSourceRecordKey(versionNumber)}) that the version points to; later pushes to this version must send all files with mode replace.`;
+}
+
 function buildNextStep(build: Build | undefined, loadedToolNames: readonly string[]): string {
     if (build) return buildNextStepForBuild(build, { loadedToolNames });
     return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
@@ -468,9 +534,11 @@ async function buildPushResponse(params: PushResponseParams): Promise<ToolRespon
         versionNumber: pushed.versionNumber,
         buildTag: pushed.buildTag,
         filesPushed: pushed.filesPushed,
+        sourceType: pushed.sourceType,
         ...(build !== undefined && { build: toBuildResult(build, linkContext) }),
     };
-    const summary = `Pushed ${formatFileCount(filesSent)} to ${pushed.actorName} version ${pushed.versionNumber} (${formatOutcome(pushed)}); the version now has ${formatFileCount(pushed.filesPushed)}.`;
+    const archiveNote = pushed.sourceType === ActorSourceType.Tarball ? ` ${formatArchiveNote(pushed)}` : '';
+    const summary = `Pushed ${formatFileCount(filesSent)} to ${pushed.actorName} version ${pushed.versionNumber} (${formatOutcome(pushed)}); the version now has ${formatFileCount(pushed.filesPushed)}.${archiveNote}`;
     const nextStep =
         buildStartErrMessage === undefined
             ? buildNextStep(build, loadedToolNames)
@@ -489,15 +557,20 @@ async function buildPushResponse(params: PushResponseParams): Promise<ToolRespon
  *  /v2/actors/{actorId}/versions/{versionNumber}
  * https://docs.apify.com/api/v2/actor-versions-post
  *  /v2/actors/{actorId}/versions
+ * https://docs.apify.com/api/v2/key-value-store-record-put
+ *  /v2/key-value-stores/{storeId}/records/{recordKey}
  *
  * Uses the same JSON `sourceType: SOURCE_FILES` + `sourceFiles` contract as `apify push`
  * (actors().create, version().update, versions().create), which is the contract the API
  * reference documents for creating and updating a version. apify/apify-core#29044 reports a
  * tarball upload route; no such route exists in the API reference and none is used here.
+ * Files over the inline limit go the other way `apify push` goes: zipped into the Actor's source
+ * key-value store, with the version set to `sourceType: TARBALL` and the record URL.
  * Resolves apify/apify-mcp-server#1217.
  *
- * Steps throw `UserInputError` when the call is rejected and `BuildStartError` when the push succeeded
- * but the build did not start; `call()` maps both to responses.
+ * Steps throw `UserInputError` when the call is rejected, `ActorCreatedError` when a new Actor's zip could
+ * not be stored after the create call, and `BuildStartError` when the push succeeded but the build did not
+ * start; `call()` maps all three to responses.
  */
 export const pushActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -556,11 +629,15 @@ export const pushActor: ToolEntry = Object.freeze({
                     ...responseContext,
                 });
             }
+            // The Actor write happened; the status and category come from the real cause, a 403 included.
+            if (error instanceof ActorCreatedError) {
+                return respondServerError(error.message, { error: error.cause, actorId: error.actorId });
+            }
             if (error instanceof UserInputError) return respondUserError(error.message);
             // Covers the reads too: a scoped token can be denied the user, Actor or version lookup as well as the write.
             if (error instanceof ApifyApiError && error.statusCode === 403) {
                 return respondUserError(
-                    'The token is not allowed to read or modify Actors in this account; scoped tokens cannot. Use a token with full Actor access.',
+                    'The token is not allowed to read or modify Actors in this account, or the key-value store a zipped push goes to; scoped tokens cannot include Actor write access. Use a token with full access.',
                     { category: FAILURE_CATEGORY.AUTH, httpStatus: 403 },
                 );
             }
