@@ -1,7 +1,8 @@
 import type { Client as ClientV2, ProgressNotification } from '@modelcontextprotocol/client';
 import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { expect } from 'vitest';
+import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { expect, vi } from 'vitest';
 
 import {
     APIFY_ACTOR_RUN_META_KEY,
@@ -16,6 +17,7 @@ import {
     getToolNames,
     skipOnStatefulEra,
     skipUnlessLegacyHttp,
+    skipUnlessStatefulEra,
     validateStructuredOutputForTool,
     withClient,
 } from '../helpers.js';
@@ -23,6 +25,10 @@ import type { Case } from '../types.js';
 
 /** String so `Number(progressToken)` is NaN and the SDK's own handler would drop it. */
 const PROGRESS_TOKEN = 'pt-1';
+
+const UNKNOWN_TOOL_NAME = 'no-such-tool';
+
+const LOG_NOTIFICATION_TIMEOUT_MS = 5_000;
 
 /** Protocol/tool behavior: prompts, docs, report-problem, schemas, MCP passthrough. */
 export const toolsCases: Case[] = [
@@ -276,6 +282,39 @@ export const toolsCases: Case[] = [
                 const runId = (meta?.[APIFY_ACTOR_RUN_META_KEY] as { runId?: string } | undefined)?.runId;
                 expect(runId).toBeTruthy();
             }
+        }),
+    },
+    {
+        // Unknown-tool emit is always `error`; raise the threshold to drop it, lower it to let it through.
+        name: 'filters notifications/message by the level set via logging/setLevel',
+        isDeploymentTest: false,
+        skipIf: skipUnlessStatefulEra,
+        run: withClient(undefined, async (client) => {
+            const statefulClient = client as ClientV1;
+            const received: { level: string; data?: unknown }[] = [];
+            statefulClient.setNotificationHandler(LoggingMessageNotificationSchema, (notification) => {
+                received.push(notification.params);
+            });
+
+            // Server awaits the log notification before throwing, so the rejection is enough of a barrier.
+            const callUnknownTool = async () => {
+                await expect(statefulClient.callTool({ name: UNKNOWN_TOOL_NAME, arguments: {} })).rejects.toThrow(
+                    /was not found/,
+                );
+            };
+
+            await statefulClient.setLoggingLevel('emergency');
+            await callUnknownTool();
+            expect(received).toEqual([]);
+
+            await statefulClient.setLoggingLevel('debug');
+            await callUnknownTool();
+            await vi.waitUntil(() => received.length > 0, { timeout: LOG_NOTIFICATION_TIMEOUT_MS, interval: 50 });
+
+            // Exactly one: the suppressed phase must not arrive late and inflate this.
+            expect(received).toHaveLength(1);
+            expect(received[0].level).toBe('error');
+            expect(String(received[0].data)).toContain(UNKNOWN_TOOL_NAME);
         }),
     },
 ];
