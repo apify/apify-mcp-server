@@ -30,7 +30,8 @@ function normalizeSourcePath(path: string): string {
 
 /**
  * Throws `UserInputError` on the first problem with the files: an absolute path, a path empty after
- * normalization, a directory, a `..` segment, a duplicate, or base64 content that is not base64.
+ * normalization, a directory, a `..` segment, a root file named `__proto__`, a duplicate, or base64
+ * content that is not base64.
  */
 export function validateSourceFiles(files: readonly SourceFileInput[]): void {
     const seen = new Set<string>();
@@ -40,6 +41,8 @@ export function validateSourceFiles(files: readonly SourceFileInput[]): void {
         if (normalized === '') throw new UserInputError(`File path '${path}' is empty after normalization.`);
         if (/[\\/]$/.test(path)) throw new UserInputError(`File path '${path}' must name a file, not a directory.`);
         if (normalized.split('/').includes('..')) throw new UserInputError(`File path '${path}' must not contain '..' segments.`);
+        // The zip writer keys entries by path on a plain object, where this name sets the prototype instead.
+        if (normalized === '__proto__') throw new UserInputError(`File path '${path}' is not allowed.`);
         if (seen.has(normalized)) throw new UserInputError(`File path '${normalized}' is listed more than once.`);
         seen.add(normalized);
         if (encoding === 'base64' && !BASE64_REGEX.test(content)) {
