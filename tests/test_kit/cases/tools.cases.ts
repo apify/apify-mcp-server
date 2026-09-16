@@ -1,18 +1,28 @@
+import type { Client as ClientV2, ProgressNotification } from '@modelcontextprotocol/client';
 import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { expect } from 'vitest';
 
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
+import {
+    APIFY_ACTOR_RUN_META_KEY,
+    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
+    HELPER_TOOLS,
+} from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
+    ACTOR_NORMAL_MODE,
     buildExampleMcpServerAddToolContent,
     getToolNames,
+    skipOnStatefulEra,
     skipUnlessLegacyHttp,
     validateStructuredOutputForTool,
     withClient,
 } from '../helpers.js';
 import type { Case } from '../types.js';
+
+/** String so `Number(progressToken)` is NaN and the SDK's own handler would drop it. */
+const PROGRESS_TOKEN = 'pt-1';
 
 /** Protocol/tool behavior: prompts, docs, report-problem, schemas, MCP passthrough. */
 export const toolsCases: Case[] = [
@@ -227,6 +237,45 @@ export const toolsCases: Case[] = [
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG);
             expect(response.isError).toBe(true);
+        }),
+    },
+    {
+        // Existing progress cases sit behind the tasks gate, which skips this era.
+        name: 'echoes the client-supplied progressToken on notifications/progress',
+        isDeploymentTest: false,
+        skipIf: skipOnStatefulEra,
+        // A live Actor run over the network; the ticket budgets one retry for notification timing.
+        retry: 1,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const statelessClient = client as ClientV2;
+            const received: ProgressNotification[] = [];
+            // Replaces the SDK's own handler, which routes by `Number(progressToken)` and would drop
+            // a string token as NaN before any assertion could see it.
+            statelessClient.setNotificationHandler('notifications/progress', (notification) => {
+                received.push(notification);
+            });
+
+            const result = await statelessClient.callTool({
+                name: HELPER_TOOLS.ACTOR_CALL,
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
+                _meta: { progressToken: PROGRESS_TOKEN },
+            });
+            expect(result.isError ?? false).toBe(false);
+
+            expect(received.length).toBeGreaterThan(0);
+            let previousProgress = 0;
+            for (const notification of received) {
+                const { progressToken, progress, message } = notification.params;
+                expect(progressToken).toBe(PROGRESS_TOKEN);
+                expect(typeof message).toBe('string');
+                expect(progress).toBeGreaterThan(previousProgress);
+                previousProgress = progress;
+
+                // runId rides `_meta` from the first emission on; internal reads it off this stream.
+                const meta = (notification.params as { _meta?: Record<string, unknown> })._meta;
+                const runId = (meta?.[APIFY_ACTOR_RUN_META_KEY] as { runId?: string } | undefined)?.runId;
+                expect(runId).toBeTruthy();
+            }
         }),
     },
 ];
