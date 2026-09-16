@@ -1,5 +1,6 @@
 import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
@@ -271,6 +272,37 @@ export const toolsCases: Case[] = [
             const capabilities = client.getServerCapabilities();
             expect(capabilities?.logging).toBeUndefined();
             expect(capabilities?.tasks).toBeUndefined();
+        }),
+    },
+    {
+        name: 'answers ping',
+        isDeploymentTest: false,
+        run: withClient(undefined, async (client) => {
+            // Spec result is EmptyResult; exact so an accidental payload shows up here.
+            await expect(client.ping()).resolves.toEqual({});
+        }),
+    },
+    {
+        name: 'rejects tools/call with an unknown tool name',
+        isDeploymentTest: false,
+        run: withClient(undefined, async (client) => {
+            // Protocol error, not an isError result — the name never resolves to a tool.
+            await expect(client.callTool({ name: 'no-such-tool', arguments: {} })).rejects.toMatchObject({
+                code: ErrorCode.InvalidParams,
+                message: expect.stringContaining('Tool "no-such-tool" was not found'),
+            });
+        }),
+    },
+    {
+        name: 'rejects prompts/get with an unknown prompt name',
+        isDeploymentTest: false,
+        run: withClient(undefined, async (client) => {
+            // Wording differs from the tool path above ("not found", no "was"), so pin the whole
+            // phrase rather than a substring that looks shared but is not.
+            await expect(client.getPrompt({ name: 'no-such-prompt' })).rejects.toMatchObject({
+                code: ErrorCode.InvalidParams,
+                message: expect.stringContaining('Prompt no-such-prompt not found'),
+            });
         }),
     },
 ];
