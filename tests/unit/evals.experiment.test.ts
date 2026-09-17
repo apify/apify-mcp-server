@@ -1,20 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { JudgeClient } from '../../evals/judge/client.js';
 import {
     buildRunSummary,
-    evaluators,
+    createExperimentTask,
+    EVALUATORS,
     expandIterations,
     formatRunSummary,
     isTransientAgentError,
-    makeTask,
     resolveExitCode,
     resolveGitBranch,
     validateConcurrency,
     validateIterations,
     validatePassThreshold,
     type McpAgentTaskOutput,
-} from '../../evals/mcp_agent/langfuse_experiment.js';
-import type { LlmClient } from '../../evals/mcp_agent/llm_client.js';
+} from '../../evals/runner/experiment.js';
 
 // The task runs the Claude Agent SDK, which would otherwise spawn the real agent + server.
 const mocks = vi.hoisted(() => ({
@@ -25,16 +25,16 @@ const mocks = vi.hoisted(() => ({
     evaluateConversation: vi.fn(async () => ({ verdict: 'PASS', reason: 'looks good', rawResponse: '' })),
 }));
 
-vi.mock('../../evals/mcp_agent/claude_agent.js', () => ({
+vi.mock('../../evals/agent/claude_agent.js', () => ({
     runAgentConversation: mocks.runAgentConversation,
 }));
 
-vi.mock('../../evals/mcp_agent/langfuse_observations.js', () => ({
+vi.mock('../../evals/langfuse/observations.js', () => ({
     buildAgentObservations: () => ({}),
     emitObservations: mocks.emitObservations,
 }));
 
-vi.mock('../../evals/mcp_agent/mcp_agent_judge.js', () => ({
+vi.mock('../../evals/judge/judge.js', () => ({
     evaluateConversation: mocks.evaluateConversation,
 }));
 
@@ -93,9 +93,9 @@ function makeScoredToolCallItem(
     };
 }
 
-describe('evaluators', () => {
+describe('EVALUATORS', () => {
     it('scores mcp_agent_judge 1 with the judge reason as comment on PASS', async () => {
-        expect(await evaluators[0]({ output: makeAgentOutput() })).toEqual({
+        expect(await EVALUATORS[0]({ output: makeAgentOutput() })).toEqual({
             name: 'mcp_agent_judge',
             value: 1,
             comment: 'looks good',
@@ -104,26 +104,26 @@ describe('evaluators', () => {
 
     it('scores mcp_agent_judge 0 on FAIL', async () => {
         const output = makeAgentOutput({ judgeResult: { verdict: 'FAIL', reason: 'missed X', rawResponse: '' } });
-        expect(await evaluators[0]({ output })).toEqual({ name: 'mcp_agent_judge', value: 0, comment: 'missed X' });
+        expect(await EVALUATORS[0]({ output })).toEqual({ name: 'mcp_agent_judge', value: 0, comment: 'missed X' });
     });
 
     it('emits only kind-appropriate scores', async () => {
-        expect(await evaluators[0]({ output: makeToolCallOutput() })).toEqual([]);
-        expect(await evaluators[1]({ output: makeToolCallOutput() })).toEqual([]);
-        expect(await evaluators[2]({ output: makeToolCallOutput() })).toEqual([]);
-        expect(await evaluators[3]({ output: makeAgentOutput() })).toEqual([]);
+        expect(await EVALUATORS[0]({ output: makeToolCallOutput() })).toEqual([]);
+        expect(await EVALUATORS[1]({ output: makeToolCallOutput() })).toEqual([]);
+        expect(await EVALUATORS[2]({ output: makeToolCallOutput() })).toEqual([]);
+        expect(await EVALUATORS[3]({ output: makeAgentOutput() })).toEqual([]);
     });
 
     it('reports the conversation token total', async () => {
-        expect(await evaluators[1]({ output: makeAgentOutput() })).toEqual([{ name: 'total_tokens', value: 1234 }]);
+        expect(await EVALUATORS[1]({ output: makeAgentOutput() })).toEqual([{ name: 'total_tokens', value: 1234 }]);
     });
 
     it('emits no token score when the provider never reported usage', async () => {
-        expect(await evaluators[1]({ output: makeAgentOutput({ totalTokens: undefined }) })).toEqual([]);
+        expect(await EVALUATORS[1]({ output: makeAgentOutput({ totalTokens: undefined }) })).toEqual([]);
     });
 
     it('scores tool_errors 0 without a comment on a clean item', async () => {
-        expect(await evaluators[2]({ output: makeAgentOutput() })).toEqual({ name: 'tool_errors', value: 0 });
+        expect(await EVALUATORS[2]({ output: makeAgentOutput() })).toEqual({ name: 'tool_errors', value: 0 });
     });
 
     it('counts only unexpected failures in tool_errors, marking expected ones in the comment', async () => {
@@ -133,7 +133,7 @@ describe('evaluators', () => {
                 { tool: 'create-actor-task', error: 'name taken', expected: false },
             ],
         });
-        expect(await evaluators[2]({ output })).toEqual({
+        expect(await EVALUATORS[2]({ output })).toEqual({
             name: 'tool_errors',
             value: 1,
             comment: 'get-actor-task: task not found (expected)\ncreate-actor-task: name taken',
@@ -144,7 +144,7 @@ describe('evaluators', () => {
         const output = makeAgentOutput({
             toolErrors: [{ tool: 'get-actor-task', error: 'task not found', expected: true }],
         });
-        expect(await evaluators[2]({ output })).toEqual({
+        expect(await EVALUATORS[2]({ output })).toEqual({
             name: 'tool_errors',
             value: 0,
             comment: 'get-actor-task: task not found (expected)',
@@ -152,7 +152,7 @@ describe('evaluators', () => {
     });
 
     it('scores first_tool_match 1 with the match comment on a tool-call pass', async () => {
-        expect(await evaluators[3]({ output: makeToolCallOutput() })).toEqual({
+        expect(await EVALUATORS[3]({ output: makeToolCallOutput() })).toEqual({
             name: 'first_tool_match',
             value: 1,
             comment: 'search-actors({}) — matched expectedTools [search-actors]',
@@ -163,7 +163,7 @@ describe('evaluators', () => {
         const output = makeToolCallOutput({
             firstToolMatch: { isMatch: false, comment: 'no tool call attempted' },
         });
-        expect(await evaluators[3]({ output })).toEqual({
+        expect(await EVALUATORS[3]({ output })).toEqual({
             name: 'first_tool_match',
             value: 0,
             comment: 'no tool call attempted',
@@ -191,7 +191,7 @@ describe('isTransientAgentError()', () => {
     );
 });
 
-describe('makeTask()', () => {
+describe('createExperimentTask()', () => {
     const makeItem = (overrides: Record<string, unknown> = {}) => ({
         id: 'search-001',
         input: { query: 'q' },
@@ -208,8 +208,8 @@ describe('makeTask()', () => {
     });
 
     const makeMcpAgentTask = () =>
-        makeTask({
-            llmClient: {} as LlmClient,
+        createExperimentTask({
+            llmClient: {} as JudgeClient,
             apifyToken: 'token',
             agentModel: 'agent',
             judgeModel: 'judge',
@@ -344,8 +344,8 @@ describe('makeTask()', () => {
 
     it('applies the run-wide mcpToolsOnly to an item that does not set its own flag', async () => {
         mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
-        const task = makeTask({
-            llmClient: {} as LlmClient,
+        const task = createExperimentTask({
+            llmClient: {} as JudgeClient,
             apifyToken: 'token',
             agentModel: 'agent',
             judgeModel: 'judge',

@@ -17,7 +17,7 @@ import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/reso
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
-import { type LlmResponse, type LlmUsage, toUsageDetails } from './llm_client.js';
+import { type JudgeClient, type LlmResponse, type LlmUsage, toUsageDetails } from './client.js';
 
 /**
  * The model's answer may wrap the verdict JSON in code fences or prose. Return the JSON
@@ -38,9 +38,9 @@ function messagesToPrompt(messages: ChatCompletionMessageParam[]): string {
         .join('\n\n');
 }
 
-export class ClaudeLlmClient {
+export class ClaudeJudgeClient implements JudgeClient {
     /**
-     * Same surface as `LlmClient.callLlm`, judge subset: no tool support (the judge never
+     * Same surface as `OpenRouterClient.callLlm`, judge subset: no tool support (the judge never
      * passes tools), `responseFormat` is enforced by instruction + extraction rather than
      * by the API. Traced as a Langfuse generation like the OpenRouter client.
      */
@@ -51,7 +51,7 @@ export class ClaudeLlmClient {
         responseFormat?: ResponseFormatJSONSchema,
     ): Promise<LlmResponse> {
         if (tools && tools.length > 0) {
-            throw new Error('ClaudeLlmClient supports judge calls only (no tools)');
+            throw new Error('ClaudeJudgeClient supports judge calls only (no tools)');
         }
 
         let prompt = messagesToPrompt(messages);

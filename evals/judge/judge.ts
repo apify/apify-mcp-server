@@ -7,9 +7,41 @@
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 import { z } from 'zod';
 
-import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
-import type { JudgeLlmClient } from './llm_client.js';
-import type { ConversationHistory } from './types.js';
+import type { ConversationHistory } from '../agent/conversation_adapter.js';
+import { MODELS } from '../config.js';
+import type { JudgeClient } from './client.js';
+
+/**
+ * Judge prompt template for evaluating conversations
+ * Uses structured output (JSON schema) - no format instructions needed
+ *
+ * Variables:
+ * - {{reference}}: The requirements the agent should meet
+ * - {{conversation}}: The formatted conversation to evaluate
+ */
+export const JUDGE_PROMPT_TEMPLATE = `You are evaluating whether an AI agent successfully completed a user's task using available tools.
+
+TASK REQUIREMENTS:
+{{reference}}
+
+AGENT CONVERSATION:
+{{conversation}}
+
+Your task is to evaluate if the agent met ALL the requirements listed above.
+
+Evaluation criteria:
+1. Did the agent use appropriate tools to accomplish the task?
+2. Were the tool calls made with correct arguments?
+3. Did the agent provide a clear, helpful final response to the user?
+4. Did the agent fully address all requirements?
+
+Important notes:
+- Focus on whether requirements were met, not on writing style
+- The agent may use different tools than expected if they accomplish the same goal
+- Tool results are not shown (only tool calls and agent responses)
+- Minor inefficiencies are acceptable if the task was completed
+
+Provide your evaluation with a verdict (PASS or FAIL) and a brief explanation (1-2 sentences).`;
 
 /**
  * Judge evaluation result
@@ -131,7 +163,7 @@ export function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'
 export async function evaluateConversation(
     reference: string,
     conversation: ConversationHistory,
-    llmClient: JudgeLlmClient,
+    llmClient: JudgeClient,
     judgeModel: string = MODELS.judge,
 ): Promise<JudgeResult> {
     // Format conversation for judge

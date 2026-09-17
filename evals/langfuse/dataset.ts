@@ -42,7 +42,7 @@ const McpAgentMetadataValidator = z.strictObject({
     expectedArgs: z.record(z.string(), z.unknown()).optional(),
     /** Tool names allowed to fail on this item without failing the zero-tool-error gate. */
     expectedErrors: z.array(z.string()).optional(),
-    /** Defaults to the config value. Not valid on `kind: "tool-call"`, which is fixed at 2. */
+    /** Defaults to `MAX_CONVERSATION_TURNS`. Not valid on `kind: "tool-call"`, which is fixed at 2. */
     maxTurns: z.number().int().positive().optional(),
     /** Tools to enable, e.g. ["actors", "docs", "apify/rag-web-browser"] */
     tools: z.array(z.string()).optional(),

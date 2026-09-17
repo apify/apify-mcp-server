@@ -10,58 +10,22 @@ import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/reso
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
-import { OPENROUTER_CONFIG } from './config.js';
+import { sanitizeEnvValue } from '../environment.js';
+import { type JudgeClient, type LlmResponse, type LlmUsage, toUsageDetails } from './client.js';
 
-/**
- * Token usage reported by the LLM API for a single call
- */
-export type LlmUsage = {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-};
-
-/**
- * Response from LLM - either text or tool calls
- */
-export type LlmResponse = {
-    /** Text content from LLM (if no tool calls) */
-    content: string | null;
-    /** Tool calls requested by LLM (if any) */
-    toolCalls?: {
-        id: string;
-        name: string;
-        arguments: string;
-    }[];
-    /** Token usage for this call (undefined if the provider did not report it) */
-    usage?: LlmUsage;
+/** OpenRouter API configuration */
+export const OPENROUTER_CONFIG = {
+    baseURL: 'https://openrouter.ai/api/v1',
+    apiKey: sanitizeEnvValue(process.env.OPENROUTER_API_KEY) || '',
 };
 
 /** Low temperature for deterministic evaluation results. */
 const TEMPERATURE = 0.15;
 
 /**
- * What the judge needs from an LLM client. Implemented by {@link LlmClient} (OpenRouter)
- * and `ClaudeLlmClient` (Claude Agent SDK, `--claude-judge`).
- */
-export type JudgeLlmClient = Pick<LlmClient, 'callLlm'>;
-
-/** Langfuse generation-update fields for a usage report; empty when the provider sent none. */
-export function toUsageDetails(usage?: LlmUsage): { usageDetails?: { input: number; output: number; total: number } } {
-    if (!usage) return {};
-    return {
-        usageDetails: {
-            input: usage.promptTokens,
-            output: usage.completionTokens,
-            total: usage.totalTokens,
-        },
-    };
-}
-
-/**
  * LLM client for chat completions with optional tool support
  */
-export class LlmClient {
+export class OpenRouterClient implements JudgeClient {
     private openai: OpenAI;
 
     constructor() {

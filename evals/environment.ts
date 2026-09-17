@@ -1,13 +1,6 @@
 /**
- * Shared configuration for evaluation systems
- * Contains OpenRouter config, environment validation, and common utilities
+ * Env var sanitization and missing-var reporting for the eval harness.
  */
-
-/** OpenRouter API configuration */
-export const OPENROUTER_CONFIG = {
-    baseURL: 'https://openrouter.ai/api/v1',
-    apiKey: sanitizeEnvValue(process.env.OPENROUTER_API_KEY) || '',
-};
 
 /**
  * Strips control characters, trims whitespace, and removes surrounding double quotes.
