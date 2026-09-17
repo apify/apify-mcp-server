@@ -46,6 +46,7 @@ Provide your evaluation with a verdict (PASS or FAIL) and a brief explanation (1
 export type JudgeResult = {
     verdict: 'PASS' | 'FAIL';
     reason: string;
+    /** Kept for debugging via the Langfuse task output; nothing in evals/ reads it. */
     rawResponse: string;
 };
 

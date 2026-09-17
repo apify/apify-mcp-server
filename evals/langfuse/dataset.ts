@@ -46,7 +46,7 @@ const McpAgentMetadataValidator = z.strictObject({
     maxTurns: z.number().int().positive().optional(),
     /** Tools to enable, e.g. ["actors", "docs", "apify/rag-web-browser"] */
     tools: z.array(z.string()).optional(),
-    /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See denyToolsHook() in agent/claude_agent.ts. */
+    /** Tools the harness refuses via a PreToolUse deny with a failure message. See denyToolsHook() in agent/claude_agent.ts. */
     failTools: z.array(z.string()).optional(),
     /** Force MCP-tools-only for this item, OR-ed with the run-wide `--mcp-tools-only` flag. */
     mcpToolsOnly: z.boolean().optional(),
