@@ -24,14 +24,23 @@ sanitizeProcessEnv();
 /** Only schedules with this prefix are ever deleted. */
 const EVAL_SCHEDULE_PREFIX = 'eval-';
 
-/** Permanent read-only fixture, target of pure get-schedule cases. Never deleted, reset every run. */
-const FIXTURE_SCHEDULE_NAME = 'eval-nightly-sum';
-/** The task fixture seeded by `tasks_fixtures.ts`; the fixture schedule's only action. */
+/**
+ * Two permanent fixtures, both reset every run, neither ever deleted. They are separate because the
+ * items run concurrently against one account: a case that edits a schedule must not edit the one the
+ * pure read cases assert on, or the read fails depending on which item finished first.
+ */
+const FIXTURE_SCHEDULE_NAMES = {
+    /** Target of pure get-schedule cases. No case may modify it. */
+    readOnly: 'eval-nightly-sum',
+    /** Target of cases that add or replace actions. Reset to one task action every run. */
+    mutable: 'eval-sched-target',
+} as const;
+
+/** The task fixture seeded by `tasks_fixtures.ts`; the only action on both fixture schedules. */
 const FIXTURE_TASK_NAME = 'eval-sum-nightly';
+
 /** Disabled on purpose: an enabled fixture would start a run on the eval account every night. */
 const FIXTURE_SCHEDULE = {
-    title: 'Eval fixture (read-only)',
-    description: 'Permanent fixture for schedule-tool MCP agent evals. Do not modify or delete.',
     cronExpression: '0 3 * * *',
     timezone: 'UTC' as const,
     isEnabled: false,
@@ -72,10 +81,11 @@ async function main() {
     const schedules = [];
     for await (const schedule of client.schedules().list()) schedules.push(schedule);
 
-    let fixture;
+    const fixtureNames: string[] = Object.values(FIXTURE_SCHEDULE_NAMES);
+    const fixtures = new Map<string, string>();
     for (const schedule of schedules) {
-        if (schedule.name === FIXTURE_SCHEDULE_NAME) {
-            fixture = schedule;
+        if (fixtureNames.includes(schedule.name)) {
+            fixtures.set(schedule.name, schedule.id);
             continue;
         }
         if (schedule.name.startsWith(EVAL_SCHEDULE_PREFIX)) {
@@ -84,15 +94,23 @@ async function main() {
         }
     }
 
-    if (fixture) {
-        // Reset everything an eval agent may have changed: enabled state, cadence, actions.
-        if (!IS_DRY_RUN) await client.schedule(fixture.id).update({ ...FIXTURE_SCHEDULE, actions });
-        console.log(`♻️  ${DRY}Reset fixture schedule "${fixture.name}" (${fixture.id})`);
-    } else if (IS_DRY_RUN) {
-        console.log(`🌱 ${DRY}Created fixture schedule "${FIXTURE_SCHEDULE_NAME}"`);
-    } else {
-        const schedule = await client.schedules().create({ ...FIXTURE_SCHEDULE, name: FIXTURE_SCHEDULE_NAME, actions });
-        console.log(`🌱 Created fixture schedule "${schedule.name}" (${schedule.id})`);
+    for (const name of fixtureNames) {
+        const title = name === FIXTURE_SCHEDULE_NAMES.readOnly ? 'Eval fixture (read-only)' : 'Eval fixture (editable)';
+        const description = `Permanent fixture for schedule-tool MCP agent evals. Do not delete; ${
+            name === FIXTURE_SCHEDULE_NAMES.readOnly ? 'do not modify' : 'reset every run'
+        }.`;
+        const fields = { ...FIXTURE_SCHEDULE, title, description, actions };
+        const existingId = fixtures.get(name);
+        if (existingId) {
+            // Reset everything an eval agent may have changed: enabled state, cadence, actions.
+            if (!IS_DRY_RUN) await client.schedule(existingId).update(fields);
+            console.log(`♻️  ${DRY}Reset fixture schedule "${name}" (${existingId})`);
+        } else if (IS_DRY_RUN) {
+            console.log(`🌱 ${DRY}Created fixture schedule "${name}"`);
+        } else {
+            const schedule = await client.schedules().create({ ...fields, name });
+            console.log(`🌱 Created fixture schedule "${schedule.name}" (${schedule.id})`);
+        }
     }
 
     console.log(IS_DRY_RUN ? '✅ Dry run complete, nothing changed' : '✅ Schedule fixtures ready');

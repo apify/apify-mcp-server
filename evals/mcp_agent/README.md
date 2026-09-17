@@ -97,8 +97,15 @@ single red run, and blame a tool description only after checking the case still 
 The schedules family (`merge/schedules/*`, 10 items: 7 proper + 3 with `expectedErrors`) covers the
 schedule tools: create for a task and for an Actor, cron and time-zone translation from user language,
 pausing, adding an action (an update replaces the whole list), deleting, a name collision, and a
-not-found read. It uses fixed `eval-sched-*` names plus one permanent, disabled fixture schedule
-`eval-nightly-sum` that runs the `eval-sum-nightly` task fixture. Run
+not-found read. It uses fixed `eval-sched-*` names plus two permanent, disabled fixture schedules that
+run the `eval-sum-nightly` task fixture: `eval-nightly-sum`, which the pure read cases assert on and no
+case may modify, and `eval-sched-target`, which the add-an-action case edits. They are separate because
+items run concurrently against one account — a case that edits the schedule a read case asserts on makes
+that read pass or fail depending on which item finished first. For the same reason,
+`merge/schedules/add-action-medium-1` is not safe under `--iterations N` above 1 unless you also pass
+`--concurrency 1`: its trials all edit `eval-sched-target`, so a trial can read the schedule after
+another trial has already added to it and get judged against a starting state that is no longer there.
+CI runs each item once, so this affects local repeat runs only. Run
 `pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures` before every
 run: the second script deletes leftover `eval-*` schedules and resets the fixture (disabled, `0 3 * * *`
 UTC, one task action), since an eval agent may have enabled it or replaced its actions. The fixture stays
