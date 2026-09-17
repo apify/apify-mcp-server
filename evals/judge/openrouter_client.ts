@@ -21,9 +21,6 @@ export const OPENROUTER_CONFIG = {
 /** Low temperature for deterministic evaluation results. */
 const TEMPERATURE = 0.15;
 
-/**
- * LLM client for chat completions
- */
 export class OpenRouterClient implements JudgeClient {
     private openai: OpenAI;
 

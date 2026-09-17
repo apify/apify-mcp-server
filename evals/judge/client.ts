@@ -17,9 +17,6 @@ export type LlmUsage = {
     totalTokens: number;
 };
 
-/**
- * Response from LLM
- */
 export type LlmResponse = {
     /** Text content from LLM */
     content: string | null;
