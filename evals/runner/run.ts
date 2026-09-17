@@ -121,6 +121,7 @@ type ParsedCliArgs = Omit<CliArgs, 'judgeModel'> & { judgeModel: string };
 /**
  * Declares the CLI, then validates it: flag sanity checks, required env vars, and the
  * built MCP server binary. Everything here can exit the process before any LLM spend.
+ * Under `--subscription` it also removes `ANTHROPIC_API_KEY` from `process.env`.
  */
 async function parseCliArgs(): Promise<ParsedCliArgs> {
     // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores
@@ -223,7 +224,7 @@ async function main() {
     const { judgeModel } = argv;
 
     const langfuse = new LangfuseClient();
-    // Non-empty: checked above. Sanitized above that.
+    // Non-empty: checked in parseCliArgs(). Sanitized at module load.
     const apifyToken = process.env.APIFY_TOKEN as string;
     const datasetName = argv.dataset;
 
