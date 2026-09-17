@@ -21,9 +21,6 @@ on:
             OPENROUTER_API_KEY:
                 description: 'Judge model on OpenRouter. Only used by tier: merge.'
                 required: false
-            OPENROUTER_BASE_URL:
-                description: 'Overrides the default OpenRouter endpoint. Only used by tier: merge.'
-                required: false
 
 jobs:
     evaluations:
@@ -59,6 +56,12 @@ jobs:
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 
+            -   name: Seed schedule fixtures (merge tier only)
+                if: inputs.tier == 'merge'
+                run: pnpm run evals:mcp-agent:schedules-fixtures
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+
             # Floor of three local runs was 0.93; a hosted runner measured 0.97 (111/115).
             # `--claude-judge` avoids the OpenRouter requirement; tool-call items are not judged.
             -   name: Run pr-tier evals
@@ -90,4 +93,12 @@ jobs:
                     LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
                     OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-                    OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
+
+            # The schedule cases leave enabled schedules behind, and an enabled schedule keeps firing
+            # on the eval account until something deletes it. Seeding at the start of the next run is
+            # too late, so tear them down here — `always()` so a failed or cancelled run still cleans up.
+            -   name: Tear down schedule fixtures (merge tier only)
+                if: always() && inputs.tier == 'merge'
+                run: pnpm run evals:mcp-agent:schedules-fixtures
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
