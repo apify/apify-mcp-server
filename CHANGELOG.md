@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.15.8 - **not yet released**
 
+### 🚀 Features
+
+- [**breaking**] Rename get-actor-log tool to get-actor-run-log ([#1375](https://github.com/apify/apify-mcp-server/pull/1375)) ([e334b9a](https://github.com/apify/apify-mcp-server/commit/e334b9a0ba6af437107876c9ab8e484dc3d93c2b)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1374](https://github.com/apify/apify-mcp-server/issues/1374)
+- Add actorId filter to get-actor-run-list ([#1330](https://github.com/apify/apify-mcp-server/pull/1330)) ([5264fe6](https://github.com/apify/apify-mcp-server/commit/5264fe629a5200992c6af3e9176174e49ea35136)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1354](https://github.com/apify/apify-mcp-server/issues/1354)
+- Add schedule tools for Actors and tasks ([#1372](https://github.com/apify/apify-mcp-server/pull/1372)) ([ef3783d](https://github.com/apify/apify-mcp-server/commit/ef3783db3b04d3241f7885684b3983a153aebd4f)) by [@Janjiran](https://github.com/Janjiran), closes [#1341](https://github.com/apify/apify-mcp-server/issues/1341)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.15.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.7) (2026-09-11)

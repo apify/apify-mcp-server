@@ -8,7 +8,7 @@ import type * as ToolsIndexModule from '../../src/tools/index.js';
 import { SERVER_MODE } from '../../src/types.js';
 import { getActors, getToolsForServerMode, toolNamesToInput } from '../../src/utils/tools_loader.js';
 
-const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview'] as const;
+const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview', 'get-actor-log'] as const;
 
 vi.mock('../../src/tools/index.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsIndexModule>();

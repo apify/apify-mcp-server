@@ -386,8 +386,86 @@ export const actorTaskOutputSchema = {
     required: ['taskId', 'actorId', 'name', 'title', 'description', 'publishedAt', 'publicConfig', 'input'],
 };
 
+/** One schedule action, in the same flat shape the schedule tools accept as input. */
+const scheduleActionOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the Actor this action runs (Actor actions only)' },
+        taskId: { type: 'string', description: 'ID of the task this action runs (task actions only)' },
+        input: {
+            type: ['object', 'array', 'string', 'number', 'boolean', 'null'],
+            description:
+                'The Actor input, or the overrides applied on top of the stored task input; secret fields are ' +
+                'encrypted placeholders. A non-JSON Actor input body is returned as a string.',
+        },
+        build: { type: 'string', description: 'Actor build tag or number (Actor actions only)' },
+        timeoutSecs: { type: 'number', description: 'Run timeout in seconds (Actor actions only)' },
+        memoryMbytes: { type: 'number', description: 'Run memory limit in megabytes (Actor actions only)' },
+        restartOnError: { type: 'boolean', description: 'Restart the run when it fails (Actor actions only)' },
+    },
+};
+
+/** Schema shared by the schedule create, get and update tools. */
+export const scheduleOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        scheduleId: { type: 'string', description: 'ID of the schedule' },
+        name: { type: 'string', description: 'Name of the schedule' },
+        title: { type: ['string', 'null'], description: 'Human-readable title of the schedule' },
+        description: { type: ['string', 'null'], description: 'Description of the schedule' },
+        cronExpression: { type: 'string', description: 'When the schedule fires, as a cron expression' },
+        timezone: { type: 'string', description: 'Time zone the cron expression is evaluated in' },
+        isEnabled: { type: 'boolean', description: 'Whether the schedule fires' },
+        isExclusive: {
+            type: 'boolean',
+            description: 'Whether an action is skipped while its previous scheduled run is still running',
+        },
+        nextRunAt: {
+            type: ['string', 'null'],
+            description: 'Next firing time (ISO 8601); null while the schedule is disabled',
+        },
+        lastRunAt: {
+            type: ['string', 'null'],
+            description: 'Last firing time (ISO 8601); null when the schedule has not fired yet',
+        },
+        createdAt: { type: ['string', 'null'], description: 'When the schedule was created (ISO 8601)' },
+        modifiedAt: { type: ['string', 'null'], description: 'When the schedule was last changed (ISO 8601)' },
+        actions: {
+            type: 'array',
+            items: scheduleActionOutputSchema,
+            description: 'What the schedule runs, in the same shape the schedule tools accept as input',
+        },
+    },
+    required: [
+        'scheduleId',
+        'name',
+        'title',
+        'description',
+        'cronExpression',
+        'timezone',
+        'isEnabled',
+        'isExclusive',
+        'nextRunAt',
+        'lastRunAt',
+        'createdAt',
+        'modifiedAt',
+        'actions',
+    ],
+};
+
+/** Schema for delete-schedule. */
+export const scheduleDeleteOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        scheduleId: { type: 'string', description: 'ID of the deleted schedule' },
+        name: { type: 'string', description: 'Name of the deleted schedule' },
+        deleted: { type: 'boolean', description: 'Always true; the schedule no longer exists' },
+    },
+    required: ['scheduleId', 'name', 'deleted'],
+};
+
 /**
- * Schema for get-actor-log. The log API returns plain text, so the schema wraps it in a single field.
+ * Schema for get-actor-run-log. The log API returns plain text, so the schema wraps it in a single field.
  */
 export const getActorRunLogToolOutputSchema = {
     type: 'object' as const,

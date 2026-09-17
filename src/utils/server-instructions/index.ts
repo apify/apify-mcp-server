@@ -208,6 +208,14 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - Publishing a task creates a public landing page for one specific use case. The page shows what the task does, the selected input values, and the expected output. Published tasks appear in the Actor's Examples tab, where users, search engines, and AI agents can discover them, which can help people understand the Actor and increase its runs.
 - Publish only tasks that represent a useful, reliable, and specific use case. Not every saved task needs to be public.
 
+## Schedules
+- A schedule runs Actors and/or saved tasks automatically on a cron expression, evaluated in the schedule's time zone (default UTC).
+- A cron expression has 5 fields (minute hour day-of-month month day-of-week), with an optional leading seconds field. The shortcuts @hourly, @daily, @weekly, @monthly and @yearly fire at a random offset inside their period, so use an explicit expression when the user names a time.
+- The platform creates schedules disabled by default, but the create tool here enables them unless told otherwise. Disabling a schedule pauses it without losing its configuration.
+- With isExclusive (the default), a run is skipped while the previous run from the same action is still running.
+- Updating a schedule's actions replaces the whole list, so send every action to keep.
+- A schedule holds at most 10 Actor actions and 10 task actions.
+
 ## Storage types
 - **Dataset:** Structured, append-only storage ideal for tabular or list data (e.g., scraped items).
 - **Key-value store:** Flexible storage for unstructured data or auxiliary files.

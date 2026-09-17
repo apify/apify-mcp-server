@@ -247,6 +247,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
 - **Apify storage**: Access data from your datasets and key-value stores.
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
+- **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
 
 ### Overview of available tools
 
@@ -271,8 +272,8 @@ Legend for the **Enabled by default** column:
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
 | [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to fetch a URL and return its content. | ✅ |
 | `report-problem` | dev | Report a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
-| `get-actor-run-list` | runs | Get a list of an Actor's runs, filterable by status. |  |
-| `get-actor-log` | runs | Retrieve the logs for a specific Actor run. |  |
+| `get-actor-run-list` | runs | Get a list of Actor runs, filterable by Actor and status. |  |
+| `get-actor-run-log` | runs | Retrieve the logs for a specific Actor run. |  |
 | `get-dataset` | storage | Get metadata about a specific dataset. |  |
 | `get-dataset-schema` | storage | Generate a JSON schema from dataset items. |  |
 | `get-key-value-store` | storage | Get metadata about a specific key-value store. |  |
@@ -284,6 +285,10 @@ Legend for the **Enabled by default** column:
 | `update-actor-task` | tasks | Update a task's input, run options, or public display configuration. |  |
 | `publish-actor-task` | tasks | Publish a task on its public landing page. |  |
 | `unpublish-actor-task` | tasks | Unpublish a task from its public landing page. |  |
+| `create-schedule` | schedules | Create a schedule that runs Actors or tasks on a cron cadence. |  |
+| `get-schedule` | schedules | Get a schedule, its cron expression, state, and the actions it runs. |  |
+| `update-schedule` | schedules | Update a schedule: cron expression, time zone, enabled state, or actions. |  |
+| `delete-schedule` | schedules | Delete a schedule. |  |
 
 > **Note:**
 >
@@ -402,6 +407,7 @@ The v2 configuration preserves backward compatibility with v1 usage. Notes:
   - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).
 - `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
 - `tools=add-actor`, `tools=experimental`, and `tools=preview` are retired: they are ignored and load no tools. Use `tools=call-actor` (or the default `actors` category) instead.
+- `tools=get-actor-log` is retired: the tool was renamed to `get-actor-run-log`. The old selector is ignored and loads no tools. Use `tools=get-actor-run-log` (or the `runs` category) instead.
 
 Existing URLs and commands using `?actors=...` or `--actors` continue to work unchanged.
 
