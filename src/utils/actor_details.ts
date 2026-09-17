@@ -6,15 +6,12 @@ import { ActorLoadError } from '../errors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
-import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
+import type { Actor, ActorCardOptions, ActorInputSchema, StructuredActorCard } from '../types.js';
 import { ACTOR_TOOL_MODE } from '../types.js';
 import { getActorToolResolutionCached } from './actor.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
-import { searchActorsByKeywords } from './actor_search.js';
 import { getHttpStatusCode, logHttpError } from './logging.js';
 import type { PricingTier } from './pricing_info.js';
-
-const ACTOR_DETAILS_PICTURE_SEARCH_LIMIT = 5;
 
 /**
  * Convert a type object to TypeScript-like string representation.
@@ -83,27 +80,18 @@ export async function fetchActorDetails(
     cardOptions?: ActorCardOptions,
 ): Promise<ActorDetailsResult | null> {
     try {
-        // Use only the actor name part (after '/') for better keyword search relevance —
-        // "apify/instagram-scraper" returns unrelated results, while "instagram-scraper" finds the correct actor.
-        const actorSlug = actorName.split('/').pop() || actorName;
         const actor = apifyClient.actor(actorName);
-        const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ActorStoreList[]] =
-            await Promise.all([
-                actor.get(),
-                actor.defaultBuild().then(async (build) => build.get()),
-                searchActorsByKeywords({
-                    search: actorSlug,
-                    apifyClient,
-                    limit: ACTOR_DETAILS_PICTURE_SEARCH_LIMIT,
-                }).catch(() => []),
-            ]);
+        const [actorInfo, buildInfo]: [Actor | undefined, Build | undefined] = await Promise.all([
+            actor.get(),
+            actor.defaultBuild().then(async (build) => build.get()),
+        ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
 
-        const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
-        const pictureUrl = storeActor?.pictureUrl;
-        const actorInfoWithPicture = { ...actorInfo, pictureUrl: pictureUrl || actorInfo.pictureUrl } as Actor & {
-            pictureUrl?: string;
-        };
+        const actorInfoWithPicture = {
+            ...actorInfo,
+            // Pass pictureUrl from actor object (untyped property but present in API response)
+            pictureUrl: (actorInfo as unknown as Record<string, unknown>).pictureUrl,
+        } as Actor;
 
         const inputSchema = (buildInfo.actorDefinition.input || {
             type: 'object',

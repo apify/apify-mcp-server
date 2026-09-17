@@ -13,20 +13,22 @@ import {
     typeObjectToString,
 } from '../../src/utils/actor_details.js';
 
-vi.mock('../../src/utils/actor_search.js', () => ({
-    searchActorsByKeywords: vi.fn().mockResolvedValue([]),
+vi.mock('../../src/utils/actor_card.js', () => ({
+    formatActorForWidget: vi.fn(),
+    formatActorToActorCard: vi.fn(),
+    formatActorToStructuredCard: vi.fn(),
 }));
 
 function apifyApiError(status: number, message: string): ApifyApiError {
     return new ApifyApiError({ data: { error: { type: message, message } }, status } as AxiosResponse, 1);
 }
 
-function stubApifyClient(getActor: () => Promise<unknown>): ApifyClient {
+function stubApifyClient(getActor: () => Promise<unknown>, getBuild = getActor): ApifyClient {
     return {
         token: 'test-token',
         actor: () => ({
             get: getActor,
-            defaultBuild: async () => ({ get: getActor }),
+            defaultBuild: async () => ({ get: getBuild }),
         }),
     } as unknown as ApifyClient;
 }
@@ -167,6 +169,18 @@ describe('typeObjectToString', () => {
 });
 
 describe('fetchActorDetails()', () => {
+    it('uses pictureUrl from the Actor response without a store search', async () => {
+        const result = await fetchActorDetails(
+            stubApifyClient(
+                async () => ({ id: 'actor-id', pictureUrl: 'https://example.com/picture.png' }),
+                async () => ({ actorDefinition: { input: { type: 'object', properties: {} } } }),
+            ),
+            'apify/web-scraper',
+        );
+
+        expect(result?.actorInfo.pictureUrl).toBe('https://example.com/picture.png');
+    });
+
     it('returns null on a genuine 404 (Actor does not exist)', async () => {
         const client = stubApifyClient(() => Promise.reject(apifyApiError(404, 'Actor was not found')));
 
