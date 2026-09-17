@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { findMissingEnvVars, sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/environment.js';
+import {
+    ENV_KEYS_TO_SANITIZE,
+    findMissingEnvVars,
+    sanitizeEnvValue,
+    sanitizeProcessEnv,
+} from '../../evals/environment.js';
 
 describe('sanitizeEnvValue()', () => {
     it('passes through undefined and null', () => {
@@ -91,14 +96,7 @@ describe('findMissingEnvVars()', () => {
 });
 
 describe('sanitizeProcessEnv()', () => {
-    const KEYS = [
-        'APIFY_TOKEN',
-        'ANTHROPIC_API_KEY',
-        'OPENROUTER_API_KEY',
-        'LANGFUSE_PUBLIC_KEY',
-        'LANGFUSE_SECRET_KEY',
-        'LANGFUSE_BASE_URL',
-    ];
+    const KEYS = ENV_KEYS_TO_SANITIZE;
     const originalValues = new Map<string, string | undefined>();
     let logSpy: ReturnType<typeof vi.spyOn>;
 

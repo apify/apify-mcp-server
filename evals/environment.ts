@@ -28,7 +28,7 @@ export const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 
  * ERR_INVALID_CHAR on any control characters. We can't intercept those reads, so
  * we sanitize process.env itself before any library loads.
  */
-const ENV_KEYS_TO_SANITIZE = ['APIFY_TOKEN', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', ...LANGFUSE_ENV_VARS];
+export const ENV_KEYS_TO_SANITIZE = ['APIFY_TOKEN', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', ...LANGFUSE_ENV_VARS];
 
 /**
  * Names of the given env vars that are unset or sanitize to empty (whitespace,
