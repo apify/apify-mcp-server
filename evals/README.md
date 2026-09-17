@@ -133,13 +133,7 @@ limit the case documents on purpose; stronger models pass.
 
 ### Tool-call mode
 
-A `kind: "tool-call"` item records the first attempted call and its arguments. A `PreToolUse` hook denies every call, so no tool executes:
-
-> Tool calls are disabled in this evaluation. Do not retry with a different tool or arguments —
-> report to the user, in your final answer, which tool you would have called and with what
-> arguments, then stop.
-
-The wording prevents the agent from retrying after denial. Tool-call items have a fixed `maxTurns` of 2.
+A `kind: "tool-call"` item records the first attempted call and its arguments. A `PreToolUse` hook denies every call with `TOOL_CALL_DENY_REASON` (`runner/tool_call_mode.ts`), so no tool executes and the agent stops after reporting what it would have called. Tool-call items have a fixed `maxTurns` of 2.
 
 The scorer skips Claude Code's `ToolSearch` meta-tool. Set `mcpToolsOnly: true` (or `--mcp-tools-only`) to remove built-ins when a case must compare MCP tools only.
 
@@ -167,16 +161,6 @@ in the dataset itself. Use `pnpm run evals:mcp-agent:export-dataset` for an opti
 
 ---
 
-## Technical overview
-
-**Core features:**
-- Multi-turn conversations run by the real Claude Code harness (system prompt, built-in tools, MCP handling)
-- Two item kinds: a deterministic first-tool-call check with no judge (`kind: "tool-call"`) and LLM-judge evaluation against requirements (`kind: "agent"`)
-- Isolated agent + MCP server per test
-- Configurable tool call timeout (default: 60 seconds)
-- Deterministic tool-failure injection (`failTools`), and per-item error exemption (`expectedErrors`)
-- Threshold-gated pass rate, with `pass@k`/`pass^k` from `--iterations`
-
 ## Critical design decisions
 
 ### 1. The Langfuse datasets are the source of truth
@@ -196,12 +180,7 @@ Every active item is validated when the dataset is fetched, so a bad UI edit fai
 
 ### 2. MCP server isolation per test
 
-**Decision:** Each test gets a fresh MCP server instance, spawned by that test's agent.
-
-**Why:**
-- Tools like `call-actor` create persistent state (datasets, runs) on Apify platform
-- State from one test can contaminate subsequent tests
-- Each test must start with clean state
+**Decision:** Each test gets a fresh MCP server instance, spawned by that test's agent, to avoid persistent Apify-platform state leaking between tests.
 
 **Trade-off:** ~20-30% slower (1-2s spawn overhead per test) but guarantees isolation.
 
@@ -209,16 +188,7 @@ Every active item is validated when the dataset is fetched, so a bad UI edit fai
 
 ### 3. The agent is Claude Code, not a hand-rolled loop
 
-**Decision:** Run each case through the Claude Agent SDK's `query()` with the `claude_code` system-prompt and tool presets, and register the Apify MCP server alongside them.
-
-**Why:**
-- The eval measures what a real client does with our tool descriptions, including Claude Code's own prompting, tool-result handling, and multi-turn behavior
-- The SDK owns the MCP lifecycle (spawn, handshake, server instructions, dynamic tool updates), so none of it is reimplemented here
-- `--mcp-tools-only` drops the built-ins when a case should be forced onto the server's tools
-
-Run settings: `canUseTool` granting every call (headless, never prompts - see "Permission path" above for why this replaced `bypassPermissions`), `settingSources: []` and `strictMcpConfig` (this repo's settings and `.mcp.json` are ignored, so a run is not shaped by the developer's machine), and `cwd: tmpdir()` (built-in file tools cannot touch the checkout).
-
-The server is registered with `alwaysLoad: true`. Left at the default, its tools sit behind tool search once built-in tools are on, and the agent answers from memory or `Bash` instead - the eval would measure tool search, not our tool descriptions.
+**Decision:** Run each case through the Claude Agent SDK's `query()` with the `claude_code` system-prompt and tool presets, and register the Apify MCP server alongside them — so the eval measures what a real client does with our tool descriptions, not a custom harness. See `agent/claude_agent.ts` for the run settings (`canUseTool`, `settingSources`, `strictMcpConfig`, `alwaysLoad`) and why each one is set that way.
 
 **Trade-off:** the harness is a moving target - a Claude Code release can shift results, so `agentSdkVersion` is recorded in the run metadata.
 
@@ -239,12 +209,7 @@ Harness failures (MCP spawn, OpenRouter, judge) are therefore left to throw rath
 
 ### 5. Judge sees tool calls, not results
 
-**Decision:** Judge sees tool calls with arguments and agent responses, but NOT raw tool results.
-
-**Why:**
-- Evaluates agent behavior (tool selection, arguments)
-- Tool results are often very long and noisy
-- Agent should summarize results, judge evaluates the summary
+**Decision:** Judge sees tool calls with arguments and agent responses, but NOT raw tool results — see `formatConversationForJudge()` in `judge/judge.ts` for why.
 
 **Judge input format:**
 ```
@@ -289,7 +254,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 ### 9. The agent's conversation is traced by hand
 
-**Decision:** After each agent run, `langfuse/observations.ts` emits the item's span tree from the adapted SDK stream; `judge/openrouter_client.ts` traces the judge call itself.
+**Decision:** After each agent run, `langfuse/observations.ts` emits the item's span tree from the adapted SDK stream; `judge/openrouter_client.ts` traces the judge call itself. See those files for why each part of the tree (agent span, tool spans, generation windowing) is shaped the way it is.
 
 ```
 experiment-item-run     Langfuse SDK, holds the scores
@@ -298,12 +263,6 @@ experiment-item-run     Langfuse SDK, holds the scores
 |  |- <tool name>       one span per tool call: arguments in, result out
 |- <judge model>        generation, emitted by judge/openrouter_client.ts
 ```
-
-**Why:**
-- The agent runs in the Claude Code subprocess, so nothing it does is instrumented for us. Left alone, an item's trace holds a single span and the conversation is invisible in the UI
-- Tokens and cost only roll up to the trace from a **generation**. The SDK reports usage once for the whole run, not per turn, so the run's aggregate sits on a single generation
-- That generation is windowed to the final model turn, not the whole run. The UI orders siblings by start time, so a generation spanning the tool calls sorts ahead of them and reads as though the model answered before calling anything. Its `usageScope: run` metadata marks that the numbers still cover the whole run
-- Tool spans are timed from when the SDK delivered the call and its result (`agent/claude_agent.ts` stamps every message as it arrives). Without those stamps every span would collapse to the moment the tree is emitted, after the run
 
 **Trade-off:** the tree is emitted after the fact, so a crashed run leaves no spans, and the agent's individual model turns are not separate generations.
 
@@ -413,36 +372,6 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
 - `mcpToolsOnly` - Force MCP-tools-only for this item, dropping Claude Code's built-ins (OR-ed with the run-wide `--mcp-tools-only`). Useful on a tool-call item that must isolate MCP-vs-MCP tool choice
 - `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny (the same hook mechanism the tool-call-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `agent/claude_agent.ts`. Not accepted on `kind: "tool-call"`.
-
-## Key insights
-
-### MCP tools are stateful
-
-Unlike typical function calling:
-- Create persistent state (datasets, runs) on Apify platform
-- Can modify tool registry dynamically
-- Have side effects affecting subsequent calls
-
-**Implication:** Test isolation critical.
-
-### Dynamic tool registration
-
-- a restored pre-cutover session's `add-actor` could dynamically register new Actor tools (no longer selectable for new sessions)
-- Tool list NOT static
-
-**Implication:** the agent must re-read the tool list mid-conversation. The Agent SDK handles `tools/list_changed` itself.
-
-### Error propagation
-
-Tool errors passed to LLM in tool result message:
-- LLM can retry, use different tool, or explain to user
-- No automatic retry by system
-
-**Rationale:** LLM should handle errors intelligently.
-
-### Conversation state
-
-Claude Code owns the message history. The harness only sees the SDK's message stream and folds it back into `ConversationHistory` for the judge.
 
 ## Common issues
 
