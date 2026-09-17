@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { startActiveObservation } from '@langfuse/tracing';
 // eslint-disable-next-line import/extensions
-import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
@@ -40,20 +40,15 @@ function messagesToPrompt(messages: ChatCompletionMessageParam[]): string {
 
 export class ClaudeJudgeClient implements JudgeClient {
     /**
-     * Same surface as `OpenRouterClient.callLlm`, judge subset: no tool support (the judge never
-     * passes tools), `responseFormat` is enforced by instruction + extraction rather than
-     * by the API. Traced as a Langfuse generation like the OpenRouter client.
+     * Same surface as `OpenRouterClient.callLlm`: `responseFormat` is enforced by
+     * instruction + extraction rather than by the API. Traced as a Langfuse generation
+     * like the OpenRouter client.
      */
     async callLlm(
         messages: ChatCompletionMessageParam[],
         model: string,
-        tools?: ChatCompletionTool[],
         responseFormat?: ResponseFormatJSONSchema,
     ): Promise<LlmResponse> {
-        if (tools && tools.length > 0) {
-            throw new Error('ClaudeJudgeClient supports judge calls only (no tools)');
-        }
-
         let prompt = messagesToPrompt(messages);
         if (responseFormat) {
             prompt +=
