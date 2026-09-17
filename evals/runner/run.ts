@@ -117,7 +117,14 @@ function resolveAgentSdkVersion(): string {
     return manifest.devDependencies['@anthropic-ai/claude-agent-sdk'] ?? 'unknown';
 }
 
-async function main() {
+/** Parsed CLI args, with `judgeModel` resolved to its provider-specific default. */
+type ParsedCliArgs = Omit<CliArgs, 'judgeModel'> & { judgeModel: string };
+
+/**
+ * Declares the CLI, then validates it: flag sanity checks, required env vars, and the
+ * built MCP server binary. Everything here can exit the process before any LLM spend.
+ */
+async function parseCliArgs(): Promise<ParsedCliArgs> {
     // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores
     // every flag behind it. Drop it so both call styles work.
     const args = hideBin(process.argv).filter((arg) => arg !== '--');
@@ -209,6 +216,13 @@ async function main() {
         console.error(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
     }
+
+    return { ...argv, judgeModel };
+}
+
+async function main() {
+    const argv = await parseCliArgs();
+    const { judgeModel } = argv;
 
     const langfuse = new LangfuseClient();
     // Non-empty: checked above. Sanitized above that.
