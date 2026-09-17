@@ -58,6 +58,15 @@ export function buildConsoleRunUrl(context: ConsoleLinkContext | undefined, runI
     return buildConsoleUrl(context, `/actors/runs/${runId}`);
 }
 
+/** Builds the Console build detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/<actorId>/builds/<buildId>`. */
+export function buildConsoleBuildUrl(
+    context: ConsoleLinkContext | undefined,
+    actorId: string,
+    buildId: string,
+): string | undefined {
+    return buildConsoleUrl(context, `/actors/${actorId}/builds/${buildId}`);
+}
+
 /** Builds the Console dataset URL: `<consoleBaseUrl>[/organization/<orgId>]/storage/datasets/<datasetId>`. */
 export function buildConsoleDatasetUrl(context: ConsoleLinkContext | undefined, datasetId: string): string | undefined {
     return buildConsoleUrl(context, `/storage/datasets/${datasetId}`);
