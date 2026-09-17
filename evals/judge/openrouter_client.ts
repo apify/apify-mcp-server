@@ -1,6 +1,5 @@
 /**
  * LLM client for calling OpenRouter API
- * Phase 3: Added support for tool calling
  */
 
 import { startActiveObservation } from '@langfuse/tracing';
@@ -40,10 +39,6 @@ export class OpenRouterClient implements JudgeClient {
     }
 
     /**
-     * Call LLM with messages and optional tools
-     * Phase 3: Added tools parameter
-     * Phase 4: Added responseFormat for structured outputs
-     *
      * Traced as a Langfuse generation, nested under whichever observation is active at the
      * call site: inside the experiment task that is the item's trace, so a judge call shows
      * up with its prompt, verdict, tokens, and cost.

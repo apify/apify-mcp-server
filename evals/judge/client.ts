@@ -21,9 +21,7 @@ export type LlmUsage = {
  * Response from LLM - either text or tool calls
  */
 export type LlmResponse = {
-    /** Text content from LLM (if no tool calls) */
     content: string | null;
-    /** Tool calls requested by LLM (if any) */
     toolCalls?: {
         id: string;
         name: string;

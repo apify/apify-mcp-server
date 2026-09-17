@@ -59,10 +59,8 @@ import { filterByCategory, filterById } from './filters.js';
 sanitizeProcessEnv();
 
 /**
- * Default timeout for MCP tool calls (in seconds)
- * This is the maximum time to wait for a single tool call to complete.
- *
- * Note: Actor runs that take longer than this will timeout.
+ * Maximum time to wait for a single MCP tool call to complete, in seconds.
+ * Actor runs that take longer than this will timeout.
  * For long-running Actors, increase this value via CLI: --tool-timeout 600
  */
 export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
