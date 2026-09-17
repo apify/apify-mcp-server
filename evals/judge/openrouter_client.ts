@@ -36,8 +36,6 @@ export class OpenRouterClient implements JudgeClient {
     }
 
     /**
-     * Call LLM with messages and an optional structured-output schema.
-     *
      * Traced as a Langfuse generation, nested under whichever observation is active at the
      * call site: inside the experiment task that is the item's trace, so a judge call shows
      * up with its prompt, verdict, tokens, and cost.

@@ -11,13 +11,8 @@ import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import { isMcpToolName, stripToolPrefix } from '../config.js';
 
-/**
- * Represents the result of an MCP tool execution
- */
 export type McpToolResult = {
-    /** Name of the tool that was called */
     toolName: string;
-    /** Whether the tool execution succeeded */
     success: boolean;
     /** Result data if successful, error message if failed */
     result?: unknown;
@@ -27,9 +22,6 @@ export type McpToolResult = {
     resultBytes?: number;
 };
 
-/**
- * A single turn in the conversation (agent action)
- */
 export type ConversationTurn = {
     toolCalls: {
         name: string;
