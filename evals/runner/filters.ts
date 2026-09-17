@@ -1,8 +1,12 @@
 /**
- * Shared test case filtering utilities
+ * Test case filtering utilities
  */
 
-import type { BaseTestCase } from './types.js';
+/** The fields {@link filterByCategory} and {@link filterById} match on. */
+type FilterableTestCase = {
+    id: string;
+    category: string;
+};
 
 /**
  * Filter test cases by category
@@ -12,7 +16,7 @@ import type { BaseTestCase } from './types.js';
  * @param category - Category pattern (supports * wildcard)
  * @returns Filtered test cases
  */
-export function filterByCategory<T extends BaseTestCase>(testCases: T[], category: string): T[] {
+export function filterByCategory<T extends FilterableTestCase>(testCases: T[], category: string): T[] {
     // Convert wildcard pattern to regex
     const pattern = category.replace(/\*/g, '.*');
     const regex = new RegExp(`^${pattern}$`);
@@ -27,7 +31,7 @@ export function filterByCategory<T extends BaseTestCase>(testCases: T[], categor
  * @param idPattern - Regex pattern to match against test case IDs
  * @returns Filtered test cases
  */
-export function filterById<T extends BaseTestCase>(testCases: T[], idPattern: string): T[] {
+export function filterById<T extends FilterableTestCase>(testCases: T[], idPattern: string): T[] {
     const regex = new RegExp(idPattern);
     return testCases.filter((testCase) => regex.test(testCase.id));
 }

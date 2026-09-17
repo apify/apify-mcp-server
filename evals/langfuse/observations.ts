@@ -24,7 +24,7 @@ import type { LangfuseObservationAttributes } from '@langfuse/tracing';
 import { startObservation } from '@langfuse/tracing';
 import type { SpanContext } from '@opentelemetry/api';
 
-import type { AdaptedConversation, ToolInvocation } from './sdk_conversation_adapter.js';
+import type { AdaptedConversation, ToolInvocation } from '../agent/conversation_adapter.js';
 
 /** Observation types this module emits. */
 type ObservationType = 'agent' | 'generation' | 'tool';

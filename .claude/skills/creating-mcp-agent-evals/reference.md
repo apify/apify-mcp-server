@@ -1,6 +1,6 @@
 # Reference: commands, shapes, probes
 
-Repo: `apify-mcp-server`. Harness docs: `evals/mcp_agent/README.md` (read it first; it documents the two datasets, `mcp-server-evals-pr` and `mcp-server-evals-merge`, the id scheme, `kind`/`expectedErrors`, scores, and flags).
+Repo: `apify-mcp-server`. Harness docs: `evals/README.md` (read it first; it documents the two datasets, `mcp-server-evals-pr` and `mcp-server-evals-merge`, the id scheme, `kind`/`expectedErrors`, scores, and flags).
 
 ## Running evals
 
@@ -102,7 +102,7 @@ npx -y langfuse-cli api observations list --level ERROR \
 
 ## API probe pattern (before writing platform-dependent cases)
 
-Throwaway script in `evals/mcp_agent/probe_*_tmp.ts`, run with `pnpm exec tsx`, **delete after use**. Probe with the real `apify-client` exactly what the case will depend on: required fields, uniqueness errors, publish requirements, length limits, secret handling. Capture exact error messages and `type` slugs — references can require the agent to react to them (tool errors include `(API error type: <slug>)`). For live-web cases, probe the exact target URL and verify the fetched *content* supports the premise (status, body, the fact the answer needs) — and prefer stable hosts (rfc-editor.org, example.com) over flaky ones (httpbin.org 503s regularly) wherever content is the deliverable.
+Throwaway script in `evals/scripts/probe_*_tmp.ts`, run with `pnpm exec tsx`, **delete after use**. Probe with the real `apify-client` exactly what the case will depend on: required fields, uniqueness errors, publish requirements, length limits, secret handling. Capture exact error messages and `type` slugs — references can require the agent to react to them (tool errors include `(API error type: <slug>)`). For live-web cases, probe the exact target URL and verify the fetched *content* supports the premise (status, body, the fact the answer needs) — and prefer stable hosts (rfc-editor.org, example.com) over flaky ones (httpbin.org 503s regularly) wherever content is the deliverable.
 
 ```ts
 import 'dotenv/config';
@@ -113,7 +113,7 @@ const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
 ## Fixtures script pattern
 
-One script per stateful family (`evals/mcp_agent/tasks_fixtures.ts` is the template): delete leftover `eval-*` resources except the permanent fixture, create the fixture if missing, and **reset the fixture's mutable state** every run (an eval agent may have mutated it). Wire as `evals:mcp-agent:<family>-fixtures` in package.json.
+One script per stateful family (`evals/scripts/tasks_fixtures.ts` is the template): delete leftover `eval-*` resources except the permanent fixture, create the fixture if missing, and **reset the fixture's mutable state** every run (an eval agent may have mutated it). Wire as `evals:mcp-agent:<family>-fixtures` in package.json.
 
 ## Coverage matrix (definition of done for the dataset)
 

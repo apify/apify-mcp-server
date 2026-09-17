@@ -192,7 +192,7 @@ Every active item is validated when the dataset is fetched, so a bad UI edit fai
 
 **Trade-off:** the dataset is mutable, so a run is only reproducible against the dataset as it was. Langfuse keeps item versions.
 
-**Location:** `langfuse_dataset.ts`, `run_mcp_agent_evals.ts`, `export_dataset.ts`
+**Location:** `langfuse/dataset.ts`, `runner/run.ts`, `scripts/export_dataset.ts`
 
 ### 2. MCP server isolation per test
 
@@ -222,12 +222,12 @@ The server is registered with `alwaysLoad: true`. Left at the default, its tools
 
 **Trade-off:** the harness is a moving target - a Claude Code release can shift results, so `agentSdkVersion` is recorded in the run metadata.
 
-**Location:** `claude_agent.ts`, `sdk_conversation_adapter.ts`
+**Location:** `agent/claude_agent.ts`, `agent/conversation_adapter.ts`
 
 ### 4. Pass rate gated on the requested trial count, threshold-configurable
 
 **Decision:** Exit code 0 while `passedTrials / requestedTrials >= --pass-threshold` (default `0.9`,
-rationale in `config.ts`). `requestedTrials = requestedIds.length * iterations`.
+rationale in `runner/run.ts`). `requestedTrials = requestedIds.length * iterations`.
 
 **Why:**
 - A calibrated suite gates on an aggregate rate instead of one flaky item blocking every PR; `--pass-threshold 1.0` restores strict all-pass
@@ -235,7 +235,7 @@ rationale in `config.ts`). `requestedTrials = requestedIds.length * iterations`.
 
 Harness failures (MCP spawn, OpenRouter, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
 
-**Location:** `langfuse_experiment.ts` (`buildRunSummary`, `resolveExitCode`)
+**Location:** `runner/experiment.ts` (`buildRunSummary`, `resolveExitCode`)
 
 ### 5. Judge sees tool calls, not results
 
@@ -253,7 +253,7 @@ AGENT: [Called tool: search-actors with args: {"keywords":"google maps","limit":
 AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 ```
 
-**Location:** `mcp_agent_judge.ts`
+**Location:** `judge/judge.ts`
 
 ### 6. Judge client shared, agent isolated
 
@@ -263,7 +263,7 @@ AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 - The judge client is stateless (OpenRouter/OpenAI SDK), so sharing it saves initialization overhead with no contamination risk
 - The agent holds conversation and Apify state, so it cannot be shared
 
-**Location:** `run_mcp_agent_evals.ts`
+**Location:** `runner/run.ts`
 
 ### 7. Agent vs judge models
 
@@ -276,7 +276,7 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 ### 8. The SDK message stream is folded back into the old conversation shape
 
-**Decision:** `sdk_conversation_adapter.ts` rebuilds `ConversationHistory` from the SDK's message stream instead of the judge reading SDK messages.
+**Decision:** `agent/conversation_adapter.ts` rebuilds `ConversationHistory` from the SDK's message stream instead of the judge reading SDK messages.
 
 **Why:**
 - The judge, its input format, and the scores stay unchanged, so verdicts remain comparable with earlier experiments
@@ -285,50 +285,52 @@ Separation allows independent optimization for speed vs evaluation quality.
 - Subagent messages (via the `Task` tool) are excluded, so the transcript reflects the main agent
 - Cached prompt tokens are counted into `total_tokens`; the API reports them separately and a cached run would otherwise look nearly free. The trace's generation splits them out (`input`, `cache_read_input_tokens`, `cache_creation_input_tokens`): the SDK reports usage for the whole run, so a multi-turn run re-reads the cached system prompt and tool definitions every turn and the total is mostly cache traffic
 
-**Location:** `sdk_conversation_adapter.ts`
+**Location:** `agent/conversation_adapter.ts`
 
 ### 9. The agent's conversation is traced by hand
 
-**Decision:** After each agent run, `langfuse_observations.ts` emits the item's span tree from the adapted SDK stream; `llm_client.ts` traces the judge call itself.
+**Decision:** After each agent run, `langfuse/observations.ts` emits the item's span tree from the adapted SDK stream; `judge/openrouter_client.ts` traces the judge call itself.
 
 ```
 experiment-item-run     Langfuse SDK, holds the scores
 |- agent                the prompt in, the final answer out
 |  |- <agent model>     generation: the run's aggregate tokens and cost, windowed to the last turn
 |  |- <tool name>       one span per tool call: arguments in, result out
-|- <judge model>        generation, emitted by llm_client.ts
+|- <judge model>        generation, emitted by judge/openrouter_client.ts
 ```
 
 **Why:**
 - The agent runs in the Claude Code subprocess, so nothing it does is instrumented for us. Left alone, an item's trace holds a single span and the conversation is invisible in the UI
 - Tokens and cost only roll up to the trace from a **generation**. The SDK reports usage once for the whole run, not per turn, so the run's aggregate sits on a single generation
 - That generation is windowed to the final model turn, not the whole run. The UI orders siblings by start time, so a generation spanning the tool calls sorts ahead of them and reads as though the model answered before calling anything. Its `usageScope: run` metadata marks that the numbers still cover the whole run
-- Tool spans are timed from when the SDK delivered the call and its result (`claude_agent.ts` stamps every message as it arrives). Without those stamps every span would collapse to the moment the tree is emitted, after the run
+- Tool spans are timed from when the SDK delivered the call and its result (`agent/claude_agent.ts` stamps every message as it arrives). Without those stamps every span would collapse to the moment the tree is emitted, after the run
 
 **Trade-off:** the tree is emitted after the fact, so a crashed run leaves no spans, and the agent's individual model turns are not separate generations.
 
-**Location:** `langfuse_observations.ts`, `claude_agent.ts`, `llm_client.ts`
+**Location:** `langfuse/observations.ts`, `agent/claude_agent.ts`, `judge/openrouter_client.ts`
 
 ## System components
 
 ### Core files
 
-- `types.ts` - Type definitions
-- `config.ts` - Models, prompts, constants
-- `claude_agent.ts` - The agent under test: Claude Agent SDK options, MCP server registration, failure injection, the tool-call-mode deny-all hook, `canUseTool`, stderr forwarding
-- `tool_call_mode.ts` - Tool-call-mode scoring: the deny wording, `ToolSearch` skip, `first_tool_match` name/args matching
-- `sdk_conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
-- `llm_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
-- `claude_judge_client.ts` - Judge backed by the Claude Agent SDK (`--claude-judge`), for runs without an OpenRouter key
-- `langfuse_observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
-- `mcp_agent_judge.ts` - Judge evaluation
-- `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
-- `langfuse_dataset.ts` - Test case schema, dataset item mapping and validation, dataset fetch
-- `langfuse_experiment.ts` - Experiment task (agent + tool-call dispatch), evaluators, run summary, exit gate
-- `run_mcp_agent_evals.ts` - Main CLI entry
-- `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
-- `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
-- `schedules_fixtures.ts` - Schedule-suite fixture CLI entry (`pnpm run evals:mcp-agent:schedules-fixtures`)
+- `config.ts` - Models and the MCP tool-name prefix, shared across responsibilities
+- `environment.ts` - Env var sanitization and missing-var reporting
+- `runner/run.ts` - Main CLI entry, runner defaults
+- `runner/experiment.ts` - Experiment task (agent + tool-call dispatch), `EVALUATORS`, run summary, exit gate
+- `runner/filters.ts` - Test case filtering by category and id
+- `runner/tool_call_mode.ts` - Tool-call-mode scoring: the deny wording, `ToolSearch` skip, `first_tool_match` name/args matching
+- `agent/claude_agent.ts` - The agent under test: Claude Agent SDK options, MCP server registration, failure injection, the tool-call-mode deny-all hook, `canUseTool`, stderr forwarding
+- `agent/conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
+- `judge/judge.ts` - Judge evaluation and `JUDGE_PROMPT_TEMPLATE`
+- `judge/client.ts` - The `JudgeClient` contract, response and usage types
+- `judge/openrouter_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
+- `judge/claude_client.ts` - Judge backed by the Claude Agent SDK (`--claude-judge`), for runs without an OpenRouter key
+- `langfuse/dataset.ts` - Test case schema, dataset item mapping and validation, dataset fetch
+- `langfuse/observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
+- `langfuse/tracing.ts` - OpenTelemetry span processor init/shutdown
+- `scripts/export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
+- `scripts/tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
+- `scripts/schedules_fixtures.ts` - Schedule-suite fixture CLI entry (`pnpm run evals:mcp-agent:schedules-fixtures`)
 - `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime and gitignored
 
 ## Configuration
@@ -464,7 +466,7 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 
 ### Judge too strict/lenient
 **Symptom:** Incorrect verdicts.<br>
-**Solution:** Tune `JUDGE_PROMPT_TEMPLATE` in `config.ts`.
+**Solution:** Tune `JUDGE_PROMPT_TEMPLATE` in `judge/judge.ts`.
 
 ### Tests timeout (hit maxTurns)
 **Symptom:** Conversations don't complete.

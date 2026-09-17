@@ -16,8 +16,7 @@ import 'dotenv/config';
 
 import { ApifyClient, type ScheduleCreateOrUpdateData, ScheduleActions } from 'apify-client';
 
-import { findMissingEnvVars } from '../shared/config.js';
-import { sanitizeProcessEnv } from './config.js';
+import { findMissingEnvVars, sanitizeProcessEnv } from '../environment.js';
 
 sanitizeProcessEnv();
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { sanitizeEnvValue } from '../../evals/shared/config.js';
+import { sanitizeEnvValue } from '../../evals/environment.js';
 
-describe('sanitizeEnvValue', () => {
+describe('sanitizeEnvValue()', () => {
     it('passes through undefined and null', () => {
         expect(sanitizeEnvValue(undefined)).toBeUndefined();
         expect(sanitizeEnvValue(null as unknown as undefined)).toBeNull();
