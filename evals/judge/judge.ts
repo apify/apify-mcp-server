@@ -187,7 +187,6 @@ export async function evaluateConversation(
         const response = await llmClient.callLlm(
             [{ role: 'user', content: judgePrompt }],
             judgeModel,
-            undefined, // No tools
             JUDGE_RESPONSE_SCHEMA,
         );
         lastRawResponse = response.content || '';
