@@ -512,6 +512,95 @@ describe('get-actor-run default response', () => {
         });
     });
 
+    it('fetches and surfaces the TIP record when the key-value store lists a TIP key', async () => {
+        const run = mockSucceededRun();
+        let getRecordCalls = 0;
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => mockDataset(),
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [{ key: 'OUTPUT' }, { key: 'TIP' }], isTruncated: false }),
+                getRecord: async (key: string) => {
+                    getRecordCalls += 1;
+                    return key === 'TIP'
+                        ? { key, value: { message: 'Use the Instagram Scraper instead.', level: 'info' } }
+                        : undefined;
+                },
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.tip).toEqual({ message: 'Use the Instagram Scraper instead.', level: 'info' });
+        expect(content[1].text.endsWith('\nTip: Use the Instagram Scraper instead.')).toBe(true);
+        expect(getRecordCalls).toBe(1);
+    });
+
+    it('omits tip and never fetches the TIP record when the key-value store does not list it', async () => {
+        const run = mockSucceededRun();
+        let getRecordCalls = 0;
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => mockDataset(),
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [{ key: 'OUTPUT' }], isTruncated: false }),
+                getRecord: async () => {
+                    getRecordCalls += 1;
+                    return undefined;
+                },
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.tip).toBeUndefined();
+        expect(content[1].text).not.toContain('Tip:');
+        expect(getRecordCalls).toBe(0);
+    });
+
+    it('discards a malformed TIP record instead of throwing', async () => {
+        const run = mockSucceededRun();
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => mockDataset(),
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [{ key: 'TIP' }], isTruncated: false }),
+                getRecord: async () => ({ key: 'TIP', value: { level: 'warning' } }), // no `message`
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toBeUndefined();
+    });
+
     it('emits progress with formatted status messages on wait + terminal flip', async () => {
         // RUNNING with a non-terminal statusMessage at start; SUCCEEDED with a terminal statusMessage
         // at end. formatRunStatusMessage suppresses non-terminal-marked statusMessages on terminal
