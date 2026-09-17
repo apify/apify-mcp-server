@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { sanitizeEnvValue } from '../../evals/environment.js';
+import { findMissingEnvVars, sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/environment.js';
 
 describe('sanitizeEnvValue()', () => {
     it('passes through undefined and null', () => {
@@ -38,5 +38,106 @@ describe('sanitizeEnvValue()', () => {
     it('is idempotent', () => {
         const value = '  "sk-abc123"\r\n';
         expect(sanitizeEnvValue(sanitizeEnvValue(value))).toBe(sanitizeEnvValue(value));
+    });
+});
+
+describe('findMissingEnvVars()', () => {
+    const KEYS = ['TEST_UNSET_VAR', 'TEST_WHITESPACE_VAR', 'TEST_QUOTES_VAR', 'TEST_CONTROL_VAR', 'TEST_VALID_VAR'];
+    const originalValues = new Map<string, string | undefined>();
+
+    beforeEach(() => {
+        for (const key of KEYS) originalValues.set(key, process.env[key]);
+        delete process.env.TEST_UNSET_VAR;
+        process.env.TEST_WHITESPACE_VAR = '   ';
+        process.env.TEST_QUOTES_VAR = '""';
+        process.env.TEST_CONTROL_VAR = '\x00\x1f';
+        process.env.TEST_VALID_VAR = 'sk-abc123';
+    });
+
+    afterEach(() => {
+        for (const key of KEYS) {
+            const original = originalValues.get(key);
+            if (original === undefined) delete process.env[key];
+            else process.env[key] = original;
+        }
+    });
+
+    it('reports an unset key as missing', () => {
+        expect(findMissingEnvVars(['TEST_UNSET_VAR'])).toEqual(['TEST_UNSET_VAR']);
+    });
+
+    it('reports a whitespace-only value as missing', () => {
+        expect(findMissingEnvVars(['TEST_WHITESPACE_VAR'])).toEqual(['TEST_WHITESPACE_VAR']);
+    });
+
+    it('reports a quotes-only value as missing', () => {
+        expect(findMissingEnvVars(['TEST_QUOTES_VAR'])).toEqual(['TEST_QUOTES_VAR']);
+    });
+
+    it('reports a control-chars-only value as missing', () => {
+        expect(findMissingEnvVars(['TEST_CONTROL_VAR'])).toEqual(['TEST_CONTROL_VAR']);
+    });
+
+    it('does not report a valid value as missing', () => {
+        expect(findMissingEnvVars(['TEST_VALID_VAR'])).toEqual([]);
+    });
+
+    it('returns missing keys in input order', () => {
+        expect(findMissingEnvVars(['TEST_VALID_VAR', 'TEST_UNSET_VAR', 'TEST_WHITESPACE_VAR'])).toEqual([
+            'TEST_UNSET_VAR',
+            'TEST_WHITESPACE_VAR',
+        ]);
+    });
+});
+
+describe('sanitizeProcessEnv()', () => {
+    const KEYS = [
+        'APIFY_TOKEN',
+        'ANTHROPIC_API_KEY',
+        'OPENROUTER_API_KEY',
+        'LANGFUSE_PUBLIC_KEY',
+        'LANGFUSE_SECRET_KEY',
+        'LANGFUSE_BASE_URL',
+    ];
+    const originalValues = new Map<string, string | undefined>();
+    let logSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+        for (const key of KEYS) originalValues.set(key, process.env[key]);
+        logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        for (const key of KEYS) {
+            const original = originalValues.get(key);
+            if (original === undefined) delete process.env[key];
+            else process.env[key] = original;
+        }
+        logSpy.mockRestore();
+    });
+
+    it('sanitizes a value with a trailing newline and quotes in place', () => {
+        process.env.APIFY_TOKEN = '"sk-abc123"\n';
+        sanitizeProcessEnv();
+        expect(process.env.APIFY_TOKEN).toBe('sk-abc123');
+    });
+
+    it('leaves an unset key unset, not the string "undefined"', () => {
+        delete process.env.ANTHROPIC_API_KEY;
+        sanitizeProcessEnv();
+        expect(process.env.ANTHROPIC_API_KEY).toBeUndefined();
+    });
+
+    it('leaves an already-clean value unchanged', () => {
+        process.env.OPENROUTER_API_KEY = 'sk-clean-value';
+        sanitizeProcessEnv();
+        expect(process.env.OPENROUTER_API_KEY).toBe('sk-clean-value');
+    });
+
+    it('does not leak the raw secret value in a logged line', () => {
+        process.env.LANGFUSE_SECRET_KEY = 'sk-lf-super-secret-value\n';
+        sanitizeProcessEnv();
+        const loggedLines = logSpy.mock.calls.map((call: unknown[]) => String(call[0]));
+        expect(loggedLines.some((line: string) => line.includes('sk-lf-super-secret-value'))).toBe(false);
     });
 });
