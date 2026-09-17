@@ -1,6 +1,6 @@
 /**
- * Judge LLM client for calling the OpenRouter API. The default judge backend;
- * `--claude-judge` selects `ClaudeJudgeClient` instead.
+ * LLM client for calling OpenRouter API
+ * Phase 3: Added support for tool calling
  */
 
 import { startActiveObservation } from '@langfuse/tracing';

@@ -6,7 +6,7 @@ Repo: `apify-mcp-server`. Harness docs: `evals/README.md` (read it first; it doc
 
 ```bash
 # The default dataset, mcp-server-evals-pr; the gate is the aggregate pass rate
-# >= DEFAULT_PASS_THRESHOLD (0.9, rationale in config.ts).
+# >= DEFAULT_PASS_THRESHOLD (0.9, rationale in evals/runner/run.ts).
 # --pass-threshold 1.0 restores the strict all-pass gate.
 # A bare run is the fast PR-gating set: the kind: "tool-call" items.
 pnpm run evals:mcp-agent --agent-model claude-haiku-4-5 --subscription
@@ -39,7 +39,7 @@ pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/
 ```
 
 - `datasetName` is one of the two: `mcp-server-evals-merge` for a `kind: "agent"` case, `mcp-server-evals-pr` for a `kind: "tool-call"` one.
-- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
+- `metadata` is strict-validated (`langfuse/dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
 - `category` = tool under test (what `--category` filters); difficulty goes in the id's `<slug>` half.
 - `kind: "agent"` requires `expectedOutput` (multi-turn, judged, `expectedErrors`/`failTools`/`maxTurns` apply); `kind: "tool-call"` requires a non-empty `expectedTools` instead, and rejects `expectedOutput`, `expectedErrors`, `failTools`, and `maxTurns` (turns are fixed at 2). `expectedArgs` (optional, `kind: "tool-call"` only): a flat object, every key deep-equals the captured call's same key, unlisted keys ignored — use it to pin an argument the tool-name check alone would miss (e.g. a resolved vs. guessed Actor slug). Only pin `expectedArgs` when `expectedTools` names a single tool, or when every tool it lists shares the pinned keys with the same expected values — a flat object can't apply differently per tool. `pr/call-actor/rag-web-browser` is the example: `apify/rag-web-browser` resolves to either the generic `call-actor` tool (`{actor, input}`) or the direct `apify--rag-web-browser` tool (`{query, maxResults, ...}`), two incompatible argument shapes, so that item lists both tools in `expectedTools` and carries no `expectedArgs`.
 - A `kind: "agent"` case that provokes an error on purpose sets `expectedErrors: ["<tool-name>", ...]` — the tool(s) allowed to fail on that item; there is no run-wide error-tolerance flag.

@@ -205,7 +205,7 @@ Every active item is validated when the dataset is fetched, so a bad UI edit fai
 
 **Trade-off:** ~20-30% slower (1-2s spawn overhead per test) but guarantees isolation.
 
-**Location:** `claude_agent.ts`
+**Location:** `agent/claude_agent.ts`
 
 ### 3. The agent is Claude Code, not a hand-rolled loop
 
@@ -412,7 +412,7 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 - `maxTurns` - `kind: "agent"` only: override the default (10). Not accepted on `kind: "tool-call"`, which is fixed at 2
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
 - `mcpToolsOnly` - Force MCP-tools-only for this item, dropping Claude Code's built-ins (OR-ed with the run-wide `--mcp-tools-only`). Useful on a tool-call item that must isolate MCP-vs-MCP tool choice
-- `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny (the same hook mechanism the tool-call-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `claude_agent.ts`. Not accepted on `kind: "tool-call"`.
+- `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny (the same hook mechanism the tool-call-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `agent/claude_agent.ts`. Not accepted on `kind: "tool-call"`.
 
 ## Key insights
 
