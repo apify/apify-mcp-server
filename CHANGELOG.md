@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.15.8 - **not yet released**
+## [0.16.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.16.0) (2026-09-17)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - **evals:** Stop the add-action eval case editing the read-only fixture ([#1384](https://github.com/apify/apify-mcp-server/pull/1384)) ([d88568c](https://github.com/apify/apify-mcp-server/commit/d88568c1d1b28dc205fedd44b340215aae1ef4a4)) by [@Janjiran](https://github.com/Janjiran), closes [#1341](https://github.com/apify/apify-mcp-server/issues/1341)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.15.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.7) (2026-09-11)
 
 ### 🐛 Bug Fixes
