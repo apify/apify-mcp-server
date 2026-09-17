@@ -480,7 +480,6 @@ async function runAgentItem(
     },
 ): Promise<McpAgentTaskOutput> {
     const { agentModel, apifyToken, toolTimeout, mcpToolsOnly, judgeModel, llmClient } = options;
-    const { iteration } = item.metadata;
 
     // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
     // "agent" items; this task only runs those in this branch, so a missing
@@ -523,7 +522,7 @@ async function runAgentItem(
     return {
         kind: 'agent',
         id: item.id,
-        ...(iteration !== undefined && { iteration }),
+        ...(item.metadata.iteration !== undefined && { iteration: item.metadata.iteration }),
         judgeResult,
         totalTokens: conversation.totalTokens,
         transcript,
