@@ -32,12 +32,13 @@ const versionsCreateMock = vi.fn();
 const actorsCreateMock = vi.fn();
 const buildMock = vi.fn();
 const versionMock = vi.fn(() => ({ get: versionGetMock, update: versionUpdateMock }));
-const actorMock = vi.fn(() => ({
+const defaultActorClient = () => ({
     get: actorGetMock,
     version: versionMock,
     versions: () => ({ create: versionsCreateMock }),
     build: buildMock,
-}));
+});
+const actorMock = vi.fn((_idOrName: string) => defaultActorClient());
 
 const stubClient = {
     user: () => ({ get: userGetMock }),
@@ -123,6 +124,7 @@ const expectNoWrite = () => {
 describe('push-actor', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        actorMock.mockImplementation(() => defaultActorClient());
         userGetMock.mockResolvedValue({ username: 'john', id: 'user-secret' });
         actorGetMock.mockResolvedValue(mockActor());
         versionGetMock.mockResolvedValue(mockVersion());
@@ -130,6 +132,22 @@ describe('push-actor', () => {
         versionsCreateMock.mockResolvedValue(mockVersion());
         actorsCreateMock.mockResolvedValue({ ...mockActor(), id: 'actor-new' });
         buildMock.mockResolvedValue(mockBuild());
+    });
+
+    it('REPRO: does not create a new Actor when actorName is an existing Actor ID', async () => {
+        // The ID resolves; the `username/<id>` form does not — which is what the tool looks up first.
+        actorMock.mockImplementation((idOrName: string) =>
+            idOrName === 'zdc3Kv0Qp8HgMxWqL'
+                ? {
+                      ...defaultActorClient(),
+                      get: vi.fn().mockResolvedValue({ ...mockActor(), name: 'my-actor', username: 'john' }),
+                  }
+                : { ...defaultActorClient(), get: vi.fn().mockResolvedValue(undefined) },
+        );
+
+        await callTool({ actorName: 'zdc3Kv0Qp8HgMxWqL', files: [ACTOR_JSON, MAIN_JS], build: false });
+
+        expect(actorsCreateMock, 'should not create an Actor named after an Actor ID').not.toHaveBeenCalled();
     });
 
     it('has the expected tool name', () => {

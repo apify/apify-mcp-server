@@ -240,7 +240,22 @@ async function resolveTargetActor(client: ApifyClient, { ownerPrefix, bareName }
         );
     }
     const actorClient = client.actor(formatActorFullName(username, bareName));
-    return { actorClient, username, bareName, actor: await actorClient.get() };
+    const actor = await actorClient.get();
+    if (actor || ownerPrefix !== undefined) return { actorClient, username, bareName, actor };
+
+    // Nothing is named `bareName` in this account, but an Actor ID is also a valid Actor name
+    // (17 alphanumerics pass `ACTOR_NAME.REGEX`). The API resolves an ID on its own, so if a bare
+    // name resolves here it was an ID — push to the Actor it names instead of creating a second
+    // Actor called after the ID.
+    const byIdClient = client.actor(bareName);
+    const byId = await byIdClient.get();
+    if (!byId) return { actorClient, username, bareName, actor: undefined };
+    if (byId.username.toLowerCase() !== username.toLowerCase()) {
+        throw new UserInputError(
+            `'${bareName}' is the ID of ${byId.username}/${byId.name}; this tool pushes only to your own account (${username}).`,
+        );
+    }
+    return { actorClient: byIdClient, username, bareName: byId.name, actor: byId };
 }
 
 type CreateActorParams = {
