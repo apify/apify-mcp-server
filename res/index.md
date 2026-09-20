@@ -22,6 +22,12 @@ Results of that runbook, 2026-08-08 on Sonnet 5: per-run cost/wall/pass table, m
 retry counts, and the confounds to fix before re-running. A dated record — do not edit it after
 the fact; a re-run gets its own file.
 
+### [mcp_tool_coverage_evals.md](./mcp_tool_coverage_evals.md)
+The two rebuilt Langfuse eval datasets (`mcp-server-evals-pr-v2`, `mcp-server-evals-merge-v2`):
+why they load every tool at once, what they cover, the findings that came out of building them,
+and the environment traps that corrupt a calibration run. Delete once they replace the live
+datasets in `_evaluations.yaml`.
+
 ## Rules
 
 - A note gets a **deletion trigger** when it is written ("delete when X ships / closes / is
