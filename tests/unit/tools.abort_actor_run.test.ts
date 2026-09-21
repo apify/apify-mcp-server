@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { abortActorRun } from '../../src/tools/runs/abort_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { mockApifyClient, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 function mockAbortedRun(overrides: Record<string, unknown> = {}) {
     return {
@@ -24,9 +24,9 @@ function mockAbortedRun(overrides: Record<string, unknown> = {}) {
 }
 
 function stubClient(run: unknown): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         run: (_id: string) => ({ abort: async () => run }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 function abortContext(args: Record<string, unknown>, run: unknown): InternalToolArgs {
