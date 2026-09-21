@@ -1,4 +1,3 @@
-import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
@@ -6,21 +5,20 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
-import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
+import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { ABORT, raceAbort, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
-import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 import { getActorBuildToolOutputSchema } from '../structured_output_schemas.js';
-import { buildNextStepForBuild, toBuildResult } from './build_helpers.js';
-
-/** Default `waitSecs` for `get-actor-build`. Intentionally non-zero so polling callers wait briefly by default. */
-const WAIT_SECS_DEFAULT = 30;
+import {
+    BUILD_WAIT_SECS_DEFAULT,
+    buildNextStepForBuild,
+    buildWaitSecsField,
+    respondWithBuild,
+    toBuildResult,
+} from './build_helpers.js';
 
 const getActorBuildArgs = z.object({
     buildId: z.string().min(1).describe('Build ID, as returned when a build is started'),
-    waitSecs: z.number().int().min(0).max(WAIT_SECS_MAX).optional().default(WAIT_SECS_DEFAULT).describe(dedent`
-            Maximum seconds to wait for the build to reach a terminal state (SUCCEEDED, FAILED, ABORTED, TIMED-OUT).
-            0 returns immediately with the current status. Cap: ${WAIT_SECS_MAX}. Default: ${WAIT_SECS_DEFAULT}.
-        `),
+    waitSecs: buildWaitSecsField('0 returns immediately with the current status.'),
 });
 
 /**
@@ -34,7 +32,7 @@ export const getActorBuild: ToolEntry = Object.freeze({
     description: `Get the status of an Actor build.
 Read-only. Returns the build (id, actorId, buildNumber, status, startedAt, finishedAt)
 and a summary with one next step.
-- waitSecs (0–${WAIT_SECS_MAX}, default ${WAIT_SECS_DEFAULT}) waits up to that many seconds for terminal status before returning.
+- waitSecs (0–${WAIT_SECS_MAX}, default ${BUILD_WAIT_SECS_DEFAULT}) waits up to that many seconds for terminal status before returning.
 
 USAGE:
 - Use to check whether a build has finished and whether it succeeded.
@@ -73,14 +71,6 @@ USAGE EXAMPLES:
             loadedToolNames,
             nonTerminalNextStep: `Call this tool again with waitSecs ${WAIT_SECS_MAX} to keep waiting.`,
         });
-        const consoleLinkText = apifyConsoleLinkText(structuredContent.build.apifyConsoleUrl);
-        return respondOk(
-            [
-                JSON.stringify(structuredContent),
-                `${summary}\n${nextStep}`,
-                ...(consoleLinkText ? [consoleLinkText] : []),
-            ],
-            { structuredContent },
-        );
+        return respondWithBuild({ structuredContent, summary, nextStep });
     },
 } as const);

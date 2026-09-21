@@ -1,10 +1,34 @@
 import type { Build } from 'apify-client';
+import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import { buildConsoleBuildUrl } from '../../utils/console_link.js';
+import type { ToolResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
-import { toIsoString } from '../actors/actor_run_response.js';
+import { toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
+
+/** The deploy tools wait this long by default, the same as `get-actor-run` and `call-actor`, so a loop of build and run calls behaves alike. */
+export const BUILD_WAIT_SECS_DEFAULT = 30;
+
+/**
+ * The `waitSecs` field shared by the deploy tools that report a build, so they agree on the cap and the
+ * default. `zeroMeans` says what a caller gets back with 0: the current status, or a build just started.
+ */
+export function buildWaitSecsField(zeroMeans: string) {
+    return z
+        .number()
+        .int()
+        .min(0)
+        .max(WAIT_SECS_MAX)
+        .optional()
+        .default(BUILD_WAIT_SECS_DEFAULT)
+        .describe(
+            `Maximum seconds to wait for the build to reach a terminal state (SUCCEEDED, FAILED, ABORTED, TIMED-OUT). ${zeroMeans} Cap: ${WAIT_SECS_MAX}. Default: ${BUILD_WAIT_SECS_DEFAULT}.`,
+        );
+}
 
 /**
  * The build subset returned by the deploy tools. Allowlisted so internal fields on the API
@@ -20,7 +44,7 @@ export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | un
         // Normalized because the client parses these into `Date` objects; the output schema promises strings.
         startedAt: toIsoString(build.startedAt) ?? null,
         finishedAt: toIsoString(build.finishedAt) ?? null,
-        apifyConsoleUrl: buildConsoleBuildUrl(linkContext, build.actId, build.id),
+        apifyConsoleUrl: buildConsoleBuildUrl(linkContext, build.actId, build.buildNumber),
     };
 }
 
@@ -38,7 +62,7 @@ export function buildNextStepForBuild(
     if (build.status === 'SUCCEEDED') {
         return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)
             ? `Run the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to ${build.buildNumber}.`
-            : 'The build is ready to run.';
+            : `The Actor is ready to run with build ${build.buildNumber}.`;
     }
     if (TERMINAL_RUN_STATUSES.has(build.status)) {
         return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_LOG)
@@ -46,4 +70,22 @@ export function buildNextStepForBuild(
             : 'Read the build log for the error, fix the source, and build again.';
     }
     return nonTerminalNextStep;
+}
+
+/**
+ * The response every deploy tool that reports a build returns: the JSON first, then the summary with
+ * its one next step, then the Console link when the session has one. Shared so the tools cannot drift
+ * in ordering or in how they treat the link.
+ */
+export function respondWithBuild(params: {
+    structuredContent: Record<string, unknown> & { build?: { apifyConsoleUrl?: string } };
+    summary: string;
+    nextStep: string;
+}): ToolResponse {
+    const { structuredContent, summary, nextStep } = params;
+    const consoleLinkText = apifyConsoleLinkText(structuredContent.build?.apifyConsoleUrl);
+    return respondOk(
+        [JSON.stringify(structuredContent), `${summary}\n${nextStep}`, ...(consoleLinkText ? [consoleLinkText] : [])],
+        { structuredContent },
+    );
 }
