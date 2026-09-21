@@ -4,7 +4,7 @@
  */
 
 // eslint-disable-next-line import/extensions
-import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 // eslint-disable-next-line import/extensions
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
@@ -17,18 +17,9 @@ export type LlmUsage = {
     totalTokens: number;
 };
 
-/**
- * Response from LLM - either text or tool calls
- */
 export type LlmResponse = {
-    /** Text content from LLM (if no tool calls) */
+    /** Text content from LLM */
     content: string | null;
-    /** Tool calls requested by LLM (if any) */
-    toolCalls?: {
-        id: string;
-        name: string;
-        arguments: string;
-    }[];
     /** Token usage for this call (undefined if the provider did not report it) */
     usage?: LlmUsage;
 };
@@ -37,14 +28,13 @@ export type LlmResponse = {
  * What the judge needs from an LLM client. Implemented by `OpenRouterClient`
  * and `ClaudeJudgeClient` (Claude Agent SDK, `--claude-judge`).
  */
-export type JudgeClient = {
+export interface JudgeClient {
     callLlm(
         messages: ChatCompletionMessageParam[],
         model: string,
-        tools?: ChatCompletionTool[],
         responseFormat?: ResponseFormatJSONSchema,
     ): Promise<LlmResponse>;
-};
+}
 
 /** Langfuse generation-update fields for a usage report; empty when the provider sent none. */
 export function toUsageDetails(usage?: LlmUsage): { usageDetails?: { input: number; output: number; total: number } } {
