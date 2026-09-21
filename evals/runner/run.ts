@@ -337,7 +337,9 @@ async function main() {
     } finally {
         // In the finally, not next to the summary: a run that crashed after the id was generated
         // may already have created schedules under it, and the age sweep is the only other way out.
-        if (runId) for (const { text } of formatTeardownHint(runId)) console.log(text);
+        if (runId) {
+            for (const { text } of formatTeardownHint(runId)) console.log(text);
+        }
 
         // Flush scores and spans before exit or the last batch is lost. Guarded
         // individually: a failed export must not skip the other flush, and an
