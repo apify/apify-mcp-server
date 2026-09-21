@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterById } from '../../evals/shared/test_case_loader.js';
-import type { BaseTestCase } from '../../evals/shared/types.js';
+import { filterById } from '../../evals/runner/filters.js';
 
 /** Mirrors the unified dataset id scheme: <category>/<slug>. */
-const CASES: BaseTestCase[] = [
+const CASES: { id: string; category: string; query: string }[] = [
     { id: 'tasks/create-explicit-1', category: 'create', query: 'q' },
     { id: 'tasks/create-collision', category: 'create', query: 'q' },
     { id: 'tasks/get-explicit-1', category: 'get', query: 'q' },

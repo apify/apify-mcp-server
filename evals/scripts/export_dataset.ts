@@ -22,16 +22,15 @@ import { LangfuseClient } from '@langfuse/client';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
-import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
-import { sanitizeProcessEnv } from './config.js';
-import { fetchMcpAgentCases, MCP_AGENT_PR_DATASET_NAME } from './langfuse_dataset.js';
+import { findMissingEnvVars, LANGFUSE_ENV_VARS, sanitizeProcessEnv } from '../environment.js';
+import { fetchMcpAgentCases, MCP_AGENT_PR_DATASET_NAME } from '../langfuse/dataset.js';
 
 // Before any client is constructed below: the Langfuse SDK reads process.env itself and
 // passes it to node:http, which throws ERR_INVALID_CHAR on a CI secret with a newline.
 sanitizeProcessEnv();
 
-/** Resolved from this module so cwd cannot change it. */
-const SNAPSHOT_DIR = path.dirname(fileURLToPath(import.meta.url));
+/** `evals/`, resolved from this module so cwd cannot change it. */
+const SNAPSHOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** One file per dataset, named after it. */
 function snapshotPath(dataset: string): string {
