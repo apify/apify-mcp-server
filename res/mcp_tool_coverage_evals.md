@@ -110,18 +110,21 @@ would succeed.
 
 ## Baseline (2026-09-21, `--subscription --claude-judge`, concurrency 2)
 
-| Tier | Opus | Haiku |
-|---|---|---|
-| `pr-v2` (72 tool-call) | 42/72 (0.58)\* | 42/72 (0.58) |
-| `merge-v2` (29 agent) | 23/29 (0.79) | see below |
+| Tier | Opus | Sonnet | Haiku |
+|---|---|---|---|
+| `pr-v2` (72 tool-call) | 37/72 (0.51) | 45/72 (0.63) | 42/72 (0.58) |
+| `merge-v2` (29 agent) | 23/29 (0.79) | not run | 16/29 (0.55) |
 
-\* 37/72 measured, plus 5 of the 10 `no tool call attempted` items that pass when re-run at
-`--concurrency 1`. Haiku's 42 is unadjusted and carries 16 such items, so its true figure is higher.
-Do not compare tiers across concurrency settings.
+Every `pr` figure is depressed by the concurrency race: 10, 10 and 16 items respectively failed with
+`no tool call attempted`, and 5 of Opus's 10 pass when re-run at `--concurrency 1` (so Opus is really
+~42/72). Treat these as a floor, not a measurement, until someone runs the tier at concurrency 1.
 
-**Haiku beats Opus on tool selection here, and that is the finding, not noise.** Opus's failures are
-a superset of Haiku's: the stronger model reads before it acts, and the tool-call scorer asserts the
-*first* call.
+**The `pr` ladder does not go the way the skill assumes: Sonnet > Haiku > Opus.** That is the finding,
+not noise. Opus's failures are a near-superset of Haiku's because the stronger model reads before it
+acts, and the tool-call scorer asserts the *first* call. The `merge` tier, which scores the whole
+multi-turn run, orders normally (Opus 0.79 > Haiku 0.55). A weaker model is the more sensitive probe
+of *descriptions*; a stronger one is the more sensitive probe of *whether an action tool is worth
+calling directly*.
 
 ### The one systemic finding
 
@@ -138,17 +141,23 @@ for nearly every failure in both models:
 | `call-actor`, `create-actor-task` | `fetch-actor-details` |
 | `abort-actor-run` | `get-actor-run` |
 
-These 11 fail on **both** Opus and Haiku, so they are description problems, not model quirks — start
-the tuning PR here:
+These 18 fail on **all three** models, so they are description problems rather than model quirks.
+Start the tuning PR here:
 
 ```
-pr/call-actor/budget-cap-one-dollar          pr/publish-actor-task/lazy-make-public
-pr/create-actor-task/lazy-save-config        pr/publish-actor-task/let-people-find-it
-pr/create-actor-task/with-stored-input       pr/update-actor-task/lazy-change-numbers
-pr/delete-schedule/remove-completely-not-pause  pr/update-actor-task/switch-build
-pr/get-actor-run-log/lazy-why-did-it-break   pr/update-schedule/change-frequency
-pr/get-key-value-store-keys/lazy-whats-in-there
+pr/call-actor/budget-cap-one-dollar             pr/get-key-value-store-keys/lazy-whats-in-there
+pr/create-actor-task/lazy-save-config           pr/publish-actor-task/lazy-make-public
+pr/create-actor-task/not-a-schedule-trap        pr/publish-actor-task/let-people-find-it
+pr/create-actor-task/with-stored-input          pr/search-actors/limit-three-amazon-reviews
+pr/create-schedule/timezone-prague              pr/update-actor-task/landing-page-title
+pr/delete-schedule/remove-completely-not-pause  pr/update-actor-task/lazy-change-numbers
+pr/fetch-apify-docs/missing-page                pr/update-actor-task/switch-build
+pr/get-actor-run-log/error-message-not-status   pr/update-schedule/change-frequency
+pr/get-actor-run-log/lazy-why-did-it-break      pr/update-schedule/turn-back-on
 ```
+
+A handful of these lost one model to the concurrency race rather than to a wrong pick, so confirm a
+case at `--concurrency 1` before treating it as evidence about a description.
 
 Two argument findings, both cross-model: `search-actors` ignores an explicit count ("just 3 options"
 → `limit` 5 or 6, though the schema allows 1), and `get-actor-run` shortens a stated wait ("up to 60
@@ -157,15 +166,30 @@ seconds" → `waitSecs` 45).
 `report-problem` **passes** as a first call on Opus. PR #1338 recorded it as structurally uncoverable;
 with the full tool set and no client built-ins competing, it is covered.
 
-### merge-v2 on Opus
+### merge-v2
 
-23/29. Three failures were case defects and are fixed: the pause case targeted a fixture that is
-seeded disabled, the lifecycle case used an Actor this account cannot create tasks for
-(`apify/hello-world` → `insufficient-permissions`, now `apify/normal-mode-test-actor`), and the
-verbatim-fetch case hit an Actor requiring account-permission approval (now in `expectedErrors`).
-The other three are real: the agent asks for confirmation instead of updating a task, speculates
-about publish requirements instead of provoking the error, and answers "what data do I have"
-without listing any storage.
+Opus 23/29, Haiku 16/29. Five case defects surfaced and are fixed:
+
+- the pause case targeted a fixture seeded disabled, so "pause it" found it already paused;
+- the lifecycle case used an Actor this account cannot create tasks for (`apify/hello-world` →
+  `insufficient-permissions`), now `apify/normal-mode-test-actor`;
+- the verbatim-fetch case hit an Actor requiring account-permission approval, now in `expectedErrors`;
+- `merge/actors/vague-need-shortlist` demanded the judge verify slugs against search results it
+  cannot see, and it duly failed real results as "implausibly precise" — the judge-blindness trap;
+- `merge/tasks/publish-requirement-discovery` required discovery-by-error and so failed an agent that
+  set the requirements up front and published in one pass, which is the better outcome. Now scored on
+  the outcome.
+
+Real findings left standing: the agent asks for confirmation instead of completing an update, answers
+"what data do I have" without listing any storage, skips the FAILED status filter, silently rewrites
+`ftp://` to `https://` without telling the user, answers a web question from memory with no search,
+and — the sharpest one — on an injected `call-actor` failure it silently switches to another tool and
+presents the result rather than reporting the failure.
+
+**Create cases leave debris.** `eval-sched-weekday` and `eval-sum-eight-nine` collided on the second
+run and failed the zero-tool-error gate. Delete every `eval-*` task and schedule except the three
+fixtures before each run; `evals:mcp-agent:schedules-fixtures` does this but exits 403 on a token
+without `users/me`.
 
 ## Open
 
