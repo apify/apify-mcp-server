@@ -10,11 +10,11 @@ import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 
-/** The deploy tools wait this long by default, the same as `get-actor-run` and `call-actor`, so a loop of build and run calls behaves alike. */
+/** The build tools wait this long by default, the same as `get-actor-run` and `call-actor`, so a loop of build and run calls behaves alike. */
 export const BUILD_WAIT_SECS_DEFAULT = 30;
 
 /**
- * The `waitSecs` field shared by the deploy tools that report a build, so they agree on the cap and the
+ * The `waitSecs` field shared by the tools that report a build, so they agree on the cap and the
  * default. `zeroMeans` says what a caller gets back with 0: the current status, or a build just started.
  */
 export function buildWaitSecsField(zeroMeans: string) {
@@ -31,7 +31,7 @@ export function buildWaitSecsField(zeroMeans: string) {
 }
 
 /**
- * The build subset returned by the deploy tools. Allowlisted so internal fields on the API
+ * The build subset returned by the build tools. Allowlisted so internal fields on the API
  * document (userId, meta, options, inspectorId) never reach the client.
  * `apifyConsoleUrl` is set only for Console UI token sessions (see `getConsoleLinkContext`).
  */
@@ -49,7 +49,7 @@ export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | un
 }
 
 /**
- * The one next step after a build reaches `status`, shared by every deploy tool that reports a build.
+ * The one next step after a build reaches `status`, shared by every tool that reports a build.
  * Sibling tools are named only when the session was served them (`loadedToolNames`), and each hint
  * keeps a fallback so the text is never a dead end. `nonTerminalNextStep` comes from the caller
  * because only the calling tool may name itself ("call this tool again").
@@ -73,7 +73,7 @@ export function buildNextStepForBuild(
 }
 
 /**
- * The response every deploy tool that reports a build returns: the JSON first, then the summary with
+ * The response every tool that reports a build returns: the JSON first, then the summary with
  * its one next step, then the Console link when the session has one. Shared so the tools cannot drift
  * in ordering or in how they treat the link.
  */
