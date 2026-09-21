@@ -55,7 +55,7 @@ describe('findMissingEnvVars()', () => {
         delete process.env.TEST_UNSET_VAR;
         process.env.TEST_WHITESPACE_VAR = '   ';
         process.env.TEST_QUOTES_VAR = '""';
-        process.env.TEST_CONTROL_VAR = '\x00\x1f';
+        process.env.TEST_CONTROL_VAR = '\x1f\x0b';
         process.env.TEST_VALID_VAR = 'sk-abc123';
     });
 
