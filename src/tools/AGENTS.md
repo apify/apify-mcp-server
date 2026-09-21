@@ -25,9 +25,13 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
+  - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`
+    converts the flat action shape to the API shape and back, and reuses the id helpers from
+    `tasks/task_helpers.ts`.
   - `deploy/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail) and
     `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
-    allowlisted build result shape, the build start call and the by-status next-step text.
+    allowlisted build result shape, the build start call, the shared `waitSecs` field, the shared
+    build response and the by-status next-step text.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
@@ -67,8 +71,9 @@ tool there only through that gate, or when it is the calling tool itself (the "c
 next offset" pagination hint); otherwise leave the cross-tool guidance to the gated description.
 An `AUTO_INJECTED_TOOLS` member is no exception — the injection is conditional on `call-actor`, an
 Actor tool, or `get-actor-run` being loaded, so a session that loaded only `abort-actor-run` gets
-none of them. The task tools name no tool, enforced by `tests/unit/tools.actor_task_crud.test.ts`;
-result text elsewhere predates the gate, and `suggestTool` is the pattern to fix it with. Grep
+none of them. The task and schedule tools name no tool, enforced by
+`tests/unit/tools.actor_task_crud.test.ts` and `tests/unit/tools.schedule_crud.test.ts`; result text
+elsewhere predates the gate, and `suggestTool` is the pattern to fix it with. Grep
 `HELPER_TOOLS` outside `buildDescription` for the current set rather than trusting a list here.
 
 **Result text is a second surface, and `hasTool` does not reach it.** A tool name in a response

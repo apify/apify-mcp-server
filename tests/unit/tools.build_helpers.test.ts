@@ -39,7 +39,7 @@ describe('buildNextStepForBuild', () => {
             { loadedToolNames: [], nonTerminalNextStep: 'Call this tool again.' },
         );
 
-        expect(nextStep).toBe('The build is ready to run.');
+        expect(nextStep).toBe('The Actor is ready to run with build 0.0.3.');
     });
 });
 
