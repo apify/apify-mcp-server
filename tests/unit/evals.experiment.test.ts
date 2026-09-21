@@ -560,8 +560,8 @@ describe('substituteUniqMarker()', () => {
 describe('expandIterations()', () => {
     it('repeats items with an iteration without mutating their metadata', () => {
         const items = [
-            { id: 'a', metadata: { category: 'x' } },
-            { id: 'b', metadata: { category: 'y' } },
+            { id: 'a', input: { query: 'List my Actors' }, metadata: { category: 'x' } },
+            { id: 'b', input: { query: 'List my tasks' }, metadata: { category: 'y' } },
         ] as unknown as Parameters<typeof expandIterations>[0];
 
         const data = expandIterations(items, 3, 'r3k9f2qa7c') as unknown as {

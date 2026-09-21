@@ -232,10 +232,12 @@ const UNIQ_MARKER_PATTERN = /\{\{uniq\}\}/g;
  */
 export function substituteUniqMarker(item: DatasetItem, suffix: string): DatasetItem {
     const substitute = (text: string): string => text.replace(UNIQ_MARKER_PATTERN, () => suffix);
-    const input = item.input as { query?: unknown } | null | undefined;
+    // `input.query` is required on every item (McpAgentItemValidator); `expectedOutput` is absent
+    // on `kind: "tool-call"` items, so only that one is conditional.
+    const input = item.input as { query: string };
     return {
         ...item,
-        ...(typeof input?.query === 'string' && { input: { ...input, query: substitute(input.query) } }),
+        input: { ...input, query: substitute(input.query) },
         ...(typeof item.expectedOutput === 'string' && { expectedOutput: substitute(item.expectedOutput) }),
     };
 }
