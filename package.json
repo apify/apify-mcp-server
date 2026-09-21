@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.15.8",
+  "version": "0.16.0",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -85,13 +85,10 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@ai-sdk/openai": "^3.0.52",
     "@anthropic-ai/claude-agent-sdk": "0.3.206",
     "@apify/mcpc": "^0.6.0",
     "@apify/oxlint-config": "^0.2.10",
     "@apify/tsconfig": "^0.1.2",
-    "@arizeai/phoenix-client": "^6.6.0",
-    "@arizeai/phoenix-evals": "^1.0.2",
     "@langfuse/client": "5.9.1",
     "@langfuse/otel": "5.9.1",
     "@langfuse/tracing": "5.9.1",
@@ -142,11 +139,10 @@
     "test:e2e:remote": "E2E_HTTP_ONLY=1 E2E_HTTP_BASE=${E2E_HTTP_BASE:-https://mcp.apify.com/} vitest run --project e2e",
     "//test:e2e:remote": "Same case table against a deployed server. Bills real Actor runs to APIFY_TOKEN.",
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
-    "evals:create-dataset": "tsx evals/create_dataset.ts",
-    "evals:run": "tsx evals/run_evaluation.ts",
     "evals:mcp-agent": "pnpm run build && tsx evals/mcp_agent/run_mcp_agent_evals.ts",
     "evals:mcp-agent:export-dataset": "tsx evals/mcp_agent/export_dataset.ts",
-    "evals:mcp-agent:tasks-fixtures": "tsx evals/mcp_agent/tasks_fixtures.ts"
+    "evals:mcp-agent:tasks-fixtures": "tsx evals/mcp_agent/tasks_fixtures.ts",
+    "evals:mcp-agent:schedules-fixtures": "tsx evals/mcp_agent/schedules_fixtures.ts"
   },
   "author": "Apify",
   "license": "MIT"

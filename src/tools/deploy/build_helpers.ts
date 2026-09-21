@@ -1,15 +1,40 @@
 import type { Actor, ActorBuildOptions, Build } from 'apify-client';
+import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS } from '../../const.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import { buildConsoleBuildUrl } from '../../utils/console_link.js';
+import { logHttpError } from '../../utils/logging.js';
+import type { ToolResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
-import { type ABORT, raceAbort, toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { ABORT, raceAbort, toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 
 /** The MAJOR.MINOR numbers of the Actor's versions; a version document without one is skipped. */
 export function listVersionNumbers(actor: Pick<Actor, 'versions'>): string[] {
     return actor.versions.flatMap((version) => version.versionNumber ?? []);
+}
+
+/** The deploy tools wait this long by default, the same as `get-actor-run` and `call-actor`, so a loop of build and run calls behaves alike. */
+export const BUILD_WAIT_SECS_DEFAULT = 30;
+
+/**
+ * The `waitSecs` field shared by the deploy tools that report a build, so they agree on the cap and the
+ * default. `zeroMeans` says what a caller gets back with 0: the current status, or a build just started.
+ */
+export function buildWaitSecsField(zeroMeans: string) {
+    return z
+        .number()
+        .int()
+        .min(0)
+        .max(WAIT_SECS_MAX)
+        .optional()
+        .default(BUILD_WAIT_SECS_DEFAULT)
+        .describe(
+            `Maximum seconds to wait for the build to reach a terminal state (SUCCEEDED, FAILED, ABORTED, TIMED-OUT). ${zeroMeans} Cap: ${WAIT_SECS_MAX}. Default: ${BUILD_WAIT_SECS_DEFAULT}.`,
+        );
 }
 
 /**
@@ -26,13 +51,27 @@ export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | un
         // Normalized because the client parses these into `Date` objects; the output schema promises strings.
         startedAt: toIsoString(build.startedAt) ?? null,
         finishedAt: toIsoString(build.finishedAt) ?? null,
-        apifyConsoleUrl: buildConsoleBuildUrl(linkContext, build.actId, build.id),
+        apifyConsoleUrl: buildConsoleBuildUrl(linkContext, build.actId, build.buildNumber),
     };
 }
 
 /**
- * Starts a build of an Actor version and waits up to `waitSecs` for it to finish.
- * The wait is raced against `signal`, so a cancelled request resolves to {@link ABORT} instead of blocking.
+ * Aborts a build the tool started when the client cancels the request, the way `call-actor` aborts its
+ * run. Failures are logged and swallowed so a transient API error does not override the cancellation.
+ */
+async function abortBuildOnSignal(buildId: string, client: ApifyClient): Promise<void> {
+    await client
+        .build(buildId)
+        .abort()
+        .catch((error: unknown) => {
+            logHttpError(error, 'Error aborting Actor build', { buildId });
+        });
+}
+
+/**
+ * Starts a build of an Actor version and waits up to `waitSecs` for it to finish. The wait is raced
+ * against `signal`; a cancelled request aborts the build it started and resolves to {@link ABORT}, so
+ * a build nobody waits for does not run on, the same as `call-actor` does with its run.
  */
 export async function startBuild(
     client: ApifyClient,
@@ -41,14 +80,22 @@ export async function startBuild(
     options: { tag?: string; useCache: boolean; waitSecs: number; signal?: AbortSignal },
 ): Promise<Build | typeof ABORT> {
     const { tag, useCache, waitSecs, signal } = options;
-    return await raceAbort(
-        client.actor(actorId).build(versionNumber, {
-            ...(tag !== undefined && { tag }),
-            useCache,
-            waitForFinish: waitSecs,
-        } satisfies ActorBuildOptions),
-        signal,
-    );
+    const started = await client
+        .actor(actorId)
+        .build(versionNumber, { ...(tag !== undefined && { tag }), useCache } satisfies ActorBuildOptions);
+    // The cancel can arrive while the start call is in flight; the build exists by then.
+    if (signal?.aborted) {
+        await abortBuildOnSignal(started.id, client);
+        return ABORT;
+    }
+    if (waitSecs === 0) return started;
+    const finished = await raceAbort(client.build(started.id).get({ waitForFinish: waitSecs }), signal);
+    if (finished === ABORT) {
+        await abortBuildOnSignal(started.id, client);
+        return ABORT;
+    }
+    // `get()` is undefined only for a build that does not exist; this one was just created.
+    return finished ?? started;
 }
 
 /**
@@ -66,7 +113,7 @@ export function buildNextStepForBuild(
     if (build.status === 'SUCCEEDED') {
         return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)
             ? `Run the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to ${build.buildNumber}.`
-            : 'The build is ready to run.';
+            : `The Actor is ready to run with build ${build.buildNumber}.`;
     }
     if (TERMINAL_RUN_STATUSES.has(build.status)) {
         return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_LOG)
@@ -77,4 +124,22 @@ export function buildNextStepForBuild(
     return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET)
         ? `Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId ${build.id} (it waits up to ${WAIT_SECS_MAX} seconds per call).`
         : 'The build is still running; check its status again in a few seconds.';
+}
+
+/**
+ * The response every deploy tool that reports a build returns: the JSON first, then the summary with
+ * its one next step, then the Console link when the session has one. Shared so the tools cannot drift
+ * in ordering or in how they treat the link.
+ */
+export function respondWithBuild(params: {
+    structuredContent: Record<string, unknown> & { build?: { apifyConsoleUrl?: string } };
+    summary: string;
+    nextStep: string;
+}): ToolResponse {
+    const { structuredContent, summary, nextStep } = params;
+    const consoleLinkText = apifyConsoleLinkText(structuredContent.build?.apifyConsoleUrl);
+    return respondOk(
+        [JSON.stringify(structuredContent), `${summary}\n${nextStep}`, ...(consoleLinkText ? [consoleLinkText] : [])],
+        { structuredContent },
+    );
 }

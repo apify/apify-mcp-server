@@ -1,36 +1,8 @@
 /**
- * Shared test case loading and filtering utilities
+ * Shared test case filtering utilities
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname as pathDirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-import type { BaseTestCase, TestData } from './types.js';
-
-/**
- * Load test cases from a JSON file
- * Supports both relative and absolute paths
- *
- * @param filePath - Path to test cases JSON file (relative to caller or absolute)
- * @returns Test data with version and test cases
- */
-export function loadTestCases(filePath: string): TestData {
-    const filename = fileURLToPath(import.meta.url);
-    const dirname = pathDirname(filename);
-
-    // Support both relative (from evals/) and absolute paths
-    let testCasesPath: string;
-    if (filePath.startsWith('/')) {
-        testCasesPath = filePath;
-    } else {
-        // Relative to evals/ directory (two levels up from shared/)
-        testCasesPath = join(dirname, '..', filePath);
-    }
-
-    const fileContent = readFileSync(testCasesPath, 'utf-8');
-    return JSON.parse(fileContent) as TestData;
-}
+import type { BaseTestCase } from './types.js';
 
 /**
  * Filter test cases by category

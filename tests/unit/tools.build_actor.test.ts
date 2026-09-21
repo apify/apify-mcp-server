@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
 import { buildActor } from '../../src/tools/deploy/build_actor.js';
+import { BUILD_WAIT_SECS_DEFAULT } from '../../src/tools/deploy/build_helpers.js';
 import { buildActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -22,8 +23,10 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 const getMock = vi.fn();
 const buildMock = vi.fn();
 const actorMock = vi.fn(() => ({ get: getMock, build: buildMock }));
-
-const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyClient'];
+const buildGetMock = vi.fn();
+const buildAbortMock = vi.fn();
+const buildClientMock = vi.fn(() => ({ get: buildGetMock, abort: buildAbortMock }));
+const stubClient = { actor: actorMock, build: buildClientMock } as unknown as InternalToolArgs['apifyClient'];
 
 /** An Actor API document; `versions` carries the internal fields the tool must ignore. */
 function mockActor(versionNumbers: string[] = ['0.1']) {
@@ -75,7 +78,10 @@ describe('build-actor', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getMock.mockResolvedValue(mockActor());
-        buildMock.mockResolvedValue(mockBuild());
+        // The start call returns the build as created; the wait call returns it finished.
+        buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
+        buildGetMock.mockResolvedValue(mockBuild());
+        buildAbortMock.mockResolvedValue(undefined);
     });
 
     it('has the expected tool name', () => {
@@ -88,7 +94,9 @@ describe('build-actor', () => {
         expect(actorMock).toHaveBeenCalledWith('john/my-actor');
         // The build call uses the resolved Actor ID, not the user-supplied selector.
         expect(actorMock).toHaveBeenCalledWith('actor-1');
-        expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true, waitForFinish: WAIT_SECS_MAX });
+        expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true });
+        expect(buildClientMock).toHaveBeenCalledWith('build-1');
+        expect(buildGetMock).toHaveBeenCalledWith({ waitForFinish: BUILD_WAIT_SECS_DEFAULT });
         expect(structuredContent).toEqual({
             build: {
                 id: 'build-1',
@@ -117,7 +125,8 @@ describe('build-actor', () => {
     it('forwards tag, useCache and waitSecs to the build call', async () => {
         await callTool({ actor: 'actor-1', tag: 'beta', useCache: false, waitSecs: 10 });
 
-        expect(buildMock).toHaveBeenCalledWith('0.1', { tag: 'beta', useCache: false, waitForFinish: 10 });
+        expect(buildMock).toHaveBeenCalledWith('0.1', { tag: 'beta', useCache: false });
+        expect(buildGetMock).toHaveBeenCalledWith({ waitForFinish: 10 });
     });
 
     it('adds the build Console link for Console UI token sessions', async () => {
@@ -129,7 +138,7 @@ describe('build-actor', () => {
         })) as TextToolResult;
         const { content, structuredContent } = result;
 
-        const consoleUrl = 'https://console.apify.com/actors/actor-1/builds/build-1';
+        const consoleUrl = 'https://console.apify.com/actors/actor-1/builds/0.1.12';
         expect((structuredContent as { build: { apifyConsoleUrl?: string } }).build.apifyConsoleUrl).toBe(consoleUrl);
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(`Apify Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}`);
@@ -137,7 +146,7 @@ describe('build-actor', () => {
     });
 
     it('emits structuredContent that validates against the outputSchema', async () => {
-        buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
+        buildGetMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
 
         const result = await callTool({ actor: 'actor-1' });
 
@@ -218,8 +227,48 @@ describe('build-actor', () => {
 
         // Per MCP spec a cancelled request gets no response body, even though the build resolved.
         expect(result).toEqual({});
+        // The build was started by then, so it is aborted rather than left running for nobody.
+        expect(buildClientMock).toHaveBeenCalledWith('build-1');
+        expect(buildAbortMock).toHaveBeenCalledTimes(1);
+        expect(buildGetMock).not.toHaveBeenCalled();
         // Nothing after the build call runs: no Console-link lookup for what would otherwise be a UI token session.
         expect(getUserInfoCached).not.toHaveBeenCalled();
+    });
+
+    it('aborts the build it started when the request is cancelled mid-wait', async () => {
+        const controller = new AbortController();
+        buildGetMock.mockImplementation(() => {
+            controller.abort();
+            return new Promise(() => {});
+        });
+
+        const result = await (buildActor as HelperTool).call({
+            ...stubToolCallContext({ actor: 'actor-1' }, stubClient),
+            signal: controller.signal,
+        });
+
+        expect(result).toEqual({});
+        expect(buildAbortMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the cancellation result when aborting the build fails', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        buildAbortMock.mockRejectedValue(new Error('boom'));
+
+        const result = await (buildActor as HelperTool).call({
+            ...stubToolCallContext({ actor: 'actor-1' }, stubClient),
+            signal: controller.signal,
+        });
+
+        expect(result).toEqual({});
+    });
+
+    it('returns the started build without waiting when waitSecs is 0', async () => {
+        const { structuredContent } = await callTool({ actor: 'actor-1', waitSecs: 0 });
+
+        expect(buildGetMock).not.toHaveBeenCalled();
+        expect(structuredContent).toMatchObject({ build: { id: 'build-1', status: 'RUNNING' } });
     });
 
     describe('description', () => {
@@ -254,14 +303,14 @@ describe('build-actor', () => {
         it('names no tool for a SUCCEEDED build when call-actor is not loaded', async () => {
             const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD]);
 
-            expect(content[1].text).toBe(`${summary} SUCCEEDED.\nThe build is ready to run.`);
+            expect(content[1].text).toBe(`${summary} SUCCEEDED.\nThe Actor is ready to run with build 0.1.12.`);
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_CALL);
         });
 
         it.each(['FAILED', 'TIMED-OUT', 'ABORTED'])(
             'points a %s build at get-actor-build-log when that tool is loaded',
             async (status) => {
-                buildMock.mockResolvedValue(mockBuild({ status }));
+                buildGetMock.mockResolvedValue(mockBuild({ status }));
 
                 const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
 
@@ -274,7 +323,7 @@ describe('build-actor', () => {
         it.each(['FAILED', 'TIMED-OUT', 'ABORTED'])(
             'names no tool for a %s build when get-actor-build-log is not loaded',
             async (status) => {
-                buildMock.mockResolvedValue(mockBuild({ status }));
+                buildGetMock.mockResolvedValue(mockBuild({ status }));
 
                 // get-actor-build is loaded but is not the log tool; the hint must not fall back to it.
                 const { content } = await callTool({ actor: 'actor-1' }, [
@@ -291,7 +340,7 @@ describe('build-actor', () => {
         );
 
         it('points a still-running build at get-actor-build when that tool is loaded', async () => {
-            buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
+            buildGetMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
 
             const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
 
@@ -301,7 +350,7 @@ describe('build-actor', () => {
         });
 
         it('names no tool for a still-running build when get-actor-build is not loaded', async () => {
-            buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
+            buildGetMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
 
             const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD]);
 

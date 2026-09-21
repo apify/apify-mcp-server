@@ -59,8 +59,8 @@ describe('buildConsole*Url (production host)', () => {
     it('builds personal Actor/run/dataset/key-value-store URLs', () => {
         expect(buildConsoleActorUrl({}, 'ACTOR_ID')).toBe('https://console.apify.com/actors/ACTOR_ID');
         expect(buildConsoleRunUrl({}, 'RUN_ID')).toBe('https://console.apify.com/actors/runs/RUN_ID');
-        expect(buildConsoleBuildUrl({}, 'ACTOR_ID', 'BUILD_ID')).toBe(
-            'https://console.apify.com/actors/ACTOR_ID/builds/BUILD_ID',
+        expect(buildConsoleBuildUrl({}, 'ACTOR_ID', '0.1.12')).toBe(
+            'https://console.apify.com/actors/ACTOR_ID/builds/0.1.12',
         );
         expect(buildConsoleDatasetUrl({}, 'DATASET_ID')).toBe('https://console.apify.com/storage/datasets/DATASET_ID');
         expect(buildConsoleKeyValueStoreUrl({}, 'STORE_ID')).toBe(
@@ -76,8 +76,8 @@ describe('buildConsole*Url (production host)', () => {
         expect(buildConsoleRunUrl(org, 'RUN_ID')).toBe(
             'https://console.apify.com/organization/ORG_ID/actors/runs/RUN_ID',
         );
-        expect(buildConsoleBuildUrl(org, 'ACTOR_ID', 'BUILD_ID')).toBe(
-            'https://console.apify.com/organization/ORG_ID/actors/ACTOR_ID/builds/BUILD_ID',
+        expect(buildConsoleBuildUrl(org, 'ACTOR_ID', '0.1.12')).toBe(
+            'https://console.apify.com/organization/ORG_ID/actors/ACTOR_ID/builds/0.1.12',
         );
         expect(buildConsoleDatasetUrl(org, 'DATASET_ID')).toBe(
             'https://console.apify.com/organization/ORG_ID/storage/datasets/DATASET_ID',

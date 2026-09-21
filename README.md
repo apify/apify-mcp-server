@@ -247,6 +247,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
 - **Apify storage**: Access data from your datasets and key-value stores.
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
+- **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
 - **Actor deploy**: Push files to an Actor (creating it if needed), build an Actor version, check the status of a build, and retrieve its build log.
 
 ### Overview of available tools
@@ -285,6 +286,10 @@ Legend for the **Enabled by default** column:
 | `update-actor-task` | tasks | Update a task's input, run options, or public display configuration. |  |
 | `publish-actor-task` | tasks | Publish a task on its public landing page. |  |
 | `unpublish-actor-task` | tasks | Unpublish a task from its public landing page. |  |
+| `create-schedule` | schedules | Create a schedule that runs Actors or tasks on a cron cadence. |  |
+| `get-schedule` | schedules | Get a schedule, its cron expression, state, and the actions it runs. |  |
+| `update-schedule` | schedules | Update a schedule: cron expression, time zone, enabled state, or actions. |  |
+| `delete-schedule` | schedules | Delete a schedule. |  |
 | `get-actor-build` | deploy | Get an Actor build's status. |  |
 | `get-actor-build-log` | deploy | Retrieve the logs for a specific Actor build. |  |
 | `build-actor` | deploy | Build an Actor version and wait a bounded time for the build to finish. |  |
