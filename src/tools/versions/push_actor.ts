@@ -1,4 +1,3 @@
-import { ACTOR_NAME, MAX_MULTIFILE_BYTES, USERNAME } from '@apify/consts';
 import type {
     Actor,
     ActorClient,
@@ -13,6 +12,8 @@ import type {
 import { ActorSourceType, ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
+import { ACTOR_NAME, MAX_MULTIFILE_BYTES, USERNAME } from '@apify/consts';
+
 import type { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../const.js';
 import { UserInputError } from '../../errors.js';
@@ -22,8 +23,8 @@ import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondServerError, respondUserError } from '../../utils/mcp.js';
+import type { ProgressTracker } from '../../utils/progress.js';
 import { ABORT } from '../actors/actor_run_response.js';
-import { pushActorToolOutputSchema } from '../structured_output_schemas.js';
 import {
     buildNextStepForBuild,
     buildWaitSecsField,
@@ -31,7 +32,8 @@ import {
     respondWithBuild,
     startBuild,
     toBuildResult,
-} from './build_helpers.js';
+} from '../builds/build_helpers.js';
+import { pushActorToolOutputSchema } from '../structured_output_schemas.js';
 import { buildSourceZip, formatSourceRecordKey, formatSourceStoreName, uploadSourceArchive } from './source_archive.js';
 import {
     ACTOR_CONFIG_PATH,
@@ -77,7 +79,10 @@ const pushActorArgs = z.object({
                 // `.optional()` instead of `.default('utf8')`: `fixZodSchemaRequired` only fixes top-level
                 // fields, so a nested default would stay in the item's `required` list and AJV would
                 // reject files that omit it.
-                encoding: z.enum(['utf8', 'base64']).optional().describe('Use base64 for binary files; defaults to utf8'),
+                encoding: z
+                    .enum(['utf8', 'base64'])
+                    .optional()
+                    .describe('Use base64 for binary files; defaults to utf8'),
             }),
         )
         .min(1)
@@ -259,7 +264,10 @@ type TargetActor = {
  * the build and run tools hand out, is looked up once as an ID: it must be the caller's Actor, and an ID
  * never creates one, so a miss falls through to creating an Actor of that name.
  */
-async function resolveTargetActor(client: ApifyClient, { ownerPrefix, bareName }: ActorNameParts): Promise<TargetActor> {
+async function resolveTargetActor(
+    client: ApifyClient,
+    { ownerPrefix, bareName }: ActorNameParts,
+): Promise<TargetActor> {
     const { username } = await client.user('me').get();
     if (ownerPrefix !== undefined && ownerPrefix.toLowerCase() !== username.toLowerCase()) {
         throw new UserInputError(
@@ -348,10 +356,7 @@ async function createActorWithVersion(params: CreateActorParams): Promise<Versio
 }
 
 /** The requested version, or the only version of the Actor, or the default for an Actor with no versions. */
-function resolveVersionNumber(
-    actor: Pick<Actor, 'versions'>,
-    requestedVersionNumber: string | undefined,
-): string {
+function resolveVersionNumber(actor: Pick<Actor, 'versions'>, requestedVersionNumber: string | undefined): string {
     const versionNumbers = listVersionNumbers(actor);
     if (requestedVersionNumber === undefined && versionNumbers.length > 1) {
         throw new UserInputError(`Specify versionNumber; ${formatVersionList(versionNumbers)}.`);
@@ -454,14 +459,29 @@ async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFi
     const actorName = formatActorFullName(username, bareName);
     if (!actor) {
         const versionNumber = params.versionNumber ?? DEFAULT_VERSION_NUMBER;
-        const { actorId, ...outcome } = await createActorWithVersion({ client, bareName, versionNumber, buildTag, sourceFiles });
+        const { actorId, ...outcome } = await createActorWithVersion({
+            client,
+            bareName,
+            versionNumber,
+            buildTag,
+            sourceFiles,
+        });
         return { actorId, actorName, versionNumber, created: true, ...outcome };
     }
     const versionNumber = resolveVersionNumber(actor, params.versionNumber);
     const versionClient = actorClient.version(versionNumber);
     const existing = await versionClient.get();
     const outcome = existing
-        ? await updateVersion({ client, versionClient, actorId: actor.id, existing, versionNumber, mode, buildTag, sourceFiles })
+        ? await updateVersion({
+              client,
+              versionClient,
+              actorId: actor.id,
+              existing,
+              versionNumber,
+              mode,
+              buildTag,
+              sourceFiles,
+          })
         : await createVersion({ client, actorClient, actor, versionNumber, buildTag, sourceFiles });
     return { actorId: actor.id, actorName, versionNumber, created: false, ...outcome };
 }
@@ -487,11 +507,17 @@ async function startPushedBuild(params: {
     pushed: PushActorFilesResult;
     waitSecs: number;
     signal: AbortSignal;
+    progressTracker: ProgressTracker | null | undefined;
 }): Promise<Build | typeof ABORT> {
-    const { client, pushed, waitSecs, signal } = params;
+    const { client, pushed, waitSecs, signal, progressTracker } = params;
     try {
         // No tag is passed: the version's buildTag applies, the same as `apify push`.
-        return await startBuild(client, pushed.actorId, pushed.versionNumber, { useCache: true, waitSecs, signal });
+        return await startBuild(client, pushed.actorId, pushed.versionNumber, {
+            useCache: true,
+            waitSecs,
+            signal,
+            progressTracker,
+        });
     } catch (error) {
         throw new BuildStartError(pushed, error);
     }
@@ -508,7 +534,10 @@ function formatFileCount(count: number): string {
 }
 
 /** A zip-stored version shows no files in Console and has nothing merge mode can add to. */
-function formatArchiveNote({ actorId, versionNumber }: Pick<PushActorFilesResult, 'actorId' | 'versionNumber'>): string {
+function formatArchiveNote({
+    actorId,
+    versionNumber,
+}: Pick<PushActorFilesResult, 'actorId' | 'versionNumber'>): string {
     return `The files total more than ${MULTIFILE_SOURCE_MAX_MIB} MiB, so they are stored as a zip in key-value store ${formatSourceStoreName(actorId)} (record ${formatSourceRecordKey(versionNumber)}) that the version points to; later pushes to this version must send all files with mode replace.`;
 }
 
@@ -607,7 +636,7 @@ export const pushActor: ToolEntry = Object.freeze({
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames, signal, progressTracker } = toolArgs;
         const parsed = pushActorArgs.parse(args);
         // `toSourceFiles` maps the input files one to one, so this is also the number of files sent.
         const responseContext = { filesSent: parsed.files.length, loadedToolNames, apifyToken, client };
@@ -626,7 +655,13 @@ export const pushActor: ToolEntry = Object.freeze({
 
             let build: Build | undefined;
             if (parsed.build) {
-                const started = await startPushedBuild({ client, pushed, waitSecs: parsed.waitSecs, signal });
+                const started = await startPushedBuild({
+                    client,
+                    pushed,
+                    waitSecs: parsed.waitSecs,
+                    signal,
+                    progressTracker,
+                });
                 // The push is already done, the same as get-actor-build aborting mid-wait. Per MCP spec a
                 // cancelled request gets no response, so the push result is not reported.
                 if (started === ABORT) return respondAborted();

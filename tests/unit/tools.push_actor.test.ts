@@ -8,10 +8,10 @@ import { createHmacSignatureAsync } from '@apify/utilities';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
-import { BUILD_WAIT_SECS_DEFAULT } from '../../src/tools/deploy/build_helpers.js';
-import { pushActor } from '../../src/tools/deploy/push_actor.js';
-import { ACTOR_CONFIG_PATH } from '../../src/tools/deploy/source_files.js';
+import { BUILD_WAIT_SECS_DEFAULT } from '../../src/tools/builds/build_helpers.js';
 import { pushActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { pushActor } from '../../src/tools/versions/push_actor.js';
+import { ACTOR_CONFIG_PATH } from '../../src/tools/versions/source_files.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
@@ -698,6 +698,16 @@ describe('push-actor', () => {
             expect(versionUpdateMock).toHaveBeenCalled();
         });
 
+        it('skips the ID lookup when the missing name is not shaped like an ID', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+
+            await callTool({ actor: 'my-actor', files: [ACTOR_JSON, MAIN_JS], build: false });
+
+            expect(actorGetMock).toHaveBeenCalledTimes(1);
+            expect(actorMock).not.toHaveBeenCalledWith('my-actor');
+            expect(actorsCreateMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-actor' }));
+        });
+
         it('never treats a prefixed value as an ID', async () => {
             actorGetMock.mockResolvedValue(undefined);
 
@@ -809,6 +819,25 @@ describe('push-actor', () => {
 
         expect((pushActor as HelperTool).outputSchema).toBe(pushActorToolOutputSchema);
         expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
+    });
+
+    it('reports build progress while waiting, like call-actor', async () => {
+        const progressTracker = { updateProgress: vi.fn(), startActorBuildUpdates: vi.fn(), stop: vi.fn() };
+
+        await (pushActor as HelperTool).call({
+            ...stubToolCallContext({ actor: 'my-actor', files: [MAIN_JS] }, stubClient),
+            progressTracker: progressTracker as unknown as InternalToolArgs['progressTracker'],
+        });
+
+        expect(progressTracker.updateProgress).toHaveBeenNthCalledWith(1, 'Build 0.0.3 of Actor actor-1: RUNNING');
+        expect(progressTracker.startActorBuildUpdates).toHaveBeenCalledWith(
+            'build-1',
+            stubClient,
+            'Build 0.0.3 of Actor actor-1',
+            expect.objectContaining({ status: 'RUNNING' }),
+        );
+        expect(progressTracker.updateProgress).toHaveBeenLastCalledWith('Build 0.0.3 of Actor actor-1: SUCCEEDED');
+        expect(progressTracker.stop).toHaveBeenCalledTimes(1);
     });
 
     it('returns the empty aborted response when the request signal is already aborted after the push', async () => {

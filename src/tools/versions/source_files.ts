@@ -36,11 +36,13 @@ function normalizeSourcePath(path: string): string {
 export function validateSourceFiles(files: readonly SourceFileInput[]): void {
     const seen = new Set<string>();
     for (const { path, content, encoding } of files) {
-        if (ABSOLUTE_PATH_REGEX.test(path)) throw new UserInputError(`File path '${path}' must be relative to the Actor root, not absolute.`);
+        if (ABSOLUTE_PATH_REGEX.test(path))
+            throw new UserInputError(`File path '${path}' must be relative to the Actor root, not absolute.`);
         const normalized = normalizeSourcePath(path);
         if (normalized === '') throw new UserInputError(`File path '${path}' is empty after normalization.`);
         if (/[\\/]$/.test(path)) throw new UserInputError(`File path '${path}' must name a file, not a directory.`);
-        if (normalized.split('/').includes('..')) throw new UserInputError(`File path '${path}' must not contain '..' segments.`);
+        if (normalized.split('/').includes('..'))
+            throw new UserInputError(`File path '${path}' must not contain '..' segments.`);
         // The zip writer keys entries by path on a plain object, where this name sets the prototype instead.
         if (normalized === '__proto__') throw new UserInputError(`File path '${path}' is not allowed.`);
         if (seen.has(normalized)) throw new UserInputError(`File path '${normalized}' is listed more than once.`);

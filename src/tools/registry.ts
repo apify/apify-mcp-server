@@ -20,10 +20,9 @@ import { SERVER_MODE } from '../types.js';
 import { callActor } from './actors/call_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
 import { searchActors } from './actors/search_actors.js';
-import { buildActor } from './deploy/build_actor.js';
-import { getActorBuild } from './deploy/get_actor_build.js';
-import { getActorBuildLog } from './deploy/get_actor_build_log.js';
-import { pushActor } from './deploy/push_actor.js';
+import { buildActor } from './builds/build_actor.js';
+import { getActorBuild } from './builds/get_actor_build.js';
+import { getActorBuildLog } from './builds/get_actor_build_log.js';
 import { reportProblem } from './dev/report_problem.js';
 import { fetchApifyDocs } from './docs/fetch_apify_docs.js';
 import { searchApifyDocs } from './docs/search_apify_docs.js';
@@ -48,6 +47,7 @@ import { getActorTask } from './tasks/get_actor_task.js';
 import { publishActorTask } from './tasks/publish_actor_task.js';
 import { unpublishActorTask } from './tasks/unpublish_actor_task.js';
 import { updateActorTask } from './tasks/update_actor_task.js';
+import { pushActor } from './versions/push_actor.js';
 import { callActorWidget } from './widgets/call_actor_widget.js';
 import { fetchActorDetailsWidget } from './widgets/fetch_actor_details_widget.js';
 import { getActorRunWidget } from './widgets/get_actor_run_widget.js';
@@ -70,7 +70,8 @@ export const toolCategories = {
     ],
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
-    deploy: [getActorBuild, getActorBuildLog, buildActor, pushActor],
+    builds: [getActorBuild, getActorBuildLog, buildActor],
+    versions: [pushActor],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 

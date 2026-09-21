@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
-import { buildActor } from '../../src/tools/deploy/build_actor.js';
-import { BUILD_WAIT_SECS_DEFAULT } from '../../src/tools/deploy/build_helpers.js';
+import { buildActor } from '../../src/tools/builds/build_actor.js';
+import { BUILD_WAIT_SECS_DEFAULT } from '../../src/tools/builds/build_helpers.js';
 import { buildActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -262,6 +262,25 @@ describe('build-actor', () => {
         });
 
         expect(result).toEqual({});
+    });
+
+    it('reports progress while waiting, like call-actor', async () => {
+        const progressTracker = { updateProgress: vi.fn(), startActorBuildUpdates: vi.fn(), stop: vi.fn() };
+
+        await (buildActor as HelperTool).call({
+            ...stubToolCallContext({ actor: 'actor-1' }, stubClient),
+            progressTracker: progressTracker as unknown as InternalToolArgs['progressTracker'],
+        });
+
+        expect(progressTracker.updateProgress).toHaveBeenNthCalledWith(1, 'Build 0.1.12 of Actor actor-1: RUNNING');
+        expect(progressTracker.startActorBuildUpdates).toHaveBeenCalledWith(
+            'build-1',
+            stubClient,
+            'Build 0.1.12 of Actor actor-1',
+            expect.objectContaining({ status: 'RUNNING' }),
+        );
+        expect(progressTracker.updateProgress).toHaveBeenLastCalledWith('Build 0.1.12 of Actor actor-1: SUCCEEDED');
+        expect(progressTracker.stop).toHaveBeenCalledTimes(1);
     });
 
     it('returns the started build without waiting when waitSecs is 0', async () => {

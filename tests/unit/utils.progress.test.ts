@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
     createProgressTracker,
+    formatBuildStatusMessage,
     formatRunStatusMessage,
     PROGRESS_NOTIFICATION_INTERVAL_MS,
     ProgressTracker,
@@ -278,6 +279,46 @@ describe('ProgressTracker', () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe('startActorBuildUpdates', () => {
+    it('emits a build status change and stops at a terminal status', async () => {
+        vi.useFakeTimers();
+        try {
+            const mockSendNotification = vi.fn();
+            const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+            const get = vi
+                .fn()
+                .mockResolvedValueOnce({ status: 'RUNNING' })
+                .mockResolvedValueOnce({ status: 'SUCCEEDED' });
+            const build = vi.fn().mockReturnValue({ get });
+
+            tracker.startActorBuildUpdates('build-1', { build } as never, 'Build 0.1 of Actor a', {
+                status: 'RUNNING',
+            });
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS * 3 + 500);
+
+            expect(build).toHaveBeenCalledWith('build-1');
+            // The seeded RUNNING is not repeated; SUCCEEDED is emitted once and polling stops.
+            expect(get).toHaveBeenCalledTimes(2);
+            expect(mockSendNotification).toHaveBeenCalledTimes(1);
+            expect(mockSendNotification).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    params: expect.objectContaining({ message: 'Build 0.1 of Actor a: SUCCEEDED' }),
+                }),
+            );
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe('formatBuildStatusMessage', () => {
+    it('leads with the label and the status', () => {
+        expect(formatBuildStatusMessage('Build 0.1 of Actor a', { status: 'RUNNING' })).toBe(
+            'Build 0.1 of Actor a: RUNNING',
+        );
     });
 });
 

@@ -1,6 +1,7 @@
-import { createHmacSignatureAsync } from '@apify/utilities';
 import type { ActorVersionSourceFile, KeyValueStoreClient } from 'apify-client';
 import { zipSync } from 'fflate';
+
+import { createHmacSignatureAsync } from '@apify/utilities';
 
 import type { ApifyClient } from '../../apify_client.js';
 
