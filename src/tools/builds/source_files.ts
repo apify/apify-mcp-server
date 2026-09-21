@@ -35,11 +35,13 @@ function normalizeSourcePath(path: string): string {
 export function validateSourceFiles(files: readonly SourceFileInput[]): void {
     const seen = new Set<string>();
     for (const { path, content, encoding } of files) {
-        if (ABSOLUTE_PATH_REGEX.test(path)) throw new UserInputError(`File path '${path}' must be relative to the Actor root, not absolute.`);
+        if (ABSOLUTE_PATH_REGEX.test(path))
+            throw new UserInputError(`File path '${path}' must be relative to the Actor root, not absolute.`);
         const normalized = normalizeSourcePath(path);
         if (normalized === '') throw new UserInputError(`File path '${path}' is empty after normalization.`);
         if (/[\\/]$/.test(path)) throw new UserInputError(`File path '${path}' must name a file, not a directory.`);
-        if (normalized.split('/').includes('..')) throw new UserInputError(`File path '${path}' must not contain '..' segments.`);
+        if (normalized.split('/').includes('..'))
+            throw new UserInputError(`File path '${path}' must not contain '..' segments.`);
         if (seen.has(normalized)) throw new UserInputError(`File path '${normalized}' is listed more than once.`);
         seen.add(normalized);
         if (encoding === 'base64' && !BASE64_REGEX.test(content)) {

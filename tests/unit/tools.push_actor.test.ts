@@ -6,9 +6,9 @@ import { MAX_MULTIFILE_BYTES } from '@apify/consts';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
-import { BUILD_WAIT_SECS_DEFAULT } from '../../src/tools/deploy/build_helpers.js';
-import { pushActor } from '../../src/tools/deploy/push_actor.js';
-import { ACTOR_CONFIG_PATH } from '../../src/tools/deploy/source_files.js';
+import { BUILD_WAIT_SECS_DEFAULT } from '../../src/tools/builds/build_helpers.js';
+import { pushActor } from '../../src/tools/builds/push_actor.js';
+import { ACTOR_CONFIG_PATH } from '../../src/tools/builds/source_files.js';
 import { pushActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';

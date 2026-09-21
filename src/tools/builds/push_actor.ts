@@ -1,4 +1,3 @@
-import { ACTOR_NAME, MAX_MULTIFILE_BYTES, USERNAME } from '@apify/consts';
 import type {
     Actor,
     ActorClient,
@@ -11,6 +10,8 @@ import type {
 } from 'apify-client';
 import { ActorSourceType, ApifyApiError } from 'apify-client';
 import { z } from 'zod';
+
+import { ACTOR_NAME, MAX_MULTIFILE_BYTES, USERNAME } from '@apify/consts';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../const.js';
@@ -75,7 +76,10 @@ const pushActorArgs = z.object({
                 // `.optional()` instead of `.default('utf8')`: `fixZodSchemaRequired` only fixes top-level
                 // fields, so a nested default would stay in the item's `required` list and AJV would
                 // reject files that omit it.
-                encoding: z.enum(['utf8', 'base64']).optional().describe('Use base64 for binary files; defaults to utf8'),
+                encoding: z
+                    .enum(['utf8', 'base64'])
+                    .optional()
+                    .describe('Use base64 for binary files; defaults to utf8'),
             }),
         )
         .min(1)
@@ -240,7 +244,10 @@ type TargetActor = {
  * the build and run tools hand out, is looked up once as an ID: it must be the caller's Actor, and an ID
  * never creates one, so a miss falls through to creating an Actor of that name.
  */
-async function resolveTargetActor(client: ApifyClient, { ownerPrefix, bareName }: ActorNameParts): Promise<TargetActor> {
+async function resolveTargetActor(
+    client: ApifyClient,
+    { ownerPrefix, bareName }: ActorNameParts,
+): Promise<TargetActor> {
     const { username } = await client.user('me').get();
     if (ownerPrefix !== undefined && ownerPrefix.toLowerCase() !== username.toLowerCase()) {
         throw new UserInputError(
@@ -293,10 +300,7 @@ async function createActorWithVersion(params: CreateActorParams): Promise<Versio
 }
 
 /** The requested version, or the only version of the Actor, or the default for an Actor with no versions. */
-function resolveVersionNumber(
-    actor: Pick<Actor, 'versions'>,
-    requestedVersionNumber: string | undefined,
-): string {
+function resolveVersionNumber(actor: Pick<Actor, 'versions'>, requestedVersionNumber: string | undefined): string {
     const versionNumbers = listVersionNumbers(actor);
     if (requestedVersionNumber === undefined && versionNumbers.length > 1) {
         throw new UserInputError(`Specify versionNumber; ${formatVersionList(versionNumbers)}.`);
@@ -393,7 +397,13 @@ async function pushActorFiles(params: PushActorFilesParams): Promise<PushActorFi
     const actorName = formatActorFullName(username, bareName);
     if (!actor) {
         const versionNumber = params.versionNumber ?? DEFAULT_VERSION_NUMBER;
-        const { actorId, ...outcome } = await createActorWithVersion({ client, bareName, versionNumber, buildTag, sourceFiles });
+        const { actorId, ...outcome } = await createActorWithVersion({
+            client,
+            bareName,
+            versionNumber,
+            buildTag,
+            sourceFiles,
+        });
         return { actorId, actorName, versionNumber, created: true, ...outcome };
     }
     const versionNumber = resolveVersionNumber(actor, params.versionNumber);

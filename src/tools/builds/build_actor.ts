@@ -72,7 +72,7 @@ export const buildActor: ToolEntry = Object.freeze({
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames, signal, progressTracker } = toolArgs;
         const parsed = buildActorArgs.parse(args);
         const actor = await client.actor(parsed.actor).get();
         if (!actor) {
@@ -98,6 +98,7 @@ export const buildActor: ToolEntry = Object.freeze({
             useCache: parsed.useCache,
             waitSecs: parsed.waitSecs,
             signal,
+            progressTracker,
         });
         if (build === ABORT) return respondAborted();
         const linkContext = await getConsoleLinkContext(apifyToken, client);
