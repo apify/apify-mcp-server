@@ -43,15 +43,10 @@ Important notes:
 
 Provide your evaluation with a verdict (PASS or FAIL) and a brief explanation (1-2 sentences).`;
 
-/**
- * Judge evaluation result
- */
 export type JudgeResult = {
-    /** PASS or FAIL verdict */
     verdict: 'PASS' | 'FAIL';
-    /** Explanation from judge */
     reason: string;
-    /** Raw response from judge (for debugging) */
+    /** Kept for debugging via the Langfuse task output; nothing in evals/ reads it. */
     rawResponse: string;
 };
 
@@ -87,8 +82,9 @@ const JUDGE_RESPONSE_SCHEMA: ResponseFormatJSONSchema = {
 };
 
 /**
- * Format conversation for judge evaluation
- * Judge sees: tool calls + arguments + final responses (NOT tool results)
+ * Judge sees tool calls + arguments + final responses, NOT tool results: the judge grades
+ * agent behavior (tool selection, arguments) and the agent's own summary of the results;
+ * raw results are long and noisy and would drown the transcript.
  */
 function formatConversationForJudge(conversation: ConversationHistory): string {
     const lines: string[] = [];
@@ -157,9 +153,6 @@ export function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'
     }
 }
 
-/**
- * Evaluate a conversation using the judge LLM
- */
 export async function evaluateConversation(
     reference: string,
     conversation: ConversationHistory,

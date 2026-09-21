@@ -18,7 +18,6 @@ export type LlmUsage = {
 };
 
 export type LlmResponse = {
-    /** Text content from LLM */
     content: string | null;
     /** Token usage for this call (undefined if the provider did not report it) */
     usage?: LlmUsage;

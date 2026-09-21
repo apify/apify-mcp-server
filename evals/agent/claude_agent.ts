@@ -33,7 +33,7 @@ export type AgentRunOptions = {
     apifyToken: string;
     /** Tools to enable on the MCP server, e.g. ["actors", "docs"]. Server default when omitted. */
     tools?: string[];
-    /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See denyToolsHook(). */
+    /** Tools the harness refuses via a PreToolUse deny with a failure message. See denyToolsHook(). */
     failTools?: string[];
     maxTurns?: number;
     toolTimeoutSeconds: number;

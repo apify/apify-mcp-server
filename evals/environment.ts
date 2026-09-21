@@ -40,8 +40,8 @@ export function findMissingEnvVars(keys: readonly string[]): string[] {
 }
 
 /**
- * Redact a value for safe logging: shows first 4 and last 4 chars, masks the rest.
- * Fully masks short values (≤ 8 chars) to prevent reconstruction from the log line.
+ * Redact a value for safe logging: shows first 3 and last 3 chars, masks the rest.
+ * Fully masks short values (≤ 6 chars) to prevent reconstruction from the log line.
  * Returns '(empty)' for empty strings, '(unset)' for undefined/null.
  */
 function redact(value?: string | null): string {
