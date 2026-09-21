@@ -11,9 +11,9 @@ import {
     isTransientAgentError,
     resolveExitCode,
     resolveGitBranch,
+    substituteUniqMarker,
     validateConcurrency,
     validateIterations,
-    substituteUniqMarker,
     validatePassThreshold,
     type McpAgentTaskOutput,
 } from '../../evals/runner/experiment.js';
