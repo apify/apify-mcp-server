@@ -27,7 +27,7 @@ reliable, and specific use case. Not every saved task needs to be public.
 The task's Actor must be public and the task must have its public display configuration set up:
 at least \`publicConfig.inputSchemaFields\`, \`publicConfig.datasetView\`, and \`publicConfig.seoDescription\`. \
 If publishing fails, follow the API reason${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? `; update these fields with ${HELPER_TOOLS.ACTOR_TASK_UPDATE} only when the reason identifies them` : ''}.
-At most 50 tasks can be published per Actor.
+At most 10 tasks can be published per Actor, and at most 100 per account.
 Publishing an already published task has no effect.
 Requires write access to both the task and its Actor.
 ${hasTool(HELPER_TOOLS.ACTOR_TASK_UNPUBLISH) ? `Use ${HELPER_TOOLS.ACTOR_TASK_UNPUBLISH} to take the page down again.\n` : ''}
