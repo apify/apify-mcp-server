@@ -3,12 +3,9 @@
  * Contains OpenRouter config, environment validation, and common utilities
  */
 
-/**
- * OpenRouter API configuration
- * OPENROUTER_BASE_URL is optional and defaults to the standard OpenRouter API URL
- */
+/** OpenRouter API configuration */
 export const OPENROUTER_CONFIG = {
-    baseURL: sanitizeEnvValue(process.env.OPENROUTER_BASE_URL) || 'https://openrouter.ai/api/v1',
+    baseURL: 'https://openrouter.ai/api/v1',
     apiKey: sanitizeEnvValue(process.env.OPENROUTER_API_KEY) || '',
 };
 
@@ -33,20 +30,12 @@ export const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 
 /**
  * Env vars used in HTTP headers (API keys, tokens, URLs).
  *
- * Why in-place? The phoenix-otel exporter and the Langfuse SDK both read these
- * directly from process.env and pass them to node:http, which throws
+ * Why in-place? The Langfuse SDK reads these directly from
+ * process.env and passes them to node:http, which throws
  * ERR_INVALID_CHAR on any control characters. We can't intercept those reads, so
  * we sanitize process.env itself before any library loads.
  */
-const ENV_KEYS_TO_SANITIZE = [
-    'APIFY_TOKEN',
-    'ANTHROPIC_API_KEY',
-    'OPENROUTER_API_KEY',
-    'OPENROUTER_BASE_URL',
-    'PHOENIX_API_KEY',
-    'PHOENIX_BASE_URL',
-    ...LANGFUSE_ENV_VARS,
-];
+const ENV_KEYS_TO_SANITIZE = ['APIFY_TOKEN', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', ...LANGFUSE_ENV_VARS];
 
 /**
  * Names of the given env vars that are unset or sanitize to empty (whitespace,

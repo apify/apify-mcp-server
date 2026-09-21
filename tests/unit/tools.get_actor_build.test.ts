@@ -84,7 +84,7 @@ describe('get-actor-build', () => {
         })) as TextToolResult;
         const { content, structuredContent } = result;
 
-        const consoleUrl = 'https://console.apify.com/actors/actor-1/builds/build-1';
+        const consoleUrl = 'https://console.apify.com/actors/actor-1/builds/0.1.12';
         expect((structuredContent as { build: { apifyConsoleUrl?: string } }).build.apifyConsoleUrl).toBe(consoleUrl);
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(`Apify Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}`);
@@ -180,7 +180,9 @@ describe('get-actor-build', () => {
 
             const { content } = await callTool({ buildId: 'build-1' }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
 
-            expect(content[1].text).toBe('Build 0.1.12 of Actor actor-1 is SUCCEEDED.\nThe build is ready to run.');
+            expect(content[1].text).toBe(
+                'Build 0.1.12 of Actor actor-1 is SUCCEEDED.\nThe Actor is ready to run with build 0.1.12.',
+            );
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_CALL);
         });
 

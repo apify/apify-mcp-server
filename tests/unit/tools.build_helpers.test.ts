@@ -39,26 +39,56 @@ describe('buildNextStepForBuild', () => {
             { loadedToolNames: [], nonTerminalNextStep: 'Call this tool again.' },
         );
 
-        expect(nextStep).toBe('The build is ready to run.');
+        expect(nextStep).toBe('The Actor is ready to run with build 0.0.3.');
     });
 });
 
 describe('startBuild', () => {
-    it('returns ABORT when the request signal is already aborted', async () => {
-        const buildMock = vi.fn().mockResolvedValue({ id: 'build-1', status: 'SUCCEEDED' });
-        const client = { actor: () => ({ build: buildMock }) } as unknown as InternalToolArgs['apifyClient'];
+    const stubClient = (
+        buildMock: ReturnType<typeof vi.fn>,
+        getMock: ReturnType<typeof vi.fn>,
+        abortMock: ReturnType<typeof vi.fn>,
+    ) =>
+        ({
+            actor: () => ({ build: buildMock }),
+            build: () => ({ get: getMock, abort: abortMock }),
+        }) as unknown as InternalToolArgs['apifyClient'];
+
+    it('aborts the started build and returns ABORT when the request signal is already aborted', async () => {
+        const buildMock = vi.fn().mockResolvedValue({ id: 'build-1', status: 'RUNNING' });
+        const getMock = vi.fn();
+        const abortMock = vi.fn().mockResolvedValue(undefined);
         const controller = new AbortController();
         controller.abort();
 
-        const result = await startBuild(client, 'actor-1', '0.1', {
+        const result = await startBuild(stubClient(buildMock, getMock, abortMock), 'actor-1', '0.1', {
             useCache: true,
             waitSecs: WAIT_SECS_MAX,
             signal: controller.signal,
         });
 
-        // The build was started, but the aborted signal wins the race even though the call resolved.
+        // The build was started, so it is aborted; the wait never begins.
         expect(result).toBe(ABORT);
-        expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true, waitForFinish: WAIT_SECS_MAX });
+        expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true });
+        expect(abortMock).toHaveBeenCalledTimes(1);
+        expect(getMock).not.toHaveBeenCalled();
+    });
+
+    it('waits for the started build and returns the finished one', async () => {
+        const buildMock = vi.fn().mockResolvedValue({ id: 'build-1', status: 'RUNNING' });
+        const getMock = vi.fn().mockResolvedValue({ id: 'build-1', status: 'SUCCEEDED' });
+        const abortMock = vi.fn();
+
+        const result = await startBuild(stubClient(buildMock, getMock, abortMock), 'actor-1', '0.1', {
+            tag: 'beta',
+            useCache: false,
+            waitSecs: 10,
+        });
+
+        expect(buildMock).toHaveBeenCalledWith('0.1', { tag: 'beta', useCache: false });
+        expect(getMock).toHaveBeenCalledWith({ waitForFinish: 10 });
+        expect(result).toEqual({ id: 'build-1', status: 'SUCCEEDED' });
+        expect(abortMock).not.toHaveBeenCalled();
     });
 });
 

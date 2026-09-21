@@ -94,6 +94,28 @@ Actor exactly retired that failure mode along with the 5/8 ratio, so re-measure 
 run as a regression. The lesson that outlived it: treat a shift in the ratio as the signal rather than a
 single red run, and blame a tool description only after checking the case still passes on Sonnet.
 
+The schedules family (`merge/schedules/*`, 10 items: 7 proper + 3 with `expectedErrors`) covers the
+schedule tools: create for a task and for an Actor, cron and time-zone translation from user language,
+pausing, adding an action (an update replaces the whole list), deleting, a name collision, and a
+not-found read. It uses fixed `eval-sched-*` names plus two permanent, disabled fixture schedules that
+run the `eval-sum-nightly` task fixture: `eval-nightly-sum`, which the pure read cases assert on and no
+case may modify, and `eval-sched-target`, which the add-an-action case edits. They are separate because
+items run concurrently against one account — a case that edits the schedule a read case asserts on makes
+that read pass or fail depending on which item finished first. For the same reason,
+`merge/schedules/add-action-medium-1` is not safe under `--iterations N` above 1 unless you also pass
+`--concurrency 1`: its trials all edit `eval-sched-target`, so a trial can read the schedule after
+another trial has already added to it and get judged against a starting state that is no longer there.
+CI runs each item once, so this affects local repeat runs only. Run
+`pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures` before every
+run: the second script deletes leftover `eval-*` schedules and resets the fixture (disabled, `0 3 * * *`
+UTC, one task action), since an eval agent may have enabled it or replaced its actions. The fixture stays
+disabled on purpose; an enabled one would start a run on the eval account every night.
+
+Run `evals:mcp-agent:schedules-fixtures` again **after** a run as well. The create cases leave enabled
+schedules behind, and an enabled schedule keeps firing on the eval account until something deletes it —
+seeding at the start of the next run is too late. CI does this in a `Tear down schedule fixtures` step
+guarded by `always()`, so a failed or cancelled run still cleans up.
+
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
 selection among the defaults, and multi-fetch chains. They create no named account state, so
@@ -304,6 +326,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `tool_call_mode.ts` - Tool-call-mode scoring: the deny wording, `ToolSearch` skip, `first_tool_match` name/args matching
 - `sdk_conversation_adapter.ts` - Folds the SDK message stream into `ConversationHistory`, tool spans, and metrics
 - `llm_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
+- `claude_judge_client.ts` - Judge backed by the Claude Agent SDK (`--claude-judge`), for runs without an OpenRouter key
 - `langfuse_observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
 - `mcp_agent_judge.ts` - Judge evaluation
 - `langfuse_tracing.ts` - OpenTelemetry span processor init/shutdown
@@ -312,6 +335,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `run_mcp_agent_evals.ts` - Main CLI entry
 - `export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
 - `tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
+- `schedules_fixtures.ts` - Schedule-suite fixture CLI entry (`pnpm run evals:mcp-agent:schedules-fixtures`)
 - `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime and gitignored
 
 ## Configuration
@@ -458,7 +482,7 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 
 ## CI
 
-CI replaces the Phoenix runner with two Langfuse tiers:
+CI runs two Langfuse tiers:
 
 - `pr`: `mcp-server-evals-pr` tool-call items. It fails below 0.9, based on a 0.93 local floor.
 - `merge`: `mcp-server-evals-merge` agent items. It fails below 0.6, based on a 0.73 local floor; nine of 60 items fail consistently, and three publish cases (`tasks/publish-discovery`, `tasks/publish-medium-1`, `tasks/chain-hard-1`) fail unless `APIFY_TOKEN` can write to their target Actor.
@@ -471,9 +495,71 @@ Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOK
 
 The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once; the handshake race above does not, because it produces a wrong answer rather than an error.
 
+## Writing tool descriptions
+
+Tool descriptions are the main lever on eval scores, but not the only one — some failures
+are model-level limits, not description bugs.
+
+### Tool definitions (Anthropic guidelines)
+
+- **Be extremely detailed.** Explain what the tool does, when it should and should not be
+  used, what each parameter means, and any caveats — including what the tool does *not*
+  return when its name is misleading. Aim for 3-4 sentences, more for complex tools.
+- **Prioritize description over examples.** Add examples only after the description is
+  complete.
+
+### Metadata for OpenAI models
+
+- Name — pair the domain with the action (`calendar.create_event`).
+- Description — start with "Use this when..." and call out disallowed cases ("Do not use
+  for reminders").
+- Parameter docs — describe each argument, include examples, use enums for constrained
+  values.
+- Annotate `readOnlyHint: true` on tools that never mutate state so clients can skip the
+  confirmation prompt.
+
+### Tool description vs parameter description
+
+Based on [Cursor Agent Tools v1.0](https://raw.githubusercontent.com/x1xhlol/system-prompts-and-models-of-ai-tools/refs/heads/main/Cursor%20Prompts/Agent%20Tools%20v1.0.json),
+[Lovable Agent Tools](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Lovable/Agent%20Tools.json)
+and [Claude Code Tools](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Claude%20Code/claude-code-tools.json):
+
+**Tool description**: what the tool does, when to use it, key limitations, high-level
+behavior.
+
+**Parameter description**: what each parameter does, input constraints, per-parameter
+examples and guidance.
+
+Keep both concise but comprehensive, use language that matches user intent, and state
+operational limits explicitly.
+
+### Improving a failing tool
+
+1. **Start with the `pr` tier.** Its tool-call items are unjudged — the item records the
+   first attempted call and nothing executes — so a failure is a plain wrong-tool or
+   wrong-args signal, easier to read than a `merge`-tier judge score.
+2. **Read the trace for what that tier records.** On a `pr` item, read the
+   first-attempted-call comment: every tool span there is an ERROR by design (the deny-all
+   hook), so red spans say nothing about pass or fail. On a `merge` item, read the judge's
+   reasoning. A run that crashed before the tree was emitted leaves no spans — only the
+   SDK's item-run root.
+3. **Confirm it is a regression** before touching a description — see
+   [Two datasets](#two-datasets-kind-id-scheme-and-expectederrors) for why a single failing
+   run is not the signal.
+4. **Change one tool at a time.** Simultaneous edits are untraceable.
+5. **Iterate on a subset**, then re-run the full dataset — fixing one case often breaks
+   another.
+6. **Never let an LLM rewrite tool descriptions automatically.** Make the edit manually
+   from your own reading of the failure; automated rewrites usually make it worse.
+
+For runtime symptoms rather than description problems — agent shelling out, judge too
+strict, timeouts — see [Common issues](#common-issues).
+
 ## References
 
 - [MCP Protocol Spec](https://modelcontextprotocol.io/)
 - [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview)
 - [Apify API](https://docs.apify.com/api/v2)
 - [OpenRouter](https://openrouter.ai/)
+- [Example of a good tool description](https://docs.claude.com/en/docs/agents-and-tools/tool-use/implement-tool-use#example-of-a-good-tool-description)
+- [OpenAI optimize metadata](https://developers.openai.com/apps-sdk/guides/optimize-metadata)
