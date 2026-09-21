@@ -97,24 +97,35 @@ single red run, and blame a tool description only after checking the case still 
 The schedules family (`merge/schedules/*`, 10 items: 7 proper + 3 with `expectedErrors`) covers the
 schedule tools: create for a task and for an Actor, cron and time-zone translation from user language,
 pausing, adding an action (an update replaces the whole list), deleting, a name collision, and a
-not-found read. It uses fixed `eval-sched-*` names plus two permanent, disabled fixture schedules that
-run the `eval-sum-nightly` task fixture: `eval-nightly-sum`, which the pure read cases assert on and no
-case may modify, and `eval-sched-target`, which the add-an-action case edits. They are separate because
-items run concurrently against one account — a case that edits the schedule a read case asserts on makes
-that read pass or fail depending on which item finished first. For the same reason,
-`merge/schedules/add-action-medium-1` is not safe under `--iterations N` above 1 unless you also pass
-`--concurrency 1`: its trials all edit `eval-sched-target`, so a trial can read the schedule after
-another trial has already added to it and get judged against a starting state that is no longer there.
-CI runs each item once, so this affects local repeat runs only. Run
-`pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures` before every
-run: the second script deletes leftover `eval-*` schedules and resets the fixture (disabled, `0 3 * * *`
-UTC, one task action), since an eval agent may have enabled it or replaced its actions. The fixture stays
-disabled on purpose; an enabled one would start a run on the eval account every night.
+not-found read. Every item that creates a schedule names it `eval-sched-<what>-{{uniq}}` in the query
+and in the reference (see "Unique resource names" below), so its trials and any concurrent run work
+on separate schedules and `--iterations N` is safe. One permanent, disabled fixture schedule runs the `eval-sum-nightly` task
+fixture: `eval-nightly-sum`, which the pure read cases and the collision case point at and no case may
+modify. The seed step resets it to the same values every run, so a concurrent reader never observes
+the reset. The fixture stays disabled on purpose; an enabled one would start a run on the eval account
+every night.
 
-Run `evals:mcp-agent:schedules-fixtures` again **after** a run as well. The create cases leave enabled
-schedules behind, and an enabled schedule keeps firing on the eval account until something deletes it —
-seeding at the start of the next run is too late. CI does this in a `Tear down schedule fixtures` step
-guarded by `always()`, so a failed or cancelled run still cleans up.
+Run `pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures` before a
+run: the second script resets the fixture (disabled, `0 3 * * *` UTC, one task action), since an eval
+agent may have enabled it or replaced its actions, and deletes `eval-*` schedules older than 6 hours.
+It deletes on whatever account `APIFY_TOKEN` points at and prints that account first; pass `--dry-run`
+to see what it would delete before it does.
+
+**After** a run, delete the schedules that run created, with the command it printed:
+
+```bash
+pnpm run evals:mcp-agent:schedules-fixtures -- --run-id <the run id from the summary>
+```
+
+`--run-id` deletes that run's own names at any age. Skipping it costs nothing permanent — the 6-hour
+sweep catches them on a later run — but the enabled ones keep firing until then. CI does this in a
+`Tear down schedule fixtures` step guarded by `always()`, passing the same
+`<github.run_id>-<github.run_attempt>` the run step used.
+
+The deterministic platform facts the judge used to score here — an update replaces the action list,
+what a name collision returns, what create returns — live in `tests/test_kit/cases/schedules.cases.ts`
+instead, asserted against the live API. Those cases name their schedules `test-sched-*`; the sweep
+above only ever touches `eval-*`.
 
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
