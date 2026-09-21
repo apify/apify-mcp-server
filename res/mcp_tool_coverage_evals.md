@@ -112,59 +112,65 @@ would succeed.
 
 | Tier | Opus | Sonnet | Haiku |
 |---|---|---|---|
-| `pr-v2` (72 items as measured) | 39/72 (0.54) | 54/72 (0.75) | 56/72 (0.78) |
-| `merge-v2` (29 items as measured) | 23/29 (0.79) | not run | 16/29 (0.55) |
+| `pr` **after** widening, 74 items | 69/74 (0.93) | 69/74 (0.93) | 70/74 (0.95) |
+| `pr` before widening, 72 items | 39/72 (0.54) | 54/72 (0.75) | 56/72 (0.78) |
+| `merge`, 29 items | 23/29 (0.79) | not run | 16/29 (0.55) |
 
-Measured before the coverage top-up below took `pr` to 74 and `merge` to 37. The 7 added cases were
-validated separately: the 5 changed/added `pr` cases pass on Haiku and Sonnet (5/5) and 4/5 on Opus,
-and all 8 added `merge` cases pass on Opus (8/8), so the tier figures move only slightly.
+The first row is the suite as it stands and the one to gate on. The second is the same cases with
+`expectedTools` naming only the action tool — kept because the gap between the rows *is* the
+finding (see below), not because either number is wrong. `merge` has not been re-run since it grew
+to 37 items.
 
 **Run the tier at `--concurrency 1`.** An earlier sweep at concurrency 2 measured 0.51/0.63/0.58 —
 each roughly 20 points low, purely from the MCP-startup race. Those numbers are void; do not compare
 against them.
 
-**The `pr` ladder runs Haiku > Sonnet > Opus, and that is the finding, not noise.** Opus is 24 points
-behind Haiku. The stronger the model, the more it reads before it acts, and the tool-call scorer
-asserts the *first* call. The `merge` tier, which scores the whole multi-turn run, orders normally
-(Opus 0.79 > Haiku 0.55). So: a weaker model is the more sensitive probe of *descriptions*; a
-stronger one is the more sensitive probe of *whether an action tool is worth calling directly*.
+**Before widening, the `pr` ladder ran Haiku > Sonnet > Opus** — Opus 24 points behind Haiku, the
+reverse of what the authoring skill assumes. That inversion was an artefact of over-strict cases, and
+it vanished once they accepted a defensible sibling read: all three now sit within two points of each
+other. The `merge` tier, which scores the whole multi-turn run rather than the first call, ordered
+normally throughout (Opus 0.79 > Haiku 0.55).
 
-### The one systemic finding
+### What the failures turned out to be
 
-With every tool loaded, agents reach for the *inspect* sibling before the *action* tool. It accounts
-for nearly every failure in both models:
+The first read of this suite was **wrong**, and the correction matters more than the original claim.
 
-| Wanted | Agent called instead |
+Nearly every failure was the agent reaching for the *inspect* sibling before the *action* tool —
+`get-actor-task` before `update-actor-task`, `get-schedule` before `update-schedule`,
+`fetch-actor-details` before `call-actor`, `get-actor-run` before `get-actor-run-log`. That was
+recorded here as a systemic description problem. It is not one:
+
+- `call-actor.input` is a **required** field, so an agent that does not know the Actor's schema has
+  to fetch details first. The case was penalising correct behaviour.
+- `update-schedule`'s own description tells the agent to read the schedule with `get-schedule`,
+  copy its `actions` and send the whole array back. The case failed agents for following it.
+- Reading before a destructive or partial mutation is good practice, not a defect.
+
+The authoring skill already says a tool-call case must accept every defensible answer, and
+`expectedTools` is a list the scorer passes on any member of. These 30 cases now name both the
+action tool and its defensible sibling. Scores went from 0.78 / 0.75 / 0.54 to **0.95 / 0.93 / 0.93**
+with no change to any description, and the inverse ladder disappeared with them — Opus was never
+worse at choosing tools, it was being penalised for reading first.
+
+The lesson for whoever writes the next batch: on a first-call scorer, a case that demands the
+*optimal* call measures efficiency, not correctness. A gate should assert the agent stayed in the
+right neighbourhood. Efficiency belongs on a nightly bench.
+
+### What is genuinely wrong
+
+Three findings survive, consistent across models, and are the work in #1411:
+
+| Case | Behaviour |
 |---|---|
-| `update-actor-task`, `publish-actor-task`, `unpublish-actor-task` | `get-actor-task` |
-| `update-schedule`, `delete-schedule` | `get-schedule` |
-| `get-actor-run-log` | `get-actor-run` |
-| `get-dataset-items`, `get-dataset-schema` | `get-dataset` |
-| `get-key-value-store-keys` | `get-key-value-store` |
-| `call-actor`, `create-actor-task` | `fetch-actor-details` |
-| `abort-actor-run` | `get-actor-run` |
+| `pr/search-actors/limit-three-amazon-reviews` | asked for 3 options, sends `limit` 5 or 10 (schema allows 1) |
+| `pr/get-actor-run/wait-until-finished` | asked to wait 60s, sends `waitSecs: 45` |
+| `pr/create-actor-task/not-a-schedule-trap` | "keep this setup so I don't retype it" reaches `get-actor-run-list` |
 
-These 13 fail on **all three** models on the clean sweep, so they are description problems rather
-than model quirks. Start the tuning PR here:
+Plus 2-3 `no tool call attempted` per run — residual harness flake even at concurrency 1, which is
+why the gate belongs at 0.9 rather than 1.0.
 
-```
-pr/call-actor/budget-cap-one-dollar             pr/get-key-value-store-keys/lazy-whats-in-there
-pr/call-actor/wait-two-minutes                  pr/publish-actor-task/let-people-find-it
-pr/create-actor-task/lazy-save-config           pr/search-actors/limit-three-amazon-reviews
-pr/create-actor-task/not-a-schedule-trap        pr/update-actor-task/lazy-change-numbers
-pr/create-actor-task/with-stored-input          pr/update-actor-task/switch-build
-pr/delete-schedule/remove-completely-not-pause  pr/update-schedule/change-frequency
-pr/get-actor-run-log/lazy-why-did-it-break
-```
-
-An earlier concurrency-2 sweep put this list at 18; five of those were race victims, not findings.
-
-Two argument findings, both cross-model: `search-actors` ignores an explicit count ("just 3 options"
-→ `limit` 5 or 6, though the schema allows 1), and `get-actor-run` shortens a stated wait ("up to 60
-seconds" → `waitSecs` 45).
-
-`report-problem` **passes** as a first call on Opus. PR #1338 recorded it as structurally uncoverable;
-with the full tool set and no client built-ins competing, it is covered.
+`report-problem` **passes** as a first call. PR #1338 recorded it as structurally uncoverable; with
+the full tool set and no client built-ins competing, it is covered.
 
 ### merge-v2
 
@@ -221,30 +227,52 @@ silently lost six axes. Restored by porting v1's own calibrated cases:
 `status-hard-1` was retargeted off httpbin.org (503s regularly, per the harness README) to a 404 on
 rfc-editor.org, probed at authoring time.
 
-## Tiering: why v2 does not replace v1 yet
+## Tiering, and where these datasets end up
 
 Three tiers, one job each:
 
-| Tier | Job | Dataset |
+| Tier | Job | Runs |
 |---|---|---|
-| PR | fast regression gate, nothing executes | **v1** — runs 0.93-0.97 against a 0.9 threshold |
-| merge | full agent run on master | **v1** |
-| nightly | diagnostic bench, non-gating | **does not exist yet** — this is where v2 belongs |
+| PR | fast regression gate, nothing executes | `tool-call` items |
+| merge | full agent run on master | `agent` items |
+| nightly | diagnostic bench, non-gating | does not exist yet |
 
-v2 scores ~0.78 on the CI model *by design*: it holds cases that fail so descriptions can be tuned
-against them. Gating on that would mean a threshold near 0.55, which is not a gate — 45% of the
-suite could break and CI would stay green. So v1 keeps gating until either the tuning work lifts
-v2's rate, or a nightly tier gives v2 a home where failures are the point. On the second path v2
-never replaces v1 at all; they run side by side.
+**The `-v2` names are staging, not the destination.** The end state is the original
+`mcp-server-evals-pr` and `mcp-server-evals-merge`, holding the new cases. Getting there is a
+migration, not a `--dataset` flag change, because Langfuse item ids are project-unique forever and
+cannot move between datasets:
+
+1. Re-slug all 111 new cases (the ids burned in the `-v2` datasets cannot be reused).
+2. Upsert them into `mcp-server-evals-pr` / `mcp-server-evals-merge`.
+3. Archive the v1 items in those datasets.
+4. Abandon the `-v2` datasets. Langfuse exposes no dataset delete or rename over the API
+   (405 on `DELETE`/`PATCH`/`PUT`), so they stay as dead scratch.
+
+**That migration *is* the CI switch** — CI already points at those names, so step 2 puts the new
+cases in front of it immediately. It therefore happens after the description work, not before.
+
+**No further suffixes, ever.** Langfuse supports time-travel reads on a dataset
+(`GET /api/public/dataset-items?datasetName=…&version=<ISO>`), verified here:
+
+```
+current                      -> 74 items
+version=2026-09-20T22:00:00Z -> 72 items   (before a coverage top-up)
+version=2026-09-01T00:00:00Z ->  0 items   (before the dataset existed)
+```
+
+So one dataset per tier from then on, with a pinned timestamp in the repo giving reproducible runs
+— that is #1395. Never create a `-v3`.
 
 ## Open
 
-- Cases are deliberately not all passing. Tuning descriptions so they do is the follow-up, and is
-  the reason these datasets exist. Start with the 13 cross-model failures above.
+- Three descriptions are the remaining work, tracked in #1411: `search-actors` ignoring an explicit
+  count, `get-actor-run` shortening a stated wait, and `create-actor-task` not being reached from
+  "keep this setup so I don't retype it". Everything else now passes.
 - Sonnet has not been run on `merge`. Queue it behind #1394: merge cases create `eval-*` resources,
   and running another model now just adds debris the sweep has to clean up first.
-- `--pass-threshold` is deliberately unset. Pick it from the post-tuning rate, or not at all if v2
-  lands on a nightly tier where nothing is gated.
+- `--pass-threshold 0.9` is the target for the PR tier, matching what v1 runs at today. The widened
+  suite measures 0.95 / 0.93 / 0.93 on Haiku / Sonnet / Opus, so it clears that with margin while
+  leaving the three real findings visible as failures.
 - #1394 is partly satisfied by v2 already: mutating cases are self-contained (`create-then-remove`
   makes and deletes its own schedule; both collision cases mutate nothing). Its per-trial-naming and
   age-based sweep are not — `eval-sched-weekday` and `eval-sum-eight-nine` collided between two runs
