@@ -11,6 +11,7 @@ import { evaluateConversation } from '../judge/judge.js';
 import type { DatasetItem, McpAgentItem } from '../langfuse/dataset.js';
 import { parseMcpAgentItem } from '../langfuse/dataset.js';
 import { buildAgentObservations, emitObservations } from '../langfuse/observations.js';
+import { buildRunSuffix } from '../run_id.js';
 import { resolveFirstToolMatch } from './tool_call_mode.js';
 
 /** One failed server tool call. `expected` is true when the item's `expectedErrors` names it. */
@@ -218,12 +219,38 @@ function withIteration(item: DatasetItem, iteration: number): DatasetItem {
     return { ...item, metadata: { ...(item.metadata as Record<string, unknown> | undefined), iteration } };
 }
 
+/** Marker an item's author writes where a name unique to the run and the trial belongs. */
+const UNIQ_MARKER_PATTERN = /\{\{uniq\}\}/g;
+
+/**
+ * Rewrites every `{{uniq}}` in the agent prompt and the judge reference to `suffix`. Both fields
+ * take the same value from one pass, so a create case and the reference scoring it name one
+ * resource. An item without the marker comes back unchanged, so unedited items keep working.
+ *
+ * Function replacer, as in judge.ts: `$&` and `` $` `` are routine in a reference quoting a shell
+ * command, and a plain string replacement would read them as replacement patterns.
+ */
+export function substituteUniqMarker(item: DatasetItem, suffix: string): DatasetItem {
+    const substitute = (text: string): string => text.replace(UNIQ_MARKER_PATTERN, () => suffix);
+    const input = item.input as { query?: unknown } | null | undefined;
+    return {
+        ...item,
+        ...(typeof input?.query === 'string' && { input: { ...input, query: substitute(input.query) } }),
+        ...(typeof item.expectedOutput === 'string' && { expectedOutput: substitute(item.expectedOutput) }),
+    };
+}
+
 /**
  * Repeats items in one experiment, tagging each copy with its one-based iteration because
- * Langfuse has no native iteration field.
+ * Langfuse has no native iteration field, and resolving each copy's `{{uniq}}` marker to
+ * `<runId>-t<trial>`, so two trials of one item never create the same named resource.
  */
-export function expandIterations(items: DatasetItem[], iterations: number): DatasetItem[] {
-    return items.flatMap((item) => Array.from({ length: iterations }, (_, index) => withIteration(item, index + 1)));
+export function expandIterations(items: DatasetItem[], iterations: number, runId: string): DatasetItem[] {
+    return items.flatMap((item) =>
+        Array.from({ length: iterations }, (_, index) =>
+            substituteUniqMarker(withIteration(item, index + 1), buildRunSuffix(runId, index + 1)),
+        ),
+    );
 }
 
 export function validateIterations(value: number): void {
@@ -312,6 +339,18 @@ export function formatRunSummary(summary: RunSummary, passThreshold: number, ite
     }
 
     return lines;
+}
+
+/**
+ * Printed after the summary: the run's id and the command that deletes the schedules it created.
+ * The runner does not delete them itself — that would put one family's cleanup in the runner every
+ * family shares, and a killed run would skip it anyway.
+ */
+export function formatTeardownHint(runId: string): RunSummaryLine[] {
+    return [
+        { stream: 'log', text: `🧹 Run id ${runId} — delete this run's schedules:` },
+        { stream: 'log', text: `   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id ${runId}` },
+    ];
 }
 
 /**

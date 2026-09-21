@@ -41,7 +41,7 @@ pnpm run build
 pnpm run evals:mcp-agent
 ```
 
-Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--tool-timeout` caps each MCP tool call (default 60 s); `--mcp-tools-only` removes Claude Code built-ins. Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
+Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--tool-timeout` caps each MCP tool call (default 60 s); `--mcp-tools-only` removes Claude Code built-ins; `--run-id` names the resources this run creates (see "Unique resource names" below). Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
 
 ### Two datasets: kind, id scheme, and expectedErrors
 
@@ -156,7 +156,36 @@ The harness uses `canUseTool` instead of root-incompatible permission bypass fla
 
 ### `--iterations` on stateful agent items
 
-`--iterations N` repeats each item in one experiment and reports `pass@k` and `pass^k`. It is safe for tool-call and stateless agent items. Stateful cases such as `merge/tasks/*` can collide with their own leftovers.
+`--iterations N` repeats each item in one experiment and reports `pass@k` and `pass^k`. It is safe for tool-call and stateless agent items, and for agent items that name their resources with `{{uniq}}` (below). Stateful cases without the marker, such as `merge/tasks/*`, can collide with their own leftovers.
+
+### Unique resource names: `{{uniq}}` and `--run-id`
+
+An item that creates a named account resource writes `{{uniq}}` where the run-specific part of the
+name belongs, in the query **and** in the reference:
+
+```
+query:     ... and call it eval-sched-add-{{uniq}}
+reference: PASS only if create-schedule created eval-sched-add-{{uniq}}.
+```
+
+The runner rewrites every `{{uniq}}` to `<run-id>-t<trial>` before the item reaches the agent and the
+judge, so two trials of one item, or two runs at once, never ask for the same name. Keep the static
+part of the name at 35 characters or fewer: a schedule or task name is capped at 63 and a CI run id
+plus the trial takes the rest.
+
+Substitute both or neither. A marker in the query alone makes the judge demand a name the agent never
+used. An item without the marker passes through unchanged — and keeps colliding exactly as before, so
+the fix is per item, not automatic. `metadata.expectedArgs` is never substituted: it is valid on
+`kind: "tool-call"` items only, and no tool-call item creates anything.
+
+`--run-id` overrides the generated id (lowercase letters, digits and dashes). CI passes
+`<github.run_id>-<github.run_attempt>`, so its teardown step matches the same names without anything
+being plumbed between the steps. A run prints its id and its teardown command when it finishes:
+
+```
+🧹 Run id r3k9f2qa7c — delete this run's schedules:
+   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id r3k9f2qa7c
+```
 
 **Exit codes:**
 - `0` = the aggregate pass rate (passed trials / requested trials) meets `--pass-threshold`
@@ -281,6 +310,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 
 - `config.ts` - Models and the MCP tool-name prefix, shared across responsibilities
 - `environment.ts` - Env var sanitization and missing-var reporting
+- `run_id.ts` - The `<static>-<runId>-t<trial>` name grammar shared by the runner and the fixtures scripts
 - `runner/run.ts` - Main CLI entry, runner defaults
 - `runner/experiment.ts` - Experiment task (agent + tool-call dispatch), `EVALUATORS`, run summary, exit gate
 - `runner/filters.ts` - Test case filtering by category and id

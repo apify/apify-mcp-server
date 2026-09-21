@@ -7,11 +7,13 @@ import {
     EVALUATORS,
     expandIterations,
     formatRunSummary,
+    formatTeardownHint,
     isTransientAgentError,
     resolveExitCode,
     resolveGitBranch,
     validateConcurrency,
     validateIterations,
+    substituteUniqMarker,
     validatePassThreshold,
     type McpAgentTaskOutput,
 } from '../../evals/runner/experiment.js';
@@ -497,6 +499,64 @@ describe('resolveExitCode()', () => {
     });
 });
 
+describe('substituteUniqMarker()', () => {
+    const makeItem = (query: string, expectedOutput?: string) =>
+        ({
+            id: 'merge/schedules/add-action-medium-1',
+            input: { query },
+            ...(expectedOutput !== undefined && { expectedOutput }),
+            metadata: { category: 'create', kind: 'agent' },
+        }) as unknown as Parameters<typeof substituteUniqMarker>[0];
+
+    it('rewrites every marker in the query and the reference to the same value', () => {
+        const item = makeItem(
+            'Create eval-sched-add-{{uniq}}, then rename it to eval-sched-add-{{uniq}}',
+            'PASS only if create-schedule created eval-sched-add-{{uniq}}.',
+        ) as unknown as { input: { query: string }; expectedOutput: string };
+
+        const resolved = substituteUniqMarker(item as never, 'r3k9f2qa7c-t2') as unknown as {
+            input: { query: string };
+            expectedOutput: string;
+        };
+
+        expect(resolved.input.query).toBe(
+            'Create eval-sched-add-r3k9f2qa7c-t2, then rename it to eval-sched-add-r3k9f2qa7c-t2',
+        );
+        expect(resolved.expectedOutput).toBe('PASS only if create-schedule created eval-sched-add-r3k9f2qa7c-t2.');
+    });
+
+    it('returns an item without the marker unchanged, metadata and all', () => {
+        const item = makeItem('Pause my schedule eval-nightly-sum', 'PASS only if update-schedule was called.');
+
+        expect(substituteUniqMarker(item, 'r3k9f2qa7c-t1')).toEqual(item);
+    });
+
+    it('keeps a reference containing $& and backtick-$ intact', () => {
+        const reference = 'PASS only if the agent runs `echo $&` and reports $` verbatim for {{uniq}}.';
+        const item = makeItem('Run it', reference);
+
+        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-t1') as unknown as { expectedOutput: string };
+
+        expect(resolved.expectedOutput).toBe(
+            'PASS only if the agent runs `echo $&` and reports $` verbatim for r3k9f2qa7c-t1.',
+        );
+    });
+
+    it('leaves fields other than the query and the reference untouched', () => {
+        const item = {
+            id: 'pr/create-schedule/daily',
+            input: { query: 'Create eval-sched-{{uniq}}' },
+            metadata: { category: 'create', kind: 'tool-call', expectedArgs: { name: 'eval-sched-{{uniq}}' } },
+        } as unknown as Parameters<typeof substituteUniqMarker>[0];
+
+        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-t1') as unknown as {
+            metadata: { expectedArgs: { name: string } };
+        };
+
+        expect(resolved.metadata.expectedArgs.name).toBe('eval-sched-{{uniq}}');
+    });
+});
+
 describe('expandIterations()', () => {
     it('repeats items with an iteration without mutating their metadata', () => {
         const items = [
@@ -504,7 +564,10 @@ describe('expandIterations()', () => {
             { id: 'b', metadata: { category: 'y' } },
         ] as unknown as Parameters<typeof expandIterations>[0];
 
-        const data = expandIterations(items, 3) as unknown as { id: string; metadata: { iteration: number } }[];
+        const data = expandIterations(items, 3, 'r3k9f2qa7c') as unknown as {
+            id: string;
+            metadata: { iteration: number };
+        }[];
 
         expect(data).toHaveLength(6);
         const iterationsFor = (id: string) =>
@@ -513,6 +576,32 @@ describe('expandIterations()', () => {
         expect(iterationsFor('b')).toEqual([1, 2, 3]);
         expect(data[0].metadata).toEqual({ category: 'x', iteration: 1 });
         expect(items[0].metadata).toEqual({ category: 'x' });
+    });
+
+    it('resolves each trial marker to its own run-and-trial value', () => {
+        const items = [
+            { id: 'a', input: { query: 'Create eval-sched-{{uniq}}' }, expectedOutput: 'eval-sched-{{uniq}}' },
+        ] as unknown as Parameters<typeof expandIterations>[0];
+
+        const data = expandIterations(items, 2, 'r3k9f2qa7c') as unknown as {
+            input: { query: string };
+            expectedOutput: string;
+        }[];
+
+        expect(data[0].input.query).toBe('Create eval-sched-r3k9f2qa7c-t1');
+        expect(data[0].expectedOutput).toBe('eval-sched-r3k9f2qa7c-t1');
+        expect(data[1].input.query).toBe('Create eval-sched-r3k9f2qa7c-t2');
+        const otherRun = expandIterations(items, 1, 'r8m1p4bz2q') as unknown as { input: { query: string } }[];
+        expect(otherRun[0].input.query).not.toBe(data[0].input.query);
+    });
+});
+
+describe('formatTeardownHint()', () => {
+    it("prints the run id and the command that deletes this run's schedules", () => {
+        const lines = formatTeardownHint('r3k9f2qa7c').map((line) => line.text);
+
+        expect(lines.join('\n')).toContain('r3k9f2qa7c');
+        expect(lines).toContain('   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id r3k9f2qa7c');
     });
 });
 
