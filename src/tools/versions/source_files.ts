@@ -17,6 +17,72 @@ const BASE64_REGEX = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{
 export type SourceFileInput = { path: string; content: string; encoding?: 'utf8' | 'base64' };
 
 /**
+ * Extensions whose files are never text. `apify push` classifies by MIME type, which calls `.ts` a
+ * video, so an explicit list is used here; an agent can still override it with an explicit `encoding`.
+ */
+const BINARY_EXTENSIONS = new Set([
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'webp',
+    'avif',
+    'bmp',
+    'ico',
+    'pdf',
+    'zip',
+    'gz',
+    'tgz',
+    'tar',
+    'bz2',
+    'xz',
+    '7z',
+    'rar',
+    'woff',
+    'woff2',
+    'ttf',
+    'otf',
+    'eot',
+    'mp3',
+    'mp4',
+    'm4a',
+    'wav',
+    'ogg',
+    'webm',
+    'mov',
+    'bin',
+    'dat',
+    'wasm',
+    'exe',
+    'dll',
+    'so',
+    'dylib',
+    'jar',
+    'class',
+    'pyc',
+    'sqlite',
+    'db',
+    'parquet',
+    'xlsx',
+    'docx',
+    'pptx',
+]);
+
+function hasBinaryExtension(path: string): boolean {
+    const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
+    return path.includes('.') && BINARY_EXTENSIONS.has(extension);
+}
+
+/**
+ * The API format of a file: an explicit `encoding` wins; without one, a file with a binary extension
+ * is base64 (the caller has no other way to carry its bytes) and everything else is text.
+ */
+function resolveSourceFormat({ path, encoding }: SourceFileInput): ActorVersionSourceFile['format'] {
+    if (encoding !== undefined) return encoding === 'base64' ? 'BASE64' : 'TEXT';
+    return hasBinaryExtension(path) ? 'BASE64' : 'TEXT';
+}
+
+/**
  * POSIX path relative to the Actor root: backslashes become `/`; empty and `.` segments (`./`, doubled
  * slashes, a trailing slash) are dropped. `..` segments are kept so the caller can reject them.
  */
@@ -30,8 +96,9 @@ function normalizeSourcePath(path: string): string {
 
 /**
  * Throws `UserInputError` on the first problem with the files: an absolute path, a path empty after
- * normalization, a directory, a `..` segment, a root file named `__proto__`, a duplicate, or base64
- * content that is not base64.
+ * normalization, a directory, a `..` segment, a root file named `__proto__`, a duplicate, base64
+ * content that is not base64, or a binary file (by extension, with no `encoding` given) whose content
+ * is not base64.
  */
 export function validateSourceFiles(files: readonly SourceFileInput[]): void {
     const seen = new Set<string>();
@@ -50,15 +117,20 @@ export function validateSourceFiles(files: readonly SourceFileInput[]): void {
         if (encoding === 'base64' && !BASE64_REGEX.test(content)) {
             throw new UserInputError(`File '${path}' has encoding base64 but its content is not valid base64.`);
         }
+        if (encoding === undefined && hasBinaryExtension(path) && !BASE64_REGEX.test(content)) {
+            throw new UserInputError(
+                `File '${path}' is binary by its extension, so its content must be base64; pass encoding 'utf8' if it really is text.`,
+            );
+        }
     }
 }
 
 /** Maps the tool's files to the `sourceFiles` shape the API takes: normalized name, TEXT or BASE64. */
 export function toSourceFiles(files: readonly SourceFileInput[]): ActorVersionSourceFile[] {
-    return files.map(({ path, content, encoding }) => ({
-        name: normalizeSourcePath(path),
-        format: encoding === 'base64' ? 'BASE64' : 'TEXT',
-        content,
+    return files.map((file) => ({
+        name: normalizeSourcePath(file.path),
+        format: resolveSourceFormat(file),
+        content: file.content,
     }));
 }
 

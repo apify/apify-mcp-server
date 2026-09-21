@@ -82,7 +82,9 @@ const pushActorArgs = z.object({
                 encoding: z
                     .enum(['utf8', 'base64'])
                     .optional()
-                    .describe('Use base64 for binary files; defaults to utf8'),
+                    .describe(
+                        'utf8 for text, base64 for binary content. When omitted, a file with a binary extension (png, jpg, pdf, zip, fonts, archives, media) must be base64 and is stored as such; everything else is text',
+                    ),
             }),
         )
         .min(1)
@@ -102,7 +104,7 @@ Creates the Actor when it does not exist and creates or updates the version othe
 Returns the Actor ID and name, the version, its build tag, the number of files now in the version, how it stores them (sourceType SOURCE_FILES inline or TARBALL as a zip), the build when one was started, and a summary with one next step.${
         actorIdTakers.length > 0 ? ` Pass the returned actorId as actor to ${actorIdTakers.join(' and ')}.` : ''
     }
-Files are text (utf8) or base64 for binaries; paths are relative to the Actor root and the version must end up containing ${ACTOR_CONFIG_PATH}.
+Files are text (utf8) or base64 for binaries: a file with a binary extension is stored as base64 even when encoding is omitted, as long as its content is base64. Paths are relative to the Actor root and the version must end up containing ${ACTOR_CONFIG_PATH}.
 Files up to ${MULTIFILE_SOURCE_MAX_MIB} MiB in total are stored as editable source files. A larger set is zipped into a key-value store the version points to, as apify push does; later pushes to that version must send all files with mode replace.
 Omit versionNumber to push to the only version of an existing Actor; an Actor with several versions needs it, and a version that does not exist yet is created.
 mode merge (default) keeps files already in the version that are not listed; mode replace makes the version contain exactly the listed files.${

@@ -771,6 +771,55 @@ describe('push-actor', () => {
         );
     });
 
+    describe('binary files without an explicit encoding', () => {
+        const PNG_BASE64 = Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64');
+
+        it('stores a file with a binary extension as BASE64 when its content is base64', async () => {
+            await callTool({ files: [{ path: 'logo.png', content: PNG_BASE64 }], build: false });
+
+            expect(versionUpdateMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    sourceFiles: expect.arrayContaining([{ name: 'logo.png', format: 'BASE64', content: PNG_BASE64 }]),
+                }),
+            );
+        });
+
+        it('refuses a file with a binary extension whose content is not base64', async () => {
+            const { text } = await callToolExpectingUserError({
+                files: [{ path: 'assets/Logo.PNG', content: 'not base64 at all!' }],
+            });
+
+            expect(text).toBe(
+                "File 'assets/Logo.PNG' is binary by its extension, so its content must be base64; pass encoding 'utf8' if it really is text.",
+            );
+            expectNoWrite();
+        });
+
+        it('keeps a binary extension as text when encoding utf8 is given', async () => {
+            await callTool({ files: [{ path: 'notes.bin', content: 'plain text', encoding: 'utf8' }], build: false });
+
+            expect(versionUpdateMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    sourceFiles: expect.arrayContaining([{ name: 'notes.bin', format: 'TEXT', content: 'plain text' }]),
+                }),
+            );
+        });
+
+        // The CLI classifies by MIME type, which treats .ts as video; source files must stay text here.
+        it.each(['src/main.ts', 'Dockerfile', 'README.md', '.actor/INPUT_SCHEMA.json'])(
+            'stores %s as TEXT',
+            async (path) => {
+                await callTool({ files: [{ path, content: 'const x = 1;' }], build: false });
+
+                expect(versionUpdateMock).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        sourceFiles: expect.arrayContaining([expect.objectContaining({ name: path, format: 'TEXT' })]),
+                    }),
+                );
+            },
+        );
+    });
+
     it.each(['YQ==', 'YWI='])('accepts padded base64 content %s', async (content) => {
         await callTool({ files: [{ path: 'blob.bin', content, encoding: 'base64' }], build: false });
 
