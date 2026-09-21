@@ -19,10 +19,9 @@ export const EVAL_SCHEDULE_PREFIX = 'eval-';
 export const FIXTURE_SCHEDULE_NAME = 'eval-nightly-sum';
 
 /**
- * How old an unmatched `eval-*` schedule must be before the sweep deletes it. An order of magnitude
- * above the longest plausible merge run (the workflow times out at 90 minutes), so a run in flight
- * never loses a schedule it is still asserting on; a crashed run's enabled schedules keep firing
- * until then.
+ * How old an unmatched `eval-*` schedule must be before the sweep deletes it. Four times the
+ * workflow's 90-minute timeout, so a run in flight never loses a schedule it is still asserting
+ * on; a crashed run's enabled schedules keep firing until then.
  */
 export const LEFTOVER_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
