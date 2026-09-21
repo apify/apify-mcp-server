@@ -574,6 +574,25 @@ describe('push-actor', () => {
         expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
     });
 
+    it('reports build progress while waiting, like call-actor', async () => {
+        const progressTracker = { updateProgress: vi.fn(), startActorBuildUpdates: vi.fn(), stop: vi.fn() };
+
+        await (pushActor as HelperTool).call({
+            ...stubToolCallContext({ actor: 'my-actor', files: [MAIN_JS] }, stubClient),
+            progressTracker: progressTracker as unknown as InternalToolArgs['progressTracker'],
+        });
+
+        expect(progressTracker.updateProgress).toHaveBeenNthCalledWith(1, 'Build 0.0.3 of Actor actor-1: RUNNING');
+        expect(progressTracker.startActorBuildUpdates).toHaveBeenCalledWith(
+            'build-1',
+            stubClient,
+            'Build 0.0.3 of Actor actor-1',
+            expect.objectContaining({ status: 'RUNNING' }),
+        );
+        expect(progressTracker.updateProgress).toHaveBeenLastCalledWith('Build 0.0.3 of Actor actor-1: SUCCEEDED');
+        expect(progressTracker.stop).toHaveBeenCalledTimes(1);
+    });
+
     it('returns the empty aborted response when the request signal is already aborted after the push', async () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
         const controller = new AbortController();

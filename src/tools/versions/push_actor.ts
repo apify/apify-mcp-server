@@ -22,6 +22,7 @@ import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import type { ProgressTracker } from '../../utils/progress.js';
 import { ABORT } from '../actors/actor_run_response.js';
 import {
     buildNextStepForBuild,
@@ -436,11 +437,17 @@ async function startPushedBuild(params: {
     pushed: PushActorFilesResult;
     waitSecs: number;
     signal: AbortSignal;
+    progressTracker: ProgressTracker | null | undefined;
 }): Promise<Build | typeof ABORT> {
-    const { client, pushed, waitSecs, signal } = params;
+    const { client, pushed, waitSecs, signal, progressTracker } = params;
     try {
         // No tag is passed: the version's buildTag applies, the same as `apify push`.
-        return await startBuild(client, pushed.actorId, pushed.versionNumber, { useCache: true, waitSecs, signal });
+        return await startBuild(client, pushed.actorId, pushed.versionNumber, {
+            useCache: true,
+            waitSecs,
+            signal,
+            progressTracker,
+        });
     } catch (error) {
         throw new BuildStartError(pushed, error);
     }
@@ -544,7 +551,7 @@ export const pushActor: ToolEntry = Object.freeze({
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames, signal, progressTracker } = toolArgs;
         const parsed = pushActorArgs.parse(args);
         // `toSourceFiles` maps the input files one to one, so this is also the number of files sent.
         const responseContext = { filesSent: parsed.files.length, loadedToolNames, apifyToken, client };
@@ -563,7 +570,13 @@ export const pushActor: ToolEntry = Object.freeze({
 
             let build: Build | undefined;
             if (parsed.build) {
-                const started = await startPushedBuild({ client, pushed, waitSecs: parsed.waitSecs, signal });
+                const started = await startPushedBuild({
+                    client,
+                    pushed,
+                    waitSecs: parsed.waitSecs,
+                    signal,
+                    progressTracker,
+                });
                 // The push is already done, the same as get-actor-build aborting mid-wait. Per MCP spec a
                 // cancelled request gets no response, so the push result is not reported.
                 if (started === ABORT) return respondAborted();
