@@ -451,6 +451,16 @@ describe('push-actor', () => {
             expect(versionUpdateMock).toHaveBeenCalled();
         });
 
+        it('skips the ID lookup when the missing name is not shaped like an ID', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+
+            await callTool({ actor: 'my-actor', files: [ACTOR_JSON, MAIN_JS], build: false });
+
+            expect(actorGetMock).toHaveBeenCalledTimes(1);
+            expect(actorMock).not.toHaveBeenCalledWith('my-actor');
+            expect(actorsCreateMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-actor' }));
+        });
+
         it('never treats a prefixed value as an ID', async () => {
             actorGetMock.mockResolvedValue(undefined);
 
