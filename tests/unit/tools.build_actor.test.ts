@@ -264,6 +264,25 @@ describe('build-actor', () => {
         expect(result).toEqual({});
     });
 
+    it('reports progress while waiting, like call-actor', async () => {
+        const progressTracker = { updateProgress: vi.fn(), startActorBuildUpdates: vi.fn(), stop: vi.fn() };
+
+        await (buildActor as HelperTool).call({
+            ...stubToolCallContext({ actor: 'actor-1' }, stubClient),
+            progressTracker: progressTracker as unknown as InternalToolArgs['progressTracker'],
+        });
+
+        expect(progressTracker.updateProgress).toHaveBeenNthCalledWith(1, 'Build 0.1.12 of Actor actor-1: RUNNING');
+        expect(progressTracker.startActorBuildUpdates).toHaveBeenCalledWith(
+            'build-1',
+            stubClient,
+            'Build 0.1.12 of Actor actor-1',
+            expect.objectContaining({ status: 'RUNNING' }),
+        );
+        expect(progressTracker.updateProgress).toHaveBeenLastCalledWith('Build 0.1.12 of Actor actor-1: SUCCEEDED');
+        expect(progressTracker.stop).toHaveBeenCalledTimes(1);
+    });
+
     it('returns the started build without waiting when waitSecs is 0', async () => {
         const { structuredContent } = await callTool({ actor: 'actor-1', waitSecs: 0 });
 

@@ -30,11 +30,12 @@ import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_erro
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { dispatchToolCall } from './tool_dispatch.js';
 
-/** INTERNAL tools that wait synchronously and emit progress meanwhile: call-actor's start and wait, get-actor-run and get-actor-build with waitSecs > 0. */
+/** INTERNAL tools that wait synchronously and emit progress meanwhile: call-actor's start and wait, get-actor-run, get-actor-build and build-actor with waitSecs > 0. */
 const PROGRESS_TRACKER_INTERNAL_TOOLS = new Set<string>([
     HELPER_TOOLS.ACTOR_CALL,
     HELPER_TOOLS.ACTOR_RUNS_GET,
     HELPER_TOOLS.ACTOR_BUILD_GET,
+    HELPER_TOOLS.ACTOR_BUILD,
 ]);
 
 /** A pre-dispatch failure that the shell converts to v1's protocol-error sequence. */

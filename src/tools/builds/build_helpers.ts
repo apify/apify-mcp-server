@@ -70,17 +70,24 @@ async function abortBuildOnSignal(buildId: string, client: ApifyClient): Promise
 }
 
 /**
- * Starts a build of an Actor version and waits up to `waitSecs` for it to finish. The wait is raced
- * against `signal`; a cancelled request aborts the build it started and resolves to {@link ABORT}, so
- * a build nobody waits for does not run on, the same as `call-actor` does with its run.
+ * Starts a build of an Actor version and waits up to `waitSecs` for it to finish, reporting progress
+ * meanwhile. The wait is raced against `signal`; a cancelled request aborts the build it started and
+ * resolves to {@link ABORT}, so a build nobody waits for does not run on, the same as `call-actor`
+ * does with its run.
  */
 export async function startBuild(
     client: ApifyClient,
     actorId: string,
     versionNumber: string,
-    options: { tag?: string; useCache: boolean; waitSecs: number; signal?: AbortSignal },
+    options: {
+        tag?: string;
+        useCache: boolean;
+        waitSecs: number;
+        signal?: AbortSignal;
+        progressTracker?: ProgressTracker | null;
+    },
 ): Promise<Build | typeof ABORT> {
-    const { tag, useCache, waitSecs, signal } = options;
+    const { tag, useCache, waitSecs, signal, progressTracker } = options;
     const started = await client
         .actor(actorId)
         .build(versionNumber, { ...(tag !== undefined && { tag }), useCache } satisfies ActorBuildOptions);
@@ -90,13 +97,9 @@ export async function startBuild(
         return ABORT;
     }
     if (waitSecs === 0) return started;
-    const finished = await raceAbort(client.build(started.id).get({ waitForFinish: waitSecs }), signal);
-    if (finished === ABORT) {
-        await abortBuildOnSignal(started.id, client);
-        return ABORT;
-    }
-    // `get()` is undefined only for a build that does not exist; this one was just created.
-    return finished ?? started;
+    const finished = await waitForBuild(client, started, { waitSecs, signal, progressTracker });
+    if (finished === ABORT) await abortBuildOnSignal(started.id, client);
+    return finished;
 }
 
 /**
