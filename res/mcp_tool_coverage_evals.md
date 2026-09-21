@@ -108,9 +108,72 @@ pnpm run evals:mcp-agent -- --dataset mcp-server-evals-pr-v2 \
 calls `users/me`, so it exits 403 on a token without that scope even when every write it performs
 would succeed.
 
+## Baseline (2026-09-21, `--subscription --claude-judge`, concurrency 2)
+
+| Tier | Opus | Haiku |
+|---|---|---|
+| `pr-v2` (72 tool-call) | 42/72 (0.58)\* | 42/72 (0.58) |
+| `merge-v2` (29 agent) | 23/29 (0.79) | see below |
+
+\* 37/72 measured, plus 5 of the 10 `no tool call attempted` items that pass when re-run at
+`--concurrency 1`. Haiku's 42 is unadjusted and carries 16 such items, so its true figure is higher.
+Do not compare tiers across concurrency settings.
+
+**Haiku beats Opus on tool selection here, and that is the finding, not noise.** Opus's failures are
+a superset of Haiku's: the stronger model reads before it acts, and the tool-call scorer asserts the
+*first* call.
+
+### The one systemic finding
+
+With every tool loaded, agents reach for the *inspect* sibling before the *action* tool. It accounts
+for nearly every failure in both models:
+
+| Wanted | Agent called instead |
+|---|---|
+| `update-actor-task`, `publish-actor-task`, `unpublish-actor-task` | `get-actor-task` |
+| `update-schedule`, `delete-schedule` | `get-schedule` |
+| `get-actor-run-log` | `get-actor-run` |
+| `get-dataset-items`, `get-dataset-schema` | `get-dataset` |
+| `get-key-value-store-keys` | `get-key-value-store` |
+| `call-actor`, `create-actor-task` | `fetch-actor-details` |
+| `abort-actor-run` | `get-actor-run` |
+
+These 11 fail on **both** Opus and Haiku, so they are description problems, not model quirks — start
+the tuning PR here:
+
+```
+pr/call-actor/budget-cap-one-dollar          pr/publish-actor-task/lazy-make-public
+pr/create-actor-task/lazy-save-config        pr/publish-actor-task/let-people-find-it
+pr/create-actor-task/with-stored-input       pr/update-actor-task/lazy-change-numbers
+pr/delete-schedule/remove-completely-not-pause  pr/update-actor-task/switch-build
+pr/get-actor-run-log/lazy-why-did-it-break   pr/update-schedule/change-frequency
+pr/get-key-value-store-keys/lazy-whats-in-there
+```
+
+Two argument findings, both cross-model: `search-actors` ignores an explicit count ("just 3 options"
+→ `limit` 5 or 6, though the schema allows 1), and `get-actor-run` shortens a stated wait ("up to 60
+seconds" → `waitSecs` 45).
+
+`report-problem` **passes** as a first call on Opus. PR #1338 recorded it as structurally uncoverable;
+with the full tool set and no client built-ins competing, it is covered.
+
+### merge-v2 on Opus
+
+23/29. Three failures were case defects and are fixed: the pause case targeted a fixture that is
+seeded disabled, the lifecycle case used an Actor this account cannot create tasks for
+(`apify/hello-world` → `insufficient-permissions`, now `apify/normal-mode-test-actor`), and the
+verbatim-fetch case hit an Actor requiring account-permission approval (now in `expectedErrors`).
+The other three are real: the agent asks for confirmation instead of updating a task, speculates
+about publish requirements instead of provoking the error, and answers "what data do I have"
+without listing any storage.
+
 ## Open
 
 - Cases are deliberately not all passing. Tuning descriptions so they do is the follow-up, and is
-  the reason these datasets exist.
-- Numbers per model, and the `--pass-threshold` each tier should carry, go here once the ladder
-  finishes.
+  the reason these datasets exist. Start with the 11 cross-model failures above.
+- Sonnet has not been run. The Opus/Haiku gap is about deliberation, not capability, so the middle
+  rung is worth having before any description is changed.
+- `--pass-threshold` for CI is deliberately not set yet: it should be chosen after the tuning PR,
+  from the post-fix rate, not from this baseline.
+- Switching CI over is a two-line change in `_evaluations.yaml` (`--dataset ...-v2`); the live
+  datasets stay until then.
