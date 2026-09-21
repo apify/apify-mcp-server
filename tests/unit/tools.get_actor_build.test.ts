@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { getActorBuild } from '../../src/tools/builds/get_actor_build.js';
@@ -47,6 +47,10 @@ const callTool = async (args: Record<string, unknown>, loadedToolNames?: readonl
 };
 
 describe('get-actor-build', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('has the expected tool name', () => {
         expect(getActorBuild.name).toBe(HELPER_TOOLS.ACTOR_BUILD_GET);
     });
@@ -67,7 +71,9 @@ describe('get-actor-build', () => {
             },
         });
         expect(buildMock).toHaveBeenCalledWith('build-1');
-        expect(getMock).toHaveBeenLastCalledWith({ waitForFinish: 30 });
+        // A finished build is returned from the first fetch; nothing is waited for.
+        expect(getMock).toHaveBeenCalledTimes(1);
+        expect(getMock).toHaveBeenCalledWith();
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         // content: [0] data, [1] summary/nextStep; no Console link for an API token session.
         expect(content).toHaveLength(2);
@@ -131,12 +137,57 @@ describe('get-actor-build', () => {
     });
 
     describe('waitSecs', () => {
-        it.each([0, 45])('forwards an explicit waitSecs of %i to the client', async (waitSecs) => {
-            getMock.mockResolvedValue(mockBuild());
+        it('waits the default 30 seconds for an unfinished build', async () => {
+            getMock
+                .mockResolvedValueOnce(mockBuild({ status: 'RUNNING', finishedAt: undefined }))
+                .mockResolvedValueOnce(mockBuild());
 
-            await callTool({ buildId: 'build-1', waitSecs });
+            const { structuredContent } = await callTool({ buildId: 'build-1' });
 
-            expect(getMock).toHaveBeenLastCalledWith({ waitForFinish: waitSecs });
+            expect(getMock).toHaveBeenCalledTimes(2);
+            expect(getMock).toHaveBeenLastCalledWith({ waitForFinish: 30 });
+            expect(structuredContent).toMatchObject({ build: { status: 'SUCCEEDED' } });
+        });
+
+        it('forwards an explicit waitSecs to the wait', async () => {
+            getMock
+                .mockResolvedValueOnce(mockBuild({ status: 'RUNNING', finishedAt: undefined }))
+                .mockResolvedValueOnce(mockBuild());
+
+            await callTool({ buildId: 'build-1', waitSecs: 45 });
+
+            expect(getMock).toHaveBeenLastCalledWith({ waitForFinish: 45 });
+        });
+
+        it('returns the current status without waiting when waitSecs is 0', async () => {
+            getMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
+
+            const { structuredContent } = await callTool({ buildId: 'build-1', waitSecs: 0 });
+
+            expect(getMock).toHaveBeenCalledTimes(1);
+            expect(structuredContent).toMatchObject({ build: { status: 'RUNNING' } });
+        });
+
+        it('reports progress while waiting, like get-actor-run', async () => {
+            getMock
+                .mockResolvedValueOnce(mockBuild({ status: 'RUNNING', finishedAt: undefined }))
+                .mockResolvedValueOnce(mockBuild());
+            const progressTracker = { updateProgress: vi.fn(), startActorBuildUpdates: vi.fn(), stop: vi.fn() };
+
+            await (getActorBuild as HelperTool).call({
+                ...stubToolCallContext({ buildId: 'build-1' }, stubClient),
+                progressTracker: progressTracker as unknown as InternalToolArgs['progressTracker'],
+            });
+
+            expect(progressTracker.updateProgress).toHaveBeenNthCalledWith(1, 'Build 0.1.12 of Actor actor-1: RUNNING');
+            expect(progressTracker.startActorBuildUpdates).toHaveBeenCalledWith(
+                'build-1',
+                stubClient,
+                'Build 0.1.12 of Actor actor-1',
+                expect.objectContaining({ status: 'RUNNING' }),
+            );
+            expect(progressTracker.updateProgress).toHaveBeenLastCalledWith('Build 0.1.12 of Actor actor-1: SUCCEEDED');
+            expect(progressTracker.stop).toHaveBeenCalledTimes(1);
         });
 
         it('rejects waitSecs above 45 via ajv validation', () => {

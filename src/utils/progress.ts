@@ -26,6 +26,11 @@ export function formatRunStatusMessage(
     return showStatusMessage ? `${actorName}: ${run.status} — ${run.statusMessage}` : `${actorName}: ${run.status}`;
 }
 
+/** Leads with the status like `formatRunStatusMessage`; builds carry no status message. */
+export function formatBuildStatusMessage(label: string, build: { status: string }): string {
+    return `${label}: ${build.status}`;
+}
+
 export class ProgressTracker {
     private progressToken?: string | number;
     private sendNotification?: (notification: ProgressNotification) => Promise<void>;
@@ -115,6 +120,21 @@ export class ProgressTracker {
                     status: initial.status ?? '',
                     statusMessage: initial.statusMessage,
                 }),
+        );
+    }
+
+    startActorBuildUpdates(
+        buildId: string,
+        apifyClient: ApifyClient,
+        label: string,
+        initial?: { status: string },
+    ): void {
+        this.startStatusUpdates(
+            async () => {
+                const build = await apifyClient.build(buildId).get();
+                return build && { status: build.status, message: formatBuildStatusMessage(label, build) };
+            },
+            initial && formatBuildStatusMessage(label, initial),
         );
     }
 

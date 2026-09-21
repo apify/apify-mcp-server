@@ -1,13 +1,15 @@
 import type { Build } from 'apify-client';
 import { z } from 'zod';
 
+import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS } from '../../const.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import { buildConsoleBuildUrl } from '../../utils/console_link.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondOk } from '../../utils/mcp.js';
-import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
-import { toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import type { ProgressTracker } from '../../utils/progress.js';
+import { formatBuildStatusMessage, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
+import { ABORT, raceAbort, toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 
 /** The build tools wait this long by default, the same as `get-actor-run` and `call-actor`, so a loop of build and run calls behaves alike. */
@@ -88,4 +90,37 @@ export function respondWithBuild(params: {
         [JSON.stringify(structuredContent), `${summary}\n${nextStep}`, ...(consoleLinkText ? [consoleLinkText] : [])],
         { structuredContent },
     );
+}
+
+/** The subject the progress notifications lead with, the same one the summary lines use. */
+function formatBuildLabel(build: Pick<Build, 'buildNumber' | 'actId'>): string {
+    return `Build ${build.buildNumber} of Actor ${build.actId}`;
+}
+
+/**
+ * Waits up to `waitSecs` for an unfinished build, emitting its status changes as progress notifications
+ * while it does, the way the run tools do; the wait is raced against `signal`. Returns the build as it
+ * stands when the wait ends, or {@link ABORT} when the request was cancelled.
+ */
+export async function waitForBuild(
+    client: ApifyClient,
+    build: Build,
+    options: { waitSecs: number; signal?: AbortSignal; progressTracker?: ProgressTracker | null },
+): Promise<Build | typeof ABORT> {
+    const { waitSecs, signal, progressTracker } = options;
+    const label = formatBuildLabel(build);
+    if (progressTracker) {
+        await progressTracker.updateProgress(formatBuildStatusMessage(label, build));
+        progressTracker.startActorBuildUpdates(build.id, client, label, build);
+    }
+    try {
+        const finished = await raceAbort(client.build(build.id).get({ waitForFinish: waitSecs }), signal);
+        if (finished === ABORT) return ABORT;
+        // `get()` is undefined only for a build that does not exist; this one was just fetched.
+        const current = finished ?? build;
+        await progressTracker?.updateProgress(formatBuildStatusMessage(label, current));
+        return current;
+    } finally {
+        progressTracker?.stop();
+    }
 }
