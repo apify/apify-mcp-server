@@ -43,7 +43,7 @@ Always read the transcript before assigning blame. The judge's one-liner is a hi
 - **Fail false claims, not silent success.** Outcome and honesty are the axes; etiquette (announcing a tool switch, apologizing for a detour) is a bonus, never a PASS condition.
 - **Tool-call cases must accept every defensible answer.** `expectedTools` is a list and the scorer passes on any member, so when a second tool legitimately serves the target (an Apify docs URL when `fetch-apify-docs` is loaded), name both rather than failing defensible behavior. Prefer targets where only the tool under test fits; where that is impossible, widen the list and skip `expectedArgs`, whose keys must hold for whichever tool the model picks.
 - **Probe the target, not just the mechanism.** For live-web cases, fetch the exact URL at authoring time and check the *content* supports the premise (a probed-working scraper still returned nothing for a profile that turned out to have zero posts).
-- **State is account-global.** Fixed `eval-` prefixed resource names + a fixtures seed/cleanup script; each conversation self-contained (create → act → clean up); one permanent read-only fixture for pure "get" cases.
+- **State is account-global.** `eval-` prefixed resource names, and every name a case creates carries the `{{uniq}}` marker in the query **and** the reference — the runner resolves it to `<runId>-t<trial>`, so trials and concurrent runs never collide. A fixtures script seeds, resets and sweeps: it deletes the finished run's own names via `--run-id`, and unmatched `eval-*` leftovers only once they are older than 6 hours. Each conversation is self-contained (create → act → clean up), with one permanent read-only fixture for pure "get" cases. Deterministic platform facts (what an update replaces, what a collision returns) belong in the integration suite, not in judged items.
 - **Dataset item ids are project-unique forever** — they cannot move between datasets or be reused after archiving. Choose ids you can live with; "moving" a case = new id + archive old.
 
 ## Red flags — stop and rethink
@@ -63,5 +63,5 @@ Always read the transcript before assigning blame. The judge's one-liner is a hi
 | A case with no `metadata.expectedErrors` provokes an error on purpose | The zero-tool-error gate fails it; either it's a case bug, or `expectedErrors` is missing |
 | Calibrating on the cheap model | Can't tell case bugs from description bugs; you'll "fix" descriptions against broken cases |
 | `maxTurns` too low on chain cases | Agent runs out of turns mid-flow and the judge sees an unfinished transcript |
-| Fixed names without cleanup | Second run collides with the first run's leftovers; nondeterministic failures |
+| A created name without `{{uniq}}` | Two trials, or a concurrent run, collide on one name; nondeterministic failures |
 | Skipping the wave review | A systematic case-authoring flaw (e.g. unknowable context) replicates into every hard case |
