@@ -28,6 +28,11 @@ why they load every tool at once, what they cover, the findings that came out of
 and the environment traps that corrupt a calibration run. Delete once they replace the live
 datasets in `_evaluations.yaml`.
 
+### [mcp_eval_cases_review.md](./mcp_eval_cases_review.md)
+Every new eval case in full — query, asserted tools, arguments, judge reference — plus every v1
+wording retired, grouped by tool. Generated, not hand-edited; regenerate rather than patch. For
+reviewing the case content before the migration in #1411. Delete once that lands.
+
 ## Rules
 
 - A note gets a **deletion trigger** when it is written ("delete when X ships / closes / is
