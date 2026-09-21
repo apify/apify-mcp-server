@@ -16,7 +16,7 @@ untouched and still gate CI.
 | | `mcp-server-evals-pr-v2` | `mcp-server-evals-merge-v2` |
 |---|---|---|
 | kind | `tool-call` (first call asserted, nothing executes) | `agent` (runs to completion, LLM judge) |
-| items | 72 | 29 |
+| items | 74 | 37 |
 | replaces | `mcp-server-evals-pr` (125) | `mcp-server-evals-merge` (70) |
 
 Every item in both carries the same two settings:
@@ -49,9 +49,9 @@ scope. Counts are `pr` cases naming the tool in `expectedTools`.
 | `update-schedule` | 3 | `report-problem` | 1 |
 | `delete-schedule` | 2 | | |
 
-`merge` families: actors 4, runs 4, storage 5, tasks 4, schedules 5, docs 2, web 4, dev 1.
+`merge` families: actors 4, runs 4, storage 6, tasks 5, schedules 6, docs 2, web 9, dev 1.
 
-Argument coverage: 36 of 72 `pr` cases pin `expectedArgs`, targeting the groups a lazy phrasing
+Argument coverage: 41 of 74 `pr` cases pin `expectedArgs`, targeting the groups a lazy phrasing
 should trigger — `limit`, `offset`, `desc`, `fields`, `unnamed`, `status`, `lines`, `waitSecs`,
 `gracefully`, `recordKey`, `isEnabled`, `timezone`, `build`, `callOptions.memory`,
 `callOptions.maxTotalChargeUsd`. Not all 95 groups: pinning every one costs a case each and most
@@ -108,23 +108,26 @@ pnpm run evals:mcp-agent -- --dataset mcp-server-evals-pr-v2 \
 calls `users/me`, so it exits 403 on a token without that scope even when every write it performs
 would succeed.
 
-## Baseline (2026-09-21, `--subscription --claude-judge`, concurrency 2)
+## Baseline (2026-09-21, `--subscription --claude-judge`, **concurrency 1**)
 
 | Tier | Opus | Sonnet | Haiku |
 |---|---|---|---|
-| `pr-v2` (72 tool-call) | 37/72 (0.51) | 45/72 (0.63) | 42/72 (0.58) |
-| `merge-v2` (29 agent) | 23/29 (0.79) | not run | 16/29 (0.55) |
+| `pr-v2` (72 items as measured) | 39/72 (0.54) | 54/72 (0.75) | 56/72 (0.78) |
+| `merge-v2` (29 items as measured) | 23/29 (0.79) | not run | 16/29 (0.55) |
 
-Every `pr` figure is depressed by the concurrency race: 10, 10 and 16 items respectively failed with
-`no tool call attempted`, and 5 of Opus's 10 pass when re-run at `--concurrency 1` (so Opus is really
-~42/72). Treat these as a floor, not a measurement, until someone runs the tier at concurrency 1.
+Measured before the coverage top-up below took `pr` to 74 and `merge` to 37. The 7 added cases were
+validated separately: the 5 changed/added `pr` cases pass on Haiku and Sonnet (5/5) and 4/5 on Opus,
+and all 8 added `merge` cases pass on Opus (8/8), so the tier figures move only slightly.
 
-**The `pr` ladder does not go the way the skill assumes: Sonnet > Haiku > Opus.** That is the finding,
-not noise. Opus's failures are a near-superset of Haiku's because the stronger model reads before it
-acts, and the tool-call scorer asserts the *first* call. The `merge` tier, which scores the whole
-multi-turn run, orders normally (Opus 0.79 > Haiku 0.55). A weaker model is the more sensitive probe
-of *descriptions*; a stronger one is the more sensitive probe of *whether an action tool is worth
-calling directly*.
+**Run the tier at `--concurrency 1`.** An earlier sweep at concurrency 2 measured 0.51/0.63/0.58 —
+each roughly 20 points low, purely from the MCP-startup race. Those numbers are void; do not compare
+against them.
+
+**The `pr` ladder runs Haiku > Sonnet > Opus, and that is the finding, not noise.** Opus is 24 points
+behind Haiku. The stronger the model, the more it reads before it acts, and the tool-call scorer
+asserts the *first* call. The `merge` tier, which scores the whole multi-turn run, orders normally
+(Opus 0.79 > Haiku 0.55). So: a weaker model is the more sensitive probe of *descriptions*; a
+stronger one is the more sensitive probe of *whether an action tool is worth calling directly*.
 
 ### The one systemic finding
 
@@ -141,23 +144,20 @@ for nearly every failure in both models:
 | `call-actor`, `create-actor-task` | `fetch-actor-details` |
 | `abort-actor-run` | `get-actor-run` |
 
-These 18 fail on **all three** models, so they are description problems rather than model quirks.
-Start the tuning PR here:
+These 13 fail on **all three** models on the clean sweep, so they are description problems rather
+than model quirks. Start the tuning PR here:
 
 ```
 pr/call-actor/budget-cap-one-dollar             pr/get-key-value-store-keys/lazy-whats-in-there
-pr/create-actor-task/lazy-save-config           pr/publish-actor-task/lazy-make-public
-pr/create-actor-task/not-a-schedule-trap        pr/publish-actor-task/let-people-find-it
-pr/create-actor-task/with-stored-input          pr/search-actors/limit-three-amazon-reviews
-pr/create-schedule/timezone-prague              pr/update-actor-task/landing-page-title
-pr/delete-schedule/remove-completely-not-pause  pr/update-actor-task/lazy-change-numbers
-pr/fetch-apify-docs/missing-page                pr/update-actor-task/switch-build
-pr/get-actor-run-log/error-message-not-status   pr/update-schedule/change-frequency
-pr/get-actor-run-log/lazy-why-did-it-break      pr/update-schedule/turn-back-on
+pr/call-actor/wait-two-minutes                  pr/publish-actor-task/let-people-find-it
+pr/create-actor-task/lazy-save-config           pr/search-actors/limit-three-amazon-reviews
+pr/create-actor-task/not-a-schedule-trap        pr/update-actor-task/lazy-change-numbers
+pr/create-actor-task/with-stored-input          pr/update-actor-task/switch-build
+pr/delete-schedule/remove-completely-not-pause  pr/update-schedule/change-frequency
+pr/get-actor-run-log/lazy-why-did-it-break
 ```
 
-A handful of these lost one model to the concurrency race rather than to a wrong pick, so confirm a
-case at `--concurrency 1` before treating it as evidence about a description.
+An earlier concurrency-2 sweep put this list at 18; five of those were race victims, not findings.
 
 Two argument findings, both cross-model: `search-actors` ignores an explicit count ("just 3 options"
 → `limit` 5 or 6, though the schema allows 1), and `get-actor-run` shortens a stated wait ("up to 60
@@ -191,13 +191,61 @@ run and failed the zero-tool-error gate. Delete every `eval-*` task and schedule
 fixtures before each run; `evals:mcp-agent:schedules-fixtures` does this but exits 403 on a token
 without `users/me`.
 
+## Is v2 at least as good as v1?
+
+Checked mechanically against snapshots of both live datasets, because "cheaper and broader" was
+true for `pr` and **false for `merge`** on the first cut.
+
+**`pr`: yes.** No tool covered by v1 is missing. v2 adds `get-actor-run-log` — v1's two cases for it
+assert the pre-rename `get-actor-log` and can never pass — and `report-problem`. Argument pinning
+goes from 21 to **43** distinct (tool, arg) pairs, with **zero** groups left only-in-v1. Five did
+regress on the first cut (`create-schedule.cronExpression`, `get-dataset.datasetId`,
+`get-dataset-schema.datasetId`/`limit`, `get-key-value-store.keyValueStoreId`) and are now closed.
+
+**`merge`: not at first.** Collapsing v1's 20 web cases to 4 and dropping its two collision cases
+silently lost six axes. Restored by porting v1's own calibrated cases:
+
+| Axis | v1 cases dropped | restored as |
+|---|---|---|
+| output formats | `formats-easy-1`, `formats-medium-1`, `format-discovery` | `web/markup-not-cleaned-up`, `web/pdf-to-text` |
+| links extraction | `links-medium-1` | `web/list-the-links` |
+| HTTP status | `status-hard-1` | `web/reports-404-truthfully` |
+| unreachable host | `unreachable` | `web/unreachable-host` |
+| name collision | `tasks/create-collision`, `schedules/collision-hard-1` | `tasks/name-collision`, `schedules/name-collision` |
+| pagination / bulk | `storage-dataset-items-{maps,hotels}-bulk` | `storage/all-rows-one-call` |
+
+`merge-v2` stays at 37 against v1's 70. The difference is v1's seven near-identical
+"run a scraper for platform X, then read its dataset" cases at 16-20 turns each, consolidated to two
+— deliberate, and the single biggest cost saving in the tier.
+
+`status-hard-1` was retargeted off httpbin.org (503s regularly, per the harness README) to a 404 on
+rfc-editor.org, probed at authoring time.
+
+## Tiering: why v2 does not replace v1 yet
+
+Three tiers, one job each:
+
+| Tier | Job | Dataset |
+|---|---|---|
+| PR | fast regression gate, nothing executes | **v1** — runs 0.93-0.97 against a 0.9 threshold |
+| merge | full agent run on master | **v1** |
+| nightly | diagnostic bench, non-gating | **does not exist yet** — this is where v2 belongs |
+
+v2 scores ~0.78 on the CI model *by design*: it holds cases that fail so descriptions can be tuned
+against them. Gating on that would mean a threshold near 0.55, which is not a gate — 45% of the
+suite could break and CI would stay green. So v1 keeps gating until either the tuning work lifts
+v2's rate, or a nightly tier gives v2 a home where failures are the point. On the second path v2
+never replaces v1 at all; they run side by side.
+
 ## Open
 
 - Cases are deliberately not all passing. Tuning descriptions so they do is the follow-up, and is
-  the reason these datasets exist. Start with the 11 cross-model failures above.
-- Sonnet has not been run. The Opus/Haiku gap is about deliberation, not capability, so the middle
-  rung is worth having before any description is changed.
-- `--pass-threshold` for CI is deliberately not set yet: it should be chosen after the tuning PR,
-  from the post-fix rate, not from this baseline.
-- Switching CI over is a two-line change in `_evaluations.yaml` (`--dataset ...-v2`); the live
-  datasets stay until then.
+  the reason these datasets exist. Start with the 13 cross-model failures above.
+- Sonnet has not been run on `merge`. Queue it behind #1394: merge cases create `eval-*` resources,
+  and running another model now just adds debris the sweep has to clean up first.
+- `--pass-threshold` is deliberately unset. Pick it from the post-tuning rate, or not at all if v2
+  lands on a nightly tier where nothing is gated.
+- #1394 is partly satisfied by v2 already: mutating cases are self-contained (`create-then-remove`
+  makes and deletes its own schedule; both collision cases mutate nothing). Its per-trial-naming and
+  age-based sweep are not — `eval-sched-weekday` and `eval-sum-eight-nine` collided between two runs
+  here. Re-scope it against v2 before implementing as written.
