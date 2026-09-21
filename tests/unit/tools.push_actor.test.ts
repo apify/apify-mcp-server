@@ -111,7 +111,7 @@ function apiError(status: number, message = 'Forbidden'): ApifyApiError {
 }
 
 const callTool = async (args: Record<string, unknown>, loadedToolNames?: readonly string[]) => {
-    const context = stubToolCallContext({ actorName: 'my-actor', ...args }, stubClient);
+    const context = stubToolCallContext({ actor: 'my-actor', ...args }, stubClient);
     if (loadedToolNames) context.loadedToolNames = loadedToolNames;
     return (await (pushActor as HelperTool).call(context)) as TextToolResult;
 };
@@ -119,7 +119,7 @@ const callTool = async (args: Record<string, unknown>, loadedToolNames?: readonl
 /** Calls the tool expecting a soft-fail result and returns its first text block plus the raw result. */
 const callToolExpectingUserError = async (args: Record<string, unknown>) => {
     const result = await (pushActor as HelperTool).call(
-        stubToolCallContext({ actorName: 'my-actor', ...args }, stubClient),
+        stubToolCallContext({ actor: 'my-actor', ...args }, stubClient),
     );
     expectSoftFailInvalidInput(result);
     const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
@@ -359,10 +359,10 @@ describe('push-actor', () => {
         });
     });
 
-    describe('actorName', () => {
+    describe('actor', () => {
         it('accepts the username/name form returned as actorName and pushes to the same Actor', async () => {
             const { structuredContent } = await callTool({
-                actorName: 'john/my-actor',
+                actor: 'john/my-actor',
                 files: [MAIN_JS],
                 build: false,
             });
@@ -373,7 +373,7 @@ describe('push-actor', () => {
 
         it('matches the username prefix case-insensitively and returns the account spelling', async () => {
             const { structuredContent } = await callTool({
-                actorName: 'John/my-actor',
+                actor: 'John/my-actor',
                 files: [MAIN_JS],
                 build: false,
             });
@@ -384,7 +384,7 @@ describe('push-actor', () => {
 
         it('accepts the API form username~name and returns the username/name form', async () => {
             const { structuredContent } = await callTool({
-                actorName: 'john~my-actor',
+                actor: 'john~my-actor',
                 files: [MAIN_JS],
                 build: false,
             });
@@ -394,7 +394,7 @@ describe('push-actor', () => {
         });
 
         it("refuses a tilde-separated username prefix that is not the caller's", async () => {
-            const { text } = await callToolExpectingUserError({ actorName: 'jane~my-actor', files: [MAIN_JS] });
+            const { text } = await callToolExpectingUserError({ actor: 'jane~my-actor', files: [MAIN_JS] });
 
             expect(text).toBe("This tool pushes only to your own account (john); 'jane' names another account.");
             expect(actorGetMock).not.toHaveBeenCalled();
@@ -404,13 +404,13 @@ describe('push-actor', () => {
         it('creates the Actor under its bare name when the username/name form is given', async () => {
             actorGetMock.mockResolvedValue(undefined);
 
-            await callTool({ actorName: 'john/my-actor', files: [ACTOR_JSON], build: false });
+            await callTool({ actor: 'john/my-actor', files: [ACTOR_JSON], build: false });
 
             expect(actorsCreateMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-actor' }));
         });
 
         it("refuses a username prefix that is not the caller's", async () => {
-            const { text } = await callToolExpectingUserError({ actorName: 'jane/my-actor', files: [MAIN_JS] });
+            const { text } = await callToolExpectingUserError({ actor: 'jane/my-actor', files: [MAIN_JS] });
 
             expect(text).toBe("This tool pushes only to your own account (john); 'jane' names another account.");
             expect(actorGetMock).not.toHaveBeenCalled();
@@ -651,26 +651,61 @@ describe('push-actor', () => {
         });
     });
 
-    it('refuses to create an Actor whose name has the shape of an Actor ID', async () => {
-        actorGetMock.mockResolvedValue(undefined);
+    describe('actor given as an ID', () => {
+        const ACTOR_ID = 'qGXMy0NAkWsIIb9LZ';
 
-        const { text } = await callToolExpectingUserError({
-            actorName: 'qGXMy0NAkWsIIb9LZ',
-            files: [ACTOR_JSON, MAIN_JS],
+        it("pushes to the existing Actor when the ID is one of the caller's, after the name lookup misses", async () => {
+            actorGetMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(mockActor());
+
+            const { structuredContent } = await callTool({ actor: ACTOR_ID, files: [MAIN_JS], build: false });
+
+            expect(actorMock).toHaveBeenNthCalledWith(1, `john/${ACTOR_ID}`);
+            expect(actorMock).toHaveBeenNthCalledWith(2, ACTOR_ID);
+            expect(actorMock).toHaveBeenCalledWith('actor-1');
+            expect(versionUpdateMock).toHaveBeenCalled();
+            expect(actorsCreateMock).not.toHaveBeenCalled();
+            expect(structuredContent).toMatchObject({ actorId: 'actor-1', actorName: 'john/my-actor', created: false });
         });
 
-        expect(text).toBe(
-            "No Actor named 'qGXMy0NAkWsIIb9LZ' exists in your account, and the name has the shape of an Actor ID (17 letters and digits), so none was created. Pass the Actor's name, not its ID.",
-        );
-        expectNoWrite();
-    });
+        it('refuses an ID that belongs to another account before any write', async () => {
+            actorGetMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce({ ...mockActor(), username: 'jane' });
 
-    it('still pushes to an existing Actor whose name has the shape of an Actor ID', async () => {
-        await callTool({ actorName: 'myactorscraper123', files: [MAIN_JS], build: false });
+            const { text } = await callToolExpectingUserError({ actor: ACTOR_ID, files: [ACTOR_JSON, MAIN_JS] });
 
-        expect(actorMock).toHaveBeenCalledWith('john/myactorscraper123');
-        expect(versionUpdateMock).toHaveBeenCalled();
-        expect(actorsCreateMock).not.toHaveBeenCalled();
+            expect(text).toBe(`This tool pushes only to your own account (john); Actor ${ACTOR_ID} belongs to jane.`);
+            expectNoWrite();
+        });
+
+        it('creates an Actor of that name when neither the name nor the ID exists', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+
+            const { structuredContent } = await callTool({
+                actor: 'scrapemapsresult1',
+                files: [ACTOR_JSON, MAIN_JS],
+                build: false,
+            });
+
+            expect(actorMock).toHaveBeenCalledWith('scrapemapsresult1');
+            expect(actorsCreateMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'scrapemapsresult1' }));
+            expect(structuredContent).toMatchObject({ actorName: 'john/scrapemapsresult1', created: true });
+        });
+
+        it('finds an Actor named like an ID by its name without an ID lookup', async () => {
+            await callTool({ actor: 'myactorscraper123', files: [MAIN_JS], build: false });
+
+            expect(actorMock).toHaveBeenCalledWith('john/myactorscraper123');
+            expect(actorMock).not.toHaveBeenCalledWith('myactorscraper123');
+            expect(versionUpdateMock).toHaveBeenCalled();
+        });
+
+        it('never treats a prefixed value as an ID', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+
+            await callTool({ actor: `john/${ACTOR_ID}`, files: [ACTOR_JSON, MAIN_JS], build: false });
+
+            expect(actorMock).not.toHaveBeenCalledWith(ACTOR_ID);
+            expect(actorsCreateMock).toHaveBeenCalledWith(expect.objectContaining({ name: ACTOR_ID }));
+        });
     });
 
     it('refuses to merge onto a version that does not use source files', async () => {
@@ -755,7 +790,7 @@ describe('push-actor', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
         const result = (await (pushActor as HelperTool).call({
-            ...stubToolCallContext({ actorName: 'my-actor', files: [MAIN_JS] }, stubClient),
+            ...stubToolCallContext({ actor: 'my-actor', files: [MAIN_JS] }, stubClient),
             apifyToken: 'apify_ui_test',
         })) as TextToolResult;
         const { content, structuredContent } = result;
@@ -782,7 +817,7 @@ describe('push-actor', () => {
         controller.abort();
 
         const result = await (pushActor as HelperTool).call({
-            ...stubToolCallContext({ actorName: 'my-actor', files: [MAIN_JS] }, stubClient),
+            ...stubToolCallContext({ actor: 'my-actor', files: [MAIN_JS] }, stubClient),
             apifyToken: 'apify_ui_test',
             signal: controller.signal,
         });
@@ -1010,13 +1045,13 @@ describe('push-actor', () => {
                 'Actor name must be 3 to 63 characters: letters, digits and dashes, not starting or ending with a dash.';
 
             it.each([
-                { label: 'too short', actorName: 'ab' },
-                { label: 'too long', actorName: 'a'.repeat(64) },
-                { label: 'an underscore', actorName: 'my_scraper' },
-                { label: 'a leading dash', actorName: '-scraper' },
-                { label: 'a second separator', actorName: 'john/jane/my-actor' },
-            ])('rejects an Actor name with $label without calling the API', async ({ actorName }) => {
-                const { text } = await callToolExpectingUserError({ actorName, files: [ACTOR_JSON] });
+                { label: 'too short', actor: 'ab' },
+                { label: 'too long', actor: 'a'.repeat(64) },
+                { label: 'an underscore', actor: 'my_scraper' },
+                { label: 'a leading dash', actor: '-scraper' },
+                { label: 'a second separator', actor: 'john/jane/my-actor' },
+            ])('rejects an Actor name with $label without calling the API', async ({ actor }) => {
+                const { text } = await callToolExpectingUserError({ actor, files: [ACTOR_JSON] });
 
                 expect(text).toBe(ACTOR_NAME_RULE_TEXT);
                 expect(userGetMock).not.toHaveBeenCalled();
@@ -1024,7 +1059,7 @@ describe('push-actor', () => {
             });
 
             it('rejects a username prefix with invalid characters without calling the API', async () => {
-                const { text } = await callToolExpectingUserError({ actorName: 'jo!hn/my-actor', files: [ACTOR_JSON] });
+                const { text } = await callToolExpectingUserError({ actor: 'jo!hn/my-actor', files: [ACTOR_JSON] });
 
                 expect(text).toBe('Username prefix must be 3 to 30 letters, digits, dots, underscores or dashes.');
                 expect(userGetMock).not.toHaveBeenCalled();
@@ -1032,11 +1067,11 @@ describe('push-actor', () => {
             });
 
             it('accepts a 63-character Actor name', async () => {
-                const actorName = 'a'.repeat(63);
+                const actor = 'a'.repeat(63);
 
-                await callTool({ actorName, files: [MAIN_JS], build: false });
+                await callTool({ actor, files: [MAIN_JS], build: false });
 
-                expect(actorMock).toHaveBeenCalledWith(`john/${actorName}`);
+                expect(actorMock).toHaveBeenCalledWith(`john/${actor}`);
                 expect(versionUpdateMock).toHaveBeenCalled();
             });
 
@@ -1044,7 +1079,7 @@ describe('push-actor', () => {
                 userGetMock.mockResolvedValue({ username: 'john.doe', id: 'user-secret' });
 
                 const { structuredContent } = await callTool({
-                    actorName: 'john.doe~my-actor',
+                    actor: 'john.doe~my-actor',
                     files: [MAIN_JS],
                     build: false,
                 });
@@ -1054,7 +1089,7 @@ describe('push-actor', () => {
             });
 
             it('accepts the username/name form', async () => {
-                await callTool({ actorName: 'john/my-actor', files: [MAIN_JS], build: false });
+                await callTool({ actor: 'john/my-actor', files: [MAIN_JS], build: false });
 
                 expect(actorMock).toHaveBeenCalledWith('john/my-actor');
                 expect(versionUpdateMock).toHaveBeenCalled();
@@ -1085,17 +1120,15 @@ describe('push-actor', () => {
 
         it('rejects an empty file list, an empty name, an empty buildTag and waitSecs above the cap via ajv validation', () => {
             const tool = pushActor as HelperTool;
-            expect(tool.ajvValidate({ actorName: 'my-actor', files: [] })).toBe(false);
-            expect(tool.ajvValidate({ actorName: '', files: [MAIN_JS] })).toBe(false);
-            expect(tool.ajvValidate({ actorName: 'my-actor', files: [MAIN_JS], buildTag: '' })).toBe(false);
-            expect(tool.ajvValidate({ actorName: 'my-actor', files: [MAIN_JS], waitSecs: WAIT_SECS_MAX + 1 })).toBe(
-                false,
-            );
-            expect(tool.ajvValidate({ actorName: 'my-actor', files: [MAIN_JS] })).toBe(true);
+            expect(tool.ajvValidate({ actor: 'my-actor', files: [] })).toBe(false);
+            expect(tool.ajvValidate({ actor: '', files: [MAIN_JS] })).toBe(false);
+            expect(tool.ajvValidate({ actor: 'my-actor', files: [MAIN_JS], buildTag: '' })).toBe(false);
+            expect(tool.ajvValidate({ actor: 'my-actor', files: [MAIN_JS], waitSecs: WAIT_SECS_MAX + 1 })).toBe(false);
+            expect(tool.ajvValidate({ actor: 'my-actor', files: [MAIN_JS] })).toBe(true);
         });
 
-        it('requires only actorName and files in the input schema', () => {
-            expect((pushActor as HelperTool).inputSchema.required).toEqual(['actorName', 'files']);
+        it('requires only actor and files in the input schema', () => {
+            expect((pushActor as HelperTool).inputSchema.required).toEqual(['actor', 'files']);
         });
     });
 

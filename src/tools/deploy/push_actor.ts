@@ -53,11 +53,11 @@ const MULTIFILE_SOURCE_MAX_MIB = MAX_MULTIFILE_BYTES / (1024 * 1024);
 const DEFAULT_VERSION_NUMBER = '0.0';
 
 const pushActorArgs = z.object({
-    actorName: z
+    actor: z
         .string()
         .min(1)
         .describe(
-            'Actor name in your account, not its ID: bare (my-scraper) or with your username as john/my-scraper or john~my-scraper (the API form); created if it does not exist. The returned actorId is the Actor ID the build and run tools take',
+            'Actor ID or name: my-scraper, john/my-scraper or john~my-scraper (the API form). A name is looked up in your account and the Actor is created when it does not exist; an ID must be an existing Actor of yours. The returned actorId is what the build and run tools take',
         ),
     versionNumber: z
         .string()
@@ -253,7 +253,12 @@ type TargetActor = {
     actor: Actor | undefined;
 };
 
-/** Looks up the caller's username and the Actor; a `username/` or `username~` prefix must name the caller's own account. */
+/**
+ * Looks up the caller's username and the Actor. A `username/` or `username~` prefix must name the caller's
+ * own account. A bare value that no Actor is named after and that has the shape of an Actor ID, the value
+ * the build and run tools hand out, is looked up once as an ID: it must be the caller's Actor, and an ID
+ * never creates one, so a miss falls through to creating an Actor of that name.
+ */
 async function resolveTargetActor(client: ApifyClient, { ownerPrefix, bareName }: ActorNameParts): Promise<TargetActor> {
     const { username } = await client.user('me').get();
     if (ownerPrefix !== undefined && ownerPrefix.toLowerCase() !== username.toLowerCase()) {
@@ -262,7 +267,17 @@ async function resolveTargetActor(client: ApifyClient, { ownerPrefix, bareName }
         );
     }
     const actorClient = client.actor(formatActorFullName(username, bareName));
-    return { actorClient, username, bareName, actor: await actorClient.get() };
+    const actor = await actorClient.get();
+    const canBeId = actor === undefined && ownerPrefix === undefined && ACTOR_ID_SHAPE_REGEX.test(bareName);
+    if (!canBeId) return { actorClient, username, bareName, actor };
+    const actorById = await client.actor(bareName).get();
+    if (!actorById) return { actorClient, username, bareName, actor: undefined };
+    if (actorById.username.toLowerCase() !== username.toLowerCase()) {
+        throw new UserInputError(
+            `This tool pushes only to your own account (${username}); Actor ${bareName} belongs to ${actorById.username}.`,
+        );
+    }
+    return { actorClient: client.actor(actorById.id), username, bareName: actorById.name, actor: actorById };
 }
 
 type CreateActorParams = {
@@ -297,20 +312,12 @@ class ActorCreatedError extends Error {
 
 /**
  * The Actor does not exist yet: the pushed files are its whole first version, so they must carry the
- * config. A name shaped like an Actor ID is refused here rather than created: an agent holding the ID
- * the sibling tools take would otherwise get a new Actor named after it, while an existing Actor with
- * such a name is still found by the lookup. A set over the inline limit is stored under the Actor's ID,
- * so the Actor is created first with an empty version, the placeholder `apify push` creates too, and
- * the version is then switched to the uploaded zip. If that upload fails the empty version stays;
- * pushing again fills it.
+ * config. A set over the inline limit is stored under the Actor's ID, so the Actor is created first
+ * with an empty version, the placeholder `apify push` creates too, and the version is then switched to
+ * the uploaded zip. If that upload fails the empty version stays; pushing again fills it.
  */
 async function createActorWithVersion(params: CreateActorParams): Promise<VersionWriteOutcome & { actorId: string }> {
     const { client, bareName, versionNumber, sourceFiles } = params;
-    if (ACTOR_ID_SHAPE_REGEX.test(bareName)) {
-        throw new UserInputError(
-            `No Actor named '${bareName}' exists in your account, and the name has the shape of an Actor ID (17 letters and digits), so none was created. Pass the Actor's name, not its ID.`,
-        );
-    }
     if (!hasActorConfig(sourceFiles)) throw new UserInputError(ACTOR_CONFIG_MISSING_TEXT);
     const buildTag = params.buildTag ?? DEFAULT_BUILD_TAG;
     const isInline = !isOverInlineSourceLimit(sourceFiles);
@@ -605,7 +612,7 @@ export const pushActor: ToolEntry = Object.freeze({
         // `toSourceFiles` maps the input files one to one, so this is also the number of files sent.
         const responseContext = { filesSent: parsed.files.length, loadedToolNames, apifyToken, client };
         try {
-            const actorNameParts = resolveActorNameInput(parsed.actorName);
+            const actorNameParts = resolveActorNameInput(parsed.actor);
             validateVersionNumber(parsed.versionNumber);
             const sourceFiles = resolveSourceFiles(parsed.files);
             const pushed = await pushActorFiles({
