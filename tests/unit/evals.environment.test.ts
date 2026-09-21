@@ -138,4 +138,15 @@ describe('sanitizeProcessEnv()', () => {
         const loggedLines = logSpy.mock.calls.map((call: unknown[]) => String(call[0]));
         expect(loggedLines.some((line: string) => line.includes('sk-lf-super-secret-value'))).toBe(false);
     });
+
+    it('fully masks a short secret instead of showing its head and tail', () => {
+        const secret = 'q7Zp4wNv2m';
+        process.env.LANGFUSE_SECRET_KEY = secret;
+        sanitizeProcessEnv();
+        const loggedLines = logSpy.mock.calls.map((call: unknown[]) => String(call[0]));
+        const leaked = loggedLines.some(
+            (line: string) => line.includes(secret.slice(0, 3)) || line.includes(secret.slice(-3)),
+        );
+        expect(leaked).toBe(false);
+    });
 });
