@@ -296,7 +296,9 @@ export const toolsCases: Case[] = [
                 received.push(notification.params);
             });
 
-            // Server awaits the log notification before throwing, so the rejection is enough of a barrier.
+            // No ordering barrier on `2025-11-25`: the log rides the standalone GET SSE stream, the error
+            // rides the POST stream. Phase 1 needs none (the message is filtered server-side, never sent);
+            // phase 2 waits explicitly below.
             const callUnknownTool = async () => {
                 await expect(statefulClient.callTool({ name: UNKNOWN_TOOL_NAME, arguments: {} })).rejects.toThrow(
                     /was not found/,
