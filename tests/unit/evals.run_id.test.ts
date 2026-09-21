@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildRunSuffix, createRunId, isNameFromRun, validateRunId } from '../../evals/run_id.js';
+import { buildRunSuffix, createRunId, isNameFromRun, parseRunIdArg, validateRunId } from '../../evals/run_id.js';
 
 /** The longest run id CI produces: `<github.run_id>-<github.run_attempt>`. */
 const CI_RUN_ID = '35014680476-1';
@@ -64,5 +64,38 @@ describe('validateRunId()', () => {
         expect(() => validateRunId('Run_1')).toThrow(/--run-id must be lowercase letters, digits and dashes/);
         expect(() => validateRunId('run 1')).toThrow(/--run-id/);
         expect(() => validateRunId('')).toThrow(/--run-id/);
+    });
+});
+
+describe('parseRunIdArg()', () => {
+    it('reads the value that follows the flag', () => {
+        expect(parseRunIdArg(['node', 'script.js', '--run-id', CI_RUN_ID, '--dry-run'])).toBe(CI_RUN_ID);
+    });
+
+    it('reads the value from the equals form', () => {
+        expect(parseRunIdArg(['node', 'script.js', `--run-id=${CI_RUN_ID}`, '--dry-run'])).toBe(CI_RUN_ID);
+    });
+
+    it('returns undefined when the flag is absent', () => {
+        expect(parseRunIdArg(['node', 'script.js', '--dry-run'])).toBeUndefined();
+    });
+
+    it('rejects a flag with no value', () => {
+        expect(() => parseRunIdArg(['node', 'script.js', '--run-id'])).toThrow(/--run-id needs a value/);
+        expect(() => parseRunIdArg(['node', 'script.js', '--run-id='])).toThrow(/--run-id needs a value/);
+    });
+
+    it('rejects the next flag as a value', () => {
+        expect(() => parseRunIdArg(['node', 'script.js', '--run-id', '--dry-run'])).toThrow(/--run-id needs a value/);
+        expect(() => parseRunIdArg(['node', 'script.js', '--run-id=--dry-run'])).toThrow(/--run-id needs a value/);
+    });
+
+    it('rejects a value outside [a-z0-9-]', () => {
+        expect(() => parseRunIdArg(['node', 'script.js', '--run-id', 'Run_1'])).toThrow(
+            /--run-id must be lowercase letters, digits and dashes/,
+        );
+        expect(() => parseRunIdArg(['node', 'script.js', '--run-id=Run_1'])).toThrow(
+            /--run-id must be lowercase letters, digits and dashes/,
+        );
     });
 });

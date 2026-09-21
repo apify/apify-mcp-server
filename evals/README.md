@@ -321,7 +321,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 
 - `config.ts` - Models and the MCP tool-name prefix, shared across responsibilities
 - `environment.ts` - Env var sanitization and missing-var reporting
-- `run_id.ts` - The `<static>-<runId>-t<trial>` name grammar shared by the runner and the fixtures scripts
+- `run_id.ts` - The `<static>-<runId>-t<trial>` name grammar shared by the runner and the fixtures scripts, plus the `--run-id` argv parsing the fixtures scripts use
 - `runner/run.ts` - Main CLI entry, runner defaults
 - `runner/experiment.ts` - Experiment task (agent + tool-call dispatch), `EVALUATORS`, run summary, exit gate
 - `runner/filters.ts` - Test case filtering by category and id

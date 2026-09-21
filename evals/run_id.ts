@@ -8,6 +8,9 @@
 
 const RUN_ID_PATTERN = /^[a-z0-9-]+$/;
 
+/** The CLI flag that carries a run id, in both its `--run-id <value>` and `--run-id=<value>` forms. */
+const RUN_ID_FLAG = '--run-id';
+
 /**
  * Identifier for one local run. Base36 seconds keeps it short; the random tail separates two runs
  * started in the same second. CI passes `<github.run_id>-<github.run_attempt>` instead.
@@ -37,4 +40,21 @@ export function validateRunId(value: string): void {
     if (!RUN_ID_PATTERN.test(value)) {
         throw new Error(`--run-id must be lowercase letters, digits and dashes, got "${value}"`);
     }
+}
+
+/**
+ * The run id an argv carries, or undefined when the flag is absent. Pure: the caller decides what a
+ * throw means (the fixtures scripts print it and exit).
+ *
+ * A value that starts with `--` is an error, not an id: `--run-id --dry-run` would otherwise swallow
+ * the next flag, and `--dry-run` matches the id pattern.
+ */
+export function parseRunIdArg(argv: string[]): string | undefined {
+    const index = argv.findIndex((arg) => arg === RUN_ID_FLAG || arg.startsWith(`${RUN_ID_FLAG}=`));
+    if (index === -1) return undefined;
+    const arg = argv[index];
+    const value = arg === RUN_ID_FLAG ? argv[index + 1] : arg.slice(`${RUN_ID_FLAG}=`.length);
+    if (!value || value.startsWith('--')) throw new Error(`${RUN_ID_FLAG} needs a value`);
+    validateRunId(value);
+    return value;
 }
