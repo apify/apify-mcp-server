@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.15.8 - **not yet released**
+## [0.16.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.16.0) (2026-09-17)
 
 ### 🚀 Features
 
@@ -11,8 +10,11 @@ All notable changes to this project will be documented in this file.
 - Add actorId filter to get-actor-run-list ([#1330](https://github.com/apify/apify-mcp-server/pull/1330)) ([5264fe6](https://github.com/apify/apify-mcp-server/commit/5264fe629a5200992c6af3e9176174e49ea35136)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1354](https://github.com/apify/apify-mcp-server/issues/1354)
 - Add schedule tools for Actors and tasks ([#1372](https://github.com/apify/apify-mcp-server/pull/1372)) ([ef3783d](https://github.com/apify/apify-mcp-server/commit/ef3783db3b04d3241f7885684b3983a153aebd4f)) by [@Janjiran](https://github.com/Janjiran), closes [#1341](https://github.com/apify/apify-mcp-server/issues/1341)
 
+### 🐛 Bug Fixes
 
-<!-- git-cliff-unreleased-end -->
+- **evals:** Stop the add-action eval case editing the read-only fixture ([#1384](https://github.com/apify/apify-mcp-server/pull/1384)) ([d88568c](https://github.com/apify/apify-mcp-server/commit/d88568c1d1b28dc205fedd44b340215aae1ef4a4)) by [@Janjiran](https://github.com/Janjiran), closes [#1341](https://github.com/apify/apify-mcp-server/issues/1341)
+
+
 ## [0.15.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.15.7) (2026-09-11)
 
 ### 🐛 Bug Fixes

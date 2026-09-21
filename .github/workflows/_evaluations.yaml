@@ -21,9 +21,6 @@ on:
             OPENROUTER_API_KEY:
                 description: 'Judge model on OpenRouter. Only used by tier: merge.'
                 required: false
-            OPENROUTER_BASE_URL:
-                description: 'Overrides the default OpenRouter endpoint. Only used by tier: merge.'
-                required: false
 
 jobs:
     evaluations:
@@ -96,7 +93,6 @@ jobs:
                     LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
                     OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-                    OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
 
             # The schedule cases leave enabled schedules behind, and an enabled schedule keeps firing
             # on the eval account until something deletes it. Seeding at the start of the next run is

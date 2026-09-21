@@ -1,0 +1,324 @@
+#!/usr/bin/env node
+/* eslint-disable no-console */
+/* eslint-disable import/extensions */
+/**
+ * Main CLI entry point for MCP agent evaluations (Langfuse backend).
+ *
+ * Every run reads its test cases from the Langfuse dataset and executes the matching
+ * items as an experiment: a Claude Code agent (Claude Agent SDK) driving its own freshly
+ * spawned Apify MCP server, then an LLM judge. Traces, scores, and the dataset live in
+ * Langfuse.
+ *
+ * Usage:
+ *   pnpm run evals:mcp-agent                       # the pr dataset
+ *   pnpm run evals:mcp-agent -- --category search
+ *   pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge --id '^merge/tasks/'  # one family, by its id prefix
+ *   pnpm run evals:mcp-agent -- --concurrency 8
+ *   pnpm run evals:mcp-agent -- --mcp-tools-only   # drop Claude Code's built-in tools
+ *   pnpm run evals:mcp-agent -- --subscription     # bill the local Claude Code login, not the API
+ *   pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge  # the judged agent items
+ *   pnpm run evals:mcp-agent -- --iterations 3      # 3 trials per item, pass@k / pass^k in the summary
+ *   pnpm run evals:mcp-agent -- --pass-threshold 0.9 # exit 0 while the aggregate pass rate is >= 0.9
+ */
+
+// Must be the first import: config modules read process.env at load time.
+import 'dotenv/config';
+
+import { execSync } from 'node:child_process';
+
+import { LangfuseClient } from '@langfuse/client';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
+
+import { readJsonFile } from '../../src/utils/generic.js';
+import { assertStdioBinExists } from '../agent/claude_agent.js';
+import { MODELS } from '../config.js';
+import { findMissingEnvVars, LANGFUSE_ENV_VARS, sanitizeProcessEnv } from '../environment.js';
+import { ClaudeJudgeClient } from '../judge/claude_client.js';
+import { OpenRouterClient } from '../judge/openrouter_client.js';
+import { fetchMcpAgentCases, MCP_AGENT_PR_DATASET_NAME } from '../langfuse/dataset.js';
+import { initTracing, shutdownTracing } from '../langfuse/tracing.js';
+import {
+    buildRunSummary,
+    createExperimentTask,
+    EVALUATORS,
+    expandIterations,
+    formatRunSummary,
+    resolveExitCode,
+    resolveGitBranch,
+    validateConcurrency,
+    validateIterations,
+    validatePassThreshold,
+} from './experiment.js';
+import { filterByCategory, filterById } from './filters.js';
+
+// Before any client is constructed below: the Langfuse SDK and the Apify client read
+// process.env themselves and pass it to node:http, which throws ERR_INVALID_CHAR on a
+// CI secret with a newline. Imported config that reads env at load time (OPENROUTER_CONFIG)
+// runs before this and sanitizes its own values.
+sanitizeProcessEnv();
+
+/**
+ * Maximum time to wait for a single MCP tool call to complete, in seconds.
+ * Actor runs that take longer than this will timeout.
+ * For long-running Actors, increase this value via CLI: --tool-timeout 600
+ */
+export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
+
+/**
+ * Default `--pass-threshold` (passed trials / requested trials) for exit code 0.
+ *
+ * Below 1.0 because two tool-call items in the pr dataset are kept although Haiku misses them
+ * about one run in three: `pr/call-actor/ecommerce-scraper-iphone` (searches for an Actor the query
+ * names) and `pr/search-apify-docs/error-handling-actors` (answers from memory). The miss is
+ * the signal, not a case defect. 0.9 is the same gate CI applies, under the 0.93 floor of three
+ * local runs and the 0.97 a hosted runner measured (111/115).
+ */
+export const DEFAULT_PASS_THRESHOLD = 0.9;
+
+type CliArgs = {
+    category?: string;
+    id?: string;
+    dataset: string;
+    agentModel: string;
+    judgeModel?: string;
+    toolTimeout: number;
+    concurrency: number;
+    mcpToolsOnly: boolean;
+    subscription: boolean;
+    claudeJudge: boolean;
+    iterations: number;
+    passThreshold: number;
+};
+
+/** Current git branch, with `resolveGitBranch()`'s CI env fallbacks when git can't name one. */
+function getGitBranch(): string {
+    let rawBranch = '';
+    try {
+        // stderr discarded: outside a checkout git's `fatal:` is noise, not a failure.
+        rawBranch = execSync('git rev-parse --abbrev-ref HEAD', {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+        });
+    } catch {
+        // Not a git checkout; the env fallbacks decide.
+    }
+    return resolveGitBranch(rawBranch, process.env);
+}
+
+/**
+ * Version of the Agent SDK, recorded in run metadata: the harness is a moving target and
+ * a release can shift results. Read from the exact pin in package.json.
+ */
+function resolveAgentSdkVersion(): string {
+    const manifest = readJsonFile<{ devDependencies: Record<string, string> }>(import.meta.url, '../../package.json');
+    return manifest.devDependencies['@anthropic-ai/claude-agent-sdk'] ?? 'unknown';
+}
+
+async function main() {
+    // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores
+    // every flag behind it. Drop it so both call styles work.
+    const args = hideBin(process.argv).filter((arg) => arg !== '--');
+
+    // yargs infers the kebab-case key, not the camelCase alias, hence the cast.
+    const argv = (await yargs(args)
+        .options({
+            category: { type: 'string', description: 'Filter by test case category (supports * wildcard)' },
+            id: { type: 'string', description: 'Run test cases whose ID matches this regex' },
+            dataset: {
+                type: 'string',
+                description: 'Langfuse dataset to run; mcp-server-evals-merge holds the judged agent items',
+                default: MCP_AGENT_PR_DATASET_NAME,
+            },
+            'agent-model': { type: 'string', description: 'LLM model for the agent', default: MODELS.agent },
+            'judge-model': {
+                type: 'string',
+                description: `LLM model for the judge (default: ${MODELS.judge}, or ${MODELS.claudeJudge} with --claude-judge)`,
+            },
+            'tool-timeout': {
+                type: 'number',
+                description: 'Tool call timeout in seconds',
+                default: DEFAULT_TOOL_TIMEOUT_SECONDS,
+            },
+            concurrency: { alias: 'c', type: 'number', description: 'Items to run in parallel', default: 8 },
+            'mcp-tools-only': {
+                type: 'boolean',
+                description: "Drop Claude Code's built-in tools, leaving only the Apify MCP server's",
+                default: false,
+            },
+            subscription: {
+                type: 'boolean',
+                description: 'Run the agent on the local Claude Code login (subscription) instead of ANTHROPIC_API_KEY',
+                default: false,
+            },
+            'claude-judge': {
+                type: 'boolean',
+                description:
+                    'Run the judge on the Claude Agent SDK (local Claude Code login) instead of OpenRouter, ' +
+                    'so no OPENROUTER_API_KEY is needed. --judge-model then takes an Anthropic model ID.',
+                default: false,
+            },
+            iterations: {
+                type: 'number',
+                description: 'Repeat each selected item N times in one run; prints pass@k / pass^k',
+                default: 1,
+            },
+            'pass-threshold': {
+                type: 'number',
+                description: 'Aggregate pass rate (passed trials / requested trials) required to exit 0',
+                default: DEFAULT_PASS_THRESHOLD,
+            },
+        })
+        // Reject a bad run flag up front, before any LLM spend.
+        .check((parsed) => {
+            validateConcurrency(parsed.concurrency);
+            validateIterations(parsed.iterations);
+            validatePassThreshold(parsed['pass-threshold']);
+            return true;
+        })
+        .help().argv) as CliArgs;
+
+    // Different defaults per judge provider, so an unset --judge-model never sends an
+    // OpenRouter slug to the Anthropic API or vice versa.
+    const judgeModel = argv.judgeModel ?? (argv.claudeJudge ? MODELS.claudeJudge : MODELS.judge);
+
+    // Fail before any test runs, listing every missing variable at once.
+    const missing = findMissingEnvVars([
+        ...LANGFUSE_ENV_VARS,
+        'APIFY_TOKEN',
+        ...(argv.claudeJudge ? [] : ['OPENROUTER_API_KEY']),
+        ...(argv.subscription ? [] : ['ANTHROPIC_API_KEY']),
+    ]);
+    if (missing.length > 0) {
+        console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
+        process.exit(1);
+    }
+
+    // The Agent SDK's Claude Code subprocess falls back to the local login only when no
+    // API key is in its environment, which it inherits from this process.
+    if (argv.subscription) {
+        delete process.env.ANTHROPIC_API_KEY;
+    }
+
+    // The Agent SDK spawns the MCP server from the built binary; fail early with the fix.
+    try {
+        assertStdioBinExists();
+    } catch (error) {
+        console.error(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+    }
+
+    const langfuse = new LangfuseClient();
+    // Non-empty: checked above. Sanitized above that.
+    const apifyToken = process.env.APIFY_TOKEN as string;
+    const datasetName = argv.dataset;
+
+    let exitCode = 1;
+    try {
+        // Read-only: the dataset is the source of truth, edited in the Langfuse UI.
+        console.log(`📇 Fetching dataset "${datasetName}"...`);
+        const cases = await fetchMcpAgentCases(langfuse, datasetName);
+
+        // Shared helpers, so every entry point filters test cases by the same rule.
+        let selected = cases;
+        if (argv.id) selected = filterById(selected, argv.id);
+        if (argv.category) selected = filterByCategory(selected, argv.category);
+        if (selected.length === 0) {
+            throw new Error(
+                `No active item in dataset "${datasetName}" (${cases.length} total) matches --id/--category`,
+            );
+        }
+        const requestedIds = selected.map((mcpAgentCase) => mcpAgentCase.id);
+        const { iterations } = argv;
+        // One experiment.run() call over every requested item x iteration: see
+        // expandIterations() for why the Langfuse v4 API forces this shape.
+        const data = expandIterations(
+            selected.map((mcpAgentCase) => mcpAgentCase.item),
+            iterations,
+        );
+
+        initTracing();
+
+        // Traces each judge call as a generation nested under the item's trace.
+        const llmClient = argv.claudeJudge ? new ClaudeJudgeClient() : new OpenRouterClient();
+
+        const agentSdkVersion = resolveAgentSdkVersion();
+        const runName = `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`;
+        console.log(
+            `▶️  Running experiment "${runName}" over ${requestedIds.length} item(s)` +
+                `${iterations > 1 ? ` x ${iterations} iteration(s)` : ''}, concurrency ${argv.concurrency} ` +
+                `(agent: ${argv.agentModel} via Claude Agent SDK ${agentSdkVersion}` +
+                `${argv.subscription ? ', Claude Code login' : ', ANTHROPIC_API_KEY'}` +
+                `${argv.mcpToolsOnly ? ', MCP tools only' : ', +built-in tools'}` +
+                `; judge: ${judgeModel} via ${argv.claudeJudge ? 'Claude Code login' : 'OpenRouter'})`,
+        );
+
+        const result = await langfuse.experiment.run({
+            name: datasetName,
+            runName,
+            description: 'MCP agent evals for the Apify MCP server (agent + tool-call items).',
+            data,
+            task: createExperimentTask({
+                llmClient,
+                apifyToken,
+                agentModel: argv.agentModel,
+                judgeModel,
+                toolTimeout: argv.toolTimeout,
+                mcpToolsOnly: argv.mcpToolsOnly,
+                totalTrials: requestedIds.length * iterations,
+            }),
+            evaluators: EVALUATORS,
+            runEvaluators: [
+                // passed trials / requested trials: requestedIds.length * iterations, so a
+                // dropped trial pulls the rate down instead of vanishing from it.
+                async ({ itemResults }) => ({
+                    name: 'pass_rate',
+                    value: buildRunSummary(requestedIds, itemResults, iterations).passRate,
+                }),
+            ],
+            maxConcurrency: argv.concurrency,
+            metadata: {
+                agentModel: argv.agentModel,
+                judgeModel,
+                judgeProvider: argv.claudeJudge ? 'claude-agent-sdk' : 'openrouter',
+                toolTimeout: argv.toolTimeout,
+                mcpToolsOnly: argv.mcpToolsOnly,
+                agentSdkVersion,
+                agentAuth: argv.subscription ? 'subscription' : 'api-key',
+                iterations,
+                passThreshold: argv.passThreshold,
+            },
+        });
+
+        // Compact on purpose: Langfuse holds the full per-item view behind the run link.
+        const summary = buildRunSummary(requestedIds, result.itemResults, iterations);
+
+        for (const { stream, text } of formatRunSummary(summary, argv.passThreshold, iterations)) {
+            (stream === 'error' ? console.error : console.log)(text);
+        }
+        console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" (view in Langfuse)`}`);
+
+        exitCode = resolveExitCode(summary, argv.passThreshold);
+    } catch (error) {
+        console.error(`❌ Run failed: ${error instanceof Error ? error.message : String(error)}`);
+        exitCode = 1;
+    } finally {
+        // Flush scores and spans before exit or the last batch is lost. Guarded
+        // individually: a failed export must not skip the other flush, and an
+        // unhandled rejection here would override the run's exit code.
+        try {
+            await langfuse.flush();
+        } catch (error) {
+            console.error(`⚠️ Langfuse flush failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        try {
+            await shutdownTracing();
+        } catch (error) {
+            console.error(`⚠️ Span export failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    process.exit(exitCode);
+}
+
+void main();
