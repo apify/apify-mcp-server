@@ -20,11 +20,17 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import type { ToolResponse } from '../../utils/mcp.js';
-import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
-import { ABORT, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
-import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
+import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import { ABORT } from '../actors/actor_run_response.js';
 import { pushActorToolOutputSchema } from '../structured_output_schemas.js';
-import { buildNextStepForBuild, listVersionNumbers, startBuild, toBuildResult } from './build_helpers.js';
+import {
+    buildNextStepForBuild,
+    buildWaitSecsField,
+    listVersionNumbers,
+    respondWithBuild,
+    startBuild,
+    toBuildResult,
+} from './build_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
     getSourceFilesSizeBytes,
@@ -49,7 +55,7 @@ const pushActorArgs = z.object({
         .string()
         .min(1)
         .describe(
-            'Actor name in your account: bare (my-scraper) or with your username as john/my-scraper or john~my-scraper (the API form); created if it does not exist. The returned actorId is the Actor ID the build and run tools take',
+            'Actor name in your account, not its ID: bare (my-scraper) or with your username as john/my-scraper or john~my-scraper (the API form); created if it does not exist. The returned actorId is the Actor ID the build and run tools take',
         ),
     versionNumber: z
         .string()
@@ -79,13 +85,7 @@ const pushActorArgs = z.object({
         .default('merge')
         .describe('merge keeps existing files not listed here; replace makes the version contain exactly these files'),
     build: z.boolean().default(true).describe('Start a build of the version after pushing the files'),
-    waitSecs: z
-        .number()
-        .int()
-        .min(0)
-        .max(WAIT_SECS_MAX)
-        .default(WAIT_SECS_MAX)
-        .describe('How long to wait for the build to finish before returning its current status'),
+    waitSecs: buildWaitSecsField('0 returns right after the build is started.'),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -162,6 +162,9 @@ function parseActorName(actorName: string): ActorNameParts {
     if (separatorIndex === -1) return { ownerPrefix: undefined, bareName: actorName };
     return { ownerPrefix: actorName.slice(0, separatorIndex), bareName: actorName.slice(separatorIndex + 1) };
 }
+
+// `APIFY_ID_REGEX` in `@apify/consts` is unanchored, so the shape is spelled out here.
+const ACTOR_ID_SHAPE_REGEX = /^[a-zA-Z0-9]{17}$/;
 
 const ACTOR_NAME_RULE_TEXT = `Actor name must be ${ACTOR_NAME.MIN_LENGTH} to ${ACTOR_NAME.MAX_LENGTH} characters: letters, digits and dashes, not starting or ending with a dash.`;
 
@@ -251,9 +254,19 @@ type CreateActorParams = {
     sourceFiles: ActorVersionSourceFile[];
 };
 
-/** The Actor does not exist yet: the pushed files are its whole first version, so they must carry the config. */
+/**
+ * The Actor does not exist yet: the pushed files are its whole first version, so they must carry the
+ * config. A name shaped like an Actor ID is refused here rather than created: an agent holding the ID
+ * the sibling tools take would otherwise get a new Actor named after it. An existing Actor with such a
+ * name is still found by the lookup, so only the create path is affected.
+ */
 async function createActorWithVersion(params: CreateActorParams): Promise<VersionWriteOutcome & { actorId: string }> {
     const { client, bareName, versionNumber, buildTag, sourceFiles } = params;
+    if (ACTOR_ID_SHAPE_REGEX.test(bareName)) {
+        throw new UserInputError(
+            `No Actor named '${bareName}' exists in your account, and the name has the shape of an Actor ID (17 letters and digits), so none was created. Pass the Actor's name, not its ID.`,
+        );
+    }
     if (!hasActorConfig(sourceFiles)) throw new UserInputError(ACTOR_CONFIG_MISSING_TEXT);
     const created = await client.actors().create({
         name: bareName,
@@ -475,11 +488,7 @@ async function buildPushResponse(params: PushResponseParams): Promise<ToolRespon
         buildStartErrMessage === undefined
             ? buildNextStep(build, loadedToolNames)
             : formatBuildStartFailure(buildStartErrMessage, loadedToolNames);
-    const consoleLinkText = apifyConsoleLinkText(structuredContent.build?.apifyConsoleUrl);
-    return respondOk(
-        [JSON.stringify(structuredContent), `${summary}\n${nextStep}`, ...(consoleLinkText ? [consoleLinkText] : [])],
-        { structuredContent },
-    );
+    return respondWithBuild({ structuredContent, summary, nextStep });
 }
 
 /**

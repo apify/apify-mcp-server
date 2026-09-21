@@ -6,6 +6,7 @@ import { MAX_MULTIFILE_BYTES } from '@apify/consts';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
+import { BUILD_WAIT_SECS_DEFAULT } from '../../src/tools/deploy/build_helpers.js';
 import { pushActor } from '../../src/tools/deploy/push_actor.js';
 import { ACTOR_CONFIG_PATH } from '../../src/tools/deploy/source_files.js';
 import { pushActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
@@ -166,7 +167,7 @@ describe('push-actor', () => {
         // The build uses the created Actor's ID and no tag: the version's buildTag applies.
         expect(actorMock).toHaveBeenCalledWith('actor-new');
         expect(buildMock).toHaveBeenCalledWith('0.0', { useCache: true });
-        expect(buildGetMock).toHaveBeenCalledWith({ waitForFinish: WAIT_SECS_MAX });
+        expect(buildGetMock).toHaveBeenCalledWith({ waitForFinish: BUILD_WAIT_SECS_DEFAULT });
         expect(structuredContent).toEqual({
             actorId: 'actor-new',
             actorName: 'john/my-actor',
@@ -401,6 +402,28 @@ describe('push-actor', () => {
             expect(actorGetMock).not.toHaveBeenCalled();
             expectNoWrite();
         });
+    });
+
+    it('refuses to create an Actor whose name has the shape of an Actor ID', async () => {
+        actorGetMock.mockResolvedValue(undefined);
+
+        const { text } = await callToolExpectingUserError({
+            actorName: 'qGXMy0NAkWsIIb9LZ',
+            files: [ACTOR_JSON, MAIN_JS],
+        });
+
+        expect(text).toBe(
+            "No Actor named 'qGXMy0NAkWsIIb9LZ' exists in your account, and the name has the shape of an Actor ID (17 letters and digits), so none was created. Pass the Actor's name, not its ID.",
+        );
+        expectNoWrite();
+    });
+
+    it('still pushes to an existing Actor whose name has the shape of an Actor ID', async () => {
+        await callTool({ actorName: 'myactorscraper123', files: [MAIN_JS], build: false });
+
+        expect(actorMock).toHaveBeenCalledWith('john/myactorscraper123');
+        expect(versionUpdateMock).toHaveBeenCalled();
+        expect(actorsCreateMock).not.toHaveBeenCalled();
     });
 
     it('refuses to merge onto a version that does not use source files', async () => {
