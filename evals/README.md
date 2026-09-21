@@ -185,11 +185,11 @@ Every active item is validated when the dataset is fetched, so a bad UI edit fai
 
 **Location:** `langfuse/dataset.ts`, `runner/run.ts`, `scripts/export_dataset.ts`
 
-### 2. MCP server isolation per test
+### 2. MCP server process isolation per test
 
-**Decision:** Each test gets a fresh MCP server instance, spawned by that test's agent, to avoid persistent Apify-platform state leaking between tests.
+**Decision:** Each test gets a fresh MCP server instance, spawned by that test's agent, so MCP session and in-process state do not carry between tests. Persistent Apify resources remain shared and fixture scripts must clean them up.
 
-**Trade-off:** ~20-30% slower (1-2s spawn overhead per test) but guarantees isolation.
+**Trade-off:** ~20-30% slower (1-2s spawn overhead per test) for process isolation.
 
 **Location:** `agent/claude_agent.ts`
 
@@ -261,19 +261,19 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 ### 9. The agent's conversation is traced by hand
 
-**Decision:** After each agent run, `langfuse/observations.ts` emits the item's span tree from the adapted SDK stream; `judge/openrouter_client.ts` traces the judge call itself. See those files for why each part of the tree (agent span, tool spans, generation windowing) is shaped the way it is.
+**Decision:** After each agent run, `langfuse/observations.ts` emits the item's span tree from the adapted SDK stream; the selected judge client traces the judge call itself. See those files for why each part of the tree (agent span, tool spans, generation windowing) is shaped the way it is.
 
 ```
 experiment-item-run     Langfuse SDK, holds the scores
 |- agent                the prompt in, the final answer out
 |  |- <agent model>     generation: the run's aggregate tokens and cost, windowed to the last turn
 |  |- <tool name>       one span per tool call: arguments in, result out
-|- <judge model>        generation, emitted by judge/openrouter_client.ts
+|- <judge model>        generation, emitted by the active judge client
 ```
 
 **Trade-off:** the tree is emitted after the fact, so a crashed run leaves no spans, and the agent's individual model turns are not separate generations.
 
-**Location:** `langfuse/observations.ts`, `agent/claude_agent.ts`, `judge/openrouter_client.ts`
+**Location:** `langfuse/observations.ts`, `agent/claude_agent.ts`, `judge/openrouter_client.ts`, `judge/claude_client.ts`
 
 ## System components
 
