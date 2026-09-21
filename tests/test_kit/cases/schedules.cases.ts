@@ -1,7 +1,5 @@
 import { expect } from 'vitest';
 
-import { HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
-
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
     ACTOR_NORMAL_MODE,
@@ -16,6 +14,9 @@ import type { Case, CaseCtx } from '../types.js';
  *
  * Names are prefixed `test-sched-`, never `eval-`: the eval harness sweeps `eval-*` schedules on the
  * same account, so an `eval-`-prefixed name here would be deleted mid-assertion by a concurrent run.
+ *
+ * Tool names are hardcoded, not read from `HELPER_TOOLS`, so a rename fails these tests
+ * (CONTRIBUTING.md, "Integration tests").
  */
 
 /** Unique per call: three transport dimensions register the same case and CI runs PRs concurrently. */
@@ -75,7 +76,7 @@ export const schedulesCases: Case[] = [
             let scheduleId: string | undefined;
             try {
                 const result = await client.callTool({
-                    name: HELPER_TOOLS.SCHEDULE_CREATE,
+                    name: 'create-schedule',
                     arguments: buildCreateArgs(name, { title: 'Integration test', description: 'Created by a test' }),
                 });
 
@@ -90,7 +91,7 @@ export const schedulesCases: Case[] = [
                 expect(schedule.createdAt).not.toBeNull();
                 expect(schedule.actions).toHaveLength(1);
                 expect(typeof schedule.actions[0].actorId).toBe('string');
-                validateStructuredOutputForTool(result, HELPER_TOOLS.SCHEDULE_CREATE, 'default');
+                validateStructuredOutputForTool(result, 'create-schedule', 'default');
 
                 // content[0] is the JSON result, content[1] the summary.
                 expect((result as { content?: unknown[] }).content).toHaveLength(2);
@@ -108,16 +109,16 @@ export const schedulesCases: Case[] = [
             let scheduleId: string | undefined;
             try {
                 const created = expectScheduleResult(
-                    await client.callTool({ name: HELPER_TOOLS.SCHEDULE_CREATE, arguments: buildCreateArgs(name) }),
+                    await client.callTool({ name: 'create-schedule', arguments: buildCreateArgs(name) }),
                 );
                 scheduleId = created.scheduleId;
 
                 const byName = expectScheduleResult(
-                    await client.callTool({ name: HELPER_TOOLS.SCHEDULE_GET, arguments: { scheduleId: name } }),
+                    await client.callTool({ name: 'get-schedule', arguments: { scheduleId: name } }),
                 );
                 const byId = expectScheduleResult(
                     await client.callTool({
-                        name: HELPER_TOOLS.SCHEDULE_GET,
+                        name: 'get-schedule',
                         arguments: { scheduleId: created.scheduleId },
                     }),
                 );
@@ -139,13 +140,13 @@ export const schedulesCases: Case[] = [
             let scheduleId: string | undefined;
             try {
                 const created = expectScheduleResult(
-                    await client.callTool({ name: HELPER_TOOLS.SCHEDULE_CREATE, arguments: buildCreateArgs(name) }),
+                    await client.callTool({ name: 'create-schedule', arguments: buildCreateArgs(name) }),
                 );
                 scheduleId = created.scheduleId;
 
                 const updated = expectScheduleResult(
                     await client.callTool({
-                        name: HELPER_TOOLS.SCHEDULE_UPDATE,
+                        name: 'update-schedule',
                         arguments: { scheduleId: name, actions: [{ actorId: ACTOR_EXAMPLE_MCP_SERVER }] },
                     }),
                 );
@@ -155,7 +156,7 @@ export const schedulesCases: Case[] = [
 
                 // Read back: the replacement is what the API stored, not just what the update echoed.
                 const stored = expectScheduleResult(
-                    await client.callTool({ name: HELPER_TOOLS.SCHEDULE_GET, arguments: { scheduleId: name } }),
+                    await client.callTool({ name: 'get-schedule', arguments: { scheduleId: name } }),
                 );
                 expect(stored.actions).toHaveLength(1);
                 expect(stored.actions[0].actorId).toBe(updated.actions[0].actorId);
@@ -172,12 +173,12 @@ export const schedulesCases: Case[] = [
             let scheduleId: string | undefined;
             try {
                 const created = expectScheduleResult(
-                    await client.callTool({ name: HELPER_TOOLS.SCHEDULE_CREATE, arguments: buildCreateArgs(name) }),
+                    await client.callTool({ name: 'create-schedule', arguments: buildCreateArgs(name) }),
                 );
                 scheduleId = created.scheduleId;
 
                 const deleted = await client.callTool({
-                    name: HELPER_TOOLS.SCHEDULE_DELETE,
+                    name: 'delete-schedule',
                     arguments: { scheduleId: name },
                 });
                 expect((deleted as { structuredContent?: { deleted?: boolean } }).structuredContent?.deleted).toBe(
@@ -185,7 +186,7 @@ export const schedulesCases: Case[] = [
                 );
 
                 const afterDelete = await client.callTool({
-                    name: HELPER_TOOLS.SCHEDULE_GET,
+                    name: 'get-schedule',
                     arguments: { scheduleId: name },
                 });
                 expect((afterDelete as { isError?: boolean }).isError).toBe(true);
@@ -203,7 +204,7 @@ export const schedulesCases: Case[] = [
             let scheduleId: string | undefined;
             try {
                 const created = expectScheduleResult(
-                    await client.callTool({ name: HELPER_TOOLS.SCHEDULE_CREATE, arguments: buildCreateArgs(name) }),
+                    await client.callTool({ name: 'create-schedule', arguments: buildCreateArgs(name) }),
                 );
                 scheduleId = created.scheduleId;
 
@@ -212,7 +213,7 @@ export const schedulesCases: Case[] = [
                 // `schedule-name-not-unique`, HTTP 409. Only the stable part is asserted: the exact
                 // wording is the API's to change.
                 const collision = await client.callTool({
-                    name: HELPER_TOOLS.SCHEDULE_CREATE,
+                    name: 'create-schedule',
                     arguments: buildCreateArgs(name),
                 });
                 expect((collision as { isError?: boolean }).isError).toBe(true);
@@ -228,7 +229,37 @@ export const schedulesCases: Case[] = [
         run: withClient({ tools: ['schedules'] }, async (client) => {
             const name = uniqueScheduleName('missing');
 
-            const result = await client.callTool({ name: HELPER_TOOLS.SCHEDULE_GET, arguments: { scheduleId: name } });
+            const result = await client.callTool({ name: 'get-schedule', arguments: { scheduleId: name } });
+
+            expect((result as { isError?: boolean }).isError).toBe(true);
+            expect(resultText(result)).toContain(`Schedule ${name} was not found.`);
+        }),
+    },
+    {
+        name: 'update-schedule reports an unknown schedule as not found',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['schedules'] }, async (client) => {
+            const name = uniqueScheduleName('missing');
+
+            const result = await client.callTool({
+                name: 'update-schedule',
+                arguments: { scheduleId: name, isEnabled: false },
+            });
+
+            // A plain name skips the tool's pre-read, so this is the API's own 404. Probed
+            // 2026-09-21: `Record was not found`, type `record-not-found`. Only the stable part is
+            // asserted: the exact wording is the API's to change.
+            expect((result as { isError?: boolean }).isError).toBe(true);
+            expect(resultText(result)).toMatch(/not found/i);
+        }),
+    },
+    {
+        name: 'delete-schedule reports an unknown schedule as not found',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['schedules'] }, async (client) => {
+            const name = uniqueScheduleName('missing');
+
+            const result = await client.callTool({ name: 'delete-schedule', arguments: { scheduleId: name } });
 
             expect((result as { isError?: boolean }).isError).toBe(true);
             expect(resultText(result)).toContain(`Schedule ${name} was not found.`);
@@ -243,7 +274,7 @@ export const schedulesCases: Case[] = [
             try {
                 const created = expectScheduleResult(
                     await client.callTool({
-                        name: HELPER_TOOLS.SCHEDULE_CREATE,
+                        name: 'create-schedule',
                         arguments: buildCreateArgs(name, { timezone: 'Europe/Prague' }),
                     }),
                 );
@@ -251,7 +282,7 @@ export const schedulesCases: Case[] = [
                 expect(created.timezone).toBe('Europe/Prague');
 
                 const stored = expectScheduleResult(
-                    await client.callTool({ name: HELPER_TOOLS.SCHEDULE_GET, arguments: { scheduleId: name } }),
+                    await client.callTool({ name: 'get-schedule', arguments: { scheduleId: name } }),
                 );
                 expect(stored.timezone).toBe('Europe/Prague');
             } finally {
