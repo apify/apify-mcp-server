@@ -8,6 +8,7 @@ import type { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
 import { isApifyApiUri, readApiResource } from '../../src/resources/api_resources.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 const API = 'https://api.apify.com';
 
@@ -56,7 +57,7 @@ function signedUrl(storeId: string, key: string): string {
 }
 
 function stubApifyClient(opts: StubOptions = {}): ApifyClient {
-    return {
+    return mockApifyClient({
         keyValueStore: (storeId: string) => ({
             getRecordPublicUrl: async (key: string) => {
                 if (opts.recordPublicUrlThrows) throw new Error('boom');
@@ -69,7 +70,7 @@ function stubApifyClient(opts: StubOptions = {}): ApifyClient {
                     opts.request ?? (async () => ({ data: streamOf(), headers: {}, status: 200, statusText: 'OK' })),
             },
         },
-    } as unknown as ApifyClient;
+    });
 }
 
 /** Build a request stub returning a fixed 200 response body, capturing the requested config. */
