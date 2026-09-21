@@ -33,6 +33,12 @@ Every new eval case in full — query, asserted tools, arguments, judge referenc
 wording retired, grouped by tool. Generated, not hand-edited; regenerate rather than patch. For
 reviewing the case content before the migration in #1411. Delete once that lands.
 
+### [eval_cases_review/](./eval_cases_review/)
+The new eval cases as editable JSON, the v1 cases they retire, each case's current pass/fail per
+model, and `CHANGES.md` comparing them per tool. For reviewing and correcting cases by hand before
+the migration in #1411: edit the JSON, and it upserts straight back into the staging datasets by
+`id`. Delete once the cases are migrated.
+
 ## Rules
 
 - A note gets a **deletion trigger** when it is written ("delete when X ships / closes / is
