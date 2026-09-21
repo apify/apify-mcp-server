@@ -6,6 +6,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { ABORT, raceAbort, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { getActorBuildToolOutputSchema } from '../structured_output_schemas.js';
 import {
@@ -14,6 +15,7 @@ import {
     buildWaitSecsField,
     respondWithBuild,
     toBuildResult,
+    waitForBuild,
 } from './build_helpers.js';
 
 const getActorBuildArgs = z.object({
@@ -55,15 +57,21 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames, signal, progressTracker } = toolArgs;
         const parsed = getActorBuildArgs.parse(args);
-        // Race the wait against the request signal so a cancelled call returns promptly instead of
-        // blocking up to `waitSecs`. Per MCP spec, receivers SHOULD NOT respond to a cancelled request.
-        const build = await raceAbort(client.build(parsed.buildId).get({ waitForFinish: parsed.waitSecs }), signal);
-        if (build === ABORT) return respondAborted();
-        if (!build) {
+        // Fetched before any wait, like get-actor-run, so a finished build returns at once and an
+        // unfinished one seeds the progress notifications. Races are against the request signal so a
+        // cancelled call returns promptly; per MCP spec, receivers SHOULD NOT respond to a cancelled request.
+        const current = await raceAbort(client.build(parsed.buildId).get(), signal);
+        if (current === ABORT) return respondAborted();
+        if (!current) {
             return respondUserError(`Build with ID '${parsed.buildId}' not found.`);
         }
+        const build =
+            parsed.waitSecs > 0 && !TERMINAL_RUN_STATUSES.has(current.status)
+                ? await waitForBuild(client, current, { waitSecs: parsed.waitSecs, signal, progressTracker })
+                : current;
+        if (build === ABORT) return respondAborted();
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const structuredContent = { build: toBuildResult(build, linkContext) };
         const summary = `Build ${build.buildNumber} of Actor ${build.actId} is ${build.status}.`;

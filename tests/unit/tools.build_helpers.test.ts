@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ABORT, WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
-import { buildNextStepForBuild, listVersionNumbers, startBuild } from '../../src/tools/deploy/build_helpers.js';
+import { buildNextStepForBuild, listVersionNumbers, startBuild } from '../../src/tools/builds/build_helpers.js';
 import type { InternalToolArgs } from '../../src/types.js';
 
 // Cast because the client's `Build.status` type lists only terminal statuses; the API also returns RUNNING.

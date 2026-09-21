@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
-import { getActorBuild } from '../../src/tools/deploy/get_actor_build.js';
-import { getActorBuildLog } from '../../src/tools/deploy/get_actor_build_log.js';
+import { getActorBuild } from '../../src/tools/builds/get_actor_build.js';
+import { getActorBuildLog } from '../../src/tools/builds/get_actor_build_log.js';
 import { getActorBuildLogToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
