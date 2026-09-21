@@ -7,8 +7,9 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
 import {
-    expectSoftFailInvalidInput,
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockApifyClient,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
@@ -28,21 +29,21 @@ const MOCK_ITEMS = [
 ];
 
 function stubApifyClient(listItemsResponse: unknown): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         dataset: (_id: string) => ({
             listItems: async () => listItemsResponse,
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         dataset: (_id: string) => ({
             listItems: async () => {
                 throw err;
             },
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-dataset-schema', () => {
@@ -69,9 +70,9 @@ describe('get-dataset-schema', () => {
 
     it('applies defaults (limit=5, clean=true) to listItems when no params given', async () => {
         const listItemsSpy = vi.fn().mockResolvedValue({ items: MOCK_ITEMS, total: 2 });
-        const client = {
+        const client = mockApifyClient({
             dataset: (_id: string) => ({ listItems: listItemsSpy }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         await (getDatasetSchema as HelperTool).call(stubToolCallContext({ datasetId: 'ds-1' }, client));
 

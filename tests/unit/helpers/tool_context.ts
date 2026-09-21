@@ -36,6 +36,11 @@ export type ToolTelemetrySnapshot = {
     failureCategory?: string;
 };
 
+/** The one unsafe `ApifyClient` cast: tests pass whatever client methods they stub. */
+export function mockApifyClient(methods: Record<string, unknown> = {}): InternalToolArgs['apifyClient'] {
+    return methods as unknown as InternalToolArgs['apifyClient'];
+}
+
 /** Minimal `InternalToolArgs` stub for unit tests. */
 export function stubToolCallContext(
     args: Record<string, unknown>,
