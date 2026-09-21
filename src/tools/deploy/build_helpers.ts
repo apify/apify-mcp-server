@@ -5,10 +5,11 @@ import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS } from '../../const.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import { buildConsoleBuildUrl } from '../../utils/console_link.js';
+import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondOk } from '../../utils/mcp.js';
 import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
-import { type ABORT, raceAbort, toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { ABORT, raceAbort, toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 
 /** The MAJOR.MINOR numbers of the Actor's versions; a version document without one is skipped. */
@@ -55,8 +56,22 @@ export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | un
 }
 
 /**
- * Starts a build of an Actor version and waits up to `waitSecs` for it to finish.
- * The wait is raced against `signal`, so a cancelled request resolves to {@link ABORT} instead of blocking.
+ * Aborts a build the tool started when the client cancels the request, the way `call-actor` aborts its
+ * run. Failures are logged and swallowed so a transient API error does not override the cancellation.
+ */
+async function abortBuildOnSignal(buildId: string, client: ApifyClient): Promise<void> {
+    await client
+        .build(buildId)
+        .abort()
+        .catch((error: unknown) => {
+            logHttpError(error, 'Error aborting Actor build', { buildId });
+        });
+}
+
+/**
+ * Starts a build of an Actor version and waits up to `waitSecs` for it to finish. The wait is raced
+ * against `signal`; a cancelled request aborts the build it started and resolves to {@link ABORT}, so
+ * a build nobody waits for does not run on, the same as `call-actor` does with its run.
  */
 export async function startBuild(
     client: ApifyClient,
@@ -65,14 +80,22 @@ export async function startBuild(
     options: { tag?: string; useCache: boolean; waitSecs: number; signal?: AbortSignal },
 ): Promise<Build | typeof ABORT> {
     const { tag, useCache, waitSecs, signal } = options;
-    return await raceAbort(
-        client.actor(actorId).build(versionNumber, {
-            ...(tag !== undefined && { tag }),
-            useCache,
-            waitForFinish: waitSecs,
-        } satisfies ActorBuildOptions),
-        signal,
-    );
+    const started = await client
+        .actor(actorId)
+        .build(versionNumber, { ...(tag !== undefined && { tag }), useCache } satisfies ActorBuildOptions);
+    // The cancel can arrive while the start call is in flight; the build exists by then.
+    if (signal?.aborted) {
+        await abortBuildOnSignal(started.id, client);
+        return ABORT;
+    }
+    if (waitSecs === 0) return started;
+    const finished = await raceAbort(client.build(started.id).get({ waitForFinish: waitSecs }), signal);
+    if (finished === ABORT) {
+        await abortBuildOnSignal(started.id, client);
+        return ABORT;
+    }
+    // `get()` is undefined only for a build that does not exist; this one was just created.
+    return finished ?? started;
 }
 
 /**

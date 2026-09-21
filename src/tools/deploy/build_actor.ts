@@ -5,11 +5,17 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
-import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
-import { ABORT, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
-import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
+import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import { ABORT } from '../actors/actor_run_response.js';
 import { buildActorToolOutputSchema } from '../structured_output_schemas.js';
-import { buildNextStepForBuild, listVersionNumbers, startBuild, toBuildResult } from './build_helpers.js';
+import {
+    buildNextStepForBuild,
+    buildWaitSecsField,
+    listVersionNumbers,
+    respondWithBuild,
+    startBuild,
+    toBuildResult,
+} from './build_helpers.js';
 
 const buildActorArgs = z.object({
     actor: z.string().min(1).describe('Actor ID or username/name'),
@@ -21,13 +27,7 @@ const buildActorArgs = z.object({
         .describe('Version to build in MAJOR.MINOR form; defaults to the only version when the Actor has exactly one'),
     tag: z.string().optional().describe('Build tag to assign, for example latest'),
     useCache: z.boolean().default(true).describe('Reuse the Docker layer cache from the previous build'),
-    waitSecs: z
-        .number()
-        .int()
-        .min(0)
-        .max(WAIT_SECS_MAX)
-        .default(WAIT_SECS_MAX)
-        .describe('How long to wait for the build to finish before returning its current status'),
+    waitSecs: buildWaitSecsField('0 starts the build and returns right away.'),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -66,7 +66,8 @@ export const buildActor: ToolEntry = Object.freeze({
     annotations: {
         title: 'Build Actor',
         readOnlyHint: false,
-        destructiveHint: false,
+        // `tag` re-points an existing tag, `latest` included, to this build, which changes what runs by default.
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: true,
     },
@@ -103,14 +104,6 @@ export const buildActor: ToolEntry = Object.freeze({
         const structuredContent = { build: toBuildResult(build, linkContext) };
         const summary = `Started build ${build.buildNumber} of Actor ${build.actId} (version ${versionNumber}); status ${build.status}.`;
         const nextStep = buildNextStepForBuild(build, { loadedToolNames });
-        const consoleLinkText = apifyConsoleLinkText(structuredContent.build.apifyConsoleUrl);
-        return respondOk(
-            [
-                JSON.stringify(structuredContent),
-                `${summary}\n${nextStep}`,
-                ...(consoleLinkText ? [consoleLinkText] : []),
-            ],
-            { structuredContent },
-        );
+        return respondWithBuild({ structuredContent, summary, nextStep });
     },
 } as const);
