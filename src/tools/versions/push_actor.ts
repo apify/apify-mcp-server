@@ -23,7 +23,6 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { ABORT } from '../actors/actor_run_response.js';
-import { pushActorToolOutputSchema } from '../structured_output_schemas.js';
 import {
     buildNextStepForBuild,
     buildWaitSecsField,
@@ -31,7 +30,8 @@ import {
     respondWithBuild,
     startBuild,
     toBuildResult,
-} from './build_helpers.js';
+} from '../builds/build_helpers.js';
+import { pushActorToolOutputSchema } from '../structured_output_schemas.js';
 import {
     ACTOR_CONFIG_PATH,
     getSourceFilesSizeBytes,

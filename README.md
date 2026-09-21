@@ -248,7 +248,8 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Apify storage**: Access data from your datasets and key-value stores.
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
-- **Builds**: Push files to an Actor (creating it if needed), build an Actor version, check the status of a build, and retrieve its build log.
+- **Builds**: Build an Actor version, check the status of a build, and retrieve its build log.
+- **Versions**: Push files to an Actor, creating it if needed, and build the version.
 
 ### Overview of available tools
 
@@ -293,7 +294,7 @@ Legend for the **Enabled by default** column:
 | `get-actor-build` | builds | Get an Actor build's status. |  |
 | `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
 | `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
-| `push-actor` | builds | Push files to an Actor in your account, creating the Actor if needed, and build the version. |  |
+| `push-actor` | versions | Push files to an Actor in your account, creating the Actor if needed, and build the version. |  |
 
 > **Note:**
 >
