@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isSweepableSchedule } from '../../evals/scripts/schedules_fixtures.js';
+import { isSweepableSchedule } from '../../evals/scripts/schedules_sweep.js';
 
 const NOW = Date.UTC(2026, 8, 21, 12, 0, 0);
 const MINUTES_AGO_12 = new Date(NOW - 12 * 60 * 1000);

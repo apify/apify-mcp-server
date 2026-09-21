@@ -117,7 +117,7 @@ const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
 One script per stateful family, wired as `evals:mcp-agent:<family>-fixtures` in package.json: create the permanent fixture if missing, **reset its mutable state** every run (an eval agent may have mutated it), and sweep leftovers.
 
-`evals/scripts/schedules_fixtures.ts` is the current template for the sweep: `--run-id <id>` deletes the names that run created (matched as the delimited token `-<id>-t`, never a bare substring), and anything unmatched survives until it is older than `LEFTOVER_MAX_AGE_MS` (6 h), so a run still in flight never loses a resource it is asserting on. The keep/delete rule is an exported pure function with a unit test. `evals/scripts/tasks_fixtures.ts` still sweeps by prefix alone.
+`evals/scripts/schedules_fixtures.ts` is the current template for the sweep: `--run-id <id>` deletes the names that run created (matched as the delimited token `-<id>-t`, never a bare substring), and anything unmatched survives until it is older than `LEFTOVER_MAX_AGE_MS` (6 h), so a run still in flight never loses a resource it is asserting on. The keep/delete rule is an exported pure function in a side-effect-free sibling module (`evals/scripts/schedules_sweep.ts`), so a unit test imports it without the CLI's `dotenv` load running. `evals/scripts/tasks_fixtures.ts` still sweeps by prefix alone.
 
 ## Coverage matrix (definition of done for the dataset)
 

@@ -13,6 +13,8 @@
  *   `LEFTOVER_MAX_AGE_MS`. A younger one may belong to a run still asserting on it, and this script
  *   deletes on whatever account `APIFY_TOKEN` points at.
  *
+ * Both rules live in `schedules_sweep.ts`, which this file imports for the delete decision.
+ *
  * `tasks_fixtures.ts` still sweeps by prefix alone, without the age or run-id rules; see #1394.
  *
  * The fixture schedule runs the task fixture from `tasks_fixtures.ts`, so run that first:
@@ -21,33 +23,13 @@
 
 import 'dotenv/config';
 
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-
 import { ApifyClient, type ScheduleCreateOrUpdateData, ScheduleActions } from 'apify-client';
 
 import { findMissingEnvVars, sanitizeProcessEnv } from '../environment.js';
-import { isNameFromRun, validateRunId } from '../run_id.js';
+import { validateRunId } from '../run_id.js';
+import { FIXTURE_SCHEDULE_NAME, isSweepableSchedule } from './schedules_sweep.js';
 
 sanitizeProcessEnv();
-
-/** Only schedules with this prefix are ever deleted. */
-const EVAL_SCHEDULE_PREFIX = 'eval-';
-
-/**
- * The one permanent fixture, reset every run and never deleted. Target of pure get-schedule cases;
- * no case may modify it. Cases that create or edit a schedule build their own, named after the run
- * and trial that created them (see `run_id.ts`).
- */
-const FIXTURE_SCHEDULE_NAME = 'eval-nightly-sum';
-
-/**
- * How old an unmatched `eval-*` schedule must be before the sweep deletes it. An order of magnitude
- * above the longest plausible merge run (the workflow times out at 90 minutes), so a run in flight
- * never loses a schedule it is still asserting on; a crashed run's enabled schedules keep firing
- * until then.
- */
-const LEFTOVER_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 /** The task fixture seeded by `tasks_fixtures.ts`; the only action on the fixture schedule. */
 const FIXTURE_TASK_NAME = 'eval-sum-nightly';
@@ -64,21 +46,6 @@ const FIXTURE_SCHEDULE = {
 const IS_DRY_RUN = process.argv.includes('--dry-run');
 /** Marks every line of a dry run, so its output cannot be read as changes that happened. */
 const DRY = IS_DRY_RUN ? '[dry run] ' : '';
-
-/** What the sweep reads off a listed schedule. */
-export type SweepCandidate = { name: string; createdAt: Date | string };
-
-/**
- * Whether the sweep deletes this schedule: the run-id token matches at any age, an unmatched
- * `eval-*` leftover only once it is older than the age limit. The fixture and anything outside the
- * `eval-` prefix are never deleted.
- */
-export function isSweepableSchedule(schedule: SweepCandidate, runId: string | undefined, now: number): boolean {
-    const { name } = schedule;
-    if (name === FIXTURE_SCHEDULE_NAME || !name.startsWith(EVAL_SCHEDULE_PREFIX)) return false;
-    if (runId && isNameFromRun(name, runId)) return true;
-    return now - new Date(schedule.createdAt).getTime() >= LEFTOVER_MAX_AGE_MS;
-}
 
 /** `--run-id <id>`, parsed by hand like `--dry-run`; the eval CLI layer uses no framework. */
 function parseRunIdArg(argv: string[]): string | undefined {
@@ -158,6 +125,4 @@ async function main() {
     console.log(IS_DRY_RUN ? '✅ Dry run complete, nothing changed' : '✅ Schedule fixtures ready');
 }
 
-// CLI only: the unit test imports `isSweepableSchedule` from here, and an unconditional call would
-// run the sweep against the account on import.
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) void main();
+void main();
