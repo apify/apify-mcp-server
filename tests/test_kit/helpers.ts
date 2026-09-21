@@ -74,14 +74,14 @@ export function skipUnlessStdio(ctx: CaseCtx): boolean {
     return ctx.transport !== STDIO_TRANSPORT;
 }
 
-/** Skip on stdio and `2025-11-25`. Denylist so a future era inherits the assertion. */
-export function skipOnStatefulEra(ctx: CaseCtx): boolean {
-    return ctx.transport === STDIO_TRANSPORT || ctx.transport === '2025-11-25';
-}
-
 /** Skip unless stdio or `2025-11-25`. Allowlist so a future era does not inherit legacy-only caps. */
 export function skipUnlessStatefulEra(ctx: CaseCtx): boolean {
-    return !skipOnStatefulEra(ctx);
+    return ctx.transport !== STDIO_TRANSPORT && ctx.transport !== '2025-11-25';
+}
+
+/** Skip on stdio and `2025-11-25`. Mirror of {@link skipUnlessStatefulEra}. */
+export function skipOnStatefulEra(ctx: CaseCtx): boolean {
+    return !skipUnlessStatefulEra(ctx);
 }
 
 export function getToolNames(tools: { tools: { name: string }[] }): string[] {

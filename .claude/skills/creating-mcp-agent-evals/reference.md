@@ -1,12 +1,12 @@
 # Reference: commands, shapes, probes
 
-Repo: `apify-mcp-server`. Harness docs: `evals/mcp_agent/README.md` (read it first; it documents the two datasets, `mcp-server-evals-pr` and `mcp-server-evals-merge`, the id scheme, `kind`/`expectedErrors`, scores, and flags).
+Repo: `apify-mcp-server`. Harness docs: `evals/README.md` (read it first; it documents the two datasets, `mcp-server-evals-pr` and `mcp-server-evals-merge`, the id scheme, `kind`/`expectedErrors`, scores, and flags).
 
 ## Running evals
 
 ```bash
 # The default dataset, mcp-server-evals-pr; the gate is the aggregate pass rate
-# >= DEFAULT_PASS_THRESHOLD (0.9, rationale in config.ts).
+# >= DEFAULT_PASS_THRESHOLD (0.9, rationale in evals/runner/run.ts).
 # --pass-threshold 1.0 restores the strict all-pass gate.
 # A bare run is the fast PR-gating set: the kind: "tool-call" items.
 pnpm run evals:mcp-agent --agent-model claude-haiku-4-5 --subscription
@@ -39,7 +39,7 @@ pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/
 ```
 
 - `datasetName` is one of the two: `mcp-server-evals-merge` for a `kind: "agent"` case, `mcp-server-evals-pr` for a `kind: "tool-call"` one.
-- `metadata` is strict-validated (`langfuse_dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
+- `metadata` is strict-validated (`langfuse/dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
 - `category` = tool under test (what `--category` filters); difficulty goes in the id's `<slug>` half.
 - `kind: "agent"` requires `expectedOutput` (multi-turn, judged, `expectedErrors`/`failTools`/`maxTurns` apply); `kind: "tool-call"` requires a non-empty `expectedTools` instead, and rejects `expectedOutput`, `expectedErrors`, `failTools`, and `maxTurns` (turns are fixed at 2). `expectedArgs` (optional, `kind: "tool-call"` only): a flat object, every key deep-equals the captured call's same key, unlisted keys ignored — use it to pin an argument the tool-name check alone would miss (e.g. a resolved vs. guessed Actor slug). Only pin `expectedArgs` when `expectedTools` names a single tool, or when every tool it lists shares the pinned keys with the same expected values — a flat object can't apply differently per tool. `pr/call-actor/rag-web-browser` is the example: `apify/rag-web-browser` resolves to either the generic `call-actor` tool (`{actor, input}`) or the direct `apify--rag-web-browser` tool (`{query, maxResults, ...}`), two incompatible argument shapes, so that item lists both tools in `expectedTools` and carries no `expectedArgs`.
 - A `kind: "agent"` case that provokes an error on purpose sets `expectedErrors: ["<tool-name>", ...]` — the tool(s) allowed to fail on that item; there is no run-wide error-tolerance flag.
@@ -102,7 +102,7 @@ npx -y langfuse-cli api observations list --level ERROR \
 
 ## API probe pattern (before writing platform-dependent cases)
 
-Throwaway script in `evals/mcp_agent/probe_*_tmp.ts`, run with `pnpm exec tsx`, **delete after use**. Probe with the real `apify-client` exactly what the case will depend on: required fields, uniqueness errors, publish requirements, length limits, secret handling. Capture exact error messages and `type` slugs — references can require the agent to react to them (tool errors include `(API error type: <slug>)`). For live-web cases, probe the exact target URL and verify the fetched *content* supports the premise (status, body, the fact the answer needs) — and prefer stable hosts (rfc-editor.org, example.com) over flaky ones (httpbin.org 503s regularly) wherever content is the deliverable.
+Throwaway script in `evals/scripts/probe_*_tmp.ts`, run with `pnpm exec tsx`, **delete after use**. Probe with the real `apify-client` exactly what the case will depend on: required fields, uniqueness errors, publish requirements, length limits, secret handling. Capture exact error messages and `type` slugs — references can require the agent to react to them (tool errors include `(API error type: <slug>)`). For live-web cases, probe the exact target URL and verify the fetched *content* supports the premise (status, body, the fact the answer needs) — and prefer stable hosts (rfc-editor.org, example.com) over flaky ones (httpbin.org 503s regularly) wherever content is the deliverable.
 
 ```ts
 import 'dotenv/config';
@@ -113,7 +113,7 @@ const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
 ## Fixtures script pattern
 
-One script per stateful family (`evals/mcp_agent/tasks_fixtures.ts` is the template): delete leftover `eval-*` resources except the permanent fixture, create the fixture if missing, and **reset the fixture's mutable state** every run (an eval agent may have mutated it). Wire as `evals:mcp-agent:<family>-fixtures` in package.json.
+One script per stateful family (`evals/scripts/tasks_fixtures.ts` is the template): delete leftover `eval-*` resources except the permanent fixture, create the fixture if missing, and **reset the fixture's mutable state** every run (an eval agent may have mutated it). Wire as `evals:mcp-agent:<family>-fixtures` in package.json.
 
 ## Coverage matrix (definition of done for the dataset)
 

@@ -2,7 +2,7 @@ import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
 import type { Options, PreToolUseHookInput, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from '../../evals/mcp_agent/tool_call_mode.js';
+import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from '../../evals/runner/tool_call_mode.js';
 import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
 
 // The SDK spawns a real Claude Code subprocess; capture what runAgentConversation builds
@@ -15,7 +15,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async () => {
 });
 
 // Imported after the mock so the module under test picks up the mocked `query`.
-const { denyToolsHook, runAgentConversation } = await import('../../evals/mcp_agent/claude_agent.js');
+const { denyToolsHook, runAgentConversation } = await import('../../evals/agent/claude_agent.js');
 
 /** A full PreToolUseHookInput, only the fields the hooks under test read vary by call. */
 function preToolUseInput(toolName: string, toolInput: unknown = {}): PreToolUseHookInput {
