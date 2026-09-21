@@ -15,8 +15,7 @@ import 'dotenv/config';
 
 import { ApifyClient } from 'apify-client';
 
-import { findMissingEnvVars } from '../shared/config.js';
-import { sanitizeProcessEnv } from './config.js';
+import { findMissingEnvVars, sanitizeProcessEnv } from '../environment.js';
 
 sanitizeProcessEnv();
 

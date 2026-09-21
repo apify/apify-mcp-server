@@ -1,7 +1,7 @@
 import type { LangfuseClient } from '@langfuse/client';
 import { describe, expect, it } from 'vitest';
 
-import { fetchMcpAgentCases, parseMcpAgentItem, toMcpAgentTestCase } from '../../evals/mcp_agent/langfuse_dataset.js';
+import { fetchMcpAgentCases, parseMcpAgentItem, toMcpAgentTestCase } from '../../evals/langfuse/dataset.js';
 
 const item = {
     id: 'a',

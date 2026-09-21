@@ -2,12 +2,12 @@ import { startObservation } from '@langfuse/tracing';
 import type { Mock } from 'vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { AdaptedConversation } from '../../evals/agent/conversation_adapter.js';
 import {
     type AgentObservationParams,
     buildAgentObservations,
     emitObservations,
-} from '../../evals/mcp_agent/langfuse_observations.js';
-import type { AdaptedConversation } from '../../evals/mcp_agent/sdk_conversation_adapter.js';
+} from '../../evals/langfuse/observations.js';
 
 vi.mock('@langfuse/tracing', () => ({ startObservation: vi.fn() }));
 

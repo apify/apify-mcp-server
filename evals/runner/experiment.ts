@@ -2,15 +2,15 @@
 
 import type { Evaluation } from '@langfuse/client';
 
-import type { AgentRunResult } from './claude_agent.js';
-import { runAgentConversation } from './claude_agent.js';
-import type { DatasetItem, McpAgentItem } from './langfuse_dataset.js';
-import { parseMcpAgentItem } from './langfuse_dataset.js';
-import { buildAgentObservations, emitObservations } from './langfuse_observations.js';
-import type { JudgeLlmClient } from './llm_client.js';
-import type { JudgeResult } from './mcp_agent_judge.js';
-import { evaluateConversation } from './mcp_agent_judge.js';
-import type { TranscriptEntry } from './sdk_conversation_adapter.js';
+import type { AgentRunResult } from '../agent/claude_agent.js';
+import { runAgentConversation } from '../agent/claude_agent.js';
+import type { TranscriptEntry } from '../agent/conversation_adapter.js';
+import type { JudgeClient } from '../judge/client.js';
+import type { JudgeResult } from '../judge/judge.js';
+import { evaluateConversation } from '../judge/judge.js';
+import type { DatasetItem, McpAgentItem } from '../langfuse/dataset.js';
+import { parseMcpAgentItem } from '../langfuse/dataset.js';
+import { buildAgentObservations, emitObservations } from '../langfuse/observations.js';
 import { resolveFirstToolMatch } from './tool_call_mode.js';
 
 /** One failed server tool call. `expected` is true when the item's `expectedErrors` names it. */
@@ -72,7 +72,7 @@ function formatToolErrors(toolErrors: ToolError[], separator = '\n'): string {
 }
 
 /** The evaluators attached to each experiment item. */
-export const evaluators: McpAgentEvaluator[] = [
+export const EVALUATORS: McpAgentEvaluator[] = [
     // Judge verdict: agent items only.
     async ({ output }) =>
         output.kind === 'agent'
@@ -341,7 +341,7 @@ export function isTransientAgentError(error: unknown): boolean {
 }
 
 export type McpAgentTaskOptions = {
-    llmClient: JudgeLlmClient;
+    llmClient: JudgeClient;
     apifyToken: string;
     agentModel: string;
     judgeModel: string;
@@ -410,7 +410,7 @@ function emitTrace(
  *
  * Errors are prefixed with the item id because the SDK's own log line carries none.
  */
-export function makeTask(options: McpAgentTaskOptions) {
+export function createExperimentTask(options: McpAgentTaskOptions) {
     const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout, mcpToolsOnly, totalTrials } = options;
 
     // Progress, one line per finished trial. The scored verdict comes later from the

@@ -1,25 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { LlmClient } from '../../evals/mcp_agent/llm_client.js';
-import { evaluateConversation, parseJudgeResponse } from '../../evals/mcp_agent/mcp_agent_judge.js';
-import type { ConversationHistory } from '../../evals/mcp_agent/types.js';
+import type { ConversationHistory } from '../../evals/agent/conversation_adapter.js';
+import type { JudgeClient } from '../../evals/judge/client.js';
+import { evaluateConversation, parseJudgeResponse } from '../../evals/judge/judge.js';
 
 /** LLM client that returns the given judge responses in order, repeating the last one. */
-function makeJudgeClient(...responses: string[]): LlmClient & { callLlm: ReturnType<typeof vi.fn> } {
+function makeJudgeClient(...responses: string[]): JudgeClient & { callLlm: ReturnType<typeof vi.fn> } {
     let call = 0;
     const callLlm = vi.fn(async () => ({ content: responses[Math.min(call++, responses.length - 1)] }));
-    return { callLlm } as unknown as LlmClient & { callLlm: ReturnType<typeof vi.fn> };
+    return { callLlm } as unknown as JudgeClient & { callLlm: ReturnType<typeof vi.fn> };
 }
 
 /** LLM client that records the prompt it was asked to judge. */
-function makePromptCapturingClient(): { client: LlmClient; prompt: () => string } {
+function makePromptCapturingClient(): { client: JudgeClient; prompt: () => string } {
     let captured = '';
     const client = {
         callLlm: async (messages: { content: string }[]) => {
             captured = messages[0].content;
             return { content: '{"verdict":"PASS","reason":"ok"}' };
         },
-    } as unknown as LlmClient;
+    } as unknown as JudgeClient;
     return { client, prompt: () => captured };
 }
 
