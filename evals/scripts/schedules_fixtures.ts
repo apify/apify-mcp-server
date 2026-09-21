@@ -26,7 +26,7 @@ import 'dotenv/config';
 import { ApifyClient, type ScheduleCreateOrUpdateData, ScheduleActions } from 'apify-client';
 
 import { findMissingEnvVars, sanitizeProcessEnv } from '../environment.js';
-import { validateRunId } from '../run_id.js';
+import { parseRunIdArg } from '../run_id.js';
 import { FIXTURE_SCHEDULE_NAME, isSweepableSchedule } from './schedules_sweep.js';
 
 sanitizeProcessEnv();
@@ -47,23 +47,14 @@ const IS_DRY_RUN = process.argv.includes('--dry-run');
 /** Marks every line of a dry run, so its output cannot be read as changes that happened. */
 const DRY = IS_DRY_RUN ? '[dry run] ' : '';
 
-/** `--run-id <id>`, parsed by hand like `--dry-run`; the eval CLI layer uses no framework. */
-function parseRunIdArg(argv: string[]): string | undefined {
-    const index = argv.indexOf('--run-id');
-    if (index === -1) return undefined;
-    const value = argv[index + 1];
+async function main() {
+    let runId: string | undefined;
     try {
-        if (!value) throw new Error('--run-id needs a value');
-        validateRunId(value);
+        runId = parseRunIdArg(process.argv);
     } catch (error) {
         console.error(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
     }
-    return value;
-}
-
-async function main() {
-    const runId = parseRunIdArg(process.argv);
     const missing = findMissingEnvVars(['APIFY_TOKEN']);
     if (missing.length > 0) {
         console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
