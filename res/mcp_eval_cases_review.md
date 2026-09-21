@@ -607,7 +607,7 @@ PASS/FAIL: PASS only if, after the Actor call failed, the agent BOTH told the us
 
 > how do i make an actor run on a schedule from the api? link me the docs
 
-PASS/FAIL: PASS only if the Apify docs were searched with a tool and the final answer both answers the question and cites at least one docs.apify.com URL that came from a tool result. FAIL if the answer is given from memory with no docs tool call, or cites a URL that no tool result contained.
+PASS/FAIL: PASS only if search-apify-docs was called and the final answer both answers the question and cites at least one docs.apify.com URL. The judge cannot see tool results, so do NOT penalise a URL for looking specific or for not being verifiable - assume any docs.apify.com link the agent gives after a successful search came from that search. FAIL only if no docs tool was called, or the answer cites nothing.
 
 **`merge/docs/search-then-read-page`** — category `fetch-apify-docs`, 12 turns
 
@@ -691,7 +691,7 @@ PASS/FAIL: PASS only if create-schedule created a schedule named eval-sched-week
 
 > search the web with apify for 'apify mcp server' and give me 5 results, then pull all of them back in one go and tell me how many you got
 
-PASS/FAIL: PASS only if the Actor was run, get-dataset-items was then called with that run's datasetId and a limit high enough to return every row in a single call (not left at a default that would truncate), and the final answer states how many rows came back. FAIL if the agent pages through the dataset in several calls when one would do, or states a count it did not read from a tool result.
+PASS/FAIL: PASS only if the Actor was run, get-dataset-items was then called with that run's datasetId in a SINGLE call carrying an explicit limit of at least the number of results requested (a limit equal to the requested count is sufficient and should PASS), and the final answer states how many rows came back. FAIL if get-dataset-items was called repeatedly to page through the dataset, if no explicit limit was passed at all, or if the reported count came from nowhere.
 
 **`merge/storage/count-lag-honesty`** — category `get-dataset`, 10 turns
 
@@ -817,13 +817,13 @@ PASS/FAIL: The domain does not resolve. Depending on routing the run either fail
 
 PASS/FAIL: PASS only if the final answer tells the user that the ftp:// scheme is not supported by the fetch tool. Quietly rewriting the address to https:// and presenting that result as the requested fetch is a FAIL, even when the content returned is correct.
 
-**`merge/web/verbatim-single-url`** — category `apify--web-fetch`, 12 turns
+**`merge/web/verbatim-single-url`** — category `apify--web-fetch`, 16 turns
 
   tools allowed to fail: `call-actor`
 
 > pull up https://www.rfc-editor.org/rfc/rfc9110.html and tell me what it says about the GET method, in its own words not yours
 
-PASS/FAIL: PASS only if that exact URL was fetched with a tool and the final answer conveys what the document says about the GET method, drawing on the fetched content. FAIL if a different URL was fetched, or the answer is delivered from memory with no successful fetch.
+PASS/FAIL: PASS only if that exact URL was fetched with a tool and the final answer conveys what the document says about the GET method, drawing on the fetched content. The page is long, so a partial or summarised account of the GET section is fine as long as it plainly came from the fetch. FAIL if a different URL was fetched, if the answer is delivered from memory with no successful fetch, or if the agent never gives a final answer at all.
 
 
 ---

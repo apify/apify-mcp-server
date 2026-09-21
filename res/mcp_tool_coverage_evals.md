@@ -114,12 +114,13 @@ would succeed.
 |---|---|---|---|
 | `pr` **after** widening, 74 items | 69/74 (0.93) | 69/74 (0.93) | 70/74 (0.95) |
 | `pr` before widening, 72 items | 39/72 (0.54) | 54/72 (0.75) | 56/72 (0.78) |
-| `merge`, 29 items | 23/29 (0.79) | not run | 16/29 (0.55) |
+| `merge`, 37 items | 31/37 (0.84) | 29/37 (0.78) | not run |
+| `merge`, 29 items (superseded) | 23/29 (0.79) | not run | 16/29 (0.55) |
 
 The first row is the suite as it stands and the one to gate on. The second is the same cases with
 `expectedTools` naming only the action tool — kept because the gap between the rows *is* the
-finding (see below), not because either number is wrong. `merge` has not been re-run since it grew
-to 37 items.
+finding (see below), not because either number is wrong. `merge` at 37 items is the current figure; the 29-item row is kept only because the earlier
+write-up cited it. Haiku has not been run on `merge` since it grew.
 
 **Run the tier at `--concurrency 1`.** An earlier sweep at concurrency 2 measured 0.51/0.63/0.58 —
 each roughly 20 points low, purely from the MCP-startup race. Those numbers are void; do not compare
@@ -196,6 +197,31 @@ presents the result rather than reporting the failure.
 run and failed the zero-tool-error gate. Delete every `eval-*` task and schedule except the three
 fixtures before each run; `evals:mcp-agent:schedules-fixtures` does this but exits 403 on a token
 without `users/me`.
+
+## merge findings, and two misdiagnoses
+
+Three `merge` cases were called case defects and "repaired". Re-running showed **one** of the three
+was: `docs/how-do-i-with-citation`'s reference asked the judge to verify that cited URLs came from
+search results, which it cannot see. Reworded, Sonnet passes.
+
+The other two were misread from judge summaries rather than the underlying failure:
+
+- `storage/all-rows-one-call` — the case is correct. The agent calls `get-dataset-items` twice, or
+  omits `limit` entirely, when one call with an explicit limit would do.
+- `web/verbatim-single-url` — not turn exhaustion. At 16 turns it fetches the page successfully and
+  then never delivers an answer, ending on "technical difficulties". A large-document bail-out.
+
+Both stay failing, because both are real.
+
+A finding came out of the repair run that is worth more than the repairs: on
+`docs/how-do-i-with-citation` **Opus invented a docs URL** (`docs.apify.com/platform/schedules`,
+404) instead of fetching one from the search results. The judge passed the answer; the
+zero-tool-error gate caught it. That is precisely what the gate is for, and it is the same class of
+failure as guessing an Actor slug rather than resolving it.
+
+One worry is closed: an Opus judgement claiming the agent "only ran shell commands" did not
+reproduce. `runs/log-not-just-status` passes on both models, so `mcpToolsOnly` is not leaking
+built-ins into agent items.
 
 ## Is v2 at least as good as v1?
 
