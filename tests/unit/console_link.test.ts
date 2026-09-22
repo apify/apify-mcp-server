@@ -88,6 +88,22 @@ describe('buildConsole*Url (production host)', () => {
     });
 });
 
+describe('buildConsole*Url (APIFY_CONSOLE_BASE_URL override)', () => {
+    const original = process.env.APIFY_CONSOLE_BASE_URL;
+    afterEach(() => {
+        if (original === undefined) delete process.env.APIFY_CONSOLE_BASE_URL;
+        else process.env.APIFY_CONSOLE_BASE_URL = original;
+    });
+
+    it('uses the override origin, and wins over the staging host check', () => {
+        process.env.APIFY_CONSOLE_BASE_URL = 'http://localhost:3000';
+        expect(buildConsoleRunUrl({}, 'RUN_ID')).toBe('http://localhost:3000/actors/runs/RUN_ID');
+        expect(buildConsoleDatasetUrl({ organizationId: 'ORG_ID' }, 'DATASET_ID')).toBe(
+            'http://localhost:3000/organization/ORG_ID/storage/datasets/DATASET_ID',
+        );
+    });
+});
+
 describe('buildConsole*Url (staging host)', () => {
     const original = process.env.HOSTNAME;
     beforeEach(() => {

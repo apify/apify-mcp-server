@@ -18,7 +18,7 @@ services:
     # secrets of its own. APIFY_API_BASE_URL points it at the local platform API
     # instead of api.apify.com, and UI_MODE serves the `*-widget` tools to clients
     # that do not advertise MCP Apps support.
-    command: 'APIFY_API_BASE_URL=http://localhost:3333 UI_MODE=true pnpm start'
+    command: 'APIFY_API_BASE_URL=http://localhost:3333 APIFY_CONSOLE_BASE_URL=http://localhost:3000 UI_MODE=true pnpm start'
     description: >-
       The Apify MCP server on :3001, running against the local platform API.
     requires:
