@@ -325,16 +325,10 @@ async function fetchKvKeys(
 function parseActorTip(value: unknown): RunResponse['tip'] {
     if (!value || typeof value !== 'object') return undefined;
     const { message, level } = value as { message?: unknown; level?: unknown };
-    if (typeof message !== 'string') return undefined;
-    const sanitized = message
-        // eslint-disable-next-line no-control-regex -- strip control chars/quotes so the Actor's text can't forge narrative lines
-        .replace(/[\x00-\x1F\x7F]/g, ' ')
-        .replace(/"/g, "'")
-        .trim();
-    if (!sanitized) return undefined;
-    const codePoints = Array.from(sanitized); // avoids splitting a surrogate pair at the cut
+    if (typeof message !== 'string' || !message) return undefined;
+    const codePoints = Array.from(message); // avoids splitting a surrogate pair at the cut
     const truncated =
-        codePoints.length > TIP_MESSAGE_LIMIT ? `${codePoints.slice(0, TIP_MESSAGE_LIMIT).join('')}…` : sanitized;
+        codePoints.length > TIP_MESSAGE_LIMIT ? `${codePoints.slice(0, TIP_MESSAGE_LIMIT).join('')}…` : message;
     return {
         message: truncated,
         ...(level === 'info' || level === 'warning' ? { level } : {}),
