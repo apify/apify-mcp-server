@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.16.1 - **not yet released**
 
+### 🚀 Features
+
+- Add get-actor-build and get-actor-build-log tools ([#1331](https://github.com/apify/apify-mcp-server/pull/1331)) ([3c1744b](https://github.com/apify/apify-mcp-server/commit/3c1744bb3df41a2ee3a3485e06f57c75f9cc39cd)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1352](https://github.com/apify/apify-mcp-server/issues/1352)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.16.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.16.0) (2026-09-17)
