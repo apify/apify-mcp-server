@@ -1,5 +1,3 @@
-import { TIP_MESSAGE_LIMIT } from './actors/actor_run_response.js';
-
 /**
  * Shared JSON schema definitions for structured output across tools.
  * These schemas define the format of structured data returned by various tools.
@@ -515,8 +513,12 @@ export const actorRunOutputSchema = {
             description: 'Advisory guidance an Actor wrote to its key-value store under the reserved "TIP" key',
             properties: {
                 message: {
+                    // Keep in sync with TIP_MESSAGE_LIMIT in actor_run_response.ts (not imported
+                    // here — that module transitively imports this file, and re-importing back
+                    // creates a circular import that crashes the built server on startup).
                     type: 'string',
-                    description: `Truncated to ${TIP_MESSAGE_LIMIT} characters, with a trailing ellipsis if the Actor's message was longer`,
+                    description:
+                        "Truncated to 300 characters, with a trailing ellipsis if the Actor's message was longer",
                 },
                 level: {
                     type: 'string',
