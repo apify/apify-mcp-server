@@ -1,35 +1,27 @@
 /**
- * The per-run name grammar for eval resources: `<static>-<runId>-t<trial>`.
- *
- * Both sides live here — the runner builds the suffix it substitutes into an item's `{{uniq}}`
- * marker, the fixtures scripts match it when they tear a run down — so the two cannot drift.
- * Names stay within `[a-z0-9-]`, which the platform's schedule and task name rules accept.
+ * Name grammar for a run's eval resources: `<static>-<runId>-t<trial>`.
+ * The runner builds the suffix and the fixtures scripts match it, so the two cannot drift.
  */
 
 const RUN_ID_PATTERN = /^[a-z0-9-]+$/;
 
-/** The CLI flag that carries a run id, in both its `--run-id <value>` and `--run-id=<value>` forms. */
 const RUN_ID_FLAG = '--run-id';
 
-/**
- * Identifier for one local run. Base36 seconds keeps it short; the random tail separates two runs
- * started in the same second. CI passes `<github.run_id>-<github.run_attempt>` instead.
- */
+/** Id for one local run; the random tail separates two runs started in the same second. */
 export function createRunId(): string {
     const seconds = Math.floor(Date.now() / 1000).toString(36);
     const random = Math.random().toString(36).slice(2, 6);
     return `${seconds}${random}`;
 }
 
-/** Name suffix for one trial of one item; `trial` is the 1-based iteration. */
+/** Name suffix for one trial of one item; `trial` is 1-based. */
 export function buildRunSuffix(runId: string, trial: number): string {
     return `${runId}-t${trial}`;
 }
 
 /**
- * Whether a resource name was created by this run. Matched as a delimited token (`-<runId>-t`),
- * never as a bare substring: `includes('35014680476-1')` also matches attempt 12's
- * `…-35014680476-12-t1`, so a teardown would delete what a sibling run is still asserting on.
+ * Matched as a delimited token, because a bare `includes('35014680476-1')` also matches attempt
+ * 12's `…-35014680476-12-t1`.
  */
 export function isNameFromRun(name: string, runId: string): boolean {
     return name.includes(`-${runId}-t`);
@@ -43,10 +35,7 @@ export function validateRunId(value: string): void {
 }
 
 /**
- * The run id an argv carries, or undefined when the flag is absent. Pure: the caller decides what a
- * throw means (the fixtures scripts print it and exit).
- *
- * A value that starts with `--` is an error, not an id: `--run-id --dry-run` would otherwise swallow
+ * A value starting with `--` is an error, not an id: `--run-id --dry-run` would otherwise swallow
  * the next flag, and `--dry-run` matches the id pattern.
  */
 export function parseRunIdArg(argv: string[]): string | undefined {

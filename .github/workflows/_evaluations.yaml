@@ -98,8 +98,7 @@ jobs:
             # The schedule cases leave enabled schedules behind, and an enabled schedule keeps firing
             # on the eval account until something deletes it. Seeding at the start of the next run is
             # too late, so tear them down here — `always()` so a failed or cancelled run still cleans up.
-            # Same run id as the run step, derived from the same context, so this deletes only the
-            # schedules this run created; anything else waits for the script's 6h age sweep.
+            # Same run id as the run step, so this deletes only what this run created.
             -   name: Tear down schedule fixtures (merge tier only)
                 if: always() && inputs.tier == 'merge'
                 run: >

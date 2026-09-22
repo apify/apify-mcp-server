@@ -10,10 +10,10 @@ import type { Case, CaseCtx } from '../types.js';
 
 /**
  * Schedule CRUD against the live API: the deterministic platform facts the schedule evals used to
- * assert through an LLM judge (an update replaces the action list, what a name collision returns).
+ * assert through an LLM judge.
  *
- * Names are prefixed `test-sched-`, never `eval-`: the eval harness sweeps `eval-*` schedules on the
- * same account, so an `eval-`-prefixed name here would be deleted mid-assertion by a concurrent run.
+ * Names are prefixed `test-sched-`, never `eval-`, so the eval harness's `eval-*` sweep on the same
+ * account never deletes one mid-assertion.
  *
  * Tool names are hardcoded, not read from `HELPER_TOOLS`, so a rename fails these tests
  * (CONTRIBUTING.md, "Integration tests").
@@ -37,7 +37,6 @@ function buildCreateArgs(name: string, overrides: Record<string, unknown> = {}) 
     };
 }
 
-/** The subset of `buildScheduleResult` these cases read. */
 type ScheduleResult = {
     scheduleId: string;
     name: string;
@@ -60,13 +59,12 @@ function resultText(result: unknown): string {
     return ((result as { content?: { text?: string }[] }).content ?? []).map((part) => part.text ?? '').join('\n');
 }
 
-/** Cleanup for a case's own schedule. The client swallows a 404, so an already-deleted one is fine. */
+/** The client swallows a 404, so deleting an already-deleted schedule is fine. */
 async function deleteSchedule(ctx: CaseCtx, scheduleId?: string): Promise<void> {
     if (!scheduleId) return;
     await ctx.createApifyClient().schedule(scheduleId).delete();
 }
 
-/** Schedule create/get/update/delete against the live API. */
 export const schedulesCases: Case[] = [
     {
         name: 'create-schedule returns the stored schedule with its cron settings and resolved action',
@@ -86,7 +84,7 @@ export const schedulesCases: Case[] = [
                 expect(schedule.cronExpression).toBe(CRON_DAILY_3AM);
                 expect(schedule.timezone).toBe('UTC');
                 expect(schedule.isEnabled).toBe(false);
-                // Disabled schedules have no next run; createdAt is the sweep's age source.
+                // A disabled schedule has no next run.
                 expect(schedule.nextRunAt).toBeNull();
                 expect(schedule.createdAt).not.toBeNull();
                 expect(schedule.actions).toHaveLength(1);
@@ -154,7 +152,7 @@ export const schedulesCases: Case[] = [
                 expect(updated.actions).toHaveLength(1);
                 expect(updated.actions[0].actorId).not.toBe(created.actions[0].actorId);
 
-                // Read back: the replacement is what the API stored, not just what the update echoed.
+                // Read back: the API stored the replacement, it did not just echo it.
                 const stored = expectScheduleResult(
                     await client.callTool({ name: 'get-schedule', arguments: { scheduleId: name } }),
                 );
@@ -208,10 +206,8 @@ export const schedulesCases: Case[] = [
                 );
                 scheduleId = created.scheduleId;
 
-                // The tool does not catch duplicate names, so this is the API's own error. Probed
-                // 2026-09-21: `Some other schedule already has this name ("<name>").`, type
-                // `schedule-name-not-unique`, HTTP 409. Only the stable part is asserted: the exact
-                // wording is the API's to change.
+                // Asserts only the name, since the message is the API's. Probed 2026-09-21:
+                // `Some other schedule already has this name ("<name>").`, type `schedule-name-not-unique`.
                 const collision = await client.callTool({
                     name: 'create-schedule',
                     arguments: buildCreateArgs(name),
@@ -246,9 +242,8 @@ export const schedulesCases: Case[] = [
                 arguments: { scheduleId: name, isEnabled: false },
             });
 
-            // A plain name skips the tool's pre-read, so this is the API's own 404. Probed
-            // 2026-09-21: `Record was not found`, type `record-not-found`. Only the stable part is
-            // asserted: the exact wording is the API's to change.
+            // A non-ID-shaped name skips the tool's pre-read, so this matches the API's own 404
+            // loosely. Probed 2026-09-21: `Record was not found`, type `record-not-found`.
             expect((result as { isError?: boolean }).isError).toBe(true);
             expect(resultText(result)).toMatch(/not found/i);
         }),

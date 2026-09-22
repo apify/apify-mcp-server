@@ -3,19 +3,10 @@
 /**
  * Fixtures for the `merge/schedules/*` agent evals (schedule-tool cases).
  *
- * Deletes the schedules a run left behind and resets the one permanent read-only fixture, which it
- * creates if missing (an eval agent may have enabled it or replaced its actions). Two delete rules:
+ * Deletes the schedules a run left behind (delete rules in `schedules_sweep.ts`) and resets the one
+ * permanent read-only fixture, creating it if missing.
  *
- * - `--run-id <id>`: every `eval-*` schedule whose name carries that run's `-<id>-t<trial>` token,
- *   whatever its age. This is the teardown of one finished run, and the only rule that runs
- *   immediately after it.
- * - The age backstop: an `eval-*` schedule no `--run-id` matched is deleted once it is older than
- *   `LEFTOVER_MAX_AGE_MS`. A younger one may belong to a run still asserting on it, and this script
- *   deletes on whatever account `APIFY_TOKEN` points at.
- *
- * Both rules live in `schedules_sweep.ts`, which this file imports for the delete decision.
- *
- * `tasks_fixtures.ts` still sweeps by prefix alone, without the age or run-id rules; see #1394.
+ * `tasks_fixtures.ts` still sweeps by prefix alone; see #1394.
  *
  * The fixture schedule runs the task fixture from `tasks_fixtures.ts`, so run that first:
  *   pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures [--run-id <id>] [--dry-run]
