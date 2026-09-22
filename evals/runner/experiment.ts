@@ -219,21 +219,17 @@ function withIteration(item: DatasetItem, iteration: number): DatasetItem {
     return { ...item, metadata: { ...(item.metadata as Record<string, unknown> | undefined), iteration } };
 }
 
-/** Marker an item's author writes where a name unique to the run and the trial belongs. */
 const UNIQ_MARKER_PATTERN = /\{\{uniq\}\}/g;
 
 /**
- * Rewrites every `{{uniq}}` in the agent prompt and the judge reference to `suffix`. Both fields
- * take the same value from one pass, so a create case and the reference scoring it name one
- * resource. An item without the marker comes back unchanged, so unedited items keep working.
+ * Rewrites every `{{uniq}}` in the agent prompt and the judge reference to `suffix`.
  *
- * Function replacer, as in judge.ts: `$&` and `` $` `` are routine in a reference quoting a shell
- * command, and a plain string replacement would read them as replacement patterns.
+ * Function replacer, as in judge.ts: `$&` and `` $` `` in a reference would otherwise be read as
+ * replacement patterns.
  */
 export function substituteUniqMarker(item: DatasetItem, suffix: string): DatasetItem {
     const substitute = (text: string): string => text.replace(UNIQ_MARKER_PATTERN, () => suffix);
-    // `input.query` is required on every item (McpAgentItemValidator); `expectedOutput` is absent
-    // on `kind: "tool-call"` items, so only that one is conditional.
+    // `expectedOutput` is absent on `kind: "tool-call"` items; `input.query` never is.
     const input = item.input as { query: string };
     return {
         ...item,
@@ -244,8 +240,8 @@ export function substituteUniqMarker(item: DatasetItem, suffix: string): Dataset
 
 /**
  * Repeats items in one experiment, tagging each copy with its one-based iteration because
- * Langfuse has no native iteration field, and resolving each copy's `{{uniq}}` marker to
- * `<runId>-t<trial>`, so two trials of one item never create the same named resource.
+ * Langfuse has no native iteration field, and resolving each copy's `{{uniq}}` marker so two
+ * trials never name the same resource.
  */
 export function expandIterations(items: DatasetItem[], iterations: number, runId: string): DatasetItem[] {
     return items.flatMap((item) =>
@@ -344,9 +340,8 @@ export function formatRunSummary(summary: RunSummary, passThreshold: number, ite
 }
 
 /**
- * Printed after the summary: the run's id and the command that deletes the schedules it created.
- * The runner does not delete them itself — that would put one family's cleanup in the runner every
- * family shares, and a killed run would skip it anyway.
+ * The run's id and the command that deletes the schedules it created. The runner never deletes them
+ * itself: family-specific cleanup does not belong in the runner every family shares.
  */
 export function formatTeardownHint(runId: string): RunSummaryLine[] {
     return [

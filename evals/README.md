@@ -41,7 +41,7 @@ pnpm run build
 pnpm run evals:mcp-agent
 ```
 
-Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--tool-timeout` caps each MCP tool call (default 60 s); `--mcp-tools-only` removes Claude Code built-ins; `--run-id` names the resources this run creates (see "Unique resource names" below). Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
+Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--tool-timeout` caps each MCP tool call (default 60 s); `--mcp-tools-only` removes Claude Code built-ins; `--run-id` names the resources this run creates (below). Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
 
 ### Two datasets: kind, id scheme, and expectedErrors
 
@@ -98,18 +98,16 @@ The schedules family (`merge/schedules/*`, 10 items: 7 proper + 3 with `expected
 schedule tools: create for a task and for an Actor, cron and time-zone translation from user language,
 pausing, adding an action (an update replaces the whole list), deleting, a name collision, and a
 not-found read. Every item that creates a schedule names it `eval-sched-<what>-{{uniq}}` in the query
-and in the reference (see "Unique resource names" below), so its trials and any concurrent run work
-on separate schedules and `--iterations N` is safe. One permanent, disabled fixture schedule runs the `eval-sum-nightly` task
-fixture: `eval-nightly-sum`, which the pure read cases and the collision case point at and no case may
-modify. The seed step resets it to the same values every run, so a concurrent reader never observes
-the reset. The fixture stays disabled on purpose; an enabled one would start a run on the eval account
-every night.
+and in the reference (see "Unique resource names" below), so its trials and any concurrent run work on
+separate schedules and `--iterations N` is safe. One permanent, disabled fixture schedule,
+`eval-nightly-sum`, runs the `eval-sum-nightly` task fixture; the pure read cases and the collision case
+point at it and no case may modify it. It stays disabled on purpose; an enabled one would start a run on
+the eval account every night.
 
 Run `pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures` before a
-run: the second script resets the fixture (disabled, `0 3 * * *` UTC, one task action), since an eval
-agent may have enabled it or replaced its actions, and deletes `eval-*` schedules older than 6 hours.
-It deletes on whatever account `APIFY_TOKEN` points at and prints that account first; pass `--dry-run`
-to see what it would delete before it does.
+run: the second script resets the fixture (disabled, `0 3 * * *` UTC, one task action) and deletes
+`eval-*` schedules older than 6 hours, on whatever account `APIFY_TOKEN` points at. Pass `--dry-run` to
+see what it would delete.
 
 **After** a run, delete the schedules that run created, with the command it printed:
 
@@ -117,15 +115,12 @@ to see what it would delete before it does.
 pnpm run evals:mcp-agent:schedules-fixtures -- --run-id <the run id from the summary>
 ```
 
-`--run-id` deletes that run's own names at any age. Skipping it costs nothing permanent — the 6-hour
-sweep catches them on a later run — but the enabled ones keep firing until then. CI does this in a
-`Tear down schedule fixtures` step guarded by `always()`, passing the same
-`<github.run_id>-<github.run_attempt>` the run step used.
+`--run-id` deletes that run's own names at any age; skip it and the enabled ones keep firing until the
+6-hour sweep. CI does this in a `Tear down schedule fixtures` step guarded by `always()`.
 
-The deterministic platform facts the judge used to score here — an update replaces the action list,
-what a name collision returns, what create returns — live in `tests/test_kit/cases/schedules.cases.ts`
-instead, asserted against the live API. Those cases name their schedules `test-sched-*`; the sweep
-above only ever touches `eval-*`.
+The deterministic platform facts the judge used to score here live in
+`tests/test_kit/cases/schedules.cases.ts` instead, asserted against the live API. Those cases name their
+schedules `test-sched-*`; the sweep only ever touches `eval-*`.
 
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
@@ -180,18 +175,16 @@ reference: PASS only if create-schedule created eval-sched-add-{{uniq}}.
 ```
 
 The runner rewrites every `{{uniq}}` to `<run-id>-t<trial>` before the item reaches the agent and the
-judge, so two trials of one item, or two runs at once, never ask for the same name. Keep the static
-part of the name at 35 characters or fewer: a schedule or task name is capped at 63 and a CI run id
-plus the trial takes the rest.
+judge. Keep the static part of the name at 35 characters or fewer: a schedule or task name is capped at
+63 and a CI run id plus the trial takes the rest.
 
-Substitute both or neither. A marker in the query alone makes the judge demand a name the agent never
-used. An item without the marker passes through unchanged — and keeps colliding exactly as before, so
-the fix is per item, not automatic. `metadata.expectedArgs` is never substituted: it is valid on
-`kind: "tool-call"` items only, and no tool-call item creates anything.
+Substitute both or neither — a marker in the query alone makes the judge demand a name the agent never
+used. An unmarked item keeps colliding exactly as before, so the fix is per item, not automatic.
+`metadata.expectedArgs` is never substituted.
 
-`--run-id` overrides the generated id (lowercase letters, digits and dashes). CI passes
-`<github.run_id>-<github.run_attempt>`, so its teardown step matches the same names without anything
-being plumbed between the steps. A run prints its id and its teardown command when it finishes:
+`--run-id` overrides the generated id (lowercase letters, digits and dashes); CI passes
+`<github.run_id>-<github.run_attempt>` to the run and to its teardown step. A run prints its id and its
+teardown command when it finishes:
 
 ```
 🧹 Run id r3k9f2qa7c — delete this run's schedules:
@@ -321,7 +314,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 
 - `config.ts` - Models and the MCP tool-name prefix, shared across responsibilities
 - `environment.ts` - Env var sanitization and missing-var reporting
-- `run_id.ts` - The `<static>-<runId>-t<trial>` name grammar shared by the runner and the fixtures scripts, plus the `--run-id` argv parsing the fixtures scripts use
+- `run_id.ts` - The `<static>-<runId>-t<trial>` name grammar and `--run-id` parsing, shared by the runner and the fixtures scripts
 - `runner/run.ts` - Main CLI entry, runner defaults
 - `runner/experiment.ts` - Experiment task (agent + tool-call dispatch), `EVALUATORS`, run summary, exit gate
 - `runner/filters.ts` - Test case filtering by category and id
@@ -338,7 +331,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `scripts/export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
 - `scripts/tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
 - `scripts/schedules_fixtures.ts` - Schedule-suite fixture CLI entry (`pnpm run evals:mcp-agent:schedules-fixtures`)
-- `scripts/schedules_sweep.ts` - Which schedules that teardown deletes; side-effect free, so a unit test can import it
+- `scripts/schedules_sweep.ts` - The teardown's delete rule; side-effect free, so a unit test can import it
 - `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime and gitignored
 
 ## Configuration

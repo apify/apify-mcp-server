@@ -257,8 +257,6 @@ async function main() {
         }
         const requestedIds = selected.map((mcpAgentCase) => mcpAgentCase.id);
         const { iterations } = argv;
-        // Names every resource an item creates, so concurrent runs and trials never collide and
-        // the fixtures script can delete this run's own leftovers by id.
         runId = argv.runId ?? createRunId();
         // One experiment.run() call over every requested item x iteration: see
         // expandIterations() for why the Langfuse v4 API forces this shape.
@@ -335,8 +333,7 @@ async function main() {
         console.error(`❌ Run failed: ${error instanceof Error ? error.message : String(error)}`);
         exitCode = 1;
     } finally {
-        // In the finally, not next to the summary: a run that crashed after the id was generated
-        // may already have created schedules under it, and the age sweep is the only other way out.
+        // In the finally: a run that crashed may already have created schedules under this id.
         if (runId) {
             for (const { text } of formatTeardownHint(runId)) console.log(text);
         }
