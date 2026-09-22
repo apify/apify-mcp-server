@@ -1,16 +1,15 @@
 import type { ActorRun } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
 import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
     buildStatusSummaryNextStep,
     collapseArrayIndices,
-    KV_KEYS_LIMIT,
     type RunDataset,
     type RunKeyValueStore,
     type RunResponse,
-    TIP_MESSAGE_LIMIT,
 } from '../../src/tools/actors/actor_run_response.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';

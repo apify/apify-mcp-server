@@ -3,7 +3,13 @@ import type { ActorRun, Dataset, KeyValueClientListKeysResult } from 'apify-clie
 import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { DATASET_SIZE_HINT_BYTES, HELPER_TOOLS, NARROW_OUTPUT_HINT } from '../../const.js';
+import {
+    DATASET_SIZE_HINT_BYTES,
+    HELPER_TOOLS,
+    KV_KEYS_LIMIT,
+    NARROW_OUTPUT_HINT,
+    TIP_MESSAGE_LIMIT,
+} from '../../const.js';
 import { buildActorRunWidgetMeta } from '../../resources/widgets.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import {
@@ -18,14 +24,8 @@ import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } f
 import { cleanEmptyProperties } from '../../utils/schema_generation.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 
-/** Cap on `storages.keyValueStores.default.keys` array length. */
-export const KV_KEYS_LIMIT = 50;
-
 /** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
 const TIP_KVS_KEY = 'TIP';
-
-/** Cap on a TIP record's `message` length. */
-export const TIP_MESSAGE_LIMIT = 300;
 
 /** Page size for the targeted `TIP` key lookup (server-side `prefix` filter, not pagination). */
 const TIP_SEARCH_LIMIT = 1000;
