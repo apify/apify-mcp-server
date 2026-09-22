@@ -58,6 +58,18 @@ export function buildConsoleRunUrl(context: ConsoleLinkContext | undefined, runI
     return buildConsoleUrl(context, `/actors/runs/${runId}`);
 }
 
+/**
+ * Builds the Console build detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/<actorId>/builds/<buildNumber>`.
+ * Console resolves builds by number, not by ID (the CLI links the same way); a build ID in the path 404s.
+ */
+export function buildConsoleBuildUrl(
+    context: ConsoleLinkContext | undefined,
+    actorId: string,
+    buildNumber: string,
+): string | undefined {
+    return buildConsoleUrl(context, `/actors/${actorId}/builds/${buildNumber}`);
+}
+
 /** Builds the Console dataset URL: `<consoleBaseUrl>[/organization/<orgId>]/storage/datasets/<datasetId>`. */
 export function buildConsoleDatasetUrl(context: ConsoleLinkContext | undefined, datasetId: string): string | undefined {
     return buildConsoleUrl(context, `/storage/datasets/${datasetId}`);

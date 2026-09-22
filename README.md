@@ -248,6 +248,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Apify storage**: Access data from your datasets and key-value stores.
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
+- **Builds**: Check the status of an Actor build and retrieve its build log.
 
 ### Overview of available tools
 
@@ -289,6 +290,8 @@ Legend for the **Enabled by default** column:
 | `get-schedule` | schedules | Get a schedule, its cron expression, state, and the actions it runs. |  |
 | `update-schedule` | schedules | Update a schedule: cron expression, time zone, enabled state, or actions. |  |
 | `delete-schedule` | schedules | Delete a schedule. |  |
+| `get-actor-build` | builds | Get an Actor build's status. |  |
+| `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
 
 > **Note:**
 >
