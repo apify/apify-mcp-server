@@ -547,6 +547,74 @@ export const pushActorToolOutputSchema = {
     required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed', 'sourceType'],
 };
 
+/**
+ * Schema for pull-actor: the version's files in the shape push-actor takes, or, for a version built from a
+ * repository, a gist or a zip at an external URL, only that URL.
+ */
+export const pullActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the Actor' },
+        actorName: { type: 'string', description: 'Full Actor name, username/name' },
+        versionNumber: { type: 'string', description: 'Version the source was read from, e.g. 0.1' },
+        sourceType: {
+            type: 'string',
+            enum: ['SOURCE_FILES', 'TARBALL', 'GIT_REPO', 'GITHUB_GIST'],
+            description:
+                'SOURCE_FILES: files stored inline; TARBALL: a zip; GIT_REPO: a Git repository; GITHUB_GIST: a GitHub gist',
+        },
+        files: {
+            type: 'array' as const,
+            description:
+                'Files read, in order; present for SOURCE_FILES and for a TARBALL stored as a key-value store record of this Apify API',
+            items: {
+                type: 'object' as const,
+                properties: {
+                    path: { type: 'string', description: 'Path relative to the Actor root, e.g. src/main.js' },
+                    content: {
+                        type: 'string',
+                        description: 'File content, as text or as base64 when encoding is base64',
+                    },
+                    encoding: {
+                        type: 'string',
+                        enum: ['utf8', 'base64'],
+                        description: 'utf8 for text, base64 for binary',
+                    },
+                },
+                required: ['path', 'content', 'encoding'],
+            },
+        },
+        omittedFiles: {
+            type: 'array' as const,
+            description: 'Files left out to keep the returned content within 256 KiB; request them with paths',
+            items: {
+                type: 'object' as const,
+                properties: {
+                    path: { type: 'string', description: 'Path relative to the Actor root' },
+                    sizeBytes: { type: 'integer', description: 'Size of the file in bytes' },
+                },
+                required: ['path', 'sizeBytes'],
+            },
+        },
+        notFoundPaths: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Requested paths the version has no file at',
+        },
+        tarballUrl: {
+            type: 'string',
+            description:
+                'URL of the zip a TARBALL version builds from, when it is not a key-value store record of this Apify API',
+        },
+        gitRepoUrl: {
+            type: 'string',
+            description: 'Repository a GIT_REPO version builds from, as https://host/repo.git#branch:subdirectory',
+        },
+        gitHubGistUrl: { type: 'string', description: 'Gist a GITHUB_GIST version builds from' },
+    },
+    required: ['actorId', 'actorName', 'versionNumber', 'sourceType'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into

@@ -34,8 +34,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     shared `waitSecs` field, the shared build response and the by-status next-step text, which
     `versions/push-actor` reuses.
   - `versions/` — `push-actor` (create the Actor if needed, upload or merge a version's source files,
-    build); `source_files.ts` holds path normalization, size accounting and merge-by-name for the
-    pushed files; `source_archive.ts` zips a set over the inline limit into the Actor's source
+    build) and `pull-actor` (read a version's files back in the shape `push-actor` takes; a `TARBALL`
+    zip only from a record of this API, a Git repository or gist only reported by URL);
+    `source_files.ts` holds path normalization, size accounting, merge-by-name and the binary-extension
+    list for the pushed files; `source_archive.ts` zips a set over the inline limit into the Actor's source
     key-value store, the way `apify push` does, and returns the record URL a `TARBALL` version points to.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
