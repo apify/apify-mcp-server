@@ -396,7 +396,9 @@ describe('push-actor', () => {
         it("refuses a tilde-separated username prefix that is not the caller's", async () => {
             const { text } = await callToolExpectingUserError({ actor: 'jane~my-actor', files: [MAIN_JS] });
 
-            expect(text).toBe("This tool pushes only to your own account (john); 'jane' names another account.");
+            expect(text).toBe(
+                "This tool works only with Actors of your own account (john); 'jane' names another account.",
+            );
             expect(actorGetMock).not.toHaveBeenCalled();
             expectNoWrite();
         });
@@ -412,8 +414,22 @@ describe('push-actor', () => {
         it("refuses a username prefix that is not the caller's", async () => {
             const { text } = await callToolExpectingUserError({ actor: 'jane/my-actor', files: [MAIN_JS] });
 
-            expect(text).toBe("This tool pushes only to your own account (john); 'jane' names another account.");
+            expect(text).toBe(
+                "This tool works only with Actors of your own account (john); 'jane' names another account.",
+            );
             expect(actorGetMock).not.toHaveBeenCalled();
+            expectNoWrite();
+        });
+
+        it('refuses a name the platform resolves to an Actor moved to another account before any write', async () => {
+            actorGetMock.mockResolvedValue({ ...mockActor(), username: 'jane' });
+
+            const { text } = await callToolExpectingUserError({ actor: 'my-actor', files: [MAIN_JS] });
+
+            expect(text).toBe(
+                'This tool works only with Actors of your own account (john); Actor my-actor belongs to jane.',
+            );
+            expect(actorMock).toHaveBeenCalledTimes(1);
             expectNoWrite();
         });
     });
@@ -672,7 +688,9 @@ describe('push-actor', () => {
 
             const { text } = await callToolExpectingUserError({ actor: ACTOR_ID, files: [ACTOR_JSON, MAIN_JS] });
 
-            expect(text).toBe(`This tool pushes only to your own account (john); Actor ${ACTOR_ID} belongs to jane.`);
+            expect(text).toBe(
+                `This tool works only with Actors of your own account (john); Actor ${ACTOR_ID} belongs to jane.`,
+            );
             expectNoWrite();
         });
 
@@ -1155,6 +1173,7 @@ describe('push-actor', () => {
 
             it('accepts a username prefix with a dot in the tilde form', async () => {
                 userGetMock.mockResolvedValue({ username: 'john.doe', id: 'user-secret' });
+                actorGetMock.mockResolvedValue({ ...mockActor(), username: 'john.doe' });
 
                 const { structuredContent } = await callTool({
                     actor: 'john.doe~my-actor',
