@@ -298,6 +298,18 @@ describe('get-actor-settings', () => {
         );
     });
 
+    it('refuses a name the platform resolves to an Actor moved to another account', async () => {
+        actorGetMock.mockResolvedValue(mockActor({ username: 'jane' }));
+
+        const text = await callToolExpectingUserError({ actor: 'my-actor' });
+
+        expect(text).toBe(
+            'This tool works only with Actors of your own account (john); Actor my-actor belongs to jane.',
+        );
+        expect(actorMock).toHaveBeenCalledTimes(1);
+        expect(actorMock).toHaveBeenCalledWith('john/my-actor');
+    });
+
     it('reports an Actor that is not in the account as not found', async () => {
         actorGetMock.mockResolvedValue(undefined);
 
