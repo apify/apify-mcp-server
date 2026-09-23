@@ -15,8 +15,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
-  - `actors/` — search, details, call, the actor-tools factory, the direct
-    actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
+  - `actors/` — search, details, call, `update-actor` (a partial update of an Actor's settings), the
+    actor-tools factory, the direct actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
     prunes an Actor's definition, `getActorDefinition`), `actor_helpers.ts` (resolves an Actor ID or
     name within the caller's own account, for the tools that write an Actor), and `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
@@ -77,8 +77,9 @@ tool there only through that gate, or when it is the calling tool itself (the "c
 next offset" pagination hint); otherwise leave the cross-tool guidance to the gated description.
 An `AUTO_INJECTED_TOOLS` member is no exception — the injection is conditional on `call-actor`, an
 Actor tool, or `get-actor-run` being loaded, so a session that loaded only `abort-actor-run` gets
-none of them. The task and schedule tools name no tool, enforced by
-`tests/unit/tools.actor_task_crud.test.ts` and `tests/unit/tools.schedule_crud.test.ts`; result text
+none of them. The task and schedule tools and `update-actor` name no tool, enforced by
+`tests/unit/tools.actor_task_crud.test.ts`, `tests/unit/tools.schedule_crud.test.ts` and
+`tests/unit/tools.update_actor.test.ts`; result text
 elsewhere predates the gate, and `suggestTool` is the pattern to fix it with. Grep
 `HELPER_TOOLS` outside `buildDescription` for the current set rather than trusting a list here.
 

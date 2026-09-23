@@ -58,6 +58,7 @@ export const HELPER_TOOLS = {
     ACTOR_TASK_UPDATE: 'update-actor-task',
     ACTOR_TASK_PUBLISH: 'publish-actor-task',
     ACTOR_TASK_UNPUBLISH: 'unpublish-actor-task',
+    ACTOR_UPDATE: 'update-actor',
     DATASET_GET: 'get-dataset',
     DATASET_LIST_GET: 'get-dataset-list',
     DATASET_GET_ITEMS: 'get-dataset-items',
@@ -297,6 +298,7 @@ export const HTTP_UNAUTHORIZED = 401;
 export const HTTP_PAYMENT_REQUIRED = 402;
 export const HTTP_FORBIDDEN = 403;
 export const HTTP_NOT_FOUND = 404;
+export const HTTP_CONFLICT = 409;
 
 // Modes that allow long running task tool executions
 export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as const;

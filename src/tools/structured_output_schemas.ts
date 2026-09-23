@@ -547,6 +547,90 @@ export const pushActorToolOutputSchema = {
     required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed', 'sourceType'],
 };
 
+/**
+ * Schema for update-actor: an allowlist of the Actor's settings as stored after the update. A field
+ * the Actor has no value for is null.
+ */
+export const updateActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Actor ID' },
+        name: { type: 'string', description: 'Actor name, without the username' },
+        username: { type: 'string', description: 'Username of the account that owns the Actor' },
+        fullName: { type: 'string', description: 'Full Actor name, username/name' },
+        title: { type: ['string', 'null'], description: 'Human-readable title' },
+        description: { type: ['string', 'null'], description: 'Short description' },
+        seoTitle: { type: ['string', 'null'], description: "Title of the Actor's Store page for search engines" },
+        seoDescription: {
+            type: ['string', 'null'],
+            description: "Description of the Actor's Store page for search engines",
+        },
+        categories: {
+            type: ['array', 'null'],
+            items: { type: 'string' },
+            description: 'Store category keys, e.g. AI or DEVELOPER_TOOLS',
+        },
+        isPublic: { type: 'boolean', description: 'True when the Actor is published in Apify Store' },
+        isDeprecated: { type: ['boolean', 'null'], description: 'True when the Actor is marked as deprecated' },
+        defaultRunOptions: {
+            type: ['object', 'null'],
+            description: 'Defaults for runs that do not set their own',
+            properties: {
+                build: { type: ['string', 'null'], description: 'Build tag or number, e.g. latest' },
+                memoryMbytes: { type: ['number', 'null'], description: 'Memory in megabytes' },
+                timeoutSecs: { type: ['number', 'null'], description: 'Run timeout in seconds; 0 means none' },
+            },
+            required: ['build', 'memoryMbytes', 'timeoutSecs'],
+        },
+        actorStandby: {
+            type: ['object', 'null'],
+            description: 'Standby mode settings; null when standby was never configured',
+            properties: {
+                isEnabled: { type: ['boolean', 'null'], description: 'True when standby mode is on' },
+                build: { type: ['string', 'null'], description: 'Build tag or number of standby runs' },
+                memoryMbytes: { type: ['number', 'null'], description: 'Memory of standby runs in megabytes' },
+                idleTimeoutSecs: {
+                    type: ['number', 'null'],
+                    description: 'Seconds a standby run waits without requests before it stops',
+                },
+                desiredRequestsPerActorRun: {
+                    type: ['number', 'null'],
+                    description: 'Concurrent requests a standby run aims to handle',
+                },
+                maxRequestsPerActorRun: {
+                    type: ['number', 'null'],
+                    description: 'Most concurrent requests a standby run handles',
+                },
+            },
+            required: [
+                'isEnabled',
+                'build',
+                'memoryMbytes',
+                'idleTimeoutSecs',
+                'desiredRequestsPerActorRun',
+                'maxRequestsPerActorRun',
+            ],
+        },
+        modifiedAt: { type: ['string', 'null'], description: 'When the Actor was last modified (ISO 8601)' },
+    },
+    required: [
+        'id',
+        'name',
+        'username',
+        'fullName',
+        'title',
+        'description',
+        'seoTitle',
+        'seoDescription',
+        'categories',
+        'isPublic',
+        'isDeprecated',
+        'defaultRunOptions',
+        'actorStandby',
+        'modifiedAt',
+    ],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
