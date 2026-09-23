@@ -292,6 +292,7 @@ Legend for the **Enabled by default** column:
 | `delete-schedule` | schedules | Delete a schedule. |  |
 | `get-actor-build` | builds | Get an Actor build's status. |  |
 | `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
+| `get-actor-build-list` | builds | List an Actor's builds in every status, newest first. |  |
 | `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
 
 > **Note:**
