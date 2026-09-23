@@ -52,6 +52,9 @@ const stubClient = {
 
 const ACTOR_ID = 'E2jjCZBezvAZnX8Rb';
 
+const CANNOT_PUBLISH_MESSAGE =
+    'The Actor cannot be published at this time. Please contact support@apify.com for assistance in resolving the issue.';
+
 /** A private Actor API document; `userId` is an internal field the tool must not leak. */
 function mockActor(overrides: Record<string, unknown> = {}) {
     return {
@@ -177,11 +180,6 @@ describe('publish-actor', () => {
             "This Actor can't be published because its default build has no input or output schema. Add the missing schema to the source code, rebuild, and publish again.",
         ],
         [
-            403,
-            'cannot-publish-actor',
-            'The Actor cannot be published at this time. Please contact support@apify.com for assistance in resolving the issue.',
-        ],
-        [
             429,
             'daily-publication-limit-exceeded',
             'You’ve reached the daily limit of 5 Actor publications. Try again in 24 hours.',
@@ -197,6 +195,37 @@ describe('publish-actor', () => {
         );
         expect(result.content).toEqual([{ type: 'text', text: message }]);
         expect(actorUpdateMock.mock.calls).toEqual([[{ isPublic: true }]]);
+    });
+
+    it('adds the likely cause to the generic cannot-publish rejection, naming the run tool when it is loaded', async () => {
+        actorUpdateMock.mockRejectedValue(apiError(403, 'cannot-publish-actor', CANNOT_PUBLISH_MESSAGE));
+
+        const result = await callTool();
+
+        expectSoftFailInvalidInput(result);
+        expect(result.toolTelemetry).toEqual(
+            expect.objectContaining({ failureHttpStatus: 403, failureDetail: 'cannot-publish-actor' }),
+        );
+        expect(result.content).toEqual([
+            {
+                type: 'text',
+                text: `${CANNOT_PUBLISH_MESSAGE} This usually means the Actor has no successful run yet; run it once with ${HELPER_TOOLS.ACTOR_CALL} and publish again.`,
+            },
+        ]);
+    });
+
+    it('names no tool in the cannot-publish cause when the run tool is not loaded', async () => {
+        actorUpdateMock.mockRejectedValue(apiError(403, 'cannot-publish-actor', CANNOT_PUBLISH_MESSAGE));
+        const context = { ...stubToolCallContext({ actor: 'my-actor' }, stubClient), loadedToolNames: [] };
+
+        const result = (await (publishActor as HelperTool).call(context)) as TextToolResult;
+
+        expect(result.content).toEqual([
+            {
+                type: 'text',
+                text: `${CANNOT_PUBLISH_MESSAGE} This usually means the Actor has no successful run yet; run it once and publish again.`,
+            },
+        ]);
     });
 
     it('rethrows a server error from the update', async () => {

@@ -2,7 +2,7 @@ import { ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
 import { ApifyClient } from '../../apify_client.js';
-import { APIFY_STORE_URL, HELPER_TOOLS } from '../../const.js';
+import { APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR, APIFY_STORE_URL, HELPER_TOOLS } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
@@ -43,6 +43,18 @@ USAGE EXAMPLES:
 }
 
 /**
+ * The API rejects an Actor with no run, or no successful run, with a generic reason that points to support,
+ * although running the Actor once is the usual fix.
+ */
+function buildRejectionText(error: ApifyApiError, loadedToolNames: readonly string[]): string {
+    if (error.type !== APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR) return error.message;
+    const runStep = loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)
+        ? `run it once with ${HELPER_TOOLS.ACTOR_CALL}`
+        : 'run it once';
+    return `${error.message} This usually means the Actor has no successful run yet; ${runStep} and publish again.`;
+}
+
+/**
  * https://docs.apify.com/api/v2/act-put
  *  /v2/acts/{actorId}
  */
@@ -64,7 +76,7 @@ export const publishActor: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = publishActorArgs.parse(args);
         try {
             const { username, bareName, actor } = await resolveTargetActor(client, resolveActorNameInput(parsed.actor));
@@ -91,7 +103,10 @@ export const publishActor: ToolEntry = Object.freeze({
                 // The publication checks answer with specific, user-facing messages (a missing README, the daily
                 // limit, ...). Read failures stay out of this catch: the generic mapper reports a bad token as auth.
                 if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {
-                    return respondUserError(error.message, { httpStatus: error.statusCode, detail: error.type });
+                    return respondUserError(buildRejectionText(error, loadedToolNames), {
+                        httpStatus: error.statusCode,
+                        detail: error.type,
+                    });
                 }
                 throw error;
             }
