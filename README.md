@@ -411,6 +411,7 @@ The v2 configuration preserves backward compatibility with v1 usage. Notes:
 - Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, `apify/rag-web-browser`, and `apify/web-fetch`.
   - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).
 - `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
+- `delete-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list that names the Actor tools you want instead of `actors`.
 - `tools=add-actor`, `tools=experimental`, and `tools=preview` are retired: they are ignored and load no tools. Use `tools=call-actor` (or the default `actors` category) instead.
 - `tools=get-actor-log` is retired: the tool was renamed to `get-actor-run-log`. The old selector is ignored and loads no tools. Use `tools=get-actor-run-log` (or the `runs` category) instead.
 
