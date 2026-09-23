@@ -264,7 +264,9 @@ export const updateActorEnvVars: ToolEntry = Object.freeze({
             const presentDeleteNames = deleteNames.filter((name) => existingNames.has(name));
             const createCount = set.filter(({ name }) => !existingNames.has(name)).length;
             const countAfter = existingNames.size + createCount - presentDeleteNames.length;
-            if (countAfter > ENV_VARS_MAX_COUNT) {
+            // Refused only when the call adds variables: the per-variable create does not check the limit,
+            // so a version may already be over it, and its variables must stay updatable and removable.
+            if (createCount > presentDeleteNames.length && countAfter > ENV_VARS_MAX_COUNT) {
                 throw new UserInputError(
                     `Version ${versionNumber} would have ${countAfter} environment variables; the platform allows at most ${ENV_VARS_MAX_COUNT}.`,
                 );

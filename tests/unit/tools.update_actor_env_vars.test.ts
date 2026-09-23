@@ -348,6 +348,33 @@ describe('update-actor-env-vars', () => {
             expectNoWrite();
         });
 
+        it('still updates and removes variables of a version already over the limit', async () => {
+            const hundredAndFiveNames = Array.from({ length: 105 }, (_, index) => ({ name: `VAR_${index}` }));
+            envVarsListMock.mockResolvedValue(mockEnvVarList(hundredAndFiveNames));
+
+            const { structuredContent } = await callTool({
+                set: [{ name: 'VAR_0', value: 'rotated', isSecret: true }],
+                delete: ['VAR_1'],
+            });
+
+            expect(structuredContent).toMatchObject({ created: [], updated: ['VAR_0'], deleted: ['VAR_1'] });
+        });
+
+        it('rejects a replacement of a variable that adds another to a version already over the limit', async () => {
+            const hundredAndFiveNames = Array.from({ length: 105 }, (_, index) => ({ name: `VAR_${index}` }));
+            envVarsListMock.mockResolvedValue(mockEnvVarList(hundredAndFiveNames));
+
+            const { text } = await callToolExpectingUserError({
+                set: [
+                    { name: 'NEW', value: '1' },
+                    { name: 'VAR_0', value: 'rotated' },
+                ],
+            });
+
+            expect(text).toBe('Version 0.1 would have 106 environment variables; the platform allows at most 100.');
+            expectNoWrite();
+        });
+
         it('allows exactly 100 variables when a delete makes room', async () => {
             envVarsListMock.mockResolvedValue(mockEnvVarList(hundredNames));
 
