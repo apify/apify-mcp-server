@@ -79,21 +79,28 @@ USAGE EXAMPLES:
 - user_input: Remove the DEBUG variable from version 0.2 of my-actor`;
 }
 
+const UNREDACTED_ARG_KEYS = new Set(['actor', 'versionNumber', 'delete']);
+
+function redactEnvVarEntry(entry: unknown): unknown {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return REDACTED_VALUE;
+    const { name, isSecret } = entry as Record<string, unknown>;
+    return { name, isSecret, ...('value' in entry && { value: REDACTED_VALUE }) };
+}
+
 /**
- * The logged copy of the arguments, with every `set[].value` replaced. It runs before AJV validation,
- * so a `set` that is not an array or an entry that is not an object is replaced whole: it may still
- * hold a value, for example a `set` sent as a JSON string.
+ * The logged copy of the arguments, built as an allowlist: it runs before AJV validation, which strips
+ * undeclared keys only from the copy the tool gets, so a value sent under a wrong key, for example a
+ * top-level `envVars`, would reach the log. Each `set` entry keeps only its name and isSecret; every key
+ * other than `actor`, `versionNumber` and `delete` is replaced whole, `set` too when it is not an array.
  */
 function redactEnvVarValues(args: Record<string, unknown>): Record<string, unknown> {
-    if (args.set === undefined) return args;
-    if (!Array.isArray(args.set)) return { ...args, set: REDACTED_VALUE };
-    return {
-        ...args,
-        set: args.set.map((entry: unknown) => {
-            if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return REDACTED_VALUE;
-            return 'value' in entry ? { ...entry, value: REDACTED_VALUE } : entry;
+    return Object.fromEntries(
+        Object.entries(args).map(([key, value]) => {
+            if (UNREDACTED_ARG_KEYS.has(key)) return [key, value];
+            if (key === 'set' && Array.isArray(value)) return [key, value.map(redactEnvVarEntry)];
+            return [key, REDACTED_VALUE];
         }),
-    };
+    );
 }
 
 function findDuplicate(names: readonly string[]): string | undefined {

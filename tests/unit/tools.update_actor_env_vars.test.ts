@@ -525,9 +525,24 @@ describe('update-actor-env-vars', () => {
             expect(redactArgs?.({ actor: 'my-actor', set })).toEqual({ actor: 'my-actor', set: expected });
         });
 
-        it('returns the arguments as they are when there is no set', () => {
-            const args = { actor: 'my-actor', delete: ['A'] };
-            expect(redactArgs?.(args)).toBe(args);
+        it('keeps actor, versionNumber and delete as they are', () => {
+            const args = { actor: 'my-actor', versionNumber: '0.1', delete: ['A'] };
+            expect(redactArgs?.(args)).toEqual(args);
+        });
+
+        // AJV strips undeclared keys only from the tool's copy, so the logged copy must not keep them.
+        it('replaces every undeclared key and every undeclared field of a set entry', () => {
+            expect(
+                redactArgs?.({
+                    actor: 'my-actor',
+                    envVars: [{ name: 'OPENAI_API_KEY', value: SECRET_VALUE, isSecret: true }],
+                    set: [{ name: 'A', value: 'x', secretValue: SECRET_VALUE, isSecret: true }],
+                }),
+            ).toEqual({
+                actor: 'my-actor',
+                envVars: '[REDACTED]',
+                set: [{ name: 'A', value: '[REDACTED]', isSecret: true }],
+            });
         });
 
         /** Runs a real tools/call preparation and dispatch, with only the tool body stubbed out. */
@@ -581,6 +596,22 @@ describe('update-actor-env-vars', () => {
                 actor: 'my-actor',
                 set: [{ name: 'API_KEY', value: SECRET_VALUE, isSecret: true }],
             });
+        });
+
+        it('keeps a value sent under an undeclared key out of the validation and the call logs', async () => {
+            const debugSpy = vi.spyOn(log, 'debug');
+            const infoSpy = vi.spyOn(log, 'info');
+
+            const { callMock } = await runToolCall({
+                actor: 'my-actor',
+                envVars: [{ name: 'OPENAI_API_KEY', value: SECRET_VALUE, isSecret: true }],
+                set: [{ name: 'A', value: 'x', secretValue: SECRET_VALUE }],
+            });
+
+            expect(callMock).toHaveBeenCalledTimes(1);
+            expect(infoSpy).toHaveBeenCalledWith('Calling internal tool', expect.anything());
+            expect(JSON.stringify(debugSpy.mock.calls)).not.toContain(SECRET_VALUE);
+            expect(JSON.stringify(infoSpy.mock.calls)).not.toContain(SECRET_VALUE);
         });
 
         it('keeps a value out of the validation log when the arguments fail validation', async () => {
