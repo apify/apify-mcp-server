@@ -8,6 +8,7 @@ import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '.
 import { pullActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { pullActor } from '../../src/tools/versions/pull_actor.js';
 import { pushActor } from '../../src/tools/versions/push_actor.js';
+import { validateSourceFiles } from '../../src/tools/versions/source_files.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
@@ -69,9 +70,26 @@ function mockTarballVersion(tarballUrl = RECORD_URL) {
     return mockVersion({ sourceType: 'TARBALL', tarballUrl, sourceFiles: [MAIN_JS_SOURCE] });
 }
 
-/** Stores the entries as the version's zip record. */
-function stubArchive(entries: Zippable): void {
+const CENTRAL_DIRECTORY_HEADER_SIGNATURE = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
+
+/**
+ * Sets the compression method of the named entries in the zip's central directory to one fflate rejects, so
+ * the call fails if any of them is decompressed.
+ */
+function markUninflatable(zip: Buffer, names: readonly string[]): void {
+    let offset = zip.indexOf(CENTRAL_DIRECTORY_HEADER_SIGNATURE);
+    while (offset !== -1) {
+        const nameLength = zip.readUInt16LE(offset + 28);
+        const name = zip.toString('utf8', offset + 46, offset + 46 + nameLength);
+        if (names.includes(name)) zip.writeUInt16LE(99, offset + 10);
+        offset = zip.indexOf(CENTRAL_DIRECTORY_HEADER_SIGNATURE, offset + CENTRAL_DIRECTORY_HEADER_SIGNATURE.length);
+    }
+}
+
+/** Stores the entries as the version's zip record; `uninflatable` entries fail the call if they are decompressed. */
+function stubArchive(entries: Zippable, uninflatable: readonly string[] = []): void {
     const zip = Buffer.from(zipSync(entries));
+    markUninflatable(zip, uninflatable);
     listKeysMock.mockResolvedValue({ items: [{ key: RECORD_KEY, size: zip.length }] });
     getRecordMock.mockResolvedValue({ key: RECORD_KEY, value: zip, contentType: 'application/zip' });
 }
@@ -160,12 +178,13 @@ describe('pull-actor', () => {
 
         it('returns files push-actor accepts as they are', async () => {
             const { structuredContent } = (await callTool({})) as TextToolResult & {
-                structuredContent: { files: unknown[] };
+                structuredContent: { files: { path: string; content: string; encoding: 'utf8' | 'base64' }[] };
             };
 
             expect((pushActor as HelperTool).ajvValidate({ actor: 'my-actor', files: structuredContent.files })).toBe(
                 true,
             );
+            expect(() => validateSourceFiles(structuredContent.files)).not.toThrow();
         });
 
         it('names no other tool when push-actor is not loaded', async () => {
@@ -322,6 +341,8 @@ describe('pull-actor', () => {
                 '.actor': { 'actor.json': strToU8(ACTOR_JSON_SOURCE.content) },
                 src: { 'main.js': strToU8(MAIN_JS_SOURCE.content) },
                 'assets/logo.png': LOGO_BYTES,
+                // Valid UTF-8, so only the extension makes it base64.
+                'assets/icon.png': strToU8('abc'),
                 'data/blob.txt': INVALID_UTF8,
                 'bom.txt': new Uint8Array([0xef, 0xbb, 0xbf, 0x68, 0x69]),
             });
@@ -342,8 +363,9 @@ describe('pull-actor', () => {
                 files: [
                     { path: '.actor/actor.json', content: ACTOR_JSON_SOURCE.content, encoding: 'utf8' },
                     { path: 'src/main.js', content: MAIN_JS_SOURCE.content, encoding: 'utf8' },
-                    // Binary by its extension.
                     { path: 'assets/logo.png', content: LOGO_BYTES.toString('base64'), encoding: 'base64' },
+                    // Binary by its extension.
+                    { path: 'assets/icon.png', content: Buffer.from('abc').toString('base64'), encoding: 'base64' },
                     // Binary because it is not valid UTF-8.
                     {
                         path: 'data/blob.txt',
@@ -355,7 +377,7 @@ describe('pull-actor', () => {
                 ],
             });
             expect(JSON.parse(content[0].text)).toEqual(structuredContent);
-            expect(content[1].text).toBe(`Pulled 5 of 5 files of john/my-actor version 0.1.\n${PUSH_REPLACE_STEP}`);
+            expect(content[1].text).toBe(`Pulled 6 of 6 files of john/my-actor version 0.1.\n${PUSH_REPLACE_STEP}`);
             expectSchemaConformingStructuredContent(result, pullActorToolOutputSchema);
             expect(JSON.stringify(result)).not.toContain('key-value-stores/store-1');
         });
@@ -399,12 +421,15 @@ describe('pull-actor', () => {
             expect(content[1].text).toContain('Pulled 1 of 2 files of john/my-actor version 0.1.');
         });
 
-        it('lists entries over the cap with their original size', async () => {
-            stubArchive({
-                'a.txt': strToU8('a'.repeat(200 * 1024)),
-                'b.txt': strToU8('b'.repeat(100 * 1024)),
-                'c.txt': strToU8('c'.repeat(50 * 1024)),
-            });
+        it('lists entries over the cap with their original size, without decompressing them', async () => {
+            stubArchive(
+                {
+                    'a.txt': strToU8('a'.repeat(200 * 1024)),
+                    'b.txt': strToU8('b'.repeat(100 * 1024)),
+                    'c.txt': strToU8('c'.repeat(50 * 1024)),
+                },
+                ['b.txt'],
+            );
             versionGetMock.mockResolvedValue(mockTarballVersion());
 
             const result = await callTool({});
@@ -420,7 +445,9 @@ describe('pull-actor', () => {
 
         it('counts a binary extension as base64 before decompressing', async () => {
             // 200 KiB of bytes fits the cap raw but not as base64.
-            stubArchive({ 'image.png': new Uint8Array(200 * 1024), 'src/main.js': strToU8(MAIN_JS_SOURCE.content) });
+            stubArchive({ 'image.png': new Uint8Array(200 * 1024), 'src/main.js': strToU8(MAIN_JS_SOURCE.content) }, [
+                'image.png',
+            ]);
             versionGetMock.mockResolvedValue(mockTarballVersion());
 
             const { content, structuredContent } = await callTool({});
@@ -662,6 +689,14 @@ describe('pull-actor', () => {
             const { content } = await callTool({}, [HELPER_TOOLS.ACTOR_PULL]);
 
             expectNoOtherToolNamed(content[1].text);
+        });
+
+        it('reports a version whose gist URL the API hides', async () => {
+            versionGetMock.mockResolvedValue({ versionNumber: '0.1', sourceType: 'GITHUB_GIST', buildTag: 'latest' });
+
+            const text = await callToolExpectingUserError({});
+
+            expect(text).toContain('Version 0.1 of john/my-actor came back without its source');
         });
     });
 
