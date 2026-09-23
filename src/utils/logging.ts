@@ -200,7 +200,8 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
     log.error(message, { error, ...data });
 }
 
-const REDACTED_VALUE = '[REDACTED]';
+/** What a redacted argument value is logged as. */
+export const REDACTED_VALUE = '[REDACTED]';
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === 'object' && value !== null && !Array.isArray(value);

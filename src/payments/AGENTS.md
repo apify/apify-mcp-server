@@ -24,7 +24,10 @@ The cross-file invariant no single file shows you:
   flow; forwards the `PAYMENT-SIGNATURE` header.
 - `const.ts` — `PAYMENT_PROTOCOL_HEADER` and the Skyfire instruction strings (x402's live in `x402.ts`).
 - `helpers.ts` — `prepareToolCallContext`: the choke point that strips payment fields
-  before AJV, redacts them for logging, and builds the client.
+  before AJV, redacts them for logging, and builds the client. The logged copy
+  (`toolArgsRedacted`, the `logSafeArgs` of both the pre-validation DEBUG log and the
+  `Calling internal tool` INFO log) first goes through the tool's own `redactArgs`, when an
+  internal tool has one (`update-actor-env-vars` hides its variable values that way).
 
 ## Rules when editing here
 
@@ -36,6 +39,10 @@ The cross-file invariant no single file shows you:
   flag. `SKYFIRE_ENABLED_TOOLS` (`const.ts`) is the expected-list the Skyfire integration test
   asserts against; keep it in sync with the `paymentRequired` tools or that test fails.
 - `skyfire-pay-id` is injected only at the top level, so `redactSkyfirePayId` redacts top-level only; if you ever nest a payment field, make the redactor recursive or it leaks.
+- A tool whose arguments carry secrets sets `redactArgs` on its entry (`HelperTool` in `../types.ts`)
+  instead of adding a case here. It runs before AJV validation, so it must accept any shape, must
+  not mutate the arguments, and must be an allowlist: the logged copy keeps the undeclared keys AJV
+  strips only from the tool's copy. `cloneToolEntry` keeps it on the copies the providers decorate.
 
 ## Local commands
 
