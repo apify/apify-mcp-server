@@ -2,6 +2,7 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as ApifyClientModule from '../../src/apify_client.js';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { publishActor } from '../../src/tools/actors/publish_actor.js';
 import { publishActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
@@ -16,10 +17,33 @@ import {
     type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
 
+const { capturedClientOptions, publicationActorMock, actorUpdateMock } = vi.hoisted(() => {
+    const updateMock = vi.fn();
+    return {
+        capturedClientOptions: [] as unknown[],
+        publicationActorMock: vi.fn(() => ({ update: updateMock })),
+        actorUpdateMock: updateMock,
+    };
+});
+
+// The update goes through a client of its own, built by the tool; the lookups use the session client.
+vi.mock('../../src/apify_client.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof ApifyClientModule>();
+    return {
+        ...actual,
+        ApifyClient: class {
+            actor = publicationActorMock;
+
+            constructor(options: unknown) {
+                capturedClientOptions.push(options);
+            }
+        },
+    };
+});
+
 const userGetMock = vi.fn();
 const actorGetMock = vi.fn();
-const actorUpdateMock = vi.fn();
-const actorMock = vi.fn(() => ({ get: actorGetMock, update: actorUpdateMock }));
+const actorMock = vi.fn(() => ({ get: actorGetMock }));
 
 const stubClient = {
     user: () => ({ get: userGetMock }),
@@ -54,6 +78,7 @@ const callTool = async (args: Record<string, unknown> = {}) =>
 describe('publish-actor', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        capturedClientOptions.length = 0;
         userGetMock.mockResolvedValue({ username: 'john', id: 'user-secret' });
         actorGetMock.mockResolvedValue(mockActor());
         actorUpdateMock.mockResolvedValue(mockActor({ isPublic: true }));
@@ -63,7 +88,7 @@ describe('publish-actor', () => {
         const result = await callTool();
 
         expect(actorMock).toHaveBeenCalledWith('john/my-actor');
-        expect(actorMock).toHaveBeenLastCalledWith('actor-1');
+        expect(publicationActorMock.mock.calls).toEqual([['actor-1']]);
         expect(actorUpdateMock.mock.calls).toEqual([[{ isPublic: true }]]);
         expect(result.structuredContent).toEqual({
             id: 'actor-1',
@@ -77,6 +102,13 @@ describe('publish-actor', () => {
             'john/my-actor is now public in Apify Store; its Store page is https://apify.com/john/my-actor.',
         );
         expect(JSON.stringify(result)).not.toContain('user-secret');
+    });
+
+    it('sends the update through a client that does not retry, so a daily-limit 429 comes back at once', async () => {
+        await callTool();
+
+        expect(capturedClientOptions).toEqual([{ token: 'test-token', maxRetries: 0 }]);
+        expect(actorUpdateMock).toHaveBeenCalledTimes(1);
     });
 
     it('emits structuredContent that validates against the outputSchema', async () => {
@@ -220,7 +252,7 @@ describe('publish-actor', () => {
 
         const { structuredContent } = await callTool({ actor: ACTOR_ID });
 
-        expect(actorMock).toHaveBeenLastCalledWith(ACTOR_ID);
+        expect(publicationActorMock.mock.calls).toEqual([[ACTOR_ID]]);
         expect(actorUpdateMock.mock.calls).toEqual([[{ isPublic: true }]]);
         expect(structuredContent).toMatchObject({ id: ACTOR_ID, fullName: 'john/my-actor' });
     });

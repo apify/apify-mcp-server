@@ -1,6 +1,7 @@
 import { ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
+import { ApifyClient } from '../../apify_client.js';
 import { APIFY_STORE_URL, HELPER_TOOLS } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
@@ -63,7 +64,7 @@ export const publishActor: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = publishActorArgs.parse(args);
         try {
             const { username, bareName, actor } = await resolveTargetActor(client, resolveActorNameInput(parsed.actor));
@@ -81,7 +82,11 @@ export const publishActor: ToolEntry = Object.freeze({
                 return respondUserError('Publishing needs a title and at least one category; set them first.');
             }
             try {
-                await client.actor(actor.id).update({ isPublic: true });
+                // apify-client retries every 429, and the daily publication limit answers with one: nine attempts
+                // over minutes, past the MCP request timeout, each notifying Apify admins. Publishing is
+                // idempotent, so a transient failure is safe for the agent to repeat.
+                const publicationClient = new ApifyClient({ token: apifyToken, maxRetries: 0 });
+                await publicationClient.actor(actor.id).update({ isPublic: true });
             } catch (error) {
                 // The publication checks answer with specific, user-facing messages (a missing README, the daily
                 // limit, ...). Read failures stay out of this catch: the generic mapper reports a bad token as auth.
