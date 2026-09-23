@@ -82,7 +82,12 @@ const updateActorArgs = z.object({
         .describe(
             `Store categories, at most ${ACTOR_CATEGORIES_MAX_COUNT}, as keys such as AI, DEVELOPER_TOOLS or MCP_SERVERS. Replaces the whole list; a public Actor needs at least one`,
         ),
-    isDeprecated: z.boolean().optional().describe('true marks the Actor as deprecated, false takes the mark off'),
+    isDeprecated: z
+        .boolean()
+        .optional()
+        .describe(
+            'true marks the Actor as deprecated, which also hides a public Actor from Apify Store search; false takes the mark off',
+        ),
     defaultRunOptions: z
         .object({
             build: z.string().optional().describe('Build tag or number that runs use, e.g. latest'),
