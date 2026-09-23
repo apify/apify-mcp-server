@@ -37,7 +37,10 @@ type BuildListItem = BuildCollectionClientListItem & Pick<Build, 'actId' | 'buil
 /** Statuses of a build that ended without succeeding; the next step points at the newest one's log. */
 const FAILED_BUILD_STATUSES: ReadonlySet<string> = new Set(['FAILED', 'TIMED-OUT', 'ABORTED']);
 
-/** The build subset returned per item. Allowlisted so userId, meta and usage never reach the client. */
+/**
+ * The build subset returned per item. Allowlisted so userId, meta and usage never reach the client.
+ * The same fields as `toBuildResult` in build_helpers.ts without the Console link; change both together.
+ */
 function toBuildListItem(build: BuildListItem) {
     return {
         id: build.id,
@@ -77,8 +80,7 @@ function buildNextStepForBuildList(
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return `List the builds of one Actor, newest first by default. Lists builds in every status; there is no status filter.
 Read-only. Returns total, count, offset, limit, desc and items (id, actorId, buildNumber, status, startedAt, finishedAt)
-and a summary with at most one next step.
-Use it to find a build that no run points at, a failed one included.${
+and a summary with at most one next step.${
         hasTool(HELPER_TOOLS.ACTOR_BUILD_GET)
             ? ` Check a build with ${HELPER_TOOLS.ACTOR_BUILD_GET} by passing its id as buildId.`
             : ''
