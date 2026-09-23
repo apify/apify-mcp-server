@@ -14,17 +14,23 @@ import { validateActorInputToolOutputSchema } from '../structured_output_schemas
  */
 const DEFAULT_VALIDATION_BUILD = 'latest';
 
+/** The schema itself does not compile, so the input was never checked against it. */
+const INVALID_INPUT_SCHEMA_ERROR_TYPE = 'invalid-input-schema';
+
+/** The build has not succeeded: it is still running, or it failed. */
+const INVALID_BUILD_ERROR_TYPE = 'invalid-build';
+
 /** 400 types that are the check's answer: the input fails the schema, or the schema itself is not valid. */
 const REJECTED_INPUT_ERROR_TYPES: ReadonlySet<string | undefined> = new Set([
     APIFY_ERROR_TYPE_INVALID_INPUT,
-    'invalid-input-schema',
+    INVALID_INPUT_SCHEMA_ERROR_TYPE,
 ]);
 
 /** 403 types for a build the schema cannot be read from: an unknown tag or number, a build that did not succeed, or one too old. */
 const UNUSABLE_BUILD_ERROR_TYPES: ReadonlySet<string | undefined> = new Set([
     'unknown-build-tag',
     'build-not-found',
-    'invalid-build',
+    INVALID_BUILD_ERROR_TYPE,
     'build-outdated',
 ]);
 
@@ -41,21 +47,38 @@ const validateActorInputArgs = z.object({
         ),
 });
 
-/** "push the change and build the Actor", naming push-actor and build-actor only where `hasTool` reports them. */
-function formatPushAndBuildStep(hasTool: (name: string) => boolean): string {
-    const pushWith = hasTool(HELPER_TOOLS.ACTOR_PUSH) ? ` with ${HELPER_TOOLS.ACTOR_PUSH}` : '';
+/**
+ * "push the change and build the Actor, then check again", naming push-actor and build-actor only where
+ * `hasTool` reports them. push-actor builds the pushed version by default, so build-actor is named only
+ * without it. The check waits for that build to succeed and names it by number: the latest tag moves only
+ * on success, so an earlier check without build reads the previous build's schema.
+ */
+function formatPushBuildAndRecheckStep(hasTool: (name: string) => boolean): string {
     const buildWith = hasTool(HELPER_TOOLS.ACTOR_BUILD) ? ` with ${HELPER_TOOLS.ACTOR_BUILD}` : '';
-    return `push the change${pushWith} and build the Actor${buildWith}`;
+    const pushAndBuildStep = hasTool(HELPER_TOOLS.ACTOR_PUSH)
+        ? `push the change with ${HELPER_TOOLS.ACTOR_PUSH} (it builds the version)`
+        : `push the change and build the Actor${buildWith}`;
+    return `${pushAndBuildStep}, then check again once that build has succeeded, passing its build number as build`;
 }
 
 /** The next step after the schema rejected the input, naming push-actor and build-actor only when the session has them. */
-function formatRejectedInputNextStep(loadedToolNames: readonly string[]): string {
-    const pushAndBuildStep = formatPushAndBuildStep((name) => loadedToolNames.includes(name));
-    return `Fix the input, or fix the input schema in .actor/input_schema.json, ${pushAndBuildStep}, then check again.`;
+function formatRejectedInputNextStep(errorType: string | undefined, loadedToolNames: readonly string[]): string {
+    const recheckStep = formatPushBuildAndRecheckStep((name) => loadedToolNames.includes(name));
+    if (errorType === INVALID_INPUT_SCHEMA_ERROR_TYPE) {
+        return `Fix the input schema in .actor/input_schema.json, ${recheckStep}.`;
+    }
+    return `Fix the input, or fix the input schema in .actor/input_schema.json, ${recheckStep}.`;
 }
 
-/** The next step after the API refused the build, naming build-actor only when the session has it. */
-function formatUnusableBuildNextStep(loadedToolNames: readonly string[]): string {
+/** The next step after the API refused the build, naming get-actor-build or build-actor only when the session has it. */
+function formatUnusableBuildNextStep(errorType: string | undefined, loadedToolNames: readonly string[]): string {
+    // A build still running gets this type too; building again would start a second one.
+    if (errorType === INVALID_BUILD_ERROR_TYPE) {
+        const waitWith = loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET)
+            ? ` with ${HELPER_TOOLS.ACTOR_BUILD_GET}`
+            : '';
+        return `Wait for the build to finish${waitWith}, or pass a build that succeeded, then check again.`;
+    }
     return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
         ? `Build the Actor with ${HELPER_TOOLS.ACTOR_BUILD}, or pass a build that finished successfully, then check again.`
         : 'Build the Actor, or pass a build that finished successfully, then check again.';
@@ -66,7 +89,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 Read-only. Returns valid true, or valid false with the API's validation message.
 Schema defaults are applied before the check; a build without an input schema accepts any input.
 Without build, the input is checked against the build tagged latest, not the Actor's default build.
-The schema is read from the build, so after editing .actor/input_schema.json, ${formatPushAndBuildStep(hasTool)} before checking again.
+The schema is read from the build, so after editing .actor/input_schema.json, ${formatPushBuildAndRecheckStep(hasTool)}.
 
 USAGE:
 - Use while developing an Actor to test .actor/input_schema.json and example inputs.
@@ -116,13 +139,13 @@ export const validateActorInput: ToolEntry = Object.freeze({
                 return respondOk(
                     [
                         JSON.stringify(structuredContent),
-                        `${error.message}\n${formatRejectedInputNextStep(loadedToolNames)}`,
+                        `${error.message}\n${formatRejectedInputNextStep(error.type, loadedToolNames)}`,
                     ],
                     { structuredContent },
                 );
             }
             if (error.statusCode === 403 && UNUSABLE_BUILD_ERROR_TYPES.has(error.type)) {
-                return respondUserError([error.message, formatUnusableBuildNextStep(loadedToolNames)], {
+                return respondUserError([error.message, formatUnusableBuildNextStep(error.type, loadedToolNames)], {
                     httpStatus: 403,
                     detail: error.type,
                 });

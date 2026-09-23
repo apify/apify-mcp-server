@@ -20,6 +20,7 @@ const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyCli
 
 const INPUT = { url: 'https://example.com', nested: { maxPages: 3 } };
 const INVALID_INPUT_MESSAGE = 'Input is not valid: Field input.url is required, Field input.maxPages must be integer';
+const RECHECK_STEP = 'then check again once that build has succeeded, passing its build number as build.';
 
 function apiError(status: number, type: string, message: string): ApifyApiError {
     return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
@@ -71,9 +72,14 @@ describe('validate-actor-input', () => {
 
     describe('rejected input', () => {
         it.each([
-            ['invalid-input', INVALID_INPUT_MESSAGE],
-            ['invalid-input-schema', 'Input schema is not valid: Field schema.properties.url.type is required'],
-        ])('returns valid false with the API message for a 400 %s', async (type, message) => {
+            ['invalid-input', INVALID_INPUT_MESSAGE, 'Fix the input, or fix the input schema'],
+            [
+                'invalid-input-schema',
+                'Input schema is not valid: Field schema.properties.url.type is required',
+                // The schema did not compile, so the input was never checked and only the schema can be fixed.
+                'Fix the input schema',
+            ],
+        ])('returns valid false with the API message for a 400 %s', async (type, message, fixStep) => {
             validateInputMock.mockRejectedValue(apiError(400, type, message));
 
             const result = await callTool({ actor: 'john/my-actor', input: INPUT, build: 'beta' });
@@ -85,8 +91,10 @@ describe('validate-actor-input', () => {
             expect(JSON.parse(content[0].text)).toEqual(structuredContent);
             expect(content).toHaveLength(2);
             expect(content[1].text).toBe(
-                `${message}\nFix the input, or fix the input schema in .actor/input_schema.json, push the change with ${HELPER_TOOLS.ACTOR_PUSH} and build the Actor with ${HELPER_TOOLS.ACTOR_BUILD}, then check again.`,
+                `${message}\n${fixStep} in .actor/input_schema.json, push the change with ${HELPER_TOOLS.ACTOR_PUSH} (it builds the version), ${RECHECK_STEP}`,
             );
+            // push-actor already builds the pushed version, so a second build is not suggested.
+            expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
             expectSchemaConformingStructuredContent(result, validateActorInputToolOutputSchema);
         });
 
@@ -104,13 +112,13 @@ describe('validate-actor-input', () => {
             const { content } = await callTool({ actor: 'actor-1', input: INPUT }, [HELPER_TOOLS.ACTOR_INPUT_VALIDATE]);
 
             expect(content[1].text).toBe(
-                `${INVALID_INPUT_MESSAGE}\nFix the input, or fix the input schema in .actor/input_schema.json, push the change and build the Actor, then check again.`,
+                `${INVALID_INPUT_MESSAGE}\nFix the input, or fix the input schema in .actor/input_schema.json, push the change and build the Actor, ${RECHECK_STEP}`,
             );
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_PUSH);
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
         });
 
-        it('names only the loaded tool when just one of push-actor and build-actor is loaded', async () => {
+        it('names build-actor when push-actor is not loaded', async () => {
             validateInputMock.mockRejectedValue(apiError(400, 'invalid-input', INVALID_INPUT_MESSAGE));
 
             const { content } = await callTool({ actor: 'actor-1', input: INPUT }, [
@@ -119,7 +127,7 @@ describe('validate-actor-input', () => {
             ]);
 
             expect(content[1].text).toBe(
-                `${INVALID_INPUT_MESSAGE}\nFix the input, or fix the input schema in .actor/input_schema.json, push the change and build the Actor with ${HELPER_TOOLS.ACTOR_BUILD}, then check again.`,
+                `${INVALID_INPUT_MESSAGE}\nFix the input, or fix the input schema in .actor/input_schema.json, push the change and build the Actor with ${HELPER_TOOLS.ACTOR_BUILD}, ${RECHECK_STEP}`,
             );
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_PUSH);
         });
@@ -129,7 +137,6 @@ describe('validate-actor-input', () => {
         it.each([
             ['unknown-build-tag', 'Build with tag "beta" was not found. Has the Actor been built already?'],
             ['build-not-found', 'Build with number "0.1.99" was not found.'],
-            ['invalid-build', 'The build has not finished or was not successful.'],
             ['build-outdated', 'This is an old build with unsupported fields. Please rebuild the Actor.'],
         ])('returns the API message and a build step for a 403 %s', async (type, message) => {
             validateInputMock.mockRejectedValue(apiError(403, type, message));
@@ -162,6 +169,42 @@ describe('validate-actor-input', () => {
                 'Build the Actor, or pass a build that finished successfully, then check again.',
             );
             expect(content.map((block) => block.text).join('\n')).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
+        });
+
+        // invalid-build also covers a build that is still running, so the step is to wait, not to build again.
+        it('returns the API message and a wait step for a 403 invalid-build', async () => {
+            validateInputMock.mockRejectedValue(
+                apiError(403, 'invalid-build', 'The build has not finished or was not successful.'),
+            );
+
+            const result = await (validateActorInput as HelperTool).call(
+                stubToolCallContext({ actor: 'actor-1', input: INPUT, build: '0.1.4' }, stubClient),
+            );
+            const { content, structuredContent } = result as TextToolResult;
+
+            expectSoftFailInvalidInput(result);
+            expect(content.map((block) => block.text)).toEqual([
+                'The build has not finished or was not successful.',
+                `Wait for the build to finish with ${HELPER_TOOLS.ACTOR_BUILD_GET}, or pass a build that succeeded, then check again.`,
+            ]);
+            expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
+            expect(structuredContent).toBeUndefined();
+        });
+
+        it('names no tool in the invalid-build wait step when get-actor-build is not loaded', async () => {
+            validateInputMock.mockRejectedValue(
+                apiError(403, 'invalid-build', 'The build has not finished or was not successful.'),
+            );
+
+            const { content } = await callTool({ actor: 'actor-1', input: INPUT, build: '0.1.4' }, [
+                HELPER_TOOLS.ACTOR_INPUT_VALIDATE,
+                HELPER_TOOLS.ACTOR_BUILD,
+            ]);
+
+            expect(content[1].text).toBe(
+                'Wait for the build to finish, or pass a build that succeeded, then check again.',
+            );
+            expect(content.map((block) => block.text).join('\n')).not.toContain(HELPER_TOOLS.ACTOR_BUILD_GET);
         });
     });
 
@@ -234,14 +277,22 @@ describe('validate-actor-input', () => {
     });
 
     describe('description', () => {
-        it('names push-actor and build-actor only when they are in the session', () => {
+        it('names push-actor, or build-actor without it, only when they are in the session', () => {
             const tool = validateActorInput as HelperTool;
             expect(tool.description).toContain(
-                `push the change with ${HELPER_TOOLS.ACTOR_PUSH} and build the Actor with ${HELPER_TOOLS.ACTOR_BUILD}`,
+                `push the change with ${HELPER_TOOLS.ACTOR_PUSH} (it builds the version), ${RECHECK_STEP}`,
+            );
+            expect(tool.description).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
+
+            const withBuildOnly = tool.buildDescription?.(
+                only(HELPER_TOOLS.ACTOR_INPUT_VALIDATE, HELPER_TOOLS.ACTOR_BUILD),
+            );
+            expect(withBuildOnly).toContain(
+                `push the change and build the Actor with ${HELPER_TOOLS.ACTOR_BUILD}, ${RECHECK_STEP}`,
             );
 
             const alone = tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_INPUT_VALIDATE));
-            expect(alone).toContain('push the change and build the Actor before checking again');
+            expect(alone).toContain(`push the change and build the Actor, ${RECHECK_STEP}`);
             expect(alone).not.toContain(HELPER_TOOLS.ACTOR_PUSH);
             expect(alone).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
         });
