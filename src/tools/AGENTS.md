@@ -31,7 +31,11 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `builds/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail) and
     `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
-    shared `waitSecs` field, the shared build response and the by-status next-step text.
+    shared `waitSecs` field, the shared build response and the by-status next-step text, which
+    `versions/push-actor` reuses.
+  - `versions/` — `push-actor` (create the Actor if needed, upload or merge a version's source files,
+    build); `source_files.ts` holds path normalization, size accounting and merge-by-name for the
+    pushed files.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).

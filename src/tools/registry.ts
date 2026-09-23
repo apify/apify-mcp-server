@@ -47,6 +47,7 @@ import { getActorTask } from './tasks/get_actor_task.js';
 import { publishActorTask } from './tasks/publish_actor_task.js';
 import { unpublishActorTask } from './tasks/unpublish_actor_task.js';
 import { updateActorTask } from './tasks/update_actor_task.js';
+import { pushActor } from './versions/push_actor.js';
 import { callActorWidget } from './widgets/call_actor_widget.js';
 import { fetchActorDetailsWidget } from './widgets/fetch_actor_details_widget.js';
 import { getActorRunWidget } from './widgets/get_actor_run_widget.js';
@@ -70,6 +71,7 @@ export const toolCategories = {
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, buildActor],
+    versions: [pushActor],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 
