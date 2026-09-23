@@ -98,7 +98,12 @@ export const publishActor: ToolEntry = Object.freeze({
                 // apify-client retries every 429, and the daily publication limit answers with one: nine attempts
                 // over minutes, past the MCP request timeout, each notifying Apify admins. Publishing is
                 // idempotent, so a transient failure is safe for the agent to repeat.
-                const publicationClient = new ApifyClient({ token: apifyToken, maxRetries: 0 });
+                // Same API as the session's client: its baseUrl already ends in /v2, which the constructor appends again.
+                const publicationClient = new ApifyClient({
+                    token: apifyToken,
+                    baseUrl: client.baseUrl.replace(/\/v2$/, ''),
+                    maxRetries: 0,
+                });
                 await publicationClient.actor(actor.id).update({ isPublic: true });
             } catch (error) {
                 // The publication checks answer with specific, user-facing messages (a missing README, the daily

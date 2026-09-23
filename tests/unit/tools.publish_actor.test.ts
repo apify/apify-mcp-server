@@ -48,6 +48,7 @@ const actorMock = vi.fn(() => ({ get: actorGetMock }));
 const stubClient = {
     user: () => ({ get: userGetMock }),
     actor: actorMock,
+    baseUrl: 'https://api.example.test/v2',
 } as unknown as InternalToolArgs['apifyClient'];
 
 const ACTOR_ID = 'E2jjCZBezvAZnX8Rb';
@@ -110,7 +111,10 @@ describe('publish-actor', () => {
     it('sends the update through a client that does not retry, so a daily-limit 429 comes back at once', async () => {
         await callTool();
 
-        expect(capturedClientOptions).toEqual([{ token: 'test-token', maxRetries: 0 }]);
+        // The same API host as the session's client, without its /v2 suffix, which the constructor appends.
+        expect(capturedClientOptions).toEqual([
+            { token: 'test-token', baseUrl: 'https://api.example.test', maxRetries: 0 },
+        ]);
         expect(actorUpdateMock).toHaveBeenCalledTimes(1);
     });
 
