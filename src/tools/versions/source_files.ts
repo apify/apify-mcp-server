@@ -68,7 +68,7 @@ const BINARY_EXTENSIONS = new Set([
     'pptx',
 ]);
 
-function hasBinaryExtension(path: string): boolean {
+export function hasBinaryExtension(path: string): boolean {
     const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
     return path.includes('.') && BINARY_EXTENSIONS.has(extension);
 }
