@@ -300,24 +300,34 @@ describe('pull-actor', () => {
                 files: [],
                 omittedFiles: [{ path: 'blob.bin', sizeBytes: 200 * KIB }],
             });
-            expect(content[1].text).toContain(
-                'Too large for this tool even on their own: blob.bin; read those with the Apify CLI (apify pull).',
+            // No call with paths can return the only omitted file, so the text does not suggest one.
+            expect(content[1].text).toBe(
+                `Pulled 0 of 1 file of john/my-actor version 0.1. Left out to keep the response within 256 KiB: 1 file, listed in omittedFiles. Too large for this tool even on their own: blob.bin; read those with the Apify CLI (apify pull).\n${PUSH_MERGE_STEP}`,
             );
         });
 
         it('says which files are too large to return even on their own', async () => {
             versionGetMock.mockResolvedValue(
-                mockVersion({ sourceFiles: [textFile('big.txt', MAX_INLINE_BYTES + 1), textFile('small.txt', 10)] }),
+                mockVersion({
+                    sourceFiles: [
+                        textFile('big.txt', MAX_INLINE_BYTES + 1),
+                        textFile('a.txt', 200 * KIB),
+                        textFile('b.txt', 100 * KIB),
+                    ],
+                }),
             );
 
             const { content, structuredContent } = await callTool({});
 
             expect(structuredContent).toMatchObject({
-                files: [{ path: 'small.txt' }],
-                omittedFiles: [{ path: 'big.txt', sizeBytes: MAX_INLINE_BYTES + 1 }],
+                files: [{ path: 'a.txt' }],
+                omittedFiles: [
+                    { path: 'big.txt', sizeBytes: MAX_INLINE_BYTES + 1 },
+                    { path: 'b.txt', sizeBytes: 100 * KIB },
+                ],
             });
             expect(content[1].text).toContain(
-                'call this tool again with their paths to read them. Too large for this tool even on their own: big.txt; read those with the Apify CLI (apify pull).',
+                '2 files, listed in omittedFiles; call this tool again with their paths to read them. Too large for this tool even on their own: big.txt; read those with the Apify CLI (apify pull).',
             );
         });
 
@@ -483,7 +493,7 @@ describe('pull-actor', () => {
             const text = await callToolExpectingUserError({});
 
             expect(text).toBe(
-                "The version's zip is 50.0 MiB, over the 50 MiB this tool reads; pull it with the Apify CLI (apify pull) instead.",
+                "The version's zip is 50.1 MiB, over the 50 MiB this tool reads; pull it with the Apify CLI (apify pull) instead.",
             );
             expect(getRecordMock).not.toHaveBeenCalled();
         });

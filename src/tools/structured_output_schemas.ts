@@ -566,7 +566,7 @@ export const pullActorToolOutputSchema = {
         files: {
             type: 'array' as const,
             description:
-                'Files read, in order; present for SOURCE_FILES and for a TARBALL stored in the Actor source key-value store',
+                'Files read, in order; present for SOURCE_FILES and for a TARBALL stored as a key-value store record of this Apify API',
             items: {
                 type: 'object' as const,
                 properties: {
@@ -603,7 +603,8 @@ export const pullActorToolOutputSchema = {
         },
         tarballUrl: {
             type: 'string',
-            description: 'URL of the zip a TARBALL version builds from, when it is outside the Actor source store',
+            description:
+                'URL of the zip a TARBALL version builds from, when it is not a key-value store record of this Apify API',
         },
         gitRepoUrl: {
             type: 'string',

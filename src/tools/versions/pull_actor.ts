@@ -57,7 +57,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
             : ''
     }
 Returns the Actor ID and name, the version, its sourceType, the files, the files left out by the size limit (omittedFiles, with their sizes), the requested paths the version has no file at (notFoundPaths), and a summary with one next step.
-A version whose files are stored on Apify, inline (SOURCE_FILES) or as a zip in the Actor's source key-value store (TARBALL), returns them. A version built from a Git repository (GIT_REPO), a GitHub gist (GITHUB_GIST) or a zip at another URL returns only that URL, to clone or download in your own environment; this tool fetches nothing from outside Apify.
+A version whose files are stored on Apify, inline (SOURCE_FILES) or as a zip in a key-value store record of this Apify API (TARBALL), returns them. A version built from a Git repository (GIT_REPO), a GitHub gist (GITHUB_GIST) or a zip at another URL returns only that URL, to clone or download in your own environment; this tool fetches nothing from outside Apify.
 The files returned total at most ${INLINE_LIMIT_KIB} KiB of content; pass paths to read only the named files, for example the ones listed in omittedFiles. Omit versionNumber to read the only version; an Actor with several versions needs it.
 
 USAGE:
@@ -188,8 +188,9 @@ function parseSourceRecordUrl(tarballUrl: string, apiBaseUrl: string): SourceRec
     return { storeId: match[1], key: match[2] };
 }
 
+/** Rounded up, so a size just over a limit never prints as the limit itself. */
 function formatMib(bytes: number): string {
-    return (bytes / BYTES_PER_MIB).toFixed(1);
+    return (Math.ceil((bytes / BYTES_PER_MIB) * 10) / 10).toFixed(1);
 }
 
 /**
@@ -246,7 +247,8 @@ function unzipSourceArchive(zip: Uint8Array, filter: UnzipFileFilter): Unzipped 
  * Lists every file entry of the zip but decompresses only the requested ones that fit in what the entries before them
  * left of the cap, so memory goes to the files returned only. The fit is judged on the size a file takes in the
  * response, base64 for a binary extension. A file that turns out not to be UTF-8 grows to base64 once read, and
- * `applyInlineCap` then leaves it out if it no longer fits.
+ * `applyInlineCap` then leaves it out if it no longer fits. The budget it held is not handed back: a later file the
+ * filter skipped stays in omittedFiles, to be read with paths, rather than the zip being decompressed a second time.
  */
 function pullArchiveFiles(zip: Uint8Array, requestedPaths: ReadonlySet<string> | undefined): PulledFiles {
     const allPaths: string[] = [];
@@ -281,7 +283,10 @@ function formatFileCount(count: number): string {
 
 function formatOmittedNote({ omittedFiles, tooLargePaths }: PulledFiles): string {
     if (omittedFiles.length === 0) return '';
-    const note = ` Left out to keep the response within ${INLINE_LIMIT_KIB} KiB: ${formatFileCount(omittedFiles.length)}, listed in omittedFiles; call this tool again with their paths to read them.`;
+    // `tooLargePaths` are all omitted; when they are the only ones, another call with paths cannot return anything.
+    const retryHint =
+        omittedFiles.length > tooLargePaths.length ? '; call this tool again with their paths to read them' : '';
+    const note = ` Left out to keep the response within ${INLINE_LIMIT_KIB} KiB: ${formatFileCount(omittedFiles.length)}, listed in omittedFiles${retryHint}.`;
     if (tooLargePaths.length === 0) return note;
     return `${note} Too large for this tool even on their own: ${tooLargePaths.join(', ')}; read those with the Apify CLI (apify pull).`;
 }
