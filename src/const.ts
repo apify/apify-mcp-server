@@ -47,6 +47,7 @@ export const HELPER_TOOLS = {
     ACTOR_CALL_WIDGET: 'call-actor-widget',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
+    ACTOR_INPUT_VALIDATE: 'validate-actor-input',
     ACTOR_RUNS_ABORT: 'abort-actor-run',
     ACTOR_RUNS_GET: 'get-actor-run',
     ACTOR_RUNS_GET_WIDGET: 'get-actor-run-widget',

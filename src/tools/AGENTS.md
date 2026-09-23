@@ -28,10 +28,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`
     converts the flat action shape to the API shape and back, and reuses the id helpers from
     `tasks/task_helpers.ts`.
-  - `builds/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail) and
-    `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
-    allowlisted build result shape, the build start and wait calls (the wait reports progress), the
-    shared `waitSecs` field, the shared build response and the by-status next-step text.
+  - `builds/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail),
+    `build-actor` (start a build of one version and wait for it) and `validate-actor-input` (check an
+    input against a build's input schema without a run; a rejected input is a normal `valid: false`
+    result, not a tool error); `build_helpers.ts` holds the allowlisted build result shape, the build
+    start and wait calls (the wait reports progress), the shared `waitSecs` field, the shared build
+    response and the by-status next-step text.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).

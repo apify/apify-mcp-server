@@ -523,6 +523,27 @@ export const buildActorToolOutputSchema = {
     required: ['build'],
 };
 
+/**
+ * Schema for validate-actor-input: whether the input passed the build's input schema, and the API's
+ * message when it did not.
+ */
+export const validateActorInputToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        valid: { type: 'boolean', description: "True when the input matches the build's input schema" },
+        actor: { type: 'string', description: 'The Actor as given, its ID or username/name' },
+        build: {
+            type: 'string',
+            description: 'Build tag or number the input was checked against; latest when none was given',
+        },
+        message: {
+            type: 'string',
+            description: 'Why the input or the input schema was rejected; present only when valid is false',
+        },
+    },
+    required: ['valid', 'actor', 'build'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into

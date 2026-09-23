@@ -119,7 +119,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
 
         it('should have correct tools in builds category (both modes)', () => {
-            const expected = [HELPER_TOOLS.ACTOR_BUILD_GET, HELPER_TOOLS.ACTOR_BUILD_LOG, HELPER_TOOLS.ACTOR_BUILD];
+            const expected = [
+                HELPER_TOOLS.ACTOR_BUILD_GET,
+                HELPER_TOOLS.ACTOR_BUILD_LOG,
+                HELPER_TOOLS.ACTOR_BUILD,
+                HELPER_TOOLS.ACTOR_INPUT_VALIDATE,
+            ];
             expect(toolNames(defaultCategories.builds)).toEqual(expected);
             expect(toolNames(appsCategories.builds)).toEqual(expected);
         });
