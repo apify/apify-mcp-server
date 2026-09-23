@@ -15,7 +15,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
-  - `actors/` — search, details, call, the actor-tools factory, the direct
+  - `actors/` — search, details, call, publish and unpublish (Apify Store listing), the actor-tools factory, the direct
     actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
     prunes an Actor's definition, `getActorDefinition`), `actor_helpers.ts` (resolves an Actor ID or
     name within the caller's own account, for the tools that write an Actor), and `actor_run_response.ts` —

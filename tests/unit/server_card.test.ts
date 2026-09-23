@@ -33,6 +33,8 @@ const EXPECTED_TOOL_NAMES = [
     'get-dataset-items',
     'get-key-value-store-record',
     'abort-actor-run',
+    'publish-actor',
+    'unpublish-actor',
     'search-apify-docs',
     'fetch-apify-docs',
 ];

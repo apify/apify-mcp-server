@@ -47,6 +47,7 @@ export const HELPER_TOOLS = {
     ACTOR_CALL_WIDGET: 'call-actor-widget',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
+    ACTOR_PUBLISH: 'publish-actor',
     ACTOR_PUSH: 'push-actor',
     ACTOR_RUNS_ABORT: 'abort-actor-run',
     ACTOR_RUNS_GET: 'get-actor-run',
@@ -58,6 +59,7 @@ export const HELPER_TOOLS = {
     ACTOR_TASK_UPDATE: 'update-actor-task',
     ACTOR_TASK_PUBLISH: 'publish-actor-task',
     ACTOR_TASK_UNPUBLISH: 'unpublish-actor-task',
+    ACTOR_UNPUBLISH: 'unpublish-actor',
     DATASET_GET: 'get-dataset',
     DATASET_LIST_GET: 'get-dataset-list',
     DATASET_GET_ITEMS: 'get-dataset-items',
@@ -290,6 +292,7 @@ export const APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED = 'full-permission-ac
 export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
 export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
+export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR = 'cannot-publish-actor';
 export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
 
 // HTTP status codes
