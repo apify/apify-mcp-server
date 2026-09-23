@@ -15,11 +15,17 @@ import type { HookCallbackMatcher, HookInput, Options, SDKMessage } from '@anthr
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
 import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
-import { MAX_CONVERSATION_TURNS, MCP_SERVER_NAME, stripToolPrefix } from './config.js';
-import type { AdaptedConversation } from './sdk_conversation_adapter.js';
-import { adaptSdkConversation } from './sdk_conversation_adapter.js';
-import type { AttemptedToolCall } from './tool_call_mode.js';
-import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from './tool_call_mode.js';
+import { MCP_SERVER_NAME, stripToolPrefix } from '../config.js';
+import type { AttemptedToolCall } from '../runner/tool_call_mode.js';
+import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from '../runner/tool_call_mode.js';
+import type { AdaptedConversation } from './conversation_adapter.js';
+import { adaptSdkConversation } from './conversation_adapter.js';
+
+/**
+ * Maximum number of conversation turns before the agent query stops
+ * (mapped onto the Agent SDK's `maxTurns` option).
+ */
+export const MAX_CONVERSATION_TURNS = 10;
 
 export type AgentRunOptions = {
     prompt: string;
@@ -27,7 +33,7 @@ export type AgentRunOptions = {
     apifyToken: string;
     /** Tools to enable on the MCP server, e.g. ["actors", "docs"]. Server default when omitted. */
     tools?: string[];
-    /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See denyToolsHook(). */
+    /** Tools the harness refuses via a PreToolUse deny with a failure message. See denyToolsHook(). */
     failTools?: string[];
     maxTurns?: number;
     toolTimeoutSeconds: number;

@@ -1,18 +1,34 @@
+import type { Client as ClientV2, ProgressNotification } from '@modelcontextprotocol/client';
 import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { expect } from 'vitest';
+import { ErrorCode, LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { expect, vi } from 'vitest';
 
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
+import {
+    APIFY_ACTOR_RUN_META_KEY,
+    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
+    HELPER_TOOLS,
+} from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
+    ACTOR_NORMAL_MODE,
     buildExampleMcpServerAddToolContent,
     getToolNames,
+    skipOnStatefulEra,
     skipUnlessLegacyHttp,
+    skipUnlessStatefulEra,
     validateStructuredOutputForTool,
     withClient,
 } from '../helpers.js';
 import type { Case } from '../types.js';
+
+/** String so `Number(progressToken)` is NaN and the SDK's own handler would drop it. */
+const PROGRESS_TOKEN = 'pt-1';
+
+const UNKNOWN_TOOL_NAME = 'no-such-tool';
+
+const LOG_NOTIFICATION_TIMEOUT_MS = 5_000;
 
 /** Protocol/tool behavior: prompts, docs, report-problem, schemas, MCP passthrough. */
 export const toolsCases: Case[] = [
@@ -227,6 +243,171 @@ export const toolsCases: Case[] = [
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG);
             expect(response.isError).toBe(true);
+        }),
+    },
+    {
+        // Legacy era only: the stateless server prefers the header over `_meta`.
+        name: 'overrides the connection token with _meta.apifyToken',
+        isDeploymentTest: false,
+        skipIf: skipUnlessLegacyHttp,
+        run: withClient({ tools: ['storage'] }, async (client) => {
+            const response = await client.callTool({
+                name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+                arguments: {},
+                _meta: { apifyToken: 'apify_api_invalid_token' },
+            });
+
+            expect(response.isError).toBe(true);
+            const content = response.content as { text: string }[];
+            expect(content[0].text).toContain('Authentication failed');
+        }),
+    },
+    {
+        name: 'exposes serverInfo, instructions and the shared capability set',
+        isDeploymentTest: false,
+        run: withClient(undefined, async (client) => {
+            const serverInfo = client.getServerVersion();
+            expect(serverInfo?.name).toBe('apify-mcp-server');
+            expect(serverInfo?.version).toMatch(/^\d+\.\d+\.\d+/);
+            expect(client.getInstructions()).toContain(HELPER_TOOLS.ACTOR_CALL);
+
+            const capabilities = client.getServerCapabilities();
+            // #1232: `tools` must stay `{}` (no listChanged).
+            expect(capabilities?.tools).toEqual({});
+            expect(capabilities?.resources).toEqual({});
+            expect(capabilities?.prompts).toEqual({});
+        }),
+    },
+    {
+        name: 'declares tasks and logging capabilities on the stateful era',
+        isDeploymentTest: false,
+        skipIf: skipUnlessStatefulEra,
+        run: withClient(undefined, async (client) => {
+            const capabilities = client.getServerCapabilities();
+            expect(capabilities?.logging).toEqual({});
+            // `SuiteClient` is v1|v2; only v1 reaches here.
+            expect(capabilities?.tasks as unknown).toEqual({
+                list: {},
+                cancel: {},
+                requests: { tools: { call: {} } },
+            });
+        }),
+    },
+    {
+        // Complements the case above so a 2026-07-28 leak is not skipped away (SEP-2577).
+        name: 'omits tasks and logging capabilities on the stateless era',
+        isDeploymentTest: false,
+        skipIf: skipOnStatefulEra,
+        run: withClient(undefined, async (client) => {
+            const capabilities = client.getServerCapabilities();
+            expect(capabilities?.logging).toBeUndefined();
+            expect(capabilities?.tasks).toBeUndefined();
+        }),
+    },
+    {
+        // v2 client refuses ping; the request never reaches the server.
+        name: 'answers ping on the stateful era',
+        isDeploymentTest: false,
+        skipIf: skipUnlessStatefulEra,
+        run: withClient(undefined, async (client) => {
+            await expect(client.ping()).resolves.toEqual({});
+        }),
+    },
+    {
+        name: 'rejects tools/call with an unknown tool name',
+        isDeploymentTest: false,
+        run: withClient(undefined, async (client) => {
+            // Protocol error, not an isError result — the name never resolves to a tool.
+            await expect(client.callTool({ name: 'no-such-tool', arguments: {} })).rejects.toMatchObject({
+                code: ErrorCode.InvalidParams,
+                message: expect.stringContaining('Tool "no-such-tool" was not found'),
+            });
+        }),
+    },
+    {
+        name: 'rejects prompts/get with an unknown prompt name',
+        isDeploymentTest: false,
+        run: withClient(undefined, async (client) => {
+            // Wording differs from the tool path above ("not found", no "was"), so pin the whole
+            // phrase rather than a substring that looks shared but is not.
+            await expect(client.getPrompt({ name: 'no-such-prompt' })).rejects.toMatchObject({
+                code: ErrorCode.InvalidParams,
+                message: expect.stringContaining('Prompt no-such-prompt not found'),
+            });
+        }),
+    },
+    {
+        // Existing progress cases sit behind the tasks gate, which skips this era.
+        name: 'echoes the client-supplied progressToken on notifications/progress',
+        isDeploymentTest: false,
+        skipIf: skipOnStatefulEra,
+        // A live Actor run over the network; the ticket budgets one retry for notification timing.
+        retry: 1,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const statelessClient = client as ClientV2;
+            const received: ProgressNotification[] = [];
+            // Replaces the SDK's own handler, which routes by `Number(progressToken)` and would drop
+            // a string token as NaN before any assertion could see it.
+            statelessClient.setNotificationHandler('notifications/progress', (notification) => {
+                received.push(notification);
+            });
+
+            const result = await statelessClient.callTool({
+                name: HELPER_TOOLS.ACTOR_CALL,
+                arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
+                _meta: { progressToken: PROGRESS_TOKEN },
+            });
+            expect(result.isError ?? false).toBe(false);
+
+            expect(received.length).toBeGreaterThan(0);
+            let previousProgress = 0;
+            for (const notification of received) {
+                const { progressToken, progress, message } = notification.params;
+                expect(progressToken).toBe(PROGRESS_TOKEN);
+                expect(typeof message).toBe('string');
+                expect(progress).toBeGreaterThan(previousProgress);
+                previousProgress = progress;
+
+                // runId rides `_meta` from the first emission on; internal reads it off this stream.
+                const meta = (notification.params as { _meta?: Record<string, unknown> })._meta;
+                const runId = (meta?.[APIFY_ACTOR_RUN_META_KEY] as { runId?: string } | undefined)?.runId;
+                expect(runId).toBeTruthy();
+            }
+        }),
+    },
+    {
+        // Unknown-tool emit is always `error`; raise the threshold to drop it, lower it to let it through.
+        name: 'filters notifications/message by the level set via logging/setLevel',
+        isDeploymentTest: false,
+        skipIf: skipUnlessStatefulEra,
+        run: withClient(undefined, async (client) => {
+            const statefulClient = client as ClientV1;
+            const received: { level: string; data?: unknown }[] = [];
+            statefulClient.setNotificationHandler(LoggingMessageNotificationSchema, (notification) => {
+                received.push(notification.params);
+            });
+
+            // No ordering barrier on `2025-11-25`: the log rides the standalone GET SSE stream, the error
+            // rides the POST stream. Phase 1 needs none (the message is filtered server-side, never sent);
+            // phase 2 waits explicitly below.
+            const callUnknownTool = async () => {
+                await expect(statefulClient.callTool({ name: UNKNOWN_TOOL_NAME, arguments: {} })).rejects.toThrow(
+                    /was not found/,
+                );
+            };
+
+            await statefulClient.setLoggingLevel('emergency');
+            await callUnknownTool();
+            expect(received).toEqual([]);
+
+            await statefulClient.setLoggingLevel('debug');
+            await callUnknownTool();
+            await vi.waitUntil(() => received.length > 0, { timeout: LOG_NOTIFICATION_TIMEOUT_MS, interval: 50 });
+
+            // Exactly one: the suppressed phase must not arrive late and inflate this.
+            expect(received).toHaveLength(1);
+            expect(received[0].level).toBe('error');
+            expect(String(received[0].data)).toContain(UNKNOWN_TOOL_NAME);
         }),
     },
 ];

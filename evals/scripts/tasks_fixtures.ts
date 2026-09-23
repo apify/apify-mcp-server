@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 /**
- * Fixtures for the `tasks-evals` and `tasks-evals-errors` datasets (task-tool MCP agent evals).
+ * Fixtures for the `merge/tasks/*` items in the `mcp-server-evals-merge` dataset (task-tool MCP agent evals).
  *
  * Deletes tasks named `eval-*` left behind by previous runs and ensures the one
  * permanent read-only fixture task exists. Run it before every eval run: the create
@@ -15,8 +15,7 @@ import 'dotenv/config';
 
 import { ApifyClient } from 'apify-client';
 
-import { findMissingEnvVars } from '../shared/config.js';
-import { sanitizeProcessEnv } from './config.js';
+import { findMissingEnvVars, sanitizeProcessEnv } from '../environment.js';
 
 sanitizeProcessEnv();
 

@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.16.1 - **not yet released**
+
+### 🚀 Features
+
+- Add get-actor-build and get-actor-build-log tools ([#1331](https://github.com/apify/apify-mcp-server/pull/1331)) ([3c1744b](https://github.com/apify/apify-mcp-server/commit/3c1744bb3df41a2ee3a3485e06f57c75f9cc39cd)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1352](https://github.com/apify/apify-mcp-server/issues/1352)
+- Run against a non-production platform with matching links ([#1422](https://github.com/apify/apify-mcp-server/pull/1422)) ([5199c88](https://github.com/apify/apify-mcp-server/commit/5199c8841c827fb4fd8f7410e1b423f7beea27c3)) by [@mfori](https://github.com/mfori)
+
+### 🐛 Bug Fixes
+
+- State the new published task limits in publish-actor-task ([#1404](https://github.com/apify/apify-mcp-server/pull/1404)) ([18d3a24](https://github.com/apify/apify-mcp-server/commit/18d3a24b5bc278db8d24efa04369d65fceaa0ce3)) by [@Janjiran](https://github.com/Janjiran), closes [#30452](https://github.com/apify/apify-mcp-server/issues/30452)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.16.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.16.0) (2026-09-17)
 
 ### 🚀 Features

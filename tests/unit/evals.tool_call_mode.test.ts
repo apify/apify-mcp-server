@@ -4,7 +4,7 @@ import {
     resolveFirstToolMatch,
     TOOL_CALL_DENY_REASON,
     type AttemptedToolCall,
-} from '../../evals/mcp_agent/tool_call_mode.js';
+} from '../../evals/runner/tool_call_mode.js';
 
 describe('TOOL_CALL_DENY_REASON', () => {
     it('keeps the spike-calibrated wording', () => {
