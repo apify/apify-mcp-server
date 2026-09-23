@@ -25,7 +25,7 @@ function parseActorName(actorName: string): ActorNameParts {
 // `APIFY_ID_REGEX` in `@apify/consts` is unanchored, so the shape is spelled out here.
 const ACTOR_ID_SHAPE_REGEX = /^[a-zA-Z0-9]{17}$/;
 
-const ACTOR_NAME_RULE_TEXT = `Actor name must be ${ACTOR_NAME.MIN_LENGTH} to ${ACTOR_NAME.MAX_LENGTH} characters: letters, digits and dashes, not starting or ending with a dash.`;
+export const ACTOR_NAME_RULE_TEXT = `Actor name must be ${ACTOR_NAME.MIN_LENGTH} to ${ACTOR_NAME.MAX_LENGTH} characters: letters, digits and dashes, not starting or ending with a dash.`;
 
 const USERNAME_PREFIX_RULE_TEXT = `Username prefix must be ${USERNAME.MIN_LENGTH} to ${USERNAME.MAX_LENGTH} letters, digits, dots, underscores or dashes.`;
 
