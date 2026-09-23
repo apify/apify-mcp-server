@@ -87,6 +87,13 @@ describe('cloneToolEntry', () => {
         expect(typeof cloned.call).toBe('function');
     });
 
+    it('keeps redactArgs, so a payment-decorated copy still redacts its logs', () => {
+        const redactArgs = vi.fn((args: Record<string, unknown>) => args);
+        const cloned = cloneToolEntry(makeInternalTool({ redactArgs })) as HelperTool;
+
+        expect(cloned.redactArgs).toBe(redactArgs);
+    });
+
     it('should work for actor tools (no call function)', () => {
         const original = makeActorTool();
         const cloned = cloneToolEntry(original);
