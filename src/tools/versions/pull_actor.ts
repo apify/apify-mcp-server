@@ -295,9 +295,29 @@ function formatNotFoundNote(notFoundPaths: readonly string[]): string {
     return notFoundPaths.length > 0 ? ` The version has no file at: ${notFoundPaths.join(', ')}.` : '';
 }
 
+/** Whether the next step may offer a push back: push-actor writes only to the caller's own account. */
+type PushBackContext = { isOwnActor: boolean; loadedToolNames: readonly string[] };
+
+/**
+ * The API returns the source of another account's Actor when its owner shows the source, so the pulled files can
+ * still be changed, but only as a new Actor in the caller's own account.
+ */
+function formatOtherAccountNote(actorName: string): string {
+    return `${actorName} belongs to another account, so changes cannot be pushed back to it`;
+}
+
 /** push-actor merges only into a version that stores its files inline; a zip-stored one is replaced as a whole. */
-function buildPushBackStep(sourceType: ActorSourceType, loadedToolNames: readonly string[]): string {
+function buildPushBackStep(
+    sourceType: ActorSourceType,
+    actorName: string,
+    { isOwnActor, loadedToolNames }: PushBackContext,
+): string {
     const hasPushTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_PUSH);
+    if (!isOwnActor) {
+        return hasPushTool
+            ? `${formatOtherAccountNote(actorName)}; to deploy an edited copy, push the files with ${HELPER_TOOLS.ACTOR_PUSH} under a new Actor name, which creates the Actor in your account.`
+            : `${formatOtherAccountNote(actorName)}; deploy an edited copy as a new Actor in your own account.`;
+    }
     if (sourceType === ActorSourceType.SourceFiles) {
         return hasPushTool
             ? `Edit the files and push them back with ${HELPER_TOOLS.ACTOR_PUSH}; mode merge sends only the edited files.`
@@ -320,9 +340,9 @@ function respondWithFiles(params: {
     target: PullTarget;
     sourceType: ActorSourceType;
     pulled: PulledFiles;
-    loadedToolNames: readonly string[];
+    pushBack: PushBackContext;
 }): ToolResponse {
-    const { target, sourceType, pulled, loadedToolNames } = params;
+    const { target, sourceType, pulled, pushBack } = params;
     const structuredContent = {
         ...target,
         sourceType,
@@ -331,14 +351,19 @@ function respondWithFiles(params: {
         ...(pulled.notFoundPaths.length > 0 && { notFoundPaths: pulled.notFoundPaths }),
     };
     const summary = `Pulled ${pulled.files.length} of ${formatFileCount(pulled.totalFiles)} of ${target.actorName} version ${target.versionNumber}.${formatOmittedNote(pulled)}${formatNotFoundNote(pulled.notFoundPaths)}`;
-    return respondWithSummary(structuredContent, summary, buildPushBackStep(sourceType, loadedToolNames));
+    return respondWithSummary(structuredContent, summary, buildPushBackStep(sourceType, target.actorName, pushBack));
 }
 
 /**
  * Said up front because the switch is silent: push-actor with mode replace turns a version built from elsewhere into
- * one built from files hosted on Apify.
+ * one built from files hosted on Apify. An Actor of another account cannot be pushed to, so it gets no such warning.
  */
-function formatDetachWarning(sourceName: string, loadedToolNames: readonly string[]): string {
+function formatPushNote(
+    sourceName: string,
+    actorName: string,
+    { isOwnActor, loadedToolNames }: PushBackContext,
+): string {
+    if (!isOwnActor) return `${formatOtherAccountNote(actorName)}.`;
     const push = loadedToolNames.includes(HELPER_TOOLS.ACTOR_PUSH)
         ? `Pushing files with ${HELPER_TOOLS.ACTOR_PUSH} and mode replace`
         : 'Pushing files to this version';
@@ -355,18 +380,18 @@ type PullVersionParams = {
     target: PullTarget;
     version: ActorVersion;
     requestedPaths: ReadonlySet<string> | undefined;
-    loadedToolNames: readonly string[];
+    pushBack: PushBackContext;
 };
 
 /** Throws `UserInputError` for a hidden source and for a zip that is missing, oversized or unreadable. */
 async function pullVersion(params: PullVersionParams): Promise<ToolResponse> {
-    const { client, target, version, requestedPaths, loadedToolNames } = params;
+    const { client, target, version, requestedPaths, pushBack } = params;
     const { actorName, versionNumber } = target;
     const { sourceType } = version;
     if (version.sourceType === ActorSourceType.SourceFiles) {
         if (!version.sourceFiles) throw new UserInputError(buildHiddenSourceText(target));
         const pulled = pullSourceFiles(version.sourceFiles, requestedPaths);
-        return respondWithFiles({ target, sourceType, pulled, loadedToolNames });
+        return respondWithFiles({ target, sourceType, pulled, pushBack });
     }
     if (version.sourceType === ActorSourceType.Tarball) {
         const { tarballUrl } = version;
@@ -376,11 +401,11 @@ async function pullVersion(params: PullVersionParams): Promise<ToolResponse> {
             return respondWithSummary(
                 { ...target, sourceType, tarballUrl },
                 `Version ${versionNumber} of ${actorName} builds from the zip at ${tarballUrl}, which this tool does not download.`,
-                `Download and unzip it in your sandbox. ${formatDetachWarning('this zip', loadedToolNames)}`,
+                `Download and unzip it in your sandbox. ${formatPushNote('this zip', actorName, pushBack)}`,
             );
         }
         const pulled = pullArchiveFiles(await fetchSourceArchive(client, recordRef), requestedPaths);
-        return respondWithFiles({ target, sourceType, pulled, loadedToolNames });
+        return respondWithFiles({ target, sourceType, pulled, pushBack });
     }
     if (version.sourceType === ActorSourceType.GitRepo) {
         const { gitRepoUrl } = version;
@@ -388,7 +413,7 @@ async function pullVersion(params: PullVersionParams): Promise<ToolResponse> {
         return respondWithSummary(
             { ...target, sourceType, gitRepoUrl },
             `Version ${versionNumber} of ${actorName} builds from the Git repository ${gitRepoUrl}, so no files are returned; a #branch:subdirectory suffix names the branch and the directory in it.`,
-            `Clone the repository in your sandbox and commit there. ${formatDetachWarning('the repository', loadedToolNames)}`,
+            `Clone the repository in your sandbox and commit there. ${formatPushNote('the repository', actorName, pushBack)}`,
         );
     }
     const { gitHubGistUrl } = version;
@@ -396,7 +421,7 @@ async function pullVersion(params: PullVersionParams): Promise<ToolResponse> {
     return respondWithSummary(
         { ...target, sourceType, gitHubGistUrl },
         `Version ${versionNumber} of ${actorName} builds from the GitHub gist ${gitHubGistUrl}, so no files are returned.`,
-        `Clone the gist in your sandbox and commit there. ${formatDetachWarning('the gist', loadedToolNames)}`,
+        `Clone the gist in your sandbox and commit there. ${formatPushNote('the gist', actorName, pushBack)}`,
     );
 }
 
@@ -405,6 +430,8 @@ async function pullVersion(params: PullVersionParams): Promise<ToolResponse> {
  *  /v2/acts/{actorId}
  * https://docs.apify.com/api/v2/act-version-get
  *  /v2/acts/{actorId}/versions/{versionNumber}
+ * https://docs.apify.com/api/v2/users-me-get
+ *  /v2/users/me
  * https://docs.apify.com/api/v2/key-value-store-keys-get
  *  /v2/key-value-stores/{storeId}/keys
  * https://docs.apify.com/api/v2/key-value-store-record-get
@@ -437,14 +464,21 @@ export const pullActor: ToolEntry = Object.freeze({
             const actor = await client.actor(parsed.actor).get();
             if (!actor) return respondUserError(`Actor '${parsed.actor}' not found.`);
             const versionNumber = resolveVersionNumber(actor, parsed.versionNumber, parsed.actor);
-            const version = await client.actor(actor.id).version(versionNumber).get();
+            const [version, caller] = await Promise.all([
+                client.actor(actor.id).version(versionNumber).get(),
+                client.user('me').get(),
+            ]);
             if (!version) return respondUserError(`Actor '${parsed.actor}' has no version ${versionNumber}.`);
             return await pullVersion({
                 client,
                 target: { actorId: actor.id, actorName: `${actor.username}/${actor.name}`, versionNumber },
                 version,
                 requestedPaths: parsed.paths ? new Set(parsed.paths) : undefined,
-                loadedToolNames,
+                // Compared the way push-actor checks the account it pushes to.
+                pushBack: {
+                    isOwnActor: actor.username.toLowerCase() === caller.username.toLowerCase(),
+                    loadedToolNames,
+                },
             });
         } catch (error) {
             if (error instanceof UserInputError) return respondUserError(error.message);

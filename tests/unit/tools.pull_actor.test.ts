@@ -25,10 +25,13 @@ const actorMock = vi.fn(() => ({ get: actorGetMock, version: versionMock }));
 const listKeysMock = vi.fn();
 const getRecordMock = vi.fn();
 const keyValueStoreMock = vi.fn(() => ({ listKeys: listKeysMock, getRecord: getRecordMock }));
+const userGetMock = vi.fn();
+const userMock = vi.fn(() => ({ get: userGetMock }));
 
 const stubClient = {
     actor: actorMock,
     keyValueStore: keyValueStoreMock,
+    user: userMock,
     baseUrl: 'https://api.example.test/v2',
 } as unknown as InternalToolArgs['apifyClient'];
 
@@ -130,6 +133,7 @@ describe('pull-actor', () => {
         getRecordMock.mockReset();
         actorGetMock.mockResolvedValue(mockActor());
         versionGetMock.mockResolvedValue(mockVersion());
+        userGetMock.mockResolvedValue({ username: 'john' });
     });
 
     it('has the expected tool name', () => {
@@ -707,6 +711,54 @@ describe('pull-actor', () => {
             const text = await callToolExpectingUserError({});
 
             expect(text).toContain('Version 0.1 of john/my-actor came back without its source');
+        });
+    });
+
+    describe('Actor of another account', () => {
+        const OTHER_ACCOUNT_NOTE = 'john/my-actor belongs to another account, so changes cannot be pushed back to it';
+
+        beforeEach(() => {
+            userGetMock.mockResolvedValue({ username: 'jane' });
+        });
+
+        it('points at a new Actor in the own account instead of a push back', async () => {
+            const result = await callTool({});
+            const { content } = result;
+
+            expect(userMock).toHaveBeenCalledWith('me');
+            expect(content[1].text).toBe(
+                `Pulled 3 of 3 files of john/my-actor version 0.1.\n${OTHER_ACCOUNT_NOTE}; to deploy an edited copy, push the files with ${HELPER_TOOLS.ACTOR_PUSH} under a new Actor name, which creates the Actor in your account.`,
+            );
+            expectSchemaConformingStructuredContent(result, pullActorToolOutputSchema);
+        });
+
+        it('names no other tool when push-actor is not loaded', async () => {
+            const { content } = await callTool({}, [HELPER_TOOLS.ACTOR_PULL]);
+
+            expect(content[1].text).toBe(
+                `Pulled 3 of 3 files of john/my-actor version 0.1.\n${OTHER_ACCOUNT_NOTE}; deploy an edited copy as a new Actor in your own account.`,
+            );
+            expectNoOtherToolNamed(content[1].text);
+        });
+
+        it('leaves out the detach warning for a version built from a Git repository', async () => {
+            const gitRepoUrl = 'https://github.com/john/my-actor.git';
+            versionGetMock.mockResolvedValue(mockVersion({ sourceType: 'GIT_REPO', gitRepoUrl }));
+
+            const { content } = await callTool({});
+
+            expect(content[1].text).toContain(
+                `\nClone the repository in your sandbox and commit there. ${OTHER_ACCOUNT_NOTE}.`,
+            );
+            expect(content[1].text).not.toContain('would switch the version');
+        });
+
+        it('compares the account names without regard to case', async () => {
+            userGetMock.mockResolvedValue({ username: 'John' });
+
+            const { content } = await callTool({});
+
+            expect(content[1].text).toBe(`Pulled 3 of 3 files of john/my-actor version 0.1.\n${PUSH_MERGE_STEP}`);
         });
     });
 
