@@ -112,6 +112,14 @@ describe('unpublish-actor', () => {
         await expect(callTool()).rejects.toBe(error);
     });
 
+    it('leaves a failed read to the generic error mapper, which reports it as an auth failure', async () => {
+        const error = apiError(401, 'token-not-valid', 'Authentication token is not valid.');
+        userGetMock.mockRejectedValue(error);
+
+        await expect(callTool()).rejects.toBe(error);
+        expect(actorUpdateMock).not.toHaveBeenCalled();
+    });
+
     it('reports an Actor that does not exist as not found', async () => {
         actorGetMock.mockResolvedValue(undefined);
 

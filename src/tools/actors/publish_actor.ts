@@ -80,15 +80,20 @@ export const publishActor: ToolEntry = Object.freeze({
             if (!actor.title || !actor.categories?.length) {
                 return respondUserError('Publishing needs a title and at least one category; set them first.');
             }
-            await client.actor(actor.id).update({ isPublic: true });
+            try {
+                await client.actor(actor.id).update({ isPublic: true });
+            } catch (error) {
+                // The publication checks answer with specific, user-facing messages (a missing README, the daily
+                // limit, ...). Read failures stay out of this catch: the generic mapper reports a bad token as auth.
+                if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {
+                    return respondUserError(error.message, { httpStatus: error.statusCode, detail: error.type });
+                }
+                throw error;
+            }
             const summary = `${fullName} is now public in Apify Store; its Store page is ${storeUrl}.`;
             return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
         } catch (error) {
             if (error instanceof UserInputError) return respondUserError(error.message);
-            // The publication checks answer with specific, user-facing messages (a missing README, the daily limit, ...).
-            if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {
-                return respondUserError(error.message, { httpStatus: error.statusCode, detail: error.type });
-            }
             throw error;
         }
     },

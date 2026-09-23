@@ -63,15 +63,20 @@ export const unpublishActor: ToolEntry = Object.freeze({
                     structuredContent,
                 });
             }
-            await client.actor(actor.id).update({ isPublic: false });
+            try {
+                await client.actor(actor.id).update({ isPublic: false });
+            } catch (error) {
+                // Paid and critical Actors are refused with specific, user-facing messages. Read failures stay
+                // out of this catch: the generic mapper reports a bad token as auth.
+                if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {
+                    return respondUserError(error.message, { httpStatus: error.statusCode, detail: error.type });
+                }
+                throw error;
+            }
             const summary = `${fullName} is now private and no longer listed in Apify Store.`;
             return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
         } catch (error) {
             if (error instanceof UserInputError) return respondUserError(error.message);
-            // Paid and critical Actors are refused with specific, user-facing messages.
-            if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {
-                return respondUserError(error.message, { httpStatus: error.statusCode, detail: error.type });
-            }
             throw error;
         }
     },
