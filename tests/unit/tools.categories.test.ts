@@ -76,7 +76,7 @@ describe('getCategoryTools', () => {
         const result = getCategoryTools('default');
         const actorNames = result.actors.map((t: ToolEntry) => t.name);
 
-        // Verify workflow order: search → details → call → list the account's Actors
+        // Verify order: the search → details → call workflow first, then the account's own Actors
         expect(actorNames).toEqual([
             HELPER_TOOLS.STORE_SEARCH,
             HELPER_TOOLS.ACTOR_GET_DETAILS,
