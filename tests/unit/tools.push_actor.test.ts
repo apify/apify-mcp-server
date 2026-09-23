@@ -1,8 +1,10 @@
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
+import { unzipSync } from 'fflate';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MAX_MULTIFILE_BYTES } from '@apify/consts';
+import { createHmacSignatureAsync } from '@apify/utilities';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
@@ -32,6 +34,9 @@ const versionUpdateMock = vi.fn();
 const versionsCreateMock = vi.fn();
 const actorsCreateMock = vi.fn();
 const buildMock = vi.fn();
+const storesGetOrCreateMock = vi.fn();
+const setRecordMock = vi.fn();
+const keyValueStoreMock = vi.fn(() => ({ setRecord: setRecordMock }));
 const buildGetMock = vi.fn();
 const buildAbortMock = vi.fn();
 const buildClientMock = vi.fn(() => ({ get: buildGetMock, abort: buildAbortMock }));
@@ -47,6 +52,9 @@ const stubClient = {
     user: () => ({ get: userGetMock }),
     actor: actorMock,
     actors: () => ({ create: actorsCreateMock }),
+    keyValueStores: () => ({ getOrCreate: storesGetOrCreateMock }),
+    keyValueStore: keyValueStoreMock,
+    baseUrl: 'https://api.example.test/v2',
     build: buildClientMock,
 } as unknown as InternalToolArgs['apifyClient'];
 
@@ -122,6 +130,8 @@ const expectNoWrite = () => {
     expect(actorsCreateMock).not.toHaveBeenCalled();
     expect(versionUpdateMock).not.toHaveBeenCalled();
     expect(versionsCreateMock).not.toHaveBeenCalled();
+    expect(storesGetOrCreateMock).not.toHaveBeenCalled();
+    expect(setRecordMock).not.toHaveBeenCalled();
     expect(buildMock).not.toHaveBeenCalled();
 };
 
@@ -138,6 +148,8 @@ describe('push-actor', () => {
         buildMock.mockResolvedValue(mockBuild({ status: 'RUNNING', finishedAt: undefined }));
         buildGetMock.mockResolvedValue(mockBuild());
         buildAbortMock.mockResolvedValue(undefined);
+        storesGetOrCreateMock.mockResolvedValue({ id: 'store-1', name: 'actor-actor-1-source' });
+        setRecordMock.mockResolvedValue(undefined);
     });
 
     it('has the expected tool name', () => {
@@ -175,6 +187,7 @@ describe('push-actor', () => {
             versionNumber: '0.0',
             buildTag: 'latest',
             filesPushed: 2,
+            sourceType: 'SOURCE_FILES',
             build: {
                 id: 'build-1',
                 actorId: 'actor-new',
@@ -216,6 +229,7 @@ describe('push-actor', () => {
             versionNumber: '0.0',
             buildTag: 'beta',
             filesPushed: 3,
+            sourceType: 'SOURCE_FILES',
         });
         // The summary separates the files sent from the files the version holds after the merge.
         expect(content[1].text).toContain(
@@ -404,6 +418,239 @@ describe('push-actor', () => {
         });
     });
 
+    describe('source archive', () => {
+        // One byte over the inline limit: 'é' is two utf8 bytes.
+        const BIG_TEXT = `${'a'.repeat(MAX_MULTIFILE_BYTES - 1)}é`;
+        const BIG_CONFIG = { path: ACTOR_CONFIG_PATH, content: BIG_TEXT };
+        const ARCHIVE_URL = 'https://api.example.test/v2/key-value-stores/store-1/records/version-0.0.zip';
+
+        /** The entries of the uploaded zip, path to bytes, in zip order. */
+        const uploadedZipEntries = () => {
+            const [{ value }] = setRecordMock.mock.calls[0] as [{ value: Buffer }];
+            return Object.fromEntries(
+                Object.entries(unzipSync(value)).map(([name, bytes]) => [name, Buffer.from(bytes)]),
+            );
+        };
+
+        it('uploads files over the limit as a zip and points the version at it', async () => {
+            const result = await callTool({ files: [BIG_CONFIG, MAIN_JS], mode: 'replace', build: false });
+            const { structuredContent, content } = result;
+
+            expect(storesGetOrCreateMock).toHaveBeenCalledWith('actor-actor-1-source');
+            expect(keyValueStoreMock).toHaveBeenCalledWith('store-1');
+            expect(setRecordMock).toHaveBeenCalledWith({
+                key: 'version-0.0.zip',
+                value: expect.any(Buffer),
+                contentType: 'application/zip',
+            });
+            const entries = uploadedZipEntries();
+            expect(Object.keys(entries)).toEqual([ACTOR_CONFIG_PATH, 'src/main.js']);
+            expect(entries[ACTOR_CONFIG_PATH].toString('utf8')).toBe(BIG_TEXT);
+            expect(entries['src/main.js'].toString('utf8')).toBe(MAIN_JS.content);
+            expect(versionUpdateMock).toHaveBeenCalledWith({ sourceType: 'TARBALL', tarballUrl: ARCHIVE_URL });
+            expect(structuredContent).toMatchObject({ sourceType: 'TARBALL', filesPushed: 2 });
+            expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
+            expect(content[1].text).toContain(
+                'stored as a zip in key-value store actor-actor-1-source (record version-0.0.zip)',
+            );
+            expect(content[1].text).toContain('must send all files with mode replace');
+        });
+
+        it('decodes base64 files into the zip', async () => {
+            const bytes = Buffer.from([0, 1, 2, 255]);
+
+            await callTool({
+                files: [BIG_CONFIG, { path: 'blob.bin', content: bytes.toString('base64'), encoding: 'base64' }],
+                mode: 'replace',
+                build: false,
+            });
+
+            expect(uploadedZipEntries()['blob.bin']).toEqual(bytes);
+        });
+
+        it('signs the archive URL when the store is restricted', async () => {
+            storesGetOrCreateMock.mockResolvedValue({ id: 'store-1', urlSigningSecretKey: 'secret' });
+
+            await callTool({ files: [BIG_CONFIG], mode: 'replace', build: false });
+
+            const signature = await createHmacSignatureAsync('secret', 'version-0.0.zip');
+            expect(versionUpdateMock).toHaveBeenCalledWith({
+                sourceType: 'TARBALL',
+                tarballUrl: `${ARCHIVE_URL}?signature=${signature}`,
+            });
+        });
+
+        it('keeps the signed archive URL out of the response', async () => {
+            storesGetOrCreateMock.mockResolvedValue({ id: 'store-1', urlSigningSecretKey: 'secret' });
+
+            const result = await callTool({ files: [BIG_CONFIG], mode: 'replace', build: false });
+
+            expect(JSON.stringify(result)).not.toContain('signature=');
+            expect(JSON.stringify(result)).not.toContain('key-value-stores/store-1');
+        });
+
+        it('zips the merged set when the kept and pushed files together exceed the limit', async () => {
+            const kept = { name: 'big.txt', format: 'TEXT', content: 'a'.repeat(MAX_MULTIFILE_BYTES - 5) };
+            versionGetMock.mockResolvedValue(mockVersion({ sourceFiles: [ACTOR_JSON_SOURCE, kept] }));
+
+            const { structuredContent } = await callTool({ files: [MAIN_JS], build: false });
+
+            expect(Object.keys(uploadedZipEntries())).toEqual([ACTOR_CONFIG_PATH, 'big.txt', 'src/main.js']);
+            expect(versionUpdateMock).toHaveBeenCalledWith({ sourceType: 'TARBALL', tarballUrl: ARCHIVE_URL });
+            expect(structuredContent).toMatchObject({ sourceType: 'TARBALL', filesPushed: 3 });
+        });
+
+        it('creates a new version pointing at the zip', async () => {
+            versionGetMock.mockResolvedValue(undefined);
+
+            await callTool({ files: [BIG_CONFIG], versionNumber: '0.2', buildTag: 'beta', build: false });
+
+            expect(setRecordMock).toHaveBeenCalledWith(expect.objectContaining({ key: 'version-0.2.zip' }));
+            expect(versionsCreateMock).toHaveBeenCalledWith({
+                versionNumber: '0.2',
+                buildTag: 'beta',
+                sourceType: 'TARBALL',
+                tarballUrl: 'https://api.example.test/v2/key-value-stores/store-1/records/version-0.2.zip',
+            });
+            expect(actorsCreateMock).not.toHaveBeenCalled();
+        });
+
+        it('creates a new Actor with an empty version first, then switches it to the zip', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+            storesGetOrCreateMock.mockResolvedValue({ id: 'store-new' });
+
+            const { structuredContent } = await callTool({ files: [BIG_CONFIG], build: false });
+
+            expect(actorsCreateMock).toHaveBeenCalledWith({
+                name: 'my-actor',
+                versions: [{ versionNumber: '0.0', buildTag: 'latest', sourceType: 'SOURCE_FILES', sourceFiles: [] }],
+            });
+            expect(actorsCreateMock.mock.invocationCallOrder[0]).toBeLessThan(
+                setRecordMock.mock.invocationCallOrder[0],
+            );
+            expect(storesGetOrCreateMock).toHaveBeenCalledWith('actor-actor-new-source');
+            expect(actorMock).toHaveBeenCalledWith('actor-new');
+            expect(versionUpdateMock).toHaveBeenCalledWith({
+                sourceType: 'TARBALL',
+                tarballUrl: 'https://api.example.test/v2/key-value-stores/store-new/records/version-0.0.zip',
+                buildTag: 'latest',
+            });
+            expect(structuredContent).toMatchObject({ created: true, sourceType: 'TARBALL', filesPushed: 1 });
+        });
+
+        it('reports the created Actor when storing its zip fails', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+            setRecordMock.mockRejectedValue(new Error('upload failed'));
+
+            const result = await callTool({ files: [BIG_CONFIG], build: false });
+
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toBe(
+                'The Actor was created (ID actor-new), but storing its files failed: upload failed. Push again to fill version 0.0.',
+            );
+            expect(versionUpdateMock).not.toHaveBeenCalled();
+        });
+
+        it('classifies a 403 while filling a created Actor as an auth failure', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+            storesGetOrCreateMock.mockRejectedValue(apiError(403));
+
+            const result = await callTool({ files: [BIG_CONFIG], build: false });
+
+            expect(result.isError).toBe(true);
+            expect(result.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.AUTH,
+                    failureHttpStatus: 403,
+                    actorId: 'actor-new',
+                }),
+            );
+            expect(result.content[0].text).toMatch(
+                /^The Actor was created \(ID actor-new\), but storing its files failed: Forbidden\. Push again/,
+            );
+        });
+
+        it('maps a 403 from the source store of an existing Actor to the token error', async () => {
+            storesGetOrCreateMock.mockRejectedValue(apiError(403));
+
+            const result = await callTool({ files: [BIG_CONFIG], mode: 'replace', build: false });
+
+            expect(result.isError).toBe(true);
+            expect(result.toolTelemetry).toEqual(
+                expect.objectContaining({ failureCategory: FAILURE_CATEGORY.AUTH, failureHttpStatus: 403 }),
+            );
+            expect(result.content[0].text).toContain('or the key-value store a zipped push goes to');
+            expect(versionUpdateMock).not.toHaveBeenCalled();
+        });
+
+        it('switches the requested version of a new Actor to the zip with the given build tag', async () => {
+            actorGetMock.mockResolvedValue(undefined);
+
+            await callTool({ files: [BIG_CONFIG], versionNumber: '1.0', buildTag: 'beta', build: false });
+
+            expect(actorsCreateMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    versions: [{ versionNumber: '1.0', buildTag: 'beta', sourceType: 'SOURCE_FILES', sourceFiles: [] }],
+                }),
+            );
+            expect(setRecordMock).toHaveBeenCalledWith(expect.objectContaining({ key: 'version-1.0.zip' }));
+            expect(versionMock).toHaveBeenCalledWith('1.0');
+            expect(versionUpdateMock).toHaveBeenCalledWith({
+                sourceType: 'TARBALL',
+                tarballUrl: 'https://api.example.test/v2/key-value-stores/store-1/records/version-1.0.zip',
+                buildTag: 'beta',
+            });
+        });
+
+        // The boundary is on utf8 bytes as the API receives them, not on characters.
+        it('keeps a set of exactly the limit inline', async () => {
+            const content = `${'a'.repeat(MAX_MULTIFILE_BYTES - 2)}é`;
+            expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_MULTIFILE_BYTES);
+
+            const { structuredContent } = await callTool({
+                files: [{ path: ACTOR_CONFIG_PATH, content }],
+                mode: 'replace',
+                build: false,
+            });
+
+            expect(setRecordMock).not.toHaveBeenCalled();
+            expect(versionUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ sourceType: 'SOURCE_FILES' }));
+            expect(structuredContent).toMatchObject({ sourceType: 'SOURCE_FILES' });
+        });
+
+        // The platform measures the base64 text, not the decoded bytes: 3 decoded bytes become 4 characters.
+        it('measures base64 files by their encoded length', async () => {
+            const atLimit = Buffer.alloc((MAX_MULTIFILE_BYTES / 4) * 3).toString('base64');
+            expect(atLimit).toHaveLength(MAX_MULTIFILE_BYTES);
+            await callTool({
+                files: [{ path: ACTOR_CONFIG_PATH, content: atLimit, encoding: 'base64' }],
+                mode: 'replace',
+                build: false,
+            });
+            expect(setRecordMock).not.toHaveBeenCalled();
+
+            const overLimit = Buffer.alloc((MAX_MULTIFILE_BYTES / 4) * 3 + 3).toString('base64');
+            expect(overLimit).toHaveLength(MAX_MULTIFILE_BYTES + 4);
+            await callTool({
+                files: [{ path: ACTOR_CONFIG_PATH, content: overLimit, encoding: 'base64' }],
+                mode: 'replace',
+                build: false,
+            });
+            expect(setRecordMock).toHaveBeenCalledTimes(1);
+        });
+
+        // The platform counts a surrogate pair as 5 bytes where utf8 has 4; the tool counts the same way.
+        it('measures astral characters the way the platform does', async () => {
+            const content = `${'a'.repeat(MAX_MULTIFILE_BYTES - 4)}😀`;
+            expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_MULTIFILE_BYTES);
+
+            await callTool({ files: [{ path: ACTOR_CONFIG_PATH, content }], mode: 'replace', build: false });
+
+            expect(setRecordMock).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('actor given as an ID', () => {
         const ACTOR_ID = 'qGXMy0NAkWsIIb9LZ';
 
@@ -479,7 +726,7 @@ describe('push-actor', () => {
         const { text } = await callToolExpectingUserError({ files: [MAIN_JS] });
 
         expect(text).toBe(
-            "Version 0.0 uses source type GIT_REPO; use mode 'replace' to overwrite it with source files.",
+            "Version 0.0 uses source type GIT_REPO, which mode 'merge' cannot add to; use mode 'replace' and send all files.",
         );
         expectNoWrite();
     });
@@ -681,6 +928,7 @@ describe('push-actor', () => {
                 versionNumber: '0.0',
                 buildTag: 'beta',
                 filesPushed: 3,
+                sourceType: 'SOURCE_FILES',
             });
             expectSchemaConformingStructuredContent(result, pushActorToolOutputSchema);
             expect(result.content[1].text).toBe(
@@ -749,6 +997,15 @@ describe('push-actor', () => {
             expectNoWrite();
         });
 
+        it.each(['__proto__', './__proto__'])('rejects a root file named %s', async (path) => {
+            const { text } = await callToolExpectingUserError({
+                files: [ACTOR_JSON, { path, content: 'x' }],
+            });
+
+            expect(text).toBe(`File path '${path}' is not allowed.`);
+            expectNoWrite();
+        });
+
         it('rejects a path that names a directory', async () => {
             const { text } = await callToolExpectingUserError({ files: [ACTOR_JSON, { path: 'src/', content: 'x' }] });
 
@@ -779,69 +1036,6 @@ describe('push-actor', () => {
             });
 
             expect(text).toBe("File 'blob.bin' has encoding base64 but its content is not valid base64.");
-            expectNoWrite();
-        });
-
-        // The boundary tests push the config file itself in replace mode, so the merged-in files of the
-        // existing version do not add to the total and the cap is measured on the pushed set alone.
-        // The boundary is on utf8 bytes, not characters: 'é' is two bytes.
-        it('accepts files whose size is exactly the limit', async () => {
-            const content = `${'a'.repeat(MAX_MULTIFILE_BYTES - 2)}é`;
-            expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_MULTIFILE_BYTES);
-
-            await callTool({ files: [{ path: ACTOR_CONFIG_PATH, content }], mode: 'replace', build: false });
-
-            expect(versionUpdateMock).toHaveBeenCalled();
-        });
-
-        it('rejects files whose size exceeds the limit by one byte', async () => {
-            const content = `${'a'.repeat(MAX_MULTIFILE_BYTES - 1)}é`;
-            expect(Buffer.byteLength(content, 'utf8')).toBe(MAX_MULTIFILE_BYTES + 1);
-
-            const { text } = await callToolExpectingUserError({ files: [{ path: 'big.txt', content }] });
-
-            expect(text).toBe(
-                `The files total ${MAX_MULTIFILE_BYTES + 1} bytes; the limit is ${MAX_MULTIFILE_BYTES} bytes (3 MiB). Use the Apify CLI (apify push) for larger projects.`,
-            );
-            expectNoWrite();
-        });
-
-        it('rejects a merge whose kept plus pushed files exceed the limit', async () => {
-            const big = { name: 'big.txt', format: 'TEXT', content: 'a'.repeat(MAX_MULTIFILE_BYTES - 5) };
-            versionGetMock.mockResolvedValue(mockVersion({ sourceFiles: [ACTOR_JSON_SOURCE, big] }));
-
-            const { text } = await callToolExpectingUserError({ files: [MAIN_JS] });
-
-            expect(text).toMatch(/^The merged version would total \d+ bytes; the limit is /);
-            expectNoWrite();
-        });
-
-        // The platform measures the base64 text, not the decoded bytes: 3 decoded bytes become 4 characters.
-        it('counts the encoded length of base64 files toward the limit', async () => {
-            const content = Buffer.alloc((MAX_MULTIFILE_BYTES / 4) * 3).toString('base64');
-            expect(content).toHaveLength(MAX_MULTIFILE_BYTES);
-
-            await callTool({
-                files: [{ path: ACTOR_CONFIG_PATH, content, encoding: 'base64' }],
-                mode: 'replace',
-                build: false,
-            });
-
-            expect(versionUpdateMock).toHaveBeenCalled();
-        });
-
-        it('rejects base64 files whose encoded length exceeds the limit', async () => {
-            const content = Buffer.alloc((MAX_MULTIFILE_BYTES / 4) * 3 + 3).toString('base64');
-            expect(content).toHaveLength(MAX_MULTIFILE_BYTES + 4);
-
-            const { text } = await callToolExpectingUserError({
-                files: [{ path: ACTOR_CONFIG_PATH, content, encoding: 'base64' }],
-                mode: 'replace',
-            });
-
-            expect(text).toBe(
-                `The files total ${MAX_MULTIFILE_BYTES + 4} bytes; the limit is ${MAX_MULTIFILE_BYTES} bytes (3 MiB). Use the Apify CLI (apify push) for larger projects.`,
-            );
             expectNoWrite();
         });
 
@@ -1034,7 +1228,7 @@ describe('push-actor', () => {
             }),
         );
         expect(result.content[0].text).toBe(
-            'The token is not allowed to read or modify Actors in this account; scoped tokens cannot. Use a token with full Actor access.',
+            'The token is not allowed to read or modify Actors in this account, or the key-value store a zipped push goes to; scoped tokens cannot include Actor write access. Use a token with full access.',
         );
         expect(buildMock).not.toHaveBeenCalled();
     });

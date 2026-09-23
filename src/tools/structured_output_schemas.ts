@@ -1,3 +1,5 @@
+import { MAX_MULTIFILE_BYTES } from '@apify/consts';
+
 /**
  * Shared JSON schema definitions for structured output across tools.
  * These schemas define the format of structured data returned by various tools.
@@ -5,6 +7,9 @@
  * The `type: '...' as const` assertions throughout narrow the string to a literal,
  * which the MCP SDK's schema types require (a plain `string` won't type-check).
  */
+
+/** The platform's inline source-files cutoff; kept in sync with the same constant `push_actor.ts` uses. */
+const MULTIFILE_SOURCE_MAX_MIB = MAX_MULTIFILE_BYTES / (1024 * 1024);
 
 /**
  * Schema for developer information
@@ -536,9 +541,14 @@ export const pushActorToolOutputSchema = {
         versionNumber: { type: 'string', description: 'Version the files were pushed to, e.g. 0.1' },
         buildTag: { type: 'string', description: 'Build tag of the version, e.g. latest' },
         filesPushed: { type: 'integer', description: 'Number of files now in the version' },
+        sourceType: {
+            type: 'string',
+            enum: ['SOURCE_FILES', 'TARBALL'],
+            description: `SOURCE_FILES when the version holds the files inline; TARBALL when they exceeded ${MULTIFILE_SOURCE_MAX_MIB} MiB and the version points at their zip in a key-value store`,
+        },
         build: getActorBuildToolOutputSchema.properties.build,
     },
-    required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed'],
+    required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed', 'sourceType'],
 };
 
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
