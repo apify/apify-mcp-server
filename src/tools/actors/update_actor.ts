@@ -32,7 +32,7 @@ const STANDBY_IDLE_TIMEOUT_SECS_MIN = 5;
 
 const { MIN_RUN_MEMORY_MBYTES, MAX_RUN_MEMORY_MBYTES } = ACTOR_LIMITS;
 
-// The power-of-two rule has no JSON-schema form, so `validateMemoryMbytes` checks it.
+// `validateMemoryMbytes` checks the power-of-two rule, not an enum of the nine values, so the error names the rule.
 const memoryMbytesSchema = z.number().int().min(MIN_RUN_MEMORY_MBYTES).max(MAX_RUN_MEMORY_MBYTES);
 
 const updateActorArgs = z.object({
