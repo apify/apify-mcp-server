@@ -295,6 +295,7 @@ Legend for the **Enabled by default** column:
 | `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
 | `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
 | `push-actor` | versions | Push files to an Actor in your account, creating the Actor if needed, and build the version. |  |
+| `pull-actor` | versions | Read the source files of an Actor version, in the shape push-actor takes. |  |
 
 > **Note:**
 >

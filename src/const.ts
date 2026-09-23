@@ -21,6 +21,7 @@ export const CODE_RUNTIME_ACTOR_NAME = 'apify/code-runtime';
  * window (base64 inflates a binary payload ~33%, and a large text/JSON body overflows it just as easily).
  * The key-value-store-record tool caps binaries here (link to a fetchable URL); the API-resource proxy
  * caps every body here — its download is also aborted mid-flight at this limit via axios `maxContentLength`.
+ * pull-actor caps the total content of the source files it returns here.
  */
 export const MAX_INLINE_BYTES = 256 * 1024;
 
@@ -47,6 +48,7 @@ export const HELPER_TOOLS = {
     ACTOR_CALL_WIDGET: 'call-actor-widget',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
+    ACTOR_PULL: 'pull-actor',
     ACTOR_PUSH: 'push-actor',
     ACTOR_RUNS_ABORT: 'abort-actor-run',
     ACTOR_RUNS_GET: 'get-actor-run',

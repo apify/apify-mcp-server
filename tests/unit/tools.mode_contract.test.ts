@@ -125,8 +125,9 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
 
         it('should have correct tools in versions category (both modes)', () => {
-            expect(toolNames(defaultCategories.versions)).toEqual([HELPER_TOOLS.ACTOR_PUSH]);
-            expect(toolNames(appsCategories.versions)).toEqual([HELPER_TOOLS.ACTOR_PUSH]);
+            const expected = [HELPER_TOOLS.ACTOR_PUSH, HELPER_TOOLS.ACTOR_PULL];
+            expect(toolNames(defaultCategories.versions)).toEqual(expected);
+            expect(toolNames(appsCategories.versions)).toEqual(expected);
         });
 
         it('should have correct tools in dev category (both modes)', () => {
