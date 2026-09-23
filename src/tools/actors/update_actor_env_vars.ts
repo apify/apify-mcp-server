@@ -118,6 +118,14 @@ function validateChanges(set: readonly EnvVarInput[], deleteNames: readonly stri
         throw new UserInputError(`Environment variable name '${nameWithEquals.name}' must not contain '='.`);
     }
     const setNames = set.map(({ name }) => name);
+    // The name is encoded into the variable's route, which still leaves '.' and '..' as path segments:
+    // an update or delete of '..' would hit the version itself.
+    const dotSegmentName = [...setNames, ...deleteNames].find((name) => name === '.' || name === '..');
+    if (dotSegmentName !== undefined) {
+        throw new UserInputError(
+            `Environment variable name '${dotSegmentName}' cannot be used: the API cannot address a variable named '.' or '..'.`,
+        );
+    }
     const duplicateInSet = findDuplicate(setNames);
     if (duplicateInSet !== undefined) {
         throw new UserInputError(`Environment variable '${duplicateInSet}' appears more than once in set.`);
@@ -168,10 +176,12 @@ async function applyChanges(
     applied: AppliedChanges,
 ): Promise<void> {
     const { set, deleteNames, existingNames } = changes;
+    // apify-client puts the name into the URL path unencoded, so a '#', '?' or '/' in it would address another route.
+    const envVarClient = (name: string) => versionClient.envVar(encodeURIComponent(name));
     for (const { name, value, isSecret = false } of set) {
         // The update is a PUT that replaces the whole variable, so it carries all three fields.
         if (existingNames.has(name)) {
-            await versionClient.envVar(name).update({ name, value, isSecret });
+            await envVarClient(name).update({ name, value, isSecret });
             applied.updated.push(name);
             continue;
         }
@@ -179,7 +189,7 @@ async function applyChanges(
         applied.created.push(name);
     }
     for (const name of deleteNames) {
-        await versionClient.envVar(name).delete();
+        await envVarClient(name).delete();
         applied.deleted.push(name);
     }
 }

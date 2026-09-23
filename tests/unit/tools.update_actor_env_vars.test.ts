@@ -215,6 +215,22 @@ describe('update-actor-env-vars', () => {
         );
     });
 
+    it('encodes a name in the variable route', async () => {
+        envVarsListMock.mockResolvedValue(
+            mockEnvVarList([
+                { name: 'A#B', isSecret: true },
+                { name: 'C/D', isSecret: false },
+            ]),
+        );
+
+        await callTool({ set: [{ name: 'A#B', value: '1', isSecret: true }], delete: ['C/D'] });
+
+        // Unencoded, 'A#B' would address variable 'A' and 'C/D' would address 'C~D'.
+        expect(envVarMock.mock.calls).toEqual([['A%23B'], ['C%2FD']]);
+        expect(envVarUpdateMock).toHaveBeenCalledExactlyOnceWith({ name: 'A#B', value: '1', isSecret: true });
+        expect(envVarDeleteMock).toHaveBeenCalledTimes(1);
+    });
+
     it('emits structuredContent that validates against the outputSchema', async () => {
         const result = await callTool({ set: [{ name: 'NEW', value: 'x' }], delete: ['TOKEN', 'MISSING'] });
 
@@ -277,6 +293,20 @@ describe('update-actor-env-vars', () => {
             const { text } = await callToolExpectingUserError({ set: [{ name, value: '1' }] });
 
             expect(text).toBe(`Environment variable name '${name}' must not contain '='.`);
+            expectNoApiCall();
+        });
+
+        // Even encoded, '.' and '..' are path segments: a '..' delete would delete the version itself.
+        it.each([
+            ['set', { set: [{ name: '..', value: '1' }] }, '..'],
+            ['delete', { delete: ['..'] }, '..'],
+            ['delete', { delete: ['.'] }, '.'],
+        ])('rejects a dot-segment name in %s', async (_field, args, name) => {
+            const { text } = await callToolExpectingUserError(args);
+
+            expect(text).toBe(
+                `Environment variable name '${name}' cannot be used: the API cannot address a variable named '.' or '..'.`,
+            );
             expectNoApiCall();
         });
 
