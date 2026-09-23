@@ -42,6 +42,7 @@ export function buildWaitSecsField(zeroMeans: string) {
  * The build subset returned by the build tools. Allowlisted so internal fields on the API
  * document (userId, meta, options, inspectorId) never reach the client.
  * `apifyConsoleUrl` is set only for Console UI token sessions (see `getConsoleLinkContext`).
+ * get-actor-build-list repeats the other fields in `toBuildListItem`; change both together.
  */
 export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | undefined) {
     return {

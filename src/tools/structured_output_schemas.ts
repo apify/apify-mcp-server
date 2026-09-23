@@ -488,6 +488,7 @@ export const getActorBuildLogToolOutputSchema = {
 
 /**
  * Schema for get-actor-build: the allowlisted build subset (`toBuildResult`).
+ * get-actor-build-list repeats these fields in `actorBuildListItemSchema`; change both together.
  */
 export const getActorBuildToolOutputSchema = {
     type: 'object' as const,
@@ -734,7 +735,10 @@ const actorRunListItemSchema = {
 /** Schema for get-actor-run-list output (paginated list of runs). */
 export const actorRunListOutputSchema = paginatedListOutputSchema(actorRunListItemSchema, 'Actor runs.');
 
-/** Schema for one build in get-actor-build-list: the allowlisted subset of the API's `BuildShort`. */
+/**
+ * Schema for one build in get-actor-build-list: the allowlisted subset of the API's `BuildShort`.
+ * The same fields as `getActorBuildToolOutputSchema.properties.build` without `apifyConsoleUrl`; change both together.
+ */
 const actorBuildListItemSchema = {
     type: 'object' as const,
     properties: {
