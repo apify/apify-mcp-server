@@ -503,6 +503,24 @@ describe('update-actor', () => {
             expect(actorUpdateMock).not.toHaveBeenCalled();
         });
 
+        it('answers a 401 on the user lookup with the API message as an auth failure', async () => {
+            const message = 'User was not found or authentication token is not valid';
+            userGetMock.mockRejectedValue(apiError(401, 'token-not-valid', message));
+
+            const result = await callTool({ title: 'x' });
+
+            expect(result.isError).toBe(true);
+            expect(result.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.AUTH,
+                    failureHttpStatus: 401,
+                }),
+            );
+            expect(result.content[0].text).toBe(message);
+            expect(actorUpdateMock).not.toHaveBeenCalled();
+        });
+
         it('answers any other 4xx with the API message', async () => {
             actorUpdateMock.mockRejectedValue(apiError(404, 'record-not-found', 'Actor was not found.'));
 

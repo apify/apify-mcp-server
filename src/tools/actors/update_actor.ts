@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { ACTOR_CATEGORIES, ACTOR_LIMITS, ACTOR_NAME } from '@apify/consts';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_CONFLICT, HTTP_FORBIDDEN } from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_CONFLICT, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
@@ -247,7 +247,10 @@ function respondApiRejection(error: ApifyApiError, newName: string | undefined):
     if (httpStatus === HTTP_CONFLICT && newName !== undefined) {
         return respondUserError(`You already have an Actor named ${newName}.`, { httpStatus });
     }
-    const category = httpStatus === HTTP_FORBIDDEN ? FAILURE_CATEGORY.AUTH : FAILURE_CATEGORY.INVALID_INPUT;
+    const category =
+        httpStatus === HTTP_UNAUTHORIZED || httpStatus === HTTP_FORBIDDEN
+            ? FAILURE_CATEGORY.AUTH
+            : FAILURE_CATEGORY.INVALID_INPUT;
     return respondUserError(error.message, { category, httpStatus });
 }
 
