@@ -327,11 +327,8 @@ describe('get-actor-settings', () => {
         expect(actorMock).not.toHaveBeenCalled();
     });
 
-    it.each([
-        ['user lookup', userGetMock],
-        ['Actor lookup', actorGetMock],
-    ])('maps a 403 from the %s to a permission error', async (_label, mock) => {
-        mock.mockRejectedValue(apiError(403));
+    it('maps a 403 from the account lookup, which scoped tokens get, to a permission error', async () => {
+        userGetMock.mockRejectedValue(apiError(403));
 
         const result = await callTool({ actor: 'my-actor' });
 
@@ -344,7 +341,7 @@ describe('get-actor-settings', () => {
             }),
         );
         expect(result.content[0].text).toBe(
-            'The token is not allowed to read Actors in this account. Use a token with read access to this Actor.',
+            'The token is not allowed to read Actors in this account; scoped tokens cannot look up the account this tool needs. Use a token with full access.',
         );
     });
 

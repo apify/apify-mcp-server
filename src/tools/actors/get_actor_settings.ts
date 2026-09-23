@@ -132,10 +132,11 @@ export const getActorSettings: ToolEntry = Object.freeze({
             return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
         } catch (error) {
             if (error instanceof UserInputError) return respondUserError(error.message);
-            // A scoped token can be denied the account lookup or the Actor read.
+            // Scoped tokens are refused the users/me lookup the resolver makes; a token that cannot read the Actor
+            // gets a 404 instead and is reported as not found.
             if (error instanceof ApifyApiError && error.statusCode === 403) {
                 return respondUserError(
-                    'The token is not allowed to read Actors in this account. Use a token with read access to this Actor.',
+                    'The token is not allowed to read Actors in this account; scoped tokens cannot look up the account this tool needs. Use a token with full access.',
                     { category: FAILURE_CATEGORY.AUTH, httpStatus: 403 },
                 );
             }
