@@ -547,6 +547,131 @@ export const pushActorToolOutputSchema = {
     required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed', 'sourceType'],
 };
 
+/**
+ * Schema for get-actor-settings: the allowlisted owner's view of an Actor (`buildActorSettingsResult`).
+ * Fields the API may omit are null.
+ */
+export const actorSettingsOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Actor ID' },
+        name: { type: 'string', description: 'Actor name, without the username' },
+        username: { type: 'string', description: 'Username of the account that owns the Actor' },
+        fullName: { type: 'string', description: 'Full Actor name, username/name' },
+        title: { type: ['string', 'null'], description: 'Human-readable title' },
+        description: { type: ['string', 'null'], description: 'Short description' },
+        seoTitle: { type: ['string', 'null'], description: 'Title of the public Store page' },
+        seoDescription: { type: ['string', 'null'], description: 'Description of the public Store page' },
+        categories: { type: ['array', 'null'], items: { type: 'string' }, description: 'Store categories' },
+        isPublic: { type: 'boolean', description: 'Whether the Actor is published in Apify Store' },
+        isDeprecated: { type: ['boolean', 'null'], description: 'Whether the Actor is marked as deprecated' },
+        defaultRunOptions: {
+            type: 'object',
+            description: 'Run options a run uses when it does not set its own',
+            properties: {
+                build: { type: 'string', description: 'Build tag or number, e.g. latest' },
+                memoryMbytes: { type: 'number', description: 'Memory limit in megabytes' },
+                timeoutSecs: { type: 'number', description: 'Run timeout in seconds' },
+            },
+            required: ['build', 'memoryMbytes', 'timeoutSecs'],
+        },
+        actorStandby: {
+            type: ['object', 'null'],
+            description: 'Standby settings; null when standby was never configured',
+            properties: {
+                isEnabled: { type: 'boolean', description: 'Whether the Actor runs in standby mode' },
+                build: { type: ['string', 'null'], description: 'Build tag or number standby runs use' },
+                memoryMbytes: { type: ['number', 'null'], description: 'Memory limit of a standby run in megabytes' },
+                idleTimeoutSecs: {
+                    type: ['number', 'null'],
+                    description: 'Seconds a standby run waits without requests before it stops',
+                },
+                desiredRequestsPerActorRun: {
+                    type: ['number', 'null'],
+                    description: 'Concurrent requests one standby run is meant to handle',
+                },
+                maxRequestsPerActorRun: {
+                    type: ['number', 'null'],
+                    description: 'Most concurrent requests one standby run accepts',
+                },
+            },
+            required: [
+                'isEnabled',
+                'build',
+                'memoryMbytes',
+                'idleTimeoutSecs',
+                'desiredRequestsPerActorRun',
+                'maxRequestsPerActorRun',
+            ],
+        },
+        versions: {
+            type: 'array',
+            description: 'Versions of the Actor',
+            items: {
+                type: 'object',
+                properties: {
+                    versionNumber: { type: ['string', 'null'], description: 'Version number, e.g. 0.1' },
+                    sourceType: {
+                        type: 'string',
+                        description: 'Where the source lives: SOURCE_FILES, GIT_REPO, TARBALL or GITHUB_GIST',
+                    },
+                    buildTag: {
+                        type: ['string', 'null'],
+                        description: 'Tag a build of this version gets, e.g. latest',
+                    },
+                    envVars: {
+                        type: ['array', 'null'],
+                        description: 'Environment variables by name and secret flag; values are never returned',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                name: { type: ['string', 'null'], description: 'Variable name' },
+                                isSecret: { type: ['boolean', 'null'], description: 'Whether the value is secret' },
+                            },
+                            required: ['name', 'isSecret'],
+                        },
+                    },
+                },
+                required: ['versionNumber', 'sourceType', 'buildTag', 'envVars'],
+            },
+        },
+        taggedBuilds: {
+            type: ['object', 'null'],
+            description: 'Build tags, e.g. latest, mapped to the build each one points to',
+            additionalProperties: {
+                type: 'object',
+                properties: {
+                    buildId: { type: ['string', 'null'], description: 'Build ID' },
+                    buildNumber: { type: ['string', 'null'], description: 'Build number, e.g. 0.1.12' },
+                    finishedAt: { type: ['string', 'null'], description: 'When the build finished (ISO 8601)' },
+                },
+                required: ['buildId', 'buildNumber', 'finishedAt'],
+            },
+        },
+        createdAt: { type: ['string', 'null'], description: 'When the Actor was created (ISO 8601)' },
+        modifiedAt: { type: ['string', 'null'], description: 'When the Actor was last changed (ISO 8601)' },
+    },
+    required: [
+        'id',
+        'name',
+        'username',
+        'fullName',
+        'title',
+        'description',
+        'seoTitle',
+        'seoDescription',
+        'categories',
+        'isPublic',
+        'isDeprecated',
+        'defaultRunOptions',
+        'actorStandby',
+        'versions',
+        'taggedBuilds',
+        'createdAt',
+        'modifiedAt',
+    ],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into

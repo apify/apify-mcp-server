@@ -53,6 +53,7 @@ export const HELPER_TOOLS = {
     ACTOR_RUNS_GET_WIDGET: 'get-actor-run-widget',
     ACTOR_RUNS_LOG: 'get-actor-run-log',
     ACTOR_RUN_LIST_GET: 'get-actor-run-list',
+    ACTOR_SETTINGS_GET: 'get-actor-settings',
     ACTOR_TASK_GET: 'get-actor-task',
     ACTOR_TASK_CREATE: 'create-actor-task',
     ACTOR_TASK_UPDATE: 'update-actor-task',
