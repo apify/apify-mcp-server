@@ -288,8 +288,9 @@ export const updateActor: ToolEntry = Object.freeze({
 
             const result = buildUpdateActorResult(updated);
             const previousFullName = formatActorFullName(target.actor.username, target.actor.name);
+            // The platform matches Actor names regardless of case, so a case-only rename keeps the URL and references.
             const renameNote =
-                result.fullName === previousFullName
+                result.fullName.toLowerCase() === previousFullName.toLowerCase()
                     ? ''
                     : ` The Actor is now ${result.fullName}; its URL and references to ${previousFullName} changed.`;
             const summary = `Updated ${previousFullName}: ${Object.keys(update).join(', ')}.${renameNote}`;

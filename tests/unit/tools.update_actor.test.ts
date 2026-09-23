@@ -264,6 +264,14 @@ describe('update-actor', () => {
             expect(content[1].text).toBe('Updated john/my-actor: name.');
         });
 
+        it('adds no rename note when only the letter case changes', async () => {
+            const { content, structuredContent } = await callTool({ name: 'My-Actor' });
+
+            expect(sentPayload()).toStrictEqual({ name: 'My-Actor' });
+            expect(structuredContent).toMatchObject({ fullName: 'john/My-Actor' });
+            expect(content[1].text).toBe('Updated john/my-actor: name.');
+        });
+
         it('names the Actor by its stored name, not the spelling given', async () => {
             const { content } = await callTool({ actor: 'My-Actor', title: 'New title' });
 
