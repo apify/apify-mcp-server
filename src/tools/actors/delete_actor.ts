@@ -2,7 +2,7 @@ import { ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
@@ -17,7 +17,7 @@ const deleteActorArgs = z.object({
 
 /**
  * https://docs.apify.com/api/v2/act-delete
- *  /v2/acts/{actorId}
+ *  /v2/actors/{actorId}
  *
  * The platform deletes a public Actor as long as it is free; its users would lose it without warning, so
  * the tool refuses every public Actor and the owner has to unpublish it first. Resolves apify/apify-mcp-server#1417.
@@ -29,8 +29,8 @@ export const deleteActor: ToolEntry = Object.freeze({
     description: dedent`
         Delete an Actor from your own account permanently; this cannot be undone.
         Its unfinished runs are aborted, its webhooks are removed, and it is removed from the schedules that start it.
-        A public Actor cannot be deleted: unpublish it from Apify Store first.
-        For a reversible option, set it as deprecated instead.
+        A public Actor cannot be deleted: unpublish it from Apify Store in Apify Console first.
+        For a reversible option, set it as deprecated in Apify Console instead.
 
         USAGE:
         - Use only when the user explicitly wants the Actor removed.
@@ -60,8 +60,9 @@ export const deleteActor: ToolEntry = Object.freeze({
             }
             const fullName = formatActorFullName(actor.username, actor.name);
             if (actor.isPublic) {
+                const { totalUsers } = actor.stats;
                 return respondUserError(
-                    `${fullName} is public in Apify Store and has ${actor.stats.totalUsers} users; unpublish it first.`,
+                    `${fullName} is public in Apify Store and has ${totalUsers} ${totalUsers === 1 ? 'user' : 'users'}; unpublish it in Apify Console first.`,
                 );
             }
             await client.actor(actor.id).delete();
@@ -71,9 +72,14 @@ export const deleteActor: ToolEntry = Object.freeze({
             return respondOk([JSON.stringify(result), summary], { structuredContent: result });
         } catch (error) {
             if (error instanceof UserInputError) return respondUserError(error.message);
-            // For example a token without write access, or a critical Actor; the API's message says why.
+            // For example a token without write access, or a critical Actor; the API's message says why. A 401/403
+            // is recorded as AUTH, as it would be if rethrown, so no report-problem nudge follows a token problem.
             if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {
-                return respondUserError(error.message, { httpStatus: error.statusCode });
+                const isAuthError = error.statusCode === HTTP_UNAUTHORIZED || error.statusCode === HTTP_FORBIDDEN;
+                return respondUserError(error.message, {
+                    category: isAuthError ? FAILURE_CATEGORY.AUTH : FAILURE_CATEGORY.INVALID_INPUT,
+                    httpStatus: error.statusCode,
+                });
             }
             throw error;
         }

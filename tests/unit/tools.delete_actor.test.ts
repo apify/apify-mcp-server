@@ -69,6 +69,7 @@ describe('delete-actor', () => {
 
     it('has the expected tool name and destructive annotations', () => {
         expect(deleteActor.name).toBe(HELPER_TOOLS.ACTOR_DELETE);
+        expect((deleteActor as HelperTool).outputSchema).toBe(deleteActorToolOutputSchema);
         expect(deleteActor.annotations).toEqual({
             title: 'Delete Actor',
             readOnlyHint: false,
@@ -113,12 +114,18 @@ describe('delete-actor', () => {
         expect(result.content[1].text).toBe(DELETED_TEXT);
     });
 
-    it('refuses a public Actor and says how many users it has, without calling delete', async () => {
-        actorGetMock.mockResolvedValue(mockActor({ isPublic: true, stats: { totalUsers: 42 } }));
+    it.each([
+        [42, '42 users'],
+        // The platform counts the owner, so an Actor nobody else ran has one user.
+        [1, '1 user'],
+    ])('refuses a public Actor with totalUsers %i, without calling delete', async (totalUsers, users) => {
+        actorGetMock.mockResolvedValue(mockActor({ isPublic: true, stats: { totalUsers } }));
 
         const text = await callToolExpectingUserError({ actor: 'my-actor' });
 
-        expect(text).toBe('john/my-actor is public in Apify Store and has 42 users; unpublish it first.');
+        expect(text).toBe(
+            `john/my-actor is public in Apify Store and has ${users}; unpublish it in Apify Console first.`,
+        );
         expect(actorDeleteMock).not.toHaveBeenCalled();
     });
 
@@ -161,12 +168,9 @@ describe('delete-actor', () => {
         expect(actorMock).not.toHaveBeenCalled();
     });
 
+    // The platform refuses a paid Actor only while it is public, which the tool refuses before the delete call.
     it.each([
-        [
-            'cannot-delete-paid-actor',
-            'Deletion of paid Actors is not possible. Before deleting the Actor, you need to remove its monetization from the publication tab.',
-        ],
-        ['cannot-delete-critical-actor', 'This Actor cannot be deleted.'],
+        ['cannot-delete-critical-actor', 'Actor is marked as critical and cannot be deleted.'],
         ['insufficient-permissions', 'Insufficient permissions for the Actor.'],
     ])('answers a 403 %s from the delete call with the API message', async (type, message) => {
         actorDeleteMock.mockRejectedValue(apiError(403, type, message));
@@ -178,8 +182,26 @@ describe('delete-actor', () => {
         expect(result.toolTelemetry).toEqual(
             expect.objectContaining({
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                failureCategory: FAILURE_CATEGORY.AUTH,
                 failureHttpStatus: 403,
+            }),
+        );
+    });
+
+    it.each([
+        [401, FAILURE_CATEGORY.AUTH],
+        [400, FAILURE_CATEGORY.INVALID_INPUT],
+    ])('records a %i from the delete call as %s', async (status, category) => {
+        actorDeleteMock.mockRejectedValue(apiError(status, 'some-error', 'Some error.'));
+
+        const result = await callTool({ actor: 'my-actor' });
+
+        expect(result.content[0].text).toBe('Some error.');
+        expect(result.toolTelemetry).toEqual(
+            expect.objectContaining({
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureCategory: category,
+                failureHttpStatus: status,
             }),
         );
     });
