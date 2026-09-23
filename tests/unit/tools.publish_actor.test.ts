@@ -128,6 +128,17 @@ describe('publish-actor', () => {
         });
     });
 
+    it('takes the Actor name from the platform, which matches names case-insensitively', async () => {
+        actorGetMock.mockResolvedValue(mockActor({ name: 'My-Actor' }));
+
+        const { structuredContent } = await callTool({ actor: 'my-actor' });
+
+        expect(structuredContent).toMatchObject({
+            fullName: 'john/My-Actor',
+            storeUrl: 'https://apify.com/john/My-Actor',
+        });
+    });
+
     it('returns success without an update when the Actor is already public', async () => {
         actorGetMock.mockResolvedValue(mockActor({ isPublic: true }));
 

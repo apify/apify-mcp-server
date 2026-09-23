@@ -54,9 +54,10 @@ export const unpublishActor: ToolEntry = Object.freeze({
         const { args, apifyClient: client } = toolArgs;
         const parsed = unpublishActorArgs.parse(args);
         try {
-            const { username, bareName, actor } = await resolveTargetActor(client, resolveActorNameInput(parsed.actor));
+            const { actor } = await resolveTargetActor(client, resolveActorNameInput(parsed.actor));
             if (!actor) return respondUserError(`Actor '${parsed.actor}' not found.`);
-            const fullName = formatActorFullName(username, bareName);
+            // The platform's spelling, not the input's: the API matches a name case-insensitively.
+            const fullName = formatActorFullName(actor.username, actor.name);
             const structuredContent = { id: actor.id, fullName, isPublic: false };
             if (!actor.isPublic) {
                 return respondOk([JSON.stringify(structuredContent), `${fullName} is already private.`], {

@@ -79,9 +79,10 @@ export const publishActor: ToolEntry = Object.freeze({
         const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = publishActorArgs.parse(args);
         try {
-            const { username, bareName, actor } = await resolveTargetActor(client, resolveActorNameInput(parsed.actor));
+            const { actor } = await resolveTargetActor(client, resolveActorNameInput(parsed.actor));
             if (!actor) return respondUserError(`Actor '${parsed.actor}' not found.`);
-            const fullName = formatActorFullName(username, bareName);
+            // The platform's spelling, not the input's: the API matches a name case-insensitively.
+            const fullName = formatActorFullName(actor.username, actor.name);
             const storeUrl = `${APIFY_STORE_URL}/${fullName}`;
             const structuredContent = { id: actor.id, fullName, isPublic: true, storeUrl };
             if (actor.isPublic) {
