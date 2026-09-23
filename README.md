@@ -242,7 +242,7 @@ One of the most powerful features of using MCP with Apify is dynamic tool discov
 It allows an AI agent to find new tools (Actors) as needed and incorporate them.
 Here are some special MCP operations and how the Apify MCP Server supports them:
 
-- **Apify Actors**: Search for Actors, view their details, and use them as tools for the AI.
+- **Apify Actors**: Search for Actors, view their details, use them as tools for the AI, and delete your own Actors.
 - **Apify documentation**: Search the Apify documentation and fetch specific documents to provide context to the AI.
 - **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
 - **Apify storage**: Access data from your datasets and key-value stores.
@@ -268,6 +268,7 @@ Legend for the **Enabled by default** column:
 | `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. | ⚡ |
 | `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. | ⚡ |
 | `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
+| `delete-actor` | actors | Delete an Actor from your account permanently. Public Actors must be unpublished first. | ✅ |
 | `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
