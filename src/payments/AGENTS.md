@@ -27,7 +27,7 @@ The cross-file invariant no single file shows you:
   before AJV, redacts them for logging, and builds the client. The logged copy
   (`toolArgsRedacted`, the `logSafeArgs` of both the pre-validation DEBUG log and the
   `Calling internal tool` INFO log) first goes through the tool's own `redactArgs`, when an
-  internal tool has one.
+  internal tool has one (`update-actor-env-vars` hides its variable values that way).
 
 ## Rules when editing here
 

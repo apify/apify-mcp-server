@@ -84,11 +84,12 @@ describe('getCategoryTools', () => {
         const result = getCategoryTools('default');
         const actorNames = result.actors.map((t: ToolEntry) => t.name);
 
-        // Verify workflow order: search → details → call
+        // Verify workflow order: search → details → call → manage your own Actors
         expect(actorNames).toEqual([
             HELPER_TOOLS.STORE_SEARCH,
             HELPER_TOOLS.ACTOR_GET_DETAILS,
             HELPER_TOOLS.ACTOR_CALL,
+            HELPER_TOOLS.ACTOR_ENV_VARS_UPDATE,
         ]);
     });
 });

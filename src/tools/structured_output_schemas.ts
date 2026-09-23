@@ -547,6 +547,43 @@ export const pushActorToolOutputSchema = {
     required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed', 'sourceType'],
 };
 
+const buildEnvVarNamesSchema = (description: string) => ({ type: 'array', items: { type: 'string' }, description });
+
+/**
+ * Schema for update-actor-env-vars: variable names and secret flags only. No value is ever returned,
+ * secret or not.
+ */
+export const updateActorEnvVarsToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the Actor' },
+        fullName: { type: 'string', description: 'Full Actor name, username/name' },
+        versionNumber: { type: 'string', description: 'Version whose variables were changed, e.g. 0.1' },
+        created: buildEnvVarNamesSchema('Names of the variables created'),
+        updated: buildEnvVarNamesSchema('Names of the existing variables replaced'),
+        deleted: buildEnvVarNamesSchema('Names of the variables deleted'),
+        notPresent: buildEnvVarNamesSchema(
+            'Names to delete that the version did not have; nothing was deleted for them',
+        ),
+        envVars: {
+            type: 'array',
+            description: "The version's variables after the change, without their values",
+            items: {
+                type: 'object',
+                properties: {
+                    name: { type: 'string' },
+                    isSecret: {
+                        type: 'boolean',
+                        description: 'True when the value is encrypted and cannot be read back',
+                    },
+                },
+                required: ['name', 'isSecret'],
+            },
+        },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'created', 'updated', 'deleted', 'notPresent', 'envVars'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
