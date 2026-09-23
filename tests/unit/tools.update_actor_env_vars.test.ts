@@ -125,7 +125,7 @@ describe('update-actor-env-vars', () => {
         // The writes use the resolved Actor ID, not the user-supplied selector.
         expect(actorMock).toHaveBeenCalledWith('actor-1');
         expect(versionMock).toHaveBeenCalledWith('0.1');
-        // isSecret defaults to false; the update is a full replacement, so it carries all three fields.
+        // A new variable without isSecret is plain; the update is a full replacement, so it carries all three fields.
         expect(envVarsCreateMock).toHaveBeenCalledExactlyOnceWith({ name: 'NEW', value: 'new-value', isSecret: false });
         expect(envVarMock).toHaveBeenCalledExactlyOnceWith('PLAIN');
         expect(envVarUpdateMock).toHaveBeenCalledExactlyOnceWith({
@@ -154,6 +154,26 @@ describe('update-actor-env-vars', () => {
             'Updated the environment variables of john/my-actor version 0.1: 1 created, 1 updated, 0 deleted.\n' +
                 `The change applies to runs of the next build. Rebuild version 0.1 with ${HELPER_TOOLS.ACTOR_BUILD}.`,
         );
+    });
+
+    it.each([
+        { name: 'TOKEN', existing: true, expected: true },
+        { name: 'PLAIN', existing: false, expected: false },
+    ])('keeps the isSecret setting of $name when a replacement omits it', async ({ name, expected }) => {
+        await callTool({ set: [{ name, value: 'rotated' }] });
+
+        expect(envVarUpdateMock).toHaveBeenCalledExactlyOnceWith({ name, value: 'rotated', isSecret: expected });
+        expect(envVarsCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('lets an explicit isSecret turn a secret into a plain variable', async () => {
+        await callTool({ set: [{ name: 'TOKEN', value: 'now-plain', isSecret: false }] });
+
+        expect(envVarUpdateMock).toHaveBeenCalledExactlyOnceWith({
+            name: 'TOKEN',
+            value: 'now-plain',
+            isSecret: false,
+        });
     });
 
     it('writes one variable at a time', async () => {

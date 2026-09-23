@@ -49,7 +49,7 @@ const updateActorEnvVarsArgs = z.object({
                     .boolean()
                     .optional()
                     .describe(
-                        'Store the value encrypted; it can never be read back. Defaults to false, also when replacing an existing secret, so pass true to keep a secret secret',
+                        'Store the value encrypted; it can never be read back. When omitted, a new variable is plain and a replaced variable keeps its current setting, so a secret stays secret',
                     ),
             }),
         )
@@ -163,9 +163,10 @@ function resolveVersionNumber(
     return requestedVersionNumber ?? versionNumbers[0];
 }
 
-async function fetchEnvVarNames(versionClient: ActorVersionClient): Promise<Set<string>> {
+/** The version's variables, name to whether it is secret. */
+async function fetchEnvVarSecrecy(versionClient: ActorVersionClient): Promise<Map<string, boolean>> {
     const { items } = await versionClient.envVars().list();
-    return new Set(items.flatMap(({ name }) => name ?? []));
+    return new Map(items.flatMap(({ name, isSecret }) => (name === undefined ? [] : [[name, isSecret === true]])));
 }
 
 type AppliedChanges = { created: string[]; updated: string[]; deleted: string[] };
@@ -177,15 +178,17 @@ type AppliedChanges = { created: string[]; updated: string[]; deleted: string[] 
  */
 async function applyChanges(
     versionClient: ActorVersionClient,
-    changes: { set: readonly EnvVarInput[]; deleteNames: readonly string[]; existingNames: ReadonlySet<string> },
+    changes: { set: readonly EnvVarInput[]; deleteNames: readonly string[]; existing: ReadonlyMap<string, boolean> },
     applied: AppliedChanges,
 ): Promise<void> {
-    const { set, deleteNames, existingNames } = changes;
+    const { set, deleteNames, existing } = changes;
     // apify-client puts the name into the URL path unencoded, so a '#', '?' or '/' in it would address another route.
     const envVarClient = (name: string) => versionClient.envVar(encodeURIComponent(name));
-    for (const { name, value, isSecret = false } of set) {
-        // The update is a PUT that replaces the whole variable, so it carries all three fields.
-        if (existingNames.has(name)) {
+    for (const { name, value, isSecret: requestedIsSecret } of set) {
+        // An omitted isSecret keeps a replaced variable's setting: the PUT replaces the whole variable, and
+        // defaulting to false would turn a secret into a plain variable readable in Console.
+        const isSecret = requestedIsSecret ?? existing.get(name) ?? false;
+        if (existing.has(name)) {
             await envVarClient(name).update({ name, value, isSecret });
             applied.updated.push(name);
             continue;
@@ -262,10 +265,10 @@ export const updateActorEnvVars: ToolEntry = Object.freeze({
             const versionNumber = resolveVersionNumber(parsed.actor, listVersionNumbers(actor), parsed.versionNumber);
             const versionClient = client.actor(actor.id).version(versionNumber);
 
-            const existingNames = await fetchEnvVarNames(versionClient);
-            const presentDeleteNames = deleteNames.filter((name) => existingNames.has(name));
-            const createCount = set.filter(({ name }) => !existingNames.has(name)).length;
-            const countAfter = existingNames.size + createCount - presentDeleteNames.length;
+            const existing = await fetchEnvVarSecrecy(versionClient);
+            const presentDeleteNames = deleteNames.filter((name) => existing.has(name));
+            const createCount = set.filter(({ name }) => !existing.has(name)).length;
+            const countAfter = existing.size + createCount - presentDeleteNames.length;
             // Refused only when the call adds variables: the per-variable create does not check the limit,
             // so a version may already be over it, and its variables must stay updatable and removable.
             if (createCount > presentDeleteNames.length && countAfter > ENV_VARS_MAX_COUNT) {
@@ -274,7 +277,7 @@ export const updateActorEnvVars: ToolEntry = Object.freeze({
                 );
             }
 
-            await applyChanges(versionClient, { set, deleteNames: presentDeleteNames, existingNames }, applied);
+            await applyChanges(versionClient, { set, deleteNames: presentDeleteNames, existing }, applied);
 
             const { items } = await versionClient.envVars().list();
             const fullName = formatActorFullName(username, bareName);
@@ -286,7 +289,7 @@ export const updateActorEnvVars: ToolEntry = Object.freeze({
                 created: applied.created,
                 updated: applied.updated,
                 deleted: applied.deleted,
-                notPresent: deleteNames.filter((name) => !existingNames.has(name)),
+                notPresent: deleteNames.filter((name) => !existing.has(name)),
                 envVars: items.flatMap(({ name, isSecret }) =>
                     name === undefined ? [] : [{ name, isSecret: isSecret === true }],
                 ),
