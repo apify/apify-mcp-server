@@ -164,6 +164,28 @@ describe('prepareToolCallContext — Skyfire-like provider', () => {
         expect((result.toolArgsRedacted as Record<string, unknown>)['skyfire-pay-id']).toBe('[REDACTED]');
     });
 
+    it("applies the tool's redactArgs and then the payment redaction to logSafeArgs", () => {
+        const args = { actor: 'apify/rag-web-browser', secret: 'hide-me', 'skyfire-pay-id': 'jwt-token-123' };
+        const tool = {
+            ...makeTool(true),
+            redactArgs: (toolArgs: Record<string, unknown>) => ({ ...toolArgs, secret: '[REDACTED]' }),
+        };
+        const result = prepareToolCallContext({
+            provider: makeSkyfireLikeProvider(),
+            tool,
+            args,
+            apifyToken: MOCK_APIFY_TOKEN,
+        });
+
+        expect(result.toolArgsRedacted).toEqual({
+            actor: 'apify/rag-web-browser',
+            secret: '[REDACTED]',
+            'skyfire-pay-id': '[REDACTED]',
+        });
+        // The tool still gets the real value.
+        expect(result.toolArgsWithoutPayment).toEqual({ actor: 'apify/rag-web-browser', secret: 'hide-me' });
+    });
+
     it('returns paymentRequiredResult when payment field is missing', () => {
         const args = { actor: 'apify/rag-web-browser' }; // no skyfire-pay-id
         const result = prepareToolCallContext({
