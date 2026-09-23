@@ -2,13 +2,14 @@ import type { ActorVersionClient } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { REDACTED_VALUE } from '../../utils/logging.js';
-import { respondOk, respondUserError } from '../../utils/mcp.js';
+import { getHttpErrorHint, respondOk, respondUserError } from '../../utils/mcp.js';
+import { classifyFailureCategory } from '../../utils/tool_status.js';
 import { listVersionNumbers } from '../builds/build_helpers.js';
 import { updateActorEnvVarsToolOutputSchema } from '../structured_output_schemas.js';
 import { formatActorFullName, resolveActorNameInput, resolveTargetActor } from './actor_helpers.js';
@@ -18,6 +19,8 @@ import { formatActorFullName, resolveActorNameInput, resolveTargetActor } from '
 const ENV_VAR_NAME_MAX_LENGTH = 100;
 const ENV_VAR_VALUE_MAX_LENGTH = 50_000;
 const ENV_VARS_MAX_COUNT = 100;
+
+const APIFY_ERROR_TYPE_ENV_VAR_ALREADY_EXISTS = 'env-var-already-exists';
 
 const updateActorEnvVarsArgs = z.object({
     actor: z.string().min(1).describe('Actor ID or name; your own account only'),
@@ -295,7 +298,21 @@ export const updateActorEnvVars: ToolEntry = Object.freeze({
         } catch (error) {
             if (error instanceof UserInputError) return respondUserError(error.message);
             if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {
-                return respondUserError(formatWriteFailure(error.message, applied), { httpStatus: error.statusCode });
+                // Classified the way the engine would a thrown error, except that a duplicate create is a 403 too.
+                const isAuthFailure =
+                    classifyFailureCategory(error) === FAILURE_CATEGORY.AUTH &&
+                    error.type !== APIFY_ERROR_TYPE_ENV_VAR_ALREADY_EXISTS;
+                const apiMessage = error.type ? `${error.message} (API error type: ${error.type})` : error.message;
+                return respondUserError(
+                    formatWriteFailure(
+                        isAuthFailure ? `${apiMessage}. ${getHttpErrorHint(error.statusCode)}` : apiMessage,
+                        applied,
+                    ),
+                    {
+                        category: isAuthFailure ? FAILURE_CATEGORY.AUTH : FAILURE_CATEGORY.INVALID_INPUT,
+                        httpStatus: error.statusCode,
+                    },
+                );
             }
             throw error;
         }

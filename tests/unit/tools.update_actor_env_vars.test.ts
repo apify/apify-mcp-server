@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import type { PreparedCall } from '../../src/mcp/tool_call_engine.js';
 import { executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
 import { updateActorEnvVars } from '../../src/tools/actors/update_actor_env_vars.js';
@@ -441,27 +441,56 @@ describe('update-actor-env-vars', () => {
     });
 
     describe('API errors', () => {
-        it('answers a rejected write with the API message and the writes that landed before it', async () => {
-            envVarUpdateMock.mockRejectedValue(apiError(403, 'Insufficient permissions for the Actor'));
+        it('answers a denied write as an auth failure with the writes that landed before it', async () => {
+            envVarUpdateMock.mockRejectedValue(
+                apiError(403, 'Insufficient permissions for the Actor', 'insufficient-permissions'),
+            );
 
-            const { text } = await callToolExpectingUserError({
+            const result = await callTool({
                 set: [
                     { name: 'NEW', value: '1' },
                     { name: 'PLAIN', value: '2' },
                 ],
             });
 
-            expect(text).toBe('Insufficient permissions for the Actor. Before the failure this call created NEW.');
+            expect(result.content[0].text).toBe(
+                'Insufficient permissions for the Actor (API error type: insufficient-permissions). ' +
+                    'The resource may be private or your token may lack access. Before the failure this call created NEW.',
+            );
+            expect(result.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.AUTH,
+                    failureHttpStatus: 403,
+                }),
+            );
         });
 
-        it('answers a rejected first write with the API message alone', async () => {
+        it('answers a rejected token on the user lookup as an auth failure', async () => {
+            userGetMock.mockRejectedValue(apiError(401, 'Authentication token is not valid', 'token-not-valid'));
+
+            const result = await callTool({ set: [{ name: 'NEW', value: '1' }] });
+
+            expect(result.content[0].text).toBe(
+                'Authentication token is not valid (API error type: token-not-valid). ' +
+                    'Authentication failed, check APIFY_TOKEN is set and valid.',
+            );
+            expect(result.toolTelemetry).toEqual(
+                expect.objectContaining({ failureCategory: FAILURE_CATEGORY.AUTH, failureHttpStatus: 401 }),
+            );
+            expectNoWrite();
+        });
+
+        it('answers a duplicate create, which is a 403 too, as invalid input', async () => {
             envVarsCreateMock.mockRejectedValue(
                 apiError(403, 'Environment variable with this name already exists', 'env-var-already-exists'),
             );
 
             const { text } = await callToolExpectingUserError({ set: [{ name: 'NEW', value: '1' }] });
 
-            expect(text).toBe('Environment variable with this name already exists');
+            expect(text).toBe(
+                'Environment variable with this name already exists (API error type: env-var-already-exists)',
+            );
         });
 
         it('rethrows a server error', async () => {
