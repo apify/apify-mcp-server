@@ -420,6 +420,18 @@ describe('push-actor', () => {
             expect(actorGetMock).not.toHaveBeenCalled();
             expectNoWrite();
         });
+
+        it('refuses a name the platform resolves to an Actor moved to another account before any write', async () => {
+            actorGetMock.mockResolvedValue({ ...mockActor(), username: 'jane' });
+
+            const { text } = await callToolExpectingUserError({ actor: 'my-actor', files: [MAIN_JS] });
+
+            expect(text).toBe(
+                'This tool works only with Actors of your own account (john); Actor my-actor belongs to jane.',
+            );
+            expect(actorMock).toHaveBeenCalledTimes(1);
+            expectNoWrite();
+        });
     });
 
     describe('source archive', () => {
@@ -1161,6 +1173,7 @@ describe('push-actor', () => {
 
             it('accepts a username prefix with a dot in the tilde form', async () => {
                 userGetMock.mockResolvedValue({ username: 'john.doe', id: 'user-secret' });
+                actorGetMock.mockResolvedValue({ ...mockActor(), username: 'john.doe' });
 
                 const { structuredContent } = await callTool({
                     actor: 'john.doe~my-actor',
