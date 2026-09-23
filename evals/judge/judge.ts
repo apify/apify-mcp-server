@@ -7,19 +7,46 @@
 import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 import { z } from 'zod';
 
-import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
-import type { JudgeLlmClient } from './llm_client.js';
-import type { ConversationHistory } from './types.js';
+import type { ConversationHistory } from '../agent/conversation_adapter.js';
+import { MODELS } from '../config.js';
+import type { JudgeClient } from './client.js';
 
 /**
- * Judge evaluation result
+ * Judge prompt template for evaluating conversations
+ * Uses structured output (JSON schema) - no format instructions needed
+ *
+ * Variables:
+ * - {{reference}}: The requirements the agent should meet
+ * - {{conversation}}: The formatted conversation to evaluate
  */
+export const JUDGE_PROMPT_TEMPLATE = `You are evaluating whether an AI agent successfully completed a user's task using available tools.
+
+TASK REQUIREMENTS:
+{{reference}}
+
+AGENT CONVERSATION:
+{{conversation}}
+
+Your task is to evaluate if the agent met ALL the requirements listed above.
+
+Evaluation criteria:
+1. Did the agent use appropriate tools to accomplish the task?
+2. Were the tool calls made with correct arguments?
+3. Did the agent provide a clear, helpful final response to the user?
+4. Did the agent fully address all requirements?
+
+Important notes:
+- Focus on whether requirements were met, not on writing style
+- The agent may use different tools than expected if they accomplish the same goal
+- Tool results are not shown (only tool calls and agent responses)
+- Minor inefficiencies are acceptable if the task was completed
+
+Provide your evaluation with a verdict (PASS or FAIL) and a brief explanation (1-2 sentences).`;
+
 export type JudgeResult = {
-    /** PASS or FAIL verdict */
     verdict: 'PASS' | 'FAIL';
-    /** Explanation from judge */
     reason: string;
-    /** Raw response from judge (for debugging) */
+    /** Kept for debugging via the Langfuse task output; nothing in evals/ reads it. */
     rawResponse: string;
 };
 
@@ -55,8 +82,9 @@ const JUDGE_RESPONSE_SCHEMA: ResponseFormatJSONSchema = {
 };
 
 /**
- * Format conversation for judge evaluation
- * Judge sees: tool calls + arguments + final responses (NOT tool results)
+ * Judge sees tool calls + arguments + final responses, NOT tool results: the judge grades
+ * agent behavior (tool selection, arguments) and the agent's own summary of the results;
+ * raw results are long and noisy and would drown the transcript.
  */
 function formatConversationForJudge(conversation: ConversationHistory): string {
     const lines: string[] = [];
@@ -125,13 +153,10 @@ export function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'
     }
 }
 
-/**
- * Evaluate a conversation using the judge LLM
- */
 export async function evaluateConversation(
     reference: string,
     conversation: ConversationHistory,
-    llmClient: JudgeLlmClient,
+    llmClient: JudgeClient,
     judgeModel: string = MODELS.judge,
 ): Promise<JudgeResult> {
     // Format conversation for judge
@@ -155,7 +180,6 @@ export async function evaluateConversation(
         const response = await llmClient.callLlm(
             [{ role: 'user', content: judgePrompt }],
             judgeModel,
-            undefined, // No tools
             JUDGE_RESPONSE_SCHEMA,
         );
         lastRawResponse = response.content || '';

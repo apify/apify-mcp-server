@@ -31,32 +31,50 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 import { readJsonFile } from '../../src/utils/generic.js';
-import { findMissingEnvVars, LANGFUSE_ENV_VARS } from '../shared/config.js';
-import { filterByCategory, filterById } from '../shared/test_case_loader.js';
-import { assertStdioBinExists } from './claude_agent.js';
-import { ClaudeLlmClient } from './claude_judge_client.js';
-import { DEFAULT_PASS_THRESHOLD, DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeProcessEnv } from './config.js';
-import { fetchMcpAgentCases, MCP_AGENT_PR_DATASET_NAME } from './langfuse_dataset.js';
+import { assertStdioBinExists } from '../agent/claude_agent.js';
+import { MODELS } from '../config.js';
+import { findMissingEnvVars, LANGFUSE_ENV_VARS, sanitizeProcessEnv } from '../environment.js';
+import { ClaudeJudgeClient } from '../judge/claude_client.js';
+import { OpenRouterClient } from '../judge/openrouter_client.js';
+import { fetchMcpAgentCases, MCP_AGENT_PR_DATASET_NAME } from '../langfuse/dataset.js';
+import { initTracing, shutdownTracing } from '../langfuse/tracing.js';
 import {
     buildRunSummary,
-    evaluators,
+    createExperimentTask,
+    EVALUATORS,
     expandIterations,
     formatRunSummary,
-    makeTask,
     resolveExitCode,
     resolveGitBranch,
     validateConcurrency,
     validateIterations,
     validatePassThreshold,
-} from './langfuse_experiment.js';
-import { initTracing, shutdownTracing } from './langfuse_tracing.js';
-import { LlmClient } from './llm_client.js';
+} from './experiment.js';
+import { filterByCategory, filterById } from './filters.js';
 
 // Before any client is constructed below: the Langfuse SDK and the Apify client read
 // process.env themselves and pass it to node:http, which throws ERR_INVALID_CHAR on a
 // CI secret with a newline. Imported config that reads env at load time (OPENROUTER_CONFIG)
 // runs before this and sanitizes its own values.
 sanitizeProcessEnv();
+
+/**
+ * Maximum time to wait for a single MCP tool call to complete, in seconds.
+ * Actor runs that take longer than this will timeout.
+ * For long-running Actors, increase this value via CLI: --tool-timeout 600
+ */
+export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
+
+/**
+ * Default `--pass-threshold` (passed trials / requested trials) for exit code 0.
+ *
+ * Below 1.0 because two tool-call items in the pr dataset are kept although Haiku misses them
+ * about one run in three: `pr/call-actor/ecommerce-scraper-iphone` (searches for an Actor the query
+ * names) and `pr/search-apify-docs/error-handling-actors` (answers from memory). The miss is
+ * the signal, not a case defect. 0.9 is the same gate CI applies, under the 0.93 floor of three
+ * local runs and the 0.97 a hosted runner measured (111/115).
+ */
+export const DEFAULT_PASS_THRESHOLD = 0.9;
 
 type CliArgs = {
     category?: string;
@@ -97,7 +115,15 @@ function resolveAgentSdkVersion(): string {
     return manifest.devDependencies['@anthropic-ai/claude-agent-sdk'] ?? 'unknown';
 }
 
-async function main() {
+/** Parsed CLI args, with `judgeModel` resolved to its provider-specific default. */
+type ParsedCliArgs = Omit<CliArgs, 'judgeModel'> & { judgeModel: string };
+
+/**
+ * Declares the CLI, then validates it: flag sanity checks, required env vars, and the
+ * built MCP server binary. Everything here can exit the process before any LLM spend.
+ * Under `--subscription` it also removes `ANTHROPIC_API_KEY` from `process.env`.
+ */
+async function parseCliArgs(): Promise<ParsedCliArgs> {
     // pnpm forwards the `--` itself, and yargs reads it as end-of-options and ignores
     // every flag behind it. Drop it so both call styles work.
     const args = hideBin(process.argv).filter((arg) => arg !== '--');
@@ -190,8 +216,15 @@ async function main() {
         process.exit(1);
     }
 
+    return { ...argv, judgeModel };
+}
+
+async function main() {
+    const argv = await parseCliArgs();
+    const { judgeModel } = argv;
+
     const langfuse = new LangfuseClient();
-    // Non-empty: checked above. Sanitized above that.
+    // Non-empty: checked in parseCliArgs(). Sanitized at module load.
     const apifyToken = process.env.APIFY_TOKEN as string;
     const datasetName = argv.dataset;
 
@@ -222,7 +255,7 @@ async function main() {
         initTracing();
 
         // Traces each judge call as a generation nested under the item's trace.
-        const llmClient = argv.claudeJudge ? new ClaudeLlmClient() : new LlmClient();
+        const llmClient = argv.claudeJudge ? new ClaudeJudgeClient() : new OpenRouterClient();
 
         const agentSdkVersion = resolveAgentSdkVersion();
         const runName = `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`;
@@ -240,7 +273,7 @@ async function main() {
             runName,
             description: 'MCP agent evals for the Apify MCP server (agent + tool-call items).',
             data,
-            task: makeTask({
+            task: createExperimentTask({
                 llmClient,
                 apifyToken,
                 agentModel: argv.agentModel,
@@ -249,7 +282,7 @@ async function main() {
                 mcpToolsOnly: argv.mcpToolsOnly,
                 totalTrials: requestedIds.length * iterations,
             }),
-            evaluators,
+            evaluators: EVALUATORS,
             runEvaluators: [
                 // passed trials / requested trials: requestedIds.length * iterations, so a
                 // dropped trial pulls the rate down instead of vanishing from it.

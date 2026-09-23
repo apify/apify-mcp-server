@@ -1,42 +1,44 @@
 import { describe, expect, it } from 'vitest';
 
-import { sanitizeEnvValue } from '../../evals/shared/config.js';
+import { isMcpToolName, stripToolPrefix } from '../../evals/config.js';
 
-describe('sanitizeEnvValue', () => {
-    it('passes through undefined and null', () => {
-        expect(sanitizeEnvValue(undefined)).toBeUndefined();
-        expect(sanitizeEnvValue(null as unknown as undefined)).toBeNull();
+describe('isMcpToolName()', () => {
+    it('matches names with the mcp__apify__ prefix', () => {
+        expect(isMcpToolName('mcp__apify__search-actors')).toBe(true);
     });
 
-    it('strips newlines and trims surrounding whitespace', () => {
-        expect(sanitizeEnvValue('sk-abc123\n')).toBe('sk-abc123');
-        expect(sanitizeEnvValue('sk-abc123\r\n')).toBe('sk-abc123');
-        expect(sanitizeEnvValue('sk-\nabc\r\n123\n')).toBe('sk-abc123');
-        expect(sanitizeEnvValue('  sk-abc123  ')).toBe('sk-abc123');
+    it('rejects built-in tool names without the prefix', () => {
+        expect(isMcpToolName('Bash')).toBe(false);
+        expect(isMcpToolName('Read')).toBe(false);
     });
 
-    it('strips control characters', () => {
-        expect(sanitizeEnvValue('sk-abc\x00123')).toBe('sk-abc123'); // null byte
-        expect(sanitizeEnvValue('sk-abc\x01123')).toBe('sk-abc123'); // SOH
-        expect(sanitizeEnvValue('sk-abc\x0b123')).toBe('sk-abc123'); // vertical tab
-        expect(sanitizeEnvValue('sk-abc\x0c123')).toBe('sk-abc123'); // form feed
-        expect(sanitizeEnvValue('sk-abc\x1f123')).toBe('sk-abc123'); // unit separator
-        expect(sanitizeEnvValue('sk-abc\x7f123')).toBe('sk-abc123'); // DEL
+    it('rejects a prefix for a different server', () => {
+        expect(isMcpToolName('mcp__other__search-actors')).toBe(false);
     });
 
-    it('strips surrounding double quotes only', () => {
-        expect(sanitizeEnvValue('"sk-abc123"')).toBe('sk-abc123');
-        expect(sanitizeEnvValue('"sk-"abc"-123"')).toBe('sk-"abc"-123');
-        expect(sanitizeEnvValue("'sk-abc123'")).toBe("'sk-abc123'");
+    it('rejects the prefix substring appearing mid-string', () => {
+        expect(isMcpToolName('search-mcp__apify__actors')).toBe(false);
     });
 
-    it('handles combined inputs and edge cases', () => {
-        expect(sanitizeEnvValue('  "sk-abc123"\n')).toBe('sk-abc123');
-        expect(sanitizeEnvValue('')).toBe('');
+    it('matches the bare prefix with nothing after it', () => {
+        expect(isMcpToolName('mcp__apify__')).toBe(true);
     });
 
-    it('is idempotent', () => {
-        const value = '  "sk-abc123"\r\n';
-        expect(sanitizeEnvValue(sanitizeEnvValue(value))).toBe(sanitizeEnvValue(value));
+    it('rejects an empty string', () => {
+        expect(isMcpToolName('')).toBe(false);
+    });
+});
+
+describe('stripToolPrefix()', () => {
+    it('removes the mcp__apify__ prefix', () => {
+        expect(stripToolPrefix('mcp__apify__search-actors')).toBe('search-actors');
+    });
+
+    it('passes through built-in tool names unchanged', () => {
+        expect(stripToolPrefix('Bash')).toBe('Bash');
+    });
+
+    it('passes through a different server prefix unchanged', () => {
+        expect(stripToolPrefix('mcp__other__search-actors')).toBe('mcp__other__search-actors');
     });
 });
