@@ -196,17 +196,21 @@ describe('unpublish-actor', () => {
             const { description } = unpublishActor as HelperTool;
 
             expect(description).toBe((unpublishActor as HelperTool).buildDescription?.(ALL_TOOLS_PRESENT));
-            expect(description).toContain(`published again later with ${HELPER_TOOLS.ACTOR_PUBLISH}.`);
+            expect(description).toContain(`Publishing it again with ${HELPER_TOOLS.ACTOR_PUBLISH} repeats every`);
             expect(description).toContain('Paid Actors and Actors marked as critical cannot be unpublished.');
         });
 
-        it('names no tool when none is served', () => {
+        it('names no tool when none is served, keeping what publishing again costs', () => {
             const description = (unpublishActor as HelperTool).buildDescription?.(only()) ?? '';
 
             for (const toolName of Object.values(HELPER_TOOLS)) {
                 expect(description).not.toContain(toolName);
             }
-            expect(description).toContain('so it can be published again later.');
+            expect(description).toContain('Users who ran it recently are notified that it was unpublished.');
+            expect(description).toContain(
+                'Publishing it again repeats every publication check, including the input and output schemas',
+            );
+            expect(description).toContain('counts against the daily publication limit.');
         });
     });
 

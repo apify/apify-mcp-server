@@ -16,9 +16,12 @@ const unpublishActorArgs = z.object({
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return `Unpublish an Actor of your account: remove it from Apify Store.
-The Actor stays in your account with its builds and settings, so it can be published again \
-later${hasTool(HELPER_TOOLS.ACTOR_PUBLISH) ? ` with ${HELPER_TOOLS.ACTOR_PUBLISH}` : ''}. Unpublishing an Actor
-that is not public does nothing.
+The Actor stays in your account with its builds and settings.
+Users who ran it recently are notified that it was unpublished.
+Publishing it again${hasTool(HELPER_TOOLS.ACTOR_PUBLISH) ? ` with ${HELPER_TOOLS.ACTOR_PUBLISH}` : ''} repeats every \
+publication check, including the input and output schemas
+an older Actor may lack, and counts against the daily publication limit.
+Unpublishing an Actor that is not public does nothing.
 Paid Actors and Actors marked as critical cannot be unpublished.
 
 USAGE:
