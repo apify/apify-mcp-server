@@ -547,6 +547,29 @@ export const pushActorToolOutputSchema = {
     required: ['actorId', 'actorName', 'created', 'versionNumber', 'buildTag', 'filesPushed', 'sourceType'],
 };
 
+/** Schema for publish-actor. */
+export const publishActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'ID of the Actor' },
+        fullName: { type: 'string', description: 'Full Actor name, username/name' },
+        isPublic: { type: 'boolean', description: 'Always true; the Actor is listed in Apify Store' },
+        storeUrl: { type: 'string', description: "URL of the Actor's Apify Store page" },
+    },
+    required: ['id', 'fullName', 'isPublic', 'storeUrl'],
+};
+
+/** Schema for unpublish-actor. */
+export const unpublishActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'ID of the Actor' },
+        fullName: { type: 'string', description: 'Full Actor name, username/name' },
+        isPublic: { type: 'boolean', description: 'Always false; the Actor is not listed in Apify Store' },
+    },
+    required: ['id', 'fullName', 'isPublic'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
