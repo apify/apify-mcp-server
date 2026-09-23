@@ -542,7 +542,7 @@ describe('update-actor-env-vars', () => {
 
             expect(content[1].text).toBe(
                 'Updated the environment variables of john/my-actor version 0.1: 1 created, 0 updated, 0 deleted.\n' +
-                    'The change applies to runs of the next build. Rebuild version 0.1 for the change to take effect.',
+                    'The change applies to runs of the next build. Rebuild version 0.1, for example in Apify Console, for the change to take effect.',
             );
             for (const toolName of Object.values(HELPER_TOOLS)) {
                 expect(content[1].text).not.toContain(toolName);
@@ -554,7 +554,9 @@ describe('update-actor-env-vars', () => {
         it('names build-actor only when that tool is in the session', () => {
             const tool = updateActorEnvVars as HelperTool;
             expect(tool.description).toContain(HELPER_TOOLS.ACTOR_BUILD);
-            expect(tool.buildDescription?.({ hasTool: () => false })).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
+            const descriptionWithoutBuild = tool.buildDescription?.({ hasTool: () => false });
+            expect(descriptionWithoutBuild).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
+            expect(descriptionWithoutBuild).toContain('rebuild the version, for example in Apify Console');
         });
 
         it('says where a per-task secret goes and to prefer secrets the platform holds', () => {

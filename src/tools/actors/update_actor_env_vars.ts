@@ -69,7 +69,9 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 Each variable in set is created, or replaced when the version has one of that name: value and isSecret are both overwritten. Each name in delete is removed; a name the version does not have is reported in notPresent.
 Returns the Actor ID and full name, the version, the names created, updated, deleted and not present, and the version's variables as name and isSecret. Values are never returned: secret values are encrypted and cannot be read back, so replacing or deleting a secret loses its old value.
 Runs read environment variables from their build, so a change applies to runs of the next build${
-        hasTool(HELPER_TOOLS.ACTOR_BUILD) ? `; rebuild the version with ${HELPER_TOOLS.ACTOR_BUILD}` : ''
+        hasTool(HELPER_TOOLS.ACTOR_BUILD)
+            ? `; rebuild the version with ${HELPER_TOOLS.ACTOR_BUILD}`
+            : '; rebuild the version, for example in Apify Console'
     }. A version holds at most ${ENV_VARS_MAX_COUNT} variables.
 A secret value passed here travels through the conversation. Prefer secrets the platform already holds, for example an existing secret variable or APIFY_TOKEN, which every run gets automatically.
 Tasks have no environment variables: a task runs the Actor's build and inherits its variables. A secret that differs per task goes into the task input, through a field marked isSecret in the Actor's input schema, which the platform stores encrypted.
@@ -213,7 +215,7 @@ function buildNextStep(versionNumber: string, hasChanged: boolean, loadedToolNam
     if (!hasChanged) return 'Nothing changed, so no rebuild is needed.';
     const rebuild = loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
         ? `Rebuild version ${versionNumber} with ${HELPER_TOOLS.ACTOR_BUILD}.`
-        : `Rebuild version ${versionNumber} for the change to take effect.`;
+        : `Rebuild version ${versionNumber}, for example in Apify Console, for the change to take effect.`;
     return `The change applies to runs of the next build. ${rebuild}`;
 }
 
