@@ -14,7 +14,7 @@
  *     |- agent                the prompt in, the final answer out
  *     |  |- <agent model>     generation: the run's aggregate tokens and cost
  *     |  |- <tool name>       one span per tool call: arguments in, result out
- *     |- <judge model>        generation, emitted by llm_client.ts (two on a judge parse retry)
+ *     |- <judge model>        generation, emitted by the active judge client (two on a judge parse retry)
  *
  * Building the tree is kept separate from emitting it so the payload shaping is testable
  * without an OpenTelemetry provider.
@@ -24,7 +24,7 @@ import type { LangfuseObservationAttributes } from '@langfuse/tracing';
 import { startObservation } from '@langfuse/tracing';
 import type { SpanContext } from '@opentelemetry/api';
 
-import type { AdaptedConversation, ToolInvocation } from './sdk_conversation_adapter.js';
+import type { AdaptedConversation, ToolInvocation } from '../agent/conversation_adapter.js';
 
 /** Observation types this module emits. */
 type ObservationType = 'agent' | 'generation' | 'tool';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractJsonObject } from '../../evals/mcp_agent/claude_judge_client.js';
+import { extractJsonObject } from '../../evals/judge/claude_client.js';
 
 describe('extractJsonObject()', () => {
     it('returns a bare JSON object unchanged', () => {

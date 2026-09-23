@@ -1,13 +1,6 @@
 /**
- * Shared configuration for evaluation systems
- * Contains OpenRouter config, environment validation, and common utilities
+ * Env var sanitization and missing-var reporting for the eval harness.
  */
-
-/** OpenRouter API configuration */
-export const OPENROUTER_CONFIG = {
-    baseURL: 'https://openrouter.ai/api/v1',
-    apiKey: sanitizeEnvValue(process.env.OPENROUTER_API_KEY) || '',
-};
 
 /**
  * Strips control characters, trims whitespace, and removes surrounding double quotes.
@@ -35,7 +28,7 @@ export const LANGFUSE_ENV_VARS = ['LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY', 
  * ERR_INVALID_CHAR on any control characters. We can't intercept those reads, so
  * we sanitize process.env itself before any library loads.
  */
-const ENV_KEYS_TO_SANITIZE = ['APIFY_TOKEN', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', ...LANGFUSE_ENV_VARS];
+export const ENV_KEYS_TO_SANITIZE = ['APIFY_TOKEN', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', ...LANGFUSE_ENV_VARS];
 
 /**
  * Names of the given env vars that are unset or sanitize to empty (whitespace,
@@ -47,14 +40,14 @@ export function findMissingEnvVars(keys: readonly string[]): string[] {
 }
 
 /**
- * Redact a value for safe logging: shows first 4 and last 4 chars, masks the rest.
- * Fully masks short values (≤ 8 chars) to prevent reconstruction from the log line.
+ * Redact a value for safe logging. Values longer than 12 chars show their first 3 and
+ * last 3 chars, so at least 7 chars stay hidden; shorter values are masked entirely.
  * Returns '(empty)' for empty strings, '(unset)' for undefined/null.
  */
 function redact(value?: string | null): string {
     if (value == null) return '(unset)';
     if (value.length === 0) return '(empty)';
-    if (value.length <= 6) return `*** (${value.length} chars)`;
+    if (value.length <= 12) return `*** (${value.length} chars)`;
     return `${value.slice(0, 3)}***${value.slice(-3)} (${value.length} chars)`;
 }
 

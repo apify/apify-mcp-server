@@ -9,8 +9,37 @@
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
-import { isMcpToolName, stripToolPrefix } from './config.js';
-import type { ConversationHistory, ConversationTurn, McpToolResult } from './types.js';
+import { isMcpToolName, stripToolPrefix } from '../config.js';
+
+export type McpToolResult = {
+    toolName: string;
+    success: boolean;
+    /** Result data if successful, error message if failed */
+    result?: unknown;
+    /** Error message if execution failed */
+    error?: string;
+    /** UTF-8 byte size of the serialized content the agent receives (set when the result is fed to the LLM) */
+    resultBytes?: number;
+};
+
+export type ConversationTurn = {
+    toolCalls: {
+        name: string;
+        arguments: Record<string, unknown>;
+    }[];
+    /** Agent text, set only on a turn that made no tool calls */
+    finalResponse?: string;
+};
+
+/**
+ * The conversation as the judge and the scores read it
+ */
+export type ConversationHistory = {
+    userPrompt: string;
+    turns: ConversationTurn[];
+    /** Agent tokens across the conversation (prompt + completion); scored in Langfuse */
+    totalTokens?: number;
+};
 
 /** One paired tool call + result, logged as a tool span under the item's trace. */
 export type ToolInvocation = {

@@ -42,11 +42,11 @@ const McpAgentMetadataValidator = z.strictObject({
     expectedArgs: z.record(z.string(), z.unknown()).optional(),
     /** Tool names allowed to fail on this item without failing the zero-tool-error gate. */
     expectedErrors: z.array(z.string()).optional(),
-    /** Defaults to the config value. Not valid on `kind: "tool-call"`, which is fixed at 2. */
+    /** Defaults to `MAX_CONVERSATION_TURNS`. Not valid on `kind: "tool-call"`, which is fixed at 2. */
     maxTurns: z.number().int().positive().optional(),
     /** Tools to enable, e.g. ["actors", "docs", "apify/rag-web-browser"] */
     tools: z.array(z.string()).optional(),
-    /** Tools the harness force-fails with a synthetic INTERNAL_ERROR. See mcp_client.ts. */
+    /** Tools the harness refuses via a PreToolUse deny with a failure message. See denyToolsHook() in agent/claude_agent.ts. */
     failTools: z.array(z.string()).optional(),
     /** Force MCP-tools-only for this item, OR-ed with the run-wide `--mcp-tools-only` flag. */
     mcpToolsOnly: z.boolean().optional(),

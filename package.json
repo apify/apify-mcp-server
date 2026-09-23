@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -138,10 +138,10 @@
     "test:e2e:remote": "E2E_HTTP_ONLY=1 E2E_HTTP_BASE=${E2E_HTTP_BASE:-https://mcp.apify.com/} vitest run --project e2e",
     "//test:e2e:remote": "Same case table against a deployed server. Bills real Actor runs to APIFY_TOKEN.",
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
-    "evals:mcp-agent": "pnpm run build && tsx evals/mcp_agent/run_mcp_agent_evals.ts",
-    "evals:mcp-agent:export-dataset": "tsx evals/mcp_agent/export_dataset.ts",
-    "evals:mcp-agent:tasks-fixtures": "tsx evals/mcp_agent/tasks_fixtures.ts",
-    "evals:mcp-agent:schedules-fixtures": "tsx evals/mcp_agent/schedules_fixtures.ts"
+    "evals:mcp-agent": "pnpm run build && tsx evals/runner/run.ts",
+    "evals:mcp-agent:export-dataset": "tsx evals/scripts/export_dataset.ts",
+    "evals:mcp-agent:tasks-fixtures": "tsx evals/scripts/tasks_fixtures.ts",
+    "evals:mcp-agent:schedules-fixtures": "tsx evals/scripts/schedules_fixtures.ts"
   },
   "author": "Apify",
   "license": "MIT"

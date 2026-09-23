@@ -1,6 +1,6 @@
-/** Tool-call mode scoring. Calls are captured by the deny-all hook in `claude_agent.ts`. */
+/** Tool-call mode scoring. Calls are captured by the deny-all hook in `agent/claude_agent.ts`. */
 
-import { stripToolPrefix } from './config.js';
+import { stripToolPrefix } from '../config.js';
 
 /**
  * Denial wording for tool-call items, calibrated by spike (2026-09-04): stops the
