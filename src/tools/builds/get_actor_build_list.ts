@@ -11,7 +11,11 @@ import { catchNotFound } from '../storage/storage_helpers.js';
 import { getActorBuildListToolOutputSchema } from '../structured_output_schemas.js';
 
 const getActorBuildListArgs = z.object({
-    actor: z.string().min(1).describe('Actor ID or username/name'),
+    actorId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Only list builds of this Actor; accepts an Actor ID or username/name.'),
     offset: z.number().int().min(0).describe('Number of builds to skip at the start. Default: 0.').default(0),
     limit: z
         .number()
@@ -78,7 +82,7 @@ function buildNextStepForBuildList(
 }
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    return `List the builds of one Actor, newest first by default. Lists builds in every status; there is no status filter.
+    return `List the Actor builds of the account, newest first by default. Pass actorId to list only the builds of one Actor, for example to find why its latest build failed. Lists builds in every status; there is no status filter.
 Read-only. Returns total, count, offset, limit, desc and items (id, actorId, buildNumber, status, startedAt, finishedAt)
 and a summary with at most one next step.${
         hasTool(HELPER_TOOLS.ACTOR_BUILD_GET)
@@ -92,7 +96,7 @@ and a summary with at most one next step.${
 
 USAGE:
 - Use to find the ID of a build that failed or that no run references.
-- Use to see an Actor's recent builds and their statuses.
+- Use to see recent builds and their statuses, of one Actor or across the account.
 
 USAGE EXAMPLES:
 - user_input: Why did the last build of my-actor fail?
@@ -100,8 +104,10 @@ USAGE EXAMPLES:
 }
 
 /**
- * https://docs.apify.com/api/v2/act-builds-get
- *  /v2/acts/{actorId}/builds
+ * https://docs.apify.com/api/v2/actor-builds-get (all builds of the user)
+ * https://docs.apify.com/api/v2/act-builds-get (builds of one Actor, when `actorId` is given)
+ *
+ * Mirrors get-actor-run-list: `actorId` is an optional filter, not a required argument.
  */
 export const getActorBuildList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -109,7 +115,7 @@ export const getActorBuildList: ToolEntry = Object.freeze({
     title: 'Get Actor build list',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    // `fixZodSchemaRequired` strips `offset`, `limit` and `desc` from `required` because they have defaults.
+    // `fixZodSchemaRequired` strips `offset`, `limit` and `desc` from `required` because they have defaults; no field is required.
     inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorBuildListArgs)) as ToolInputSchema,
     outputSchema: getActorBuildListToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorBuildListArgs)),
@@ -123,11 +129,12 @@ export const getActorBuildList: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, loadedToolNames } = toolArgs;
         const parsed = getActorBuildListArgs.parse(args);
-        const builds = await catchNotFound(
-            client.actor(parsed.actor).builds().list({ offset: parsed.offset, limit: parsed.limit, desc: parsed.desc }),
-        );
+        const listOptions = { offset: parsed.offset, limit: parsed.limit, desc: parsed.desc };
+        const builds = parsed.actorId
+            ? await catchNotFound(client.actor(parsed.actorId).builds().list(listOptions))
+            : await client.builds().list(listOptions);
         if (!builds) {
-            return respondUserError(`Actor '${parsed.actor}' not found.`);
+            return respondUserError(`Actor '${parsed.actorId}' not found.`);
         }
         // Cast because the client's item type omits fields the API returns (see `BuildListItem`).
         const items = builds.items as BuildListItem[];
@@ -139,7 +146,8 @@ export const getActorBuildList: ToolEntry = Object.freeze({
             desc: builds.desc,
             items: items.map(toBuildListItem),
         };
-        const summary = `Actor ${parsed.actor} has ${builds.total} builds; showing ${builds.count} from offset ${builds.offset}.`;
+        const owner = parsed.actorId ? `Actor ${parsed.actorId}` : 'Your account';
+        const summary = `${owner} has ${builds.total} builds; showing ${builds.count} from offset ${builds.offset}.`;
         const nextStep = buildNextStepForBuildList(items, builds.desc, loadedToolNames);
         return respondOk([JSON.stringify(structuredContent), nextStep ? `${summary}\n${nextStep}` : summary], {
             structuredContent,

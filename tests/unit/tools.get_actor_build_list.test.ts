@@ -15,8 +15,10 @@ import {
 const listMock = vi.fn();
 const buildsMock = vi.fn(() => ({ list: listMock }));
 const actorMock = vi.fn(() => ({ builds: buildsMock }));
+// client.builds(): the account-wide list, used when no actorId is given.
+const accountBuildsMock = vi.fn(() => ({ list: listMock }));
 
-const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyClient'];
+const stubClient = { actor: actorMock, builds: accountBuildsMock } as unknown as InternalToolArgs['apifyClient'];
 
 /** A build list item as the API returns it, with internal fields that the tool must not leak. */
 function mockBuild(overrides: Record<string, unknown> = {}) {
@@ -61,7 +63,7 @@ describe('get-actor-build-list', () => {
     it('returns only the allowlisted page and build fields', async () => {
         listMock.mockResolvedValue(mockPage([mockBuild()]));
 
-        const { content, structuredContent } = await callTool({ actor: 'john/my-actor' });
+        const { content, structuredContent } = await callTool({ actorId: 'john/my-actor' });
 
         expect(structuredContent).toEqual({
             total: 1,
@@ -91,7 +93,7 @@ describe('get-actor-build-list', () => {
     it('sends the defaults (offset 0, limit 10, newest first) to the Actor build list', async () => {
         listMock.mockResolvedValue(mockPage([mockBuild()]));
 
-        await callTool({ actor: 'john/my-actor' });
+        await callTool({ actorId: 'john/my-actor' });
 
         expect(actorMock).toHaveBeenCalledWith('john/my-actor');
         expect(buildsMock).toHaveBeenCalledWith();
@@ -101,7 +103,7 @@ describe('get-actor-build-list', () => {
     it('forwards explicit offset, limit and desc', async () => {
         listMock.mockResolvedValue(mockPage([mockBuild()], { total: 30, offset: 20, limit: 5, desc: false }));
 
-        const { content } = await callTool({ actor: 'actor-1', offset: 20, limit: 5, desc: false });
+        const { content } = await callTool({ actorId: 'actor-1', offset: 20, limit: 5, desc: false });
 
         expect(listMock).toHaveBeenCalledWith({ offset: 20, limit: 5, desc: false });
         expect(content[1].text).toContain('Actor actor-1 has 30 builds; showing 1 from offset 20.');
@@ -110,7 +112,7 @@ describe('get-actor-build-list', () => {
     it('emits structuredContent that validates against the outputSchema', async () => {
         listMock.mockResolvedValue(mockPage([mockBuild(), mockBuild({ id: 'build-2', status: 'FAILED' })]));
 
-        const result = await callTool({ actor: 'actor-1' });
+        const result = await callTool({ actorId: 'actor-1' });
 
         expect((getActorBuildList as HelperTool).outputSchema).toBe(getActorBuildListToolOutputSchema);
         expectSchemaConformingStructuredContent(result, getActorBuildListToolOutputSchema);
@@ -121,7 +123,7 @@ describe('get-actor-build-list', () => {
             mockPage([mockBuild({ status: 'READY', startedAt: undefined, finishedAt: undefined })]),
         );
 
-        const result = await callTool({ actor: 'actor-1' });
+        const result = await callTool({ actorId: 'actor-1' });
 
         expect((result.structuredContent as { items: Record<string, unknown>[] }).items[0]).toMatchObject({
             startedAt: null,
@@ -133,17 +135,29 @@ describe('get-actor-build-list', () => {
     it('returns an empty page with a summary and no next step', async () => {
         listMock.mockResolvedValue(mockPage([]));
 
-        const result = await callTool({ actor: 'actor-1' });
+        const result = await callTool({ actorId: 'actor-1' });
 
         expect(result.content[1].text).toBe('Actor actor-1 has 0 builds; showing 0 from offset 0.');
         expectSchemaConformingStructuredContent(result, getActorBuildListToolOutputSchema);
+    });
+
+    it('lists the builds of the whole account when actorId is omitted', async () => {
+        listMock.mockResolvedValue(mockPage([mockBuild(), mockBuild({ id: 'build-2', actId: 'actor-2' })]));
+
+        const { content, structuredContent } = await callTool({});
+
+        expect(accountBuildsMock).toHaveBeenCalledTimes(1);
+        expect(actorMock).not.toHaveBeenCalled();
+        expect(listMock).toHaveBeenCalledWith({ offset: 0, limit: 10, desc: true });
+        expect(structuredContent).toMatchObject({ items: [{ actorId: 'actor-1' }, { actorId: 'actor-2' }] });
+        expect(content[1].text).toMatch(/^Your account has \d+ builds; showing 2 from offset 0\./);
     });
 
     it('returns a not-found error when the Actor does not exist', async () => {
         listMock.mockRejectedValue(Object.assign(new Error('Actor was not found'), { statusCode: 404 }));
 
         const result = await (getActorBuildList as HelperTool).call(
-            stubToolCallContext({ actor: 'missing' }, stubClient),
+            stubToolCallContext({ actorId: 'missing' }, stubClient),
         );
         const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
@@ -157,35 +171,35 @@ describe('get-actor-build-list', () => {
         const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
         listMock.mockRejectedValue(serverError);
 
-        await expect(callTool({ actor: 'actor-1' })).rejects.toBe(serverError);
+        await expect(callTool({ actorId: 'actor-1' })).rejects.toBe(serverError);
     });
 
     describe('input validation', () => {
-        it('rejects an empty or missing actor via ajv validation', () => {
+        it('rejects an empty actorId and accepts a missing one via ajv validation', () => {
             const tool = getActorBuildList as HelperTool;
-            expect(tool.ajvValidate({ actor: '' })).toBe(false);
-            expect(tool.ajvValidate({})).toBe(false);
-            expect(tool.ajvValidate({ actor: 'actor-1' })).toBe(true);
+            expect(tool.ajvValidate({ actorId: '' })).toBe(false);
+            expect(tool.ajvValidate({})).toBe(true);
+            expect(tool.ajvValidate({ actorId: 'actor-1' })).toBe(true);
         });
 
         it('rejects limit outside 1..10 or not an integer via ajv validation', () => {
             const tool = getActorBuildList as HelperTool;
-            expect(tool.ajvValidate({ actor: 'actor-1', limit: 0 })).toBe(false);
-            expect(tool.ajvValidate({ actor: 'actor-1', limit: 11 })).toBe(false);
-            expect(tool.ajvValidate({ actor: 'actor-1', limit: 2.5 })).toBe(false);
-            expect(tool.ajvValidate({ actor: 'actor-1', limit: 1 })).toBe(true);
-            expect(tool.ajvValidate({ actor: 'actor-1', limit: 10 })).toBe(true);
+            expect(tool.ajvValidate({ actorId: 'actor-1', limit: 0 })).toBe(false);
+            expect(tool.ajvValidate({ actorId: 'actor-1', limit: 11 })).toBe(false);
+            expect(tool.ajvValidate({ actorId: 'actor-1', limit: 2.5 })).toBe(false);
+            expect(tool.ajvValidate({ actorId: 'actor-1', limit: 1 })).toBe(true);
+            expect(tool.ajvValidate({ actorId: 'actor-1', limit: 10 })).toBe(true);
         });
 
         it('rejects a negative or fractional offset via ajv validation', () => {
             const tool = getActorBuildList as HelperTool;
-            expect(tool.ajvValidate({ actor: 'actor-1', offset: -1 })).toBe(false);
-            expect(tool.ajvValidate({ actor: 'actor-1', offset: 1.5 })).toBe(false);
-            expect(tool.ajvValidate({ actor: 'actor-1', offset: 0 })).toBe(true);
+            expect(tool.ajvValidate({ actorId: 'actor-1', offset: -1 })).toBe(false);
+            expect(tool.ajvValidate({ actorId: 'actor-1', offset: 1.5 })).toBe(false);
+            expect(tool.ajvValidate({ actorId: 'actor-1', offset: 0 })).toBe(true);
         });
 
-        it('keeps only actor required in the input schema', () => {
-            expect(getActorBuildList.inputSchema.required).toEqual(['actor']);
+        it('requires no field in the input schema', () => {
+            expect(getActorBuildList.inputSchema.required ?? []).toEqual([]);
         });
     });
 
@@ -195,7 +209,7 @@ describe('get-actor-build-list', () => {
             async (status) => {
                 listMock.mockResolvedValue(mockPage([mockBuild({ id: 'build-9', buildNumber: '0.1.9', status })]));
 
-                const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
+                const { content } = await callTool({ actorId: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
 
                 expect(content[1].text).toBe(
                     `Actor actor-1 has 1 builds; showing 1 from offset 0.\nRead why build 0.1.9 failed with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-9.`,
@@ -209,7 +223,7 @@ describe('get-actor-build-list', () => {
                 listMock.mockResolvedValue(mockPage([mockBuild({ id: 'build-9', buildNumber: '0.1.9', status })]));
 
                 // get-actor-build is loaded but is not the log tool; the hint must not fall back to it.
-                const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
+                const { content } = await callTool({ actorId: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
 
                 expect(content[1].text).toBe(
                     'Actor actor-1 has 1 builds; showing 1 from offset 0.\nRead the log of build 0.1.9 (ID build-9) to see why it failed.',
@@ -226,7 +240,7 @@ describe('get-actor-build-list', () => {
                 ]),
             );
 
-            const { content } = await callTool({ actor: 'actor-1' });
+            const { content } = await callTool({ actorId: 'actor-1' });
 
             expect(content[1].text).toContain(
                 `Read why build 0.1.3 failed with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-3.`,
@@ -245,7 +259,7 @@ describe('get-actor-build-list', () => {
                 ),
             );
 
-            const { content } = await callTool({ actor: 'actor-1', desc: false });
+            const { content } = await callTool({ actorId: 'actor-1', desc: false });
 
             expect(content[1].text).toContain(
                 `Read why build 0.1.3 failed with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-3.`,
@@ -255,7 +269,7 @@ describe('get-actor-build-list', () => {
         it('names no tool when the page has no failed build and get-actor-build is not loaded', async () => {
             listMock.mockResolvedValue(mockPage([mockBuild(), mockBuild({ id: 'build-2', status: 'RUNNING' })]));
 
-            const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
+            const { content } = await callTool({ actorId: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
 
             expect(content[1].text).toBe('Actor actor-1 has 2 builds; showing 2 from offset 0.');
         });
@@ -266,7 +280,7 @@ describe('get-actor-build-list', () => {
         ])('names no tool that is not loaded for a page with %s', async (_label, status) => {
             listMock.mockResolvedValue(mockPage([mockBuild({ status })]));
 
-            const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_LIST_GET]);
+            const { content } = await callTool({ actorId: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_LIST_GET]);
 
             expect(findToolNames(content[1].text)).toEqual([]);
         });

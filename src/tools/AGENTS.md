@@ -29,8 +29,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     converts the flat action shape to the API shape and back, and reuses the id helpers from
     `tasks/task_helpers.ts`.
   - `builds/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail),
-    `get-actor-build-list` (one Actor's builds in every status, newest first, pointing at the newest
-    failed one) and `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
+    `get-actor-build-list` (the account's builds, or one Actor's with `actorId`, in every status, newest
+    first, pointing at the newest failed one) and `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
     shared `waitSecs` field, the shared build response and the by-status next-step text.
   - `docs/` — search and fetch Apify docs.
