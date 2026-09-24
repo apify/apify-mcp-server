@@ -15,7 +15,9 @@ const getActorBuildListArgs = z.object({
         .string()
         .min(1)
         .optional()
-        .describe('Only list builds of this Actor; accepts an Actor ID or username/name.'),
+        .describe(
+            'Only list builds of this Actor: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
+        ),
     offset: z.number().int().min(0).describe('Number of builds to skip at the start. Default: 0.').default(0),
     limit: z
         .number()
