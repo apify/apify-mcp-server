@@ -11,8 +11,9 @@
     "license": "ISC",
     "description": "",
     "dependencies": {
-        "@apify/ui-icons": "^1.27.2",
-        "@apify/ui-library": "^1.124.0",
+        "@apify/mcp-widgets": "^0.3.0",
+        "@apify/ui-icons": "^1.52.0",
+        "@apify/ui-library": "^1.165.13",
         "@modelcontextprotocol/ext-apps": "^1.1.2",
         "pluralize": "^8.0.0",
         "react": "^18.3.1",

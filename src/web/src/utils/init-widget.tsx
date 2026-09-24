@@ -1,14 +1,16 @@
 import '../index.css';
 
 import type { McpUiStyles, McpUiTheme } from '@modelcontextprotocol/ext-apps';
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from 'styled-components';
 
+import { type WidgetHost, WidgetHostProvider } from '@apify/mcp-widgets';
 import { UiDependencyProvider } from '@apify/ui-library';
 import { cssColorsVariablesLight, cssColorsVariablesDark } from '@apify/ui-library';
 
 import { McpAppProvider, useMcpApp, type RefetchToolForArgs } from '../context/mcp-app-context';
+import { useMaxHeight } from '../hooks/use-max-height';
 
 function applyDocumentTheme(theme: McpUiTheme): void {
     document.documentElement.setAttribute('data-theme', theme);
@@ -77,6 +79,23 @@ const ThemeSync: React.FC = () => {
     }, [hostContext?.theme]);
 
     return null;
+};
+
+/** Exposes the MCP Apps host to the `@apify/mcp-widgets` components. */
+const McpWidgetHost: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { app } = useMcpApp();
+    const maxHeight = useMaxHeight();
+    const host = useMemo<WidgetHost>(
+        () => ({
+            openLink: (url) => void app?.openLink({ url }),
+            requestDisplayMode: async (mode) => {
+                await app?.requestDisplayMode({ mode });
+            },
+            maxHeight: maxHeight ?? undefined,
+        }),
+        [app, maxHeight],
+    );
+    return <WidgetHostProvider host={host}>{children}</WidgetHostProvider>;
 };
 
 /**
@@ -190,7 +209,9 @@ export const renderWidget = (Component: React.FC, options?: { refetchToolForArgs
                 <UiDependencyProvider dependencies={dependencies as any}>
                     <McpAppProvider refetchToolForArgs={options?.refetchToolForArgs}>
                         <ThemeSync />
-                        <Component />
+                        <McpWidgetHost>
+                            <Component />
+                        </McpWidgetHost>
                     </McpAppProvider>
                 </UiDependencyProvider>
             </ThemeProvider>,
