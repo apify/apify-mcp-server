@@ -693,6 +693,57 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.tip).not.toHaveProperty('level');
     });
 
+    it('surfaces recommendedActorId when the TIP record names one', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: {
+                message: 'Use the Instagram Scraper instead.',
+                level: 'info',
+                recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+            },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({
+            message: 'Use the Instagram Scraper instead.',
+            level: 'info',
+            recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+        });
+    });
+
+    it('omits recommendedActorId when the TIP record does not name one', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'General advice, no specific Actor.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).not.toHaveProperty('recommendedActorId');
+    });
+
+    it('discards a non-string recommendedActorId instead of surfacing a malformed value', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'Use a specialized Actor.', level: 'info', recommendedActorId: 12345 },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({ message: 'Use a specialized Actor.', level: 'info' });
+        expect(structuredContent.tip).not.toHaveProperty('recommendedActorId');
+    });
+
     it('renders the tip in a fenced code block in the text response', async () => {
         const { client } = makeKvStoreClient({
             displayedKeys: [{ key: 'TIP' }],

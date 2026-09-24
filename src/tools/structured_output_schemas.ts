@@ -523,6 +523,11 @@ export const actorRunOutputSchema = {
                     enum: ['info', 'warning'],
                     description: 'Omitted when the Actor wrote an unrecognized level',
                 },
+                recommendedActorId: {
+                    type: 'string',
+                    description:
+                        'Apify Actor ID the tip recommends running next, when it names one — pass directly as `actor` to call-actor or fetch-actor-details',
+                },
             },
             required: ['message'],
         },
