@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Add get-actor-build and get-actor-build-log tools ([#1331](https://github.com/apify/apify-mcp-server/pull/1331)) ([3c1744b](https://github.com/apify/apify-mcp-server/commit/3c1744bb3df41a2ee3a3485e06f57c75f9cc39cd)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1352](https://github.com/apify/apify-mcp-server/issues/1352)
 - Run against a non-production platform with matching links ([#1422](https://github.com/apify/apify-mcp-server/pull/1422)) ([5199c88](https://github.com/apify/apify-mcp-server/commit/5199c8841c827fb4fd8f7410e1b423f7beea27c3)) by [@mfori](https://github.com/mfori)
+- Add build-actor tool ([#1332](https://github.com/apify/apify-mcp-server/pull/1332)) ([624dbd1](https://github.com/apify/apify-mcp-server/commit/624dbd1d5470d1956d0441244a7d17203a51ff54)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1353](https://github.com/apify/apify-mcp-server/issues/1353)
 
 ### 🐛 Bug Fixes
 
