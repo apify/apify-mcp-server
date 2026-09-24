@@ -202,11 +202,15 @@ export function expectNormalModeTestStructuredContent(result: unknown): void {
     expect(narrative).not.toContain('Apify Console:');
 }
 
-/** Assert Apify usage-cost `_meta` shape. */
+/** Assert Apify usage-cost `_meta` shape and that `structuredContent.usageTotalUsd` mirrors it. */
 export function expectUsageCostMeta(result: unknown): void {
     const resultWithMeta = result as {
         _meta?: { 'com.apify/ActorRun'?: { usageTotalUsd?: number; usageUsd?: Record<string, number> } };
+        structuredContent?: { usageTotalUsd?: number };
     };
+    expect(resultWithMeta.structuredContent?.usageTotalUsd).toBe(
+        resultWithMeta._meta?.['com.apify/ActorRun']?.usageTotalUsd,
+    );
     expect(resultWithMeta._meta).toBeDefined();
     const actorRun = resultWithMeta._meta?.['com.apify/ActorRun'];
     expect(actorRun).toBeDefined();

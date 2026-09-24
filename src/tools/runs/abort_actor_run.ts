@@ -66,6 +66,7 @@ USAGE EXAMPLES:
             startedAt: toIsoString(run.startedAt),
             finishedAt: toIsoString(run.finishedAt),
             stats: buildStats(run),
+            usageTotalUsd: run.usageTotalUsd ?? undefined,
             storages: {
                 ...(dataset && { datasets: { default: dataset } }),
                 ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),

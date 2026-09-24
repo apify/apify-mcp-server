@@ -146,6 +146,8 @@ export type RunResponse = {
         computeUnits?: number;
         memMaxBytes?: number;
     };
+    /** Total run cost in USD; mirrors `_meta['com.apify/ActorRun'].usageTotalUsd` for clients that only read structuredContent. */
+    usageTotalUsd?: number;
     storages: RunStorages;
     summary: string;
     nextStep: string;
@@ -907,6 +909,7 @@ export async function fetchActorRunData(params: {
         startedAt: toIsoString(run.startedAt),
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
+        usageTotalUsd: run.usageTotalUsd ?? undefined,
         storages: {
             ...(datasets && { datasets }),
             ...(keyValueStores && { keyValueStores }),
