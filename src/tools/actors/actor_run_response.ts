@@ -146,7 +146,7 @@ export type RunResponse = {
         computeUnits?: number;
         memMaxBytes?: number;
     };
-    /** Total run cost in USD; mirrors `_meta['com.apify/ActorRun'].usageTotalUsd` for clients that only read structuredContent. */
+    /** Total run cost in USD, from the Apify run record. */
     usageTotalUsd?: number;
     storages: RunStorages;
     summary: string;
