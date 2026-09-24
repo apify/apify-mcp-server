@@ -145,24 +145,6 @@ export const formatNumber = (num: number): string => {
     }
 };
 
-export const formatDuration = (startedAt: string, finishedAt?: string): string => {
-    const start = new Date(startedAt).getTime();
-    const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
-    const durationMs = end - start;
-
-    const seconds = Math.floor(durationMs / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    if (hours > 0) {
-        return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-    }
-    if (minutes > 0) {
-        return `${minutes}m ${seconds % 60}s`;
-    }
-    return `${seconds}s`;
-};
-
 export const formatBytes = (bytes: number): string => {
     if (bytes >= 1024 * 1024 * 1024) {
         return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
@@ -181,30 +163,4 @@ export const formatDecimalNumber = (value: number): string => {
         return value.toString();
     }
     return value.toFixed(1);
-};
-
-export const formatTimestamp = (dateString: string): string => {
-    const date = new Date(dateString);
-
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
-};
-
-/**
- * Converts a technical name (kebab-case) to a human-readable format (Title Case).
- * Example: "python-example" -> "Python Example"
- *
- * @param technicalName - The technical name to humanize (e.g., "my-actor-name")
- * @returns The humanized name with each word capitalized (e.g., "My Actor Name")
- */
-export const humanizeActorName = (technicalName: string): string => {
-    return technicalName
-        .split('-')
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
 };

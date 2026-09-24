@@ -1,109 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import styled from 'styled-components';
 
-import { CheckIcon, CrossIcon, LoaderIcon } from '@apify/ui-icons';
-import { ActorAvatar, Badge, Button, Text, theme, type BadgeVariant } from '@apify/ui-library';
+import { type ActorRunOutput, ActorRunWidget } from '@apify/mcp-widgets';
 
-import { WidgetLayout } from '../../components/layout/WidgetLayout';
 import { useMcpApp } from '../../context/mcp-app-context';
 import { useWidgetProps } from '../../hooks/use-widget-props';
 import { extractActorRunErrorMessage, ACTOR_RUN_META_KEY } from '../../utils/actor-run';
-import { formatDuration, formatTimestamp, humanizeActorName } from '../../utils/formatting';
-import { TableSkeleton } from './ActorRun.skeleton';
 
-interface ActorRunData {
-    runId: string;
-    actorName: string;
-    actorFullName: string; // Full name with username (e.g., "apify/rag-web-browser")
-    actorDeveloperUsername: string;
-    status: string;
-    cost?: number;
-    timestamp: string;
-    duration: string;
-    startedAt?: string;
-    finishedAt?: string;
-    stats?: {
-        computeUnits?: number;
-    };
-    /** Identifier + count only. Item bodies are fetched separately via get-dataset-items. */
-    dataset?: {
-        id: string;
-        itemCount?: number;
-    };
-}
-
-/**
- * Shape from get-actor-run / get-actor-run-widget.
- * storages mirrors ActorRunStorageIds: alias-map where "default" is always the primary entry,
- * extended with fetched metadata. Named Actor storages occupy additional alias keys.
- * Item bodies are not inlined — fetch via get-dataset-items.
- */
-interface ToolOutput extends Record<string, unknown> {
-    runId?: string;
-    actorId?: string;
-    actorName?: string;
-    status?: string;
-    startedAt?: string;
-    finishedAt?: string;
-    stats?: any;
-    storages?: {
-        datasets?: {
-            default: { id: string; itemCount?: number; fields?: string[] };
-            [alias: string]: { id: string; itemCount?: number; fields?: string[] };
-        };
-        keyValueStores?: {
-            default: { id: string; keys?: string[]; keyCount?: number };
-            [alias: string]: { id: string; keys?: string[]; keyCount?: number };
-        };
-    };
-}
+/** A `get-actor-run` / `call-actor` result: the run itself plus the cost the server sends in `_meta`. */
+type RunSnapshot = {
+    output: ActorRunOutput;
+    costUsd?: number;
+};
 
 const TERMINAL_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']);
 const delay = async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const getStatusVariant = (status: string): BadgeVariant => {
-    switch (status.toUpperCase()) {
-        case 'SUCCEEDED':
-            return 'success';
-        case 'FAILED':
-        case 'ABORTED':
-        case 'TIMED-OUT':
-            return 'danger';
-        case 'RUNNING':
-        case 'READY':
-            return 'primary_blue';
-        default:
-            return 'neutral';
-    }
-};
+type ActorRunMeta = { [key in typeof ACTOR_RUN_META_KEY]?: { usageTotalUsd?: number } } | null | undefined;
 
-const getStatusVariantLeadingIcon = (status: string) => {
-    switch (status.toUpperCase()) {
-        case 'SUCCEEDED':
-            return CheckIcon;
-        case 'FAILED':
-        case 'ABORTED':
-        case 'TIMED-OUT':
-            return CrossIcon;
-        case 'RUNNING':
-        case 'READY':
-            return LoaderIcon;
-        default:
-            return undefined;
-    }
-};
+function extractUsageTotalUsd(meta: ActorRunMeta): number | undefined {
+    const value = meta?.[ACTOR_RUN_META_KEY]?.usageTotalUsd;
+    return typeof value === 'number' ? value : undefined;
+}
 
-const extractActorName = (fullActorName: string): string => {
-    // Extract actor name without username prefix (e.g., "apify/python-example" -> "python-example")
-    const actorNameParts = fullActorName.split('/');
-    return actorNameParts.length > 1 ? actorNameParts[1] : fullActorName;
-};
-
-const extractDeveloperUsername = (fullActorName: string): string => {
-    // Extract developer username from full name (e.g., "apify/python-example" -> "apify")
-    const actorNameParts = fullActorName.split('/');
-    return actorNameParts.length > 1 ? actorNameParts[0] : 'unknown';
-};
+const getDataset = (output: ActorRunOutput) => output.storages?.datasets?.default;
 
 /**
  * Resolves runId from URL query parameter (?runId=xxx).
@@ -117,241 +36,34 @@ function getRunIdFromUrl(): string | null {
     return runId?.trim() || null;
 }
 
-const Container = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${theme.space.space8};
-    width: 100%;
-    background: ${theme.color.neutral.background};
-    border: 1px solid ${theme.color.neutral.separatorSubtle};
-    border-radius: ${theme.radius.radius12};
-    padding: ${theme.space.space16};
-`;
-
-const ActorHeader = styled.div`
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: ${theme.space.space12};
-    width: 100%;
-    min-height: 24px;
-`;
-
-const ActorNameLink = styled.a`
-    color: ${theme.color.neutral.text};
-    text-decoration: underline;
-    text-decoration-color: ${theme.color.neutral.text};
-    cursor: pointer;
-    ${theme.typography.shared.desktop.bodyMMedium};
-
-    &:hover {
-        color: ${theme.color.primary.action};
-        text-decoration-color: ${theme.color.primary.action};
-    }
-`;
-
-const MetadataRow = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${theme.space.space8};
-    flex-wrap: nowrap;
-`;
-
-const Divider = styled.span`
-    color: ${theme.color.neutral.textMuted};
-    font-size: 12px;
-    transform: rotate(0deg);
-    display: flex;
-    align-items: center;
-`;
-
-const TableContainer = styled.div`
-    width: 100%;
-    overflow-x: auto;
-    overflow-y: auto;
-    border: 1px solid ${theme.color.neutral.separatorSubtle};
-    border-radius: ${theme.radius.radius12};
-    background: ${theme.color.neutral.background};
-    position: relative;
-    max-height: 265px;
-`;
-
-const TableGradientOverlay = styled.div`
-    position: sticky;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 86px;
-    margin-top: -86px;
-    background: linear-gradient(178.84deg, transparent 13.4%, ${theme.color.neutral.background} 81.59%);
-    pointer-events: none;
-    border-radius: 0 0 ${theme.radius.radius12} ${theme.radius.radius12};
-    z-index: 2;
-`;
-
-const Table = styled.table`
-    width: 100%;
-    border-collapse: collapse;
-`;
-
-const TableHeader = styled.thead`
-    background: ${theme.color.neutral.backgroundMuted};
-    position: sticky;
-    top: 0;
-    z-index: 1;
-`;
-
-const TableHeaderCell = styled.th`
-    text-align: left;
-    padding: ${theme.space.space8} ${theme.space.space16};
-    ${theme.typography.shared.desktop.titleXs};
-    color: ${theme.color.neutral.textMuted};
-    white-space: nowrap;
-    border-right: 1px solid ${theme.color.neutral.separatorSubtle};
-    border-bottom: 1px solid ${theme.color.neutral.separatorSubtle};
-
-    &:last-child {
-        border-right: none;
-    }
-`;
-
-const TableBody = styled.tbody``;
-
-const TableRow = styled.tr`
-    border-bottom: 1px solid ${theme.color.neutral.separatorSubtle};
-
-    &:last-child {
-        border-bottom: none;
-    }
-`;
-
-const TableCell = styled.td`
-    padding: ${theme.space.space10} ${theme.space.space16};
-    color: ${theme.color.neutral.textMuted};
-    ${theme.typography.shared.desktop.bodyMMedium};
-    max-width: 240px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    border-right: 1px solid ${theme.color.neutral.separatorSubtle};
-    background: ${theme.color.neutral.background};
-
-    &:last-child {
-        border-right: none;
-    }
-`;
-
-const Footer = styled.div`
-    display: flex;
-    align-items: center;
-`;
-
-const EmptyStateContainer = styled.div`
-    padding: ${theme.space.space24} ${theme.space.space16};
-    text-align: center;
-    color: ${theme.color.neutral.textMuted};
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: ${theme.space.space8};
-`;
-
-const ActorInfoRow = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${theme.space.space16};
-    height: 24px;
-`;
-
-const ActorNameWithIcon = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${theme.space.space6};
-`;
-
-const StatusMetadataContainer = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${theme.space.space16};
-    flex-wrap: nowrap;
-    overflow: hidden;
-    flex: 1;
-`;
-
-const MetadataText = styled(Text)`
-    color: ${theme.color.neutral.text};
-    font-weight: 500;
-`;
-
-const SuccessMessage = styled.p`
-    ${theme.typography.shared.desktop.bodyM};
-    color: ${theme.color.neutral.text};
-    margin: 0;
-`;
-
-type ActorRunMeta = { [key in typeof ACTOR_RUN_META_KEY]?: { usageTotalUsd?: number } } | null | undefined;
-
-function extractUsageTotalUsd(meta: ActorRunMeta): number | undefined {
-    const value = meta?.[ACTOR_RUN_META_KEY]?.usageTotalUsd;
-    return typeof value === 'number' ? value : undefined;
-}
-
-function extractDatasetSummary(toolOutput: ToolOutput): ActorRunData['dataset'] {
-    const ds = toolOutput.storages?.datasets?.default;
-    if (!ds?.id) return undefined;
-    return { id: ds.id, itemCount: ds.itemCount };
-}
-
-function toolOutputToRunData(toolOutput: ToolOutput, meta?: ActorRunMeta): ActorRunData {
-    // READY runs have no `startedAt`. Feeding `undefined` into formatDuration/formatTimestamp
-    // yields "NaN-NaN-NaN NaN:NaN" / "NaNs"; render an em-dash placeholder instead.
-    const { startedAt, finishedAt } = toolOutput;
-    const duration = startedAt ? formatDuration(startedAt, finishedAt) : '—';
-    const timestamp = startedAt ? formatTimestamp(startedAt) : '—';
-    const fullActorName = (toolOutput.actorName as string) || 'Unknown Actor';
-    const actorNameOnly = extractActorName(fullActorName);
-    const humanizedName = humanizeActorName(actorNameOnly);
-    const developerUsername = extractDeveloperUsername(fullActorName);
-    const usageTotalUsd = extractUsageTotalUsd(meta);
-    return {
-        runId: toolOutput.runId!,
-        actorName: humanizedName,
-        actorFullName: fullActorName,
-        actorDeveloperUsername: developerUsername,
-        status: (toolOutput.status as string) || 'RUNNING',
-        startedAt,
-        finishedAt,
-        timestamp,
-        duration,
-        cost: usageTotalUsd,
-        stats: toolOutput.stats,
-        dataset: extractDatasetSummary(toolOutput),
-    };
-}
-
 export const ActorRun: React.FC = () => {
     const { app, toolResult } = useMcpApp();
-    const toolOutput = useWidgetProps<ToolOutput>();
+    const toolOutput = useWidgetProps<ActorRunOutput>();
     const toolResponseMetadata = (toolResult?._meta ?? null) as ActorRunMeta;
     const stableRunId = getRunIdFromUrl();
     const toolErrorMessage = extractActorRunErrorMessage(toolResult);
 
-    const [runData, setRunData] = useState<ActorRunData | null>(null);
+    const [run, setRun] = useState<RunSnapshot | null>(null);
     const [pictureUrl, setPictureUrl] = useState<string | undefined>(undefined);
     /**
      * Run response carries identifiers only; item bodies are fetched separately.
      * We fetch a small preview via `get-dataset-items` once the run reaches SUCCEEDED and a datasetId is available.
      */
-    const [previewItems, setPreviewItems] = useState<Record<string, any>[] | null>(null);
+    const [previewItems, setPreviewItems] = useState<Record<string, unknown>[] | null>(null);
 
-    // Initialize runData from toolOutput (call-actor result) or by fetching run when we have a stable runId.
+    const runId = run?.output.runId;
+    const status = (run?.output.status || 'RUNNING').toUpperCase();
+    const actorName = run?.output.actorName;
+    const dataset = run ? getDataset(run.output) : undefined;
+
+    // Initialize the run from toolOutput (call-actor result) or by fetching run when we have a stable runId.
     // When the host overwrites toolResult with another tool (e.g. search-actors), toolOutput has no runId;
     // use runId from URL so this widget still shows the correct run.
     useEffect(() => {
-        if (runData) return;
+        if (run) return;
 
         if (toolOutput?.runId) {
-            setRunData(toolOutputToRunData(toolOutput, toolResponseMetadata));
+            setRun({ output: toolOutput, costUsd: extractUsageTotalUsd(toolResponseMetadata) });
             return;
         }
 
@@ -365,10 +77,9 @@ export const ActorRun: React.FC = () => {
                     arguments: { runId: stableRunId, waitSecs: 0 },
                 });
                 if (cancelled) return;
-                const data = response?.structuredContent as ToolOutput | undefined;
+                const data = response?.structuredContent as ActorRunOutput | undefined;
                 if (data?.runId) {
-                    const meta = response?._meta as ActorRunMeta;
-                    setRunData(toolOutputToRunData(data, meta));
+                    setRun({ output: data, costUsd: extractUsageTotalUsd(response?._meta as ActorRunMeta) });
                 }
             } catch (err) {
                 if (!cancelled) console.error('[ActorRun] Failed to fetch run by runId:', err);
@@ -378,35 +89,31 @@ export const ActorRun: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [toolOutput, runData, toolResponseMetadata, stableRunId, app]);
+    }, [toolOutput, run, toolResponseMetadata, stableRunId, app]);
 
     // Drop a stale preview when the dataset id changes (e.g. host swaps toolResult to a new run).
     useEffect(() => {
         setPreviewItems(null);
-    }, [runData?.dataset?.id]);
+    }, [dataset?.id]);
 
     // Once the run reaches SUCCEEDED, fetch a small preview via get-dataset-items.
     // Run response carries shape + identifiers only; item bodies are fetched via get-dataset-items.
     useEffect(() => {
-        if (!app || !runData) return;
+        if (!app || !runId) return;
         if (previewItems !== null) return;
-        if (runData.status.toUpperCase() !== 'SUCCEEDED') return;
-        if (!runData.dataset?.id || !runData.dataset.itemCount) return;
+        if (status !== 'SUCCEEDED') return;
+        if (!dataset?.id || !dataset.itemCount) return;
 
         let cancelled = false;
         (async () => {
             try {
                 const response = await app.callServerTool({
                     name: 'get-dataset-items',
-                    arguments: { datasetId: runData.dataset!.id, limit: 20, clean: true },
+                    arguments: { datasetId: dataset.id, limit: 20, clean: true },
                 });
                 if (cancelled) return;
-                const content = response?.structuredContent as { items?: Record<string, any>[] } | undefined;
-                if (Array.isArray(content?.items)) {
-                    setPreviewItems(content!.items);
-                } else {
-                    setPreviewItems([]);
-                }
+                const content = response?.structuredContent as { items?: Record<string, unknown>[] } | undefined;
+                setPreviewItems(Array.isArray(content?.items) ? content.items : []);
             } catch (err) {
                 if (!cancelled) {
                     console.error('[ActorRun] Failed to fetch dataset items:', err);
@@ -418,41 +125,36 @@ export const ActorRun: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [app, runData?.status, runData?.dataset?.id, runData?.dataset?.itemCount, previewItems]);
+    }, [app, runId, status, dataset?.id, dataset?.itemCount, previewItems]);
 
     // Fetch actor details to get pictureUrl
     useEffect(() => {
-        if (!app || !runData?.actorFullName || pictureUrl !== undefined) return;
+        if (!app || !actorName || pictureUrl !== undefined) return;
 
         const fetchActorDetails = async () => {
             try {
                 const response = await app.callServerTool({
                     name: 'fetch-actor-details',
-                    arguments: { actor: runData.actorFullName },
+                    arguments: { actor: actorName },
                 });
 
-                if (response?.structuredContent) {
-                    const content = response.structuredContent as Record<string, any>;
-                    if (content.actorInfo) {
-                        const actorInfo = content.actorInfo as { pictureUrl?: string };
-                        setPictureUrl(actorInfo.pictureUrl);
-                    }
-                }
+                const actorInfo = (response?.structuredContent as { actorInfo?: { pictureUrl?: string } } | undefined)
+                    ?.actorInfo;
+                if (actorInfo) setPictureUrl(actorInfo.pictureUrl);
             } catch (err) {
                 console.error('[ActorRun] Failed to fetch actor details:', err);
             }
         };
 
         fetchActorDetails();
-    }, [runData?.actorFullName, pictureUrl, app]);
+    }, [actorName, pictureUrl, app]);
 
     // Auto-polling: Fetch status updates automatically with gradual escalation
     useEffect(() => {
-        if (!app || !runData?.runId) return;
-
-        const status = (runData.status || '').toUpperCase();
+        if (!app || !run?.output.runId) return;
         if (TERMINAL_STATUSES.has(status)) return;
 
+        const current = run;
         let isCancelled = false;
         let pollCount = 0;
         let consecutiveErrors = 0;
@@ -472,44 +174,40 @@ export const ActorRun: React.FC = () => {
                     // waitSecs: 0 keeps each refresh non-blocking; the widget polls on its own cadence.
                     const response = await app.callServerTool({
                         name: 'get-actor-run',
-                        arguments: { runId: runData.runId, waitSecs: 0 },
+                        arguments: { runId: current.output.runId, waitSecs: 0 },
                     });
 
                     if (response.structuredContent) {
-                        const newData = response.structuredContent as unknown as ToolOutput;
-                        const meta = response._meta as ActorRunMeta;
-                        const computed = toolOutputToRunData(newData, meta);
-                        // Preserve all name-derived fields when the response omits actorName, so a
-                        // transient actor-name lookup miss doesn't flip the widget to "Unknown Actor"
-                        // when the previous run snapshot already had a known name.
-                        const updatedRunData: ActorRunData = newData.actorName
-                            ? computed
-                            : {
-                                  ...computed,
-                                  actorName: runData.actorName,
-                                  actorFullName: runData.actorFullName,
-                                  actorDeveloperUsername: runData.actorDeveloperUsername,
-                              };
+                        const newOutput = response.structuredContent as ActorRunOutput;
+                        const updated: RunSnapshot = {
+                            // Keep the known name when the response omits actorName, so a transient
+                            // actor-name lookup miss doesn't flip the widget to "Unknown Actor".
+                            output: newOutput.actorName
+                                ? newOutput
+                                : { ...newOutput, actorName: current.output.actorName },
+                            costUsd: extractUsageTotalUsd(response._meta as ActorRunMeta),
+                        };
 
                         // Skip the state update when nothing visible changed; otherwise every poll
                         // forces a re-render with identical data.
+                        const previousDataset = getDataset(current.output);
+                        const updatedDataset = getDataset(updated.output);
                         if (
-                            updatedRunData.status !== runData.status ||
-                            updatedRunData.finishedAt !== runData.finishedAt ||
-                            updatedRunData.dataset?.id !== runData.dataset?.id ||
-                            updatedRunData.dataset?.itemCount !== runData.dataset?.itemCount ||
-                            updatedRunData.cost !== runData.cost
+                            updated.output.status !== current.output.status ||
+                            updated.output.finishedAt !== current.output.finishedAt ||
+                            updatedDataset?.id !== previousDataset?.id ||
+                            updatedDataset?.itemCount !== previousDataset?.itemCount ||
+                            updated.costUsd !== current.costUsd
                         ) {
-                            setRunData(updatedRunData);
+                            setRun(updated);
                         }
 
-                        const newStatus = updatedRunData.status.toUpperCase();
+                        const newStatus = (updated.output.status || '').toUpperCase();
                         if (TERMINAL_STATUSES.has(newStatus)) {
-                            const ds = updatedRunData.dataset;
                             const ctx = [
-                                `Actor run ${runData.runId} finished with status: ${newStatus}.`,
-                                ds?.id ? `Dataset ID: ${ds.id}` : null,
-                                ds?.itemCount != null ? `Items scraped: ${ds.itemCount}` : null,
+                                `Actor run ${current.output.runId} finished with status: ${newStatus}.`,
+                                updatedDataset?.id ? `Dataset ID: ${updatedDataset.id}` : null,
+                                updatedDataset?.itemCount != null ? `Items scraped: ${updatedDataset.itemCount}` : null,
                             ]
                                 .filter(Boolean)
                                 .join(' ');
@@ -539,151 +237,18 @@ export const ActorRun: React.FC = () => {
         return () => {
             isCancelled = true;
         };
-    }, [runData?.runId, runData?.status, app]);
+    }, [runId, status, app]);
 
-    if (!runData) {
-        return (
-            <WidgetLayout>
-                <Container>
-                    <EmptyStateContainer>
-                        {toolErrorMessage ? (
-                            <>
-                                <Badge variant="danger" size="small" LeadingIcon={CrossIcon}>
-                                    Failed
-                                </Badge>
-                                <Text type="body" size="small" style={{ color: theme.color.neutral.text }}>
-                                    {toolErrorMessage}
-                                </Text>
-                            </>
-                        ) : (
-                            <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
-                                Loading Actor run data ...
-                            </Text>
-                        )}
-                    </EmptyStateContainer>
-                </Container>
-            </WidgetLayout>
-        );
-    }
-
-    const statusUpper = runData.status.toUpperCase();
-    const columns = previewItems && previewItems.length > 0 ? Object.keys(previewItems[0]) : [];
-    // Show the skeleton while running OR while the preview fetch is in flight on a fresh SUCCEEDED.
-    const showSkeleton =
-        statusUpper === 'RUNNING' ||
-        (statusUpper === 'SUCCEEDED' && (runData.dataset?.itemCount ?? 0) > 0 && previewItems === null);
-
-    const handleOpenRun = () => {
-        if (runData && app) {
-            app.openLink({ url: `https://console.apify.com/actors/runs/${runData.runId}` });
-        }
-    };
-
-    const handleOpenActor = () => {
-        if (runData && app) {
-            app.openLink({ url: `https://apify.com/${runData.actorFullName}` });
-        }
-    };
+    // No preview to load for a run that produced nothing.
+    const hasNoItems = status === 'SUCCEEDED' && !dataset?.itemCount;
 
     return (
-        <WidgetLayout>
-            <Container>
-                <ActorHeader>
-                    <ActorInfoRow>
-                        <ActorNameWithIcon>
-                            <ActorAvatar size={20} name={runData.actorName} url={pictureUrl} />
-                            <ActorNameLink onClick={handleOpenActor}>{runData.actorName}</ActorNameLink>
-                        </ActorNameWithIcon>
-
-                        <StatusMetadataContainer>
-                            <Badge
-                                variant={getStatusVariant(runData.status)}
-                                size="small"
-                                LeadingIcon={getStatusVariantLeadingIcon(runData.status)}
-                            >
-                                {runData.status.charAt(0) + runData.status.slice(1).toLowerCase()}
-                            </Badge>
-                            <MetadataRow>
-                                {typeof runData.cost === 'number' && (
-                                    <>
-                                        <MetadataText type="body" size="small" as="span">
-                                            ${runData.cost.toFixed(3)}
-                                        </MetadataText>
-                                        <Divider>|</Divider>
-                                    </>
-                                )}
-                                <MetadataText type="body" size="small" as="span">
-                                    {runData.timestamp}
-                                </MetadataText>
-                                <Divider>|</Divider>
-                                <MetadataText type="body" size="small" as="span">
-                                    {runData.duration}
-                                </MetadataText>
-                            </MetadataRow>
-                        </StatusMetadataContainer>
-                    </ActorInfoRow>
-                    {/* TODO (KH): add expand view in next step */}
-                    {/* <IconButton Icon={ExpandIcon} onClick={() => setIsExpanded(!isExpanded)} /> */}
-                </ActorHeader>
-
-                {previewItems && previewItems.length > 0 ? (
-                    <TableContainer>
-                        <Table>
-                            <TableHeader>
-                                <tr>
-                                    {columns.map((column) => (
-                                        <TableHeaderCell key={column}>
-                                            {column.charAt(0).toUpperCase() + column.slice(1)}
-                                        </TableHeaderCell>
-                                    ))}
-                                </tr>
-                            </TableHeader>
-                            <TableBody>
-                                {previewItems.map((item, index) => (
-                                    <TableRow key={index}>
-                                        {columns.map((column) => (
-                                            <TableCell key={column}>
-                                                {item[column] == null
-                                                    ? '—'
-                                                    : // If the value is an object, show number of fields instead of [object Object]
-                                                      typeof item[column] === 'object'
-                                                      ? `${Object.keys(item[column]).length} fields`
-                                                      : String(item[column]) || '—'}
-                                            </TableCell>
-                                        ))}
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                        {previewItems.length > 3 && <TableGradientOverlay />}
-                    </TableContainer>
-                ) : showSkeleton ? (
-                    <TableSkeleton />
-                ) : (
-                    <EmptyStateContainer>
-                        {statusUpper === 'READY' ? (
-                            <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
-                                The Actor is ready to run.
-                            </Text>
-                        ) : (
-                            <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
-                                No results available.
-                            </Text>
-                        )}
-                    </EmptyStateContainer>
-                )}
-                <Footer>
-                    <Button onClick={handleOpenRun} variant="secondary" size="small">
-                        View on Apify
-                    </Button>
-                </Footer>
-            </Container>
-            {statusUpper === 'SUCCEEDED' && runData.dataset?.itemCount && runData.dataset.itemCount > 0 && (
-                <SuccessMessage>
-                    The {runData.actorName} found {runData.dataset.itemCount} result
-                    {runData.dataset.itemCount !== 1 ? 's' : ''}. You can visit results via the provided link.
-                </SuccessMessage>
-            )}
-        </WidgetLayout>
+        <ActorRunWidget
+            output={run?.output ?? null}
+            errorMessage={toolErrorMessage}
+            costUsd={run?.costUsd}
+            pictureUrl={pictureUrl}
+            previewItems={hasNoItems ? [] : previewItems}
+        />
     );
 };
