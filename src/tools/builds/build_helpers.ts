@@ -1,16 +1,22 @@
-import type { Build } from 'apify-client';
+import type { Actor, ActorBuildOptions, Build } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS } from '../../const.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import { buildConsoleBuildUrl } from '../../utils/console_link.js';
+import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondOk } from '../../utils/mcp.js';
 import type { ProgressTracker } from '../../utils/progress.js';
 import { formatBuildStatusMessage, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { ABORT, raceAbort, toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
+
+/** The MAJOR.MINOR numbers of the Actor's versions; a version document without one is skipped. */
+export function listVersionNumbers(actor: Pick<Actor, 'versions'>): string[] {
+    return actor.versions.flatMap((version) => version.versionNumber ?? []);
+}
 
 /** The build tools wait this long by default, the same as `get-actor-run` and `call-actor`, so a loop of build and run calls behaves alike. */
 export const BUILD_WAIT_SECS_DEFAULT = 30;
@@ -51,16 +57,63 @@ export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | un
 }
 
 /**
+ * Aborts a build the tool started when the client cancels the request, the way `call-actor` aborts its
+ * run. Failures are logged and swallowed so a transient API error does not override the cancellation.
+ */
+async function abortBuildOnSignal(buildId: string, client: ApifyClient): Promise<void> {
+    await client
+        .build(buildId)
+        .abort()
+        .catch((error: unknown) => {
+            logHttpError(error, 'Error aborting Actor build', { buildId });
+        });
+}
+
+/**
+ * Starts a build of an Actor version and waits up to `waitSecs` for it to finish, reporting progress
+ * meanwhile. The wait is raced against `signal`; a cancelled request aborts the build it started and
+ * resolves to {@link ABORT}, so a build nobody waits for does not run on, the same as `call-actor`
+ * does with its run.
+ */
+export async function startBuild(
+    client: ApifyClient,
+    actorId: string,
+    versionNumber: string,
+    options: {
+        tag?: string;
+        useCache: boolean;
+        waitSecs: number;
+        signal?: AbortSignal;
+        progressTracker?: ProgressTracker | null;
+    },
+): Promise<Build | typeof ABORT> {
+    const { tag, useCache, waitSecs, signal, progressTracker } = options;
+    const started = await client
+        .actor(actorId)
+        .build(versionNumber, { ...(tag !== undefined && { tag }), useCache } satisfies ActorBuildOptions);
+    // The cancel can arrive while the start call is in flight; the build exists by then.
+    if (signal?.aborted) {
+        await abortBuildOnSignal(started.id, client);
+        return ABORT;
+    }
+    if (waitSecs === 0) return started;
+    const finished = await waitForBuild(client, started, { waitSecs, signal, progressTracker });
+    if (finished === ABORT) await abortBuildOnSignal(started.id, client);
+    return finished;
+}
+
+/**
  * The one next step after a build reaches `status`, shared by every tool that reports a build.
  * Sibling tools are named only when the session was served them (`loadedToolNames`), and each hint
- * keeps a fallback so the text is never a dead end. `nonTerminalNextStep` comes from the caller
- * because only the calling tool may name itself ("call this tool again").
+ * keeps a fallback so the text is never a dead end. A still-running build points at get-actor-build;
+ * only get-actor-build itself passes `nonTerminalNextStep`, because only the calling tool may name
+ * itself ("call this tool again").
  */
 export function buildNextStepForBuild(
     build: Pick<Build, 'id' | 'buildNumber' | 'status'>,
-    options: { loadedToolNames: readonly string[]; nonTerminalNextStep: string },
+    options: { loadedToolNames: readonly string[]; nonTerminalNextStep?: string },
 ): string {
-    const { loadedToolNames, nonTerminalNextStep } = options;
+    const { loadedToolNames } = options;
     if (build.status === 'SUCCEEDED') {
         return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)
             ? `Run the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to ${build.buildNumber}.`
@@ -71,7 +124,10 @@ export function buildNextStepForBuild(
             ? `Read the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId ${build.id}; pass lines 0 for the whole log.`
             : 'Read the build log for the error, fix the source, and build again.';
     }
-    return nonTerminalNextStep;
+    if (options.nonTerminalNextStep !== undefined) return options.nonTerminalNextStep;
+    return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET)
+        ? `Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId ${build.id} (it waits up to ${WAIT_SECS_MAX} seconds per call).`
+        : 'The build is still running; check its status again in a few seconds.';
 }
 
 /**

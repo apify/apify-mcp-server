@@ -20,6 +20,7 @@ import { SERVER_MODE } from '../types.js';
 import { callActor } from './actors/call_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
 import { searchActors } from './actors/search_actors.js';
+import { buildActor } from './builds/build_actor.js';
 import { getActorBuild } from './builds/get_actor_build.js';
 import { getActorBuildLog } from './builds/get_actor_build_log.js';
 import { reportProblem } from './dev/report_problem.js';
@@ -68,7 +69,7 @@ export const toolCategories = {
     ],
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
-    builds: [getActorBuild, getActorBuildLog],
+    builds: [getActorBuild, getActorBuildLog, buildActor],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 
