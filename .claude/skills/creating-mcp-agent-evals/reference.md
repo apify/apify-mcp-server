@@ -25,6 +25,7 @@ pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/
 - `<m>` above is any agent model; pick it off this ladder rather than a default in the examples: `claude-opus-5` (calibration) → `claude-sonnet-5` → `claude-haiku-4-5` (the CLI default, and the sensitive probe). A chained shell command's exit code is the LAST run's — read each log's `📊` line, not the chain status.
 - Known flakes, retry the single item once before diagnosing: `🔥 Never completed (task threw)` (harness/SDK spawn); in remote/sandboxed environments, the agent reading "MCP servers still connecting" and falling back to built-ins (doesn't reproduce locally).
 - Between runs of suites that create named resources: `pnpm run evals:mcp-agent:tasks-fixtures` (adapt per family) deletes leftover `eval-*` resources and reseeds the permanent fixture. Web-target families that create no named state need no fixtures script — say so in the README instead.
+- After a run of the schedules family, delete what it created: `pnpm run evals:mcp-agent:schedules-fixtures -- --run-id <id>`, with the id the run's summary printed. CI passes `<github.run_id>-<github.run_attempt>` to the run and to its teardown step.
 
 ## Dataset item shape (Langfuse)
 
@@ -32,12 +33,13 @@ pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/
 {
   "datasetName": "mcp-server-evals-merge",
   "id": "merge/<family>/<tool>-<difficulty>-1",
-  "input": { "query": "<user-language prompt, no tool names>" },
+  "input": { "query": "<user-language prompt, no tool names; a name the case creates ends in -{{uniq}}>" },
   "expectedOutput": "PASS only if <tool> was called with <args> and the final answer states <fact>. FAIL if <specific bad behavior>.",
   "metadata": { "category": "<tool-or-chain>", "kind": "agent", "maxTurns": 10, "tools": ["<family>", "actors"] }
 }
 ```
 
+- `{{uniq}}` in `query` and `expectedOutput` is replaced by the runner with `<runId>-t<trial>`; put it in both or neither, and keep the static part of the name at 35 characters or fewer (63-char platform cap). Not substituted in `expectedArgs`.
 - `datasetName` is one of the two: `mcp-server-evals-merge` for a `kind: "agent"` case, `mcp-server-evals-pr` for a `kind: "tool-call"` one.
 - `metadata` is strict-validated (`langfuse/dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
 - `category` = tool under test (what `--category` filters); difficulty goes in the id's `<slug>` half.
@@ -113,7 +115,9 @@ const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
 ## Fixtures script pattern
 
-One script per stateful family (`evals/scripts/tasks_fixtures.ts` is the template): delete leftover `eval-*` resources except the permanent fixture, create the fixture if missing, and **reset the fixture's mutable state** every run (an eval agent may have mutated it). Wire as `evals:mcp-agent:<family>-fixtures` in package.json.
+One script per stateful family, wired as `evals:mcp-agent:<family>-fixtures` in package.json: create the permanent fixture if missing, **reset its mutable state** every run (an eval agent may have mutated it), and sweep leftovers.
+
+`evals/scripts/schedules_fixtures.ts` is the current template for the sweep: `--run-id <id>` deletes the names that run created (matched as the delimited token `-<id>-t`), and anything unmatched survives until it is older than `LEFTOVER_MAX_AGE_MS` (6 h), so a run still in flight never loses a resource it is asserting on. The rule is a pure function in a side-effect-free sibling module (`evals/scripts/schedules_sweep.ts`), so a unit test imports it without the CLI's `dotenv` load running. `evals/scripts/tasks_fixtures.ts` still sweeps by prefix alone.
 
 ## Coverage matrix (definition of done for the dataset)
 

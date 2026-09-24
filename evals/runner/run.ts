@@ -19,6 +19,7 @@
  *   pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge  # the judged agent items
  *   pnpm run evals:mcp-agent -- --iterations 3      # 3 trials per item, pass@k / pass^k in the summary
  *   pnpm run evals:mcp-agent -- --pass-threshold 0.9 # exit 0 while the aggregate pass rate is >= 0.9
+ *   pnpm run evals:mcp-agent -- --run-id ci-42          # name this run's resources after ci-42
  */
 
 // Must be the first import: config modules read process.env at load time.
@@ -38,12 +39,14 @@ import { ClaudeJudgeClient } from '../judge/claude_client.js';
 import { OpenRouterClient } from '../judge/openrouter_client.js';
 import { fetchMcpAgentCases, MCP_AGENT_PR_DATASET_NAME } from '../langfuse/dataset.js';
 import { initTracing, shutdownTracing } from '../langfuse/tracing.js';
+import { createRunId, validateRunId } from '../run_id.js';
 import {
     buildRunSummary,
     createExperimentTask,
     EVALUATORS,
     expandIterations,
     formatRunSummary,
+    formatTeardownHint,
     resolveExitCode,
     resolveGitBranch,
     validateConcurrency,
@@ -89,6 +92,7 @@ type CliArgs = {
     claudeJudge: boolean;
     iterations: number;
     passThreshold: number;
+    runId?: string;
 };
 
 /** Current git branch, with `resolveGitBranch()`'s CI env fallbacks when git can't name one. */
@@ -176,12 +180,19 @@ async function parseCliArgs(): Promise<ParsedCliArgs> {
                 description: 'Aggregate pass rate (passed trials / requested trials) required to exit 0',
                 default: DEFAULT_PASS_THRESHOLD,
             },
+            'run-id': {
+                type: 'string',
+                description:
+                    'Identifier this run names its resources after ([a-z0-9-]); generated when omitted. ' +
+                    'CI passes <github.run_id>-<github.run_attempt> so its teardown step matches the same names.',
+            },
         })
         // Reject a bad run flag up front, before any LLM spend.
         .check((parsed) => {
             validateConcurrency(parsed.concurrency);
             validateIterations(parsed.iterations);
             validatePassThreshold(parsed['pass-threshold']);
+            if (parsed['run-id'] !== undefined) validateRunId(parsed['run-id']);
             return true;
         })
         .help().argv) as CliArgs;
@@ -229,6 +240,7 @@ async function main() {
     const datasetName = argv.dataset;
 
     let exitCode = 1;
+    let runId: string | undefined;
     try {
         // Read-only: the dataset is the source of truth, edited in the Langfuse UI.
         console.log(`📇 Fetching dataset "${datasetName}"...`);
@@ -245,11 +257,13 @@ async function main() {
         }
         const requestedIds = selected.map((mcpAgentCase) => mcpAgentCase.id);
         const { iterations } = argv;
+        runId = argv.runId ?? createRunId();
         // One experiment.run() call over every requested item x iteration: see
         // expandIterations() for why the Langfuse v4 API forces this shape.
         const data = expandIterations(
             selected.map((mcpAgentCase) => mcpAgentCase.item),
             iterations,
+            runId,
         );
 
         initTracing();
@@ -302,6 +316,7 @@ async function main() {
                 agentAuth: argv.subscription ? 'subscription' : 'api-key',
                 iterations,
                 passThreshold: argv.passThreshold,
+                runId,
             },
         });
 
@@ -318,6 +333,11 @@ async function main() {
         console.error(`❌ Run failed: ${error instanceof Error ? error.message : String(error)}`);
         exitCode = 1;
     } finally {
+        // In the finally: a run that crashed may already have created schedules under this id.
+        if (runId) {
+            for (const { text } of formatTeardownHint(runId)) console.log(text);
+        }
+
         // Flush scores and spans before exit or the last batch is lost. Guarded
         // individually: a failed export must not skip the other flush, and an
         // unhandled rejection here would override the run's exit code.

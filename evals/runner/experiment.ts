@@ -11,6 +11,7 @@ import { evaluateConversation } from '../judge/judge.js';
 import type { DatasetItem, McpAgentItem } from '../langfuse/dataset.js';
 import { parseMcpAgentItem } from '../langfuse/dataset.js';
 import { buildAgentObservations, emitObservations } from '../langfuse/observations.js';
+import { buildRunSuffix } from '../run_id.js';
 import { resolveFirstToolMatch } from './tool_call_mode.js';
 
 /** One failed server tool call. `expected` is true when the item's `expectedErrors` names it. */
@@ -218,12 +219,36 @@ function withIteration(item: DatasetItem, iteration: number): DatasetItem {
     return { ...item, metadata: { ...(item.metadata as Record<string, unknown> | undefined), iteration } };
 }
 
+const UNIQ_MARKER_PATTERN = /\{\{uniq\}\}/g;
+
+/**
+ * Rewrites every `{{uniq}}` in the agent prompt and the judge reference to `suffix`.
+ *
+ * Function replacer, as in judge.ts: `$&` and `` $` `` in a reference would otherwise be read as
+ * replacement patterns.
+ */
+export function substituteUniqMarker(item: DatasetItem, suffix: string): DatasetItem {
+    const substitute = (text: string): string => text.replace(UNIQ_MARKER_PATTERN, () => suffix);
+    // `expectedOutput` is absent on `kind: "tool-call"` items; `input.query` never is.
+    const input = item.input as { query: string };
+    return {
+        ...item,
+        input: { ...input, query: substitute(input.query) },
+        ...(typeof item.expectedOutput === 'string' && { expectedOutput: substitute(item.expectedOutput) }),
+    };
+}
+
 /**
  * Repeats items in one experiment, tagging each copy with its one-based iteration because
- * Langfuse has no native iteration field.
+ * Langfuse has no native iteration field, and resolving each copy's `{{uniq}}` marker so two
+ * trials never name the same resource.
  */
-export function expandIterations(items: DatasetItem[], iterations: number): DatasetItem[] {
-    return items.flatMap((item) => Array.from({ length: iterations }, (_, index) => withIteration(item, index + 1)));
+export function expandIterations(items: DatasetItem[], iterations: number, runId: string): DatasetItem[] {
+    return items.flatMap((item) =>
+        Array.from({ length: iterations }, (_, index) =>
+            substituteUniqMarker(withIteration(item, index + 1), buildRunSuffix(runId, index + 1)),
+        ),
+    );
 }
 
 export function validateIterations(value: number): void {
@@ -312,6 +337,17 @@ export function formatRunSummary(summary: RunSummary, passThreshold: number, ite
     }
 
     return lines;
+}
+
+/**
+ * The run's id and the command that deletes the schedules it created. The runner never deletes them
+ * itself: family-specific cleanup does not belong in the runner every family shares.
+ */
+export function formatTeardownHint(runId: string): RunSummaryLine[] {
+    return [
+        { stream: 'log', text: `🧹 Run id ${runId} — delete this run's schedules:` },
+        { stream: 'log', text: `   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id ${runId}` },
+    ];
 }
 
 /**
