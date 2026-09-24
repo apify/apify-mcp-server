@@ -3,7 +3,13 @@ import type { ActorRun, Dataset, KeyValueClientListKeysResult } from 'apify-clie
 import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { DATASET_SIZE_HINT_BYTES, HELPER_TOOLS, NARROW_OUTPUT_HINT } from '../../const.js';
+import {
+    DATASET_SIZE_HINT_BYTES,
+    HELPER_TOOLS,
+    KV_KEYS_LIMIT,
+    NARROW_OUTPUT_HINT,
+    TIP_MESSAGE_LIMIT,
+} from '../../const.js';
 import { buildActorRunWidgetMeta } from '../../resources/widgets.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import {
@@ -18,8 +24,11 @@ import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } f
 import { cleanEmptyProperties } from '../../utils/schema_generation.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 
-/** Cap on `storages.keyValueStores.default.keys` array length. */
-const KV_KEYS_LIMIT = 50;
+/** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
+const TIP_KVS_KEY = 'TIP';
+
+/** Page size for the targeted `TIP` key lookup (server-side `prefix` filter, not pagination). */
+const TIP_SEARCH_LIMIT = 1000;
 
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
 export const WIDGET_NO_POLL_NEXT_STEP =
@@ -147,6 +156,8 @@ export type RunResponse = {
         memMaxBytes?: number;
     };
     storages: RunStorages;
+    /** Advisory guidance an Actor wrote under the reserved {@link TIP_KVS_KEY}, if any. */
+    tip?: { message: string; level?: 'info' | 'warning'; recommendedActorId?: string };
     summary: string;
     nextStep: string;
 };
@@ -310,6 +321,55 @@ async function fetchKvKeys(
             errMessage: errMessage(error),
         });
         return null;
+    }
+}
+
+/** Defensive parse of a TIP record's value: any Actor can write it, so shape isn't trusted. */
+function parseActorTip(value: unknown): RunResponse['tip'] {
+    if (!value || typeof value !== 'object') return undefined;
+    const { message, level, recommendedActorId } = value as {
+        message?: unknown;
+        level?: unknown;
+        recommendedActorId?: unknown;
+    };
+    if (typeof message !== 'string' || !message) return undefined;
+    const codePoints = Array.from(message); // avoids splitting a surrogate pair at the cut
+    const truncated =
+        codePoints.length > TIP_MESSAGE_LIMIT ? `${codePoints.slice(0, TIP_MESSAGE_LIMIT).join('')}…` : message;
+    return {
+        message: truncated,
+        ...(level === 'info' || level === 'warning' ? { level } : {}),
+        ...(typeof recommendedActorId === 'string' && recommendedActorId ? { recommendedActorId } : {}),
+    };
+}
+
+/** Targeted `TIP` key lookup via the API's `prefix` filter — works for stores of any size, one request. */
+async function keyValueStoreHasTipKey(client: ApifyClient, id: string, mcpSessionId?: string): Promise<boolean> {
+    try {
+        const page = await client.keyValueStore(id).listKeys({ prefix: TIP_KVS_KEY, limit: TIP_SEARCH_LIMIT });
+        return page.items.some((item) => item.key === TIP_KVS_KEY);
+    } catch (error) {
+        log.warning('Failed to look up Actor tip key', {
+            keyValueStoreId: id,
+            mcpSessionId,
+            errMessage: errMessage(error),
+        });
+        return false;
+    }
+}
+
+/** Fetch the run's advisory tip; a transient failure or malformed record logs and yields undefined. */
+async function fetchActorTip(
+    client: ApifyClient,
+    keyValueStoreId: string,
+    mcpSessionId?: string,
+): Promise<RunResponse['tip']> {
+    try {
+        const record = await client.keyValueStore(keyValueStoreId).getRecord(TIP_KVS_KEY);
+        return parseActorTip(record?.value);
+    } catch (error) {
+        log.warning('Failed to fetch Actor tip', { keyValueStoreId, mcpSessionId, errMessage: errMessage(error) });
+        return undefined;
     }
 }
 
@@ -897,6 +957,18 @@ export async function fetchActorRunData(params: {
         keyValueStore: keyValueStores?.default,
     });
 
+    // Targeted lookup only when the displayed (KV_KEYS_LIMIT-capped) page is truncated and lacks TIP —
+    // avoids an extra round trip in the common case while still catching TIP beyond that page.
+    const defaultKv = keyValueStores?.default;
+    const displayedKeys = defaultKv?.keys ?? [];
+    const kvTruncated = defaultKv?.keyCount === undefined && displayedKeys.length === KV_KEYS_LIMIT;
+    const hasTipKey =
+        isTerminal && defaultKv
+            ? displayedKeys.includes(TIP_KVS_KEY) ||
+              (kvTruncated && (await keyValueStoreHasTipKey(client, defaultKv.id, mcpSessionId)))
+            : false;
+    const tip = hasTipKey && defaultKv ? await fetchActorTip(client, defaultKv.id, mcpSessionId) : undefined;
+
     const structuredContent: RunResponse = {
         runId: run.id,
         actorId: run.actId,
@@ -911,6 +983,7 @@ export async function fetchActorRunData(params: {
             ...(datasets && { datasets }),
             ...(keyValueStores && { keyValueStores }),
         },
+        tip,
         summary,
         nextStep,
     };

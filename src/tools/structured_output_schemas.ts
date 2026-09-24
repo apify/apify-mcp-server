@@ -1,3 +1,5 @@
+import { TIP_MESSAGE_LIMIT } from '../const.js';
+
 /**
  * Shared JSON schema definitions for structured output across tools.
  * These schemas define the format of structured data returned by various tools.
@@ -633,6 +635,27 @@ export const actorRunOutputSchema = {
                     additionalProperties: buildKeyValueStoreEntrySchema(),
                 },
             },
+        },
+        tip: {
+            type: 'object' as const,
+            description: 'Advisory guidance an Actor wrote to its key-value store under the reserved "TIP" key',
+            properties: {
+                message: {
+                    type: 'string',
+                    description: `Truncated to ${TIP_MESSAGE_LIMIT} characters, with a trailing ellipsis if the Actor's message was longer`,
+                },
+                level: {
+                    type: 'string',
+                    enum: ['info', 'warning'],
+                    description: 'Omitted when the Actor wrote an unrecognized level',
+                },
+                recommendedActorId: {
+                    type: 'string',
+                    description:
+                        'Apify Actor ID the tip recommends running next, when it names one — pass directly as `actor` to call-actor or fetch-actor-details',
+                },
+            },
+            required: ['message'],
         },
         summary: { type: 'string', description: 'Past-tense summary of the run state' },
         nextStep: { type: 'string', description: 'One primary follow-up action with identifiers interpolated' },
