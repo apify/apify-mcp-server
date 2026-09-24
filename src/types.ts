@@ -390,6 +390,7 @@ export type ToolCallTelemetryProperties = {
     run_status?: string;
     dataset_id?: string;
     key_value_store_id?: string;
+    tip_recommended_actor_id?: string;
     validation_keyword?: string;
     validation_path?: string;
     validation_missing_property?: string;
@@ -452,6 +453,7 @@ export type CallDiagnostics = Pick<
     | 'run_status'
     | 'dataset_id'
     | 'key_value_store_id'
+    | 'tip_recommended_actor_id'
     | 'validation_keyword'
     | 'validation_path'
     | 'validation_missing_property'

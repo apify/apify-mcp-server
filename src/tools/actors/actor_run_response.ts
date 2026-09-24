@@ -157,7 +157,7 @@ export type RunResponse = {
     };
     storages: RunStorages;
     /** Advisory guidance an Actor wrote under the reserved {@link TIP_KVS_KEY}, if any. */
-    tip?: { message: string; level?: 'info' | 'warning' };
+    tip?: { message: string; level?: 'info' | 'warning'; recommendedActorId?: string };
     summary: string;
     nextStep: string;
 };
@@ -327,7 +327,11 @@ async function fetchKvKeys(
 /** Defensive parse of a TIP record's value: any Actor can write it, so shape isn't trusted. */
 function parseActorTip(value: unknown): RunResponse['tip'] {
     if (!value || typeof value !== 'object') return undefined;
-    const { message, level } = value as { message?: unknown; level?: unknown };
+    const { message, level, recommendedActorId } = value as {
+        message?: unknown;
+        level?: unknown;
+        recommendedActorId?: unknown;
+    };
     if (typeof message !== 'string' || !message) return undefined;
     const codePoints = Array.from(message); // avoids splitting a surrogate pair at the cut
     const truncated =
@@ -335,6 +339,7 @@ function parseActorTip(value: unknown): RunResponse['tip'] {
     return {
         message: truncated,
         ...(level === 'info' || level === 'warning' ? { level } : {}),
+        ...(typeof recommendedActorId === 'string' && recommendedActorId ? { recommendedActorId } : {}),
     };
 }
 
