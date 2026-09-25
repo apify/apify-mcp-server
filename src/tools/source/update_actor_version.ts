@@ -945,6 +945,10 @@ export const updateActorVersion: ToolEntry = Object.freeze({
             const { actor, fullName } = await resolveOwnActor({ client, apifyToken, actorSelector: parsed.actor });
             const versionNumber = resolveVersionNumber(actor, parsed.versionNumber, parsed.actor);
             const target = { actorId: actor.id, fullName, versionNumber };
+            // TODO: The Apify API has no way to read or change single files of an Actor's source, so even a one-line
+            // edit reads the whole version here and writes all its files back with the PUT below. That read and write
+            // is also what leaves a save landing between them undetected. Once the API can apply atomic changes to an
+            // Actor's source, send only the changed files instead.
             const versionClient = client.actor(actor.id).version(versionNumber);
             const version = await versionClient.get();
             if (!version) throw new UserInputError(`Actor ${fullName} has no version ${versionNumber}.`);
