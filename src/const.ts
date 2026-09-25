@@ -73,6 +73,9 @@ export const HELPER_TOOLS = {
     STORE_SEARCH_WIDGET: 'search-actors-widget',
     DOCS_SEARCH: 'search-apify-docs',
     DOCS_FETCH: 'fetch-apify-docs',
+    API_SEARCH: 'search-apify-api',
+    API_OPERATION_FETCH: 'fetch-apify-api-operation',
+    API_READ: 'read-apify-api',
     PROBLEM_REPORT: 'report-problem',
 } as const;
 export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];

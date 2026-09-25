@@ -137,8 +137,8 @@ async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promis
     );
 }
 
-/** The mid-consumption abort axios raises when a streamed body crosses `maxContentLength`. */
-function isMaxContentLengthAbort(err: unknown): boolean {
+/** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
+export function isMaxContentLengthAbort(err: unknown): boolean {
     return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
 }
 

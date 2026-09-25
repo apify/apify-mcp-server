@@ -877,3 +877,100 @@ export const keyValueStoreRecordOutputSchema = {
     },
     required: ['keyValueStoreId', 'key', 'value', 'summary'],
 };
+
+const apiAccessProperty = {
+    type: 'string' as const,
+    enum: ['read', 'write', 'unavailable'],
+    description: 'read (GET) or write (POST, PUT) access, or unavailable when the API tools do not call it',
+};
+const apiUnavailableReasonProperty = {
+    type: 'string' as const,
+    description: 'Why the API tools do not call the operation; only when access is unavailable',
+};
+
+/**
+ * Schema for the operations found by search-apify-api.
+ */
+export const apifyApiSearchOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operations: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    operationId: { type: 'string', description: 'Operation ID' },
+                    method: { type: 'string', description: 'HTTP method' },
+                    path: { type: 'string', description: 'Path template' },
+                    summary: { type: 'string', description: 'What the operation does' },
+                    access: apiAccessProperty,
+                    unavailableReason: apiUnavailableReasonProperty,
+                },
+                required: ['operationId', 'method', 'path', 'summary', 'access'],
+            },
+        },
+    },
+    required: ['operations'],
+};
+
+/**
+ * Schema for one operation's details (fetch-apify-api-operation).
+ */
+export const apifyApiOperationOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operationId: { type: 'string', description: 'Operation ID' },
+        method: { type: 'string', description: 'HTTP method' },
+        path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
+        summary: { type: 'string', description: 'What the operation does' },
+        description: { type: 'string', description: 'Full description from the API reference' },
+        access: apiAccessProperty,
+        unavailableReason: apiUnavailableReasonProperty,
+        parameters: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    name: { type: 'string', description: 'Parameter name' },
+                    in: { type: 'string', enum: ['path', 'query'], description: 'Where the parameter goes' },
+                    isRequired: { type: 'boolean', description: 'Whether the parameter is required' },
+                    description: { type: 'string', description: 'What the parameter does' },
+                    schema: { description: 'JSON schema of the value' },
+                },
+                required: ['name', 'in', 'isRequired'],
+            },
+            description: 'Path and query parameters',
+        },
+        requestBody: {
+            type: 'object' as const,
+            properties: {
+                isRequired: { type: 'boolean', description: 'Whether the body is required' },
+                schema: { description: 'JSON schema of the body, sent as JSON' },
+            },
+            required: ['isRequired', 'schema'],
+            description: 'Only when the operation takes a body',
+        },
+        refusedBodyFields: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Body fields the API tools refuse to set for this operation',
+        },
+    },
+    required: ['operationId', 'method', 'path', 'summary', 'description', 'access', 'parameters', 'refusedBodyFields'],
+};
+
+/**
+ * Schema for the response of an API call (read-apify-api).
+ */
+export const apifyApiCallOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operationId: { type: 'string', description: 'Operation ID' },
+        method: { type: 'string', description: 'HTTP method' },
+        path: { type: 'string', description: 'Request path, with the path parameters filled in' },
+        statusCode: { type: 'integer', description: 'HTTP status code' },
+        contentType: { type: 'string', description: 'Content-Type of the response' },
+        data: { description: 'Response body: parsed JSON, text, or null for an empty or binary body' },
+    },
+    required: ['operationId', 'method', 'path', 'statusCode', 'data'],
+};
