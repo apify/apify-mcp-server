@@ -135,6 +135,10 @@ function formatKib(bytes: number): string {
 /**
  * Downloads the zip record. Its size comes from the key listing first, so an oversized zip is refused before any of
  * it is downloaded; throws `UserInputError` for a missing record and for an oversized one.
+ *
+ * TODO: The Apify API has no way to read or change single files of an Actor's source, so returning even one file
+ * downloads and unpacks the whole zip. Once the API can apply atomic changes to an Actor's source and serve single
+ * files, read only the files asked for.
  */
 async function fetchSourceArchive(client: ApifyClient, { storeId, key }: SourceRecordRef): Promise<Uint8Array> {
     const store = client.keyValueStore(storeId);
@@ -607,6 +611,8 @@ export const getActorVersion: ToolEntry = Object.freeze({
             }
             const fullName = `${actor.username}/${actor.name}`;
             const versionNumber = resolveVersionNumber(actor, parsed.versionNumber, parsed.actor);
+            // TODO: The version GET returns every stored file even when one is asked for: the Apify API has no way to
+            // read or change single files of an Actor's source. Use such an API once it exists.
             const version = await client.actor(actor.id).version(versionNumber).get();
             if (!version) return respondUserError(`Actor '${parsed.actor}' has no version ${versionNumber}.`);
             return await readVersion({
