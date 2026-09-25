@@ -1,6 +1,7 @@
 import { inflateRawSync } from 'node:zlib';
 
 import { UserInputError } from '../../errors.js';
+import { parseSourcePath } from './source_files.js';
 
 const BYTES_PER_MIB = 1024 * 1024;
 
@@ -46,6 +47,8 @@ const UTF8_NAME_DECODER = new TextDecoder('utf-8', { fatal: true });
 
 type CentralDirectoryEntry = {
     name: string;
+    /** Compared with the local header's name, so the two cannot list different files. */
+    nameBytes: Buffer;
     path: string;
     isDirectory: boolean;
     method: number;
@@ -139,8 +142,8 @@ function decodeEntryName(nameBytes: Buffer): string {
 }
 
 /**
- * The path relative to the Actor root: backslashes become `/`, and empty and `.` segments are dropped. Throws for a
- * name that could escape the root or cannot be a path.
+ * The path relative to the Actor root, empty for a root folder entry such as `./`. Throws for a name that could escape
+ * the root or cannot be a path. Runs before any other check, so no refusal repeats a NUL or an overlong name.
  */
 function parseEntryPath(name: string): string {
     if (name.includes('\0')) throw buildRefusal(`an entry name contains a NUL character`);
@@ -148,10 +151,9 @@ function parseEntryPath(name: string): string {
         throw buildRefusal(`entry ${name.slice(0, 40)}... has a name over ${MAX_ENTRY_NAME_LENGTH} characters`);
     }
     if (ABSOLUTE_NAME_REGEX.test(name)) throw buildRefusal(`entry ${name} has an absolute path`);
-    const segments = name.split(/[\\/]/).filter((segment) => segment !== '' && segment !== '.');
-    if (segments.includes('..')) throw buildRefusal(`entry ${name} has a '..' segment`);
-    if (segments.length === 0) throw buildRefusal(`entry ${name} has an empty path`);
-    return segments.join('/');
+    const path = parseSourcePath(name);
+    if (path.split('/').includes('..')) throw buildRefusal(`entry ${name} has a '..' segment`);
+    return path;
 }
 
 /** The Unix file type from the external attributes, or undefined when the archive was not written on Unix. */
@@ -174,7 +176,9 @@ function readCentralDirectoryEntry(zip: Buffer, offset: number, location: Centra
     const nextOffset = offset + CENTRAL_DIRECTORY_HEADER_LENGTH + nameLength + extraLength + commentLength;
     if (nextOffset > centralDirectoryEnd) throw buildRefusal('its central directory is corrupt');
     const nameStart = offset + CENTRAL_DIRECTORY_HEADER_LENGTH;
-    const name = decodeEntryName(zip.subarray(nameStart, nameStart + nameLength));
+    const nameBytes = zip.subarray(nameStart, nameStart + nameLength);
+    const name = decodeEntryName(nameBytes);
+    const path = parseEntryPath(name);
     const flags = zip.readUInt16LE(offset + 8);
     const method = zip.readUInt16LE(offset + 10);
     const compressedSize = zip.readUInt32LE(offset + 20);
@@ -205,10 +209,13 @@ function readCentralDirectoryEntry(zip: Buffer, offset: number, location: Centra
     if (method === COMPRESSION_METHOD_STORED && compressedSize !== uncompressedSize) {
         throw buildRefusal(`entry ${name} is stored uncompressed but declares two different sizes`);
     }
+    const isDirectory = /[\\/]$/.test(name) || fileType === UNIX_FILE_TYPE_DIRECTORY;
+    if (path === '' && !isDirectory) throw buildRefusal(`entry ${name} has an empty path`);
     const entry: CentralDirectoryEntry = {
         name,
-        path: parseEntryPath(name),
-        isDirectory: /[\\/]$/.test(name) || fileType === UNIX_FILE_TYPE_DIRECTORY,
+        nameBytes,
+        path,
+        isDirectory,
         method,
         // Read from the central directory, never the local header: `apify push` sets the data descriptor flag, so
         // its local headers carry zeros for the CRC and the sizes.
@@ -227,6 +234,9 @@ function readCentralDirectory(zip: Buffer, location: CentralDirectoryLocation): 
     let { offset } = location;
     for (let i = 0; i < location.entryCount; i++) {
         const { entry, nextOffset } = readCentralDirectoryEntry(zip, offset, location);
+        offset = nextOffset;
+        // A root folder entry such as `./` holds nothing; unzip extracts such an archive without complaint.
+        if (entry.path === '') continue;
         if (seenPaths.has(entry.path)) throw buildRefusal(`the path ${entry.path} appears more than once`);
         seenPaths.add(entry.path);
         inflatedBytes += entry.uncompressedSize;
@@ -236,12 +246,20 @@ function readCentralDirectory(zip: Buffer, location: CentralDirectoryLocation): 
             );
         }
         entries.push(entry);
-        offset = nextOffset;
+    }
+    // An end record that declares fewer entries than the central directory holds would hide files that another zip
+    // reader extracts.
+    if (offset !== location.offset + location.size) {
+        throw buildRefusal('its central directory does not match its end record');
     }
     return entries;
 }
 
-/** The entry's compressed bytes; the local header is read only for where they start, as its sizes may be zeros. */
+/**
+ * The entry's compressed bytes. The local header's sizes may be zeros, so it is read only for where the data starts
+ * (its own name and extra lengths, which can differ from the central ones) and checked to name the same file with the
+ * same method, so a reader that streams local headers sees the same files.
+ */
 function extractCompressedData(zip: Buffer, entry: CentralDirectoryEntry, centralDirectoryOffset: number): Buffer {
     const headerOffset = entry.localHeaderOffset;
     if (
@@ -250,13 +268,17 @@ function extractCompressedData(zip: Buffer, entry: CentralDirectoryEntry, centra
     ) {
         throw buildRefusal(`entry ${entry.name} points outside the archive`);
     }
-    const dataStart =
-        headerOffset +
-        LOCAL_FILE_HEADER_LENGTH +
-        zip.readUInt16LE(headerOffset + 26) +
-        zip.readUInt16LE(headerOffset + 28);
+    const nameStart = headerOffset + LOCAL_FILE_HEADER_LENGTH;
+    const nameEnd = nameStart + zip.readUInt16LE(headerOffset + 26);
+    const dataStart = nameEnd + zip.readUInt16LE(headerOffset + 28);
     const dataEnd = dataStart + entry.compressedSize;
     if (dataEnd > centralDirectoryOffset) throw buildRefusal(`entry ${entry.name} points outside the archive`);
+    if (
+        !zip.subarray(nameStart, nameEnd).equals(entry.nameBytes) ||
+        zip.readUInt16LE(headerOffset + 8) !== entry.method
+    ) {
+        throw buildRefusal(`entry ${entry.name} has a local header that does not match the central directory`);
+    }
     return zip.subarray(dataStart, dataEnd);
 }
 

@@ -24,11 +24,23 @@ export type ZipEntryOptions = {
     externalAttributes?: number;
     /** Central directory extra field, for example a zip64 record. */
     extraField?: Buffer;
+    /**
+     * Local header extra field. Info-ZIP and macOS zip write one whose length differs from the central one, so the
+     * data starts where the local lengths say.
+     */
+    localExtraField?: Buffer;
+    /** Overrides of what the local header declares, to make it disagree with the central directory. */
+    localName?: string;
+    localMethod?: number;
 };
 
 export type ZipArchiveOptions = {
     /** Writes a zip64 end of central directory locator before the end record. */
     hasZip64Locator?: boolean;
+    /** Overrides the entry count in the end record, to make it lie. */
+    declaredEntryCount?: number;
+    /** The archive comment after the end record. */
+    comment?: Buffer;
 };
 
 const UNIX_HOST_VERSION_MADE_BY = (3 << 8) | 20;
@@ -63,6 +75,8 @@ export function buildZipArchive(entries: readonly ZipEntryOptions[], options: Zi
     let offset = 0;
     for (const entry of entries) {
         const name = Buffer.from(entry.name, 'utf8');
+        const localName = Buffer.from(entry.localName ?? entry.name, 'utf8');
+        const localExtraField = entry.localExtraField ?? Buffer.alloc(0);
         const data = toBytes(entry.data);
         const method = entry.method ?? 8;
         const compressed = method === 8 ? deflateRawSync(data) : data;
@@ -73,14 +87,14 @@ export function buildZipArchive(entries: readonly ZipEntryOptions[], options: Zi
             [0x04034b50, 4],
             [20, 2],
             [flags, 2],
-            [method, 2],
+            [entry.localMethod ?? method, 2],
             [0, 2],
             [DOS_DATE_1980, 2],
             [hasDataDescriptor ? 0 : crc32, 4],
             [hasDataDescriptor ? 0 : compressed.length, 4],
             [hasDataDescriptor ? 0 : data.length, 4],
-            [name.length, 2],
-            [0, 2],
+            [localName.length, 2],
+            [localExtraField.length, 2],
         ]);
         const dataDescriptor = hasDataDescriptor
             ? buildRecord([
@@ -111,9 +125,10 @@ export function buildZipArchive(entries: readonly ZipEntryOptions[], options: Zi
             [entry.externalAttributes ?? (isDirectory ? DIRECTORY_ATTRIBUTES : REGULAR_FILE_ATTRIBUTES), 4],
             [offset, 4],
         ]);
-        localParts.push(localHeader, name, compressed, dataDescriptor);
+        const entryParts = [localHeader, localName, localExtraField, compressed, dataDescriptor];
+        localParts.push(...entryParts);
         centralParts.push(centralHeader, name, extraField);
-        offset += localHeader.length + name.length + compressed.length + dataDescriptor.length;
+        offset += entryParts.reduce((total, part) => total + part.length, 0);
     }
     const centralDirectory = Buffer.concat(centralParts);
     const zip64Locator = options.hasZip64Locator
@@ -125,15 +140,17 @@ export function buildZipArchive(entries: readonly ZipEntryOptions[], options: Zi
               [1, 4],
           ])
         : Buffer.alloc(0);
+    const entryCount = options.declaredEntryCount ?? entries.length;
+    const comment = options.comment ?? Buffer.alloc(0);
     const endOfCentralDirectory = buildRecord([
         [0x06054b50, 4],
         [0, 2],
         [0, 2],
-        [entries.length, 2],
-        [entries.length, 2],
+        [entryCount, 2],
+        [entryCount, 2],
         [centralDirectory.length, 4],
         [offset, 4],
-        [0, 2],
+        [comment.length, 2],
     ]);
-    return Buffer.concat([...localParts, centralDirectory, zip64Locator, endOfCentralDirectory]);
+    return Buffer.concat([...localParts, centralDirectory, zip64Locator, endOfCentralDirectory, comment]);
 }

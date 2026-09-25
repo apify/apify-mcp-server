@@ -1,3 +1,4 @@
+import { isUtf8 } from 'node:buffer';
 import { createHash } from 'node:crypto';
 
 import type { ActorVersionSourceFile } from 'apify-client';
@@ -65,13 +66,16 @@ export type SourceFileFormat = ActorVersionSourceFile['format'];
 /** One regular file of a version, the same shape whether the version stores its files inline or in a zip. */
 export type SourceFile = {
     path: string;
+    /** The stored format for an inline file; for a zip entry, which stores none, the detected one. */
     format: SourceFileFormat;
+    /** How the content is returned: UTF-8 text as utf8 whatever its stored format, anything else as base64. */
+    encoding: 'utf8' | 'base64';
     /** Length of the decoded bytes. */
     sizeBytes: number;
     hash: string;
     /** UTF-8 length of the content as returned: the text itself, or its base64. */
     contentBytes: number;
-    /** Built on demand, so a zip's binaries that are not returned are never encoded to base64. */
+    /** Built on demand, so content that is not returned is never decoded or encoded to base64. */
     readContent: () => string;
 };
 
@@ -80,14 +84,15 @@ export function hasBinaryExtension(path: string): boolean {
     return path.includes('.') && BINARY_EXTENSIONS.has(extension);
 }
 
-/** The text, or undefined when the bytes are not valid UTF-8. */
-export function decodeUtf8(bytes: Uint8Array): string | undefined {
-    try {
-        return UTF8_DECODER.decode(bytes);
-    } catch {
-        // The decoder is fatal: bytes that are not UTF-8 throw instead of turning into replacement characters.
-        return undefined;
-    }
+/**
+ * A path relative to the Actor root, the way the build worker writes it: backslashes become `/`, and empty and `.`
+ * segments are dropped. `..` segments are kept; the zip reader refuses them.
+ */
+export function parseSourcePath(name: string): string {
+    return name
+        .split(/[\\/]/)
+        .filter((segment) => segment !== '' && segment !== '.')
+        .join('/');
 }
 
 function getSha256Prefix(data: Uint8Array | string): string {
@@ -128,34 +133,54 @@ function getBase64Length(byteLength: number): number {
     return Math.ceil(byteLength / 3) * 4;
 }
 
-/** A file stored inline in the version; its format is the one the platform stored. */
-export function buildInlineSourceFile({ name, format, content }: ActorVersionSourceFile): SourceFile {
-    const bytes = Buffer.from(content, format === 'BASE64' ? 'base64' : 'utf8');
-    return {
-        path: name,
-        format,
-        sizeBytes: bytes.length,
-        hash: getSourceFileHash(bytes),
-        contentBytes: Buffer.byteLength(content, 'utf8'),
-        readContent: () => content,
-    };
-}
-
 /**
- * A file read from a zip, which carries no format: text when the extension is not a binary one and the bytes are
- * valid UTF-8, base64 otherwise, so no byte is lost.
+ * Text when the extension is not a binary one and the bytes are valid UTF-8, base64 otherwise, so no byte is lost.
+ * `isUtf8` checks without building a string; the text is decoded only when it is returned, so a listing holds only
+ * the bytes.
  */
-export function buildArchiveSourceFile(path: string, bytes: Uint8Array): SourceFile {
+function buildSourceFileFromBytes(path: string, bytes: Uint8Array, storedBase64?: string): SourceFile {
     const common = { path, sizeBytes: bytes.length, hash: getSourceFileHash(bytes) };
-    const text = hasBinaryExtension(path) ? undefined : decodeUtf8(bytes);
-    if (text !== undefined) {
+    // An inline file keeps its stored format; a zip entry, which stores none, reports TEXT for text.
+    const format: SourceFileFormat = storedBase64 === undefined ? 'TEXT' : 'BASE64';
+    if (!hasBinaryExtension(path) && isUtf8(bytes)) {
         // Valid UTF-8 decoded with the BOM kept encodes back to the same bytes, so its length is the byte count.
-        return { ...common, format: 'TEXT', contentBytes: bytes.length, readContent: () => text };
+        const readContent = () => UTF8_DECODER.decode(bytes);
+        return { ...common, format, encoding: 'utf8', contentBytes: bytes.length, readContent };
     }
     return {
         ...common,
         format: 'BASE64',
-        contentBytes: getBase64Length(bytes.length),
-        readContent: () => Buffer.from(bytes).toString('base64'),
+        encoding: 'base64',
+        contentBytes: storedBase64 === undefined ? getBase64Length(bytes.length) : Buffer.byteLength(storedBase64),
+        readContent: () => storedBase64 ?? Buffer.from(bytes).toString('base64'),
     };
+}
+
+/**
+ * A file stored inline in the version; its format is the one the platform stored. The platform stores a file without
+ * `format` or `content` as given, and the build worker reads them as TEXT and as empty, so the same defaults apply.
+ * A UTF-8 file stored as BASE64 (`apify push` picks the format by MIME type) is returned as text, the same as from a
+ * zip.
+ */
+export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile {
+    const { name, format }: Partial<ActorVersionSourceFile> & { name: string } = file;
+    const content = (file as Partial<ActorVersionSourceFile>).content ?? '';
+    // A name that normalizes to nothing, such as `.`, is kept as stored rather than dropped.
+    const path = parseSourcePath(name) || name;
+    if (format === 'BASE64') return buildSourceFileFromBytes(path, Buffer.from(content, 'base64'), content);
+    const bytes = Buffer.from(content, 'utf8');
+    return {
+        path,
+        format: 'TEXT',
+        encoding: 'utf8',
+        sizeBytes: bytes.length,
+        hash: getSourceFileHash(bytes),
+        contentBytes: bytes.length,
+        readContent: () => content,
+    };
+}
+
+/** A file read from a zip, which carries no format: TEXT or BASE64 as detected. */
+export function buildArchiveSourceFile(path: string, bytes: Uint8Array): SourceFile {
+    return buildSourceFileFromBytes(path, bytes);
 }

@@ -95,6 +95,9 @@ type ReturnedContent = {
     totalLines?: number;
 };
 
+/** A line over `MAX_INLINE_BYTES` on its own, which stopped a line range. */
+type LongLineInfo = { path: string; line: number; totalLines: number };
+
 type ContentSelection = {
     contents: ReturnedContent[];
     omittedPaths: string[];
@@ -102,7 +105,8 @@ type ContentSelection = {
     /** The text files' total size, set when `paths` was omitted and they did not all fit. */
     textBytesOverLimit?: number;
     /** Base64 files left out because `paths` was omitted; they are returned only when named. */
-    unnamedBinaryCount: number;
+    unnamedBinaryFiles: SourceFile[];
+    longLine?: LongLineInfo;
 };
 
 type SourceRecordRef = { storeId: string; key: string };
@@ -192,7 +196,7 @@ function sortSourceFiles(files: Iterable<SourceFile>): SourceFile[] {
 }
 
 function toReturnedContent(file: SourceFile): ReturnedContent {
-    return { path: file.path, content: file.readContent(), encoding: file.format === 'BASE64' ? 'base64' : 'utf8' };
+    return { path: file.path, content: file.readContent(), encoding: file.encoding };
 }
 
 /** Lines with their line endings kept, so joined back they give the exact text. */
@@ -201,11 +205,16 @@ function splitLines(text: string): string[] {
     return text.split(/(?<=\n)/);
 }
 
+function buildEmptySelection(): ContentSelection {
+    return { contents: [], omittedPaths: [], notFoundPaths: [], unnamedBinaryFiles: [] };
+}
+
 /**
- * The lines from `startLine`, up to `lineCount` of them and as many as fit in `MAX_INLINE_BYTES`. Throws
- * `UserInputError` when `startLine` is past the end, and when that line alone does not fit.
+ * The lines from `startLine`, up to `lineCount` of them and as many as fit in `MAX_INLINE_BYTES`. A line over the
+ * limit on its own stops the range and is reported, so the caller learns which startLine skips it; when it is the
+ * first wanted line, the file goes to `omittedPaths`. Throws `UserInputError` when `startLine` is past the end.
  */
-function readLineRange(file: SourceFile, startLine: number, lineCount: number | undefined): ReturnedContent {
+function selectLineRange(file: SourceFile, startLine: number, lineCount: number | undefined): ContentSelection {
     const lines = splitLines(file.readContent());
     const totalLines = lines.length;
     if (startLine > totalLines) {
@@ -213,19 +222,22 @@ function readLineRange(file: SourceFile, startLine: number, lineCount: number | 
     }
     const lastWantedIndex = Math.min(totalLines, lineCount === undefined ? totalLines : startLine - 1 + lineCount);
     const selectedLines: string[] = [];
+    let longLine: LongLineInfo | undefined;
     let totalBytes = 0;
     for (let index = startLine - 1; index < lastWantedIndex; index++) {
         const lineBytes = Buffer.byteLength(lines[index], 'utf8');
+        // Checked before the budget, so a range that fills up just before a long line names that line.
+        if (lineBytes > MAX_INLINE_BYTES) {
+            longLine = { path: file.path, line: index + 1, totalLines };
+            break;
+        }
         if (totalBytes + lineBytes > MAX_INLINE_BYTES) break;
         selectedLines.push(lines[index]);
         totalBytes += lineBytes;
     }
-    if (selectedLines.length === 0) {
-        throw new UserInputError(
-            `Line ${startLine} of ${file.path} alone is over ${INLINE_LIMIT_KIB} KiB, so this tool cannot return it.`,
-        );
-    }
-    return {
+    const selection: ContentSelection = { ...buildEmptySelection(), ...(longLine && { longLine }) };
+    if (selectedLines.length === 0) return { ...selection, omittedPaths: [file.path] };
+    const content: ReturnedContent = {
         path: file.path,
         content: selectedLines.join(''),
         encoding: 'utf8',
@@ -233,21 +245,18 @@ function readLineRange(file: SourceFile, startLine: number, lineCount: number | 
         endLine: startLine + selectedLines.length - 1,
         totalLines,
     };
-}
-
-function buildEmptySelection(): ContentSelection {
-    return { contents: [], omittedPaths: [], notFoundPaths: [], unnamedBinaryCount: 0 };
+    return { ...selection, contents: [content] };
 }
 
 /** Every text file, or none when they do not all fit: a partial set would let one large file crowd out the rest. */
 function selectAllTextContents(view: readonly SourceFile[]): ContentSelection {
-    const textFiles = view.filter((file) => file.format === 'TEXT');
+    const textFiles = view.filter((file) => file.encoding === 'utf8');
     const textBytes = textFiles.reduce((total, file) => total + file.contentBytes, 0);
-    const unnamedBinaryCount = view.length - textFiles.length;
+    const unnamedBinaryFiles = view.filter((file) => file.encoding === 'base64');
     if (textBytes > MAX_INLINE_BYTES) {
-        return { ...buildEmptySelection(), textBytesOverLimit: textBytes, unnamedBinaryCount };
+        return { ...buildEmptySelection(), textBytesOverLimit: textBytes, unnamedBinaryFiles };
     }
-    return { ...buildEmptySelection(), contents: textFiles.map(toReturnedContent), unnamedBinaryCount };
+    return { ...buildEmptySelection(), contents: textFiles.map(toReturnedContent), unnamedBinaryFiles };
 }
 
 /**
@@ -258,8 +267,8 @@ function selectRequestedContents(view: readonly SourceFile[], paths: readonly st
     const filesByPath = new Map(view.map((file) => [file.path, file]));
     const requestedPaths = [...new Set(paths)];
     const onlyFile = requestedPaths.length === 1 ? filesByPath.get(requestedPaths[0]) : undefined;
-    if (onlyFile?.format === 'TEXT' && onlyFile.contentBytes > MAX_INLINE_BYTES) {
-        return { ...buildEmptySelection(), contents: [readLineRange(onlyFile, 1, undefined)] };
+    if (onlyFile?.encoding === 'utf8' && onlyFile.contentBytes > MAX_INLINE_BYTES) {
+        return selectLineRange(onlyFile, 1, undefined);
     }
     const selection = buildEmptySelection();
     let remainingBytes = MAX_INLINE_BYTES;
@@ -286,26 +295,41 @@ function selectContents(view: readonly SourceFile[], args: GetActorVersionArgs):
     // The call checks that a line range comes with exactly one path.
     const file = view.find((candidate) => candidate.path === paths[0]);
     if (!file) return { ...buildEmptySelection(), notFoundPaths: [paths[0]] };
-    if (file.format === 'BASE64') {
+    if (file.encoding === 'base64') {
         throw new UserInputError(
-            `${file.path} is stored as base64, and startLine and lineCount work only on text files.`,
+            `${file.path} is returned as base64, and startLine and lineCount work only on text files.`,
         );
     }
-    return { ...buildEmptySelection(), contents: [readLineRange(file, startLine ?? 1, lineCount)] };
+    return selectLineRange(file, startLine ?? 1, lineCount);
 }
 
 function formatFileCount(count: number): string {
     return `${count} ${count === 1 ? 'file' : 'files'}`;
 }
 
+/** Names the long line and the startLine that skips it, so a minified file is never a dead end. */
+function formatLongLineNote({ path, line, totalLines }: LongLineInfo): string {
+    if (totalLines === 1) {
+        return ` ${path} is a single line over ${INLINE_LIMIT_KIB} KiB, so it cannot be read by lines.`;
+    }
+    const skipNote =
+        line < totalLines ? ` Pass startLine ${line + 1} to skip it.` : ' It is the last line of the file.';
+    return ` Line ${line} of ${path} is over ${INLINE_LIMIT_KIB} KiB on its own, so it cannot be returned.${skipNote}`;
+}
+
 function formatContentNote(selection: ContentSelection, args: GetActorVersionArgs): string {
     const [first] = selection.contents;
+    const { longLine } = selection;
     if (first?.startLine !== undefined && first.endLine !== undefined && first.totalLines !== undefined) {
         const wholeFileNote =
             args.startLine === undefined && args.lineCount === undefined
                 ? ` The whole file is over the ${INLINE_LIMIT_KIB} KiB limit.`
                 : '';
-        const continueNote = first.endLine < first.totalLines ? ` Continue with startLine ${first.endLine + 1}.` : '';
+        const continueNote = longLine
+            ? formatLongLineNote(longLine)
+            : first.endLine < first.totalLines
+              ? ` Continue with startLine ${first.endLine + 1}.`
+              : '';
         return ` Returned lines ${first.startLine}-${first.endLine} of ${first.totalLines} of ${first.path}.${wholeFileNote}${continueNote}`;
     }
     if (selection.contents.length > 0) {
@@ -318,27 +342,68 @@ function formatContentNote(selection: ContentSelection, args: GetActorVersionArg
             `the ${INLINE_LIMIT_KIB} KiB limit. Pass paths or pathPrefix to read some of them.`
         );
     }
-    return ' Returned the listing only.';
+    return ` Returned the listing only.${longLine ? formatLongLineNote(longLine) : ''}`;
+}
+
+/** Whether line ranges from line 1 can return anything of the file. */
+function hasReturnableFirstLine(file: SourceFile): boolean {
+    const text = file.readContent();
+    const newlineIndex = text.indexOf('\n');
+    const firstLine = newlineIndex === -1 ? text : text.slice(0, newlineIndex + 1);
+    return Buffer.byteLength(firstLine, 'utf8') <= MAX_INLINE_BYTES;
+}
+
+function formatCliNote(pronoun: 'it' | 'them'): string {
+    return `read ${pronoun} with the Apify CLI (apify pull)`;
 }
 
 function formatOmittedNote(selection: ContentSelection, view: readonly SourceFile[]): string {
-    if (selection.omittedPaths.length === 0) return '';
     const filesByPath = new Map(view.map((file) => [file.path, file]));
-    const tooLarge = selection.omittedPaths.filter(
-        (path) => (filesByPath.get(path)?.contentBytes ?? 0) > MAX_INLINE_BYTES,
+    // The long line note already covers the file a line range left out.
+    const omittedFiles = selection.omittedPaths
+        .filter((path) => path !== selection.longLine?.path)
+        .flatMap((path) => filesByPath.get(path) ?? []);
+    if (omittedFiles.length === 0) return '';
+    const listPaths = (files: SourceFile[]) => files.map(({ path }) => path).join(', ');
+    const fitAlone = omittedFiles.filter((file) => file.contentBytes <= MAX_INLINE_BYTES);
+    const tooLargeText = omittedFiles.filter(
+        (file) => file.contentBytes > MAX_INLINE_BYTES && file.encoding === 'utf8',
     );
-    const fitAlone = selection.omittedPaths.filter((path) => !tooLarge.includes(path));
-    const tooLargeText = tooLarge.filter((path) => filesByPath.get(path)?.format === 'TEXT');
-    const tooLargeBinary = tooLarge.filter((path) => filesByPath.get(path)?.format === 'BASE64');
+    const byLines = tooLargeText.filter(hasReturnableFirstLine);
+    const longFirstLine = tooLargeText.filter((file) => !byLines.includes(file));
+    const tooLargeBinary = omittedFiles.filter(
+        (file) => file.contentBytes > MAX_INLINE_BYTES && file.encoding === 'base64',
+    );
     const notes = [
         fitAlone.length > 0 &&
-            ` Left out to stay within ${INLINE_LIMIT_KIB} KiB: ${fitAlone.join(', ')}; request them in another call.`,
-        tooLargeText.length > 0 &&
-            ` Over ${INLINE_LIMIT_KIB} KiB on their own: ${tooLargeText.join(', ')}; request one alone to read it in line ranges.`,
+            ` Left out to stay within ${INLINE_LIMIT_KIB} KiB: ${listPaths(fitAlone)}; request them in another call.`,
+        byLines.length > 0 &&
+            ` Over ${INLINE_LIMIT_KIB} KiB on their own: ${listPaths(byLines)}; request one alone to read it in line ranges.`,
+        longFirstLine.length > 0 &&
+            ` Over ${INLINE_LIMIT_KIB} KiB on their own, first line included: ${listPaths(longFirstLine)}; request one alone to see which of its lines can be returned.`,
         tooLargeBinary.length > 0 &&
-            ` Over ${INLINE_LIMIT_KIB} KiB as base64, so they cannot be returned: ${tooLargeBinary.join(', ')}.`,
+            ` Over ${INLINE_LIMIT_KIB} KiB as base64, so they cannot be returned: ${listPaths(tooLargeBinary)}; ${formatCliNote('them')}.`,
     ];
     return notes.filter(Boolean).join('');
+}
+
+/** Base64 files the default read left out: which of them naming would return, and which are too large for that. */
+function formatUnnamedBinaryNote(files: readonly SourceFile[]): string {
+    const nameable = files.filter((file) => file.contentBytes <= MAX_INLINE_BYTES).length;
+    const tooLarge = files.length - nameable;
+    const nameableNote =
+        nameable === 0
+            ? ''
+            : nameable === 1
+              ? ' 1 base64 file is in the listing only; name it in paths to read it.'
+              : ` ${nameable} base64 files are in the listing only; name them in paths to read them.`;
+    const tooLargeNote =
+        tooLarge === 0
+            ? ''
+            : tooLarge === 1
+              ? ` 1 base64 file is over ${INLINE_LIMIT_KIB} KiB as base64, so it cannot be returned; ${formatCliNote('it')}.`
+              : ` ${tooLarge} base64 files are over ${INLINE_LIMIT_KIB} KiB as base64, so they cannot be returned; ${formatCliNote('them')}.`;
+    return `${nameableNote}${tooLargeNote}`;
 }
 
 function formatSelectionSummary(params: {
@@ -348,13 +413,8 @@ function formatSelectionSummary(params: {
     args: GetActorVersionArgs;
 }): string {
     const { headline, selection, view, args } = params;
-    const { unnamedBinaryCount, notFoundPaths } = selection;
-    const binaryNote =
-        unnamedBinaryCount > 0
-            ? unnamedBinaryCount === 1
-                ? ' 1 base64 file is in the listing only; name it in paths to read it.'
-                : ` ${unnamedBinaryCount} base64 files are in the listing only; name them in paths to read them.`
-            : '';
+    const { notFoundPaths } = selection;
+    const binaryNote = formatUnnamedBinaryNote(selection.unnamedBinaryFiles);
     const underPrefix = args.pathPrefix === undefined ? '' : ` under ${args.pathPrefix}`;
     const notFoundNote = notFoundPaths.length > 0 ? ` No file${underPrefix} at: ${notFoundPaths.join(', ')}.` : '';
     return `${headline}${formatContentNote(selection, args)}${binaryNote}${formatOmittedNote(selection, view)}${notFoundNote}`;
@@ -382,8 +442,21 @@ function parseGitRepoUrl(gitRepoUrl: string): { repository: string; branch?: str
     };
 }
 
-/** The query string of a zip URL can hold a signature that grants access to it, so it never goes out. */
-function stripQueryString(url: string): string {
+/**
+ * The URL without what can grant access to it, so that never goes out or into the revision: the query string (for
+ * example a store signature) and, for http and https, the user and password. An SSH user such as `git@` is not a
+ * secret and stays. A URL the parser cannot read, such as `git@github.com:user/repo.git`, loses only its query string.
+ */
+function formatUrlWithoutSecrets(url: string): string {
+    if (URL.canParse(url)) {
+        const parsed = new URL(url);
+        parsed.search = '';
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            parsed.username = '';
+            parsed.password = '';
+        }
+        return parsed.href;
+    }
     const queryIndex = url.indexOf('?');
     if (queryIndex === -1) return url;
     const hashIndex = url.indexOf('#', queryIndex);
@@ -444,9 +517,10 @@ function respondWithUrl(
         url: string;
         urlFields: Record<string, string>;
         sourceText: string;
+        fetchNote: string;
     },
 ): ToolResponse {
-    const { target, version, url, urlFields, sourceText } = params;
+    const { target, version, url, urlFields, sourceText, fetchNote } = params;
     const revision = buildUrlRevision(version.sourceType, url);
     const structuredContent = {
         ...buildVersionFields({ target, version }),
@@ -456,11 +530,14 @@ function respondWithUrl(
         envVars: formatEnvVars(version),
         ...urlFields,
     };
-    const summary = `Version ${target.versionNumber} of ${target.fullName} builds from ${sourceText}, revision ${revision}. Its source is not stored on Apify, and nothing outside the Apify API is fetched, so no files are returned.`;
+    const summary = `Version ${target.versionNumber} of ${target.fullName} builds from ${sourceText}, revision ${revision}. ${fetchNote}`;
     return respondWithSummary(structuredContent, summary);
 }
 
-/** Throws `UserInputError` for a hidden or unsupported source and for a zip that is missing, oversized or refused. */
+const NOT_ON_APIFY_NOTE =
+    'Its source is not stored on Apify, and nothing outside the Apify API is fetched, so no files are returned.';
+
+/** Throws `UserInputError` for a hidden or unsupported source and for a zip that is missing, oversized, or refused. */
 async function readVersion(params: ReadVersionParams): Promise<ToolResponse> {
     const { client, target, version } = params;
     // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
@@ -474,13 +551,14 @@ async function readVersion(params: ReadVersionParams): Promise<ToolResponse> {
         if (!version.tarballUrl) throw new UserInputError(buildHiddenSourceText(target));
         const recordRef = parseSourceRecordUrl(version.tarballUrl, client.baseUrl);
         if (!recordRef) {
-            const tarballUrl = stripQueryString(version.tarballUrl);
+            const tarballUrl = formatUrlWithoutSecrets(version.tarballUrl);
             return respondWithUrl({
                 target,
                 version,
                 url: tarballUrl,
                 urlFields: { tarballUrl },
                 sourceText: `the zip at ${tarballUrl}, which is not a key-value store record of this Apify API`,
+                fetchNote: 'Only key-value store records of this Apify API are read, so no files are returned.',
             });
         }
         const archive = readSourceArchive(await fetchSourceArchive(client, recordRef));
@@ -490,7 +568,7 @@ async function readVersion(params: ReadVersionParams): Promise<ToolResponse> {
     }
     if (version.sourceType === ActorSourceType.GitRepo) {
         if (!version.gitRepoUrl) throw new UserInputError(buildHiddenSourceText(target));
-        const { gitRepoUrl } = version;
+        const gitRepoUrl = formatUrlWithoutSecrets(version.gitRepoUrl);
         const git = parseGitRepoUrl(gitRepoUrl);
         const branch = git.branch === undefined ? '' : `, branch ${git.branch}`;
         const directory = git.directory === undefined ? '' : `, directory ${git.directory}`;
@@ -500,17 +578,19 @@ async function readVersion(params: ReadVersionParams): Promise<ToolResponse> {
             url: gitRepoUrl,
             urlFields: { gitRepoUrl, ...git },
             sourceText: `the Git repository ${git.repository}${branch}${directory}`,
+            fetchNote: NOT_ON_APIFY_NOTE,
         });
     }
     if (version.sourceType === ActorSourceType.GitHubGist) {
         if (!version.gitHubGistUrl) throw new UserInputError(buildHiddenSourceText(target));
-        const { gitHubGistUrl } = version;
+        const gitHubGistUrl = formatUrlWithoutSecrets(version.gitHubGistUrl);
         return respondWithUrl({
             target,
             version,
             url: gitHubGistUrl,
             urlFields: { gitHubGistUrl },
             sourceText: `the GitHub gist ${gitHubGistUrl}`,
+            fetchNote: NOT_ON_APIFY_NOTE,
         });
     }
     throw new UserInputError(
@@ -538,12 +618,12 @@ export const getActorVersion: ToolEntry = Object.freeze({
     title: 'Get Actor version',
     description: dedent`
         Read an Actor version's source: its metadata, a revision, a listing of its files with sizes and hashes, and the content of the files you ask for.
-        Read-only. Works on any Actor your token can read. Content is raw, with no line numbers: text as utf8, binary files as base64. One call returns at most ${INLINE_LIMIT_KIB} KiB of content.
+        Read-only. Works on any Actor your token can read, but the API hides the source of most Actors you cannot modify, and the call then fails with a message saying so. Content is raw, with no line numbers: text as utf8, binary files as base64. One call returns at most ${INLINE_LIMIT_KIB} KiB of content.
         - Without paths: the listing, plus every text file if all of them together fit in ${INLINE_LIMIT_KIB} KiB; otherwise the listing only.
         - paths: [] returns the listing only, the cheap way to get the revision and the hashes.
         - With paths: those files, in that order, within the limit; the rest are named in omittedPaths or notFoundPaths. Base64 files are returned only when named.
         - For a large text file, pass its path alone with startLine and lineCount. A text file over the limit requested alone returns the lines that fit, with endLine and totalLines, to continue from.
-        - hash is the first 16 hex characters of the SHA-256 of the file's bytes, the same as sha256sum <file> | cut -c1-16. revision identifies the whole file set and changes when any file changes.
+        - hash is the first 16 hex characters of the SHA-256 of the file's bytes, the same as sha256sum <file> | cut -c1-16 (shasum -a 256 on macOS). revision identifies the whole file set and changes when any file changes.
         A version built from a Git repository, a GitHub gist, or a zip at an outside URL returns only that URL: nothing outside the Apify API is fetched. Environment variables come back as names and isSecret only, never their values.
         Omit versionNumber to read the only version; an Actor with several versions needs it.
 
