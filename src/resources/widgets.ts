@@ -8,6 +8,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import type { McpUiResourceCsp, McpUiResourceMeta, McpUiToolMeta } from '@modelcontextprotocol/ext-apps';
 import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps';
 import type { Resource } from '@modelcontextprotocol/sdk/types.js';
 
@@ -15,7 +16,7 @@ export { RESOURCE_MIME_TYPE };
 
 const WIDGET_DOMAIN = 'https://apify.com';
 
-const RESOURCE_DOMAINS = [
+const RESOURCE_DOMAINS: string[] = [
     'https://mcp.apify.com',
     'https://images.apifyusercontent.com',
     'https://apify-image-uploads-prod.s3.us-east-1.amazonaws.com',
@@ -23,15 +24,15 @@ const RESOURCE_DOMAINS = [
     WIDGET_DOMAIN,
     'https://fonts.googleapis.com',
     'https://fonts.gstatic.com',
-] as const;
+];
 
-const CONNECT_DOMAINS = [`https://api.apify.com`] as const;
+const CONNECT_DOMAINS: string[] = [`https://api.apify.com`];
 
 // MCP Apps standard CSP (camelCase)
-const WIDGET_CSP = {
+const WIDGET_CSP: McpUiResourceCsp = {
     connectDomains: CONNECT_DOMAINS,
     resourceDomains: RESOURCE_DOMAINS,
-} as const;
+};
 
 // ChatGPT-specific CSP compatibility key uses snake_case field names.
 // See: https://developers.openai.com/apps-sdk/reference/#component-resource-_meta-fields
@@ -44,15 +45,16 @@ const OPENAI_WIDGET_CSP = {
 // "hosts read it from the resources/read content item (with resources/list entry as fallback) and
 // ignore it here [on the tool]"; `McpUiToolMeta` types `csp`/`permissions` as `never` and carries
 // only `resourceUri`/`visibility`. Claude's host warns at runtime when they're mixed up
-// ("declares _meta.ui.csp/permissions, which is ignored"), so each surface gets only its own fields.
-const WIDGET_RESOURCE_UI = {
+// ("declares _meta.ui.csp/permissions, which is ignored"). The SDK types below make a misplaced
+// field a compile error, so each surface can only carry its own fields.
+const WIDGET_RESOURCE_UI: McpUiResourceMeta = {
     prefersBorder: true,
     csp: WIDGET_CSP,
-} as const;
+};
 
-const WIDGET_TOOL_UI = {
-    visibility: ['model', 'app'] as const,
-} as const;
+const WIDGET_TOOL_UI: McpUiToolMeta = {
+    visibility: ['model', 'app'],
+};
 
 export const WIDGET_URIS = {
     SEARCH_ACTORS: 'ui://widget/search-actors.html',
@@ -63,7 +65,7 @@ export const WIDGET_URIS = {
 type WidgetResourceMeta = NonNullable<Resource['_meta']> & {
     'openai/widgetCSP'?: typeof OPENAI_WIDGET_CSP;
     'openai/widgetDomain'?: string;
-    ui: typeof WIDGET_RESOURCE_UI;
+    ui: McpUiResourceMeta;
 };
 
 type WidgetMeta = NonNullable<Resource['_meta']> & {
@@ -78,7 +80,7 @@ type WidgetMeta = NonNullable<Resource['_meta']> & {
     // 'openai/widgetPrefersBorder'?: boolean;
     'openai/widgetDomain'?: string;
     // MCP Apps standard metadata (SEP-1865)
-    ui: typeof WIDGET_TOOL_UI & { resourceUri: string };
+    ui: McpUiToolMeta & { resourceUri: string };
     // Legacy alias for `ui.resourceUri`; the ext-apps SDK's `registerAppTool` populates both
     // "for compatibility with older hosts" and Claude Desktop's host reads it.
     'ui/resourceUri': string;

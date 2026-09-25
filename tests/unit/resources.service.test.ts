@@ -25,8 +25,13 @@ const buildAvailableWidget = (uri: string, exists: boolean): AvailableWidget => 
 });
 
 // `contents[0]` is a text|blob union; narrow it in tests that read the text/widget shape.
-function firstContent(result: { contents: unknown[] }): { mimeType?: string; text?: string; html?: string } {
-    return result.contents[0] as { mimeType?: string; text?: string; html?: string };
+function firstContent(result: { contents: unknown[] }): {
+    mimeType?: string;
+    text?: string;
+    html?: string;
+    _meta?: AvailableWidget['resourceMeta'];
+} {
+    return result.contents[0] as ReturnType<typeof firstContent>;
 }
 
 describe('createResourceService()', () => {
@@ -76,6 +81,13 @@ describe('createResourceService()', () => {
             const { resources } = await service.listResources();
 
             expect(resources.map((resource) => resource.uri)).toEqual([WIDGET_URIS.SEARCH_ACTORS]);
+            // SEP-1865: csp/prefersBorder live on the resource entry; tool-only keys must not leak here.
+            expect(resources[0]._meta).toBe(WIDGET_REGISTRY[WIDGET_URIS.SEARCH_ACTORS].resourceMeta);
+            expect(resources[0]._meta?.ui).toMatchObject({
+                prefersBorder: true,
+                csp: { connectDomains: expect.any(Array) },
+            });
+            expect(resources[0]._meta?.ui).not.toHaveProperty('resourceUri');
         });
     });
 
@@ -167,6 +179,13 @@ describe('createResourceService()', () => {
             expect(firstContent(result).mimeType).toBe('text/html;profile=mcp-app');
             expect(firstContent(result).text).toContain('console.log("widget");');
             expect(firstContent(result).html).toContain('<script type="module">console.log("widget");</script>');
+            // SEP-1865: hosts read csp/prefersBorder from this content item first.
+            expect(firstContent(result)._meta).toBe(WIDGET_REGISTRY[WIDGET_URIS.SEARCH_ACTORS].resourceMeta);
+            expect(firstContent(result)._meta?.ui).toMatchObject({
+                prefersBorder: true,
+                csp: { connectDomains: expect.any(Array) },
+            });
+            expect(firstContent(result)._meta?.ui).not.toHaveProperty('resourceUri');
         });
 
         it('returns a plain-text fallback for a widget URI not in the registry', async () => {
