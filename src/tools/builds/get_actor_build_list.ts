@@ -23,8 +23,8 @@ const getActorBuildListArgs = z.object({
         .number()
         .int()
         .min(1)
-        .max(10)
-        .describe('Maximum number of builds to return. Default and maximum: 10.')
+        .max(20)
+        .describe('Maximum number of builds to return. Default is 10. Maximum is 20.')
         .default(10),
     // Newest first by default, unlike get-actor-run-list, because the build a caller looks for is
     // usually the latest one (#1407).

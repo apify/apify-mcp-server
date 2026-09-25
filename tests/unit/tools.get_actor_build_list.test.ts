@@ -182,13 +182,13 @@ describe('get-actor-build-list', () => {
             expect(tool.ajvValidate({ actorId: 'actor-1' })).toBe(true);
         });
 
-        it('rejects limit outside 1..10 or not an integer via ajv validation', () => {
+        it('rejects limit outside 1..20 or not an integer via ajv validation', () => {
             const tool = getActorBuildList as HelperTool;
             expect(tool.ajvValidate({ actorId: 'actor-1', limit: 0 })).toBe(false);
-            expect(tool.ajvValidate({ actorId: 'actor-1', limit: 11 })).toBe(false);
+            expect(tool.ajvValidate({ actorId: 'actor-1', limit: 21 })).toBe(false);
             expect(tool.ajvValidate({ actorId: 'actor-1', limit: 2.5 })).toBe(false);
             expect(tool.ajvValidate({ actorId: 'actor-1', limit: 1 })).toBe(true);
-            expect(tool.ajvValidate({ actorId: 'actor-1', limit: 10 })).toBe(true);
+            expect(tool.ajvValidate({ actorId: 'actor-1', limit: 20 })).toBe(true);
         });
 
         it('rejects a negative or fractional offset via ajv validation', () => {
