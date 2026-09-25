@@ -124,6 +124,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.builds)).toEqual(expected);
         });
 
+        it('should have correct tools in api category (both modes)', () => {
+            const expected = [HELPER_TOOLS.API_SEARCH, HELPER_TOOLS.API_OPERATION_FETCH, HELPER_TOOLS.API_READ];
+            expect(toolNames(defaultCategories.api)).toEqual(expected);
+            expect(toolNames(appsCategories.api)).toEqual(expected);
+        });
+
         it('should have correct tools in dev category (both modes)', () => {
             const expected = [HELPER_TOOLS.PROBLEM_REPORT];
             expect(toolNames(defaultCategories.dev)).toEqual(expected);
@@ -538,6 +544,7 @@ describe('tool descriptions never name a tool absent from the session', () => {
         { label: "tools: ['storage']", input: { tools: ['storage'] }, actorTools: [] },
         { label: "tools: ['actors']", input: { tools: ['actors'] }, actorTools: [] },
         { label: "tools: ['schedules']", input: { tools: ['schedules'] }, actorTools: [] },
+        { label: "tools: ['api']", input: { tools: ['api'] }, actorTools: [] },
         ...ALL_TOOL_NAMES.map((name) => ({
             label: `tools: ['${name}']`,
             input: { tools: [name] },

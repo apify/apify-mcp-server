@@ -32,6 +32,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
     shared `waitSecs` field, the shared build response and the by-status next-step text.
+  - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get one
+    operation, and call a GET operation. `apify_api_spec.ts` builds the operation index from the spec
+    (cached for an hour) and decides each operation's access: read, write, or unavailable with a reason.
+    `apify_api_request.ts` fills in the path, checks the query, and sends one request with no retries.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
