@@ -56,7 +56,7 @@ function makeActorTool(overrides: Partial<ActorTool> = {}): ActorTool {
 // ---------------------------------------------------------------------------
 
 describe('cloneToolEntry', () => {
-    it('should create a deep copy with independent data', () => {
+    it('creates a deep copy with independent data', () => {
         const original = makeInternalTool();
         const cloned = cloneToolEntry(original);
 
@@ -71,7 +71,7 @@ describe('cloneToolEntry', () => {
         expect(cloned.inputSchema).toEqual(original.inputSchema);
     });
 
-    it('should preserve ajvValidate function reference', () => {
+    it('preserves ajvValidate function reference', () => {
         const original = makeInternalTool();
         const cloned = cloneToolEntry(original);
 
@@ -79,7 +79,7 @@ describe('cloneToolEntry', () => {
         expect(typeof cloned.ajvValidate).toBe('function');
     });
 
-    it('should preserve call function reference for internal tools', () => {
+    it('preserves call function reference for internal tools', () => {
         const original = makeInternalTool();
         const cloned = cloneToolEntry(original) as HelperTool;
 
@@ -87,7 +87,7 @@ describe('cloneToolEntry', () => {
         expect(typeof cloned.call).toBe('function');
     });
 
-    it('should work for actor tools (no call function)', () => {
+    it('works for actor tools (no call function)', () => {
         const original = makeActorTool();
         const cloned = cloneToolEntry(original);
 
@@ -96,7 +96,7 @@ describe('cloneToolEntry', () => {
         expect((cloned as ActorTool).actorFullName).toBe(original.actorFullName);
     });
 
-    it('should not share nested objects with the original', () => {
+    it('does not share nested objects with the original', () => {
         const original = makeInternalTool();
         const cloned = cloneToolEntry(original);
 

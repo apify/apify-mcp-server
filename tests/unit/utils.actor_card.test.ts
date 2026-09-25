@@ -99,7 +99,7 @@ function buildInputSchema(fieldCount: number): ActorStoreInputSchema {
 
 describe('formatActorToActorCard', () => {
     describe('backwards compatibility (no options)', () => {
-        it('should include all sections when no options are provided', () => {
+        it('includes all sections when no options are provided', () => {
             const result = formatActorToActorCard(mockActor);
 
             // Should include title and URL (always present)
@@ -126,24 +126,24 @@ describe('formatActorToActorCard', () => {
             expect(result).toContain('- **Last modified:** 2025-11-27T09:32:06.582Z');
         });
 
-        it('should include deprecation warning for deprecated actors', () => {
+        it('includes deprecation warning for deprecated actors', () => {
             const result = formatActorToActorCard(mockDeprecatedActor);
             expect(result).toContain('>This Actor is deprecated and may not be maintained anymore.');
         });
 
-        it('should include rating for ActorStoreList', () => {
+        it('includes rating for ActorStoreList', () => {
             const result = formatActorToActorCard(mockActorStoreList);
             expect(result).toContain('- **Rating:** 4.50 out of 5');
         });
 
-        it('should include categories for ActorStoreList', () => {
+        it('includes categories for ActorStoreList', () => {
             const result = formatActorToActorCard(mockActorStoreList);
             expect(result).toContain('- **Categories:** Web Scraping, AI');
         });
     });
 
     describe('granular options - includeDescription', () => {
-        it('should include only title and URL when all options are false', () => {
+        it('includes only title and URL when all options are false', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -168,7 +168,7 @@ describe('formatActorToActorCard', () => {
             expect(result).not.toContain('- **Last modified:**');
         });
 
-        it('should include only description text when includeDescription is true', () => {
+        it('includes only description text when includeDescription is true', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: true,
                 includeStats: false,
@@ -187,7 +187,7 @@ describe('formatActorToActorCard', () => {
     });
 
     describe('granular options - includeStats', () => {
-        it('should include only stats when includeStats is true', () => {
+        it('includes only stats when includeStats is true', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: false,
                 includeStats: true,
@@ -202,7 +202,7 @@ describe('formatActorToActorCard', () => {
             expect(result).not.toContain('- **Pricing');
         });
 
-        it('should include bookmark count from Actor.stats', () => {
+        it('includes bookmark count from Actor.stats', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: false,
                 includeStats: true,
@@ -216,7 +216,7 @@ describe('formatActorToActorCard', () => {
     });
 
     describe('granular options - includePricing', () => {
-        it('should include only pricing when includePricing is true', () => {
+        it('includes only pricing when includePricing is true', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -232,7 +232,7 @@ describe('formatActorToActorCard', () => {
     });
 
     describe('granular options - includeRating', () => {
-        it('should include rating when includeRating is true for ActorStoreList', () => {
+        it('includes rating when includeRating is true for ActorStoreList', () => {
             const result = formatActorToActorCard(mockActorStoreList, {
                 includeDescription: false,
                 includeStats: false,
@@ -245,7 +245,7 @@ describe('formatActorToActorCard', () => {
             expect(result).not.toContain('- **Stats:**');
         });
 
-        it('should not include rating when includeRating is false', () => {
+        it('does not include rating when includeRating is false', () => {
             const result = formatActorToActorCard(mockActorStoreList, {
                 includeDescription: false,
                 includeStats: false,
@@ -259,7 +259,7 @@ describe('formatActorToActorCard', () => {
     });
 
     describe('granular options - includeMetadata', () => {
-        it('should include metadata (developer, categories, modified date) when includeMetadata is true', () => {
+        it('includes metadata (developer, categories, modified date) when includeMetadata is true', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -276,7 +276,7 @@ describe('formatActorToActorCard', () => {
             expect(result).not.toContain('- **Pricing');
         });
 
-        it('should include deprecation warning when includeMetadata is true', () => {
+        it('includes deprecation warning when includeMetadata is true', () => {
             const result = formatActorToActorCard(mockDeprecatedActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -288,7 +288,7 @@ describe('formatActorToActorCard', () => {
             expect(result).toContain('>This Actor is deprecated and may not be maintained anymore.');
         });
 
-        it('should not include metadata when includeMetadata is false', () => {
+        it('does not include metadata when includeMetadata is false', () => {
             const result = formatActorToActorCard(mockDeprecatedActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -303,7 +303,7 @@ describe('formatActorToActorCard', () => {
     });
 
     describe('granular options - combinations', () => {
-        it('should include description and pricing only', () => {
+        it('includes description and pricing only', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: true,
                 includeStats: false,
@@ -320,7 +320,7 @@ describe('formatActorToActorCard', () => {
             expect(result).not.toContain('- **Last modified:**');
         });
 
-        it('should include stats and rating only', () => {
+        it('includes stats and rating only', () => {
             const result = formatActorToActorCard(mockActorStoreList, {
                 includeDescription: false,
                 includeStats: true,
@@ -339,7 +339,7 @@ describe('formatActorToActorCard', () => {
 
 describe('formatActorToStructuredCard', () => {
     describe('backwards compatibility (no options)', () => {
-        it('should include all fields when no options are provided', () => {
+        it('includes all fields when no options are provided', () => {
             const result = formatActorToStructuredCard(mockActor);
 
             // Should always include
@@ -372,14 +372,14 @@ describe('formatActorToStructuredCard', () => {
             expect(result.isDeprecated).toBe(false);
         });
 
-        it('should include rating for ActorStoreList', () => {
+        it('includes rating for ActorStoreList', () => {
             const result = formatActorToStructuredCard(mockActorStoreList);
             expect(result.rating).toBeDefined();
         });
     });
 
     describe('granular options - includeDescription', () => {
-        it('should exclude description section when includeDescription is false', () => {
+        it('excludes description section when includeDescription is false', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -399,7 +399,7 @@ describe('formatActorToStructuredCard', () => {
             expect(result.categories).toEqual([]);
         });
 
-        it('should include only description text when includeDescription is true', () => {
+        it('includes only description text when includeDescription is true', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: true,
                 includeStats: false,
@@ -416,7 +416,7 @@ describe('formatActorToStructuredCard', () => {
     });
 
     describe('granular options - includeStats', () => {
-        it('should exclude stats when includeStats is false', () => {
+        it('excludes stats when includeStats is false', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -428,7 +428,7 @@ describe('formatActorToStructuredCard', () => {
             expect(result.stats).toBeUndefined();
         });
 
-        it('should include stats when includeStats is true', () => {
+        it('includes stats when includeStats is true', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: false,
                 includeStats: true,
@@ -442,7 +442,7 @@ describe('formatActorToStructuredCard', () => {
             expect(result.stats?.monthlyUsers).toBe(904);
         });
 
-        it('should include bookmarks from Actor.stats', () => {
+        it('includes bookmarks from Actor.stats', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: false,
                 includeStats: true,
@@ -456,7 +456,7 @@ describe('formatActorToStructuredCard', () => {
     });
 
     describe('granular options - includePricing', () => {
-        it('should include default pricing when includePricing is false', () => {
+        it('includes default pricing when includePricing is false', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -469,7 +469,7 @@ describe('formatActorToStructuredCard', () => {
             expect(result.pricing.model).toBe('FREE');
         });
 
-        it('should include actual pricing when includePricing is true', () => {
+        it('includes actual pricing when includePricing is true', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -483,7 +483,7 @@ describe('formatActorToStructuredCard', () => {
     });
 
     describe('granular options - includeRating', () => {
-        it('should exclude rating when includeRating is false', () => {
+        it('excludes rating when includeRating is false', () => {
             const result = formatActorToStructuredCard(mockActorStoreList, {
                 includeDescription: false,
                 includeStats: false,
@@ -495,7 +495,7 @@ describe('formatActorToStructuredCard', () => {
             expect(result.rating).toBeUndefined();
         });
 
-        it('should include rating when includeRating is true', () => {
+        it('includes rating when includeRating is true', () => {
             const result = formatActorToStructuredCard(mockActorStoreList, {
                 includeDescription: false,
                 includeStats: false,
@@ -509,7 +509,7 @@ describe('formatActorToStructuredCard', () => {
     });
 
     describe('granular options - includeMetadata', () => {
-        it('should exclude metadata when includeMetadata is false', () => {
+        it('excludes metadata when includeMetadata is false', () => {
             const result = formatActorToStructuredCard(mockDeprecatedActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -522,7 +522,7 @@ describe('formatActorToStructuredCard', () => {
             expect(result.isDeprecated).toBe(false); // Default value
         });
 
-        it('should include metadata (developer, categories, dates, deprecation) when includeMetadata is true', () => {
+        it('includes metadata (developer, categories, dates, deprecation) when includeMetadata is true', () => {
             const result = formatActorToStructuredCard(mockDeprecatedActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -540,7 +540,7 @@ describe('formatActorToStructuredCard', () => {
     });
 
     describe('granular options - combinations', () => {
-        it('should include only requested sections (description + pricing)', () => {
+        it('includes only requested sections (description + pricing)', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: true,
                 includeStats: false,
@@ -558,7 +558,7 @@ describe('formatActorToStructuredCard', () => {
             expect(result.modifiedAt).toBeUndefined();
         });
 
-        it('should include only requested sections (stats + rating)', () => {
+        it('includes only requested sections (stats + rating)', () => {
             const result = formatActorToStructuredCard(mockActorStoreList, {
                 includeDescription: false,
                 includeStats: true,

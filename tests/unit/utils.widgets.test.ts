@@ -19,21 +19,21 @@ vi.mock('node:fs', () => ({
 
 describe('Widget Utils', () => {
     describe('getWidgetConfig', () => {
-        it('should return config for valid URI', () => {
+        it('returns config for valid URI', () => {
             const uri = WIDGET_URIS.SEARCH_ACTORS;
             const config = getWidgetConfig(uri);
             expect(config).toBeDefined();
             expect(config?.uri).toBe(uri);
         });
 
-        it('should return undefined for invalid URI', () => {
+        it('returns undefined for invalid URI', () => {
             const config = getWidgetConfig('ui://invalid');
             expect(config).toBeUndefined();
         });
     });
 
     describe('resolveAvailableWidgets', () => {
-        it('should correctly identify existing and missing widgets', async () => {
+        it('correctly identifies existing and missing widgets', async () => {
             const fs = await import('node:fs');
             const mockExistsSync = vi.mocked(fs.existsSync);
 
@@ -56,7 +56,7 @@ describe('Widget Utils', () => {
             expect(runWidget?.exists).toBe(false);
         });
 
-        it('should handle path resolution correctly', async () => {
+        it('handles path resolution correctly', async () => {
             const fs = await import('node:fs');
             const mockExistsSync = vi.mocked(fs.existsSync);
             mockExistsSync.mockReturnValue(true);
