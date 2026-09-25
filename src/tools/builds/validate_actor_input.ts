@@ -48,22 +48,19 @@ const validateActorInputArgs = z.object({
 });
 
 /**
- * "push the change and build the Actor, then check again", naming push-actor and build-actor only where
- * `hasTool` reports them. push-actor builds the pushed version by default, so build-actor is named only
- * without it. The check waits for that build to succeed and names it by number: the latest tag moves only
- * on success, so an earlier check without build reads the previous build's schema.
+ * "update the source and build the Actor again, then check again", naming build-actor only where
+ * `hasTool` reports it. No tool is named for the source change: it may be pushed files, a Git commit or the
+ * CLI. The check waits for that build to succeed and names it by number: the latest tag moves only on
+ * success, so an earlier check without build reads the previous build's schema.
  */
-function formatPushBuildAndRecheckStep(hasTool: (name: string) => boolean): string {
+function formatRebuildAndRecheckStep(hasTool: (name: string) => boolean): string {
     const buildWith = hasTool(HELPER_TOOLS.ACTOR_BUILD) ? ` with ${HELPER_TOOLS.ACTOR_BUILD}` : '';
-    const pushAndBuildStep = hasTool(HELPER_TOOLS.ACTOR_PUSH)
-        ? `push the change with ${HELPER_TOOLS.ACTOR_PUSH} (it builds the version)`
-        : `push the change and build the Actor${buildWith}`;
-    return `${pushAndBuildStep}, then check again once that build has succeeded, passing its build number as build`;
+    return `update the Actor's source and build it again${buildWith}, then check again once that build has succeeded, passing its build number as build`;
 }
 
-/** The next step after the schema rejected the input, naming push-actor and build-actor only when the session has them. */
+/** The next step after the schema rejected the input, naming build-actor only when the session has it. */
 function formatRejectedInputNextStep(errorType: string | undefined, loadedToolNames: readonly string[]): string {
-    const recheckStep = formatPushBuildAndRecheckStep((name) => loadedToolNames.includes(name));
+    const recheckStep = formatRebuildAndRecheckStep((name) => loadedToolNames.includes(name));
     if (errorType === INVALID_INPUT_SCHEMA_ERROR_TYPE) {
         return `Fix the input schema in .actor/input_schema.json, ${recheckStep}.`;
     }
@@ -89,7 +86,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 Read-only. Returns valid true, or valid false with the API's validation message.
 Schema defaults are applied before the check; a build without an input schema accepts any input.
 Without build, the input is checked against the build tagged latest, not the Actor's default build.
-The schema is read from the build, so after editing .actor/input_schema.json, ${formatPushBuildAndRecheckStep(hasTool)}.
+The schema is read from the build, so after editing .actor/input_schema.json, ${formatRebuildAndRecheckStep(hasTool)}.
 
 USAGE:
 - Use while developing an Actor to test .actor/input_schema.json and example inputs.

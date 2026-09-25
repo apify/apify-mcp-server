@@ -91,10 +91,8 @@ describe('validate-actor-input', () => {
             expect(JSON.parse(content[0].text)).toEqual(structuredContent);
             expect(content).toHaveLength(2);
             expect(content[1].text).toBe(
-                `${message}\n${fixStep} in .actor/input_schema.json, push the change with ${HELPER_TOOLS.ACTOR_PUSH} (it builds the version), ${RECHECK_STEP}`,
+                `${message}\n${fixStep} in .actor/input_schema.json, update the Actor's source and build it again with ${HELPER_TOOLS.ACTOR_BUILD}, ${RECHECK_STEP}`,
             );
-            // push-actor already builds the pushed version, so a second build is not suggested.
-            expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
             expectSchemaConformingStructuredContent(result, validateActorInputToolOutputSchema);
         });
 
@@ -106,19 +104,18 @@ describe('validate-actor-input', () => {
             expect(structuredContent).toMatchObject({ valid: false, build: 'latest' });
         });
 
-        it('names no tool in the next step when push-actor and build-actor are not loaded', async () => {
+        it('names no tool in the next step when build-actor is not loaded', async () => {
             validateInputMock.mockRejectedValue(apiError(400, 'invalid-input', INVALID_INPUT_MESSAGE));
 
             const { content } = await callTool({ actor: 'actor-1', input: INPUT }, [HELPER_TOOLS.ACTOR_INPUT_VALIDATE]);
 
             expect(content[1].text).toBe(
-                `${INVALID_INPUT_MESSAGE}\nFix the input, or fix the input schema in .actor/input_schema.json, push the change and build the Actor, ${RECHECK_STEP}`,
+                `${INVALID_INPUT_MESSAGE}\nFix the input, or fix the input schema in .actor/input_schema.json, update the Actor's source and build it again, ${RECHECK_STEP}`,
             );
-            expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_PUSH);
             expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
         });
 
-        it('names build-actor when push-actor is not loaded', async () => {
+        it('names build-actor when it is loaded', async () => {
             validateInputMock.mockRejectedValue(apiError(400, 'invalid-input', INVALID_INPUT_MESSAGE));
 
             const { content } = await callTool({ actor: 'actor-1', input: INPUT }, [
@@ -127,9 +124,8 @@ describe('validate-actor-input', () => {
             ]);
 
             expect(content[1].text).toBe(
-                `${INVALID_INPUT_MESSAGE}\nFix the input, or fix the input schema in .actor/input_schema.json, push the change and build the Actor with ${HELPER_TOOLS.ACTOR_BUILD}, ${RECHECK_STEP}`,
+                `${INVALID_INPUT_MESSAGE}\nFix the input, or fix the input schema in .actor/input_schema.json, update the Actor's source and build it again with ${HELPER_TOOLS.ACTOR_BUILD}, ${RECHECK_STEP}`,
             );
-            expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_PUSH);
         });
     });
 
@@ -277,23 +273,14 @@ describe('validate-actor-input', () => {
     });
 
     describe('description', () => {
-        it('names push-actor, or build-actor without it, only when they are in the session', () => {
+        it('names build-actor only when it is in the session', () => {
             const tool = validateActorInput as HelperTool;
             expect(tool.description).toContain(
-                `push the change with ${HELPER_TOOLS.ACTOR_PUSH} (it builds the version), ${RECHECK_STEP}`,
-            );
-            expect(tool.description).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
-
-            const withBuildOnly = tool.buildDescription?.(
-                only(HELPER_TOOLS.ACTOR_INPUT_VALIDATE, HELPER_TOOLS.ACTOR_BUILD),
-            );
-            expect(withBuildOnly).toContain(
-                `push the change and build the Actor with ${HELPER_TOOLS.ACTOR_BUILD}, ${RECHECK_STEP}`,
+                `update the Actor's source and build it again with ${HELPER_TOOLS.ACTOR_BUILD}, ${RECHECK_STEP}`,
             );
 
             const alone = tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_INPUT_VALIDATE));
-            expect(alone).toContain(`push the change and build the Actor, ${RECHECK_STEP}`);
-            expect(alone).not.toContain(HELPER_TOOLS.ACTOR_PUSH);
+            expect(alone).toContain(`update the Actor's source and build it again, ${RECHECK_STEP}`);
             expect(alone).not.toContain(HELPER_TOOLS.ACTOR_BUILD);
         });
     });
