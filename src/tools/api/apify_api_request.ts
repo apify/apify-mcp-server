@@ -9,7 +9,7 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import type { ApiAccess, ApiOperation } from './apify_api_spec.js';
-import { API_ACCESS } from './apify_api_spec.js';
+import { API_ACCESS, isRecord } from './apify_api_spec.js';
 
 /** Input fields the read and write tools share. */
 export const apiCallArgsShape = {
@@ -34,6 +34,8 @@ export const apiCallArgsShape = {
 
 export type ApiCallParams = {
     query?: Record<string, string | number | boolean>;
+    /** JSON request body; only the write tool sends one. */
+    body?: unknown;
     /** Aborts the request when the client cancels the tool call. */
     signal?: AbortSignal;
 };
@@ -57,8 +59,10 @@ export function resolveOperationToCall(
         return { error: `The API tools do not call ${operationId}. ${operation.unavailableReason}` };
     }
     if (operation.access !== access) {
+        const otherTool = operation.access === API_ACCESS.READ ? HELPER_TOOLS.API_READ : HELPER_TOOLS.API_WRITE;
+        const callOther = loadedToolNames.includes(otherTool) ? ` Call it with ${otherTool}.` : '';
         return {
-            error: `${operationId} is a ${operation.method} operation with ${operation.access} access; this tool has ${access} access.`,
+            error: `${operationId} is a ${operation.method} operation with ${operation.access} access; this tool has ${access} access.${callOther}`,
         };
     }
     return { operation };
@@ -115,11 +119,31 @@ export function validateQueryParams(
     return undefined;
 }
 
+/** Checks the body against the operation; returns the reason on failure. */
+export function validateRequestBody(operation: ApiOperation, body: unknown): string | undefined {
+    if (!operation.requestBody) {
+        return body === undefined ? undefined : `${operation.operationId} takes no request body.`;
+    }
+    if (body === undefined) {
+        return operation.requestBody.isRequired ? `${operation.operationId} needs a request body.` : undefined;
+    }
+    if (!isRecord(body)) return undefined;
+    const refusedFields = operation.refusedBodyFields.filter((field) => field in body);
+    if (refusedFields.length > 0) {
+        return (
+            `The API tools do not set ${refusedFields.join(', ')}, whatever the value: publishing, pricing, ` +
+            'permission, and sharing changes need a dedicated tool or Apify Console. Remove the field and call again.'
+        );
+    }
+    return undefined;
+}
+
 function formatOversizeMessage(operation: ApiOperation, path: string): string {
-    return (
-        `The response of ${operation.method} ${path} is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned. ` +
-        'Narrow the request, for example with the limit, offset, or fields query parameters if the operation declares them.'
-    );
+    const next =
+        operation.method === 'GET'
+            ? 'Narrow the request, for example with the limit, offset, or fields query parameters if the operation declares them.'
+            : 'The request itself was sent; check its effect with an operation with read access.';
+    return `The response of ${operation.method} ${path} is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned. ${next}`;
 }
 
 /**
@@ -144,6 +168,7 @@ export async function callApiOperation(
             url: `${client.baseUrl}${path.slice('/v2'.length)}`,
             method: operation.method,
             params: params.query,
+            data: params.body,
             maxContentLength: MAX_INLINE_BYTES,
             signal: params.signal,
         });
