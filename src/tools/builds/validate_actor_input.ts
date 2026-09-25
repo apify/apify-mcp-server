@@ -35,7 +35,12 @@ const UNUSABLE_BUILD_ERROR_TYPES: ReadonlySet<string | undefined> = new Set([
 ]);
 
 const validateActorInputArgs = z.object({
-    actor: z.string().min(1).describe('Actor ID or username/name'),
+    actor: z
+        .string()
+        .min(1)
+        .describe(
+            'The Actor to check against: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
+        ),
     input: z.object({}).passthrough().describe('The input JSON to check against the input schema. Required.'),
     // Non-empty so the reported build is the one checked: the API treats an empty build as latest.
     build: z
