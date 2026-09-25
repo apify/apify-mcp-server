@@ -643,6 +643,51 @@ export const createActorToolOutputSchema = {
     required: ['actorId', 'fullName', 'versionNumber', 'sourceType', 'buildTag', 'revision', 'files', 'warnings'],
 };
 
+/** Schema for create-actor-version: the new version, its files, and what a copy could not take over. */
+export const createActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Number of the new version, e.g. 0.2' },
+        sourceType: {
+            type: 'string',
+            description: 'Where the source lives: SOURCE_FILES, GIT_REPO, or GITHUB_GIST',
+        },
+        buildTag: { type: 'string', description: 'Tag that builds of the version get; absent when none was given' },
+        revision: {
+            type: 'string',
+            description: 'Identifies the file set, or the URL; the same value a later read of the version returns',
+        },
+        files: {
+            type: 'array',
+            description: 'The files as stored, sorted by path, folders excluded; empty for an empty or URL version',
+            items: getActorVersionToolOutputSchema.properties.files.items,
+        },
+        copiedFromVersion: { type: 'string', description: 'The version the source was copied from' },
+        secretEnvVarsNotCopied: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+                'Names of secret environment variables a copy could not take over, since their values cannot be read',
+        },
+        ...sourceWriteBuildProperties,
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'sourceType', 'revision', 'files', 'warnings'],
+};
+
+/** Schema for delete-actor-version: the version that was deleted. */
+export const deleteActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Number of the deleted version' },
+        deleted: { type: 'boolean', description: 'Always true' },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'deleted'],
+};
+
 /** Schema for update-actor-version: the revisions before and after, what changed, and excerpts of edited regions. */
 export const updateActorVersionToolOutputSchema = {
     type: 'object' as const,

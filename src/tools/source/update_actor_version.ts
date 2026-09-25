@@ -31,6 +31,7 @@ import {
     formatBuildLaterHint,
     formatBuildStartFailure,
     formatEmptyFilesWarning,
+    formatUrlSourceText,
     formatUrlWithoutSecrets,
     getInlineSourceBytes,
     getSourceFileEntryBytes,
@@ -38,6 +39,7 @@ import {
     isFolderEntry,
     MAX_INLINE_SOURCE_BYTES,
     MAX_WRITE_FILES,
+    parseInputFileEntries,
     parseInputPath,
     resolveOwnActor,
     resolveVersionNumber,
@@ -313,20 +315,7 @@ function parseUpdateRequest(args: UpdateActorVersionArgs, loadedToolNames: reado
     );
     const prepared = operations.map(parseOperation);
     if (replaceFiles === undefined) return { operations: prepared, gitRepoUrl };
-    const seenPaths = new Set<string>();
-    const entries = replaceFiles.map((file, index) => {
-        const label = `replaceFiles[${index}]`;
-        const path = parseInputPath(file.path, `${label} path`);
-        if (seenPaths.has(path)) throw new UserInputError(`replaceFiles has ${path} more than once.`);
-        seenPaths.add(path);
-        return buildSourceFileEntry({
-            path,
-            content: file.content,
-            encoding: file.encoding,
-            label: `${label} content for`,
-        });
-    });
-    return { operations: prepared, replaceFiles: entries };
+    return { operations: prepared, replaceFiles: parseInputFileEntries(replaceFiles, 'replaceFiles') };
 }
 
 type VersionTarget = { actorId: string; fullName: string; versionNumber: string };
@@ -369,12 +358,6 @@ function readCurrentSource(version: ActorVersion, { fullName, versionNumber }: V
     throw new UserInputError(
         `Version ${versionNumber} of ${fullName} has source type ${sourceType}, which this tool does not support.`,
     );
-}
-
-function formatUrlSourceText(source: { sourceType: string; url: string }): string {
-    return source.sourceType === ActorSourceType.GitHubGist
-        ? `the GitHub gist ${source.url}`
-        : `the Git repository ${source.url}`;
 }
 
 type ApplyState = {
@@ -943,7 +926,10 @@ export const updateActorVersion: ToolEntry = Object.freeze({
         try {
             const request = parseUpdateRequest(parsed, loadedToolNames);
             const { actor, fullName } = await resolveOwnActor({ client, apifyToken, actorSelector: parsed.actor });
-            const versionNumber = resolveVersionNumber(actor, parsed.versionNumber, parsed.actor);
+            const addVersionHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_CREATE)
+                ? ` To add it, use ${HELPER_TOOLS.ACTOR_VERSION_CREATE}.`
+                : '';
+            const versionNumber = resolveVersionNumber(actor, parsed.versionNumber, parsed.actor, addVersionHint);
             const target = { actorId: actor.id, fullName, versionNumber };
             // TODO: The Apify API has no way to read or change single files of an Actor's source, so even a one-line
             // edit reads the whole version here and writes all its files back with the PUT below. That read and write

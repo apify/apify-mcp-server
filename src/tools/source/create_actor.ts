@@ -20,8 +20,7 @@ import {
     buildFilesManifest,
     formatBuildLaterHint,
     formatBuildStartFailure,
-    formatEmptyFilesWarning,
-    formatMissingDockerfileWarning,
+    buildSentFilesWarnings,
     formatUrlWithoutSecrets,
     getSourceFileEntryBytes,
     isFolderEntry,
@@ -31,7 +30,7 @@ import {
     sourceFileArgs,
     startBuildAfterWrite,
     validateActorName,
-    validateCallContentSize,
+    validateNewFilesCallSize,
     validateSessionToken,
 } from './source_helpers.js';
 
@@ -98,38 +97,24 @@ function parseCreateRequest(args: CreateActorArgs, loadedToolNames: readonly str
     }
     if (args.gitRepoUrl !== undefined) return { kind: 'git', gitRepoUrl: args.gitRepoUrl };
     const files = args.files ?? [];
-    // Files within this cap always fit the platform's 3 MiB measure, which counts at most 1.25 bytes per UTF-8 byte.
-    const addLaterText = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_UPDATE)
-        ? ` with ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}`
-        : '';
-    validateCallContentSize(
-        files.map(({ content }) => content),
-        {
-            fieldsText: 'content',
-            recoveryText: `Create the Actor with fewer files, then add the rest in later calls${addLaterText}.`,
-        },
-    );
-    return { kind: 'files', entries: parseInputFiles(files, 'files') };
+    validateNewFilesCallSize(files, { subject: 'Actor', loadedToolNames });
+    return { kind: 'files', entries: parseInputFiles(files) };
 }
 
 function buildFilesWarnings(
     sentEntries: readonly ActorVersionSourceFile[],
     storedEntries: readonly ActorVersionSourceFile[] | undefined,
 ): string[] {
-    const emptyPaths = sentEntries.filter(({ content }) => content === '').map(({ name }) => name);
     const sentConfig = sentEntries.find(({ name }) => name === ACTOR_CONFIG_PATH);
     const storedConfig = storedEntries?.findLast(({ name }) => parseStoredPath(name) === ACTOR_CONFIG_PATH);
     const isConfigRewritten =
         sentConfig !== undefined &&
         storedConfig !== undefined &&
         !getSourceFileEntryBytes(sentConfig).equals(getSourceFileEntryBytes(storedConfig));
-    return [
-        formatMissingDockerfileWarning(sentEntries),
-        isConfigRewritten &&
-            `The platform set the name field of ${ACTOR_CONFIG_PATH} to the Actor name, so the stored file differs ` +
-                'from the one sent; its hash in files, and the revision, are those of the stored file.',
-        formatEmptyFilesWarning(emptyPaths),
-    ].filter((warning): warning is string => typeof warning === 'string');
+    const rewrittenWarning =
+        `The platform set the name field of ${ACTOR_CONFIG_PATH} to the Actor name, so the stored file differs ` +
+        'from the one sent; its hash in files, and the revision, are those of the stored file.';
+    return [...buildSentFilesWarnings(sentEntries), ...(isConfigRewritten ? [rewrittenWarning] : [])];
 }
 
 /**

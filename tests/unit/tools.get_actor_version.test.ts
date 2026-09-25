@@ -167,6 +167,8 @@ describe('get-actor-version', () => {
             HELPER_TOOLS.ACTOR_VERSION_GET,
             HELPER_TOOLS.ACTOR_CREATE,
             HELPER_TOOLS.ACTOR_VERSION_UPDATE,
+            HELPER_TOOLS.ACTOR_VERSION_CREATE,
+            HELPER_TOOLS.ACTOR_VERSION_DELETE,
         ]);
         expect(toolCategoriesEnabledByDefault).not.toContain('source');
     });

@@ -1251,6 +1251,17 @@ describe('update-actor-version', () => {
     });
 
     describe('input rules', () => {
+        it('refuses a version the Actor does not have, naming create-actor-version only when loaded', async () => {
+            const args = { versionNumber: '0.3', operations: [{ type: 'write', path: 'src/new.js', content: 'x' }] };
+            expect(await callToolExpectingUserError(args)).toBe(
+                "Actor 'john/my-actor' has no version 0.3; available versions: 0.1. " +
+                    `To add it, use ${HELPER_TOOLS.ACTOR_VERSION_CREATE}.`,
+            );
+            const bare = await callToolExpectingUserError(args, [HELPER_TOOLS.ACTOR_VERSION_UPDATE]);
+            expect(bare).toBe("Actor 'john/my-actor' has no version 0.3; available versions: 0.1.");
+            expect(versionUpdateMock).not.toHaveBeenCalled();
+        });
+
         it.each([
             ['/etc/passwd', 'is absolute'],
             ['C:\\x.js', 'is absolute'],
