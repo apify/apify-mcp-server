@@ -20,13 +20,14 @@ import {
     buildFilesRevision,
     buildInlineSourceFile,
     buildUrlRevision,
+    BYTES_PER_MIB,
     compareSourcePaths,
+    formatMib,
+    splitLines,
 } from './source_files.js';
 import { formatUrlWithoutSecrets, isFolderEntry, resolveVersionNumber } from './source_helpers.js';
 
 const INLINE_LIMIT_KIB = MAX_INLINE_BYTES / 1024;
-
-const BYTES_PER_MIB = 1024 * 1024;
 
 const MAX_REQUESTED_PATHS = 100;
 
@@ -127,11 +128,6 @@ function parseSourceRecordUrl(tarballUrl: string, apiBaseUrl: string): SourceRec
     }
 }
 
-/** Rounded up, so a size just over a limit never prints as the limit itself. */
-function formatMib(bytes: number): string {
-    return (Math.ceil((bytes / BYTES_PER_MIB) * 10) / 10).toFixed(1);
-}
-
 function formatKib(bytes: number): string {
     return (Math.ceil((bytes / 1024) * 10) / 10).toFixed(1);
 }
@@ -166,12 +162,6 @@ function sortSourceFiles(files: Iterable<SourceFile>): SourceFile[] {
 
 function toReturnedContent(file: SourceFile): ReturnedContent {
     return { path: file.path, content: file.readContent(), encoding: file.encoding };
-}
-
-/** Lines with their line endings kept, so joined back they give the exact text. */
-function splitLines(text: string): string[] {
-    if (text === '') return [];
-    return text.split(/(?<=\n)/);
 }
 
 function buildEmptySelection(): ContentSelection {

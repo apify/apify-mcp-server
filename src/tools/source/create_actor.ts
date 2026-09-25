@@ -1,8 +1,9 @@
-import type { ActorCollectionCreateOptions, ActorVersion, ActorVersionSourceFile } from 'apify-client';
+import type { Actor, ActorCollectionCreateOptions, ActorVersion, ActorVersionSourceFile } from 'apify-client';
 import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
+import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
@@ -12,7 +13,15 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondAborted } from '../../utils/mcp.js';
 import { buildNextStepForBuild, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
 import { createActorToolOutputSchema } from '../structured_output_schemas.js';
-import { buildFilesRevision, buildInlineSourceFile, buildUrlRevision, compareSourcePaths } from './source_files.js';
+import type { SourceFile } from './source_files.js';
+import {
+    buildFilesRevision,
+    buildInlineSourceFile,
+    buildUrlRevision,
+    compareSourcePaths,
+    MAX_SOURCE_PATH_LENGTH,
+    parseStoredPath,
+} from './source_files.js';
 import type { BuildAfterWriteResult } from './source_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
@@ -21,7 +30,9 @@ import {
     formatBuildStartFailure,
     formatEmptyFilesWarning,
     formatUrlWithoutSecrets,
-    MAX_SOURCE_PATH_LENGTH,
+    getSourceFileEntryBytes,
+    isFolderEntry,
+    MAX_WRITE_FILES,
     parseInputPath,
     respondToSourceToolError,
     sourceFileArgs,
@@ -31,19 +42,20 @@ import {
     validateSessionToken,
 } from './source_helpers.js';
 
-const MAX_FILES = 500;
-
 /** `apify push` starts a new Actor at this version. */
 const DEFAULT_VERSION_NUMBER = '0.0';
 
 /** `apify push` uses this tag too, because the platform expects an Actor to have a `latest` build. */
 const DEFAULT_BUILD_TAG = 'latest';
 
-/** The error type the platform returns when the account already has an Actor with the name. */
-const ACTOR_NAME_TAKEN_ERROR_TYPE = 'actor-name-not-unique';
+/**
+ * The error types the platform returns when the account already has an Actor with the name: the first from its
+ * lookup before the insert, the second from the unique index when two creates race past that lookup.
+ */
+const ACTOR_NAME_TAKEN_ERROR_TYPES: ReadonlySet<string> = new Set(['actor-name-not-unique', 'name-not-unique']);
 
-/** Where the build looks for a Dockerfile when `.actor/actor.json` names none. */
-const DOCKERFILE_PATHS = ['Dockerfile', '.actor/Dockerfile'];
+/** Where the build looks for a Dockerfile when `.actor/actor.json` names none; it matches them regardless of case. */
+const DOCKERFILE_PATHS = ['dockerfile', '.actor/dockerfile'];
 
 const createActorArgs = z.object({
     name: z
@@ -57,10 +69,10 @@ const createActorArgs = z.object({
     files: z
         .array(sourceFileArgs)
         .min(1)
-        .max(MAX_FILES)
+        .max(MAX_WRITE_FILES)
         .optional()
         .describe(
-            `The Actor's files, 1 to ${MAX_FILES}; they must include ${ACTOR_CONFIG_PATH}. Give exactly one of files or gitRepoUrl.`,
+            `The Actor's files, 1 to ${MAX_WRITE_FILES}; they must include ${ACTOR_CONFIG_PATH}. Give exactly one of files or gitRepoUrl.`,
         ),
     gitRepoUrl: z
         .string()
@@ -89,7 +101,7 @@ type CreateActorArgs = z.infer<typeof createActorArgs>;
 type PreparedSource = { kind: 'files'; entries: ActorVersionSourceFile[] } | { kind: 'git'; gitRepoUrl: string };
 
 /** Checks the input without any API call; throws `UserInputError` for the first problem. */
-function parseCreateRequest(args: CreateActorArgs): PreparedSource {
+function parseCreateRequest(args: CreateActorArgs, loadedToolNames: readonly string[]): PreparedSource {
     validateActorName(args.name);
     if ((args.files === undefined) === (args.gitRepoUrl === undefined)) {
         throw new UserInputError('Give exactly one of files or gitRepoUrl.');
@@ -97,7 +109,16 @@ function parseCreateRequest(args: CreateActorArgs): PreparedSource {
     if (args.gitRepoUrl !== undefined) return { kind: 'git', gitRepoUrl: args.gitRepoUrl };
     const files = args.files ?? [];
     // Files within this cap always fit the platform's 3 MiB measure, which counts at most 1.25 bytes per UTF-8 byte.
-    validateCallContentSize(files.map(({ content }) => content));
+    const addLaterText = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_UPDATE)
+        ? ` with ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}`
+        : '';
+    validateCallContentSize(
+        files.map(({ content }) => content),
+        {
+            fieldsText: 'content',
+            recoveryText: `Create the Actor with fewer files, then add the rest in later calls${addLaterText}.`,
+        },
+    );
     const seenPaths = new Set<string>();
     const entries = files.map((file, index) => {
         const label = `files[${index}]`;
@@ -116,7 +137,8 @@ function parseCreateRequest(args: CreateActorArgs): PreparedSource {
     });
     if (!seenPaths.has(ACTOR_CONFIG_PATH)) {
         throw new UserInputError(
-            `files must include ${ACTOR_CONFIG_PATH}, the Actor's configuration; the build cannot start without it.`,
+            `files must include ${ACTOR_CONFIG_PATH}: this tool requires it, since the build reads the Actor's ` +
+                'configuration from it.',
         );
     }
     return { kind: 'files', entries };
@@ -134,15 +156,50 @@ function hasDockerfileField(entries: readonly ActorVersionSourceFile[]): boolean
     }
 }
 
-function buildFilesWarnings(entries: readonly ActorVersionSourceFile[]): string[] {
-    const paths = new Set(entries.map(({ name }) => name));
-    const hasDockerfile = DOCKERFILE_PATHS.some((path) => paths.has(path)) || hasDockerfileField(entries);
-    const emptyPaths = entries.filter(({ content }) => content === '').map(({ name }) => name);
+function buildFilesWarnings(
+    sentEntries: readonly ActorVersionSourceFile[],
+    storedEntries: readonly ActorVersionSourceFile[] | undefined,
+): string[] {
+    const paths = new Set(sentEntries.map(({ name }) => name.toLowerCase()));
+    const hasDockerfile = DOCKERFILE_PATHS.some((path) => paths.has(path)) || hasDockerfileField(sentEntries);
+    const emptyPaths = sentEntries.filter(({ content }) => content === '').map(({ name }) => name);
+    const sentConfig = sentEntries.find(({ name }) => name === ACTOR_CONFIG_PATH);
+    const storedConfig = storedEntries?.findLast(({ name }) => parseStoredPath(name) === ACTOR_CONFIG_PATH);
+    const isConfigRewritten =
+        sentConfig !== undefined &&
+        storedConfig !== undefined &&
+        !getSourceFileEntryBytes(sentConfig).equals(getSourceFileEntryBytes(storedConfig));
     return [
         !hasDockerfile &&
-            `No Dockerfile found: there is no Dockerfile or .actor/Dockerfile, and ${ACTOR_CONFIG_PATH} names none, so the build will fail.`,
+            `No Dockerfile found: there is no Dockerfile or .actor/Dockerfile, and ${ACTOR_CONFIG_PATH} names none, so ` +
+                "the build uses the platform's default Node.js Dockerfile; an Actor in another language needs its own.",
+        isConfigRewritten &&
+            `The platform set the name field of ${ACTOR_CONFIG_PATH} to the Actor name, so the stored file differs ` +
+                'from the one sent; its hash in files, and the revision, are those of the stored file.',
         formatEmptyFilesWarning(emptyPaths),
     ].filter((warning): warning is string => typeof warning === 'string');
+}
+
+/**
+ * The files the platform stored, from the created Actor's version; undefined when the response has none. The platform
+ * rewrites the name in `.actor/actor.json` on create, so these, not the sent ones, match a later read.
+ */
+function extractStoredEntries(created: Actor, versionNumber: string): ActorVersionSourceFile[] | undefined {
+    const version = (created.versions as ActorVersion[] | undefined)?.find(
+        (candidate) => candidate.versionNumber === versionNumber,
+    );
+    const sourceFiles = version?.sourceType === ActorSourceType.SourceFiles ? version.sourceFiles : undefined;
+    return Array.isArray(sourceFiles) ? sourceFiles.filter((entry) => !isFolderEntry(entry)) : undefined;
+}
+
+/** One file per path, the last stored entry winning as in get-actor-version, sorted by path. */
+function buildFilesManifest(entries: readonly ActorVersionSourceFile[]): SourceFile[] {
+    const filesByPath = new Map<string, SourceFile>();
+    for (const entry of entries) {
+        const file = buildInlineSourceFile(entry);
+        filesByPath.set(file.path, file);
+    }
+    return [...filesByPath.values()].sort((a, b) => compareSourcePaths(a.path, b.path));
 }
 
 function buildVersion(args: CreateActorArgs, source: PreparedSource): ActorVersion {
@@ -151,11 +208,28 @@ function buildVersion(args: CreateActorArgs, source: PreparedSource): ActorVersi
     return { ...common, sourceType: ActorSourceType.SourceFiles, sourceFiles: source.entries };
 }
 
-function formatNameTakenText(name: string, loadedToolNames: readonly string[]): string {
+/** The caller's username, so the name-taken text can give the full name update-actor-version takes. */
+async function fetchUsername(client: ApifyClient): Promise<string | undefined> {
+    try {
+        const user = await client.user('me').get();
+        return typeof user?.username === 'string' && user.username !== '' ? user.username : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function formatNameTakenText(params: {
+    name: string;
+    username: string | undefined;
+    loadedToolNames: readonly string[];
+}): string {
+    const { name, username, loadedToolNames } = params;
+    const fullName = username === undefined ? name : `${username}/${name}`;
+    const selectorText = username === undefined ? ' with actor set to your username/name' : ` with actor ${fullName}`;
     const hint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_UPDATE)
-        ? ` To change its source, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}.`
+        ? ` To change its source, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}${selectorText}.`
         : ' Pick another name, or change the existing Actor instead.';
-    return `Your account already has an Actor named ${name}, and this tool never changes an existing Actor.${hint}`;
+    return `Your account already has an Actor named ${fullName}, and this tool never changes an existing Actor.${hint}`;
 }
 
 function formatNextStep(buildResult: BuildAfterWriteResult | undefined, loadedToolNames: readonly string[]): string {
@@ -176,9 +250,9 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return dedent`
         Create a new private Actor in your own account, with one version holding its source: files, or a Git repository to build from.
         It never changes an existing Actor: a name your account already uses is refused.${existingNote}
-        - files: every file with its path and content; they must include ${ACTOR_CONFIG_PATH} and a Dockerfile (at the root, in .actor/, or named by ${ACTOR_CONFIG_PATH}). Binary files take base64 content with encoding base64; files with a binary extension such as .png default to it.
+        - files: every file with its path and content; they must include ${ACTOR_CONFIG_PATH}. Without a Dockerfile (at the root, in .actor/, or named by ${ACTOR_CONFIG_PATH}) the build uses the platform's default Node.js one. Binary files take base64 content with encoding base64; files with a binary extension such as .png default to it.
         - gitRepoUrl: repository#branch:directory, with the branch and directory optional.
-        Limits: ${MAX_FILES} files and 2 MiB of content. The result lists each file's hash and the version's revision.
+        Limits: ${MAX_WRITE_FILES} files and 2 MiB of content. The result lists each file's hash and the version's revision.
         autoBuild starts a build after creating the Actor and returns without waiting.${waitNote} The version is ${DEFAULT_VERSION_NUMBER} with build tag ${DEFAULT_BUILD_TAG} unless you set versionNumber and buildTag.
 
         USAGE:
@@ -218,8 +292,10 @@ export const createActor: ToolEntry = Object.freeze({
         const { args, apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
         const parsed = createActorArgs.parse(args);
         try {
-            const source = parseCreateRequest(parsed);
+            const source = parseCreateRequest(parsed, loadedToolNames);
             validateSessionToken(apifyToken, 'Creating an Actor');
+            // A cancel before the POST creates nothing; per the MCP spec the cancelled request gets no response.
+            if (signal?.aborted) return respondAborted();
             let created;
             try {
                 created = await client.actors().create({
@@ -229,8 +305,9 @@ export const createActor: ToolEntry = Object.freeze({
                     versions: [buildVersion(parsed, source)],
                 } satisfies ActorCollectionCreateOptions);
             } catch (error) {
-                if (error instanceof ApifyApiError && error.type === ACTOR_NAME_TAKEN_ERROR_TYPE) {
-                    throw new UserInputError(formatNameTakenText(parsed.name, loadedToolNames));
+                if (error instanceof ApifyApiError && ACTOR_NAME_TAKEN_ERROR_TYPES.has(error.type ?? '')) {
+                    const username = await fetchUsername(client);
+                    throw new UserInputError(formatNameTakenText({ name: parsed.name, username, loadedToolNames }));
                 }
                 throw error;
             }
@@ -240,10 +317,9 @@ export const createActor: ToolEntry = Object.freeze({
                 ? await startBuildAfterWrite(client, created.id, parsed.versionNumber)
                 : undefined;
             const linkContext = buildResult?.build ? await getConsoleLinkContext(apifyToken, client) : undefined;
-            const files =
-                source.kind === 'files'
-                    ? source.entries.map(buildInlineSourceFile).sort((a, b) => compareSourcePaths(a.path, b.path))
-                    : [];
+            const storedEntries =
+                source.kind === 'files' ? extractStoredEntries(created, parsed.versionNumber) : undefined;
+            const files = source.kind === 'files' ? buildFilesManifest(storedEntries ?? source.entries) : [];
             const revision =
                 source.kind === 'files'
                     ? buildFilesRevision(files)
@@ -257,7 +333,7 @@ export const createActor: ToolEntry = Object.freeze({
                 buildTag: parsed.buildTag,
                 revision,
                 files: files.map(({ path, sizeBytes, hash, format }) => ({ path, sizeBytes, hash, format })),
-                warnings: source.kind === 'files' ? buildFilesWarnings(source.entries) : [],
+                warnings: source.kind === 'files' ? buildFilesWarnings(source.entries, storedEntries) : [],
                 ...(buildResult?.build && { build: toBuildResult(buildResult.build, linkContext) }),
                 ...(buildResult?.buildErrMessage !== undefined && { buildError: buildResult.buildErrMessage }),
             };

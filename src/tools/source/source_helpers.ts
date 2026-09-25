@@ -11,9 +11,7 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { ABORT } from '../actors/actor_run_response.js';
 import { listVersionNumbers, startBuild } from '../builds/build_helpers.js';
 import { ABSOLUTE_NAME_REGEX } from './source_archive.js';
-import { hasBinaryExtension, parseSourcePath } from './source_files.js';
-
-const BYTES_PER_MIB = 1024 * 1024;
+import { BYTES_PER_MIB, formatMib, hasBinaryExtension, parseSourcePath } from './source_files.js';
 
 /**
  * The platform refuses a version whose inline files measure more than this (`MAX_MULTIFILE_BYTES` in `@apify/consts`);
@@ -24,10 +22,10 @@ export const MAX_INLINE_SOURCE_BYTES = 3 * BYTES_PER_MIB;
 /** Content, oldText, and newText together per call, so one call stays well within the transports' body limits. */
 export const MAX_CALL_CONTENT_BYTES = 2 * BYTES_PER_MIB;
 
-/** The platform keeps file names up to this length, the same cap the zip reader applies. */
-export const MAX_SOURCE_PATH_LENGTH = 255;
+/** Files one call sends: create-actor's files and update-actor-version's replaceFiles. */
+export const MAX_WRITE_FILES = 500;
 
-/** Every version stored as files needs it: the build reads the Actor's configuration from it. */
+/** The build reads the Actor's configuration, such as its Dockerfile and input schema, from this file. */
 export const ACTOR_CONFIG_PATH = '.actor/actor.json';
 
 /** The platform's Actor name rules (`ACTOR_NAME` in `@apify/consts`), checked here to fail before any request. */
@@ -171,6 +169,14 @@ export function formatUrlWithoutSecrets(url: string): string {
     return url.slice(0, queryIndex) + (hashIndex === -1 ? '' : url.slice(hashIndex));
 }
 
+/** Whether the URL holds something `formatUrlWithoutSecrets` removes: a query string, or an http(s) user or password. */
+export function hasUrlSecrets(url: string): boolean {
+    if (!URL.canParse(url)) return url.includes('?');
+    const parsed = new URL(url);
+    const isHttp = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    return parsed.search !== '' || (isHttp && (parsed.username !== '' || parsed.password !== ''));
+}
+
 /**
  * The path as the version stores it (`parseSourcePath`, so it matches get-actor-version's listing); throws
  * `UserInputError` for a path that could escape the Actor root or is not a file path. `label` names the input field.
@@ -239,11 +245,6 @@ export function getInlineSourceBytes(entries: readonly ActorVersionSourceFile[])
     );
 }
 
-/** Rounded up, so a size just over a limit never prints as the limit itself. */
-export function formatMib(bytes: number): string {
-    return (Math.ceil((bytes / BYTES_PER_MIB) * 100) / 100).toFixed(2);
-}
-
 /** Throws `UserInputError` when the files would not fit inline; zip storage is not written by these tools yet. */
 export function validateInlineSourceSize(entries: readonly ActorVersionSourceFile[]): number {
     const sizeBytes = getInlineSourceBytes(entries);
@@ -258,13 +259,19 @@ export function validateInlineSourceSize(entries: readonly ActorVersionSourceFil
     return sizeBytes;
 }
 
-/** Throws `UserInputError` when a call sends more text than `MAX_CALL_CONTENT_BYTES`. */
-export function validateCallContentSize(texts: readonly string[]): void {
+/**
+ * Throws `UserInputError` when a call sends more text than `MAX_CALL_CONTENT_BYTES`. `fieldsText` names the fields
+ * counted, and `recoveryText` says how to send the change instead, since that differs between the tools.
+ */
+export function validateCallContentSize(
+    texts: readonly string[],
+    { fieldsText, recoveryText }: { fieldsText: string; recoveryText: string },
+): void {
     const totalBytes = texts.reduce((total, text) => total + Buffer.byteLength(text, 'utf8'), 0);
     if (totalBytes > MAX_CALL_CONTENT_BYTES) {
         throw new UserInputError(
-            `This call sends ${formatMib(totalBytes)} MiB of content, oldText, and newText together, over the ` +
-                `${MAX_CALL_CONTENT_BYTES / BYTES_PER_MIB} MiB one call takes. Split the change into several calls.`,
+            `This call sends ${formatMib(totalBytes)} MiB of ${fieldsText}, over the ` +
+                `${MAX_CALL_CONTENT_BYTES / BYTES_PER_MIB} MiB one call takes. ${recoveryText}`,
         );
     }
 }

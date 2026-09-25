@@ -1,10 +1,20 @@
+import { splitLines } from './source_files.js';
+
 /** A half-open range of character offsets, `[start, end)`, in the text as it stands now. */
 export type TextRange = { start: number; end: number };
 
 export type TextEdit = { oldText: string; newText: string; allOccurrences?: boolean };
 
-/** An edit that could not be applied, with the text the caller needs to fix its oldText. */
-export type EditFailure = { reason: 'NO_MATCH' | 'MULTIPLE_MATCHES'; editIndex: number; detail: string };
+/**
+ * An edit that could not be applied, with the text the caller needs to fix its oldText. `hasContext` is false when
+ * the detail shows none of the current text, so the caller has to read the file again to correct the edit.
+ */
+export type EditFailure = {
+    reason: 'NO_MATCH' | 'MULTIPLE_MATCHES';
+    editIndex: number;
+    detail: string;
+    hasContext: boolean;
+};
 
 export type EditsResult = { text: string; changedRanges: TextRange[] } | { failure: EditFailure };
 
@@ -14,11 +24,15 @@ export type TextExcerpt = { path: string; startLine: number; endLine: number; te
 const NO_MATCH_EXCERPT_LINES = 10;
 const MULTIPLE_MATCH_LINES_LISTED = 10;
 
-/** Lines with their line endings kept, so joined back they give the exact text. */
-function splitLines(text: string): string[] {
-    if (text === '') return [];
-    return text.split(/(?<=\n)/);
-}
+/** The NO_MATCH context stays within the same budget as the excerpts of a successful edit. */
+const MAX_NO_MATCH_CONTEXT_BYTES = 4 * 1024;
+
+/**
+ * Of a line too long to show whole (minified code, one-line JSON), this many characters around the match are shown;
+ * at most 3 UTF-8 bytes per character, they stay within `MAX_NO_MATCH_CONTEXT_BYTES`.
+ */
+const LONG_LINE_WINDOW_CHARS = 1024;
+const LONG_LINE_CHARS_BEFORE_MATCH = 256;
 
 /** Start offsets of the non-overlapping occurrences of `needle`, left to right. */
 function findOccurrences(text: string, needle: string): number[] {
@@ -49,8 +63,9 @@ function getLineNumber(text: string, offset: number): number {
 }
 
 /**
- * The offset where `oldText` matches when whitespace is ignored, or where its first non-blank line does; undefined
- * when neither is in the text. Gives the caller the current text to copy a corrected oldText from.
+ * The offset where `oldText` matches when whitespace is ignored, or where its first non-blank line does when that
+ * line occurs once (a common line such as `}` would point anywhere); undefined otherwise. Gives the caller the current
+ * text to copy a corrected oldText from.
  */
 function findClosestMatchOffset(text: string, oldText: string): number | undefined {
     const compactChars: string[] = [];
@@ -61,36 +76,85 @@ function findClosestMatchOffset(text: string, oldText: string): number | undefin
         offsets.push(index);
     }
     const compactText = compactChars.join('');
+    const compactOldText = oldText.replace(/\s+/g, '');
+    if (compactOldText === '') return undefined;
+    const wholeIndex = compactText.indexOf(compactOldText);
+    if (wholeIndex !== -1) return offsets[wholeIndex];
     const firstLine = oldText
         .split('\n')
         .map((line) => line.replace(/\s+/g, ''))
         .find((line) => line !== '');
-    for (const needle of [oldText.replace(/\s+/g, ''), firstLine]) {
-        if (!needle) continue;
-        const compactIndex = compactText.indexOf(needle);
-        if (compactIndex !== -1) return offsets[compactIndex];
-    }
-    return undefined;
+    if (!firstLine) return undefined;
+    const lineIndex = compactText.indexOf(firstLine);
+    return lineIndex !== -1 && lineIndex === compactText.lastIndexOf(firstLine) ? offsets[lineIndex] : undefined;
 }
 
-function formatNoMatchDetail(text: string, edit: TextEdit, editIndex: number): string {
-    const appliedNote =
-        edit.newText !== '' && findOccurrences(text, edit.newText).length === 1
-            ? ' newText is in the file once, so this edit may already be applied.'
-            : '';
-    const offset = findClosestMatchOffset(text, edit.oldText);
-    if (offset === undefined) {
-        return `oldText of edits[${editIndex}] is not in the file, and nothing similar is.${appliedNote}`;
-    }
+/**
+ * The current text around `offset`: up to `NO_MATCH_EXCERPT_LINES` lines from 2 before its line, cut from the end
+ * (then the start) to fit `MAX_NO_MATCH_CONTEXT_BYTES`; for a line too long on its own, a window of it.
+ */
+function formatCurrentTextAround(text: string, offset: number): string {
     const lines = splitLines(text);
     const matchLine = getLineNumber(text, offset);
-    const startLine = Math.max(1, Math.min(matchLine - 2, lines.length - NO_MATCH_EXCERPT_LINES + 1));
-    const excerptLines = lines.slice(startLine - 1, startLine - 1 + NO_MATCH_EXCERPT_LINES);
-    const endLine = startLine + excerptLines.length - 1;
-    return (
-        `oldText of edits[${editIndex}] is not in the file byte for byte; the closest match ignoring whitespace ` +
-        `is at line ${matchLine}.${appliedNote} The current text of lines ${startLine}-${endLine}:\n${excerptLines.join('')}`
-    );
+    const getLineBytes = (line: number) => Buffer.byteLength(lines[line - 1], 'utf8');
+    if (getLineBytes(matchLine) > MAX_NO_MATCH_CONTEXT_BYTES) {
+        const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+        const lineEnd = lineStart + lines[matchLine - 1].length;
+        const start = Math.max(lineStart, offset - LONG_LINE_CHARS_BEFORE_MATCH);
+        const end = Math.min(lineEnd, start + LONG_LINE_WINDOW_CHARS);
+        return (
+            `Line ${matchLine} is too long to show whole; its characters ${start - lineStart + 1} to ` +
+            `${end - lineStart}:\n${text.slice(start, end)}`
+        );
+    }
+    let startLine = Math.max(1, Math.min(matchLine - 2, lines.length - NO_MATCH_EXCERPT_LINES + 1));
+    let endLine = Math.min(lines.length, startLine + NO_MATCH_EXCERPT_LINES - 1);
+    let totalBytes = 0;
+    for (let line = startLine; line <= endLine; line++) totalBytes += getLineBytes(line);
+    // The match line alone fits, so this stops at it at the latest.
+    while (totalBytes > MAX_NO_MATCH_CONTEXT_BYTES) {
+        if (endLine > matchLine) {
+            totalBytes -= getLineBytes(endLine);
+            endLine--;
+        } else {
+            totalBytes -= getLineBytes(startLine);
+            startLine++;
+        }
+    }
+    return `The current text of lines ${startLine}-${endLine}:\n${lines.slice(startLine - 1, endLine).join('')}`;
+}
+
+function formatNoMatchDetail(
+    text: string,
+    edit: TextEdit,
+    editIndex: number,
+): Pick<EditFailure, 'detail' | 'hasContext'> {
+    const newTextOffsets = edit.newText === '' ? [] : findOccurrences(text, edit.newText);
+    const isMaybeApplied = newTextOffsets.length === 1;
+    const offset = findClosestMatchOffset(text, edit.oldText);
+    if (offset !== undefined) {
+        const appliedNote = isMaybeApplied ? ' newText is in the file once, so this edit may already be applied.' : '';
+        return {
+            detail:
+                `oldText of edits[${editIndex}] is not in the file byte for byte; the closest match ignoring ` +
+                `whitespace is at line ${getLineNumber(text, offset)}.${appliedNote} ${formatCurrentTextAround(text, offset)}`,
+            hasContext: true,
+        };
+    }
+    if (isMaybeApplied) {
+        const [newTextOffset] = newTextOffsets;
+        return {
+            detail:
+                `oldText of edits[${editIndex}] is not in the file, even ignoring whitespace, but newText is in it ` +
+                `once, at line ${getLineNumber(text, newTextOffset)}, so this edit may already be applied. ` +
+                formatCurrentTextAround(text, newTextOffset),
+            hasContext: true,
+        };
+    }
+    return {
+        detail: `oldText of edits[${editIndex}] is not in the file, and it has no whitespace-insensitive match either.`,
+        hasContext: false,
+    };
 }
 
 function formatMultipleMatchesDetail(text: string, offsets: readonly number[], editIndex: number): string {
@@ -106,12 +170,13 @@ function formatMultipleMatchesDetail(text: string, offsets: readonly number[], e
  * Moves ranges of the text before a replacement to where they are after it. A range that overlaps a replaced
  * occurrence grows to cover its replacement.
  */
-function shiftRanges(
-    ranges: readonly TextRange[],
-    offsets: readonly number[],
-    oldLength: number,
-    newLength: number,
-): TextRange[] {
+function shiftRanges(params: {
+    ranges: readonly TextRange[];
+    offsets: readonly number[];
+    oldLength: number;
+    newLength: number;
+}): TextRange[] {
+    const { ranges, offsets, oldLength, newLength } = params;
     const delta = newLength - oldLength;
     // A start inside a replaced occurrence moves to where its replacement starts, an end to where it ends.
     const mapStart = (offset: number): number => {
@@ -156,11 +221,11 @@ export function applyTextEdits(
             }
         }
         if (offsets.length === 0) {
-            return { failure: { reason: 'NO_MATCH', editIndex, detail: formatNoMatchDetail(text, edit, editIndex) } };
+            return { failure: { reason: 'NO_MATCH', editIndex, ...formatNoMatchDetail(text, edit, editIndex) } };
         }
         if (offsets.length > 1 && !edit.allOccurrences) {
             const detail = formatMultipleMatchesDetail(text, offsets, editIndex);
-            return { failure: { reason: 'MULTIPLE_MATCHES', editIndex, detail } };
+            return { failure: { reason: 'MULTIPLE_MATCHES', editIndex, detail, hasContext: true } };
         }
         const pieces: string[] = [];
         let from = 0;
@@ -169,7 +234,7 @@ export function applyTextEdits(
             from = offset + oldText.length;
         }
         pieces.push(text.slice(from));
-        ranges = shiftRanges(ranges, offsets, oldText.length, newText.length);
+        ranges = shiftRanges({ ranges, offsets, oldLength: oldText.length, newLength: newText.length });
         const delta = newText.length - oldText.length;
         for (const [index, offset] of offsets.entries()) {
             const start = offset + index * delta;
@@ -184,12 +249,13 @@ export function applyTextEdits(
  * The changed regions as line ranges with `contextLines` around them, overlapping ones merged, in file order.
  * An empty range, left by a deletion, shows the lines around the point where the text was.
  */
-export function buildTextExcerpts(
-    path: string,
-    text: string,
-    ranges: readonly TextRange[],
-    contextLines: number,
-): TextExcerpt[] {
+export function buildTextExcerpts(params: {
+    path: string;
+    text: string;
+    ranges: readonly TextRange[];
+    contextLines: number;
+}): TextExcerpt[] {
+    const { path, text, ranges, contextLines } = params;
     const lines = splitLines(text);
     if (lines.length === 0 || ranges.length === 0) return [];
     const lineRanges = ranges

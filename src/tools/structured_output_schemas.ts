@@ -630,11 +630,12 @@ export const createActorToolOutputSchema = {
         buildTag: { type: 'string', description: 'Tag that builds of this version get, e.g. latest' },
         revision: {
             type: 'string',
-            description: 'Identifies the file set, or the Git URL; the same value get-actor-version returns',
+            description:
+                'Identifies the stored file set, or the Git URL; the same value a later read of the version returns',
         },
         files: {
             type: 'array',
-            description: 'The files written, sorted by path; empty for a version built from Git',
+            description: 'The files as stored, sorted by path; empty for a version built from Git',
             items: getActorVersionToolOutputSchema.properties.files.items,
         },
         ...sourceWriteBuildProperties,
@@ -649,14 +650,19 @@ export const updateActorVersionToolOutputSchema = {
         actorId: { type: 'string', description: 'Actor ID' },
         fullName: { type: 'string', description: 'Actor full name, username/name' },
         versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
-        sourceType: { type: 'string', description: 'The source type after the update: SOURCE_FILES or GIT_REPO' },
+        sourceType: {
+            type: 'string',
+            description:
+                'The source type after the update: SOURCE_FILES, GIT_REPO, or GITHUB_GIST (buildTag-only change)',
+        },
         buildTag: { type: 'string', description: 'Tag that builds of this version get, e.g. latest' },
         previousRevision: { type: 'string', description: 'Revision of the version as read before the update' },
         revision: { type: 'string', description: 'Revision after the update; pass it as expectedRevision next time' },
         changed: { type: 'boolean', description: 'False when the call changed nothing and nothing was written' },
         changes: {
             type: 'array',
-            description: 'One entry per file an operation touched',
+            description:
+                'One entry per file the call created, updated, moved, or deleted, or sent with the content it already had',
             items: {
                 type: 'object',
                 properties: {

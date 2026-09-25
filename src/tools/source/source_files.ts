@@ -58,6 +58,11 @@ const BINARY_EXTENSIONS = new Set([
 /** Hashes and revisions are this many hex characters of a SHA-256, so an agent can compare them by eye. */
 const HASH_HEX_LENGTH = 16;
 
+export const BYTES_PER_MIB = 1024 * 1024;
+
+/** The platform keeps file names up to this length; the zip reader and the write tools apply the same cap. */
+export const MAX_SOURCE_PATH_LENGTH = 255;
+
 // `ignoreBOM` keeps a byte order mark in the text, so the text encodes back to the same bytes and hash.
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
@@ -79,20 +84,37 @@ export type SourceFile = {
     readContent: () => string;
 };
 
+/** Rounded up, so a size just over a limit never prints as the limit itself. */
+export function formatMib(bytes: number): string {
+    return (Math.ceil((bytes / BYTES_PER_MIB) * 10) / 10).toFixed(1);
+}
+
+/** Lines with their line endings kept, so joined back they give the exact text. */
+export function splitLines(text: string): string[] {
+    if (text === '') return [];
+    return text.split(/(?<=\n)/);
+}
+
 export function hasBinaryExtension(path: string): boolean {
     const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
     return path.includes('.') && BINARY_EXTENSIONS.has(extension);
 }
 
 /**
- * A path relative to the Actor root, the way the build worker writes it: backslashes become `/`, and empty and `.`
- * segments are dropped. `..` segments are kept; the zip reader refuses them.
+ * A path relative to the Actor root: empty and `.` segments are dropped, as the build worker's path normalization
+ * does, and backslashes become `/`, as Windows zip tools write them. The build worker keeps an inline name's backslash
+ * as a character, so the two can differ for such a name. `..` segments are kept; the zip reader refuses them.
  */
 export function parseSourcePath(name: string): string {
     return name
         .split(/[\\/]/)
         .filter((segment) => segment !== '' && segment !== '.')
         .join('/');
+}
+
+/** The path of a stored entry; a name that normalizes to nothing, such as `.`, is kept as stored rather than dropped. */
+export function parseStoredPath(name: string): string {
+    return parseSourcePath(name) || name;
 }
 
 function getSha256Prefix(data: Uint8Array | string): string {
@@ -165,8 +187,7 @@ function buildSourceFileFromBytes(path: string, bytes: Uint8Array, storedBase64?
 export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile {
     const { name, format }: Partial<ActorVersionSourceFile> & { name: string } = file;
     const content = (file as Partial<ActorVersionSourceFile>).content ?? '';
-    // A name that normalizes to nothing, such as `.`, is kept as stored rather than dropped.
-    const path = parseSourcePath(name) || name;
+    const path = parseStoredPath(name);
     if (format === 'BASE64') return buildSourceFileFromBytes(path, Buffer.from(content, 'base64'), content);
     const bytes = Buffer.from(content, 'utf8');
     return {

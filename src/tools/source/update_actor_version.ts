@@ -15,7 +15,15 @@ import { updateActorVersionToolOutputSchema } from '../structured_output_schemas
 import type { TextEdit, TextExcerpt, TextRange } from './source_edits.js';
 import { applyTextEdits, buildTextExcerpts, limitTextExcerpts } from './source_edits.js';
 import type { SourceFile } from './source_files.js';
-import { buildFilesRevision, buildInlineSourceFile, buildUrlRevision, compareSourcePaths } from './source_files.js';
+import {
+    buildFilesRevision,
+    buildInlineSourceFile,
+    buildUrlRevision,
+    compareSourcePaths,
+    formatMib,
+    MAX_SOURCE_PATH_LENGTH,
+    parseStoredPath,
+} from './source_files.js';
 import type { BuildAfterWriteResult } from './source_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
@@ -23,13 +31,13 @@ import {
     formatBuildLaterHint,
     formatBuildStartFailure,
     formatEmptyFilesWarning,
-    formatMib,
     formatUrlWithoutSecrets,
     getInlineSourceBytes,
     getSourceFileEntryBytes,
+    hasUrlSecrets,
     isFolderEntry,
     MAX_INLINE_SOURCE_BYTES,
-    MAX_SOURCE_PATH_LENGTH,
+    MAX_WRITE_FILES,
     parseInputPath,
     resolveOwnActor,
     resolveVersionNumber,
@@ -42,7 +50,6 @@ import {
 
 const MAX_OPERATIONS = 100;
 const MAX_EDITS_PER_OPERATION = 50;
-const MAX_REPLACE_FILES = 500;
 const EXCERPT_CONTEXT_LINES = 2;
 const MAX_EXCERPT_BYTES = 4 * 1024;
 
@@ -140,10 +147,10 @@ const updateActorVersionArgs = z.object({
     replaceFiles: z
         .array(sourceFileArgs)
         .min(1)
-        .max(MAX_REPLACE_FILES)
+        .max(MAX_WRITE_FILES)
         .optional()
         .describe(
-            `Replace every file of the version with these, up to ${MAX_REPLACE_FILES}. Needs expectedRevision; not with operations or gitRepoUrl.`,
+            `Replace every file of the version with these, up to ${MAX_WRITE_FILES}. Needs expectedRevision; not with operations or gitRepoUrl.`,
         ),
     gitRepoUrl: z
         .string()
@@ -157,7 +164,8 @@ const updateActorVersionArgs = z.object({
         .string()
         .optional()
         .describe(
-            'The revision of the version when you read it; the call fails if the version changed since. Required with replaceFiles and gitRepoUrl.',
+            'The revision of the version when you read it; the call fails if the version changed since. Required with replaceFiles and gitRepoUrl. ' +
+                'Pass it with operations too, so that a retried call fails instead of applying its edits twice.',
         ),
     buildTag: z.string().min(1).optional().describe('Tag that builds of this version get, for example latest.'),
     autoBuild: z
@@ -195,7 +203,14 @@ const OPERATION_FIELD_NAMES: OperationField[] = ['content', 'encoding', 'expecte
 type WorkingFile = { entry: ActorVersionSourceFile; file: SourceFile; originPath?: string };
 
 type CurrentSource =
-    | { kind: 'files'; files: Map<string, WorkingFile>; folders: ActorVersionSourceFile[]; revision: string }
+    | {
+          kind: 'files';
+          files: Map<string, WorkingFile>;
+          folders: ActorVersionSourceFile[];
+          /** Every stored entry in its stored order, so the entries the call leaves alone go back as they were. */
+          storedEntries: ActorVersionSourceFile[];
+          revision: string;
+      }
     | { kind: 'url'; sourceType: string; url: string; revision: string };
 
 type FileChange = {
@@ -211,12 +226,17 @@ type FileChange = {
  * the revision check.
  */
 class PreconditionError extends UserInputError {
+    /** Whether reading the version again is the way out, so the response says so. */
+    readonly isStaleRead: boolean;
+
     constructor(
         readonly reason: PRECONDITION_REASON,
         label: string | undefined,
         detail: string,
+        options: { isStaleRead?: boolean } = {},
     ) {
         super(`Nothing was written: ${label ?? 'expectedRevision'} failed with ${reason}. ${detail}`);
+        this.isStaleRead = options.isStaleRead ?? STALE_READ_REASONS.has(reason);
     }
 }
 
@@ -281,13 +301,16 @@ function parseUpdateRequest(args: UpdateActorVersionArgs, loadedToolNames: reado
     if (operations.length === 0 && replaceFiles === undefined && gitRepoUrl === undefined && buildTag === undefined) {
         throw new UserInputError(formatNothingToWriteText(autoBuild, loadedToolNames));
     }
-    validateCallContentSize([
-        ...operations.flatMap((operation) => [
-            operation.content ?? '',
-            ...(operation.edits ?? []).flatMap(({ oldText, newText }) => [oldText, newText]),
-        ]),
-        ...(replaceFiles ?? []).map(({ content }) => content),
-    ]);
+    validateCallContentSize(
+        [
+            ...operations.flatMap((operation) => [
+                operation.content ?? '',
+                ...(operation.edits ?? []).flatMap(({ oldText, newText }) => [oldText, newText]),
+            ]),
+            ...(replaceFiles ?? []).map(({ content }) => content),
+        ],
+        { fieldsText: 'content, oldText, and newText together', recoveryText: 'Split the change into several calls.' },
+    );
     const prepared = operations.map(parseOperation);
     if (replaceFiles === undefined) return { operations: prepared, gitRepoUrl };
     const seenPaths = new Set<string>();
@@ -324,12 +347,12 @@ function readCurrentSource(version: ActorVersion, { fullName, versionNumber }: V
                 folders.push(entry);
                 continue;
             }
-            const { path } = buildInlineSourceFile(entry);
+            const path = parseStoredPath(entry.name);
             // A path stored twice is written by the build in order, so the last one wins, as in get-actor-version.
             files.set(path, buildWorkingFile(entry, path));
         }
         const revision = buildFilesRevision([...files.values()].map(({ file }) => file));
-        return { kind: 'files', files, folders, revision };
+        return { kind: 'files', files, folders, storedEntries: version.sourceFiles, revision };
     }
     if (version.sourceType === ActorSourceType.Tarball) {
         throw new UserInputError(
@@ -413,7 +436,9 @@ function applyEdit(state: ApplyState, operation: Extract<PreparedOperation, { ty
     }
     const result = applyTextEdits(existing.file.readContent(), edits, state.editedRanges.get(path));
     if ('failure' in result) {
-        throw new PreconditionError(PRECONDITION_REASON[result.failure.reason], label, result.failure.detail);
+        const { reason, detail, hasContext } = result.failure;
+        // With none of the current text shown, reading the file again is how the caller corrects its oldText.
+        throw new PreconditionError(PRECONDITION_REASON[reason], label, detail, { isStaleRead: !hasContext });
     }
     state.touchedPaths.add(path);
     state.editedRanges.set(path, result.changedRanges);
@@ -518,15 +543,51 @@ function buildReplacedFiles(
     );
 }
 
-/** Throws `UserInputError` when the result could not be stored or built. */
-function validateResultFiles(
-    files: ReadonlyMap<string, WorkingFile>,
-    folders: readonly ActorVersionSourceFile[],
-): number {
+/**
+ * Each file path that is also a folder of the result, with a path under it, or itself when a folder entry names it.
+ * The build cannot write both, so such a version fails to build.
+ */
+function findFileFolderConflicts(filePaths: readonly string[], folderPaths: readonly string[]): Map<string, string> {
+    const folders = new Map<string, string>();
+    const addFolders = (path: string, isFolder: boolean) => {
+        const segments = path.split('/');
+        for (let count = isFolder ? segments.length : segments.length - 1; count > 0; count--) {
+            const folder = segments.slice(0, count).join('/');
+            if (!folders.has(folder)) folders.set(folder, path);
+        }
+    };
+    for (const path of filePaths) addFolders(path, false);
+    for (const path of folderPaths) addFolders(path, true);
+    return new Map(filePaths.flatMap((path) => (folders.has(path) ? [[path, folders.get(path) ?? path]] : [])));
+}
+
+/**
+ * Throws `UserInputError` when the result could not be stored or built; returns the size the platform measures.
+ * `before` is the file set the result replaces, undefined for a version that built from a URL.
+ */
+function validateResultFiles(params: {
+    files: ReadonlyMap<string, WorkingFile>;
+    folders: readonly ActorVersionSourceFile[];
+    sourceFiles: readonly ActorVersionSourceFile[];
+    before: { files: ReadonlyMap<string, WorkingFile>; folders: readonly ActorVersionSourceFile[] } | undefined;
+    /** replaceFiles: the new set stands on its own, so a conflict the version had is not excused. */
+    isReplacingAll: boolean;
+}): number {
+    const { files, folders, sourceFiles, before, isReplacingAll } = params;
     if (!files.has(ACTOR_CONFIG_PATH)) {
-        throw new UserInputError(
-            `Nothing was written: after the changes the version would have no ${ACTOR_CONFIG_PATH}, which every version stored as files needs.`,
-        );
+        // Older versions build from a root Dockerfile alone, so only removing the file is refused.
+        if (before?.files.has(ACTOR_CONFIG_PATH)) {
+            throw new UserInputError(
+                `Nothing was written: the changes remove ${ACTOR_CONFIG_PATH}, which the build reads the Actor's ` +
+                    'configuration from. Keep it, or give its new content with a write.',
+            );
+        }
+        if (!before) {
+            throw new UserInputError(
+                `Nothing was written: to switch a version to stored files, this tool needs ${ACTOR_CONFIG_PATH} in ` +
+                    "replaceFiles, since the build reads the Actor's configuration from it.",
+            );
+        }
     }
     const longPath = [...files.keys()].find((path) => path.length > MAX_SOURCE_PATH_LENGTH);
     if (longPath) {
@@ -534,7 +595,51 @@ function validateResultFiles(
             `Nothing was written: the path ${longPath.slice(0, 40)}... is over ${MAX_SOURCE_PATH_LENGTH} characters.`,
         );
     }
-    return validateInlineSourceSize([...folders, ...[...files.values()].map(({ entry }) => entry)]);
+    const getFolderPaths = (entries: readonly ActorVersionSourceFile[]) =>
+        entries.map(({ name }) => parseStoredPath(name));
+    const conflicts = findFileFolderConflicts([...files.keys()], getFolderPaths(folders));
+    // A conflict the version already had is not this call's doing, so it does not block the call.
+    const previousConflicts =
+        before && !isReplacingAll
+            ? findFileFolderConflicts([...before.files.keys()], getFolderPaths(before.folders))
+            : new Map<string, string>();
+    const newConflict = [...conflicts].find(([path]) => !previousConflicts.has(path));
+    if (newConflict) {
+        const [path, other] = newConflict;
+        const otherText = other === path ? 'a folder entry has the same path' : `${other} is inside it`;
+        throw new UserInputError(
+            `Nothing was written: after the changes ${path} would be a file and also a folder (${otherText}), ` +
+                'so the build could not write it.',
+        );
+    }
+    return validateInlineSourceSize(sourceFiles);
+}
+
+/**
+ * The entries to store after operations. An entry whose file the call left alone goes back verbatim and in place,
+ * duplicates that normalize to the same path included. A changed file takes the place of the last entry for its path
+ * and keeps that entry's name; a file at a new path goes at the end.
+ */
+function buildStoredEntries(params: {
+    storedEntries: readonly ActorVersionSourceFile[];
+    before: ReadonlyMap<string, WorkingFile>;
+    after: ReadonlyMap<string, WorkingFile>;
+}): ActorVersionSourceFile[] {
+    const { storedEntries, before, after } = params;
+    const lastIndexByPath = new Map<string, number>();
+    for (const [index, entry] of storedEntries.entries()) {
+        if (!isFolderEntry(entry)) lastIndexByPath.set(parseStoredPath(entry.name), index);
+    }
+    const entries = storedEntries.flatMap((entry, index) => {
+        if (isFolderEntry(entry)) return [entry];
+        const path = parseStoredPath(entry.name);
+        const current = after.get(path);
+        if (!current) return [];
+        if (current === before.get(path)) return [entry];
+        return index === lastIndexByPath.get(path) ? [{ ...current.entry, name: entry.name }] : [];
+    });
+    for (const [path, { entry }] of after) if (!lastIndexByPath.has(path)) entries.push(entry);
+    return entries;
 }
 
 /** Excerpts of what the edits changed, within `MAX_EXCERPT_BYTES`, for the files whose content changed. */
@@ -550,7 +655,7 @@ function buildEditExcerpts(
         .sort(([a], [b]) => compareSourcePaths(a, b))
         .flatMap(([path, ranges]) => {
             const text = state.files.get(path)?.file.readContent() ?? '';
-            return buildTextExcerpts(path, text, ranges, EXCERPT_CONTEXT_LINES);
+            return buildTextExcerpts({ path, text, ranges, contextLines: EXCERPT_CONTEXT_LINES });
         });
     return limitTextExcerpts(excerpts, MAX_EXCERPT_BYTES);
 }
@@ -579,6 +684,45 @@ type UpdateOutcome = {
     putBody?: Record<string, unknown>;
 };
 
+/**
+ * The stored URL with the credentials of `storedUrl` carried over, when both are http(s) URLs on the same host;
+ * undefined otherwise.
+ */
+function buildUrlWithStoredSecrets(storedUrl: string, requestedUrl: string): string | undefined {
+    if (!URL.canParse(storedUrl) || !URL.canParse(requestedUrl)) return undefined;
+    const stored = new URL(storedUrl);
+    const requested = new URL(requestedUrl);
+    if (stored.protocol !== requested.protocol || stored.host !== requested.host) return undefined;
+    if (stored.protocol === 'http:' || stored.protocol === 'https:') {
+        requested.username = stored.username;
+        requested.password = stored.password;
+    }
+    if (requested.search === '') requested.search = stored.search;
+    return requested.href;
+}
+
+/**
+ * The Git URL to store, undefined when the version already builds from it, and a warning when stored credentials were
+ * carried over. get-actor-version shows the URL without its credentials, so an agent that sends that URL back, or
+ * the same repository with another branch, must not remove them: builds of a private repository would then fail.
+ */
+function resolveGitRepoUrl(version: ActorVersion, requestedUrl: string): { url?: string; warning?: string } {
+    const storedUrl = version.sourceType === ActorSourceType.GitRepo ? version.gitRepoUrl : undefined;
+    if (!storedUrl || hasUrlSecrets(requestedUrl)) return storedUrl === requestedUrl ? {} : { url: requestedUrl };
+    const shownUrl = formatUrlWithoutSecrets(requestedUrl);
+    if (formatUrlWithoutSecrets(storedUrl) === shownUrl) return {};
+    if (!hasUrlSecrets(storedUrl)) return { url: requestedUrl };
+    const url = buildUrlWithStoredSecrets(storedUrl, requestedUrl);
+    if (!url) {
+        throw new UserInputError(
+            'The stored Git URL carries credentials or a query string that are not shown, and they cannot be kept for ' +
+                `${shownUrl}, which is on another host. Include the credentials in gitRepoUrl, or change the URL in ` +
+                'Apify Console.',
+        );
+    }
+    return { url, warning: `The credentials stored with the previous Git URL were kept for ${shownUrl}.` };
+}
+
 /** The whole update against the version as read; throws `UserInputError` (and `PreconditionError`) before any write. */
 function resolveUpdateOutcome(params: {
     current: CurrentSource;
@@ -605,9 +749,9 @@ function resolveUpdateOutcome(params: {
     const isBuildTagChanged = args.buildTag !== undefined && args.buildTag !== version.buildTag;
     const buildTagBody = args.buildTag === undefined ? {} : { buildTag: args.buildTag };
     if (request.gitRepoUrl !== undefined) {
-        const gitRepoUrl = formatUrlWithoutSecrets(request.gitRepoUrl);
-        const isSourceChanged =
-            version.sourceType !== ActorSourceType.GitRepo || version.gitRepoUrl !== request.gitRepoUrl;
+        const resolved = resolveGitRepoUrl(version, request.gitRepoUrl);
+        const gitRepoUrl = formatUrlWithoutSecrets(resolved.url ?? request.gitRepoUrl);
+        const isSourceChanged = resolved.url !== undefined;
         const changed = isSourceChanged || isBuildTagChanged;
         const buildTagText = isBuildTagChanged ? `; build tag set to ${args.buildTag}` : '';
         return {
@@ -618,11 +762,11 @@ function resolveUpdateOutcome(params: {
             changes: [],
             excerpts: [],
             isExcerptTruncated: false,
-            warnings: [],
+            warnings: resolved.warning === undefined ? [] : [resolved.warning],
             // sourceType goes with the URL so the platform validates it; a gitRepoUrl alone skips that check.
             ...(changed && {
                 putBody: {
-                    ...(isSourceChanged && { sourceType: ActorSourceType.GitRepo, gitRepoUrl: request.gitRepoUrl }),
+                    ...(isSourceChanged && { sourceType: ActorSourceType.GitRepo, gitRepoUrl: resolved.url }),
                     ...buildTagBody,
                 },
             }),
@@ -651,8 +795,9 @@ function resolveUpdateOutcome(params: {
                   touchedPaths: new Set<string>(),
                   editedRanges: new Map(),
               };
+    const isReplacingAll = request.replaceFiles !== undefined;
     // replaceFiles starts from an empty set, so Console's empty folder entries go too.
-    const folders = current.kind === 'files' && request.replaceFiles === undefined ? current.folders : [];
+    const folders = current.kind === 'files' && !isReplacingAll ? current.folders : [];
     const revision = buildFilesRevision([...state.files.values()].map(({ file }) => file));
     const isSourceChanged = current.kind === 'url' || revision !== current.revision;
     const changes = buildFileChanges(before ?? new Map(), state.files, state.touchedPaths);
@@ -666,7 +811,10 @@ function resolveUpdateOutcome(params: {
         formatEmptyFilesWarning(emptyPaths),
     ].filter((warning): warning is string => typeof warning === 'string');
     const changed = isSourceChanged || isBuildTagChanged;
-    const sourceFiles = [...folders, ...[...state.files.values()].map(({ entry }) => entry)];
+    const sourceFiles =
+        current.kind === 'files' && !isReplacingAll
+            ? buildStoredEntries({ storedEntries: current.storedEntries, before: current.files, after: state.files })
+            : [...state.files.values()].map(({ entry }) => entry);
     const buildTagText = isBuildTagChanged ? `; build tag set to ${args.buildTag}` : '';
     return {
         sourceType: ActorSourceType.SourceFiles,
@@ -676,7 +824,15 @@ function resolveUpdateOutcome(params: {
         changes,
         excerpts,
         isExcerptTruncated: isTruncated,
-        totalSizeBytes: isSourceChanged ? validateResultFiles(state.files, folders) : getInlineSourceBytes(sourceFiles),
+        totalSizeBytes: isSourceChanged
+            ? validateResultFiles({
+                  files: state.files,
+                  folders,
+                  sourceFiles,
+                  before: current.kind === 'files' ? current : undefined,
+                  isReplacingAll,
+              })
+            : getInlineSourceBytes(sourceFiles),
         warnings,
         ...(changed && {
             putBody: {
@@ -794,6 +950,8 @@ export const updateActorVersion: ToolEntry = Object.freeze({
             if (!version) throw new UserInputError(`Actor ${fullName} has no version ${versionNumber}.`);
             const current = readCurrentSource(version, target);
             const outcome = resolveUpdateOutcome({ current, version, request, args: parsed, target });
+            // A cancel during the reads writes nothing; per the MCP spec the cancelled request gets no response.
+            if (signal?.aborted) return respondAborted();
             if (outcome.putBody) {
                 // apify-client types the body as a whole version; the API takes any subset of its fields, and
                 // sending only these keeps the PUT away from envVars and the rest.
@@ -826,7 +984,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                 nextStep: formatNextStep(outcome, buildResult, loadedToolNames),
             });
         } catch (error) {
-            if (error instanceof PreconditionError && STALE_READ_REASONS.has(error.reason)) {
+            if (error instanceof PreconditionError && error.isStaleRead) {
                 const readAgain = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
                     ? `Read the version again with ${HELPER_TOOLS.ACTOR_VERSION_GET} and retry.`
                     : 'Read the version again and retry.';

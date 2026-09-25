@@ -1,16 +1,12 @@
 import { inflateRawSync } from 'node:zlib';
 
 import { UserInputError } from '../../errors.js';
-import { parseSourcePath } from './source_files.js';
-
-const BYTES_PER_MIB = 1024 * 1024;
+import { BYTES_PER_MIB, MAX_SOURCE_PATH_LENGTH, parseSourcePath } from './source_files.js';
 
 export const MAX_ARCHIVE_ENTRIES = 10_000;
 
 /** The declared uncompressed size of all entries together; every entry is inflated to hash it. */
 export const MAX_ARCHIVE_INFLATED_BYTES = 64 * BYTES_PER_MIB;
-
-const MAX_ENTRY_NAME_LENGTH = 255;
 
 const END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
 const END_OF_CENTRAL_DIRECTORY_LENGTH = 22;
@@ -147,8 +143,8 @@ function decodeEntryName(nameBytes: Buffer): string {
  */
 function parseEntryPath(name: string): string {
     if (name.includes('\0')) throw buildRefusal(`an entry name contains a NUL character`);
-    if (name.length > MAX_ENTRY_NAME_LENGTH) {
-        throw buildRefusal(`entry ${name.slice(0, 40)}... has a name over ${MAX_ENTRY_NAME_LENGTH} characters`);
+    if (name.length > MAX_SOURCE_PATH_LENGTH) {
+        throw buildRefusal(`entry ${name.slice(0, 40)}... has a name over ${MAX_SOURCE_PATH_LENGTH} characters`);
     }
     if (ABSOLUTE_NAME_REGEX.test(name)) throw buildRefusal(`entry ${name} has an absolute path`);
     const path = parseSourcePath(name);

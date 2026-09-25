@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
 import { createActor } from '../../src/tools/source/create_actor.js';
+import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
 import { buildFilesRevision, buildUrlRevision } from '../../src/tools/source/source_files.js';
 import { createActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -20,14 +21,20 @@ import {
 
 const actorsCreateMock = vi.fn();
 const buildMock = vi.fn();
-const actorMock = vi.fn(() => ({ build: buildMock }));
+const userGetMock = vi.fn();
+const actorGetMock = vi.fn();
+const versionGetMock = vi.fn();
+const actorMock = vi.fn(() => ({ build: buildMock, get: actorGetMock, version: () => ({ get: versionGetMock }) }));
 
 const stubClient = {
     actors: () => ({ create: actorsCreateMock }),
     actor: actorMock,
+    user: () => ({ get: userGetMock }),
+    baseUrl: 'https://api.example.test/v2',
 } as unknown as InternalToolArgs['apifyClient'];
 
-const ACTOR_JSON = { path: '.actor/actor.json', content: '{"actorSpecification": 1}' };
+/** Already names the Actor, so the platform stores it unchanged. */
+const ACTOR_JSON = { path: '.actor/actor.json', content: '{"actorSpecification": 1, "name": "my-actor"}' };
 const DOCKERFILE = { path: 'Dockerfile', content: 'FROM apify/actor-node:20\n' };
 const MAIN_JS = { path: 'src/main.js', content: 'console.log(1);\n' };
 
@@ -48,6 +55,26 @@ type CreateOutput = {
 
 type CreateResult = TextToolResult & { structuredContent: CreateOutput; toolTelemetry?: ToolTelemetrySnapshot };
 
+type SentVersion = { versionNumber: string; sourceType: string; sourceFiles?: { name: string; content: string }[] };
+
+/**
+ * What the platform stores on create: `.actor/actor.json` gets `name` set to the Actor name (insertActor rewrites
+ * the file when the name differs), and the response carries the stored versions.
+ */
+function buildStoredVersions(body: { name: string; versions: SentVersion[] }): SentVersion[] {
+    return body.versions.map((version) => ({
+        ...version,
+        ...(version.sourceFiles && {
+            sourceFiles: version.sourceFiles.map((file) => {
+                if (file.name !== '.actor/actor.json') return file;
+                const config = JSON.parse(file.content) as { name?: string };
+                if (config.name === body.name) return file;
+                return { ...file, content: JSON.stringify({ ...config, name: body.name }, null, 4) };
+            }),
+        }),
+    }));
+}
+
 function sha256Prefix(data: Buffer | string): string {
     return createHash('sha256').update(data).digest('hex').slice(0, 16);
 }
@@ -56,10 +83,15 @@ function apiError(status: number, message: string, type = 'some-error'): ApifyAp
     return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
 }
 
-async function callTool(args: Record<string, unknown>, loadedToolNames?: string[]): Promise<CreateResult> {
+async function callTool(
+    args: Record<string, unknown>,
+    loadedToolNames?: string[],
+    signal?: AbortSignal,
+): Promise<CreateResult> {
     const context = stubToolCallContext({ name: 'my-actor', ...args }, stubClient);
     const withTools = loadedToolNames === undefined ? context : { ...context, loadedToolNames };
-    return (await (createActor as HelperTool).call(withTools)) as CreateResult;
+    const withSignal = signal === undefined ? withTools : { ...withTools, signal };
+    return (await (createActor as HelperTool).call(withSignal)) as CreateResult;
 }
 
 async function callToolExpectingUserError(args: Record<string, unknown>, loadedToolNames?: string[]) {
@@ -75,11 +107,13 @@ function expectNoToolNamed(text: string) {
 describe('create-actor', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        actorsCreateMock.mockImplementation(async (body: { name: string }) => ({
+        actorsCreateMock.mockImplementation(async (body: { name: string; versions: SentVersion[] }) => ({
             id: 'actor-9',
             name: body.name,
             username: 'john',
+            versions: buildStoredVersions(body),
         }));
+        userGetMock.mockResolvedValue({ id: 'user-1', username: 'john' });
         buildMock.mockResolvedValue({
             id: 'build-1',
             actId: 'actor-9',
@@ -218,18 +252,42 @@ describe('create-actor', () => {
         expect(actorsCreateMock).toHaveBeenCalledTimes(2);
     });
 
-    it('refuses a taken name, naming update-actor-version only when loaded', async () => {
+    it('refuses a taken name with the full name, naming update-actor-version only when loaded', async () => {
         actorsCreateMock.mockRejectedValue(
             apiError(409, 'Some other Actor already has this name ("my-actor").', 'actor-name-not-unique'),
         );
         const text = await callToolExpectingUserError({ files: [ACTOR_JSON, DOCKERFILE] });
         expect(text).toBe(
-            'Your account already has an Actor named my-actor, and this tool never changes an existing Actor. ' +
-                `To change its source, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}.`,
+            'Your account already has an Actor named john/my-actor, and this tool never changes an existing Actor. ' +
+                `To change its source, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE} with actor john/my-actor.`,
         );
         const bare = await callToolExpectingUserError({ files: [ACTOR_JSON, DOCKERFILE] }, [HELPER_TOOLS.ACTOR_CREATE]);
         expect(bare).toContain('Pick another name, or change the existing Actor instead.');
         expectNoToolNamed(bare);
+    });
+
+    it('treats the unique-index error of a racing create as a taken name', async () => {
+        actorsCreateMock.mockRejectedValue(apiError(400, 'Actor name is not unique for this user.', 'name-not-unique'));
+        const text = await callToolExpectingUserError({ files: [ACTOR_JSON, DOCKERFILE] });
+        expect(text).toContain('Your account already has an Actor named john/my-actor');
+    });
+
+    it('asks for username/name when users/me does not give the username', async () => {
+        actorsCreateMock.mockRejectedValue(apiError(409, 'Taken', 'actor-name-not-unique'));
+        userGetMock.mockRejectedValue(apiError(403, 'Forbidden'));
+        const text = await callToolExpectingUserError({ files: [ACTOR_JSON, DOCKERFILE] });
+        expect(text).toBe(
+            'Your account already has an Actor named my-actor, and this tool never changes an existing Actor. ' +
+                `To change its source, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE} with actor set to your username/name.`,
+        );
+    });
+
+    it('creates nothing when the request is cancelled before the POST', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        const result = await callTool({ files: [ACTOR_JSON, DOCKERFILE] }, undefined, controller.signal);
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+        expect(result).toEqual({});
     });
 
     it('refuses a session without a token before any request', async () => {
@@ -248,18 +306,19 @@ describe('create-actor', () => {
         it('warns when no Dockerfile is found', async () => {
             const result = await callTool({ files: [ACTOR_JSON, MAIN_JS] });
             expect(result.structuredContent.warnings).toEqual([
-                'No Dockerfile found: there is no Dockerfile or .actor/Dockerfile, and .actor/actor.json names none, so the build will fail.',
+                "No Dockerfile found: there is no Dockerfile or .actor/Dockerfile, and .actor/actor.json names none, so the build uses the platform's default Node.js Dockerfile; an Actor in another language needs its own.",
             ]);
         });
 
         it.each([
             ['.actor/Dockerfile', [ACTOR_JSON, { path: '.actor/Dockerfile', content: 'FROM x\n' }]],
+            ['a lowercase dockerfile', [ACTOR_JSON, { path: 'dockerfile', content: 'FROM x\n' }]],
             [
                 'a dockerfile field',
                 [
                     {
                         path: '.actor/actor.json',
-                        content: '{"actorSpecification": 1, "dockerfile": "../docker/Dockerfile"}',
+                        content: '{"actorSpecification": 1, "name": "my-actor", "dockerfile": "../docker/Dockerfile"}',
                     },
                 ],
             ],
@@ -276,6 +335,59 @@ describe('create-actor', () => {
                 'These files are empty, and the build skips empty files, so they will not exist in the build: storage/.gitkeep.',
             ]);
             expect(result.content[1].text).toContain('These files are empty');
+        });
+    });
+
+    describe('stored files', () => {
+        const unnamedConfig = { path: '.actor/actor.json', content: '{"actorSpecification": 1}' };
+        const storedConfig = JSON.stringify({ actorSpecification: 1, name: 'my-actor' }, null, 4);
+
+        it('lists the actor.json the platform stored, with its name set, and warns about the rewrite', async () => {
+            const result = await callTool({ files: [unnamedConfig, DOCKERFILE] });
+            expectSchemaConformingStructuredContent(result, createActorToolOutputSchema);
+            const files = [
+                { path: '.actor/actor.json', content: storedConfig },
+                { path: 'Dockerfile', content: DOCKERFILE.content },
+            ].map(({ path, content }) => ({
+                path,
+                sizeBytes: content.length,
+                hash: sha256Prefix(content),
+                format: 'TEXT',
+            }));
+            expect(result.structuredContent.files).toEqual(files);
+            expect(result.structuredContent.revision).toBe(buildFilesRevision(files));
+            expect(result.structuredContent.warnings).toEqual([
+                'The platform set the name field of .actor/actor.json to the Actor name, so the stored file differs ' +
+                    'from the one sent; its hash in files, and the revision, are those of the stored file.',
+            ]);
+        });
+
+        it('returns the revision and hashes a later get-actor-version read returns', async () => {
+            const result = await callTool({ files: [unnamedConfig, DOCKERFILE, MAIN_JS] });
+            const [body] = actorsCreateMock.mock.calls[0] as [{ name: string; versions: SentVersion[] }];
+            const [storedVersion] = buildStoredVersions(body);
+            actorGetMock.mockResolvedValue({
+                id: 'actor-9',
+                userId: 'user-1',
+                name: 'my-actor',
+                username: 'john',
+                versions: [{ versionNumber: '0.0', sourceType: 'SOURCE_FILES', buildTag: 'latest' }],
+            });
+            versionGetMock.mockResolvedValue({ ...storedVersion, buildTag: 'latest', envVars: [] });
+            const read = (await (getActorVersion as HelperTool).call(
+                stubToolCallContext({ actor: 'john/my-actor', paths: [] }, stubClient),
+            )) as { structuredContent: { revision: string; files: { path: string; hash: string }[] } };
+            expect(result.structuredContent.revision).toBe(read.structuredContent.revision);
+            expect(result.structuredContent.files.map(({ path, hash }) => ({ path, hash }))).toEqual(
+                read.structuredContent.files.map(({ path, hash }) => ({ path, hash })),
+            );
+        });
+
+        it('falls back to the sent files when the response carries no version', async () => {
+            actorsCreateMock.mockResolvedValue({ id: 'actor-9', name: 'my-actor', username: 'john' });
+            const result = await callTool({ files: [unnamedConfig, DOCKERFILE] });
+            expect(result.structuredContent.files[0].hash).toBe(sha256Prefix(unnamedConfig.content));
+            expect(result.structuredContent.warnings).toEqual([]);
         });
     });
 
@@ -330,8 +442,17 @@ describe('create-actor', () => {
             const text = await callToolExpectingUserError({
                 files: [ACTOR_JSON, { path: 'big.txt', content: 'x'.repeat(2 * 1024 * 1024) }],
             });
-            expect(text).toContain('over the 2 MiB one call takes');
+            expect(text).toContain('MiB of content, over the 2 MiB one call takes.');
+            expect(text).toContain(
+                `Create the Actor with fewer files, then add the rest in later calls with ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}.`,
+            );
             expect(actorsCreateMock).not.toHaveBeenCalled();
+            const bare = await callToolExpectingUserError(
+                { files: [ACTOR_JSON, { path: 'big.txt', content: 'x'.repeat(2 * 1024 * 1024) }] },
+                [HELPER_TOOLS.ACTOR_CREATE],
+            );
+            expect(bare).toContain('Create the Actor with fewer files, then add the rest in later calls.');
+            expectNoToolNamed(bare);
         });
 
         it('caps files at 500 in the input schema', () => {
