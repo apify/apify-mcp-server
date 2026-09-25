@@ -7,8 +7,9 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
-    expectSoftFailInvalidInput,
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockApifyClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -26,9 +27,9 @@ const MOCK_STORE = {
 };
 
 function stubApifyClient(store: unknown): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         keyValueStore: (_id: string) => ({ get: async () => store }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-key-value-store', () => {

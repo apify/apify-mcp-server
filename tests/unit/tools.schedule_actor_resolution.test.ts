@@ -11,15 +11,16 @@ import type { ApifyClient } from '../../src/apify_client.js';
 import { getActorDefinition } from '../../src/tools/actors/actor_definition.js';
 import { buildApiActions } from '../../src/tools/schedules/schedule_helpers.js';
 import type { ActorDefinitionWithInfo } from '../../src/types.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 const getActorDefinitionMock = vi.mocked(getActorDefinition);
 
 /** A tenant's client: `actor(id).get()` answers only for the Actors that tenant owns or can see. */
 function tenantClient(actorsById: Record<string, { id: string }>): ApifyClient {
-    return {
+    return mockApifyClient({
         token: `token-${Object.keys(actorsById).join('-')}`,
         actor: (id: string) => ({ get: async () => actorsById[id] }),
-    } as unknown as ApifyClient;
+    });
 }
 
 function actorDefinition(id: string, ownerUserId: string): ActorDefinitionWithInfo {

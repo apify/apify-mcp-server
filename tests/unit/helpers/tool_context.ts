@@ -2,6 +2,7 @@ import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/typ
 import Ajv from 'ajv';
 import { expect } from 'vitest';
 
+import type { ApifyClient } from '../../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs, ToolDescriptionContext } from '../../../src/types.js';
 import type { CachedUserInfo } from '../../../src/utils/userid_cache.js';
@@ -35,6 +36,11 @@ export type ToolTelemetrySnapshot = {
     toolStatus?: string;
     failureCategory?: string;
 };
+
+/** The one unsafe `ApifyClient` cast: tests pass whatever client methods they stub. */
+export function mockApifyClient(methods: Record<string, unknown> = {}): ApifyClient {
+    return methods as unknown as ApifyClient;
+}
 
 /** Minimal `InternalToolArgs` stub for unit tests. */
 export function stubToolCallContext(

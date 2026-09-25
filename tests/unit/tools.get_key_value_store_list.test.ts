@@ -6,6 +6,7 @@ import { storageListOutputSchema } from '../../src/tools/structured_output_schem
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
+    mockApifyClient,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -23,9 +24,9 @@ const MOCK_LIST = {
 };
 
 function stubApifyClient(listSpy: ReturnType<typeof vi.fn>): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         keyValueStores: () => ({ list: listSpy }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-key-value-store-list', () => {

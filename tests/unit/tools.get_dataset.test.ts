@@ -7,8 +7,9 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
-    expectSoftFailInvalidInput,
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockApifyClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -27,9 +28,9 @@ const MOCK_DATASET = {
 };
 
 function stubApifyClient(dataset: unknown): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         dataset: (_id: string) => ({ get: async () => dataset }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-dataset', () => {
