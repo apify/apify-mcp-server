@@ -3,20 +3,25 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED } from '../../const.js';
-import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
+import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { deleteActorToolOutputSchema } from '../structured_output_schemas.js';
-import { formatActorFullName, resolveActorNameInput, resolveTargetActor } from './actor_helpers.js';
 
 const deleteActorArgs = z.object({
-    actor: z.string().min(1).describe('Actor ID or name; your own account only'),
+    actor: z
+        .string()
+        .min(1)
+        .describe(
+            'The Actor to delete: its ID, or its full name as username/name or username~name. ' +
+                'A name without the username is not enough. It must be in your own account.',
+        ),
 });
 
 /**
- * https://docs.apify.com/api/v2/act-delete
+ * https://docs.apify.com/api/v2/actor-delete
  *  /v2/actors/{actorId}
  *
  * The platform deletes a public Actor as long as it is free; its users would lose it without warning, so
@@ -36,7 +41,7 @@ export const deleteActor: ToolEntry = Object.freeze({
         - Use only when the user explicitly wants the Actor removed.
 
         USAGE EXAMPLES:
-        - user_input: Delete my Actor my-test-scraper
+        - user_input: Delete my Actor john/my-test-scraper
         - user_input: Remove Actor E2jjCZBezvAZnX8Rb`,
     inputSchema: z.toJSONSchema(deleteActorArgs) as ToolInputSchema,
     outputSchema: deleteActorToolOutputSchema,
@@ -49,16 +54,25 @@ export const deleteActor: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = deleteActorArgs.parse(args);
         try {
             // The client swallows a 404 on delete, so read first to report a missing Actor and to name the
-            // one that was removed.
-            const { actor } = await resolveTargetActor(client, resolveActorNameInput(parsed.actor));
+            // one that was removed. apify-client turns username/name into the API's username~name.
+            const actor = await client.actor(parsed.actor).get();
             if (!actor) {
-                return respondUserError(`Actor ${parsed.actor} was not found in your account.`);
+                return respondUserError(
+                    `Actor ${parsed.actor} not found. Give its ID or its full name, username/name; ` +
+                        'a name without the username is not enough.',
+                );
             }
-            const fullName = formatActorFullName(actor.username, actor.name);
+            const fullName = `${actor.username}/${actor.name}`;
+            // The platform deletes an Actor for anyone with write access to it, and an Actor's old username~name
+            // still reaches it after a move to another account, so check that it is the caller's own Actor.
+            const { userId } = await getUserInfoCached(apifyToken, client);
+            if (!userId || actor.userId !== userId) {
+                return respondUserError(`${fullName} is not in your account; this tool deletes only your own Actors.`);
+            }
             if (actor.isPublic) {
                 const { totalUsers } = actor.stats;
                 return respondUserError(
@@ -71,7 +85,6 @@ export const deleteActor: ToolEntry = Object.freeze({
             const summary = `Deleted ${fullName}. This cannot be undone; its unfinished runs were aborted.`;
             return respondOk([JSON.stringify(result), summary], { structuredContent: result });
         } catch (error) {
-            if (error instanceof UserInputError) return respondUserError(error.message);
             // For example a token without write access, or a critical Actor; the API's message says why. A 401/403
             // is recorded as AUTH, as it would be if rethrown, so no report-problem nudge follows a token problem.
             if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {

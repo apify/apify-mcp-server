@@ -6,28 +6,30 @@ import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js'
 import { deleteActor } from '../../src/tools/actors/delete_actor.js';
 import { deleteActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
     stubToolCallContext,
     type TextToolResult,
+    mockUserInfo,
     type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
 
-const userGetMock = vi.fn();
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
+
 const actorGetMock = vi.fn();
 const actorDeleteMock = vi.fn();
 const actorMock = vi.fn(() => ({ get: actorGetMock, delete: actorDeleteMock }));
 
-const stubClient = {
-    user: () => ({ get: userGetMock }),
-    actor: actorMock,
-} as unknown as InternalToolArgs['apifyClient'];
+const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyClient'];
 
 const ACTOR_ID = 'qGXMy0NAkWsIIb9LZ';
 const DELETED_TEXT = 'Deleted john/my-actor. This cannot be undone; its unfinished runs were aborted.';
 
-/** An Actor API document; `userId` is an internal field the tool must not leak. */
+/** An Actor API document of the caller's account; `userId` is an internal field the tool must not leak. */
 function mockActor(overrides: Record<string, unknown> = {}) {
     return {
         id: 'actor-1',
@@ -62,7 +64,7 @@ const callToolExpectingUserError = async (args: Record<string, unknown>) => {
 describe('delete-actor', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        userGetMock.mockResolvedValue({ username: 'john' });
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: 'user-secret' }));
         actorGetMock.mockResolvedValue(mockActor());
         actorDeleteMock.mockResolvedValue(undefined);
     });
@@ -79,10 +81,10 @@ describe('delete-actor', () => {
         });
     });
 
-    it('deletes an Actor given by bare name under its ID and names it', async () => {
-        const result = await callTool({ actor: 'my-actor' });
+    it('deletes an Actor given by ID under the ID the lookup returned and names it', async () => {
+        const result = await callTool({ actor: ACTOR_ID });
 
-        expect(actorMock.mock.calls).toEqual([['john/my-actor'], ['actor-1']]);
+        expect(actorMock.mock.calls).toEqual([[ACTOR_ID], ['actor-1']]);
         expect(actorDeleteMock).toHaveBeenCalledTimes(1);
         expect(actorDeleteMock).toHaveBeenCalledWith();
         expectSchemaConformingStructuredContent(result, deleteActorToolOutputSchema);
@@ -95,23 +97,10 @@ describe('delete-actor', () => {
     it.each(['john/my-actor', 'john~my-actor'])('deletes an Actor given as %s', async (actor) => {
         const result = await callTool({ actor });
 
-        expect(actorMock.mock.calls).toEqual([['john/my-actor'], ['actor-1']]);
+        // apify-client turns username/name into the API's username~name.
+        expect(actorMock.mock.calls).toEqual([[actor], ['actor-1']]);
         expect(actorDeleteMock).toHaveBeenCalledTimes(1);
         expect(result.structuredContent).toEqual({ actorId: 'actor-1', fullName: 'john/my-actor', deleted: true });
-    });
-
-    it('deletes an Actor given as an ID after the name lookup misses', async () => {
-        actorGetMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(mockActor());
-
-        const result = await callTool({ actor: ACTOR_ID });
-
-        expect(actorMock).toHaveBeenNthCalledWith(1, `john/${ACTOR_ID}`);
-        expect(actorMock).toHaveBeenNthCalledWith(2, ACTOR_ID);
-        // The delete goes to the ID the lookup returned.
-        expect(actorMock).toHaveBeenLastCalledWith('actor-1');
-        expect(actorDeleteMock).toHaveBeenCalledTimes(1);
-        expect(result.structuredContent).toEqual({ actorId: 'actor-1', fullName: 'john/my-actor', deleted: true });
-        expect(result.content[1].text).toBe(DELETED_TEXT);
     });
 
     it.each([
@@ -121,7 +110,7 @@ describe('delete-actor', () => {
     ])('refuses a public Actor with totalUsers %i, without calling delete', async (totalUsers, users) => {
         actorGetMock.mockResolvedValue(mockActor({ isPublic: true, stats: { totalUsers } }));
 
-        const text = await callToolExpectingUserError({ actor: 'my-actor' });
+        const text = await callToolExpectingUserError({ actor: ACTOR_ID });
 
         expect(text).toBe(
             `john/my-actor is public in Apify Store and has ${users}; unpublish it in Apify Console first.`,
@@ -129,22 +118,22 @@ describe('delete-actor', () => {
         expect(actorDeleteMock).not.toHaveBeenCalled();
     });
 
-    it("refuses a username prefix that is not the caller's before any Actor lookup", async () => {
+    it('refuses an Actor of another account without calling delete', async () => {
+        // The platform deletes for anyone with write access, such as a user the Actor is shared with.
+        actorGetMock.mockResolvedValue(mockActor({ userId: 'someone-else', username: 'jane' }));
+
         const text = await callToolExpectingUserError({ actor: 'jane/my-actor' });
 
-        expect(text).toBe("This tool works only with Actors of your own account (john); 'jane' names another account.");
-        expect(actorGetMock).not.toHaveBeenCalled();
+        expect(text).toBe('jane/my-actor is not in your account; this tool deletes only your own Actors.');
         expect(actorDeleteMock).not.toHaveBeenCalled();
     });
 
-    it('refuses an ID that belongs to another account without calling delete', async () => {
-        actorGetMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(mockActor({ username: 'jane' }));
+    it("refuses when the caller's account cannot be read", async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
 
         const text = await callToolExpectingUserError({ actor: ACTOR_ID });
 
-        expect(text).toBe(
-            `This tool works only with Actors of your own account (john); Actor ${ACTOR_ID} belongs to jane.`,
-        );
+        expect(text).toBe('john/my-actor is not in your account; this tool deletes only your own Actors.');
         expect(actorDeleteMock).not.toHaveBeenCalled();
     });
 
@@ -154,18 +143,11 @@ describe('delete-actor', () => {
 
         const text = await callToolExpectingUserError({ actor });
 
-        expect(text).toBe(`Actor ${actor} was not found in your account.`);
-        expect(actorDeleteMock).not.toHaveBeenCalled();
-    });
-
-    it('rejects an invalid Actor name before any API call', async () => {
-        const text = await callToolExpectingUserError({ actor: '-bad-' });
-
         expect(text).toBe(
-            'Actor name must be 3 to 63 characters: letters, digits and dashes, not starting or ending with a dash.',
+            `Actor ${actor} not found. Give its ID or its full name, username/name; ` +
+                'a name without the username is not enough.',
         );
-        expect(userGetMock).not.toHaveBeenCalled();
-        expect(actorMock).not.toHaveBeenCalled();
+        expect(actorDeleteMock).not.toHaveBeenCalled();
     });
 
     // The platform refuses a paid Actor only while it is public, which the tool refuses before the delete call.
@@ -175,7 +157,7 @@ describe('delete-actor', () => {
     ])('answers a 403 %s from the delete call with the API message', async (type, message) => {
         actorDeleteMock.mockRejectedValue(apiError(403, type, message));
 
-        const result = await callTool({ actor: 'my-actor' });
+        const result = await callTool({ actor: ACTOR_ID });
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe(message);
@@ -194,7 +176,7 @@ describe('delete-actor', () => {
     ])('records a %i from the delete call as %s', async (status, category) => {
         actorDeleteMock.mockRejectedValue(apiError(status, 'some-error', 'Some error.'));
 
-        const result = await callTool({ actor: 'my-actor' });
+        const result = await callTool({ actor: ACTOR_ID });
 
         expect(result.content[0].text).toBe('Some error.');
         expect(result.toolTelemetry).toEqual(
@@ -209,7 +191,7 @@ describe('delete-actor', () => {
     it('answers a 403 from the Actor lookup with the API message, without calling delete', async () => {
         actorGetMock.mockRejectedValue(apiError(403, 'insufficient-permissions', 'Insufficient permissions.'));
 
-        const result = await callTool({ actor: 'my-actor' });
+        const result = await callTool({ actor: ACTOR_ID });
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe('Insufficient permissions.');
@@ -230,7 +212,7 @@ describe('delete-actor', () => {
     ])('names no tool and leaks no internal field in the result of %s', async (_label, actor) => {
         actorGetMock.mockResolvedValue(actor);
 
-        const result = await callTool({ actor: 'my-actor' });
+        const result = await callTool({ actor: ACTOR_ID });
 
         const text = result.content.map((block) => block.text).join('\n');
         for (const toolName of Object.values(HELPER_TOOLS)) {
