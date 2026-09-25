@@ -13,27 +13,20 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondAborted } from '../../utils/mcp.js';
 import { buildNextStepForBuild, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
 import { createActorToolOutputSchema } from '../structured_output_schemas.js';
-import type { SourceFile } from './source_files.js';
-import {
-    buildFilesRevision,
-    buildInlineSourceFile,
-    buildUrlRevision,
-    compareSourcePaths,
-    MAX_SOURCE_PATH_LENGTH,
-    parseStoredPath,
-} from './source_files.js';
+import { buildFilesRevision, buildUrlRevision, parseStoredPath } from './source_files.js';
 import type { BuildAfterWriteResult } from './source_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
-    buildSourceFileEntry,
+    buildFilesManifest,
     formatBuildLaterHint,
     formatBuildStartFailure,
     formatEmptyFilesWarning,
+    formatMissingDockerfileWarning,
     formatUrlWithoutSecrets,
     getSourceFileEntryBytes,
     isFolderEntry,
     MAX_WRITE_FILES,
-    parseInputPath,
+    parseInputFiles,
     respondToSourceToolError,
     sourceFileArgs,
     startBuildAfterWrite,
@@ -53,9 +46,6 @@ const DEFAULT_BUILD_TAG = 'latest';
  * lookup before the insert, the second from the unique index when two creates race past that lookup.
  */
 const ACTOR_NAME_TAKEN_ERROR_TYPES: ReadonlySet<string> = new Set(['actor-name-not-unique', 'name-not-unique']);
-
-/** Where the build looks for a Dockerfile when `.actor/actor.json` names none; it matches them regardless of case. */
-const DOCKERFILE_PATHS = ['dockerfile', '.actor/dockerfile'];
 
 const createActorArgs = z.object({
     name: z
@@ -119,49 +109,13 @@ function parseCreateRequest(args: CreateActorArgs, loadedToolNames: readonly str
             recoveryText: `Create the Actor with fewer files, then add the rest in later calls${addLaterText}.`,
         },
     );
-    const seenPaths = new Set<string>();
-    const entries = files.map((file, index) => {
-        const label = `files[${index}]`;
-        const path = parseInputPath(file.path, `${label} path`);
-        if (path.length > MAX_SOURCE_PATH_LENGTH) {
-            throw new UserInputError(`${label} path is over ${MAX_SOURCE_PATH_LENGTH} characters.`);
-        }
-        if (seenPaths.has(path)) throw new UserInputError(`files has ${path} more than once.`);
-        seenPaths.add(path);
-        return buildSourceFileEntry({
-            path,
-            content: file.content,
-            encoding: file.encoding,
-            label: `${label} content for`,
-        });
-    });
-    if (!seenPaths.has(ACTOR_CONFIG_PATH)) {
-        throw new UserInputError(
-            `files must include ${ACTOR_CONFIG_PATH}: this tool requires it, since the build reads the Actor's ` +
-                'configuration from it.',
-        );
-    }
-    return { kind: 'files', entries };
-}
-
-/** Whether `.actor/actor.json` names a Dockerfile; a file that is not valid JSON names none. */
-function hasDockerfileField(entries: readonly ActorVersionSourceFile[]): boolean {
-    const config = entries.find(({ name }) => name === ACTOR_CONFIG_PATH);
-    if (!config) return false;
-    try {
-        const parsed = JSON.parse(buildInlineSourceFile(config).readContent()) as { dockerfile?: unknown };
-        return typeof parsed?.dockerfile === 'string' && parsed.dockerfile !== '';
-    } catch {
-        return false;
-    }
+    return { kind: 'files', entries: parseInputFiles(files, 'files') };
 }
 
 function buildFilesWarnings(
     sentEntries: readonly ActorVersionSourceFile[],
     storedEntries: readonly ActorVersionSourceFile[] | undefined,
 ): string[] {
-    const paths = new Set(sentEntries.map(({ name }) => name.toLowerCase()));
-    const hasDockerfile = DOCKERFILE_PATHS.some((path) => paths.has(path)) || hasDockerfileField(sentEntries);
     const emptyPaths = sentEntries.filter(({ content }) => content === '').map(({ name }) => name);
     const sentConfig = sentEntries.find(({ name }) => name === ACTOR_CONFIG_PATH);
     const storedConfig = storedEntries?.findLast(({ name }) => parseStoredPath(name) === ACTOR_CONFIG_PATH);
@@ -170,9 +124,7 @@ function buildFilesWarnings(
         storedConfig !== undefined &&
         !getSourceFileEntryBytes(sentConfig).equals(getSourceFileEntryBytes(storedConfig));
     return [
-        !hasDockerfile &&
-            `No Dockerfile found: there is no Dockerfile or .actor/Dockerfile, and ${ACTOR_CONFIG_PATH} names none, so ` +
-                "the build uses the platform's default Node.js Dockerfile; an Actor in another language needs its own.",
+        formatMissingDockerfileWarning(sentEntries),
         isConfigRewritten &&
             `The platform set the name field of ${ACTOR_CONFIG_PATH} to the Actor name, so the stored file differs ` +
                 'from the one sent; its hash in files, and the revision, are those of the stored file.',
@@ -190,16 +142,6 @@ function extractStoredEntries(created: Actor, versionNumber: string): ActorVersi
     );
     const sourceFiles = version?.sourceType === ActorSourceType.SourceFiles ? version.sourceFiles : undefined;
     return Array.isArray(sourceFiles) ? sourceFiles.filter((entry) => !isFolderEntry(entry)) : undefined;
-}
-
-/** One file per path, the last stored entry winning as in get-actor-version, sorted by path. */
-function buildFilesManifest(entries: readonly ActorVersionSourceFile[]): SourceFile[] {
-    const filesByPath = new Map<string, SourceFile>();
-    for (const entry of entries) {
-        const file = buildInlineSourceFile(entry);
-        filesByPath.set(file.path, file);
-    }
-    return [...filesByPath.values()].sort((a, b) => compareSourcePaths(a.path, b.path));
 }
 
 function buildVersion(args: CreateActorArgs, source: PreparedSource): ActorVersion {
