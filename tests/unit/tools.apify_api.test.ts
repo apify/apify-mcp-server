@@ -9,6 +9,7 @@ import { buildApiOperationIndex } from '../../src/tools/api/apify_api_spec.js';
 import { fetchApifyApiOperation } from '../../src/tools/api/fetch_apify_api_operation.js';
 import { readApifyApi } from '../../src/tools/api/read_apify_api.js';
 import { searchApifyApi } from '../../src/tools/api/search_apify_api.js';
+import { writeApifyApi } from '../../src/tools/api/write_apify_api.js';
 import {
     apifyApiCallOutputSchema,
     apifyApiOperationOutputSchema,
@@ -204,6 +205,15 @@ describe('read-apify-api', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
+    it('names the write tool for a write operation only when the session has it', async () => {
+        const args = { operationId: 'dataset_put', pathParams: { datasetId: 'abc' } };
+        const withWrite = await callTool(readApifyApi, args);
+        const withoutWrite = await callTool(readApifyApi, args, [HELPER_TOOLS.API_READ]);
+
+        expect(withWrite.content[0].text).toContain(`Call it with ${HELPER_TOOLS.API_WRITE}.`);
+        expect(withoutWrite.content[0].text).not.toContain(HELPER_TOOLS.API_WRITE);
+    });
+
     it('refuses bad path or query parameters without a request', async () => {
         const badPath = await callTool(readApifyApi, { operationId: 'dataset_get', pathParams: { datasetId: '..' } });
         const badQuery = await callTool(readApifyApi, {
@@ -266,5 +276,118 @@ describe('read-apify-api', () => {
         expect(result.content[1].text).toBe(
             'GET /v2/datasets/abc returned HTTP 200 with a binary body (application/zip, 3 bytes), which is not shown.',
         );
+    });
+});
+
+describe('write-apify-api', () => {
+    it('sends one request with the JSON body and returns the response', async () => {
+        const body = { data: { id: 'abc', name: 'leads-2026' } };
+        requestMock.mockResolvedValue(mockResponse(200, body));
+
+        const result = await callTool(writeApifyApi, {
+            operationId: 'dataset_put',
+            pathParams: { datasetId: 'abc' },
+            body: { name: 'leads-2026' },
+        });
+
+        expect(requestMock).toHaveBeenCalledTimes(1);
+        expect(requestMock).toHaveBeenCalledWith({
+            url: `${BASE_URL}/datasets/abc`,
+            method: 'PUT',
+            params: undefined,
+            data: { name: 'leads-2026' },
+            maxContentLength: MAX_INLINE_BYTES,
+            signal: expect.any(AbortSignal),
+        });
+        expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
+        expect(result.structuredContent).toMatchObject({ method: 'PUT', path: '/v2/datasets/abc', data: body });
+    });
+
+    it('sends an operation without a body when none is given', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: { id: 'run-1', status: 'ABORTING' } }));
+
+        await callTool(writeApifyApi, { operationId: 'actorRun_abort_post', pathParams: { runId: 'run-1' } });
+
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', data: undefined }));
+    });
+
+    it.each([
+        [{ operationId: 'dataset_delete', pathParams: { datasetId: 'abc' } }, 'Deletion cannot be undone'],
+        [{ operationId: 'users_me_limits_put', body: {} }, 'spending limits'],
+        [
+            { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } },
+            `dataset_get is a GET operation with read access; this tool has write access. Call it with ${HELPER_TOOLS.API_READ}.`,
+        ],
+        [{ operationId: 'dataset_put', pathParams: { datasetId: 'abc' } }, 'dataset_put needs a request body.'],
+        [
+            { operationId: 'actorRun_abort_post', pathParams: { runId: 'run-1' }, body: { gracefully: true } },
+            'actorRun_abort_post takes no request body.',
+        ],
+        [
+            {
+                operationId: 'actor_put',
+                pathParams: { actorId: 'john~my-actor' },
+                body: { title: 'T', isPublic: false },
+            },
+            'The API tools do not set isPublic, whatever the value',
+        ],
+        [
+            {
+                operationId: 'dataset_put',
+                pathParams: { datasetId: 'abc' },
+                body: { generalAccess: 'ANYONE_WITH_ID_CAN_READ' },
+            },
+            'The API tools do not set generalAccess',
+        ],
+    ])('refuses %j without a request', async (args, reason) => {
+        const result = await callTool(writeApifyApi, args);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain(reason);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('sends a refused field name when the body is free-form, such as a stored record', async () => {
+        requestMock.mockResolvedValue(mockResponse(201, undefined, ''));
+
+        const result = await callTool(writeApifyApi, {
+            operationId: 'keyValueStore_record_put',
+            pathParams: { storeId: 'store-1', recordKey: 'CONFIG' },
+            body: { isPublic: true },
+        });
+
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ data: { isPublic: true } }));
+        expect(result.structuredContent).toMatchObject({ statusCode: 201, data: null });
+    });
+
+    it('says the request was sent when the response is over the inline limit', async () => {
+        requestMock.mockRejectedValue(
+            new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE'),
+        );
+
+        const result = await callTool(writeApifyApi, {
+            operationId: 'dataset_put',
+            pathParams: { datasetId: 'abc' },
+            body: { name: 'leads-2026' },
+        });
+
+        expect(result.content[0].text).toContain('The request itself was sent');
+    });
+
+    describe('redactArgs()', () => {
+        const { redactArgs } = writeApifyApi as HelperTool;
+
+        it('redacts the body in the logged copy without changing the arguments', () => {
+            const args = { operationId: 'actor_version_envVar_put', body: { value: 'secret' } };
+
+            expect(redactArgs?.(args)).toEqual({ operationId: 'actor_version_envVar_put', body: '[REDACTED]' });
+            expect(args.body).toEqual({ value: 'secret' });
+        });
+
+        it('leaves arguments without a body as they are', () => {
+            const args = { operationId: 'actorRun_abort_post' };
+
+            expect(redactArgs?.(args)).toBe(args);
+        });
     });
 });

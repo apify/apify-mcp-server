@@ -23,6 +23,7 @@ import { searchActors } from './actors/search_actors.js';
 import { fetchApifyApiOperation } from './api/fetch_apify_api_operation.js';
 import { readApifyApi } from './api/read_apify_api.js';
 import { searchApifyApi } from './api/search_apify_api.js';
+import { writeApifyApi } from './api/write_apify_api.js';
 import { buildActor } from './builds/build_actor.js';
 import { getActorBuild } from './builds/get_actor_build.js';
 import { getActorBuildLog } from './builds/get_actor_build_log.js';
@@ -73,7 +74,7 @@ export const toolCategories = {
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, buildActor],
-    api: [searchApifyApi, fetchApifyApiOperation, readApifyApi],
+    api: [searchApifyApi, fetchApifyApiOperation, readApifyApi, writeApifyApi],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 
