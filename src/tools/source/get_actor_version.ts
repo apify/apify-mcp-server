@@ -599,10 +599,10 @@ async function readVersion(params: ReadVersionParams): Promise<ToolResponse> {
 }
 
 /**
- * https://docs.apify.com/api/v2/act-get
- *  /v2/acts/{actorId}
- * https://docs.apify.com/api/v2/act-version-get
- *  /v2/acts/{actorId}/versions/{versionNumber}
+ * https://docs.apify.com/api/v2/actor-get
+ *  /v2/actors/{actorId}
+ * https://docs.apify.com/api/v2/actor-version-get
+ *  /v2/actors/{actorId}/versions/{versionNumber}
  * https://docs.apify.com/api/v2/key-value-store-keys-get
  *  /v2/key-value-stores/{storeId}/keys
  * https://docs.apify.com/api/v2/key-value-store-record-get
