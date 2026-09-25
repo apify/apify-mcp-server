@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
-import { compileSchema } from '../../utils/ajv.js';
+import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { deleteActorToolOutputSchema } from '../structured_output_schemas.js';
@@ -18,7 +18,18 @@ const deleteActorArgs = z.object({
             'The Actor to delete: its ID, or its full name as username/name or username~name. ' +
                 'A name without the username is not enough. It must be in your own account.',
         ),
+    abortRunningRuns: z
+        .boolean()
+        .describe(
+            'Delete even while the Actor has unfinished runs, which the deletion aborts. Set it only after the user ' +
+                'agreed to abort them. Default: false.',
+        )
+        .default(false),
 });
+
+/** Statuses of runs that have not finished: the ones the platform aborts when it deletes the Actor. */
+const UNFINISHED_RUN_STATUSES = ['READY', 'RUNNING', 'TIMING-OUT', 'ABORTING'] as const;
+const LISTED_RUN_IDS_MAX = 5;
 
 /**
  * https://docs.apify.com/api/v2/actor-delete
@@ -34,6 +45,7 @@ export const deleteActor: ToolEntry = Object.freeze({
     description: dedent`
         Delete an Actor from your own account permanently; this cannot be undone.
         Its unfinished runs are aborted, its webhooks are removed, and it is removed from the schedules that start it.
+        While it has unfinished runs, for example a Standby Actor serving requests, the tool refuses unless abortRunningRuns is set.
         A public Actor cannot be deleted: unpublish it in Apify Console first, after cancelling its monetization if it is paid.
         For a reversible option, set it as deprecated in Apify Console instead.
 
@@ -43,9 +55,10 @@ export const deleteActor: ToolEntry = Object.freeze({
         USAGE EXAMPLES:
         - user_input: Delete my Actor john/my-test-scraper
         - user_input: Remove Actor E2jjCZBezvAZnX8Rb`,
-    inputSchema: z.toJSONSchema(deleteActorArgs) as ToolInputSchema,
+    // `fixZodSchemaRequired` strips `abortRunningRuns` from `required` because it has a default.
+    inputSchema: fixZodSchemaRequired(z.toJSONSchema(deleteActorArgs)) as ToolInputSchema,
     outputSchema: deleteActorToolOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(deleteActorArgs)),
+    ajvValidate: compileSchema(fixZodSchemaRequired(z.toJSONSchema(deleteActorArgs))),
     annotations: {
         title: 'Delete Actor',
         readOnlyHint: false,
@@ -100,10 +113,29 @@ export const deleteActor: ToolEntry = Object.freeze({
                         'A paid Actor needs its monetization cancelled before it can be unpublished.',
                 );
             }
+            // The platform aborts every unfinished run on delete (removeActor), so ask before stopping live work.
+            const unfinishedRuns = await client
+                .actor(actor.id)
+                .runs()
+                .list({ status: [...UNFINISHED_RUN_STATUSES], desc: true, limit: LISTED_RUN_IDS_MAX });
+            const unfinishedRunCount = unfinishedRuns.total;
+            if (unfinishedRunCount > 0 && !parsed.abortRunningRuns) {
+                const runIds = unfinishedRuns.items.map((run) => run.id).join(', ');
+                const more = unfinishedRunCount > unfinishedRuns.items.length ? ', and more' : '';
+                return respondUserError(
+                    `${fullName} has ${unfinishedRunCount} unfinished ${unfinishedRunCount === 1 ? 'run' : 'runs'} ` +
+                        `(${runIds}${more}), and deleting it aborts them. Ask the user whether to abort them, and if ` +
+                        'so call again with abortRunningRuns set to true; otherwise wait until they finish.',
+                );
+            }
             await client.actor(actor.id).delete();
 
-            const result = { actorId: actor.id, fullName, deleted: true };
-            const summary = `Deleted ${fullName}. This cannot be undone; any unfinished runs were aborted.`;
+            const result = { actorId: actor.id, fullName, deleted: true, abortedRunCount: unfinishedRunCount };
+            const aborted =
+                unfinishedRunCount > 0
+                    ? ` ${unfinishedRunCount} unfinished ${unfinishedRunCount === 1 ? 'run was' : 'runs were'} aborted.`
+                    : '';
+            const summary = `Deleted ${fullName}. This cannot be undone.${aborted}`;
             return respondOk([JSON.stringify(result), summary], { structuredContent: result });
         } catch (error) {
             // For example a token without write access, or a critical Actor; the API's message says why, and

@@ -22,12 +22,13 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 
 const actorGetMock = vi.fn();
 const actorDeleteMock = vi.fn();
-const actorMock = vi.fn(() => ({ get: actorGetMock, delete: actorDeleteMock }));
+const runsListMock = vi.fn();
+const actorMock = vi.fn(() => ({ get: actorGetMock, delete: actorDeleteMock, runs: () => ({ list: runsListMock }) }));
 
 const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyClient'];
 
 const ACTOR_ID = 'qGXMy0NAkWsIIb9LZ';
-const DELETED_TEXT = 'Deleted john/my-actor. This cannot be undone; any unfinished runs were aborted.';
+const DELETED_TEXT = 'Deleted john/my-actor. This cannot be undone.';
 
 /** An Actor API document of the caller's account; `userId` is an internal field the tool must not leak. */
 function mockActor(overrides: Record<string, unknown> = {}) {
@@ -40,6 +41,11 @@ function mockActor(overrides: Record<string, unknown> = {}) {
         stats: { totalUsers: 3 },
         ...overrides,
     };
+}
+
+/** A run list page as the API returns it for the unfinished-run check. */
+function mockRunList(runIds: string[], total = runIds.length) {
+    return { total, count: runIds.length, offset: 0, limit: 5, desc: true, items: runIds.map((id) => ({ id })) };
 }
 
 function apiError(status: number, type: string, message: string): ApifyApiError {
@@ -67,6 +73,7 @@ describe('delete-actor', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: 'user-secret' }));
         actorGetMock.mockResolvedValue(mockActor());
         actorDeleteMock.mockResolvedValue(undefined);
+        runsListMock.mockResolvedValue(mockRunList([]));
     });
 
     it('has the expected tool name and destructive annotations', () => {
@@ -84,11 +91,16 @@ describe('delete-actor', () => {
     it('deletes an Actor given by ID under the ID the lookup returned and names it', async () => {
         const result = await callTool({ actor: ACTOR_ID });
 
-        expect(actorMock.mock.calls).toEqual([[ACTOR_ID], ['actor-1']]);
+        expect(actorMock.mock.calls).toEqual([[ACTOR_ID], ['actor-1'], ['actor-1']]);
         expect(actorDeleteMock).toHaveBeenCalledTimes(1);
         expect(actorDeleteMock).toHaveBeenCalledWith();
         expectSchemaConformingStructuredContent(result, deleteActorToolOutputSchema);
-        expect(result.structuredContent).toEqual({ actorId: 'actor-1', fullName: 'john/my-actor', deleted: true });
+        expect(result.structuredContent).toEqual({
+            actorId: 'actor-1',
+            fullName: 'john/my-actor',
+            deleted: true,
+            abortedRunCount: 0,
+        });
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content).toHaveLength(2);
         expect(result.content[1].text).toBe(DELETED_TEXT);
@@ -98,9 +110,62 @@ describe('delete-actor', () => {
         const result = await callTool({ actor });
 
         // apify-client turns username/name into the API's username~name.
-        expect(actorMock.mock.calls).toEqual([[actor], ['actor-1']]);
+        expect(actorMock.mock.calls).toEqual([[actor], ['actor-1'], ['actor-1']]);
         expect(actorDeleteMock).toHaveBeenCalledTimes(1);
-        expect(result.structuredContent).toEqual({ actorId: 'actor-1', fullName: 'john/my-actor', deleted: true });
+        expect(result.structuredContent).toEqual({
+            actorId: 'actor-1',
+            fullName: 'john/my-actor',
+            deleted: true,
+            abortedRunCount: 0,
+        });
+    });
+
+    it('refuses while the Actor has unfinished runs, naming them, without calling delete', async () => {
+        runsListMock.mockResolvedValue(mockRunList(['run-1', 'run-2']));
+
+        const text = await callToolExpectingUserError({ actor: ACTOR_ID });
+
+        expect(runsListMock).toHaveBeenCalledWith({
+            status: ['READY', 'RUNNING', 'TIMING-OUT', 'ABORTING'],
+            desc: true,
+            limit: 5,
+        });
+        expect(text).toBe(
+            'john/my-actor has 2 unfinished runs (run-1, run-2), and deleting it aborts them. Ask the user whether ' +
+                'to abort them, and if so call again with abortRunningRuns set to true; otherwise wait until they finish.',
+        );
+        expect(actorDeleteMock).not.toHaveBeenCalled();
+    });
+
+    it('says there are more unfinished runs than it names', async () => {
+        runsListMock.mockResolvedValue(mockRunList(['r1', 'r2', 'r3', 'r4', 'r5'], 7));
+
+        const text = await callToolExpectingUserError({ actor: ACTOR_ID });
+
+        expect(text).toContain('has 7 unfinished runs (r1, r2, r3, r4, r5, and more)');
+    });
+
+    it.each([
+        [1, '1 unfinished run was aborted.'],
+        [2, '2 unfinished runs were aborted.'],
+    ])('deletes with abortRunningRuns while %i runs are unfinished and reports them', async (count, aborted) => {
+        runsListMock.mockResolvedValue(mockRunList(Array.from({ length: count }, (_, i) => `run-${i}`)));
+
+        const result = await callTool({ actor: ACTOR_ID, abortRunningRuns: true });
+
+        expect(actorDeleteMock).toHaveBeenCalledTimes(1);
+        expectSchemaConformingStructuredContent(result, deleteActorToolOutputSchema);
+        expect(result.structuredContent).toEqual({
+            actorId: 'actor-1',
+            fullName: 'john/my-actor',
+            deleted: true,
+            abortedRunCount: count,
+        });
+        expect(result.content[1].text).toBe(`Deleted john/my-actor. This cannot be undone. ${aborted}`);
+    });
+
+    it('requires only actor in its input schema', () => {
+        expect(deleteActor.inputSchema.required).toEqual(['actor']);
     });
 
     it.each([
