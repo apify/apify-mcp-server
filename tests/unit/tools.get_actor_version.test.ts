@@ -13,6 +13,7 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    only,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
@@ -151,8 +152,22 @@ describe('get-actor-version', () => {
         expect((getActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
+    it('says its hashes and revision feed update-actor-version only when the session has it', () => {
+        const { buildDescription } = getActorVersion as HelperTool;
+        const note = `These hashes and this revision are what ${HELPER_TOOLS.ACTOR_VERSION_UPDATE} takes as expectedHash and expectedRevision.`;
+        expect(buildDescription?.(only(HELPER_TOOLS.ACTOR_VERSION_UPDATE))).toContain(note);
+        expect(getActorVersion.description).toContain(note);
+        const bare = buildDescription?.(only()) ?? '';
+        expect(bare).not.toContain(HELPER_TOOLS.ACTOR_VERSION_UPDATE);
+        expect(bare).toContain('revision identifies the whole file set and changes when any file changes.\n');
+    });
+
     it('is served in the source category, which is not enabled by default', () => {
-        expect(getCategoryTools().source.map((tool) => tool.name)).toEqual([HELPER_TOOLS.ACTOR_VERSION_GET]);
+        expect(getCategoryTools().source.map((tool) => tool.name)).toEqual([
+            HELPER_TOOLS.ACTOR_VERSION_GET,
+            HELPER_TOOLS.ACTOR_CREATE,
+            HELPER_TOOLS.ACTOR_VERSION_UPDATE,
+        ]);
         expect(toolCategoriesEnabledByDefault).not.toContain('source');
     });
 

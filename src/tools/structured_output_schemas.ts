@@ -605,6 +605,110 @@ export const getActorVersionToolOutputSchema = {
     required: ['actorId', 'fullName', 'versionNumber', 'sourceType', 'revision', 'files', 'contents', 'envVars'],
 };
 
+/** The build a source write started with autoBuild: the same allowlisted subset (`toBuildResult`) as get-actor-build. */
+const sourceWriteBuildProperties = {
+    build: getActorBuildToolOutputSchema.properties.build,
+    buildError: {
+        type: 'string',
+        description: 'Why the build did not start; set when autoBuild was true and the write succeeded without a build',
+    },
+    warnings: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Things to know about the written source, such as empty files the build skips',
+    },
+};
+
+/** Schema for create-actor: the new Actor, its one version, and the files written to it. */
+export const createActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the new Actor' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.0' },
+        sourceType: { type: 'string', description: 'SOURCE_FILES for files stored in the version, GIT_REPO for Git' },
+        buildTag: { type: 'string', description: 'Tag that builds of this version get, e.g. latest' },
+        revision: {
+            type: 'string',
+            description:
+                'Identifies the stored file set, or the Git URL; the same value a later read of the version returns',
+        },
+        files: {
+            type: 'array',
+            description: 'The files as stored, sorted by path; empty for a version built from Git',
+            items: getActorVersionToolOutputSchema.properties.files.items,
+        },
+        ...sourceWriteBuildProperties,
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'sourceType', 'buildTag', 'revision', 'files', 'warnings'],
+};
+
+/** Schema for update-actor-version: the revisions before and after, what changed, and excerpts of edited regions. */
+export const updateActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        sourceType: {
+            type: 'string',
+            description:
+                'The source type after the update: SOURCE_FILES, GIT_REPO, or GITHUB_GIST (buildTag-only change)',
+        },
+        buildTag: { type: 'string', description: 'Tag that builds of this version get, e.g. latest' },
+        previousRevision: { type: 'string', description: 'Revision of the version as read before the update' },
+        revision: { type: 'string', description: 'Revision after the update; pass it as expectedRevision next time' },
+        changed: { type: 'boolean', description: 'False when the call changed nothing and nothing was written' },
+        changes: {
+            type: 'array',
+            description:
+                'One entry per file the call created, updated, moved, or deleted, or sent with the content it already had',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'Path before the update' },
+                    action: { type: 'string', enum: ['created', 'updated', 'deleted', 'moved', 'unchanged'] },
+                    newPath: { type: 'string', description: 'Path after a move' },
+                    hash: { type: 'string', description: 'Hash of the file after the update; absent for deleted' },
+                    sizeBytes: { type: 'number', description: 'Size after the update; absent for deleted' },
+                },
+                required: ['path', 'action'],
+            },
+        },
+        excerpts: {
+            type: 'array',
+            description: 'Edited regions with 2 lines of context, exact text, at most 4 KiB together',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string' },
+                    startLine: { type: 'integer', description: 'First line of the excerpt, counting from 1' },
+                    endLine: { type: 'integer', description: 'Last line of the excerpt' },
+                    text: { type: 'string', description: 'The lines as they are now, line endings included' },
+                },
+                required: ['path', 'startLine', 'endLine', 'text'],
+            },
+        },
+        totalSizeBytes: {
+            type: 'number',
+            description: 'Size of the stored files as the platform measures it against its 3 MiB limit; absent for Git',
+        },
+        ...sourceWriteBuildProperties,
+    },
+    required: [
+        'actorId',
+        'fullName',
+        'versionNumber',
+        'sourceType',
+        'previousRevision',
+        'revision',
+        'changed',
+        'changes',
+        'excerpts',
+        'warnings',
+    ],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into

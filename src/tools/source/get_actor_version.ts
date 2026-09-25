@@ -1,4 +1,4 @@
-import type { Actor, ActorVersion, ActorVersionSourceFile } from 'apify-client';
+import type { ActorVersion } from 'apify-client';
 import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
@@ -6,12 +6,11 @@ import { z } from 'zod';
 import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import { UserInputError } from '../../errors.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
-import { listVersionNumbers } from '../builds/build_helpers.js';
 import { catchNotFound } from '../storage/storage_helpers.js';
 import { getActorVersionToolOutputSchema } from '../structured_output_schemas.js';
 import { readSourceArchive } from './source_archive.js';
@@ -21,12 +20,14 @@ import {
     buildFilesRevision,
     buildInlineSourceFile,
     buildUrlRevision,
+    BYTES_PER_MIB,
     compareSourcePaths,
+    formatMib,
+    splitLines,
 } from './source_files.js';
+import { formatUrlWithoutSecrets, isFolderEntry, resolveVersionNumber } from './source_helpers.js';
 
 const INLINE_LIMIT_KIB = MAX_INLINE_BYTES / 1024;
-
-const BYTES_PER_MIB = 1024 * 1024;
 
 const MAX_REQUESTED_PATHS = 100;
 
@@ -111,32 +112,6 @@ type ContentSelection = {
 
 type SourceRecordRef = { storeId: string; key: string };
 
-/** The requested version when the Actor has it, else the only version; throws `UserInputError` otherwise. */
-function resolveVersionNumber(
-    actor: Pick<Actor, 'versions'>,
-    requestedVersionNumber: string | undefined,
-    actorSelector: string,
-): string {
-    const versionNumbers = listVersionNumbers(actor);
-    if (versionNumbers.length === 0) throw new UserInputError(`Actor '${actorSelector}' has no versions.`);
-    if (requestedVersionNumber !== undefined && !versionNumbers.includes(requestedVersionNumber)) {
-        throw new UserInputError(
-            `Actor '${actorSelector}' has no version ${requestedVersionNumber}; available versions: ${versionNumbers.join(', ')}.`,
-        );
-    }
-    if (requestedVersionNumber === undefined && versionNumbers.length !== 1) {
-        // The source type and build tag tell the caller which version holds the code it is after.
-        const versions = actor.versions
-            .filter((version) => version.versionNumber !== undefined)
-            .map(({ versionNumber, sourceType, buildTag }) => {
-                const tag = buildTag ? `, build tag ${buildTag}` : '';
-                return `${versionNumber} (${sourceType}${tag})`;
-            });
-        throw new UserInputError(`Specify versionNumber; this Actor has versions: ${versions.join(', ')}.`);
-    }
-    return requestedVersionNumber ?? versionNumbers[0];
-}
-
 /**
  * The store and key when `tarballUrl` is a key-value store record of the API this client talks to; undefined for any
  * other URL, which this tool never fetches. The query string (a store signature) is ignored: the token reads the record.
@@ -151,11 +126,6 @@ function parseSourceRecordUrl(tarballUrl: string, apiBaseUrl: string): SourceRec
     } catch {
         return undefined;
     }
-}
-
-/** Rounded up, so a size just over a limit never prints as the limit itself. */
-function formatMib(bytes: number): string {
-    return (Math.ceil((bytes / BYTES_PER_MIB) * 10) / 10).toFixed(1);
 }
 
 function formatKib(bytes: number): string {
@@ -187,11 +157,6 @@ async function fetchSourceArchive(client: ApifyClient, { storeId, key }: SourceR
     return record.value;
 }
 
-/** Console keeps an empty folder as a `{ name, folder: true }` entry with no content; apify-client's type leaves it out. */
-function isFolderEntry(file: ActorVersionSourceFile): boolean {
-    return (file as { folder?: boolean }).folder === true;
-}
-
 /** One file per path, sorted by path, so the manifest reads the same however the version stores its files. */
 function sortSourceFiles(files: Iterable<SourceFile>): SourceFile[] {
     const filesByPath = new Map<string, SourceFile>();
@@ -201,12 +166,6 @@ function sortSourceFiles(files: Iterable<SourceFile>): SourceFile[] {
 
 function toReturnedContent(file: SourceFile): ReturnedContent {
     return { path: file.path, content: file.readContent(), encoding: file.encoding };
-}
-
-/** Lines with their line endings kept, so joined back they give the exact text. */
-function splitLines(text: string): string[] {
-    if (text === '') return [];
-    return text.split(/(?<=\n)/);
 }
 
 function buildEmptySelection(): ContentSelection {
@@ -446,27 +405,6 @@ function parseGitRepoUrl(gitRepoUrl: string): { repository: string; branch?: str
     };
 }
 
-/**
- * The URL without what can grant access to it, so that never goes out or into the revision: the query string (for
- * example a store signature) and, for http and https, the user and password. An SSH user such as `git@` is not a
- * secret and stays. A URL the parser cannot read, such as `git@github.com:user/repo.git`, loses only its query string.
- */
-function formatUrlWithoutSecrets(url: string): string {
-    if (URL.canParse(url)) {
-        const parsed = new URL(url);
-        parsed.search = '';
-        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-            parsed.username = '';
-            parsed.password = '';
-        }
-        return parsed.href;
-    }
-    const queryIndex = url.indexOf('?');
-    if (queryIndex === -1) return url;
-    const hashIndex = url.indexOf('#', queryIndex);
-    return url.slice(0, queryIndex) + (hashIndex === -1 ? '' : url.slice(hashIndex));
-}
-
 /** The API returns only the number, type, and build tag of a version whose source it hides from this account. */
 function buildHiddenSourceText({ fullName, versionNumber }: VersionTarget): string {
     return `Version ${versionNumber} of ${fullName} came back without its source: the API hides it from accounts that cannot modify the Actor. Ask the Actor's owner for the source.`;
@@ -602,6 +540,29 @@ async function readVersion(params: ReadVersionParams): Promise<ToolResponse> {
     );
 }
 
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    const updateNote = hasTool(HELPER_TOOLS.ACTOR_VERSION_UPDATE)
+        ? ` These hashes and this revision are what ${HELPER_TOOLS.ACTOR_VERSION_UPDATE} takes as expectedHash and expectedRevision.`
+        : '';
+    return dedent`
+        Read an Actor version's source: its metadata, a revision, a listing of its files with sizes and hashes, and the content of the files you ask for.
+        Read-only. Works on any Actor your token can read, but the API hides the source of most Actors you cannot modify, and the call then fails with a message saying so. Content is raw, with no line numbers: text as utf8, binary files as base64. One call returns at most ${INLINE_LIMIT_KIB} KiB of content.
+        - Without paths: the listing, plus every text file if all of them together fit in ${INLINE_LIMIT_KIB} KiB; otherwise the listing only.
+        - paths: [] returns the listing only, the cheap way to get the revision and the hashes.
+        - With paths: those files, in that order, within the limit; the rest are named in omittedPaths or notFoundPaths. Base64 files are returned only when named.
+        - For a large text file, pass its path alone with startLine and lineCount. A text file over the limit requested alone returns the lines that fit, with endLine and totalLines, to continue from.
+        - hash is the first 16 hex characters of the SHA-256 of the file's bytes, the same as sha256sum <file> | cut -c1-16 (shasum -a 256 on macOS). revision identifies the whole file set and changes when any file changes.${updateNote}
+        A version built from a Git repository, a GitHub gist, or a zip at an outside URL returns only that URL: nothing outside the Apify API is fetched. Environment variables come back as names and isSecret only, never their values.
+        Omit versionNumber to read the only version; an Actor with several versions needs it.
+
+        USAGE:
+        - Use to read an Actor's code before changing it, or to check which files changed since an earlier read.
+
+        USAGE EXAMPLES:
+        - user_input: Show me the source code of john/my-scraper
+        - user_input: What does src/main.js of my Actor E2jjCZBezvAZnX8Rb do?`;
+}
+
 /**
  * https://docs.apify.com/api/v2/actor-get
  *  /v2/actors/{actorId}
@@ -620,23 +581,8 @@ export const getActorVersion: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_VERSION_GET,
     title: 'Get Actor version',
-    description: dedent`
-        Read an Actor version's source: its metadata, a revision, a listing of its files with sizes and hashes, and the content of the files you ask for.
-        Read-only. Works on any Actor your token can read, but the API hides the source of most Actors you cannot modify, and the call then fails with a message saying so. Content is raw, with no line numbers: text as utf8, binary files as base64. One call returns at most ${INLINE_LIMIT_KIB} KiB of content.
-        - Without paths: the listing, plus every text file if all of them together fit in ${INLINE_LIMIT_KIB} KiB; otherwise the listing only.
-        - paths: [] returns the listing only, the cheap way to get the revision and the hashes.
-        - With paths: those files, in that order, within the limit; the rest are named in omittedPaths or notFoundPaths. Base64 files are returned only when named.
-        - For a large text file, pass its path alone with startLine and lineCount. A text file over the limit requested alone returns the lines that fit, with endLine and totalLines, to continue from.
-        - hash is the first 16 hex characters of the SHA-256 of the file's bytes, the same as sha256sum <file> | cut -c1-16 (shasum -a 256 on macOS). revision identifies the whole file set and changes when any file changes.
-        A version built from a Git repository, a GitHub gist, or a zip at an outside URL returns only that URL: nothing outside the Apify API is fetched. Environment variables come back as names and isSecret only, never their values.
-        Omit versionNumber to read the only version; an Actor with several versions needs it.
-
-        USAGE:
-        - Use to read an Actor's code before changing it, or to check which files changed since an earlier read.
-
-        USAGE EXAMPLES:
-        - user_input: Show me the source code of john/my-scraper
-        - user_input: What does src/main.js of my Actor E2jjCZBezvAZnX8Rb do?`,
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     inputSchema: z.toJSONSchema(getActorVersionArgs) as ToolInputSchema,
     outputSchema: getActorVersionToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorVersionArgs)),
