@@ -523,6 +523,18 @@ export const buildActorToolOutputSchema = {
     required: ['build'],
 };
 
+/** Schema for delete-actor. */
+export const deleteActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the deleted Actor' },
+        fullName: { type: 'string', description: 'Full name of the deleted Actor, username/name' },
+        deleted: { type: 'boolean', description: 'Always true; the Actor no longer exists' },
+        abortedRunCount: { type: 'integer', description: 'Number of unfinished runs the deletion aborted' },
+    },
+    required: ['actorId', 'fullName', 'deleted', 'abortedRunCount'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into

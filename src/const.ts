@@ -45,6 +45,7 @@ export const HELPER_TOOLS = {
     ACTOR_BUILD_LOG: 'get-actor-build-log',
     ACTOR_CALL: 'call-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
+    ACTOR_DELETE: 'delete-actor',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
     ACTOR_RUNS_ABORT: 'abort-actor-run',
