@@ -37,7 +37,7 @@ describe('fixedAjvCompile — untrusted schema size cap', () => {
 });
 
 describe('buildApifySpecificProperties', () => {
-    it('should add resource picker structure to array items with editor resourcePicker', () => {
+    it('adds resource picker structure to array items with editor resourcePicker', () => {
         const properties: Record<string, SchemaProperties> = {
             resources: {
                 type: 'array',
@@ -63,7 +63,7 @@ describe('buildApifySpecificProperties', () => {
 
         expect(result.otherProp).toEqual(properties.otherProp);
     });
-    it('should add key and value structure to array items with editor keyValue', () => {
+    it('adds key and value structure to array items with editor keyValue', () => {
         const properties: Record<string, SchemaProperties> = {
             keyValuePairs: {
                 type: 'array',
@@ -90,7 +90,7 @@ describe('buildApifySpecificProperties', () => {
 
         expect(result.otherProp).toEqual(properties.otherProp);
     });
-    it('should add globs structure to array items with editor globs', () => {
+    it('adds globs structure to array items with editor globs', () => {
         const properties: Record<string, SchemaProperties> = {
             globs: {
                 type: 'array',
@@ -123,7 +123,7 @@ describe('buildApifySpecificProperties', () => {
 
         expect(result.otherProp).toEqual(properties.otherProp);
     });
-    it('should add pseudoUrls structure to array items with items.editor pseudoUrls', () => {
+    it('adds pseudoUrls structure to array items with items.editor pseudoUrls', () => {
         const properties: Record<string, SchemaProperties> = {
             pseudoUrls: {
                 type: 'array',
@@ -156,7 +156,7 @@ describe('buildApifySpecificProperties', () => {
 
         expect(result.otherProp).toEqual(properties.otherProp);
     });
-    it('should add useApifyProxy, apifyProxyGroups, and proxyUrls properties to proxy objects', () => {
+    it('adds useApifyProxy, apifyProxyGroups, and proxyUrls properties to proxy objects', () => {
         const properties: Record<string, SchemaProperties> = {
             proxy: {
                 type: 'object',
@@ -196,7 +196,7 @@ describe('buildApifySpecificProperties', () => {
         expect(result.otherProp).toEqual(properties.otherProp);
     });
 
-    it('should add URL structure to requestListSources array items', () => {
+    it('adds URL structure to requestListSources array items', () => {
         const properties: Record<string, SchemaProperties> = {
             sources: {
                 type: 'array',
@@ -222,7 +222,7 @@ describe('buildApifySpecificProperties', () => {
         expect(result.otherProp).toEqual(properties.otherProp);
     });
 
-    it("should not modify properties that don't match special cases", () => {
+    it("does not modify properties that don't match special cases", () => {
         const properties: Record<string, SchemaProperties> = {
             regularObject: {
                 type: 'object',
@@ -254,7 +254,7 @@ describe('buildApifySpecificProperties', () => {
         expect(result).toEqual(properties);
     });
 
-    it('should handle empty properties object', () => {
+    it('handles empty properties object', () => {
         const properties: Record<string, SchemaProperties> = {};
         const result = buildApifySpecificProperties(properties);
         expect(result).toEqual({});
@@ -262,7 +262,7 @@ describe('buildApifySpecificProperties', () => {
 });
 
 describe('markInputPropertiesAsRequired', () => {
-    it('should add REQUIRED prefix to required properties', () => {
+    it('adds REQUIRED prefix to required properties', () => {
         const input: ActorInputSchema = {
             title: 'Test Schema',
             type: 'object',
@@ -296,7 +296,7 @@ describe('markInputPropertiesAsRequired', () => {
         expect(result.optionalProp.description).toBe('This is optional');
     });
 
-    it('should handle input without required fields', () => {
+    it('handles input without required fields', () => {
         const input: ActorInputSchema = {
             title: 'Test Schema',
             type: 'object',
@@ -320,7 +320,7 @@ describe('markInputPropertiesAsRequired', () => {
         expect(result).toEqual(input.properties);
     });
 
-    it('should handle empty required array', () => {
+    it('handles empty required array', () => {
         const input: ActorInputSchema = {
             title: 'Test Schema',
             type: 'object',
@@ -342,7 +342,7 @@ describe('markInputPropertiesAsRequired', () => {
 });
 
 describe('shortenProperties', () => {
-    it('should truncate long descriptions', () => {
+    it('truncates long descriptions', () => {
         const longDescription = 'a'.repeat(ACTOR_MAX_DESCRIPTION_LENGTH + 100);
         const properties: Record<string, SchemaProperties> = {
             prop1: {
@@ -405,7 +405,7 @@ describe('shortenProperties', () => {
         );
     });
 
-    it('should not modify descriptions that are within limits', () => {
+    it('does not modify descriptions that are within limits', () => {
         const description = 'This is a normal description';
         const properties: Record<string, SchemaProperties> = {
             prop1: {
@@ -554,7 +554,7 @@ describe('shortenProperties', () => {
         expect(result.prop1.description).toContain(enumValues[0]);
     });
 
-    it('should handle properties without enum or items.enum', () => {
+    it('handles properties without enum or items.enum', () => {
         const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'string',
@@ -579,7 +579,7 @@ describe('shortenProperties', () => {
         expect(result).toEqual(properties);
     });
 
-    it('should handle empty enum arrays', () => {
+    it('handles empty enum arrays', () => {
         const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'string',
@@ -608,7 +608,7 @@ describe('shortenProperties', () => {
 });
 
 describe('encodeDotPropertyNames', () => {
-    it('should replace dots in property names with -dot-', () => {
+    it('replaces dots in property names with -dot-', () => {
         const input = {
             'foo.bar': { type: 'string', title: 'Foo Bar', description: 'desc' },
             baz: { type: 'number', title: 'Baz', description: 'desc2' },
@@ -622,7 +622,7 @@ describe('encodeDotPropertyNames', () => {
         expect(result['a.b.c']).toBeUndefined();
     });
 
-    it('should not modify property names without dots', () => {
+    it('does not modify property names without dots', () => {
         const input = {
             foo: { type: 'string', title: 'Foo', description: 'desc' },
             bar: { type: 'number', title: 'Bar', description: 'desc2' },
@@ -633,7 +633,7 @@ describe('encodeDotPropertyNames', () => {
 });
 
 describe('decodeDotPropertyNames', () => {
-    it('should replace -dot- in property names with dots', () => {
+    it('replaces -dot- in property names with dots', () => {
         const input = {
             'foo-dot-bar': { type: 'string', title: 'Foo Bar', description: 'desc' },
             baz: { type: 'number', title: 'Baz', description: 'desc2' },
@@ -647,7 +647,7 @@ describe('decodeDotPropertyNames', () => {
         expect(result['a-dot-b-dot-c']).toBeUndefined();
     });
 
-    it('should not modify property names without -dot-', () => {
+    it('does not modify property names without -dot-', () => {
         const input = {
             foo: { type: 'string', title: 'Foo', description: 'desc' },
             bar: { type: 'number', title: 'Bar', description: 'desc2' },
@@ -661,7 +661,7 @@ describe('decodeDotPropertyNames', () => {
 // Tests for transformActorInputSchemaProperties
 // ----------------------
 describe('transformActorInputSchemaProperties', () => {
-    it('should correctly transform a schema with all Apify-specific types and features', () => {
+    it('correctly transforms a schema with all Apify-specific types and features', () => {
         const input: ActorInputSchema = {
             title: 'Complex Schema',
             type: 'object',
@@ -810,7 +810,7 @@ describe('transformActorInputSchemaProperties', () => {
         // Should not have the original dotted name
         expect(result['dotted.name']).toBeUndefined();
     });
-    it('should apply all transformations in the correct order', () => {
+    it('applies all transformations in the correct order', () => {
         const input = {
             title: 'Test',
             type: 'object',
@@ -869,7 +869,7 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result['foo.bar']).toBeUndefined();
     });
 
-    it('should handle input with no required, no enums, no dots', () => {
+    it('handles input with no required, no enums, no dots', () => {
         const input = {
             title: 'Simple',
             type: 'object',
@@ -887,7 +887,7 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result.simple).toBeDefined();
     });
 
-    it('should encode all dotted property names', () => {
+    it('encodes all dotted property names', () => {
         const input = {
             title: 'Dots',
             type: 'object',
@@ -903,7 +903,7 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result['c.d.e']).toBeUndefined();
     });
 
-    it('should not mutate the input object', () => {
+    it('does not mutate the input object', () => {
         const input = {
             title: 'Immut',
             type: 'object',
@@ -917,7 +917,7 @@ describe('transformActorInputSchemaProperties', () => {
         expect(input).toEqual(inputCopy);
     });
 
-    it('should build array items property correctly for stringList editor with place IDs', () => {
+    it('builds array items property correctly for stringList editor with place IDs', () => {
         const input: ActorInputSchema = {
             type: 'object',
             schemaVersion: 1,
@@ -976,7 +976,7 @@ describe('inferArrayItemType', () => {
 });
 
 describe('inferArrayItemsTypeIfMissing', () => {
-    it('should infer and set items type for array property with stringList editor', () => {
+    it('infers and sets items type for array property with stringList editor', () => {
         const properties: { [key: string]: SchemaProperties } = {
             placeIds: {
                 title: '🗃 Place IDs',
@@ -994,7 +994,7 @@ describe('inferArrayItemsTypeIfMissing', () => {
         expect(result.placeIds.items?.description).toBe(properties.placeIds.description);
     });
 
-    it('should not modify array properties that already have items.type defined', () => {
+    it('does not modify array properties that already have items.type defined', () => {
         const properties: { [key: string]: SchemaProperties } = {
             existingArray: {
                 title: 'Existing Array',

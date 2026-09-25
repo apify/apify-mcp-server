@@ -15,13 +15,13 @@ import { ACTOR_TOOL_MODE } from '../../src/types.js';
 
 describe('actors', () => {
     describe('actorNameToToolName', () => {
-        it('should convert actor full name to {username}--{actor-name} format', () => {
+        it('converts actor full name to {username}--{actor-name} format', () => {
             expect(actorNameToToolName('apify/web-scraper')).toBe('apify--web-scraper');
             expect(actorNameToToolName('apify/rag-web-browser')).toBe('apify--rag-web-browser');
             expect(actorNameToToolName('compass/crawler-google-places')).toBe('compass--crawler-google-places');
         });
 
-        it('should handle strings without slashes by using hash truncation for long names', () => {
+        it('handles strings without slashes by using hash truncation for long names', () => {
             expect(actorNameToToolName('actorname')).toBe('actorname');
             // Strings longer than 64 chars without a slash should use hash-based truncation
             const longName = 'a'.repeat(70);
@@ -35,7 +35,7 @@ describe('actors', () => {
             expect(actorNameToToolName('~my-actor')).toBe('~my-actor');
         });
 
-        it('should handle tool names longer than 64 characters by truncating with a hash', () => {
+        it('handles tool names longer than 64 characters by truncating with a hash', () => {
             const longName = 'apify/website-content-crawler-very-long-name-that-exceeds-the-limit';
             const result = actorNameToToolName(longName);
             expect(result.length).toBe(64);
@@ -48,31 +48,31 @@ describe('actors', () => {
             expect(result.endsWith(`-${hash}`)).toBe(true);
         });
 
-        it('should replace dots with -dot- in usernames', () => {
+        it('replaces dots with -dot- in usernames', () => {
             expect(actorNameToToolName('my.org/my-actor')).toBe('my-dot-org--my-actor');
         });
 
-        it('should handle empty string', () => {
+        it('handles empty string', () => {
             expect(actorNameToToolName('')).toBe('');
         });
 
-        it('should produce deterministic results', () => {
+        it('produces deterministic results', () => {
             const name = 'apify/rag-web-browser';
             expect(actorNameToToolName(name)).toBe(actorNameToToolName(name));
         });
     });
 
     describe('legacyToolNameToNew', () => {
-        it('should convert legacy -slash- format to new -- format', () => {
+        it('converts legacy -slash- format to new -- format', () => {
             expect(legacyToolNameToNew('apify-slash-rag-web-browser')).toBe('apify--rag-web-browser');
             expect(legacyToolNameToNew('compass-slash-crawler-google-places')).toBe('compass--crawler-google-places');
         });
 
-        it('should preserve -dot- encoding unchanged', () => {
+        it('preserves -dot- encoding unchanged', () => {
             expect(legacyToolNameToNew('jiri-dot-spilka-slash-openrouter-x')).toBe('jiri-dot-spilka--openrouter-x');
         });
 
-        it('should return null for names without -slash-', () => {
+        it('returns null for names without -slash-', () => {
             expect(legacyToolNameToNew('apify--rag-web-browser')).toBeNull();
             expect(legacyToolNameToNew('search-actors')).toBeNull();
         });

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ajv, compileSchema, fixZodSchemaRequired } from '../../src/utils/ajv.js';
 
 describe('compileSchema', () => {
-    it('should validate declared properties normally', () => {
+    it('validates declared properties normally', () => {
         const validate = compileSchema({
             type: 'object',
             properties: {
@@ -18,7 +18,7 @@ describe('compileSchema', () => {
         expect(validate(data)).toBe(true);
     });
 
-    it('should mutate the input object by stripping additional properties', () => {
+    it('mutates the input object by stripping additional properties', () => {
         const validate = compileSchema({
             type: 'object',
             properties: {
@@ -33,7 +33,7 @@ describe('compileSchema', () => {
         expect(data).toEqual({ name: 'test' });
     });
 
-    it('should still reject invalid declared properties', () => {
+    it('still rejects invalid declared properties', () => {
         const validate = compileSchema({
             type: 'object',
             properties: {
@@ -48,7 +48,7 @@ describe('compileSchema', () => {
         expect(validate({ name: [1, 2] })).toBe(false); // wrong type (array, not coercible to string)
     });
 
-    it('should allow omitting a field that has a default even when it is listed as required', () => {
+    it('allows omitting a field that has a default even when it is listed as required', () => {
         const validate = compileSchema({
             type: 'object',
             properties: {
@@ -140,7 +140,7 @@ describe('ajv instance — regex keywords disabled (ReDoS guard)', () => {
 });
 
 describe('ajv instance — Actor input schemas', () => {
-    it('should strip extra properties when schema has additionalProperties: false', () => {
+    it('strips extra properties when schema has additionalProperties: false', () => {
         const validate = ajv.compile({
             type: 'object',
             properties: { url: { type: 'string' } },
@@ -153,7 +153,7 @@ describe('ajv instance — Actor input schemas', () => {
         expect(data).toEqual({ url: 'https://example.com' });
     });
 
-    it('should keep extra properties when schema omits additionalProperties', () => {
+    it('keeps extra properties when schema omits additionalProperties', () => {
         const validate = ajv.compile({
             type: 'object',
             properties: { url: { type: 'string' } },

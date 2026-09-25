@@ -15,43 +15,43 @@ function makeActorDefinitionWithPath(webServerMcpPath?: unknown): ActorDefinitio
 }
 
 describe('getActorMCPServerPath', () => {
-    it('should return null if webServerMcpPath is missing', () => {
+    it('returns null if webServerMcpPath is missing', () => {
         const actorDefinition = makeActorDefinitionWithPath();
         const result = getActorMCPServerPath(actorDefinition);
         expect(result).toBeNull();
     });
 
-    it('should return null if webServerMcpPath is not a string', () => {
+    it('returns null if webServerMcpPath is not a string', () => {
         const actorDefinition = makeActorDefinitionWithPath(123);
         const result = getActorMCPServerPath(actorDefinition);
         expect(result).toBeNull();
     });
 
-    it('should return the single path if only one is present', () => {
+    it('returns the single path if only one is present', () => {
         const actorDefinition = makeActorDefinitionWithPath('/mcp');
         const result = getActorMCPServerPath(actorDefinition);
         expect(result).toBe('/mcp');
     });
 
-    it('should return the streamable path if present among multiple', () => {
+    it('returns the streamable path if present among multiple', () => {
         const actorDefinition = makeActorDefinitionWithPath(`/foo, ${MCP_STREAMABLE_ENDPOINT}, /bar`);
         const result = getActorMCPServerPath(actorDefinition);
         expect(result).toBe(MCP_STREAMABLE_ENDPOINT);
     });
 
-    it('should return the first path if streamable is not present', () => {
+    it('returns the first path if streamable is not present', () => {
         const actorDefinition = makeActorDefinitionWithPath('/foo, /bar, /baz');
         const result = getActorMCPServerPath(actorDefinition);
         expect(result).toBe('/foo');
     });
 
-    it('should trim whitespace from paths', () => {
+    it('trims whitespace from paths', () => {
         const actorDefinition = makeActorDefinitionWithPath('   /foo  ,   /bar  ');
         const result = getActorMCPServerPath(actorDefinition);
         expect(result).toBe('/foo');
     });
 
-    it('should handle streamable path with whitespace', () => {
+    it('handles streamable path with whitespace', () => {
         const actorDefinition = makeActorDefinitionWithPath(` /foo ,   ${MCP_STREAMABLE_ENDPOINT}  , /bar `);
         const result = getActorMCPServerPath(actorDefinition);
         expect(result).toBe(MCP_STREAMABLE_ENDPOINT);
