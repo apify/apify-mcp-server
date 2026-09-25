@@ -23,6 +23,7 @@ import { searchActors } from './actors/search_actors.js';
 import { buildActor } from './builds/build_actor.js';
 import { getActorBuild } from './builds/get_actor_build.js';
 import { getActorBuildLog } from './builds/get_actor_build_log.js';
+import { validateActorInput } from './builds/validate_actor_input.js';
 import { reportProblem } from './dev/report_problem.js';
 import { fetchApifyDocs } from './docs/fetch_apify_docs.js';
 import { searchApifyDocs } from './docs/search_apify_docs.js';
@@ -69,7 +70,7 @@ export const toolCategories = {
     ],
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
-    builds: [getActorBuild, getActorBuildLog, buildActor],
+    builds: [getActorBuild, getActorBuildLog, buildActor, validateActorInput],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 
