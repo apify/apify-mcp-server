@@ -125,7 +125,11 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
 
         it('should have correct tools in source category (both modes)', () => {
-            const expected = [HELPER_TOOLS.ACTOR_VERSION_GET];
+            const expected = [
+                HELPER_TOOLS.ACTOR_VERSION_GET,
+                HELPER_TOOLS.ACTOR_CREATE,
+                HELPER_TOOLS.ACTOR_VERSION_UPDATE,
+            ];
             expect(toolNames(defaultCategories.source)).toEqual(expected);
             expect(toolNames(appsCategories.source)).toEqual(expected);
         });

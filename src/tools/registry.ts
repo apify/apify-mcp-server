@@ -34,7 +34,9 @@ import { createSchedule } from './schedules/create_schedule.js';
 import { deleteSchedule } from './schedules/delete_schedule.js';
 import { getSchedule } from './schedules/get_schedule.js';
 import { updateSchedule } from './schedules/update_schedule.js';
+import { createActor } from './source/create_actor.js';
 import { getActorVersion } from './source/get_actor_version.js';
+import { updateActorVersion } from './source/update_actor_version.js';
 import { getDataset } from './storage/get_dataset.js';
 import { getDatasetItems } from './storage/get_dataset_items.js';
 import { getDatasetList } from './storage/get_dataset_list.js';
@@ -71,7 +73,7 @@ export const toolCategories = {
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, buildActor],
-    source: [getActorVersion],
+    source: [getActorVersion, createActor, updateActorVersion],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 

@@ -41,7 +41,7 @@ const UNIX_FILE_TYPE_DIRECTORY = 0o040000;
 const UNIX_FILE_TYPE_SYMLINK = 0o120000;
 
 /** A POSIX root (`/abs`), a backslash root, or a Windows drive (`C:\abs`, `C:abs`). */
-const ABSOLUTE_NAME_REGEX = /^(?:[\\/]|[a-zA-Z]:)/;
+export const ABSOLUTE_NAME_REGEX = /^(?:[\\/]|[a-zA-Z]:)/;
 
 const UTF8_NAME_DECODER = new TextDecoder('utf-8', { fatal: true });
 
