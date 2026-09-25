@@ -11,7 +11,16 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { ABORT } from '../actors/actor_run_response.js';
 import { listVersionNumbers, startBuild } from '../builds/build_helpers.js';
 import { ABSOLUTE_NAME_REGEX } from './source_archive.js';
-import { BYTES_PER_MIB, formatMib, hasBinaryExtension, parseSourcePath } from './source_files.js';
+import type { SourceFile } from './source_files.js';
+import {
+    buildInlineSourceFile,
+    BYTES_PER_MIB,
+    compareSourcePaths,
+    formatMib,
+    hasBinaryExtension,
+    MAX_SOURCE_PATH_LENGTH,
+    parseSourcePath,
+} from './source_files.js';
 
 /**
  * The platform refuses a version whose inline files measure more than this (`MAX_MULTIFILE_BYTES` in `@apify/consts`);
@@ -47,6 +56,11 @@ export const sourceFileArgs = z.object({
             'utf8 for text, base64 for binary files. Defaults to base64 for binary extensions such as .png and to utf8 otherwise.',
         ),
 });
+
+type SourceFileArgs = z.infer<typeof sourceFileArgs>;
+
+/** Where the build looks for a Dockerfile when `.actor/actor.json` names none; it matches them regardless of case. */
+const DOCKERFILE_PATHS = ['dockerfile', '.actor/dockerfile'];
 
 /** A refusal about the caller's account or token, recorded as AUTH rather than as invalid input. */
 export class AccountAuthError extends UserInputError {}
@@ -214,6 +228,70 @@ export function buildSourceFileEntry(params: {
         );
     }
     return { name: path, format: 'BASE64', content };
+}
+
+/**
+ * The entries to store for a whole file set sent by the caller, in the order sent. Throws `UserInputError` for a path
+ * that is not valid, is over 255 characters, or is given twice, and when `.actor/actor.json` is missing. `field` names
+ * the input field in the messages.
+ */
+export function parseInputFiles(files: readonly SourceFileArgs[], field: string): ActorVersionSourceFile[] {
+    const seenPaths = new Set<string>();
+    const entries = files.map((file, index) => {
+        const label = `${field}[${index}]`;
+        const path = parseInputPath(file.path, `${label} path`);
+        if (path.length > MAX_SOURCE_PATH_LENGTH) {
+            throw new UserInputError(`${label} path is over ${MAX_SOURCE_PATH_LENGTH} characters.`);
+        }
+        if (seenPaths.has(path)) throw new UserInputError(`${field} has ${path} more than once.`);
+        seenPaths.add(path);
+        return buildSourceFileEntry({
+            path,
+            content: file.content,
+            encoding: file.encoding,
+            label: `${label} content for`,
+        });
+    });
+    if (!seenPaths.has(ACTOR_CONFIG_PATH)) {
+        throw new UserInputError(
+            `${field} must include ${ACTOR_CONFIG_PATH}: this tool requires it, since the build reads the Actor's ` +
+                'configuration from it.',
+        );
+    }
+    return entries;
+}
+
+/** One file per path, the last stored entry winning as in get-actor-version, sorted by path; folder entries are left out. */
+export function buildFilesManifest(entries: readonly ActorVersionSourceFile[]): SourceFile[] {
+    const filesByPath = new Map<string, SourceFile>();
+    for (const entry of entries) {
+        if (isFolderEntry(entry)) continue;
+        const file = buildInlineSourceFile(entry);
+        filesByPath.set(file.path, file);
+    }
+    return [...filesByPath.values()].sort((a, b) => compareSourcePaths(a.path, b.path));
+}
+
+/** Whether `.actor/actor.json` names a Dockerfile; a file that is not valid JSON names none. */
+function hasDockerfileField(entries: readonly ActorVersionSourceFile[]): boolean {
+    const config = entries.find(({ name }) => name === ACTOR_CONFIG_PATH);
+    if (!config) return false;
+    try {
+        const parsed = JSON.parse(buildInlineSourceFile(config).readContent()) as { dockerfile?: unknown };
+        return typeof parsed?.dockerfile === 'string' && parsed.dockerfile !== '';
+    } catch {
+        return false;
+    }
+}
+
+/** The warning for files sent without a Dockerfile, which the build then replaces with the platform's default one. */
+export function formatMissingDockerfileWarning(entries: readonly ActorVersionSourceFile[]): string | undefined {
+    const paths = new Set(entries.map(({ name }) => name.toLowerCase()));
+    if (DOCKERFILE_PATHS.some((path) => paths.has(path)) || hasDockerfileField(entries)) return undefined;
+    return (
+        `No Dockerfile found: there is no Dockerfile or .actor/Dockerfile, and ${ACTOR_CONFIG_PATH} names none, so ` +
+        "the build uses the platform's default Node.js Dockerfile; an Actor in another language needs its own."
+    );
 }
 
 /** The decoded bytes of a stored entry; a missing format or content reads as TEXT and empty, as the build worker reads it. */
