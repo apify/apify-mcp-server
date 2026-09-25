@@ -417,6 +417,9 @@ export const createActorVersion: ToolEntry = Object.freeze({
             let newVersion: NewVersion;
             if (source.kind === 'copy') {
                 const sourceVersionNumber = resolveVersionNumber(actor, source.versionNumber, parsed.actor);
+                // TODO: A copy reads every file of the source version here and sends them all back in the POST below:
+                // the Apify API cannot copy a version or apply atomic changes to an Actor's source. Once it can, let
+                // the platform make the copy.
                 const sourceVersion = await client.actor(actor.id).version(sourceVersionNumber).get();
                 if (!sourceVersion) {
                     throw new UserInputError(`Actor ${fullName} has no version ${sourceVersionNumber}.`);
