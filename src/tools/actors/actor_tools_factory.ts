@@ -95,7 +95,8 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
  * Clients such as Claude run read-only tools without asking each time (see apify/apify-mcp-server#973).
  * An Actor counts as read-only only when Apify maintains it and nothing lets it act outside its run
  * storages: limited permissions keep it out of the user's other Apify data, and it has no secret input
- * (credentials for other services), MCP connector input (writes to connected apps) or code input.
+ * (credentials for other services), writable storage input (writes to the user's existing storages),
+ * MCP connector input (writes to connected apps) or code input.
  */
 function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
     if (!OFFICIAL_APIFY_USERNAMES.has(actor.username)) return false;
@@ -106,6 +107,7 @@ function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
     return !inputProperties.some(
         (property) =>
             property.isSecret ||
+            property.resourcePermissions?.includes('WRITE') ||
             property.resourceType === 'mcpConnector' ||
             property.editor === 'javascript' ||
             property.editor === 'python',

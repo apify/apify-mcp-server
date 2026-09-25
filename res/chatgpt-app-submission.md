@@ -44,7 +44,7 @@ their base tool.
 | Tool | readOnlyHint | destructiveHint | openWorldHint | Rationale |
 |---|---|---|---|---|
 | `call-actor` (both modes) | false | true | true | Runs Actors that can modify external state |
-| Dynamic Actor tools, read-only Apify-maintained Actors | true | false | true | Limited permissions, no secret, MCP connector, or code input (`isReadOnlyActor`) |
+| Dynamic Actor tools, read-only Apify-maintained Actors | true | false | true | Limited permissions, no secret, writable storage, MCP connector, or code input (`isReadOnlyActor`) |
 | Other dynamic Actor tools | false | true | true | Same as call-actor |
 | `abort-actor-run` | false | true | false | Irreversible abort within Apify platform |
 | `search-actors` | true | false | false | Searches Apify Store (read-only) |

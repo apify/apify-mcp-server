@@ -72,6 +72,15 @@ describe('getNormalActorsAsTools()', () => {
                 }),
             ],
             [
+                'an Actor with a writable storage input',
+                createMockActorInfo('apify/web-fetch', {
+                    ...LIMITED,
+                    inputProperties: {
+                        datasetId: { type: 'string', resourceType: 'dataset', resourcePermissions: ['READ', 'WRITE'] },
+                    },
+                }),
+            ],
+            [
                 'an Actor with an MCP connector input',
                 createMockActorInfo('apify/web-fetch', {
                     ...LIMITED,
