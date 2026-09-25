@@ -7,6 +7,8 @@ import {
     ACTOR_MAX_MEMORY_MBYTES,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
+    OFFICIAL_ACTORS_WITH_SIDE_EFFECTS,
+    OFFICIAL_APIFY_USERNAMES,
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
     WEB_FETCH,
@@ -90,6 +92,29 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
 }
 
 /**
+ * Clients such as Claude run read-only tools without asking each time (see apify/apify-mcp-server#973).
+ * An Actor counts as read-only only when Apify maintains it and nothing lets it act outside its run
+ * storages: limited permissions keep it out of the user's other Apify data, and it has no secret input
+ * (credentials for other services), writable storage input (writes to the user's existing storages),
+ * MCP connector input (writes to connected apps) or code input.
+ */
+function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
+    if (!OFFICIAL_APIFY_USERNAMES.has(actor.username)) return false;
+    if (OFFICIAL_ACTORS_WITH_SIDE_EFFECTS.has(definition.actorFullName)) return false;
+    if (actor.actorPermissionLevel !== 'LIMITED_PERMISSIONS') return false;
+
+    const inputProperties = Object.values(definition.input?.properties ?? {});
+    return !inputProperties.some(
+        (property) =>
+            property.isSecret ||
+            property.resourcePermissions?.includes('WRITE') ||
+            property.resourceType === 'mcpConnector' ||
+            property.editor === 'javascript' ||
+            property.editor === 'python',
+    );
+}
+
+/**
  * Fetches input schemas for normal (non-MCP-server) Actors by ID or full name and compiles them
  * into MCP tools, using AJV to validate the input schemas. Tool name can't contain /, so it is
  * replaced with _.
@@ -118,6 +143,7 @@ export async function getNormalActorsAsTools(
         if (!definition) continue;
 
         const { actorFullName, description: actorDescription } = definition;
+        const isReadOnly = isReadOnlyActor(actorInfo);
         const isRag = actorFullName === RAG_WEB_BROWSER;
         const isWebFetch = actorFullName === WEB_FETCH;
         const { inputSchema } = buildActorInputSchema(definition.actorFullName, definition.input, isRag);
@@ -178,8 +204,8 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,
             annotations: {
                 title: definition.actorFullName,
-                readOnlyHint: false,
-                destructiveHint: true,
+                readOnlyHint: isReadOnly,
+                destructiveHint: !isReadOnly,
                 openWorldHint: true,
             },
             // Allow long-running tasks for Actor tools, make it optional for now
