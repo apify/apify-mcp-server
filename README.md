@@ -249,7 +249,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
 - **Builds**: Build an Actor version, check the status of a build, and retrieve its build log.
-- **Actor source**: Read an Actor version's files, with a hash for each file and a revision for the whole set, create an Actor from files or a Git repository, and change a version's files with checks that catch changes made since your last read.
+- **Actor source**: Read an Actor version's files, with a hash for each file and a revision for the whole set, create an Actor from files or a Git repository, change a version's files with checks that catch changes made since your last read, and add or delete versions, including copies of a version made on the server.
 
 ### Overview of available tools
 
@@ -297,6 +297,8 @@ Legend for the **Enabled by default** column:
 | `get-actor-version` | source | Get an Actor version's metadata, its file listing with hashes, and the content of the files you ask for. |  |
 | `create-actor` | source | Create a private Actor in your account from files or a Git repository, optionally starting a build. |  |
 | `update-actor-version` | source | Write, edit, delete, or move files of your Actor's version in one all-or-nothing write, or point it at a Git repository. |  |
+| `create-actor-version` | source | Add a version to your Actor: a copy of another version, new files, a Git repository, or an empty version. |  |
+| `delete-actor-version` | source | Delete a version of your Actor; its builds and their tags stay. |  |
 
 > **Note:**
 >

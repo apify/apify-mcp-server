@@ -58,6 +58,8 @@ export const HELPER_TOOLS = {
     ACTOR_TASK_UPDATE: 'update-actor-task',
     ACTOR_TASK_PUBLISH: 'publish-actor-task',
     ACTOR_TASK_UNPUBLISH: 'unpublish-actor-task',
+    ACTOR_VERSION_CREATE: 'create-actor-version',
+    ACTOR_VERSION_DELETE: 'delete-actor-version',
     ACTOR_VERSION_GET: 'get-actor-version',
     ACTOR_VERSION_UPDATE: 'update-actor-version',
     DATASET_GET: 'get-dataset',
