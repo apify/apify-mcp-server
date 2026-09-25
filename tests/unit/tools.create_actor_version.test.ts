@@ -100,7 +100,8 @@ function mockSourceVersion(overrides: Record<string, unknown> = {}) {
             { name: 'API_KEY', isSecret: true, valueHash: 'abc123' },
             { name: 'REGION', value: 'eu' },
         ],
-        sourceFiles: STORED_FILES,
+        // A copy of its own, so a POST body that equals STORED_FILES was not changed in place.
+        sourceFiles: structuredClone(STORED_FILES),
         ...overrides,
     };
 }
@@ -188,7 +189,7 @@ describe('create-actor-version', () => {
         it('uses plain punctuation and names no tool in the input schema', () => {
             expect(createActorVersion.description).not.toMatch(/[–—]/);
             const schemaText = JSON.stringify(createActorVersion.inputSchema);
-            for (const name of TOOL_NAMES) expect(schemaText).not.toContain(`${name} `);
+            for (const name of TOOL_NAMES) expect(schemaText).not.toContain(name);
         });
     });
 
@@ -199,7 +200,10 @@ describe('create-actor-version', () => {
             expect(versionMock).toHaveBeenCalledWith('0.1');
             const body = getPostBody();
             expect(body.sourceType).toBe('SOURCE_FILES');
-            expect(body.sourceFiles).toEqual(STORED_FILES);
+            expect(body.sourceFiles).toStrictEqual(STORED_FILES);
+            const sent = body.sourceFiles as { name: string; format?: string; folder?: boolean }[];
+            expect(sent[1].format).toBe('BASE64');
+            expect(sent).toContainEqual({ name: 'assets', folder: true });
             expect(body.versionNumber).toBe('0.2');
         });
 
@@ -325,7 +329,10 @@ describe('create-actor-version', () => {
             const text = await callToolExpectingUserError({ copyFromVersion: '0.1' });
             expect(text).toBe(
                 'Version 0.1 of john/my-actor is stored as a zip (TARBALL), and this tool cannot copy zip-stored ' +
-                    'versions yet. Push the source to the new version with the Apify CLI instead (apify push --version 0.2).',
+                    'versions yet. Give the source as files or gitRepoUrl instead. Or upload your local project ' +
+                    'folder (not the stored zip) with the Apify CLI and a build tag no other version uses: apify ' +
+                    'push --version 0.2 --build-tag wip-0-2. Without --build-tag, apify push takes the tag from ' +
+                    '.actor/actor.json, often latest, and it builds right away.',
             );
             expect(versionsCreateMock).not.toHaveBeenCalled();
         });
@@ -494,28 +501,95 @@ describe('create-actor-version', () => {
             expect(createActorVersion.ajvValidate({ actor: 'john/my-actor', versionNumber: '0.2', files })).toBe(false);
         });
 
-        it('refuses a versionNumber the Actor already has, naming update-actor-version only when loaded', async () => {
+        it('refuses a versionNumber the Actor already has, suggesting a free one first', async () => {
             const text = await callToolExpectingUserError({ versionNumber: '0.1', files: [ACTOR_JSON] });
             expect(text).toBe(
                 'john/my-actor already has version 0.1, and this tool never changes an existing version. ' +
-                    `Its versions: 0.1. To change it, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}.`,
+                    'Its versions: 0.1. Pick another versionNumber, such as 0.2. ' +
+                    `If you meant to change version 0.1 itself, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}.`,
             );
             const bare = await callToolExpectingUserError({ versionNumber: '0.1' }, [
                 HELPER_TOOLS.ACTOR_VERSION_CREATE,
             ]);
-            expect(bare).toContain('Pick another versionNumber, or change the existing version instead.');
+            expect(bare).toBe(
+                'john/my-actor already has version 0.1, and this tool never changes an existing version. ' +
+                    'Its versions: 0.1. Pick another versionNumber, such as 0.2.',
+            );
             expectNoToolNamed(bare);
             expect(versionsCreateMock).not.toHaveBeenCalled();
         });
 
-        it('refuses a versionNumber that a racing call created first', async () => {
+        it('suggests a number after the highest version', async () => {
+            actorGetMock.mockResolvedValue(
+                mockActor({
+                    versions: [
+                        { versionNumber: '1.99', sourceType: 'SOURCE_FILES' },
+                        { versionNumber: '0.1', sourceType: 'SOURCE_FILES' },
+                        { versionNumber: '1.2', sourceType: 'SOURCE_FILES' },
+                    ],
+                }),
+            );
+            const text = await callToolExpectingUserError({ versionNumber: '0.1' });
+            expect(text).toContain('Its versions: 1.99, 0.1, 1.2. Pick another versionNumber, such as 2.0.');
+        });
+
+        it('refuses a versionNumber that a racing call created first, listing it among the versions', async () => {
             versionsCreateMock.mockRejectedValue(
                 apiError(403, 'Version with this number already exists', 'version-already-exists'),
             );
             const text = await callToolExpectingUserError({ files: [ACTOR_JSON] });
-            expect(text).toContain(
-                'john/my-actor already has version 0.2, and this tool never changes an existing version.',
+            expect(text).toBe(
+                'john/my-actor already has version 0.2, and this tool never changes an existing version. ' +
+                    'Its versions: 0.1, 0.2. Pick another versionNumber, such as 0.3. ' +
+                    `If you meant to change version 0.2 itself, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}.`,
             );
+        });
+    });
+
+    describe('Standby', () => {
+        const STANDBY_WARNING =
+            'Creating this version turned on Standby for the whole Actor, because its .actor/actor.json sets ' +
+            'usesStandbyMode and Standby was off. Turn it off again in Apify Console if it should stay off.';
+        const standbyConfig = {
+            path: '.actor/actor.json',
+            content: '{"actorSpecification": 1, "usesStandbyMode": true}',
+        };
+
+        it('warns when a copied actor.json turns Standby on for the Actor', async () => {
+            versionGetMock.mockResolvedValue(
+                mockSourceVersion({
+                    sourceFiles: [{ name: '.actor/actor.json', format: 'TEXT', content: standbyConfig.content }],
+                }),
+            );
+            const result = await callTool({ copyFromVersion: '0.1' });
+            expect(result.structuredContent.warnings).toEqual([STANDBY_WARNING]);
+            expect(result.content[1].text).toContain(STANDBY_WARNING);
+        });
+
+        it('warns when sent files turn Standby on, and not when Standby is already on', async () => {
+            const result = await callTool({ files: [standbyConfig, DOCKERFILE] });
+            expect(result.structuredContent.warnings).toEqual([STANDBY_WARNING]);
+            actorGetMock.mockResolvedValue(mockActor({ actorStandby: { isEnabled: true } }));
+            const enabled = await callTool({ files: [standbyConfig, DOCKERFILE] });
+            expect(enabled.structuredContent.warnings).toEqual([]);
+        });
+
+        it('does not warn for an actor.json without usesStandbyMode, or one stored as BASE64', async () => {
+            const result = await callTool({ files: [ACTOR_JSON, DOCKERFILE] });
+            expect(result.structuredContent.warnings).toEqual([]);
+            versionGetMock.mockResolvedValue(
+                mockSourceVersion({
+                    sourceFiles: [
+                        {
+                            name: '.actor/actor.json',
+                            format: 'BASE64',
+                            content: Buffer.from(standbyConfig.content).toString('base64'),
+                        },
+                    ],
+                }),
+            );
+            const copied = await callTool({ copyFromVersion: '0.1' });
+            expect(copied.structuredContent.warnings).toEqual([]);
         });
     });
 

@@ -25,6 +25,7 @@ const deleteActorVersionArgs = z.object({
     versionNumber: z.string().min(1).describe('The version to delete, in MAJOR.MINOR form, for example 0.2.'),
 });
 
+// TODO(#1439): name HELPER_TOOLS.ACTOR_DELETE here, gated on loadedToolNames, once delete-actor is registered.
 function formatLastVersionText(fullName: string, versionNumber: string): string {
     return (
         `Nothing was deleted: version ${versionNumber} is the only version of ${fullName}, and an Actor must keep ` +
@@ -32,6 +33,7 @@ function formatLastVersionText(fullName: string, versionNumber: string): string 
     );
 }
 
+// TODO(#1439): name HELPER_TOOLS.ACTOR_DELETE in the last-version sentence, gated on hasTool, once delete-actor is registered.
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const copyNote = hasTool(HELPER_TOOLS.ACTOR_VERSION_CREATE)
         ? ` such as a working copy made with ${HELPER_TOOLS.ACTOR_VERSION_CREATE}`

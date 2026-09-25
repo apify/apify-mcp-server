@@ -109,6 +109,11 @@ describe('delete-actor-version', () => {
         expect(full).not.toMatch(/[–—]/);
     });
 
+    it('names no tool in the input schema', () => {
+        const schemaText = JSON.stringify(deleteActorVersion.inputSchema);
+        for (const name of TOOL_NAMES) expect(schemaText).not.toContain(name);
+    });
+
     it('deletes the version with one DELETE and says its builds and tags stay', async () => {
         const result = await callTool({});
         expectSchemaConformingStructuredContent(result, deleteActorVersionToolOutputSchema);

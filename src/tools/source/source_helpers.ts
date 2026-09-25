@@ -1,5 +1,5 @@
 import type { Actor, ActorVersionSourceFile, Build } from 'apify-client';
-import { ApifyApiError } from 'apify-client';
+import { ActorSourceType, ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
@@ -31,7 +31,7 @@ export const MAX_INLINE_SOURCE_BYTES = 3 * BYTES_PER_MIB;
 /** Content, oldText, and newText together per call, so one call stays well within the transports' body limits. */
 export const MAX_CALL_CONTENT_BYTES = 2 * BYTES_PER_MIB;
 
-/** Files one call sends: create-actor's files and update-actor-version's replaceFiles. */
+/** Files one call sends: the files input of create-actor and create-actor-version, and update-actor-version's replaceFiles. */
 export const MAX_WRITE_FILES = 500;
 
 /** The build reads the Actor's configuration, such as its Dockerfile and input schema, from this file. */
@@ -45,7 +45,10 @@ const ACTOR_NAME_REGEX = /^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])$/;
 /** Groups of four base64 characters, the last one padded; no whitespace, no URL-safe alphabet. */
 const BASE64_REGEX = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
-/** The input shape of one file, shared by create-actor's files and update-actor-version's replaceFiles. */
+/**
+ * The input shape of one file, shared by the files input of create-actor and create-actor-version and by
+ * update-actor-version's replaceFiles.
+ */
 export const sourceFileArgs = z.object({
     path: z.string().min(1).describe('Path relative to the Actor root, for example src/main.js.'),
     content: z.string().describe('The whole file content: text as is, or base64 when encoding is base64.'),
@@ -136,12 +139,14 @@ export function resolveVersionNumber(
     actor: Pick<Actor, 'versions'>,
     requestedVersionNumber: string | undefined,
     actorSelector: string,
+    /** Appended to the refusal of a version the Actor does not have, for example how to add it. */
+    missingVersionHint = '',
 ): string {
     const versionNumbers = listVersionNumbers(actor);
     if (versionNumbers.length === 0) throw new UserInputError(`Actor '${actorSelector}' has no versions.`);
     if (requestedVersionNumber !== undefined && !versionNumbers.includes(requestedVersionNumber)) {
         throw new UserInputError(
-            `Actor '${actorSelector}' has no version ${requestedVersionNumber}; available versions: ${versionNumbers.join(', ')}.`,
+            `Actor '${actorSelector}' has no version ${requestedVersionNumber}; available versions: ${versionNumbers.join(', ')}.${missingVersionHint}`,
         );
     }
     if (requestedVersionNumber === undefined && versionNumbers.length !== 1) {
@@ -181,6 +186,13 @@ export function formatUrlWithoutSecrets(url: string): string {
     if (queryIndex === -1) return url;
     const hashIndex = url.indexOf('#', queryIndex);
     return url.slice(0, queryIndex) + (hashIndex === -1 ? '' : url.slice(hashIndex));
+}
+
+/** The source a version builds from a URL, for result text: the Git repository or the GitHub gist, and its URL. */
+export function formatUrlSourceText(source: { sourceType: string; url: string }): string {
+    return source.sourceType === ActorSourceType.GitHubGist
+        ? `the GitHub gist ${source.url}`
+        : `the Git repository ${source.url}`;
 }
 
 /** Whether the URL holds something `formatUrlWithoutSecrets` removes: a query string, or an http(s) user or password. */
@@ -231,13 +243,12 @@ export function buildSourceFileEntry(params: {
 }
 
 /**
- * The entries to store for a whole file set sent by the caller, in the order sent. Throws `UserInputError` for a path
- * that is not valid, is over 255 characters, or is given twice, and when `.actor/actor.json` is missing. `field` names
- * the input field in the messages.
+ * The entries to store for files sent by the caller, in the order sent. Throws `UserInputError` for a path that is not
+ * valid, is over 255 characters, or is given twice. `field` names the input field in the messages.
  */
-export function parseInputFiles(files: readonly SourceFileArgs[], field: string): ActorVersionSourceFile[] {
+export function parseInputFileEntries(files: readonly SourceFileArgs[], field: string): ActorVersionSourceFile[] {
     const seenPaths = new Set<string>();
-    const entries = files.map((file, index) => {
+    return files.map((file, index) => {
         const label = `${field}[${index}]`;
         const path = parseInputPath(file.path, `${label} path`);
         if (path.length > MAX_SOURCE_PATH_LENGTH) {
@@ -252,13 +263,55 @@ export function parseInputFiles(files: readonly SourceFileArgs[], field: string)
             label: `${label} content for`,
         });
     });
-    if (!seenPaths.has(ACTOR_CONFIG_PATH)) {
+}
+
+/**
+ * The entries for a whole new file set sent as files, as `parseInputFileEntries` gives them; also throws
+ * `UserInputError` when `.actor/actor.json` is missing.
+ */
+export function parseInputFiles(files: readonly SourceFileArgs[]): ActorVersionSourceFile[] {
+    const entries = parseInputFileEntries(files, 'files');
+    if (!entries.some(({ name }) => name === ACTOR_CONFIG_PATH)) {
         throw new UserInputError(
-            `${field} must include ${ACTOR_CONFIG_PATH}: this tool requires it, since the build reads the Actor's ` +
+            `files must include ${ACTOR_CONFIG_PATH}: this tool requires it, since the build reads the Actor's ` +
                 'configuration from it.',
         );
     }
     return entries;
+}
+
+/** " with update-actor-version" when the session has it, for text that says how to add files later. */
+export function formatWithUpdateToolText(loadedToolNames: readonly string[]): string {
+    return loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_UPDATE)
+        ? ` with ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}`
+        : '';
+}
+
+/**
+ * Throws `UserInputError` when the files of a new Actor or version send more content than one call takes. Files
+ * within this cap always fit the platform's 3 MiB measure, which counts at most 1.25 bytes per UTF-8 byte.
+ */
+export function validateNewFilesCallSize(
+    files: readonly SourceFileArgs[],
+    { subject, loadedToolNames }: { subject: 'Actor' | 'version'; loadedToolNames: readonly string[] },
+): void {
+    validateCallContentSize(
+        files.map(({ content }) => content),
+        {
+            fieldsText: 'content',
+            recoveryText:
+                `Create the ${subject} with fewer files, then add the rest in later calls` +
+                `${formatWithUpdateToolText(loadedToolNames)}.`,
+        },
+    );
+}
+
+/** The warnings for a file set the caller sent: no Dockerfile, and empty files the build skips. */
+export function buildSentFilesWarnings(entries: readonly ActorVersionSourceFile[]): string[] {
+    const emptyPaths = entries.filter(({ content }) => content === '').map(({ name }) => name);
+    return [formatMissingDockerfileWarning(entries), formatEmptyFilesWarning(emptyPaths)].filter(
+        (warning): warning is string => warning !== undefined,
+    );
 }
 
 /** One file per path, the last stored entry winning as in get-actor-version, sorted by path; folder entries are left out. */
@@ -285,7 +338,7 @@ function hasDockerfileField(entries: readonly ActorVersionSourceFile[]): boolean
 }
 
 /** The warning for files sent without a Dockerfile, which the build then replaces with the platform's default one. */
-export function formatMissingDockerfileWarning(entries: readonly ActorVersionSourceFile[]): string | undefined {
+function formatMissingDockerfileWarning(entries: readonly ActorVersionSourceFile[]): string | undefined {
     const paths = new Set(entries.map(({ name }) => name.toLowerCase()));
     if (DOCKERFILE_PATHS.some((path) => paths.has(path)) || hasDockerfileField(entries)) return undefined;
     return (

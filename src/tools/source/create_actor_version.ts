@@ -1,4 +1,12 @@
-import type { ActorEnvironmentVariable, ActorVersion, ActorVersionSourceFile } from 'apify-client';
+import type {
+    Actor,
+    ActorEnvironmentVariable,
+    ActorVersion,
+    ActorVersionGitHubGist,
+    ActorVersionGitRepo,
+    ActorVersionSourceFile,
+    ActorVersionSourceFiles,
+} from 'apify-client';
 import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
@@ -17,11 +25,12 @@ import type { BuildAfterWriteResult } from './source_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
     buildFilesManifest,
+    buildSentFilesWarnings,
     formatBuildLaterHint,
     formatBuildStartFailure,
-    formatEmptyFilesWarning,
-    formatMissingDockerfileWarning,
+    formatUrlSourceText,
     formatUrlWithoutSecrets,
+    formatWithUpdateToolText,
     hasUrlSecrets,
     MAX_WRITE_FILES,
     parseInputFiles,
@@ -30,7 +39,7 @@ import {
     respondToSourceToolError,
     sourceFileArgs,
     startBuildAfterWrite,
-    validateCallContentSize,
+    validateNewFilesCallSize,
 } from './source_helpers.js';
 
 /** The error type the platform returns when the Actor already has the version, also when two creates race. */
@@ -92,10 +101,15 @@ type RequestedSource =
     | { kind: 'git'; gitRepoUrl: string }
     | { kind: 'copy'; versionNumber: string };
 
+/** The source keys of the POST body: sourceType and the one field that holds the source. */
+type SourceBody =
+    | Pick<ActorVersionSourceFiles, 'sourceType' | 'sourceFiles'>
+    | Pick<ActorVersionGitRepo, 'sourceType' | 'gitRepoUrl'>
+    | Pick<ActorVersionGitHubGist, 'sourceType' | 'gitHubGistUrl'>;
+
 /** The version to create, as the POST body and as the result describes it. */
 type NewVersion = {
-    /** The source keys of the POST body: sourceType and the one field that holds the source. */
-    sourceBody: Record<string, unknown>;
+    sourceBody: SourceBody;
     sourceType: string;
     /** The stored entries, for the manifest; undefined for a version built from a URL. */
     entries?: readonly ActorVersionSourceFile[];
@@ -122,34 +136,77 @@ function parseCreateVersionRequest(args: CreateActorVersionArgs, loadedToolNames
         }
         return { kind: 'empty' };
     }
-    // Files within this cap always fit the platform's 3 MiB measure, which counts at most 1.25 bytes per UTF-8 byte.
-    const addLaterText = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_UPDATE)
-        ? ` with ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}`
-        : '';
-    validateCallContentSize(
-        files.map(({ content }) => content),
-        {
-            fieldsText: 'content',
-            recoveryText: `Create the version with fewer files, then add the rest in later calls${addLaterText}.`,
-        },
-    );
-    return { kind: 'files', entries: parseInputFiles(files, 'files') };
+    validateNewFilesCallSize(files, { subject: 'version', loadedToolNames });
+    return { kind: 'files', entries: parseInputFiles(files) };
 }
 
+/** The platform's limit for each part of MAJOR.MINOR. */
+const MAX_VERSION_PART = 99;
+
+/** A number after the highest MAJOR.MINOR version, for the caller to pick instead; undefined when none is left. */
+function suggestFreeVersionNumber(versionNumbers: readonly string[]): string | undefined {
+    const parsed = versionNumbers.flatMap((versionNumber) => {
+        const match = /^(\d+)\.(\d+)$/.exec(versionNumber);
+        return match ? [{ major: Number(match[1]), minor: Number(match[2]) }] : [];
+    });
+    if (parsed.length === 0) return undefined;
+    const { major, minor } = parsed.reduce((highest, part) =>
+        part.major > highest.major || (part.major === highest.major && part.minor > highest.minor) ? part : highest,
+    );
+    if (minor < MAX_VERSION_PART) return `${major}.${minor + 1}`;
+    return major < MAX_VERSION_PART ? `${major + 1}.0` : undefined;
+}
+
+/**
+ * Leads with a free number, since a parallel caller that finds the number taken needs a version of its own; changing
+ * the existing version is offered only to a caller who meant that version.
+ */
 function formatVersionExistsText(params: {
     fullName: string;
     versionNumber: string;
     versionNumbers: readonly string[];
     loadedToolNames: readonly string[];
 }): string {
-    const { fullName, versionNumber, versionNumbers, loadedToolNames } = params;
-    const hint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_UPDATE)
-        ? ` To change it, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}.`
-        : ' Pick another versionNumber, or change the existing version instead.';
-    const versionsText = versionNumbers.length > 0 ? ` Its versions: ${versionNumbers.join(', ')}.` : '';
+    const { fullName, versionNumber, loadedToolNames } = params;
+    // After a race the versions were read before the other call created this one.
+    const versionNumbers = params.versionNumbers.includes(versionNumber)
+        ? params.versionNumbers
+        : [...params.versionNumbers, versionNumber];
+    const freeVersionNumber = suggestFreeVersionNumber(versionNumbers);
+    const pickText =
+        freeVersionNumber === undefined
+            ? ' Pick another versionNumber.'
+            : ` Pick another versionNumber, such as ${freeVersionNumber}.`;
+    const updateHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_UPDATE)
+        ? ` If you meant to change version ${versionNumber} itself, use ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}.`
+        : '';
     return (
-        `${fullName} already has version ${versionNumber}, and this tool never changes an existing version.` +
-        `${versionsText}${hint}`
+        `${fullName} already has version ${versionNumber}, and this tool never changes an existing version. ` +
+        `Its versions: ${versionNumbers.join(', ')}.${pickText}${updateHint}`
+    );
+}
+
+/**
+ * The warning for a version that turns Standby on for the whole Actor. The platform's version POST does that when the
+ * first entry named `.actor/actor.json` sets usesStandbyMode and Standby is off. It parses the content as stored, so a
+ * BASE64 entry never turns it on; it reads JSON5, and a file JSON.parse cannot read only loses this warning.
+ */
+function formatStandbyWarning(
+    actor: Pick<Actor, 'actorStandby'>,
+    entries: readonly ActorVersionSourceFile[] | undefined,
+): string | undefined {
+    if (actor.actorStandby?.isEnabled === true) return undefined;
+    const config = entries?.find(({ name }) => name === ACTOR_CONFIG_PATH);
+    if (!config || config.format === 'BASE64' || typeof config.content !== 'string') return undefined;
+    try {
+        const parsed = JSON.parse(config.content) as { usesStandbyMode?: unknown };
+        if (!parsed?.usesStandbyMode) return undefined;
+    } catch {
+        return undefined;
+    }
+    return (
+        `Creating this version turned on Standby for the whole Actor, because its ${ACTOR_CONFIG_PATH} sets ` +
+        'usesStandbyMode and Standby was off. Turn it off again in Apify Console if it should stay off.'
     );
 }
 
@@ -191,11 +248,11 @@ function buildCopiedVersion(
     if (version.sourceType === ActorSourceType.SourceFiles) {
         if (!Array.isArray(version.sourceFiles)) throw new UserInputError(hiddenText);
         const entries = version.sourceFiles;
-        return { ...env, sourceType, sourceBody: { sourceType, sourceFiles: entries }, entries, warnings: [] };
+        const sourceBody = { sourceType: ActorSourceType.SourceFiles, sourceFiles: entries } as const;
+        return { ...env, sourceType, sourceBody, entries, warnings: [] };
     }
     if (version.sourceType === ActorSourceType.GitRepo || version.sourceType === ActorSourceType.GitHubGist) {
-        const isGit = version.sourceType === ActorSourceType.GitRepo;
-        const url = isGit ? version.gitRepoUrl : version.gitHubGistUrl;
+        const url = version.sourceType === ActorSourceType.GitRepo ? version.gitRepoUrl : version.gitHubGistUrl;
         if (!url) throw new UserInputError(hiddenText);
         const shownUrl = formatUrlWithoutSecrets(url);
         const warnings = hasUrlSecrets(url)
@@ -203,13 +260,20 @@ function buildCopiedVersion(
                   `The credentials stored with the URL of version ${sourceVersionNumber} were copied too; they are not shown.`,
               ]
             : [];
-        const sourceBody = isGit ? { sourceType, gitRepoUrl: url } : { sourceType, gitHubGistUrl: url };
+        const sourceBody: SourceBody =
+            version.sourceType === ActorSourceType.GitRepo
+                ? { sourceType: ActorSourceType.GitRepo, gitRepoUrl: url }
+                : { sourceType: ActorSourceType.GitHubGist, gitHubGistUrl: url };
         return { ...env, sourceType, sourceBody, shownUrl, warnings };
     }
     if (version.sourceType === ActorSourceType.Tarball) {
+        // apify push takes the tag from .actor/actor.json without --build-tag and always builds, so the hint sets one.
         throw new UserInputError(
-            `${subject} is stored as a zip (TARBALL), and this tool cannot copy zip-stored versions yet. Push the ` +
-                `source to the new version with the Apify CLI instead (apify push --version ${versionNumber}).`,
+            `${subject} is stored as a zip (TARBALL), and this tool cannot copy zip-stored versions yet. Give the ` +
+                'source as files or gitRepoUrl instead. Or upload your local project folder (not the stored zip) ' +
+                `with the Apify CLI and a build tag no other version uses: apify push --version ${versionNumber} ` +
+                `--build-tag wip-${versionNumber.replace('.', '-')}. Without --build-tag, apify push takes the tag ` +
+                'from .actor/actor.json, often latest, and it builds right away.',
         );
     }
     throw new UserInputError(`${subject} has source type ${sourceType}, which this tool cannot copy.`);
@@ -228,29 +292,21 @@ function buildNewVersion(source: Exclude<RequestedSource, { kind: 'copy' }>): Ne
     }
     // The platform takes an empty list of files, which gives a version to fill later.
     const entries = source.kind === 'files' ? source.entries : [];
-    const emptyPaths = entries.filter(({ content }) => content === '').map(({ name }) => name);
     return {
         ...common,
         sourceType: ActorSourceType.SourceFiles,
         sourceBody: { sourceType: ActorSourceType.SourceFiles, sourceFiles: entries },
         entries,
-        warnings:
-            source.kind === 'files'
-                ? [formatMissingDockerfileWarning(entries), formatEmptyFilesWarning(emptyPaths)].filter(
-                      (warning): warning is string => warning !== undefined,
-                  )
-                : [],
+        warnings: source.kind === 'files' ? buildSentFilesWarnings(entries) : [],
     };
 }
 
 function formatSourceText(source: RequestedSource, newVersion: NewVersion, fileCount: number): string {
     const filesText = `${fileCount} ${fileCount === 1 ? 'file' : 'files'}`;
-    const urlText =
-        newVersion.sourceType === ActorSourceType.GitHubGist
-            ? `the GitHub gist ${newVersion.shownUrl}`
-            : `the Git repository ${newVersion.shownUrl}`;
+    const { sourceType, shownUrl } = newVersion;
+    const urlText = shownUrl === undefined ? '' : formatUrlSourceText({ sourceType, url: shownUrl });
     if (source.kind === 'copy') {
-        const copiedText = newVersion.shownUrl === undefined ? filesText : `building from ${urlText}`;
+        const copiedText = shownUrl === undefined ? filesText : `building from ${urlText}`;
         return `as a copy of version ${source.versionNumber} (${copiedText})`;
     }
     if (source.kind === 'files') return `from ${filesText}`;
@@ -283,10 +339,7 @@ function formatNextStep(params: {
         return formatBuildStartFailure('The version was created', buildResult.buildErrMessage, loadedToolNames);
     }
     if (source.kind === 'empty') {
-        const addText = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_UPDATE)
-            ? ` with ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}`
-            : '';
-        return `The version has no files yet: add them${addText}, then build it.`;
+        return `The version has no files yet: add them${formatWithUpdateToolText(loadedToolNames)}, then build it.`;
     }
     return `The version has no build yet, so it cannot run until it is built.${formatBuildLaterHint(loadedToolNames)}`;
 }
@@ -372,10 +425,11 @@ export const createActorVersion: ToolEntry = Object.freeze({
             } else {
                 newVersion = buildNewVersion(source);
             }
+            const standbyWarning = formatStandbyWarning(actor, newVersion.entries);
+            if (standbyWarning !== undefined) newVersion.warnings.push(standbyWarning);
             // A cancel before the POST creates nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
             try {
-                // apify-client types the body as one of its version shapes; the source keys are built per type above.
                 await client
                     .actor(actor.id)
                     .versions()
@@ -385,7 +439,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
                         ...newVersion.sourceBody,
                         ...(newVersion.envVars.length > 0 && { envVars: newVersion.envVars }),
                         ...(newVersion.applyEnvVarsToBuild && { applyEnvVarsToBuild: true }),
-                    } as unknown as ActorVersion);
+                    } satisfies ActorVersion);
             } catch (error) {
                 if (error instanceof ApifyApiError && error.type === VERSION_EXISTS_ERROR_TYPE) {
                     throw new UserInputError(versionExistsText);
