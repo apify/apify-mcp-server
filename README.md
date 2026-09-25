@@ -305,7 +305,7 @@ Legend for the **Enabled by default** column:
 All tools include metadata annotations to help MCP clients and LLMs understand tool behavior:
 
 - **`title`**: Short display name for the tool (e.g., "Search Actors", "Call Actor", "apify/rag-web-browser")
-- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`)
+- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`). Actor tools get it only for Apify-maintained Actors with limited permissions and no secret, MCP connector, or code input (e.g., `apify--web-fetch`); other Actor tools are marked destructive.
 - **`openWorldHint`**: `true` for tools that access external resources outside the Apify platform (e.g., `call-actor` executes external Actors). Tools that interact only with the Apify platform (like `search-actors` or `fetch-apify-docs`) do not have this hint.
 
 ### Tools configuration

@@ -244,6 +244,15 @@ export const OFFICIAL_APIFY_USERNAMES: ReadonlySet<string> = new Set([
     'voyager',
 ]);
 
+/**
+ * Official Apify Actors that pass the input checks in `isReadOnlyActor` but still act outside
+ * their run storages, so their tools keep the destructive hints.
+ */
+export const OFFICIAL_ACTORS_WITH_SIDE_EFFECTS: ReadonlySet<string> = new Set([
+    'apify/send-mail', // Sends email.
+    'apify/actor-light-fixture', // Controls a physical light.
+]);
+
 export const APIFY_STORE_URL = 'https://apify.com';
 /** Apify Console origin (production). */
 export const CONSOLE_BASE_URL = 'https://console.apify.com';
