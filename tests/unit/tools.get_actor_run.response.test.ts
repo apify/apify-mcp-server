@@ -126,6 +126,8 @@ describe('get-actor-run default response', () => {
             usageTotalUsd: 0.0001,
             usageUsd: { ACTOR_COMPUTE_UNITS: 0.0001 },
         });
+        // Run cost is also in structuredContent: most clients (and the model) never see `_meta`.
+        expect(structuredContent.usageTotalUsd).toBe(0.0001);
     });
 
     it('surfaces dataset inflatedBytes from stats in structuredContent', async () => {

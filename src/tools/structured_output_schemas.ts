@@ -604,6 +604,7 @@ export const actorRunOutputSchema = {
                 memMaxBytes: { type: 'number' },
             },
         },
+        usageTotalUsd: { type: 'number', description: 'Total run cost in USD.' },
         storages: {
             type: 'object' as const,
             // Alias-map shape mirrors ActorRunStorageIds from the Apify client.
