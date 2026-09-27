@@ -35,7 +35,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get one
     operation, and call it with read access (GET) or write access (POST, PUT). `apify_api_spec.ts` builds
     the operation index from the spec (cached for an hour) and decides each operation's access: read,
-    write, or unavailable with a reason, plus the body fields the write tool refuses.
+    write, or unavailable with a reason, plus the body fields the write tool refuses. Fields that set
+    an Actor's source, versions, or whole env var list are refused; the single-variable env var
+    operations stay callable, since each changes one variable.
     `apify_api_request.ts` fills in the path, checks the query and body, and sends one request with no
     retries. The call tools log their arguments through `redactApiCallArgs` (`redactArgs`): only the
     declared keys, with the body and the `token`, `signature`, and `webhooks` query values redacted.

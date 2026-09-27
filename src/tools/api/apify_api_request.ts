@@ -196,22 +196,38 @@ export function validateRequestBody(operation: ApiOperation, body: unknown): str
     }
     if (!isRecord(body)) return undefined;
     const refusedFields = operation.refusedBodyFields.filter((field) => field in body);
+    if (refusedFields.length === 0) return undefined;
+    // One refusal lists every refused field, so the agent does not learn of them one call at a time.
     const sourceFields = refusedFields.filter((field) => SOURCE_BODY_FIELDS.has(field));
     const otherFields = refusedFields.filter((field) => !SOURCE_BODY_FIELDS.has(field));
+    const sentences: string[] = [];
     if (otherFields.length > 0) {
-        return (
+        sentences.push(
             `The API tools do not set ${otherFields.join(', ')}, whatever the value: publishing, pricing, ` +
-            'permission, and sharing changes need a dedicated tool or Apify Console. Remove the field and call again.'
+                'permission, and sharing changes need a dedicated tool or Apify Console.',
         );
     }
     if (sourceFields.length > 0) {
-        return (
-            `The API tools do not set ${sourceFields.join(', ')}: each replaces the whole source or list. Actor ` +
-            'source and environment variables are changed through dedicated source tools or Apify Console. ' +
-            'Remove the field and call again.'
+        sentences.push(
+            `The API tools do not set ${sourceFields.join(', ')}: they set an Actor's source, versions, or ` +
+                'environment variables, which dedicated source tools or Apify Console change.',
         );
     }
-    return undefined;
+    // Operation IDs, not tool names: this same tool calls them, and each changes one variable.
+    if (sourceFields.includes('envVars')) {
+        sentences.push(
+            'To add or change one environment variable, call actor_version_envVars_post or ' +
+                'actor_version_envVar_put; each leaves the other variables as they are.',
+        );
+    }
+    // Sending the rest of an otherwise empty body would succeed and change nothing.
+    const isNothingElseSet = Object.keys(body).every((field) => refusedFields.includes(field));
+    sentences.push(
+        isNothingElseSet
+            ? 'Without the refused fields the body sets nothing, so do not call again with it.'
+            : 'Remove the refused fields and call again.',
+    );
+    return sentences.join(' ');
 }
 
 function formatOversizeMessage(operation: ApiOperation, path: string): string {

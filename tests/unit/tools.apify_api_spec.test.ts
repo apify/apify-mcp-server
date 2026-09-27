@@ -16,7 +16,7 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(25);
+        expect(index.size).toBe(27);
     });
 
     it('resolves parameter references and keeps only path and query parameters', () => {
@@ -60,6 +60,7 @@ describe('buildApiOperationIndex()', () => {
         ['actor_runs_last_metamorph_post', 'cannot be undone'],
         ['actorTask_runs_last_metamorph_post', 'cannot be undone'],
         ['actor_runSyncGetDatasetItems_post', 'waits up to 300 seconds'],
+        ['actor_versions_post', "sets the new version's source and environment variables"],
     ])('makes %s unavailable with the reason', (operationId, reason) => {
         const operation = index.get(operationId);
         expect(operation?.access).toBe(API_ACCESS.UNAVAILABLE);
@@ -82,13 +83,16 @@ describe('buildApiOperationIndex()', () => {
             'versions',
         ]);
         // Only the source fields the version schema declares; buildTag stays settable.
-        expect(index.get('actor_version_put')?.refusedBodyFields).toEqual([
+        const versionSourceFields = [
             'sourceType',
             'sourceFiles',
             'tarballUrl',
             'gitRepoUrl',
+            'gitHubGistUrl',
             'envVars',
-        ]);
+        ];
+        expect(index.get('actor_version_put')?.refusedBodyFields).toEqual(versionSourceFields);
+        expect(index.get('actor_version_post')?.refusedBodyFields).toEqual(versionSourceFields);
         // A record body is free-form: a record may hold an isPublic key as plain data.
         expect(index.get('keyValueStore_record_put')?.refusedBodyFields).toEqual([]);
     });

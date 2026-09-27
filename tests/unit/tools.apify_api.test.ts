@@ -468,8 +468,10 @@ describe('apify-api-write', () => {
                 pathParams: { actorId: 'john~my-actor', versionNumber: '0.1' },
                 body: { envVars: [{ name: 'API_KEY', value: 'x', isSecret: true }] },
             },
-            'The API tools do not set envVars: each replaces the whole source or list. Actor source and ' +
-                'environment variables are changed through dedicated source tools or Apify Console.',
+            "The API tools do not set envVars: they set an Actor's source, versions, or environment variables, " +
+                'which dedicated source tools or Apify Console change. To add or change one environment ' +
+                'variable, call actor_version_envVars_post or actor_version_envVar_put; each leaves the other ' +
+                'variables as they are. Without the refused fields the body sets nothing, so do not call again with it.',
         ],
         [
             {
@@ -482,6 +484,22 @@ describe('apify-api-write', () => {
         [
             { operationId: 'actor_put', pathParams: { actorId: 'john~my-actor' }, body: { versions: [] } },
             'The API tools do not set versions',
+        ],
+        [
+            {
+                operationId: 'actor_version_post',
+                pathParams: { actorId: 'john~my-actor', versionNumber: '0.1' },
+                body: { buildTag: 'beta', gitHubGistUrl: 'https://gist.github.com/x' },
+            },
+            'The API tools do not set gitHubGistUrl',
+        ],
+        [
+            {
+                operationId: 'actor_versions_post',
+                pathParams: { actorId: 'john~my-actor' },
+                body: { versionNumber: '0.2', envVars: [{ name: 'API_KEY', value: 'x' }] },
+            },
+            "The API tools do not call actor_versions_post. It sets the new version's source",
         ],
         [
             {
@@ -501,6 +519,33 @@ describe('apify-api-write', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain(reason);
         expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('lists every refused field in one refusal and says to call again when the rest of the body sets something', async () => {
+        const result = await callTool(apifyApiWrite, {
+            operationId: 'actor_put',
+            pathParams: { actorId: 'john~my-actor' },
+            body: { title: 'T', isPublic: true, versions: [] },
+        });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            'The API tools do not set isPublic, whatever the value: publishing, pricing, permission, and sharing ' +
+                "changes need a dedicated tool or Apify Console. The API tools do not set versions: they set an Actor's " +
+                'source, versions, or environment variables, which dedicated source tools or Apify Console change. ' +
+                'Remove the refused fields and call again.',
+        );
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('does not name the read tool for a read operation when the session lacks it', async () => {
+        const result = await callTool(apifyApiWrite, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } }, [
+            HELPER_TOOLS.API_WRITE,
+        ]);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).not.toContain(HELPER_TOOLS.API_READ);
+        expect(result.content[0].text).toContain('No tool in this session has read access.');
     });
 
     it('sends a version field that does not replace the source, such as buildTag', async () => {
@@ -576,6 +621,13 @@ describe('apify-api-write', () => {
 
     describe('redactArgs()', () => {
         const { redactArgs } = apifyApiWrite as HelperTool;
+
+        it('shares the read tool redactor, so an undeclared token is redacted too', () => {
+            const args = { operationId: 'dataset_put', pathParams: { datasetId: 'abc' }, query: { token: 'secret' } };
+
+            expect(redactArgs).toBe(redactApiCallArgs);
+            expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
+        });
 
         it('redacts the body in the logged copy without changing the arguments', () => {
             const args = { operationId: 'actor_version_envVar_put', body: { value: 'secret' } };

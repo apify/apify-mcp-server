@@ -135,7 +135,32 @@ export const API_SPEC_FIXTURE = {
                 },
             },
         },
+        '/v2/actors/{actorId}/versions': {
+            post: {
+                operationId: 'actor_versions_post',
+                summary: 'Create version',
+                tags: ['Actors/Actor versions'],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/VersionRequest' } } },
+                },
+            },
+        },
         '/v2/actors/{actorId}/versions/{versionNumber}': {
+            post: {
+                operationId: 'actor_version_post',
+                summary: 'Update version (POST)',
+                tags: ['Actors/Actor versions'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/VersionRequest' } } },
+                },
+            },
             put: {
                 operationId: 'actor_version_put',
                 summary: 'Update version',
@@ -310,6 +335,7 @@ export const API_SPEC_FIXTURE = {
                     sourceFiles: { type: 'array' },
                     gitRepoUrl: { type: 'string' },
                     tarballUrl: { type: 'string' },
+                    gitHubGistUrl: { type: 'string' },
                     envVars: { type: 'array' },
                 },
             },

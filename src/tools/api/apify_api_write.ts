@@ -11,11 +11,12 @@ import {
     apiCallArgsShape,
     buildRequestPath,
     callApiOperation,
+    redactApiCallArgs,
     resolveOperationToCall,
     validateQueryParams,
     validateRequestBody,
 } from './apify_api_request.js';
-import { API_ACCESS, fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
+import { API_ACCESS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiWriteArgs = z.object({
     ...apiCallArgsShape,
@@ -36,10 +37,10 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         Call one Apify API operation with write access (POST or PUT), by its operation ID. The server builds
         the URL from the operation's path and pathParams and adds the API token: never pass a URL or a token.${getParameters}
         The request is sent once and applies at once. Refused: deletions, synchronous runs, metamorphs,
-        spending limits, and run charging; fields that publish an Actor or task, change its pricing or
-        permissions, or change who can read a storage; and fields that replace an Actor's source, versions,
-        or environment variables, which dedicated source tools or Apify Console change. Returns the response
-        body as the API sends it; a body over ${MAX_INLINE_BYTES} bytes is not returned.
+        spending limits, run charging, and creating Actor versions; fields that publish an Actor or task,
+        change its pricing or permissions, or change who can read a storage; and fields that set an Actor's
+        source, versions, or environment variables, which dedicated source tools or Apify Console change.
+        Returns the response body as the API sends it; a body over ${MAX_INLINE_BYTES} bytes is not returned.
 
         USAGE:
         - Use to change something no dedicated tool changes, such as a dataset's name or a webhook.
@@ -71,13 +72,8 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     // A body can carry secrets: environment variable values, webhook headers, stored records. So can the
-    // webhooks query parameter of a run, whose webhooks carry headers. Undeclared keys are left out.
-    redactArgs: ({ operationId, pathParams, query, body }: Record<string, unknown>) => ({
-        operationId,
-        pathParams,
-        query: isRecord(query) && 'webhooks' in query ? { ...query, webhooks: '[REDACTED]' } : query,
-        ...(body !== undefined && { body: '[REDACTED]' }),
-    }),
+    // webhooks query parameter of a run, whose webhooks carry headers.
+    redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiWriteArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();

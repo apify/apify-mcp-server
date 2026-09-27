@@ -970,7 +970,11 @@ export const apifyApiCallOutputSchema = {
         path: { type: 'string', description: 'Request path, with the path parameters filled in' },
         statusCode: { type: 'integer', description: 'HTTP status code' },
         contentType: { type: 'string', description: 'Content-Type of the response' },
-        data: { description: 'Response body: parsed JSON, text, or null for an empty or binary body' },
+        data: {
+            description:
+                'Response body: parsed JSON, text, or null for an empty or binary body, or for a write response ' +
+                'over the inline limit',
+        },
     },
     required: ['operationId', 'method', 'path', 'statusCode', 'data'],
 };

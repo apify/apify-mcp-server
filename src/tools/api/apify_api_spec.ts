@@ -61,6 +61,13 @@ const UNAVAILABLE_OPERATION_REASONS: ReadonlyMap<string, string> = new Map([
     ['actorRun_metamorph_post', METAMORPH_REASON],
     ['actor_runs_last_metamorph_post', METAMORPH_REASON],
     ['actorTask_runs_last_metamorph_post', METAMORPH_REASON],
+    // The API needs sourceType on create, and sourceFiles with the SOURCE_FILES type, which the write
+    // tool refuses; a create without them fails. Updating a version checks only the fields it sends.
+    [
+        'actor_versions_post',
+        "It sets the new version's source and environment variables, which dedicated source tools or Apify " +
+            'Console change.',
+    ],
 ]);
 
 /**
@@ -84,13 +91,12 @@ const UNDECLARED_REFUSED_BODY_FIELDS: ReadonlyMap<string, readonly string[]> = n
 const VERSION_SOURCE_FIELDS = ['sourceType', 'sourceFiles', 'tarballUrl', 'gitRepoUrl', 'gitHubGistUrl', 'envVars'];
 
 /**
- * Body fields that set an Actor's source, versions, or environment variables, by operation. Each
- * replaces a whole source or list, so whatever the body leaves out is gone, secret variables included.
+ * Body fields that set an Actor's source, versions, or environment variables, by operation. Most replace
+ * a whole source or list, so whatever the body leaves out is gone, secret variables included.
  * Dedicated source tools own these changes. Like the fields above, they are refused only where the
  * operation's schema declares them. The single-variable env var operations stay available.
  */
 const SOURCE_BODY_FIELDS_BY_OPERATION: ReadonlyMap<string, readonly string[]> = new Map([
-    ['actor_versions_post', VERSION_SOURCE_FIELDS],
     ['actor_version_post', VERSION_SOURCE_FIELDS],
     ['actor_version_put', VERSION_SOURCE_FIELDS],
     ['actors_post', ['versions']],
