@@ -16,7 +16,7 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(20);
+        expect(index.size).toBe(21);
     });
 
     it('resolves parameter references and keeps only path and query parameters', () => {
@@ -63,14 +63,28 @@ describe('buildApiOperationIndex()', () => {
         expect(operation?.unavailableReason).toContain(reason);
     });
 
-    it('refuses publishing, pricing, permission and sharing fields only where the body schema declares them', () => {
-        expect(index.get('actor_put')?.refusedBodyFields).toEqual(['isPublic', 'pricingInfos', 'actorPermissionLevel']);
+    it('refuses publishing, pricing, permission, sharing, and source fields where the body takes them', () => {
+        expect(index.get('actor_put')?.refusedBodyFields).toEqual([
+            'isPublic',
+            'pricingInfos',
+            'actorPermissionLevel',
+            'versions',
+        ]);
         expect(index.get('dataset_put')?.refusedBodyFields).toEqual(['generalAccess']);
         // The API takes these on create, although the create schema does not declare them.
         expect(index.get('actors_post')?.refusedBodyFields).toEqual([
             'isPublic',
             'pricingInfos',
             'actorPermissionLevel',
+            'versions',
+        ]);
+        // Only the source fields the version schema declares; buildTag stays settable.
+        expect(index.get('actor_version_put')?.refusedBodyFields).toEqual([
+            'sourceType',
+            'sourceFiles',
+            'tarballUrl',
+            'gitRepoUrl',
+            'envVars',
         ]);
         // A record body is free-form: a record may hold an isPublic key as plain data.
         expect(index.get('keyValueStore_record_put')?.refusedBodyFields).toEqual([]);

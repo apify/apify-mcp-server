@@ -80,6 +80,26 @@ const UNDECLARED_REFUSED_BODY_FIELDS: ReadonlyMap<string, readonly string[]> = n
     ['actors_post', ['pricingInfos', 'actorPermissionLevel']],
 ]);
 
+/** Body fields of an Actor version that set its source or its environment variables. */
+const VERSION_SOURCE_FIELDS = ['sourceType', 'sourceFiles', 'tarballUrl', 'gitRepoUrl', 'gitHubGistUrl', 'envVars'];
+
+/**
+ * Body fields that set an Actor's source, versions, or environment variables, by operation. Each
+ * replaces a whole source or list, so whatever the body leaves out is gone, secret variables included.
+ * Dedicated source tools own these changes. Like the fields above, they are refused only where the
+ * operation's schema declares them. The single-variable env var operations stay available.
+ */
+const SOURCE_BODY_FIELDS_BY_OPERATION: ReadonlyMap<string, readonly string[]> = new Map([
+    ['actor_versions_post', VERSION_SOURCE_FIELDS],
+    ['actor_version_post', VERSION_SOURCE_FIELDS],
+    ['actor_version_put', VERSION_SOURCE_FIELDS],
+    ['actors_post', ['versions']],
+    ['actor_put', ['versions']],
+]);
+
+/** Every source field of `SOURCE_BODY_FIELDS_BY_OPERATION`, to tell its refusal from the others. */
+export const SOURCE_BODY_FIELDS: ReadonlySet<string> = new Set([...SOURCE_BODY_FIELDS_BY_OPERATION.values()].flat());
+
 /** Schema keywords that only cost context. `x-*` vendor extensions are dropped by prefix in `dereference()`. */
 const DROPPED_SCHEMA_KEYS: ReadonlySet<string> = new Set(['example', 'examples']);
 
@@ -227,9 +247,14 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
                 tags: tags ?? [],
                 parameters: parseParameters(parameters, spec),
                 ...(body && { requestBody: body }),
-                refusedBodyFields: [...REFUSED_BODY_FIELDS].filter(
-                    (field) => declaredBodyFields.has(field) || undeclaredRefusedFields.includes(field),
-                ),
+                refusedBodyFields: [
+                    ...[...REFUSED_BODY_FIELDS].filter(
+                        (field) => declaredBodyFields.has(field) || undeclaredRefusedFields.includes(field),
+                    ),
+                    ...(SOURCE_BODY_FIELDS_BY_OPERATION.get(operationId) ?? []).filter((field) =>
+                        declaredBodyFields.has(field),
+                    ),
+                ],
                 ...resolveAccess(method, path, operationId),
             });
         }

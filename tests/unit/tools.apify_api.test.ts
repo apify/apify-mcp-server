@@ -163,7 +163,7 @@ describe('apify-api-details', () => {
             access: 'write',
             parameters: [{ name: 'actorId', in: 'path', isRequired: true }],
             requestBody: { isRequired: false },
-            refusedBodyFields: ['isPublic', 'pricingInfos', 'actorPermissionLevel'],
+            refusedBodyFields: ['isPublic', 'pricingInfos', 'actorPermissionLevel', 'versions'],
         });
     });
 
@@ -423,6 +423,27 @@ describe('apify-api-write', () => {
         ],
         [
             {
+                operationId: 'actor_version_put',
+                pathParams: { actorId: 'john~my-actor', versionNumber: '0.1' },
+                body: { envVars: [{ name: 'API_KEY', value: 'x', isSecret: true }] },
+            },
+            'The API tools do not set envVars: each replaces the whole source or list. Actor source and ' +
+                'environment variables are changed through dedicated source tools or Apify Console.',
+        ],
+        [
+            {
+                operationId: 'actor_version_put',
+                pathParams: { actorId: 'john~my-actor', versionNumber: '0.1' },
+                body: { sourceFiles: [] },
+            },
+            'The API tools do not set sourceFiles',
+        ],
+        [
+            { operationId: 'actor_put', pathParams: { actorId: 'john~my-actor' }, body: { versions: [] } },
+            'The API tools do not set versions',
+        ],
+        [
+            {
                 operationId: 'actors_runs_post',
                 pathParams: { actorId: 'john~my-actor' },
                 query: { forcePermissionLevel: 'FULL_PERMISSIONS' },
@@ -439,6 +460,18 @@ describe('apify-api-write', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain(reason);
         expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('sends a version field that does not replace the source, such as buildTag', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: { versionNumber: '0.1', buildTag: 'beta' } }));
+
+        await callTool(apifyApiWrite, {
+            operationId: 'actor_version_put',
+            pathParams: { actorId: 'john~my-actor', versionNumber: '0.1' },
+            body: { buildTag: 'beta' },
+        });
+
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ data: '{"buildTag":"beta"}' }));
     });
 
     it('sends a refused field name when the body is free-form, such as a stored record', async () => {

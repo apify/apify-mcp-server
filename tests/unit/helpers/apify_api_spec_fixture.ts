@@ -135,6 +135,21 @@ export const API_SPEC_FIXTURE = {
                 },
             },
         },
+        '/v2/actors/{actorId}/versions/{versionNumber}': {
+            put: {
+                operationId: 'actor_version_put',
+                summary: 'Update version',
+                tags: ['Actors/Versions'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/VersionRequest' } } },
+                },
+            },
+        },
         '/v2/actors/{actorId}/runs': {
             post: {
                 operationId: 'actors_runs_post',
@@ -239,7 +254,7 @@ export const API_SPEC_FIXTURE = {
             // Like the published spec, it does not declare pricingInfos or actorPermissionLevel.
             CreateActorRequest: {
                 type: 'object',
-                properties: { name: { type: 'string' }, isPublic: { type: 'boolean' } },
+                properties: { name: { type: 'string' }, isPublic: { type: 'boolean' }, versions: { type: 'array' } },
             },
             UpdateActorRequest: {
                 allOf: [{ $ref: '#/components/schemas/ActorPermissionFields' }],
@@ -247,6 +262,19 @@ export const API_SPEC_FIXTURE = {
                     title: { type: 'string' },
                     isPublic: { type: 'boolean' },
                     pricingInfos: { type: 'array' },
+                    versions: { type: 'array' },
+                },
+            },
+            VersionRequest: {
+                type: 'object',
+                properties: {
+                    versionNumber: { type: 'string' },
+                    buildTag: { type: 'string' },
+                    sourceType: { type: 'string' },
+                    sourceFiles: { type: 'array' },
+                    gitRepoUrl: { type: 'string' },
+                    tarballUrl: { type: 'string' },
+                    envVars: { type: 'array' },
                 },
             },
             ActorPermissionFields: {

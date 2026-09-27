@@ -36,9 +36,10 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         Call one Apify API operation with write access (POST or PUT), by its operation ID. The server builds
         the URL from the operation's path and pathParams and adds the API token: never pass a URL or a token.${getParameters}
         The request is sent once and applies at once. Refused: deletions, synchronous runs, metamorphs,
-        spending limits, run charging, and fields that publish an Actor or task, change its pricing or
-        permissions, or change who can read a storage. Returns the response body as the API sends it; a
-        body over ${MAX_INLINE_BYTES} bytes is not returned.
+        spending limits, and run charging; fields that publish an Actor or task, change its pricing or
+        permissions, or change who can read a storage; and fields that replace an Actor's source, versions,
+        or environment variables, which dedicated source tools or Apify Console change. Returns the response
+        body as the API sends it; a body over ${MAX_INLINE_BYTES} bytes is not returned.
 
         USAGE:
         - Use to change something no dedicated tool changes, such as a dataset's name or a webhook.

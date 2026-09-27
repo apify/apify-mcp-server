@@ -10,7 +10,7 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import type { ApiAccess, ApiOperation } from './apify_api_spec.js';
-import { API_ACCESS, isRecord } from './apify_api_spec.js';
+import { API_ACCESS, isRecord, SOURCE_BODY_FIELDS } from './apify_api_spec.js';
 
 /** Input fields the read and write tools share. */
 export const apiCallArgsShape = {
@@ -171,10 +171,19 @@ export function validateRequestBody(operation: ApiOperation, body: unknown): str
     }
     if (!isRecord(body)) return undefined;
     const refusedFields = operation.refusedBodyFields.filter((field) => field in body);
-    if (refusedFields.length > 0) {
+    const sourceFields = refusedFields.filter((field) => SOURCE_BODY_FIELDS.has(field));
+    const otherFields = refusedFields.filter((field) => !SOURCE_BODY_FIELDS.has(field));
+    if (otherFields.length > 0) {
         return (
-            `The API tools do not set ${refusedFields.join(', ')}, whatever the value: publishing, pricing, ` +
+            `The API tools do not set ${otherFields.join(', ')}, whatever the value: publishing, pricing, ` +
             'permission, and sharing changes need a dedicated tool or Apify Console. Remove the field and call again.'
+        );
+    }
+    if (sourceFields.length > 0) {
+        return (
+            `The API tools do not set ${sourceFields.join(', ')}: each replaces the whole source or list. Actor ` +
+            'source and environment variables are changed through dedicated source tools or Apify Console. ' +
+            'Remove the field and call again.'
         );
     }
     return undefined;
