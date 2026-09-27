@@ -41,7 +41,6 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 
         USAGE EXAMPLES:
         - user_input: List the webhooks on my account
-        - user_input: Rename my dataset to leads-2026
         - user_input: How much of my monthly usage have I spent?
     `;
 }

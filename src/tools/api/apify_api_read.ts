@@ -59,7 +59,12 @@ export const apifyApiRead: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiReadArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
-        const resolved = resolveOperationToCall(index, parsed.operationId, API_ACCESS.READ, toolArgs.loadedToolNames);
+        const resolved = resolveOperationToCall({
+            index,
+            operationId: parsed.operationId,
+            access: API_ACCESS.READ,
+            loadedToolNames: toolArgs.loadedToolNames,
+        });
         if ('error' in resolved) return respondUserError(resolved.error);
         const { operation } = resolved;
 
@@ -68,7 +73,10 @@ export const apifyApiRead: ToolEntry = Object.freeze({
         const queryError = validateQueryParams(operation, parsed.query);
         if (queryError) return respondUserError(queryError);
 
-        return callApiOperation(toolArgs.apifyClient, operation, request.path, {
+        return callApiOperation({
+            client: toolArgs.apifyClient,
+            operation,
+            path: request.path,
             query: parsed.query,
             signal: toolArgs.signal,
         });

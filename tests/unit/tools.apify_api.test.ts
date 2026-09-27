@@ -1,5 +1,5 @@
 import { ApifyApiError } from 'apify-client';
-import { AxiosError } from 'axios';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
@@ -69,6 +69,12 @@ describe('buildRequestPath()', () => {
         expect(buildRequestPath(INDEX.get('webhooks_get')!)).toEqual({ path: '/v2/webhooks' });
     });
 
+    it('sends a value that is not a resource ID, such as a record key, as it is', () => {
+        expect(
+            buildRequestPath(INDEX.get('keyValueStore_record_put')!, { storeId: 'john/store', recordKey: 'a/b' }),
+        ).toEqual({ path: '/v2/key-value-stores/john~store/records/a%2Fb' });
+    });
+
     it.each([
         [{}, 'Missing path parameter datasetId'],
         [{ datasetId: '' }, 'Missing path parameter datasetId'],
@@ -98,9 +104,21 @@ describe('validateQueryParams()', () => {
         );
     });
 
-    it('caps waitForFinish below the tool-call timeout', () => {
-        expect(validateQueryParams(INDEX.get('actorRun_get')!, { waitForFinish: 45 })).toBeUndefined();
-        expect(validateQueryParams(INDEX.get('actorRun_get')!, { waitForFinish: 60 })).toContain('at most 45 seconds');
+    it('caps waitForFinish below the tool-call timeout, reading it as the API does', () => {
+        const actorRunGet = INDEX.get('actorRun_get')!;
+        expect(validateQueryParams(actorRunGet, { waitForFinish: 45 })).toBeUndefined();
+        expect(validateQueryParams(actorRunGet, { waitForFinish: 60 })).toContain('at most 45 seconds');
+        expect(validateQueryParams(actorRunGet, { waitForFinish: '60s' })).toContain('at most 45 seconds');
+    });
+
+    it.each([true, 'true', '1', 1])('refuses stream %j, which keeps the log request open', (stream) => {
+        expect(validateQueryParams(INDEX.get('actorRun_log_get')!, { stream })).toContain(
+            'Call again without stream to get the log so far.',
+        );
+    });
+
+    it('accepts a false stream', () => {
+        expect(validateQueryParams(INDEX.get('actorRun_log_get')!, { stream: false })).toBeUndefined();
     });
 });
 
@@ -155,7 +173,7 @@ describe('apify-api-details', () => {
         expect(withSearch.content[0].text).toBe(
             `API operation nope not found. Find it with ${HELPER_TOOLS.API_SEARCH}.`,
         );
-        expect(withoutSearch.content[0].text).toBe('API operation nope not found.');
+        expect(withoutSearch.content[0].text).toBe('API operation nope not found. Operation IDs are case-sensitive.');
     });
 });
 
@@ -191,7 +209,11 @@ describe('apify-api-read', () => {
     });
 
     it.each([
-        ['dataset_put', 'dataset_put is a PUT operation with write access; this tool has read access.'],
+        [
+            'dataset_put',
+            'dataset_put is a PUT operation with write access; this tool has read access. ' +
+                'No tool in this session has write access.',
+        ],
         ['actor_runSync_get', 'The API tools do not call actor_runSync_get. It waits up to 300 seconds'],
         ['nope', 'API operation nope not found.'],
     ])('refuses %s without a request', async (operationId, reason) => {
@@ -246,12 +268,19 @@ describe('apify-api-read', () => {
         expect(result.content[0].text).toContain('limit, offset, or fields');
     });
 
-    it('rethrows any other request failure', async () => {
-        requestMock.mockRejectedValue(new AxiosError('socket hang up', 'ECONNRESET'));
+    it('rethrows any other request failure without the request config, which holds the token', async () => {
+        const config = { headers: new AxiosHeaders({ Authorization: 'Bearer secret-token' }) };
+        requestMock.mockRejectedValue(new AxiosError('socket hang up', 'ECONNRESET', config));
 
-        await expect(
-            callTool(apifyApiRead, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } }),
-        ).rejects.toThrow('socket hang up');
+        const error = await callTool(apifyApiRead, {
+            operationId: 'dataset_get',
+            pathParams: { datasetId: 'abc' },
+        }).catch((thrown: unknown) => thrown);
+
+        expect(error).toBeInstanceOf(Error);
+        expect(error).not.toBeInstanceOf(AxiosError);
+        expect(error).toMatchObject({ message: 'socket hang up', code: 'ECONNRESET' });
+        expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain('secret-token');
     });
 
     it('describes a binary body instead of returning it', async () => {

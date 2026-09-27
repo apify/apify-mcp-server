@@ -47,6 +47,13 @@ export const API_SPEC_FIXTURE = {
                     { name: 'Accept-Encoding', in: 'header', schema: { type: 'string' } },
                 ],
             },
+            post: {
+                operationId: 'dataset_items_post',
+                summary: 'Store items',
+                tags: ['Storage/Datasets'],
+                parameters: [{ $ref: '#/components/parameters/datasetId' }],
+                requestBody: { required: true, content: { 'application/json': { schema: { type: 'array' } } } },
+            },
             head: { operationId: 'dataset_items_head', summary: 'Get dataset items headers' },
         },
         '/v2/actor-runs/{runId}/dataset': {
@@ -71,12 +78,50 @@ export const API_SPEC_FIXTURE = {
                 ],
             },
         },
+        '/v2/actor-runs/{runId}/log': {
+            get: {
+                operationId: 'actorRun_log_get',
+                summary: 'Get log',
+                tags: ['Logs'],
+                parameters: [
+                    { name: 'runId', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'stream', in: 'query', schema: { type: 'boolean' } },
+                ],
+            },
+        },
+        '/v2/actor-runs/{runId}/metamorph': {
+            post: {
+                operationId: 'actorRun_metamorph_post',
+                summary: 'Metamorph run',
+                tags: ['Actor runs'],
+                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
+            },
+        },
+        '/v2/actor-runs/{runId}/charge': {
+            post: {
+                operationId: 'PostChargeRun',
+                summary: 'Charge events in run',
+                tags: ['Actor runs'],
+                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
+            },
+        },
         '/v2/actor-runs/{runId}/abort': {
             post: {
                 operationId: 'actorRun_abort_post',
                 summary: 'Abort run',
                 tags: ['Actor runs'],
                 parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
+            },
+        },
+        '/v2/actors': {
+            post: {
+                operationId: 'actors_post',
+                summary: 'Create Actor',
+                tags: ['Actors'],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateActorRequest' } } },
+                },
             },
         },
         '/v2/actors/{actorId}': {
@@ -104,6 +149,14 @@ export const API_SPEC_FIXTURE = {
                 summary: 'Run Actor synchronously without input',
                 tags: ['Actors/Actor runs'],
                 parameters: [{ $ref: '#/components/parameters/actorId' }],
+            },
+        },
+        '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items': {
+            get: {
+                operationId: 'actorTask_runSyncGetDatasetItems_get',
+                summary: 'Run task synchronously and get dataset items',
+                tags: ['Actor tasks'],
+                parameters: [{ name: 'actorTaskId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
         '/v2/key-value-stores/{storeId}/records/{recordKey}': {
@@ -168,6 +221,11 @@ export const API_SPEC_FIXTURE = {
                     generalAccess: { type: 'string' },
                     example: { type: 'string', description: 'A property that happens to be named example.' },
                 },
+            },
+            // Like the published spec, it does not declare pricingInfos or actorPermissionLevel.
+            CreateActorRequest: {
+                type: 'object',
+                properties: { name: { type: 'string' }, isPublic: { type: 'boolean' } },
             },
             UpdateActorRequest: {
                 allOf: [{ $ref: '#/components/schemas/ActorPermissionFields' }],
