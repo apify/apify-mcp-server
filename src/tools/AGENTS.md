@@ -36,6 +36,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     operation, and call a GET operation. `apify_api_spec.ts` builds the operation index from the spec
     (cached for an hour) and decides each operation's access: read, write, or unavailable with a reason.
     `apify_api_request.ts` fills in the path, checks the query, and sends one request with no retries.
+    The call tools log their arguments through `redactApiCallArgs` (`redactArgs`): only the declared
+    keys, with the body and the `token`, `signature`, and `webhooks` query values redacted.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).

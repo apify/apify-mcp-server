@@ -16,7 +16,7 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(19);
+        expect(index.size).toBe(23);
     });
 
     it('resolves parameter references and keeps only path and query parameters', () => {
@@ -57,13 +57,16 @@ describe('buildApiOperationIndex()', () => {
         ['users_me_limits_put', 'spending limits'],
         ['PostChargeRun', 'Only the Actor itself charges'],
         ['actorRun_metamorph_post', 'cannot be undone'],
+        ['actor_runs_last_metamorph_post', 'cannot be undone'],
+        ['actorTask_runs_last_metamorph_post', 'cannot be undone'],
+        ['actor_runSyncGetDatasetItems_post', 'waits up to 300 seconds'],
     ])('makes %s unavailable with the reason', (operationId, reason) => {
         const operation = index.get(operationId);
         expect(operation?.access).toBe(API_ACCESS.UNAVAILABLE);
         expect(operation?.unavailableReason).toContain(reason);
     });
 
-    it('refuses publishing, pricing, permission and sharing fields only where the body schema declares them', () => {
+    it('refuses publishing, pricing, permission, and sharing fields only where the body schema declares them', () => {
         expect(index.get('actor_put')?.refusedBodyFields).toEqual(['isPublic', 'pricingInfos', 'actorPermissionLevel']);
         expect(index.get('dataset_put')?.refusedBodyFields).toEqual(['generalAccess']);
         // The API takes these on create, although the create schema does not declare them.
@@ -106,8 +109,19 @@ describe('searchApiOperations()', () => {
 
     it("counts a verb for the operation's method, but not on its own", () => {
         expect(searchIds('rename dataset')[0]).toBe('dataset_put');
-        expect(searchIds('add items to a dataset')[0]).toBe('dataset_items_post');
         expect(searchIds('rename')).toEqual([]);
+    });
+
+    it("ranks a storage's own operation above a run's copy of it and above an unavailable one", () => {
+        // Both competitors name the dataset in their summary; the storage's own operation does not.
+        const ids = searchIds('add items to a dataset');
+        expect(ids[0]).toBe('dataset_items_post');
+        expect(ids.indexOf('actor_runs_last_dataset_items_post')).toBeGreaterThan(0);
+        expect(ids.indexOf('actor_runSyncGetDatasetItems_post')).toBeGreaterThan(0);
+    });
+
+    it("keeps a run's copy first when the query is about runs", () => {
+        expect(searchIds("store items in last run's dataset")[0]).toBe('actor_runs_last_dataset_items_post');
     });
 
     it('caps the results at the limit', () => {

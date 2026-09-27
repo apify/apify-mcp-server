@@ -1,6 +1,6 @@
 /**
  * A small OpenAPI document shaped like https://docs.apify.com/api/openapi.json: `$ref` parameters and
- * bodies, examples and `x-*` extensions, and one operation of each kind the API tools treat differently.
+ * bodies, examples, and `x-*` extensions, and one operation of each kind the API tools treat differently.
  */
 export const API_SPEC_FIXTURE = {
     openapi: '3.1.2',
@@ -133,6 +133,42 @@ export const API_SPEC_FIXTURE = {
                 requestBody: {
                     content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateActorRequest' } } },
                 },
+            },
+        },
+        // A run's copy of the dataset operation, and a synchronous run, both of which name the dataset
+        // in their summary: search must still rank the storage's own operation first.
+        '/v2/actors/{actorId}/runs/last/dataset/items': {
+            post: {
+                operationId: 'actor_runs_last_dataset_items_post',
+                summary: "Store items in last run's dataset",
+                tags: ["Last Actor run's default dataset"],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
+                requestBody: { required: true, content: { 'application/json': { schema: { type: 'array' } } } },
+            },
+        },
+        '/v2/actors/{actorId}/run-sync-get-dataset-items': {
+            post: {
+                operationId: 'actor_runSyncGetDatasetItems_post',
+                summary: 'Run Actor synchronously and get dataset items',
+                tags: ['Actors/Actor runs'],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
+                requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
+            },
+        },
+        '/v2/actors/{actorId}/runs/last/metamorph': {
+            post: {
+                operationId: 'actor_runs_last_metamorph_post',
+                summary: "Metamorph Actor's last run",
+                tags: ["Last Actor run's metamorph"],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
+            },
+        },
+        '/v2/actor-tasks/{actorTaskId}/runs/last/metamorph': {
+            post: {
+                operationId: 'actorTask_runs_last_metamorph_post',
+                summary: "Metamorph Actor task's last run",
+                tags: ["Last Actor task run's metamorph"],
+                parameters: [{ name: 'actorTaskId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
         '/v2/actors/{actorId}/runs/{runId}': {

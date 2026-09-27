@@ -94,6 +94,19 @@ describe('prepareToolCallContext — no provider', () => {
         expect(result.toolArgsWithoutPayment).toEqual(args);
     });
 
+    it("applies the tool's redactArgs to logSafeArgs", () => {
+        const args = { actor: 'apify/rag-web-browser', secret: 'hide-me' };
+        const tool = {
+            ...makeTool(false),
+            redactArgs: (toolArgs: Record<string, unknown>) => ({ ...toolArgs, secret: '[REDACTED]' }),
+        };
+        const result = prepareToolCallContext({ provider: undefined, tool, args, apifyToken: MOCK_APIFY_TOKEN });
+
+        expect(result.toolArgsRedacted).toEqual({ actor: 'apify/rag-web-browser', secret: '[REDACTED]' });
+        // The tool still gets the real value.
+        expect(result.toolArgsWithoutPayment).toEqual({ actor: 'apify/rag-web-browser', secret: 'hide-me' });
+    });
+
     it('AJV mutation of toolArgs does not affect logSafeArgs', () => {
         const args = { actor: 'apify/rag-web-browser', unknownExtra: 'should-be-stripped' };
         const result = prepareToolCallContext({

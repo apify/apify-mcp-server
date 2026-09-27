@@ -1,11 +1,11 @@
 import { ApifyApiError } from 'apify-client';
-import { AxiosError, AxiosHeaders } from 'axios';
+import { AxiosError, AxiosHeaders, CanceledError } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
 import { apifyApiRead } from '../../src/tools/api/apify_api_read.js';
-import { buildRequestPath, validateQueryParams } from '../../src/tools/api/apify_api_request.js';
+import { buildRequestPath, redactApiCallArgs, validateQueryParams } from '../../src/tools/api/apify_api_request.js';
 import { apifyApiSearch } from '../../src/tools/api/apify_api_search.js';
 import type * as ApifyApiSpecModule from '../../src/tools/api/apify_api_spec.js';
 import { buildApiOperationIndex } from '../../src/tools/api/apify_api_spec.js';
@@ -150,7 +150,7 @@ describe('apify-api-search', () => {
 });
 
 describe('apify-api-details', () => {
-    it('returns the parameters, body schema and refused fields', async () => {
+    it('returns the parameters, body schema, and refused fields', async () => {
         const result = await callTool(apifyApiDetails, { operationId: 'actor_put' });
 
         expectSchemaConformingStructuredContent(result, apifyApiDetailsOutputSchema);
@@ -283,6 +283,19 @@ describe('apify-api-read', () => {
         expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain('secret-token');
     });
 
+    it('returns the empty response for a cancelled call instead of throwing it as a tool error', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        requestMock.mockRejectedValue(new CanceledError());
+        const context = stubToolCallContext(
+            { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } },
+            stubClient,
+        );
+        context.signal = controller.signal;
+
+        await expect((apifyApiRead as HelperTool).call(context)).resolves.toEqual({});
+    });
+
     it('describes a binary body instead of returning it', async () => {
         requestMock.mockResolvedValue(mockResponse(200, Buffer.from([1, 2, 3]), 'application/zip'));
 
@@ -293,5 +306,33 @@ describe('apify-api-read', () => {
         expect(result.content[1].text).toBe(
             'GET /v2/datasets/abc returned HTTP 200 with a binary body (application/zip, 3 bytes), which is not shown.',
         );
+    });
+
+    it('logs a storage signature, webhooks, or an undeclared token only as redacted', () => {
+        const args = {
+            operationId: 'dataset_items_get',
+            pathParams: { datasetId: 'abc' },
+            query: { format: 'json', signature: 'sig-secret', webhooks: 'W3t9XQ==', token: 'token-secret' },
+        };
+
+        expect((apifyApiRead as HelperTool).redactArgs).toBe(redactApiCallArgs);
+        expect(redactApiCallArgs(args)).toEqual({
+            operationId: 'dataset_items_get',
+            pathParams: { datasetId: 'abc' },
+            query: { format: 'json', signature: '[REDACTED]', webhooks: '[REDACTED]', token: '[REDACTED]' },
+        });
+        // The tool itself still gets the real values.
+        expect(args.query.signature).toBe('sig-secret');
+    });
+
+    it('logs only the declared arguments and a body only as redacted', () => {
+        const logged = redactApiCallArgs({ operationId: 'dataset_get', body: { value: 'secret' }, extra: 'secret' });
+
+        expect(logged).toEqual({
+            operationId: 'dataset_get',
+            pathParams: undefined,
+            query: undefined,
+            body: '[REDACTED]',
+        });
     });
 });
