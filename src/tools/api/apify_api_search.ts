@@ -32,6 +32,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         hasTool(HELPER_TOOLS.API_DETAILS) && `get its parameters with ${HELPER_TOOLS.API_DETAILS}`,
         callTools.length > 0 && `call it with ${callTools.join(' or ')}`,
     ].filter(Boolean);
+    const renameExample = hasTool(HELPER_TOOLS.API_WRITE) ? '\n- user_input: Rename my dataset to leads-2026' : '';
     const nextStepsSentence = nextSteps.length > 0 ? `\nAfter finding an operation, ${nextSteps.join(', then ')}.` : '';
     return dedent`
         Search the Apify API reference for operations by keywords. Returns each operation's ID, method,
@@ -43,7 +44,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         - Tell the user the reason when the operation they need is unavailable.
 
         USAGE EXAMPLES:
-        - user_input: List the webhooks on my account
+        - user_input: List the webhooks on my account${renameExample}
         - user_input: How much of my monthly usage have I spent?
     `;
 }

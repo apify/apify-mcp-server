@@ -16,7 +16,7 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(19);
+        expect(index.size).toBe(20);
     });
 
     it('resolves parameter references and keeps only path and query parameters', () => {

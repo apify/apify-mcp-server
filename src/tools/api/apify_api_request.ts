@@ -1,5 +1,6 @@
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
+import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
@@ -128,7 +129,20 @@ export function validateQueryParams(
     // Same cap as the run and build tools: MCP clients stop waiting for a tool call after 60 seconds.
     // The API reads the value with parseInt, so "60s" waits 60 seconds.
     if (query.waitForFinish !== undefined && Number.parseInt(String(query.waitForFinish), 10) > WAIT_SECS_MAX) {
-        return `waitForFinish can be at most ${WAIT_SECS_MAX} seconds. Call the operation again to keep waiting.`;
+        // Calling a run or build POST again starts another paid run or build.
+        const next =
+            operation.method === 'GET'
+                ? 'Call the operation again to keep waiting.'
+                : "To keep waiting after that, call the run's or build's GET operation with waitForFinish; " +
+                  'calling this operation again starts another one.';
+        return `waitForFinish can be at most ${WAIT_SECS_MAX} seconds. ${next}`;
+    }
+    // It sets the run's permission level, like the refused actorPermissionLevel body field.
+    if (query.forcePermissionLevel !== undefined) {
+        return (
+            'The API tools do not set forcePermissionLevel, whatever the value: permission changes need a ' +
+            'dedicated tool or Apify Console. Remove the parameter and call again.'
+        );
     }
     // The log operations' stream keeps the request open while the run or build is running.
     if (query.stream !== undefined && TRUE_QUERY_VALUES.has(String(query.stream).toLowerCase())) {
@@ -148,6 +162,13 @@ export function validateRequestBody(operation: ApiOperation, body: unknown): str
     if (body === undefined) {
         return operation.requestBody.isRequired ? `${operation.operationId} needs a request body.` : undefined;
     }
+    // A JSON-encoded string would reach the API as a string, not as the object, and skip the checks below.
+    if (typeof body === 'string' || body === null) {
+        return (
+            `Pass the body of ${operation.operationId} as a JSON object or array, not as ` +
+            `${body === null ? 'null' : 'a string'}.`
+        );
+    }
     if (!isRecord(body)) return undefined;
     const refusedFields = operation.refusedBodyFields.filter((field) => field in body);
     if (refusedFields.length > 0) {
@@ -165,6 +186,13 @@ function formatOversizeMessage(operation: ApiOperation, path: string): string {
             ? 'Narrow the request, for example with the limit, offset, or fields query parameters if the operation declares them.'
             : 'The request itself was sent; check its effect with an operation with read access.';
     return `The response of ${operation.method} ${path} is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned. ${next}`;
+}
+
+/** The status of a response axios aborted mid-body; Node's request object keeps the response it got. */
+function readAbortedResponseStatus(error: unknown): number | undefined {
+    const request: unknown = isAxiosError(error) ? error.request : undefined;
+    const statusCode = isRecord(request) && isRecord(request.res) ? request.res.statusCode : undefined;
+    return typeof statusCode === 'number' ? statusCode : undefined;
 }
 
 /**
@@ -207,12 +235,34 @@ export async function callApiOperation(params: {
             url: `${client.baseUrl}${path.slice('/v2'.length)}`,
             method: operation.method,
             params: params.query,
-            data: params.body,
+            // Serialized here: axios would send a string as a form and refuse a number. With only the JSON
+            // header, a JSON-looking string would reach the API as the object it holds.
+            ...(params.body !== undefined && {
+                data: JSON.stringify(params.body),
+                headers: { 'Content-Type': 'application/json' },
+            }),
             maxContentLength: MAX_INLINE_BYTES,
             signal: params.signal,
         });
     } catch (error) {
-        if (isMaxContentLengthAbort(error)) return respondUserError(formatOversizeMessage(operation, path));
+        if (isMaxContentLengthAbort(error)) {
+            // A write has applied by the time its response arrives, so a large response is not a failure.
+            const statusCode = readAbortedResponseStatus(error);
+            if (operation.method !== 'GET' && statusCode !== undefined && statusCode < 300) {
+                const structuredContent = {
+                    operationId: operation.operationId,
+                    method: operation.method,
+                    path,
+                    statusCode,
+                    data: null,
+                };
+                const summary =
+                    `${operation.method} ${path} returned HTTP ${statusCode}. The response is larger than ` +
+                    `${MAX_INLINE_BYTES} bytes, so it is not returned; check the result with an operation with read access.`;
+                return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
+            }
+            return respondUserError(formatOversizeMessage(operation, path));
+        }
         throw toPlainRequestError(error);
     }
     if (response.status >= 300) throw new ApifyApiError(response, 1);

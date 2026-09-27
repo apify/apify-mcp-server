@@ -2,6 +2,7 @@ import { ApifyApiError } from 'apify-client';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
 import { apifyApiRead } from '../../src/tools/api/apify_api_read.js';
@@ -308,7 +309,9 @@ describe('apify-api-read', () => {
 });
 
 describe('apify-api-write', () => {
-    it('sends one request with the JSON body and returns the response', async () => {
+    const REQUEST_BASE = { params: undefined, maxContentLength: MAX_INLINE_BYTES, signal: expect.any(AbortSignal) };
+
+    it('sends one request with the body serialized as JSON and returns the response', async () => {
         const body = { data: { id: 'abc', name: 'leads-2026' } };
         requestMock.mockResolvedValue(mockResponse(200, body));
 
@@ -320,12 +323,11 @@ describe('apify-api-write', () => {
 
         expect(requestMock).toHaveBeenCalledTimes(1);
         expect(requestMock).toHaveBeenCalledWith({
+            ...REQUEST_BASE,
             url: `${BASE_URL}/datasets/abc`,
             method: 'PUT',
-            params: undefined,
-            data: { name: 'leads-2026' },
-            maxContentLength: MAX_INLINE_BYTES,
-            signal: expect.any(AbortSignal),
+            data: '{"name":"leads-2026"}',
+            headers: { 'Content-Type': 'application/json' },
         });
         expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
         expect(result.structuredContent).toMatchObject({ method: 'PUT', path: '/v2/datasets/abc', data: body });
@@ -336,17 +338,65 @@ describe('apify-api-write', () => {
 
         await callTool(apifyApiWrite, { operationId: 'actorRun_abort_post', pathParams: { runId: 'run-1' } });
 
-        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', data: undefined }));
+        expect(requestMock).toHaveBeenCalledWith({
+            ...REQUEST_BASE,
+            url: `${BASE_URL}/actor-runs/run-1/abort`,
+            method: 'POST',
+        });
+    });
+
+    it('sends the body as application/json through the real apify-client axios instance', async () => {
+        const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com' });
+        const sent: { data?: unknown; contentType?: unknown }[] = [];
+        client.httpClient.axios.defaults.adapter = async (config) => {
+            sent.push({ data: config.data, contentType: config.headers.get('Content-Type') });
+            return {
+                status: 201,
+                statusText: 'Created',
+                headers: { 'content-type': 'application/json' },
+                data: Buffer.from('{"data":{}}'),
+                config,
+                request: {},
+            };
+        };
+        const call = async (body: unknown) => {
+            const context = stubToolCallContext(
+                { operationId: 'keyValueStore_record_put', pathParams: { storeId: 's', recordKey: 'K' }, body },
+                client,
+            );
+            return (await (apifyApiWrite as HelperTool).call(context)) as TextToolResult;
+        };
+
+        const results = [await call({ name: 'x' }), await call(42), await call([1, 2])];
+
+        expect(results.map((result) => result.structuredContent)).toEqual(
+            Array(3).fill(expect.objectContaining({ statusCode: 201, data: { data: {} } })),
+        );
+        expect(sent).toEqual([
+            { data: '{"name":"x"}', contentType: 'application/json' },
+            { data: '42', contentType: 'application/json' },
+            { data: '[1,2]', contentType: 'application/json' },
+        ]);
     });
 
     it.each([
         [{ operationId: 'dataset_delete', pathParams: { datasetId: 'abc' } }, 'Deletion cannot be undone'],
         [{ operationId: 'users_me_limits_put', body: {} }, 'spending limits'],
+        [{ operationId: 'actorRun_metamorph_post', pathParams: { runId: 'run-1' } }, 'cannot be undone'],
         [
             { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } },
             `dataset_get is a GET operation with read access; this tool has write access. Call it with ${HELPER_TOOLS.API_READ}.`,
         ],
         [{ operationId: 'dataset_put', pathParams: { datasetId: 'abc' } }, 'dataset_put needs a request body.'],
+        [
+            { operationId: 'dataset_put', pathParams: { datasetId: 'abc' }, body: null },
+            'Pass the body of dataset_put as a JSON object or array, not as null.',
+        ],
+        [
+            // A JSON-encoded string would otherwise get past the refused-field check.
+            { operationId: 'actor_put', pathParams: { actorId: 'john~my-actor' }, body: '{"isPublic":true}' },
+            'Pass the body of actor_put as a JSON object or array, not as a string.',
+        ],
         [
             { operationId: 'actorRun_abort_post', pathParams: { runId: 'run-1' }, body: { gracefully: true } },
             'actorRun_abort_post takes no request body.',
@@ -360,12 +410,28 @@ describe('apify-api-write', () => {
             'The API tools do not set isPublic, whatever the value',
         ],
         [
+            { operationId: 'actors_post', body: { name: 'x', actorPermissionLevel: 'FULL_PERMISSIONS' } },
+            'The API tools do not set actorPermissionLevel, whatever the value',
+        ],
+        [
             {
                 operationId: 'dataset_put',
                 pathParams: { datasetId: 'abc' },
                 body: { generalAccess: 'ANYONE_WITH_ID_CAN_READ' },
             },
             'The API tools do not set generalAccess',
+        ],
+        [
+            {
+                operationId: 'actors_runs_post',
+                pathParams: { actorId: 'john~my-actor' },
+                query: { forcePermissionLevel: 'FULL_PERMISSIONS' },
+            },
+            'The API tools do not set forcePermissionLevel, whatever the value',
+        ],
+        [
+            { operationId: 'actors_runs_post', pathParams: { actorId: 'john~my-actor' }, query: { waitForFinish: 60 } },
+            "call the run's or build's GET operation with waitForFinish; calling this operation again starts another one.",
         ],
     ])('refuses %j without a request', async (args, reason) => {
         const result = await callTool(apifyApiWrite, args);
@@ -384,11 +450,43 @@ describe('apify-api-write', () => {
             body: { isPublic: true },
         });
 
-        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ data: { isPublic: true } }));
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ data: '{"isPublic":true}' }));
         expect(result.structuredContent).toMatchObject({ statusCode: 201, data: null });
     });
 
-    it('says the request was sent when the response is over the inline limit', async () => {
+    it('reports a write whose response is over the inline limit as done, not failed', async () => {
+        const request = { res: { statusCode: 200 } };
+        requestMock.mockRejectedValue(
+            new AxiosError(
+                `maxContentLength size of ${MAX_INLINE_BYTES} exceeded`,
+                'ERR_BAD_RESPONSE',
+                undefined,
+                request,
+            ),
+        );
+
+        const result = await callTool(apifyApiWrite, {
+            operationId: 'dataset_put',
+            pathParams: { datasetId: 'abc' },
+            body: { name: 'leads-2026' },
+        });
+
+        expect(result.isError).toBe(false);
+        expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
+        expect(result.structuredContent).toEqual({
+            operationId: 'dataset_put',
+            method: 'PUT',
+            path: '/v2/datasets/abc',
+            statusCode: 200,
+            data: null,
+        });
+        expect(result.content[1].text).toBe(
+            `PUT /v2/datasets/abc returned HTTP 200. The response is larger than ${MAX_INLINE_BYTES} bytes, so ` +
+                'it is not returned; check the result with an operation with read access.',
+        );
+    });
+
+    it('says the request was sent when an oversize response has no status', async () => {
         requestMock.mockRejectedValue(
             new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE'),
         );
@@ -408,14 +506,29 @@ describe('apify-api-write', () => {
         it('redacts the body in the logged copy without changing the arguments', () => {
             const args = { operationId: 'actor_version_envVar_put', body: { value: 'secret' } };
 
-            expect(redactArgs?.(args)).toEqual({ operationId: 'actor_version_envVar_put', body: '[REDACTED]' });
+            expect(redactArgs?.(args)).toMatchObject({ operationId: 'actor_version_envVar_put', body: '[REDACTED]' });
             expect(args.body).toEqual({ value: 'secret' });
         });
 
-        it('leaves arguments without a body as they are', () => {
-            const args = { operationId: 'actorRun_abort_post' };
+        it('logs only the declared arguments, so a body under another key is left out', () => {
+            const args = { operationId: 'actor_version_envVar_put', requestBody: { value: 'secret' } };
 
-            expect(redactArgs?.(args)).toBe(args);
+            expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
+        });
+
+        it('redacts the webhooks query parameter, whose webhooks carry headers', () => {
+            const args = {
+                operationId: 'actors_runs_post',
+                pathParams: { actorId: 'john~my-actor' },
+                query: { memory: 1024, webhooks: 'W3siaGVhZGVyc1RlbXBsYXRlIjoic2VjcmV0In1d' },
+            };
+
+            expect(redactArgs?.(args)).toEqual({
+                operationId: 'actors_runs_post',
+                pathParams: { actorId: 'john~my-actor' },
+                query: { memory: 1024, webhooks: '[REDACTED]' },
+            });
+            expect(args.query.webhooks).not.toBe('[REDACTED]');
         });
     });
 });

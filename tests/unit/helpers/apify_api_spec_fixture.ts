@@ -135,6 +135,20 @@ export const API_SPEC_FIXTURE = {
                 },
             },
         },
+        '/v2/actors/{actorId}/runs': {
+            post: {
+                operationId: 'actors_runs_post',
+                summary: 'Run Actor',
+                tags: ['Actors/Actor runs'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'waitForFinish', in: 'query', schema: { type: 'number' } },
+                    { name: 'webhooks', in: 'query', schema: { type: 'string' } },
+                    { name: 'forcePermissionLevel', in: 'query', schema: { type: 'string' } },
+                ],
+                requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
+            },
+        },
         '/v2/actors/{actorId}/runs/{runId}': {
             get: {
                 operationId: 'actors_run_get',
