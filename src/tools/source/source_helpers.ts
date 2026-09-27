@@ -10,12 +10,10 @@ import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { ABORT } from '../actors/actor_run_response.js';
 import { listVersionNumbers, startBuild } from '../builds/build_helpers.js';
-import { ABSOLUTE_NAME_REGEX } from './source_archive.js';
-import type { SourceFile } from './source_files.js';
 import {
+    ABSOLUTE_NAME_REGEX,
     buildInlineSourceFile,
     BYTES_PER_MIB,
-    compareSourcePaths,
     formatMib,
     hasBinaryExtension,
     MAX_SOURCE_PATH_LENGTH,
@@ -160,11 +158,6 @@ export function resolveVersionNumber(
         throw new UserInputError(`Specify versionNumber; this Actor has versions: ${versions.join(', ')}.`);
     }
     return requestedVersionNumber ?? versionNumbers[0];
-}
-
-/** Console keeps an empty folder as a `{ name, folder: true }` entry with no content; apify-client's type leaves it out. */
-export function isFolderEntry(file: ActorVersionSourceFile): boolean {
-    return (file as { folder?: boolean }).folder === true;
 }
 
 /**
@@ -312,17 +305,6 @@ export function buildSentFilesWarnings(entries: readonly ActorVersionSourceFile[
     return [formatMissingDockerfileWarning(entries), formatEmptyFilesWarning(emptyPaths)].filter(
         (warning): warning is string => warning !== undefined,
     );
-}
-
-/** One file per path, the last stored entry winning as in get-actor-version, sorted by path; folder entries are left out. */
-export function buildFilesManifest(entries: readonly ActorVersionSourceFile[]): SourceFile[] {
-    const filesByPath = new Map<string, SourceFile>();
-    for (const entry of entries) {
-        if (isFolderEntry(entry)) continue;
-        const file = buildInlineSourceFile(entry);
-        filesByPath.set(file.path, file);
-    }
-    return [...filesByPath.values()].sort((a, b) => compareSourcePaths(a.path, b.path));
 }
 
 /** Whether `.actor/actor.json` names a Dockerfile; a file that is not valid JSON names none. */

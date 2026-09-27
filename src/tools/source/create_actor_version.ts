@@ -20,11 +20,10 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondAborted } from '../../utils/mcp.js';
 import { buildNextStepForBuild, listVersionNumbers, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
 import { createActorVersionToolOutputSchema } from '../structured_output_schemas.js';
-import { buildFilesRevision, buildUrlRevision } from './source_files.js';
+import { buildFilesManifest, buildFilesRevision, buildUrlRevision } from './source_files.js';
 import type { BuildAfterWriteResult } from './source_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
-    buildFilesManifest,
     buildSentFilesWarnings,
     formatBuildLaterHint,
     formatBuildStartFailure,
