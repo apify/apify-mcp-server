@@ -76,7 +76,7 @@ export const HELPER_TOOLS = {
     API_SEARCH: 'apify-api-search',
     API_DETAILS: 'apify-api-details',
     API_READ: 'apify-api-read',
-    API_WRITE: 'write-apify-api',
+    API_WRITE: 'apify-api-write',
     PROBLEM_REPORT: 'report-problem',
 } as const;
 export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];

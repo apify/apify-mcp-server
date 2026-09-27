@@ -17,7 +17,7 @@ import {
 } from './apify_api_request.js';
 import { API_ACCESS, fetchApiOperationIndex } from './apify_api_spec.js';
 
-const writeApifyApiArgs = z.object({
+const apifyApiWriteArgs = z.object({
     ...apiCallArgsShape,
     body: z
         .unknown()
@@ -50,15 +50,15 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 /**
  * Calls one POST or PUT operation of the published Apify API spec, https://docs.apify.com/api/v2.
  */
-export const writeApifyApi: ToolEntry = Object.freeze({
+export const apifyApiWrite: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.API_WRITE,
     title: 'Write Apify API',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: z.toJSONSchema(writeApifyApiArgs) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(apifyApiWriteArgs) as ToolInputSchema,
     outputSchema: apifyApiCallOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(writeApifyApiArgs)),
+    ajvValidate: compileSchema(z.toJSONSchema(apifyApiWriteArgs)),
     annotations: {
         title: 'Write Apify API',
         readOnlyHint: false,
@@ -69,7 +69,7 @@ export const writeApifyApi: ToolEntry = Object.freeze({
     // A body can carry secrets: environment variable values, webhook headers, stored records.
     redactArgs: (args: Record<string, unknown>) => ('body' in args ? { ...args, body: '[REDACTED]' } : args),
     call: async (toolArgs: InternalToolArgs) => {
-        const parsed = writeApifyApiArgs.parse(toolArgs.args);
+        const parsed = apifyApiWriteArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
         const resolved = resolveOperationToCall({
             index,

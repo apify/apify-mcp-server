@@ -297,7 +297,7 @@ Legend for the **Enabled by default** column:
 | `apify-api-search` | api | Search the Apify API reference for operations by keywords. |  |
 | `apify-api-details` | api | Get an Apify API operation's parameters and request body schema. |  |
 | `apify-api-read` | api | Call a read-only (GET) Apify API operation by its operation ID. |  |
-| `write-apify-api` | api | Call a POST or PUT Apify API operation by its operation ID. Deletions, publishing, and pricing changes are refused. |  |
+| `apify-api-write` | api | Call a POST or PUT Apify API operation by its operation ID. Deletions, publishing, and pricing changes are refused. |  |
 
 > **Note:**
 >

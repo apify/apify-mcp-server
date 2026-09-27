@@ -960,7 +960,7 @@ export const apifyApiDetailsOutputSchema = {
 };
 
 /**
- * Schema for the response of an API call (apify-api-read, write-apify-api).
+ * Schema for the response of an API call (apify-api-read, apify-api-write).
  */
 export const apifyApiCallOutputSchema = {
     type: 'object' as const,

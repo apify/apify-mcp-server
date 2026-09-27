@@ -9,7 +9,7 @@ import { buildRequestPath, validateQueryParams } from '../../src/tools/api/apify
 import { apifyApiSearch } from '../../src/tools/api/apify_api_search.js';
 import type * as ApifyApiSpecModule from '../../src/tools/api/apify_api_spec.js';
 import { buildApiOperationIndex } from '../../src/tools/api/apify_api_spec.js';
-import { writeApifyApi } from '../../src/tools/api/write_apify_api.js';
+import { apifyApiWrite } from '../../src/tools/api/apify_api_write.js';
 import {
     apifyApiCallOutputSchema,
     apifyApiDetailsOutputSchema,
@@ -307,12 +307,12 @@ describe('apify-api-read', () => {
     });
 });
 
-describe('write-apify-api', () => {
+describe('apify-api-write', () => {
     it('sends one request with the JSON body and returns the response', async () => {
         const body = { data: { id: 'abc', name: 'leads-2026' } };
         requestMock.mockResolvedValue(mockResponse(200, body));
 
-        const result = await callTool(writeApifyApi, {
+        const result = await callTool(apifyApiWrite, {
             operationId: 'dataset_put',
             pathParams: { datasetId: 'abc' },
             body: { name: 'leads-2026' },
@@ -334,7 +334,7 @@ describe('write-apify-api', () => {
     it('sends an operation without a body when none is given', async () => {
         requestMock.mockResolvedValue(mockResponse(200, { data: { id: 'run-1', status: 'ABORTING' } }));
 
-        await callTool(writeApifyApi, { operationId: 'actorRun_abort_post', pathParams: { runId: 'run-1' } });
+        await callTool(apifyApiWrite, { operationId: 'actorRun_abort_post', pathParams: { runId: 'run-1' } });
 
         expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', data: undefined }));
     });
@@ -368,7 +368,7 @@ describe('write-apify-api', () => {
             'The API tools do not set generalAccess',
         ],
     ])('refuses %j without a request', async (args, reason) => {
-        const result = await callTool(writeApifyApi, args);
+        const result = await callTool(apifyApiWrite, args);
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain(reason);
@@ -378,7 +378,7 @@ describe('write-apify-api', () => {
     it('sends a refused field name when the body is free-form, such as a stored record', async () => {
         requestMock.mockResolvedValue(mockResponse(201, undefined, ''));
 
-        const result = await callTool(writeApifyApi, {
+        const result = await callTool(apifyApiWrite, {
             operationId: 'keyValueStore_record_put',
             pathParams: { storeId: 'store-1', recordKey: 'CONFIG' },
             body: { isPublic: true },
@@ -393,7 +393,7 @@ describe('write-apify-api', () => {
             new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE'),
         );
 
-        const result = await callTool(writeApifyApi, {
+        const result = await callTool(apifyApiWrite, {
             operationId: 'dataset_put',
             pathParams: { datasetId: 'abc' },
             body: { name: 'leads-2026' },
@@ -403,7 +403,7 @@ describe('write-apify-api', () => {
     });
 
     describe('redactArgs()', () => {
-        const { redactArgs } = writeApifyApi as HelperTool;
+        const { redactArgs } = apifyApiWrite as HelperTool;
 
         it('redacts the body in the logged copy without changing the arguments', () => {
             const args = { operationId: 'actor_version_envVar_put', body: { value: 'secret' } };
