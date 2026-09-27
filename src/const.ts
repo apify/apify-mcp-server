@@ -73,9 +73,9 @@ export const HELPER_TOOLS = {
     STORE_SEARCH_WIDGET: 'search-actors-widget',
     DOCS_SEARCH: 'search-apify-docs',
     DOCS_FETCH: 'fetch-apify-docs',
-    API_SEARCH: 'search-apify-api',
-    API_OPERATION_FETCH: 'fetch-apify-api-operation',
-    API_READ: 'read-apify-api',
+    API_SEARCH: 'apify-api-search',
+    API_DETAILS: 'apify-api-details',
+    API_READ: 'apify-api-read',
     API_WRITE: 'write-apify-api',
     PROBLEM_REPORT: 'report-problem',
 } as const;

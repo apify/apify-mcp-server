@@ -26,8 +26,8 @@ const writeApifyApiArgs = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const getParameters = hasTool(HELPER_TOOLS.API_OPERATION_FETCH)
-        ? `\nGet the operation's parameters and body schema first with ${HELPER_TOOLS.API_OPERATION_FETCH}.`
+    const getParameters = hasTool(HELPER_TOOLS.API_DETAILS)
+        ? `\nGet the operation's parameters and body schema first with ${HELPER_TOOLS.API_DETAILS}.`
         : '';
     return dedent`
         Call one Apify API operation with write access (POST or PUT), by its operation ID. The server builds
@@ -71,7 +71,12 @@ export const writeApifyApi: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = writeApifyApiArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
-        const resolved = resolveOperationToCall(index, parsed.operationId, API_ACCESS.WRITE, toolArgs.loadedToolNames);
+        const resolved = resolveOperationToCall({
+            index,
+            operationId: parsed.operationId,
+            access: API_ACCESS.WRITE,
+            loadedToolNames: toolArgs.loadedToolNames,
+        });
         if ('error' in resolved) return respondUserError(resolved.error);
         const { operation } = resolved;
 
@@ -80,7 +85,10 @@ export const writeApifyApi: ToolEntry = Object.freeze({
         const inputError = validateQueryParams(operation, parsed.query) ?? validateRequestBody(operation, parsed.body);
         if (inputError) return respondUserError(inputError);
 
-        return callApiOperation(toolArgs.apifyClient, operation, request.path, {
+        return callApiOperation({
+            client: toolArgs.apifyClient,
+            operation,
+            path: request.path,
             query: parsed.query,
             body: parsed.body,
             signal: toolArgs.signal,

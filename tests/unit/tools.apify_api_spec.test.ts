@@ -16,7 +16,7 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(13);
+        expect(index.size).toBe(19);
     });
 
     it('resolves parameter references and keeps only path and query parameters', () => {
@@ -53,7 +53,10 @@ describe('buildApiOperationIndex()', () => {
     it.each([
         ['dataset_delete', 'Deletion cannot be undone'],
         ['actor_runSync_get', 'waits up to 300 seconds'],
+        ['actorTask_runSyncGetDatasetItems_get', 'waits up to 300 seconds'],
         ['users_me_limits_put', 'spending limits'],
+        ['PostChargeRun', 'Only the Actor itself charges'],
+        ['actorRun_metamorph_post', 'cannot be undone'],
     ])('makes %s unavailable with the reason', (operationId, reason) => {
         const operation = index.get(operationId);
         expect(operation?.access).toBe(API_ACCESS.UNAVAILABLE);
@@ -63,6 +66,12 @@ describe('buildApiOperationIndex()', () => {
     it('refuses publishing, pricing, permission and sharing fields only where the body schema declares them', () => {
         expect(index.get('actor_put')?.refusedBodyFields).toEqual(['isPublic', 'pricingInfos', 'actorPermissionLevel']);
         expect(index.get('dataset_put')?.refusedBodyFields).toEqual(['generalAccess']);
+        // The API takes these on create, although the create schema does not declare them.
+        expect(index.get('actors_post')?.refusedBodyFields).toEqual([
+            'isPublic',
+            'pricingInfos',
+            'actorPermissionLevel',
+        ]);
         // A record body is free-form: a record may hold an isPublic key as plain data.
         expect(index.get('keyValueStore_record_put')?.refusedBodyFields).toEqual([]);
     });
@@ -81,11 +90,24 @@ describe('searchApiOperations()', () => {
         expect(ids.slice(0, 2)).toEqual(['dataset_put', 'actorRun_dataset_put']);
     });
 
-    it('matches word forms either way and ignores stop words', () => {
-        const ids = searchApiOperations(index, 'list all of the webhooks', 10).map(
-            (operation) => operation.operationId,
-        );
-        expect(ids).toEqual(['webhooks_get', 'actor_webhooks_get']);
+    function searchIds(query: string): string[] {
+        return searchApiOperations(index, query, 10).map((operation) => operation.operationId);
+    }
+
+    it('matches word prefixes and ignores stop words', () => {
+        // Without the stop words, "with" would also match "Run Actor synchronously without input".
+        expect(searchIds('webhook with')).toEqual(['webhooks_get', 'actor_webhooks_get']);
+    });
+
+    it('matches a plural to its singular and drops one-letter terms', () => {
+        expect(searchIds('abort runs')[0]).toBe('actorRun_abort_post');
+        expect(searchIds("dataset's")).toEqual(searchIds('dataset'));
+    });
+
+    it("counts a verb for the operation's method, but not on its own", () => {
+        expect(searchIds('rename dataset')[0]).toBe('dataset_put');
+        expect(searchIds('add items to a dataset')[0]).toBe('dataset_items_post');
+        expect(searchIds('rename')).toEqual([]);
     });
 
     it('caps the results at the limit', () => {

@@ -889,7 +889,7 @@ const apiUnavailableReasonProperty = {
 };
 
 /**
- * Schema for the operations found by search-apify-api.
+ * Schema for the operations found by apify-api-search.
  */
 export const apifyApiSearchOutputSchema = {
     type: 'object' as const,
@@ -914,9 +914,9 @@ export const apifyApiSearchOutputSchema = {
 };
 
 /**
- * Schema for one operation's details (fetch-apify-api-operation).
+ * Schema for one operation's details (apify-api-details).
  */
-export const apifyApiOperationOutputSchema = {
+export const apifyApiDetailsOutputSchema = {
     type: 'object' as const,
     properties: {
         operationId: { type: 'string', description: 'Operation ID' },
@@ -960,7 +960,7 @@ export const apifyApiOperationOutputSchema = {
 };
 
 /**
- * Schema for the response of an API call (read-apify-api, write-apify-api).
+ * Schema for the response of an API call (apify-api-read, write-apify-api).
  */
 export const apifyApiCallOutputSchema = {
     type: 'object' as const,

@@ -47,7 +47,9 @@ const DELETE_REASON =
     'Deletion cannot be undone, so the API tools do not delete. The user can delete it in Apify Console.';
 const SYNC_RUN_REASON =
     'It waits up to 300 seconds for the run to finish, longer than MCP clients wait for a tool call. ' +
-    'Start the run with the asynchronous run operation instead.';
+    'Start the run with actors_runs_post or actorTask_runs_post instead.';
+const METAMORPH_REASON =
+    'It turns the run into a run of another Actor, which cannot be undone. Only the Actor itself metamorphs its run.';
 
 /** Synchronous run paths. Some are GET, but every one of them starts a paid run. */
 const SYNC_RUN_PATH_REGEX = /\/run-sync(-get-dataset-items)?$/;
@@ -56,6 +58,9 @@ const SYNC_RUN_PATH_REGEX = /\/run-sync(-get-dataset-items)?$/;
 const UNAVAILABLE_OPERATION_REASONS: ReadonlyMap<string, string> = new Map([
     ['users_me_limits_put', "It changes the account's spending limits. The user can change them in Apify Console."],
     ['PostChargeRun', 'It charges the user of a pay-per-event run. Only the Actor itself charges for its events.'],
+    ['actorRun_metamorph_post', METAMORPH_REASON],
+    ['actor_runs_last_metamorph_post', METAMORPH_REASON],
+    ['actorTask_runs_last_metamorph_post', METAMORPH_REASON],
 ]);
 
 /**
@@ -70,7 +75,12 @@ export const REFUSED_BODY_FIELDS: ReadonlySet<string> = new Set([
     'generalAccess',
 ]);
 
-/** Schema keywords that only cost context: examples and the docs' vendor extensions (`x-*`). */
+/** Refused fields the API accepts on an operation although its body schema does not declare them. */
+const UNDECLARED_REFUSED_BODY_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
+    ['actors_post', ['pricingInfos', 'actorPermissionLevel']],
+]);
+
+/** Schema keywords that only cost context. `x-*` vendor extensions are dropped by prefix in `dereference()`. */
 const DROPPED_SCHEMA_KEYS: ReadonlySet<string> = new Set(['example', 'examples']);
 
 const openApiOperationValidator = z.object({
@@ -207,6 +217,7 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
             const { operationId, summary, description, tags, parameters, requestBody } = parsed.data;
             const body = parseRequestBody(requestBody, spec);
             const declaredBodyFields = extractTopLevelPropertyNames(body?.schema);
+            const undeclaredRefusedFields = UNDECLARED_REFUSED_BODY_FIELDS.get(operationId) ?? [];
             index.set(operationId, {
                 operationId,
                 method,
@@ -216,7 +227,9 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
                 tags: tags ?? [],
                 parameters: parseParameters(parameters, spec),
                 ...(body && { requestBody: body }),
-                refusedBodyFields: [...REFUSED_BODY_FIELDS].filter((field) => declaredBodyFields.has(field)),
+                refusedBodyFields: [...REFUSED_BODY_FIELDS].filter(
+                    (field) => declaredBodyFields.has(field) || undeclaredRefusedFields.includes(field),
+                ),
                 ...resolveAccess(method, path, operationId),
             });
         }
@@ -274,30 +287,43 @@ function splitWords(text: string): string[] {
         .filter(Boolean);
 }
 
-/** A prefix match either way, so `runs` finds `run` and `env` finds `environment`. */
+/** Verbs for what each method does, so a verb the summary does not use, such as rename, still counts. */
+const METHOD_VERBS: Record<ApiMethod, readonly string[]> = {
+    GET: ['get', 'list', 'read'],
+    POST: ['add', 'create', 'push', 'start'],
+    PUT: ['update', 'set', 'rename', 'change'],
+    DELETE: ['delete', 'remove'],
+};
+
+/** A prefix match, or the plural of a word, so `env` finds `environment` and `runs` finds `run`. */
 function hasMatchingWord(term: string, words: string[]): boolean {
-    return words.some((word) => word.startsWith(term) || (word.length >= 3 && term.startsWith(word)));
+    return words.some((word) => word.startsWith(term) || term === `${word}s`);
 }
 
 /**
  * Operations matching the query's keywords, best first. A keyword scores 3 in the summary, else 2 in the
- * operation ID or path, else 1 in the tags. Ties go to the shorter path, so `/v2/datasets/{datasetId}`
- * comes before the same operation on a run's default dataset.
+ * operation ID or path, else 1 in the tags, else 2 when it is a verb for the operation's method. A verb
+ * alone does not match an operation. Ties go to the shorter path, so `/v2/datasets/{datasetId}` comes
+ * before the same operation on a run's default dataset.
  */
 export function searchApiOperations(index: Map<string, ApiOperation>, query: string, limit: number): ApiOperation[] {
-    const terms = [...new Set(splitWords(query))].filter((term) => !SEARCH_STOP_WORDS.has(term));
+    // One-letter terms, such as the s of "run's", match too many words.
+    const terms = [...new Set(splitWords(query))].filter((term) => term.length > 1 && !SEARCH_STOP_WORDS.has(term));
     const scored: { operation: ApiOperation; score: number }[] = [];
     for (const operation of index.values()) {
         const summaryWords = splitWords(operation.summary);
         const idWords = splitWords(`${operation.operationId} ${operation.path}`);
         const tagWords = splitWords(operation.tags.join(' '));
+        const verbs = METHOD_VERBS[operation.method];
         let score = 0;
+        let verbScore = 0;
         for (const term of terms) {
             if (hasMatchingWord(term, summaryWords)) score += 3;
             else if (hasMatchingWord(term, idWords)) score += 2;
             else if (hasMatchingWord(term, tagWords)) score += 1;
+            else if (verbs.includes(term)) verbScore += 2;
         }
-        if (score > 0) scored.push({ operation, score });
+        if (score > 0) scored.push({ operation, score: score + verbScore });
     }
     return scored
         .sort((a, b) => b.score - a.score || a.operation.path.length - b.operation.path.length)

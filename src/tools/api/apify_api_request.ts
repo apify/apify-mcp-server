@@ -32,27 +32,22 @@ export const apiCallArgsShape = {
         ),
 };
 
-export type ApiCallParams = {
-    query?: Record<string, string | number | boolean>;
-    /** JSON request body; only the write tool sends one. */
-    body?: unknown;
-    /** Aborts the request when the client cancels the tool call. */
-    signal?: AbortSignal;
-};
-
 /** The not-found text, naming the search tool only when the session has it. */
 export function formatOperationNotFoundMessage(operationId: string, loadedToolNames: readonly string[]): string {
-    const findIt = loadedToolNames.includes(HELPER_TOOLS.API_SEARCH) ? ` Find it with ${HELPER_TOOLS.API_SEARCH}.` : '';
-    return `API operation ${operationId} not found.${findIt}`;
+    const next = loadedToolNames.includes(HELPER_TOOLS.API_SEARCH)
+        ? `Find it with ${HELPER_TOOLS.API_SEARCH}.`
+        : 'Operation IDs are case-sensitive.';
+    return `API operation ${operationId} not found. ${next}`;
 }
 
 /** The operation a tool with the given access may call, or the reason it may not. */
-export function resolveOperationToCall(
-    index: Map<string, ApiOperation>,
-    operationId: string,
-    access: Exclude<ApiAccess, 'unavailable'>,
-    loadedToolNames: readonly string[],
-): { operation: ApiOperation } | { error: string } {
+export function resolveOperationToCall(params: {
+    index: Map<string, ApiOperation>;
+    operationId: string;
+    access: Exclude<ApiAccess, 'unavailable'>;
+    loadedToolNames: readonly string[];
+}): { operation: ApiOperation } | { error: string } {
+    const { index, operationId, access, loadedToolNames } = params;
     const operation = index.get(operationId);
     if (!operation) return { error: formatOperationNotFoundMessage(operationId, loadedToolNames) };
     if (operation.access === API_ACCESS.UNAVAILABLE) {
@@ -60,15 +55,29 @@ export function resolveOperationToCall(
     }
     if (operation.access !== access) {
         const otherTool = operation.access === API_ACCESS.READ ? HELPER_TOOLS.API_READ : HELPER_TOOLS.API_WRITE;
-        const callOther = loadedToolNames.includes(otherTool) ? ` Call it with ${otherTool}.` : '';
+        const next = loadedToolNames.includes(otherTool)
+            ? `Call it with ${otherTool}.`
+            : `No tool in this session has ${operation.access} access.`;
         return {
-            error: `${operationId} is a ${operation.method} operation with ${operation.access} access; this tool has ${access} access.${callOther}`,
+            error:
+                `${operationId} is a ${operation.method} operation with ${operation.access} access; this tool has ` +
+                `${access} access. ${next}`,
         };
     }
     return { operation };
 }
 
 const PATH_PARAMETER_REGEX = /\{([^}]+)\}/g;
+
+/** Path parameters the API also resolves as username~name; other values, such as record keys, are sent as they are. */
+const RESOURCE_ID_PARAMETERS: ReadonlySet<string> = new Set([
+    'actorId',
+    'actorTaskId',
+    'storeId',
+    'datasetId',
+    'queueId',
+    'scheduleId',
+]);
 
 /** Fills the operation's path template; returns the reason instead when the parameters do not fit it. */
 export function buildRequestPath(
@@ -88,11 +97,15 @@ export function buildRequestPath(
         if (!value) return { error: `Missing path parameter ${name}. The path is ${operation.path}.` };
         // Encoded, `.` and `..` stay as they are and would move the request to another route.
         if (value === '.' || value === '..') return { error: `Path parameter ${name} cannot be "${value}".` };
-        // The API takes username~name; apify-client swaps the first slash the same way.
-        path = path.replace(`{${name}}`, encodeURIComponent(value.replace('/', '~')));
+        // The API takes username~name; apify-client swaps the first slash of a resource ID the same way.
+        const apiValue = RESOURCE_ID_PARAMETERS.has(name) ? value.replace('/', '~') : value;
+        path = path.replace(`{${name}}`, encodeURIComponent(apiValue));
     }
     return { path };
 }
+
+/** Query values the API reads as true. */
+const TRUE_QUERY_VALUES: ReadonlySet<string> = new Set(['true', '1']);
 
 /** Checks the query against the parameters the operation declares; returns the reason on failure. */
 export function validateQueryParams(
@@ -113,8 +126,16 @@ export function validateQueryParams(
         .map((parameter) => parameter.name);
     if (missingNames.length > 0) return `Missing required query parameter ${missingNames.join(', ')}.`;
     // Same cap as the run and build tools: MCP clients stop waiting for a tool call after 60 seconds.
-    if (query.waitForFinish !== undefined && Number(query.waitForFinish) > WAIT_SECS_MAX) {
+    // The API reads the value with parseInt, so "60s" waits 60 seconds.
+    if (query.waitForFinish !== undefined && Number.parseInt(String(query.waitForFinish), 10) > WAIT_SECS_MAX) {
         return `waitForFinish can be at most ${WAIT_SECS_MAX} seconds. Call the operation again to keep waiting.`;
+    }
+    // The log operations' stream keeps the request open while the run or build is running.
+    if (query.stream !== undefined && TRUE_QUERY_VALUES.has(String(query.stream).toLowerCase())) {
+        return (
+            'stream keeps the request open while the run or build is running, longer than MCP clients wait for ' +
+            'a tool call. Call again without stream to get the log so far.'
+        );
     }
     return undefined;
 }
@@ -147,20 +168,38 @@ function formatOversizeMessage(operation: ApiOperation, path: string): string {
 }
 
 /**
+ * The request failure as a plain error with its message and code. The axios error keeps the request
+ * config, which holds the Authorization header and the request body, and the tool error log prints
+ * the whole error. The engine tells a cancelled call by its signal, not by the error type.
+ */
+function toPlainRequestError(error: unknown): Error {
+    if (!(error instanceof Error)) return new Error(String(error));
+    const { code } = error as { code?: unknown };
+    return Object.assign(new Error(error.message), typeof code === 'string' ? { code } : {});
+}
+
+/**
  * Sends one request to a filled-in operation path and returns the response body.
  *
  * It goes through the client's axios instance, not `httpClient.call()`, like `readApiResource`: one
  * attempt and no retries, since a retried write could apply twice, and apify-client would retry the
  * `maxContentLength` abort as a network error. The instance still adds the token and the request-origin
- * and payment headers, and parses JSON and text bodies. A non-2xx response is thrown as the
- * `ApifyApiError` apify-client itself builds, so it gets the usual tool error text and telemetry.
+ * and payment headers, and parses JSON and text bodies. Like `readApiResource`, the request skips the
+ * setup `httpClient.call()` runs first, so it does not honor `HTTPS_PROXY` and goes out with axios's
+ * default User-Agent instead of apify-client's. A non-2xx response is thrown as the `ApifyApiError`
+ * apify-client itself builds, so it gets the usual tool error text and telemetry.
  */
-export async function callApiOperation(
-    client: ApifyClient,
-    operation: ApiOperation,
-    path: string,
-    params: ApiCallParams,
-): Promise<ToolResponse> {
+export async function callApiOperation(params: {
+    client: ApifyClient;
+    operation: ApiOperation;
+    path: string;
+    query?: Record<string, string | number | boolean>;
+    /** JSON request body; only the write tool sends one. */
+    body?: unknown;
+    /** Aborts the request when the client cancels the tool call. */
+    signal?: AbortSignal;
+}): Promise<ToolResponse> {
+    const { client, operation, path } = params;
     let response: AxiosResponse<unknown>;
     try {
         response = await client.httpClient.axios.request<unknown>({
@@ -174,7 +213,7 @@ export async function callApiOperation(
         });
     } catch (error) {
         if (isMaxContentLengthAbort(error)) return respondUserError(formatOversizeMessage(operation, path));
-        throw error;
+        throw toPlainRequestError(error);
     }
     if (response.status >= 300) throw new ApifyApiError(response, 1);
 

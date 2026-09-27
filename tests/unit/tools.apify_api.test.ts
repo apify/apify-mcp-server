@@ -1,18 +1,18 @@
 import { ApifyApiError } from 'apify-client';
-import { AxiosError } from 'axios';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
+import { apifyApiRead } from '../../src/tools/api/apify_api_read.js';
 import { buildRequestPath, validateQueryParams } from '../../src/tools/api/apify_api_request.js';
+import { apifyApiSearch } from '../../src/tools/api/apify_api_search.js';
 import type * as ApifyApiSpecModule from '../../src/tools/api/apify_api_spec.js';
 import { buildApiOperationIndex } from '../../src/tools/api/apify_api_spec.js';
-import { fetchApifyApiOperation } from '../../src/tools/api/fetch_apify_api_operation.js';
-import { readApifyApi } from '../../src/tools/api/read_apify_api.js';
-import { searchApifyApi } from '../../src/tools/api/search_apify_api.js';
 import { writeApifyApi } from '../../src/tools/api/write_apify_api.js';
 import {
     apifyApiCallOutputSchema,
-    apifyApiOperationOutputSchema,
+    apifyApiDetailsOutputSchema,
     apifyApiSearchOutputSchema,
 } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -70,6 +70,12 @@ describe('buildRequestPath()', () => {
         expect(buildRequestPath(INDEX.get('webhooks_get')!)).toEqual({ path: '/v2/webhooks' });
     });
 
+    it('sends a value that is not a resource ID, such as a record key, as it is', () => {
+        expect(
+            buildRequestPath(INDEX.get('keyValueStore_record_put')!, { storeId: 'john/store', recordKey: 'a/b' }),
+        ).toEqual({ path: '/v2/key-value-stores/john~store/records/a%2Fb' });
+    });
+
     it.each([
         [{}, 'Missing path parameter datasetId'],
         [{ datasetId: '' }, 'Missing path parameter datasetId'],
@@ -99,15 +105,27 @@ describe('validateQueryParams()', () => {
         );
     });
 
-    it('caps waitForFinish below the tool-call timeout', () => {
-        expect(validateQueryParams(INDEX.get('actorRun_get')!, { waitForFinish: 45 })).toBeUndefined();
-        expect(validateQueryParams(INDEX.get('actorRun_get')!, { waitForFinish: 60 })).toContain('at most 45 seconds');
+    it('caps waitForFinish below the tool-call timeout, reading it as the API does', () => {
+        const actorRunGet = INDEX.get('actorRun_get')!;
+        expect(validateQueryParams(actorRunGet, { waitForFinish: 45 })).toBeUndefined();
+        expect(validateQueryParams(actorRunGet, { waitForFinish: 60 })).toContain('at most 45 seconds');
+        expect(validateQueryParams(actorRunGet, { waitForFinish: '60s' })).toContain('at most 45 seconds');
+    });
+
+    it.each([true, 'true', '1', 1])('refuses stream %j, which keeps the log request open', (stream) => {
+        expect(validateQueryParams(INDEX.get('actorRun_log_get')!, { stream })).toContain(
+            'Call again without stream to get the log so far.',
+        );
+    });
+
+    it('accepts a false stream', () => {
+        expect(validateQueryParams(INDEX.get('actorRun_log_get')!, { stream: false })).toBeUndefined();
     });
 });
 
-describe('search-apify-api', () => {
+describe('apify-api-search', () => {
     it('returns the matching operations with their access', async () => {
-        const result = await callTool(searchApifyApi, { query: 'delete dataset', limit: 1 });
+        const result = await callTool(apifyApiSearch, { query: 'delete dataset', limit: 1 });
 
         expectSchemaConformingStructuredContent(result, apifyApiSearchOutputSchema);
         expect(result.structuredContent).toEqual({
@@ -125,18 +143,18 @@ describe('search-apify-api', () => {
     });
 
     it('says so when nothing matches', async () => {
-        const result = await callTool(searchApifyApi, { query: 'zebra' });
+        const result = await callTool(apifyApiSearch, { query: 'zebra' });
 
         expect(result.structuredContent).toEqual({ operations: [] });
         expect(result.content[1].text).toBe('No API operation matches "zebra". Try other keywords.');
     });
 });
 
-describe('fetch-apify-api-operation', () => {
+describe('apify-api-details', () => {
     it('returns the parameters, body schema and refused fields', async () => {
-        const result = await callTool(fetchApifyApiOperation, { operationId: 'actor_put' });
+        const result = await callTool(apifyApiDetails, { operationId: 'actor_put' });
 
-        expectSchemaConformingStructuredContent(result, apifyApiOperationOutputSchema);
+        expectSchemaConformingStructuredContent(result, apifyApiDetailsOutputSchema);
         expect(result.structuredContent).toMatchObject({
             operationId: 'actor_put',
             method: 'PUT',
@@ -149,25 +167,23 @@ describe('fetch-apify-api-operation', () => {
     });
 
     it('names the search tool on an unknown operation only when the session has it', async () => {
-        const withSearch = await callTool(fetchApifyApiOperation, { operationId: 'nope' });
-        const withoutSearch = await callTool(fetchApifyApiOperation, { operationId: 'nope' }, [
-            HELPER_TOOLS.API_OPERATION_FETCH,
-        ]);
+        const withSearch = await callTool(apifyApiDetails, { operationId: 'nope' });
+        const withoutSearch = await callTool(apifyApiDetails, { operationId: 'nope' }, [HELPER_TOOLS.API_DETAILS]);
 
         expectSoftFailInvalidInput(withSearch);
         expect(withSearch.content[0].text).toBe(
             `API operation nope not found. Find it with ${HELPER_TOOLS.API_SEARCH}.`,
         );
-        expect(withoutSearch.content[0].text).toBe('API operation nope not found.');
+        expect(withoutSearch.content[0].text).toBe('API operation nope not found. Operation IDs are case-sensitive.');
     });
 });
 
-describe('read-apify-api', () => {
+describe('apify-api-read', () => {
     it('sends one GET to the filled-in path and returns the body as the API sends it', async () => {
         const body = { data: { total: 1, items: [{ id: 'abc' }] } };
         requestMock.mockResolvedValue(mockResponse(200, body));
 
-        const result = await callTool(readApifyApi, {
+        const result = await callTool(apifyApiRead, {
             operationId: 'dataset_items_get',
             pathParams: { datasetId: 'abc' },
             query: { format: 'json', limit: 1 },
@@ -194,11 +210,15 @@ describe('read-apify-api', () => {
     });
 
     it.each([
-        ['dataset_put', 'dataset_put is a PUT operation with write access; this tool has read access.'],
+        [
+            'dataset_put',
+            'dataset_put is a PUT operation with write access; this tool has read access. ' +
+                `Call it with ${HELPER_TOOLS.API_WRITE}.`,
+        ],
         ['actor_runSync_get', 'The API tools do not call actor_runSync_get. It waits up to 300 seconds'],
         ['nope', 'API operation nope not found.'],
     ])('refuses %s without a request', async (operationId, reason) => {
-        const result = await callTool(readApifyApi, { operationId, pathParams: { datasetId: 'abc', actorId: 'a' } });
+        const result = await callTool(apifyApiRead, { operationId, pathParams: { datasetId: 'abc', actorId: 'a' } });
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain(reason);
@@ -207,16 +227,17 @@ describe('read-apify-api', () => {
 
     it('names the write tool for a write operation only when the session has it', async () => {
         const args = { operationId: 'dataset_put', pathParams: { datasetId: 'abc' } };
-        const withWrite = await callTool(readApifyApi, args);
-        const withoutWrite = await callTool(readApifyApi, args, [HELPER_TOOLS.API_READ]);
+        const withWrite = await callTool(apifyApiRead, args);
+        const withoutWrite = await callTool(apifyApiRead, args, [HELPER_TOOLS.API_READ]);
 
         expect(withWrite.content[0].text).toContain(`Call it with ${HELPER_TOOLS.API_WRITE}.`);
         expect(withoutWrite.content[0].text).not.toContain(HELPER_TOOLS.API_WRITE);
+        expect(withoutWrite.content[0].text).toContain('No tool in this session has write access.');
     });
 
     it('refuses bad path or query parameters without a request', async () => {
-        const badPath = await callTool(readApifyApi, { operationId: 'dataset_get', pathParams: { datasetId: '..' } });
-        const badQuery = await callTool(readApifyApi, {
+        const badPath = await callTool(apifyApiRead, { operationId: 'dataset_get', pathParams: { datasetId: '..' } });
+        const badQuery = await callTool(apifyApiRead, {
             operationId: 'dataset_get',
             pathParams: { datasetId: 'abc' },
             query: { token: 'secret' },
@@ -232,7 +253,7 @@ describe('read-apify-api', () => {
             mockResponse(404, { error: { type: 'record-not-found', message: 'Dataset was not found' } }),
         );
 
-        const call = callTool(readApifyApi, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } });
+        const call = callTool(apifyApiRead, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } });
 
         await expect(call).rejects.toBeInstanceOf(ApifyApiError);
         await expect(call).rejects.toMatchObject({
@@ -247,7 +268,7 @@ describe('read-apify-api', () => {
             new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE'),
         );
 
-        const result = await callTool(readApifyApi, {
+        const result = await callTool(apifyApiRead, {
             operationId: 'dataset_items_get',
             pathParams: { datasetId: 'abc' },
             query: { format: 'json' },
@@ -258,18 +279,25 @@ describe('read-apify-api', () => {
         expect(result.content[0].text).toContain('limit, offset, or fields');
     });
 
-    it('rethrows any other request failure', async () => {
-        requestMock.mockRejectedValue(new AxiosError('socket hang up', 'ECONNRESET'));
+    it('rethrows any other request failure without the request config, which holds the token', async () => {
+        const config = { headers: new AxiosHeaders({ Authorization: 'Bearer secret-token' }) };
+        requestMock.mockRejectedValue(new AxiosError('socket hang up', 'ECONNRESET', config));
 
-        await expect(
-            callTool(readApifyApi, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } }),
-        ).rejects.toThrow('socket hang up');
+        const error = await callTool(apifyApiRead, {
+            operationId: 'dataset_get',
+            pathParams: { datasetId: 'abc' },
+        }).catch((thrown: unknown) => thrown);
+
+        expect(error).toBeInstanceOf(Error);
+        expect(error).not.toBeInstanceOf(AxiosError);
+        expect(error).toMatchObject({ message: 'socket hang up', code: 'ECONNRESET' });
+        expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain('secret-token');
     });
 
     it('describes a binary body instead of returning it', async () => {
         requestMock.mockResolvedValue(mockResponse(200, Buffer.from([1, 2, 3]), 'application/zip'));
 
-        const result = await callTool(readApifyApi, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } });
+        const result = await callTool(apifyApiRead, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } });
 
         expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
         expect(result.structuredContent).toMatchObject({ contentType: 'application/zip', data: null });
