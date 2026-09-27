@@ -7,7 +7,7 @@ import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import { isMaxContentLengthAbort } from '../../resources/api_resources.js';
 import type { ToolResponse } from '../../utils/mcp.js';
-import { respondOk, respondUserError } from '../../utils/mcp.js';
+import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import type { ApiAccess, ApiOperation } from './apify_api_spec.js';
 import { API_ACCESS, isRecord, SOURCE_BODY_FIELDS } from './apify_api_spec.js';
@@ -23,7 +23,7 @@ export const apiCallArgsShape = {
         .optional()
         .describe(
             'Values for the placeholders in the operation path, by name, for example {"actorId": "apify~web-scraper"}. ' +
-                'An Actor, task or storage is given by its ID or as username~name.',
+                'An Actor, task, or storage is given by its ID or as username~name.',
         ),
     query: z
         .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
@@ -32,6 +32,31 @@ export const apiCallArgsShape = {
             'Query parameters, by name, for example {"limit": 10}. Only parameters the operation declares are accepted.',
         ),
 };
+
+/** Query parameters whose values grant access or carry secrets: a storage signature, and webhooks with headers. */
+const SECRET_QUERY_PARAMS: readonly string[] = ['token', 'signature', 'webhooks'];
+
+/**
+ * The logged copy of an API tool call's arguments (`redactArgs`). An allowlist: it keeps operationId and
+ * pathParams, the query with the values of secret parameters redacted, and only a marker for the body,
+ * which can carry environment variable values, webhook headers, or stored records. An undeclared
+ * `token` is redacted too, since it is logged before the query check refuses it.
+ */
+export function redactApiCallArgs({ operationId, pathParams, query, body }: Record<string, unknown>) {
+    return {
+        operationId,
+        pathParams,
+        query: isRecord(query)
+            ? Object.fromEntries(
+                  Object.entries(query).map(([name, value]) => [
+                      name,
+                      SECRET_QUERY_PARAMS.includes(name) ? '[REDACTED]' : value,
+                  ]),
+              )
+            : query,
+        ...(body !== undefined && { body: '[REDACTED]' }),
+    };
+}
 
 /** The not-found text, naming the search tool only when the session has it. */
 export function formatOperationNotFoundMessage(operationId: string, loadedToolNames: readonly string[]): string {
@@ -207,7 +232,7 @@ function readAbortedResponseStatus(error: unknown): number | undefined {
 /**
  * The request failure as a plain error with its message and code. The axios error keeps the request
  * config, which holds the Authorization header and the request body, and the tool error log prints
- * the whole error. The engine tells a cancelled call by its signal, not by the error type.
+ * the whole error.
  */
 function toPlainRequestError(error: unknown): Error {
     if (!(error instanceof Error)) return new Error(String(error));
@@ -254,6 +279,8 @@ export async function callApiOperation(params: {
             signal: params.signal,
         });
     } catch (error) {
+        // A cancelled call is not a tool error; like the run and build tools, it gets the empty response.
+        if (params.signal?.aborted) return respondAborted();
         if (isMaxContentLengthAbort(error)) {
             // A write has applied by the time its response arrives, so a large response is not a failure.
             const statusCode = readAbortedResponseStatus(error);

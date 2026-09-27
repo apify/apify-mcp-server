@@ -223,8 +223,8 @@ function parseRequestBody(rawRequestBody: unknown, spec: unknown): ApiOperation[
 }
 
 /**
- * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations and
- * anything outside `/v2/` are left out; malformed entries are skipped rather than failing the whole spec.
+ * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations,
+ * and anything outside `/v2/` are left out; malformed entries are skipped rather than failing the whole spec.
  */
 export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation> {
     const index = new Map<string, ApiOperation>();
@@ -303,7 +303,7 @@ const SEARCH_STOP_WORDS: ReadonlySet<string> = new Set([
     'with',
 ]);
 
-/** Lowercase words of a text, splitting camelCase, snake_case, kebab-case and paths. */
+/** Lowercase words of a text, splitting camelCase, snake_case, kebab-case, and paths. */
 function splitWords(text: string): string[] {
     return text
         .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -326,14 +326,25 @@ function hasMatchingWord(term: string, words: string[]): boolean {
 }
 
 /**
+ * Paths that reach a run's own copy of a resource: the default storages and actions of a run or of the
+ * last run, and the synchronous runs. A plain ask such as "add items to a dataset" means the storage
+ * itself, so these rank lower unless the query is about runs or tasks.
+ */
+const RUN_SCOPED_PATH_REGEX = /^\/v2\/actor-runs\/\{runId\}\/|\/runs\/last\/|\/run-sync/;
+const RUN_SCOPE_TERMS: ReadonlySet<string> = new Set(['run', 'runs', 'last', 'task', 'tasks', 'sync']);
+const RUN_SCOPED_PENALTY = 2;
+
+/**
  * Operations matching the query's keywords, best first. A keyword scores 3 in the summary, else 2 in the
  * operation ID or path, else 1 in the tags, else 2 when it is a verb for the operation's method. A verb
- * alone does not match an operation. Ties go to the shorter path, so `/v2/datasets/{datasetId}` comes
+ * alone does not match an operation. A run-scoped path loses 2 when no keyword is about runs or tasks.
+ * Ties go to an available operation, then to the shorter path, so `/v2/datasets/{datasetId}` comes
  * before the same operation on a run's default dataset.
  */
 export function searchApiOperations(index: Map<string, ApiOperation>, query: string, limit: number): ApiOperation[] {
     // One-letter terms, such as the s of "run's", match too many words.
     const terms = [...new Set(splitWords(query))].filter((term) => term.length > 1 && !SEARCH_STOP_WORDS.has(term));
+    const isAboutRuns = terms.some((term) => RUN_SCOPE_TERMS.has(term));
     const scored: { operation: ApiOperation; score: number }[] = [];
     for (const operation of index.values()) {
         const summaryWords = splitWords(operation.summary);
@@ -348,10 +359,18 @@ export function searchApiOperations(index: Map<string, ApiOperation>, query: str
             else if (hasMatchingWord(term, tagWords)) score += 1;
             else if (verbs.includes(term)) verbScore += 2;
         }
-        if (score > 0) scored.push({ operation, score: score + verbScore });
+        if (score === 0) continue;
+        const penalty = !isAboutRuns && RUN_SCOPED_PATH_REGEX.test(operation.path) ? RUN_SCOPED_PENALTY : 0;
+        scored.push({ operation, score: score + verbScore - penalty });
     }
+    const isUnavailable = (operation: ApiOperation) => (operation.access === API_ACCESS.UNAVAILABLE ? 1 : 0);
     return scored
-        .sort((a, b) => b.score - a.score || a.operation.path.length - b.operation.path.length)
+        .sort(
+            (a, b) =>
+                b.score - a.score ||
+                isUnavailable(a.operation) - isUnavailable(b.operation) ||
+                a.operation.path.length - b.operation.path.length,
+        )
         .slice(0, limit)
         .map(({ operation }) => operation);
 }

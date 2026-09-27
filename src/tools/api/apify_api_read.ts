@@ -11,6 +11,7 @@ import {
     apiCallArgsShape,
     buildRequestPath,
     callApiOperation,
+    redactApiCallArgs,
     resolveOperationToCall,
     validateQueryParams,
 } from './apify_api_request.js';
@@ -29,7 +30,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         ${MAX_INLINE_BYTES} bytes is not returned.
 
         USAGE:
-        - Use for data no dedicated tool returns, such as webhooks, usage and limits.
+        - Use for data no dedicated tool returns, such as webhooks, usage, and limits.
 
         USAGE EXAMPLES:
         - user_input: List the webhooks on my account
@@ -56,6 +57,8 @@ export const apifyApiRead: ToolEntry = Object.freeze({
         idempotentHint: true,
         openWorldHint: false,
     },
+    // A storage signature, or the webhooks of a synchronous run, would otherwise be logged.
+    redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiReadArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
