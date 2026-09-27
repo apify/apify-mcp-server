@@ -10,12 +10,10 @@ import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { ABORT } from '../actors/actor_run_response.js';
 import { listVersionNumbers, startBuild } from '../builds/build_helpers.js';
-import type { SourceFile } from './source_files.js';
 import {
     ABSOLUTE_NAME_REGEX,
     buildInlineSourceFile,
     BYTES_PER_MIB,
-    compareSourcePaths,
     formatMib,
     hasBinaryExtension,
     MAX_SOURCE_PATH_LENGTH,
@@ -157,11 +155,6 @@ export function resolveVersionNumber(
     return requestedVersionNumber ?? versionNumbers[0];
 }
 
-/** Console keeps an empty folder as a `{ name, folder: true }` entry with no content; apify-client's type leaves it out. */
-export function isFolderEntry(file: ActorVersionSourceFile): boolean {
-    return (file as { folder?: boolean }).folder === true;
-}
-
 /**
  * The URL without what can grant access to it, so that never goes out or into the revision: the query string (for
  * example a store signature) and, for http and https, the user and password. An SSH user such as `git@` is not a
@@ -259,17 +252,6 @@ export function parseInputFiles(files: readonly SourceFileArgs[], field: string)
         );
     }
     return entries;
-}
-
-/** One file per path, the last stored entry winning as in get-actor-version, sorted by path; folder entries are left out. */
-export function buildFilesManifest(entries: readonly ActorVersionSourceFile[]): SourceFile[] {
-    const filesByPath = new Map<string, SourceFile>();
-    for (const entry of entries) {
-        if (isFolderEntry(entry)) continue;
-        const file = buildInlineSourceFile(entry);
-        filesByPath.set(file.path, file);
-    }
-    return [...filesByPath.values()].sort((a, b) => compareSourcePaths(a.path, b.path));
 }
 
 /** Whether `.actor/actor.json` names a Dockerfile; a file that is not valid JSON names none. */

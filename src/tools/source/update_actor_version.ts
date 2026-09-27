@@ -21,6 +21,7 @@ import {
     buildUrlRevision,
     compareSourcePaths,
     formatMib,
+    isFolderEntry,
     MAX_SOURCE_PATH_LENGTH,
     parseStoredPath,
 } from './source_files.js';
@@ -35,7 +36,6 @@ import {
     getInlineSourceBytes,
     getSourceFileEntryBytes,
     hasUrlSecrets,
-    isFolderEntry,
     MAX_INLINE_SOURCE_BYTES,
     MAX_WRITE_FILES,
     parseInputPath,
@@ -356,8 +356,8 @@ function readCurrentSource(version: ActorVersion, { fullName, versionNumber }: V
     }
     if (version.sourceType === ActorSourceType.Tarball) {
         throw new UserInputError(
-            `Version ${versionNumber} of ${fullName} is stored as a zip (TARBALL), and zip-stored versions cannot be ` +
-                'edited with this tool yet. Push the whole source with the Apify CLI (apify push) instead.',
+            `Version ${versionNumber} of ${fullName} is stored as a zip (TARBALL), and versions stored as a zip cannot ` +
+                'be changed with this tool yet. Open the version in Apify Console to change its source.',
         );
     }
     if (version.sourceType === ActorSourceType.GitRepo || version.sourceType === ActorSourceType.GitHubGist) {

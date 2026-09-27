@@ -1204,8 +1204,8 @@ describe('update-actor-version', () => {
                 operations: [{ type: 'write', path: 'src/a.js', content: 'a' }],
             });
             expect(text).toBe(
-                'Version 0.1 of john/my-actor is stored as a zip (TARBALL), and zip-stored versions cannot be edited ' +
-                    'with this tool yet. Push the whole source with the Apify CLI (apify push) instead.',
+                'Version 0.1 of john/my-actor is stored as a zip (TARBALL), and versions stored as a zip cannot be ' +
+                    'changed with this tool yet. Open the version in Apify Console to change its source.',
             );
             expect(versionUpdateMock).not.toHaveBeenCalled();
         });

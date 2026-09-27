@@ -13,18 +13,22 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondAborted } from '../../utils/mcp.js';
 import { buildNextStepForBuild, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
 import { createActorToolOutputSchema } from '../structured_output_schemas.js';
-import { buildFilesRevision, buildUrlRevision, parseStoredPath } from './source_files.js';
+import {
+    buildFilesManifest,
+    buildFilesRevision,
+    buildUrlRevision,
+    isFolderEntry,
+    parseStoredPath,
+} from './source_files.js';
 import type { BuildAfterWriteResult } from './source_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
-    buildFilesManifest,
     formatBuildLaterHint,
     formatBuildStartFailure,
     formatEmptyFilesWarning,
     formatMissingDockerfileWarning,
     formatUrlWithoutSecrets,
     getSourceFileEntryBytes,
-    isFolderEntry,
     MAX_WRITE_FILES,
     parseInputFiles,
     respondToSourceToolError,
