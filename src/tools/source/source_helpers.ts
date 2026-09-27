@@ -10,9 +10,9 @@ import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { ABORT } from '../actors/actor_run_response.js';
 import { listVersionNumbers, startBuild } from '../builds/build_helpers.js';
-import { ABSOLUTE_NAME_REGEX } from './source_archive.js';
 import type { SourceFile } from './source_files.js';
 import {
+    ABSOLUTE_NAME_REGEX,
     buildInlineSourceFile,
     BYTES_PER_MIB,
     compareSourcePaths,

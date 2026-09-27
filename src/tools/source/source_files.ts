@@ -60,18 +60,21 @@ const HASH_HEX_LENGTH = 16;
 
 export const BYTES_PER_MIB = 1024 * 1024;
 
-/** The platform keeps file names up to this length; the zip reader and the write tools apply the same cap. */
+/** The platform keeps file names up to this length; the write tools apply the same cap. */
 export const MAX_SOURCE_PATH_LENGTH = 255;
+
+/** A POSIX root (`/abs`), a backslash root, or a Windows drive (`C:\abs`, `C:abs`). */
+export const ABSOLUTE_NAME_REGEX = /^(?:[\\/]|[a-zA-Z]:)/;
 
 // `ignoreBOM` keeps a byte order mark in the text, so the text encodes back to the same bytes and hash.
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
 export type SourceFileFormat = ActorVersionSourceFile['format'];
 
-/** One regular file of a version, the same shape whether the version stores its files inline or in a zip. */
+/** One regular file of a version. */
 export type SourceFile = {
     path: string;
-    /** The stored format for an inline file; for a zip entry, which stores none, the detected one. */
+    /** The format the version stores the file in. */
     format: SourceFileFormat;
     /** How the content is returned: UTF-8 text as utf8 whatever its stored format, anything else as base64. */
     encoding: 'utf8' | 'base64';
@@ -80,13 +83,17 @@ export type SourceFile = {
     hash: string;
     /** UTF-8 length of the content as returned: the text itself, or its base64. */
     contentBytes: number;
-    /** Built on demand, so content that is not returned is never decoded or encoded to base64. */
+    /** Built on demand, so content that is not returned is never decoded. */
     readContent: () => string;
 };
 
-/** Rounded up, so a size just over a limit never prints as the limit itself. */
+/** Rounded up to one decimal, so a size just over a limit never prints as the limit itself. */
+export function formatKib(bytes: number): string {
+    return (Math.ceil((bytes / 1024) * 10) / 10).toFixed(1);
+}
+
 export function formatMib(bytes: number): string {
-    return (Math.ceil((bytes / BYTES_PER_MIB) * 10) / 10).toFixed(1);
+    return formatKib(bytes / 1024);
 }
 
 /** Lines with their line endings kept, so joined back they give the exact text. */
@@ -103,7 +110,7 @@ export function hasBinaryExtension(path: string): boolean {
 /**
  * A path relative to the Actor root: empty and `.` segments are dropped, as the build worker's path normalization
  * does, and backslashes become `/`, as Windows zip tools write them. The build worker keeps an inline name's backslash
- * as a character, so the two can differ for such a name. `..` segments are kept; the zip reader refuses them.
+ * as a character, so the two can differ for such a name. `..` segments are kept.
  */
 export function parseSourcePath(name: string): string {
     return name
@@ -117,26 +124,20 @@ export function parseStoredPath(name: string): string {
     return parseSourcePath(name) || name;
 }
 
-function getSha256Prefix(data: Uint8Array | string): string {
+/** The first 16 hex characters of the SHA-256; for a file's bytes, the same as `sha256sum <file> | cut -c1-16`. */
+export function getSha256Prefix(data: Uint8Array | string): string {
     return createHash('sha256').update(data).digest('hex').slice(0, HASH_HEX_LENGTH);
 }
 
-/** The same value as `sha256sum <file> | cut -c1-16` on the file's bytes. */
-export function getSourceFileHash(bytes: Uint8Array): string {
-    return getSha256Prefix(bytes);
-}
-
-/**
- * Orders paths by their UTF-8 bytes, the order `LC_ALL=C sort` gives, so the manifest and the revision do not
- * depend on the locale or on how JavaScript compares UTF-16 strings.
- */
+/** Paths in JavaScript's default string order, so the manifest and the revision do not depend on the locale. */
 export function compareSourcePaths(a: string, b: string): number {
-    return Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
+    if (a === b) return 0;
+    return a < b ? -1 : 1;
 }
 
 /**
- * Identifies the file set: one `path\0hash\n` line per regular file, sorted by path. Neither the storage (inline or
- * zip) nor the stored format goes in, so the same files give the same revision however they are stored.
+ * Identifies the file set: one `path\0hash\n` line per regular file, sorted by path. The stored format does not go
+ * in, so a file stored as TEXT or as BASE64 gives the same revision.
  */
 export function buildFilesRevision(files: readonly Pick<SourceFile, 'path' | 'hash'>[]): string {
     const lines = [...files]
@@ -150,20 +151,22 @@ export function buildUrlRevision(sourceType: string, url: string): string {
     return getSha256Prefix(`${sourceType}\0${url}`);
 }
 
-/** Base64 text takes 4 characters per 3 bytes, the last group padded. */
-function getBase64Length(byteLength: number): number {
-    return Math.ceil(byteLength / 3) * 4;
-}
-
 /**
- * Text when the extension is not a binary one and the bytes are valid UTF-8, base64 otherwise, so no byte is lost.
- * `isUtf8` checks without building a string; the text is decoded only when it is returned, so a listing holds only
- * the bytes.
+ * A file stored inline in the version; its format is the one the platform stored. The platform stores a file without
+ * `format` or `content` as given, and the build worker reads them as TEXT and as empty, so the same defaults apply.
+ * A BASE64 file is returned as text when the extension is not a binary one and the bytes are valid UTF-8 (`apify push`
+ * picks the format by MIME type), and as its stored base64 otherwise, so no byte is lost. `isUtf8` checks without
+ * building a string, so a listing holds only the bytes.
  */
-function buildSourceFileFromBytes(path: string, bytes: Uint8Array, storedBase64?: string): SourceFile {
-    const common = { path, sizeBytes: bytes.length, hash: getSourceFileHash(bytes) };
-    // An inline file keeps its stored format; a zip entry, which stores none, reports TEXT for text.
-    const format: SourceFileFormat = storedBase64 === undefined ? 'TEXT' : 'BASE64';
+export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile {
+    const { name, format }: Partial<ActorVersionSourceFile> & { name: string } = file;
+    const content = (file as Partial<ActorVersionSourceFile>).content ?? '';
+    const path = parseStoredPath(name);
+    const bytes = format === 'BASE64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
+    const common = { path, sizeBytes: bytes.length, hash: getSha256Prefix(bytes) };
+    if (format !== 'BASE64') {
+        return { ...common, format: 'TEXT', encoding: 'utf8', contentBytes: bytes.length, readContent: () => content };
+    }
     if (!hasBinaryExtension(path) && isUtf8(bytes)) {
         // Valid UTF-8 decoded with the BOM kept encodes back to the same bytes, so its length is the byte count.
         const readContent = () => UTF8_DECODER.decode(bytes);
@@ -171,37 +174,28 @@ function buildSourceFileFromBytes(path: string, bytes: Uint8Array, storedBase64?
     }
     return {
         ...common,
-        format: 'BASE64',
+        format,
         encoding: 'base64',
-        contentBytes: storedBase64 === undefined ? getBase64Length(bytes.length) : Buffer.byteLength(storedBase64),
-        readContent: () => storedBase64 ?? Buffer.from(bytes).toString('base64'),
-    };
-}
-
-/**
- * A file stored inline in the version; its format is the one the platform stored. The platform stores a file without
- * `format` or `content` as given, and the build worker reads them as TEXT and as empty, so the same defaults apply.
- * A UTF-8 file stored as BASE64 (`apify push` picks the format by MIME type) is returned as text, the same as from a
- * zip.
- */
-export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile {
-    const { name, format }: Partial<ActorVersionSourceFile> & { name: string } = file;
-    const content = (file as Partial<ActorVersionSourceFile>).content ?? '';
-    const path = parseStoredPath(name);
-    if (format === 'BASE64') return buildSourceFileFromBytes(path, Buffer.from(content, 'base64'), content);
-    const bytes = Buffer.from(content, 'utf8');
-    return {
-        path,
-        format: 'TEXT',
-        encoding: 'utf8',
-        sizeBytes: bytes.length,
-        hash: getSourceFileHash(bytes),
-        contentBytes: bytes.length,
+        contentBytes: Buffer.byteLength(content),
         readContent: () => content,
     };
 }
 
-/** A file read from a zip, which carries no format: TEXT or BASE64 as detected. */
-export function buildArchiveSourceFile(path: string, bytes: Uint8Array): SourceFile {
-    return buildSourceFileFromBytes(path, bytes);
+/** Console keeps an empty folder as a `{ name, folder: true }` entry with no content; apify-client's type leaves it out. */
+export function isFolderEntry(file: ActorVersionSourceFile): boolean {
+    return (file as { folder?: boolean }).folder === true;
+}
+
+/**
+ * The version's regular files, one per path (the last stored entry wins), sorted by path, so the manifest reads the
+ * same whatever order the version stores its files in; folder entries are left out.
+ */
+export function buildFilesManifest(entries: readonly ActorVersionSourceFile[]): SourceFile[] {
+    const filesByPath = new Map<string, SourceFile>();
+    for (const entry of entries) {
+        if (isFolderEntry(entry)) continue;
+        const file = buildInlineSourceFile(entry);
+        filesByPath.set(file.path, file);
+    }
+    return [...filesByPath.values()].sort((a, b) => compareSourcePaths(a.path, b.path));
 }
