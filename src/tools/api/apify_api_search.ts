@@ -9,7 +9,7 @@ import { respondOk } from '../../utils/mcp.js';
 import { apifyApiSearchOutputSchema } from '../structured_output_schemas.js';
 import { fetchApiOperationIndex, searchApiOperations } from './apify_api_spec.js';
 
-const searchApifyApiArgs = z.object({
+const apifyApiSearchArgs = z.object({
     query: z
         .string()
         .min(1)
@@ -26,7 +26,7 @@ const searchApifyApiArgs = z.object({
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const callTools = [hasTool(HELPER_TOOLS.API_READ) && `${HELPER_TOOLS.API_READ} for read access`].filter(Boolean);
     const nextSteps = [
-        hasTool(HELPER_TOOLS.API_OPERATION_FETCH) && `get its parameters with ${HELPER_TOOLS.API_OPERATION_FETCH}`,
+        hasTool(HELPER_TOOLS.API_DETAILS) && `get its parameters with ${HELPER_TOOLS.API_DETAILS}`,
         callTools.length > 0 && `call it with ${callTools.join(' or ')}`,
     ].filter(Boolean);
     const nextStepsSentence = nextSteps.length > 0 ? `\nAfter finding an operation, ${nextSteps.join(', then ')}.` : '';
@@ -49,15 +49,15 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 /**
  * Searches the operations of the published Apify API spec, https://docs.apify.com/api/v2.
  */
-export const searchApifyApi: ToolEntry = Object.freeze({
+export const apifyApiSearch: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.API_SEARCH,
     title: 'Search Apify API',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: fixZodSchemaRequired(z.toJSONSchema(searchApifyApiArgs)) as ToolInputSchema,
+    inputSchema: fixZodSchemaRequired(z.toJSONSchema(apifyApiSearchArgs)) as ToolInputSchema,
     outputSchema: apifyApiSearchOutputSchema,
-    ajvValidate: compileSchema(fixZodSchemaRequired(z.toJSONSchema(searchApifyApiArgs))),
+    ajvValidate: compileSchema(fixZodSchemaRequired(z.toJSONSchema(apifyApiSearchArgs))),
     annotations: {
         title: 'Search Apify API',
         readOnlyHint: true,
@@ -66,7 +66,7 @@ export const searchApifyApi: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const parsed = searchApifyApiArgs.parse(toolArgs.args);
+        const parsed = apifyApiSearchArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
         const operations = searchApiOperations(index, parsed.query, parsed.limit).map((operation) => ({
             operationId: operation.operationId,

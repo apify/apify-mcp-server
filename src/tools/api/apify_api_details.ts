@@ -6,11 +6,11 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { apifyApiOperationOutputSchema } from '../structured_output_schemas.js';
+import { apifyApiDetailsOutputSchema } from '../structured_output_schemas.js';
 import { apiCallArgsShape, formatOperationNotFoundMessage } from './apify_api_request.js';
 import { fetchApiOperationIndex } from './apify_api_spec.js';
 
-const fetchApifyApiOperationArgs = z.object({
+const apifyApiDetailsArgs = z.object({
     operationId: apiCallArgsShape.operationId,
 });
 
@@ -35,24 +35,24 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 /**
  * Returns one operation of the published Apify API spec, https://docs.apify.com/api/v2.
  */
-export const fetchApifyApiOperation: ToolEntry = Object.freeze({
+export const apifyApiDetails: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.API_OPERATION_FETCH,
-    title: 'Fetch Apify API operation',
+    name: HELPER_TOOLS.API_DETAILS,
+    title: 'Get Apify API operation details',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: z.toJSONSchema(fetchApifyApiOperationArgs) as ToolInputSchema,
-    outputSchema: apifyApiOperationOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(fetchApifyApiOperationArgs)),
+    inputSchema: z.toJSONSchema(apifyApiDetailsArgs) as ToolInputSchema,
+    outputSchema: apifyApiDetailsOutputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(apifyApiDetailsArgs)),
     annotations: {
-        title: 'Fetch Apify API operation',
+        title: 'Get Apify API operation details',
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const parsed = fetchApifyApiOperationArgs.parse(toolArgs.args);
+        const parsed = apifyApiDetailsArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
         const operation = index.get(parsed.operationId);
         if (!operation) {

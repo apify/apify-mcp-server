@@ -16,11 +16,11 @@ import {
 } from './apify_api_request.js';
 import { API_ACCESS, fetchApiOperationIndex } from './apify_api_spec.js';
 
-const readApifyApiArgs = z.object(apiCallArgsShape);
+const apifyApiReadArgs = z.object(apiCallArgsShape);
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const getParameters = hasTool(HELPER_TOOLS.API_OPERATION_FETCH)
-        ? `\nGet the operation's parameters first with ${HELPER_TOOLS.API_OPERATION_FETCH}.`
+    const getParameters = hasTool(HELPER_TOOLS.API_DETAILS)
+        ? `\nGet the operation's parameters first with ${HELPER_TOOLS.API_DETAILS}.`
         : '';
     return dedent`
         Call one Apify API operation with read access (GET), by its operation ID. The server builds the
@@ -40,15 +40,15 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 /**
  * Calls one GET operation of the published Apify API spec, https://docs.apify.com/api/v2.
  */
-export const readApifyApi: ToolEntry = Object.freeze({
+export const apifyApiRead: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.API_READ,
     title: 'Read Apify API',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: z.toJSONSchema(readApifyApiArgs) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(apifyApiReadArgs) as ToolInputSchema,
     outputSchema: apifyApiCallOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(readApifyApiArgs)),
+    ajvValidate: compileSchema(z.toJSONSchema(apifyApiReadArgs)),
     annotations: {
         title: 'Read Apify API',
         readOnlyHint: true,
@@ -57,7 +57,7 @@ export const readApifyApi: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const parsed = readApifyApiArgs.parse(toolArgs.args);
+        const parsed = apifyApiReadArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
         const resolved = resolveOperationToCall(index, parsed.operationId, API_ACCESS.READ, toolArgs.loadedToolNames);
         if ('error' in resolved) return respondUserError(resolved.error);

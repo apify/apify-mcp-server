@@ -125,7 +125,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
 
         it('should have correct tools in api category (both modes)', () => {
-            const expected = [HELPER_TOOLS.API_SEARCH, HELPER_TOOLS.API_OPERATION_FETCH, HELPER_TOOLS.API_READ];
+            const expected = [HELPER_TOOLS.API_SEARCH, HELPER_TOOLS.API_DETAILS, HELPER_TOOLS.API_READ];
             expect(toolNames(defaultCategories.api)).toEqual(expected);
             expect(toolNames(appsCategories.api)).toEqual(expected);
         });
