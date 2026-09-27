@@ -7,7 +7,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
 import { getCategoryTools, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
 import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
-import { getCrc32, readSourceArchive } from '../../src/tools/source/source_archive.js';
 import { getActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
@@ -17,24 +16,19 @@ import {
     type TextToolResult,
     type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
-import { buildZipArchive, type ZipEntryOptions } from './helpers/zip_archive.js';
 
 const actorGetMock = vi.fn();
 const versionGetMock = vi.fn();
 const versionMock = vi.fn(() => ({ get: versionGetMock }));
 const actorMock = vi.fn(() => ({ get: actorGetMock, version: versionMock }));
-const listKeysMock = vi.fn();
-const getRecordMock = vi.fn();
-const keyValueStoreMock = vi.fn(() => ({ listKeys: listKeysMock, getRecord: getRecordMock }));
 
 const stubClient = {
     actor: actorMock,
-    keyValueStore: keyValueStoreMock,
     baseUrl: 'https://api.example.test/v2',
 } as unknown as InternalToolArgs['apifyClient'];
 
-const RECORD_KEY = 'version-0.1.zip';
-const RECORD_URL = `https://api.example.test/v2/key-value-stores/store-1/records/${RECORD_KEY}?signature=secret-signature`;
+const RECORD_PATH = '/v2/key-value-stores/store-1/records/version-0.1.zip';
+const RECORD_URL = `https://api.example.test${RECORD_PATH}?signature=secret-signature`;
 
 const ACTOR_JSON_SOURCE = { name: '.actor/actor.json', format: 'TEXT', content: '{"actorSpecification": 1}' };
 const MAIN_JS_SOURCE = { name: 'src/main.js', format: 'TEXT', content: 'console.log("hi");\n' };
@@ -87,12 +81,6 @@ function mockTarballVersion(tarballUrl = RECORD_URL) {
     return mockVersion({ sourceType: 'TARBALL', tarballUrl, sourceFiles: [MAIN_JS_SOURCE] });
 }
 
-/** Stores the zip as the version's record, with the size the key listing reports. */
-function stubArchive(zip: Buffer, listedSize = zip.length): void {
-    listKeysMock.mockResolvedValue({ items: [{ key: RECORD_KEY, size: listedSize }] });
-    getRecordMock.mockResolvedValue({ key: RECORD_KEY, value: zip, contentType: 'application/zip' });
-}
-
 function apiError(status: number, message: string): ApifyApiError {
     return new ApifyApiError({ data: { error: { type: 'some-error', message } }, status } as AxiosResponse, 1);
 }
@@ -133,8 +121,6 @@ function buildTextSources(count: number, sizeBytes: number) {
 describe('get-actor-version', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        listKeysMock.mockReset();
-        getRecordMock.mockReset();
         actorGetMock.mockResolvedValue(mockActor());
         versionGetMock.mockResolvedValue(mockVersion());
     });
@@ -165,7 +151,6 @@ describe('get-actor-version', () => {
             // The version is read through the resolved Actor ID, not the selector the caller gave.
             expect(actorMock).toHaveBeenCalledWith('actor-1');
             expect(versionMock).toHaveBeenCalledWith('0.1');
-            expect(keyValueStoreMock).not.toHaveBeenCalled();
             expect(structuredContent).toEqual({
                 actorId: 'actor-1',
                 fullName: 'john/my-actor',
@@ -197,7 +182,7 @@ describe('get-actor-version', () => {
             expect(result.content[1].text).toBe(
                 `Read version 0.1 of john/my-actor, stored inline (SOURCE_FILES): 3 files, revision ${structuredContent.revision}.` +
                     ' Returned the content of 2 files (0.1 KiB).' +
-                    ' 1 base64 file is in the listing only; name it in paths to read it.',
+                    ' Base64 files are returned only when named in paths: 1 file left out.',
             );
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
             const serialized = JSON.stringify(result);
@@ -207,8 +192,9 @@ describe('get-actor-version', () => {
             expectNoToolNamed(result);
         });
 
-        it('sorts the manifest by UTF-8 bytes and computes the revision over sorted path and hash lines', async () => {
-            // Locale order puts package.json before README.md, and UTF-16 order puts the emoji before the fullwidth z.
+        it('sorts the manifest in plain string order and computes the revision over sorted path and hash lines', async () => {
+            // Locale order would put package.json before README.md; plain order puts the emoji, a UTF-16 surrogate pair,
+            // before the fullwidth z.
             const names = ['\u{1F600}.txt', 'package.json', 'src/main.js', '\uFF5A.txt', 'README.md', 'Dockerfile'];
             versionGetMock.mockResolvedValue(
                 mockVersion({ sourceFiles: names.map((name) => ({ name, format: 'TEXT', content: `${name}\n` })) }),
@@ -218,8 +204,8 @@ describe('get-actor-version', () => {
                 'README.md',
                 'package.json',
                 'src/main.js',
-                '\uFF5A.txt',
                 '\u{1F600}.txt',
+                '\uFF5A.txt',
             ];
 
             const { structuredContent } = await callTool({ paths: [] });
@@ -270,7 +256,7 @@ describe('get-actor-version', () => {
                 format: 'BASE64',
             });
             expect(reencoded.structuredContent.contents).toEqual(first.structuredContent.contents);
-            expect(reencoded.content[1].text).toContain(' 1 base64 file is in the listing only;');
+            expect(reencoded.content[1].text).toContain(' Base64 files are returned only when named in paths: 1 file');
         });
 
         it('reads an inline file stored without format as TEXT and one without content as empty', async () => {
@@ -299,7 +285,7 @@ describe('get-actor-version', () => {
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
         });
 
-        it('normalizes inline paths the way the build worker and the zip reader do', async () => {
+        it('normalizes inline paths the way the build worker does', async () => {
             const first = await callTool({ paths: [] });
             versionGetMock.mockResolvedValue(
                 mockVersion({
@@ -341,7 +327,7 @@ describe('get-actor-version', () => {
 
             expect(result.structuredContent.contents.map(({ path }) => path)).toEqual(['file-00.txt', 'file-01.txt']);
             expect(result.content[1].text).toContain(
-                ' 1 base64 file is in the listing only; name it in paths to read it.',
+                ' Base64 files are returned only when named in paths: 1 file left out.',
             );
         });
 
@@ -356,7 +342,7 @@ describe('get-actor-version', () => {
             const result = await callTool({});
 
             expect(result.content[1].text).toMatch(
-                / Returned the content of 1 file \(0\.1 KiB\)\. 1 base64 file is over 256 KiB as base64, so it cannot be returned; read it with the Apify CLI \(apify pull\)\.$/,
+                / Returned the content of 1 file \(0\.1 KiB\)\. Over 256 KiB as base64, so they cannot be returned: big\.bin\.$/,
             );
             expectNoToolNamed(result);
         });
@@ -392,7 +378,8 @@ describe('get-actor-version', () => {
             expect(structuredContent.omittedPaths).toEqual(['file-00.txt']);
             expect(structuredContent.notFoundPaths).toEqual(['missing.js']);
             expect(result.content[1].text).toContain(
-                ' Left out to stay within 256 KiB: file-00.txt; request them in another call. No file at: missing.js.',
+                ' Left out to stay within 256 KiB: file-00.txt; request them in another call, and a text file over the' +
+                    ' limit on its own to read it in line ranges. No file at: missing.js.',
             );
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
             expectNoToolNamed(result);
@@ -409,7 +396,7 @@ describe('get-actor-version', () => {
             expect(structuredContent.omittedPaths).toEqual(['big.txt']);
         });
 
-        it('says which omitted files are over the limit on their own', async () => {
+        it('says which omitted files cannot be returned at all', async () => {
             const bigBinary = {
                 name: 'big.bin',
                 format: 'BASE64',
@@ -425,9 +412,8 @@ describe('get-actor-version', () => {
 
             expect(result.structuredContent.omittedPaths).toEqual(['big.txt', 'min.js', 'big.bin']);
             expect(result.content[1].text).toContain(
-                ' Over 256 KiB on their own: big.txt; request one alone to read it in line ranges.' +
-                    ' Over 256 KiB on their own, first line included: min.js; request one alone to see which of its lines can be returned.' +
-                    ' Over 256 KiB as base64, so they cannot be returned: big.bin; read them with the Apify CLI (apify pull).',
+                ' Left out to stay within 256 KiB: big.txt, min.js; request them in another call, and a text file over' +
+                    ' the limit on its own to read it in line ranges. Over 256 KiB as base64, so they cannot be returned: big.bin.',
             );
         });
 
@@ -557,7 +543,7 @@ describe('get-actor-version', () => {
             });
             expect(result.structuredContent.omittedPaths).toBeUndefined();
             expect(result.content[1].text).toContain(
-                ' Returned lines 1-256 of 300 of big.js. The whole file is over the 256 KiB limit. Continue with startLine 257.',
+                ' Returned lines 1-256 of 300 of big.js. Continue with startLine 257.',
             );
             expectNoToolNamed(result);
         });
@@ -586,17 +572,17 @@ describe('get-actor-version', () => {
                 expectNoToolNamed(result);
             });
 
-            it('says when the long line is the last one', async () => {
+            it('names no startLine past the last line', async () => {
                 mockFile(`short\n${LONG_LINE}`);
 
                 const result = await callTool({ paths: ['min.js'], startLine: 2 });
 
                 expect(result.content[1].text).toMatch(
-                    / Line 2 of min\.js is over 256 KiB on its own, so it cannot be returned\. It is the last line of the file\.$/,
+                    / Line 2 of min\.js is over 256 KiB on its own, so it cannot be returned\.$/,
                 );
             });
 
-            it('names the long line when the range stops just before it', async () => {
+            it('continues at the long line when the lines before it were returned', async () => {
                 mockFile(`short\n${LONG_LINE}tail\n`);
 
                 const result = await callTool({ paths: ['min.js'] });
@@ -605,11 +591,9 @@ describe('get-actor-version', () => {
                     { path: 'min.js', content: 'short\n', encoding: 'utf8', startLine: 1, endLine: 1, totalLines: 3 },
                 ]);
                 expect(result.structuredContent.omittedPaths).toBeUndefined();
-                expect(result.content[1].text).toContain(
-                    ' Returned lines 1-1 of 3 of min.js. The whole file is over the 256 KiB limit.' +
-                        ' Line 2 of min.js is over 256 KiB on its own, so it cannot be returned. Pass startLine 3 to skip it.',
+                expect(result.content[1].text).toMatch(
+                    / Returned lines 1-1 of 3 of min\.js\. Continue with startLine 2\.$/,
                 );
-                expect(result.content[1].text).not.toContain('Continue with');
             });
 
             it('returns the listing for a single-line file requested alone', async () => {
@@ -621,7 +605,7 @@ describe('get-actor-version', () => {
                 expect(result.structuredContent.revision).toMatch(/^[0-9a-f]{16}$/);
                 expect(result.structuredContent.omittedPaths).toEqual(['min.js']);
                 expect(result.content[1].text).toMatch(
-                    / Returned the listing only\. min\.js is a single line over 256 KiB, so it cannot be read by lines\.$/,
+                    / Returned the listing only\. Line 1 of min\.js is over 256 KiB on its own, so it cannot be returned\.$/,
                 );
                 expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
             });
@@ -743,7 +727,6 @@ describe('get-actor-version', () => {
             expect(text).toBe(
                 "Version 0.1 of john/my-actor came back without its source: the API hides it from accounts that cannot modify the Actor. Ask the Actor's owner for the source.",
             );
-            expect(keyValueStoreMock).not.toHaveBeenCalled();
         });
 
         it.each(['SOURCE_CODE', 'SOMETHING_NEW'])(
@@ -790,7 +773,6 @@ describe('get-actor-version', () => {
             expect(result.content[1].text).toBe(
                 `Version 0.1 of john/my-actor builds from the Git repository https://github.com/john/scrapers.git, branch main, directory actors/my-actor, revision ${result.structuredContent.revision}. Its source is not stored on Apify, and nothing outside the Apify API is fetched, so no files are returned.`,
             );
-            expect(keyValueStoreMock).not.toHaveBeenCalled();
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
             expectNoToolNamed(result);
         });
@@ -891,14 +873,14 @@ describe('get-actor-version', () => {
             ],
             // A record URL on another host is not read from this API as if it were one of its stores.
             [
-                `https://evil.example.test/v2/key-value-stores/store-1/records/${RECORD_KEY}?signature=secret-signature`,
-                `https://evil.example.test/v2/key-value-stores/store-1/records/${RECORD_KEY}`,
+                `https://evil.example.test${RECORD_PATH}?signature=secret-signature`,
+                `https://evil.example.test${RECORD_PATH}`,
             ],
             [
                 'https://user:secret-signature@downloads.example.com/source.zip',
                 'https://downloads.example.com/source.zip',
             ],
-        ])('reports the zip at %s without its secrets and never fetches it', async (tarballUrl, strippedUrl) => {
+        ])('reports the zip at %s without its secrets', async (tarballUrl, strippedUrl) => {
             versionGetMock.mockResolvedValue(mockTarballVersion(tarballUrl));
 
             const result = await callTool({});
@@ -912,351 +894,23 @@ describe('get-actor-version', () => {
             });
             expect(JSON.stringify(result)).not.toContain('secret-signature');
             expect(result.content[1].text).toMatch(
-                / Only key-value store records of this Apify API are read, so no files are returned\.$/,
+                / builds from the zip at \S+, revision [0-9a-f]{16}\. Nothing outside the Apify API is fetched, so no files are returned\.$/,
             );
-            expect(keyValueStoreMock).not.toHaveBeenCalled();
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
         });
-    });
 
-    describe('zip-stored TARBALL', () => {
-        const ZIP_ENTRIES: ZipEntryOptions[] = [
-            { name: 'src/', method: 0 },
-            { name: MAIN_JS_SOURCE.name, data: MAIN_JS_SOURCE.content, hasDataDescriptor: true },
-            { name: ACTOR_JSON_SOURCE.name, data: ACTOR_JSON_SOURCE.content, method: 0 },
-            { name: LOGO_SOURCE.name, data: LOGO_BYTES, hasDataDescriptor: true },
-        ];
-
-        beforeEach(() => {
+        it('refuses a version stored as a zip in a key-value store of this API, without its URL', async () => {
             versionGetMock.mockResolvedValue(mockTarballVersion());
-            stubArchive(buildZipArchive(ZIP_ENTRIES));
-        });
-
-        it('reads the record with the caller token and returns the same output as inline storage', async () => {
-            versionGetMock.mockResolvedValueOnce(mockVersion());
-            const inline = await callTool({});
-            expect(keyValueStoreMock).not.toHaveBeenCalled();
 
             const result = await callTool({});
 
-            expect(keyValueStoreMock).toHaveBeenCalledWith('store-1');
-            expect(listKeysMock).toHaveBeenCalledWith({ prefix: RECORD_KEY });
-            expect(getRecordMock).toHaveBeenCalledWith(RECORD_KEY, { buffer: true });
-            expect(result.structuredContent).toEqual({ ...inline.structuredContent, sourceType: 'TARBALL' });
-            expect(result.content[1].text).toContain(
-                'Read version 0.1 of john/my-actor, stored as a zip in key-value store store-1 (TARBALL): 3 files',
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                'Version 0.1 of john/my-actor is stored as a zip (TARBALL), and versions stored as a zip cannot be read' +
+                    ' with this tool yet. Open the version in Apify Console to see its source.',
             );
-            expect(JSON.stringify(result)).not.toContain('secret-signature');
-            expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
-            expectNoToolNamed(result);
+            expect(result.structuredContent).toBeUndefined();
+            expect(JSON.stringify(result)).not.toContain(RECORD_PATH);
         });
-
-        it('returns a zip entry as base64 when it has a binary extension or is not UTF-8', async () => {
-            const notUtf8 = Buffer.from([0xc3, 0x28]);
-            stubArchive(
-                buildZipArchive([
-                    { name: 'data.bin', data: 'plain text' },
-                    { name: 'notes.txt', data: notUtf8 },
-                    { name: 'bom.txt', data: '\uFEFFwith bom' },
-                ]),
-            );
-
-            const { structuredContent } = await callTool({ paths: ['data.bin', 'notes.txt', 'bom.txt'] });
-
-            expect(structuredContent.files.map(({ path, format }) => [path, format])).toEqual([
-                ['bom.txt', 'TEXT'],
-                ['data.bin', 'BASE64'],
-                ['notes.txt', 'BASE64'],
-            ]);
-            expect(structuredContent.contents).toEqual([
-                { path: 'data.bin', content: Buffer.from('plain text').toString('base64'), encoding: 'base64' },
-                { path: 'notes.txt', content: notUtf8.toString('base64'), encoding: 'base64' },
-                { path: 'bom.txt', content: '\uFEFFwith bom', encoding: 'utf8' },
-            ]);
-            expect(structuredContent.files[0].hash).toBe(sha256Prefix(Buffer.from('\uFEFFwith bom')));
-        });
-
-        it('refuses a zip the key listing reports over 50 MiB before downloading it', async () => {
-            stubArchive(buildZipArchive(ZIP_ENTRIES), 50 * 1024 * 1024 + 1);
-
-            const text = await callToolExpectingUserError({});
-
-            expect(text).toBe(
-                "The version's zip is 50.1 MiB, over the 50 MiB this tool reads; read it with the Apify CLI (apify pull) instead.",
-            );
-            expect(getRecordMock).not.toHaveBeenCalled();
-        });
-
-        it('refuses a downloaded zip over 50 MiB even when the key listing reported less', async () => {
-            stubArchive(Buffer.alloc(50 * 1024 * 1024 + 1), 1000);
-
-            const text = await callToolExpectingUserError({});
-
-            expect(text).toBe(
-                "The version's zip is 50.1 MiB, over the 50 MiB this tool reads; read it with the Apify CLI (apify pull) instead.",
-            );
-        });
-
-        it('reports a record that does not exist', async () => {
-            listKeysMock.mockResolvedValue({ items: [] });
-
-            const text = await callToolExpectingUserError({});
-
-            expect(text).toBe(
-                `The version points at record ${RECORD_KEY} in key-value store store-1, which does not exist.`,
-            );
-            expect(getRecordMock).not.toHaveBeenCalled();
-        });
-
-        it('reports a store that does not exist', async () => {
-            listKeysMock.mockRejectedValue(apiError(404, 'Store not found'));
-
-            expect(await callToolExpectingUserError({})).toContain('which does not exist.');
-        });
-
-        it('refuses a zip it cannot read safely with a user error', async () => {
-            stubArchive(buildZipArchive([{ name: '../escape.js', data: 'x' }]));
-
-            const text = await callToolExpectingUserError({});
-
-            expect(text).toBe("The version's zip was refused: entry ../escape.js has a '..' segment.");
-        });
-    });
-});
-
-describe('readSourceArchive()', () => {
-    const readPaths = (zip: Buffer) => [...readSourceArchive(zip).keys()];
-
-    it('reads stored, deflated, and data-descriptor entries and skips folders', () => {
-        const files = readSourceArchive(
-            buildZipArchive([
-                { name: 'src/', method: 0 },
-                { name: 'src/main.js', data: 'deflated', hasDataDescriptor: true },
-                { name: 'README.md', data: 'stored', method: 0 },
-                { name: './lib\\util.js', data: 'normalized' },
-                { name: 'empty.txt', data: '' },
-            ]),
-        );
-
-        expect([...files.keys()]).toEqual(['src/main.js', 'README.md', 'lib/util.js', 'empty.txt']);
-        expect(Buffer.from(files.get('src/main.js')!).toString()).toBe('deflated');
-        expect(Buffer.from(files.get('README.md')!).toString()).toBe('stored');
-        expect(files.get('empty.txt')).toHaveLength(0);
-    });
-
-    it('keeps an entry named __proto__ as a file', () => {
-        const files = readSourceArchive(buildZipArchive([{ name: '__proto__', data: 'x' }]));
-
-        expect([...files.keys()]).toEqual(['__proto__']);
-        expect(Object.getPrototypeOf(files)).toBe(Map.prototype);
-    });
-
-    it('reads a zip with a comment after the end record', () => {
-        const zip = buildZipArchive([{ name: 'a.js', data: 'a' }]);
-        zip.writeUInt16LE(5, zip.length - 2);
-
-        expect(readPaths(Buffer.concat([zip, Buffer.from('hello')]))).toEqual(['a.js']);
-    });
-
-    it.each<[string, ZipEntryOptions[], string]>([
-        ['an absolute path', [{ name: '/etc/passwd', data: 'x' }], 'entry /etc/passwd has an absolute path'],
-        ['a Windows drive path', [{ name: 'C:\\evil.js', data: 'x' }], 'entry C:\\evil.js has an absolute path'],
-        ['a .. segment', [{ name: 'src/../../evil.js', data: 'x' }], "entry src/../../evil.js has a '..' segment"],
-        ['a NUL in a name', [{ name: 'a\0b.js', data: 'x' }], 'an entry name contains a NUL character'],
-        [
-            'a regular file whose name is empty after normalization',
-            [{ name: '.', data: 'x' }],
-            'entry . has an empty path',
-        ],
-        [
-            'a name over 255 characters',
-            [{ name: `${'a'.repeat(256)}.js`, data: 'x' }],
-            `entry ${'a'.repeat(40)}... has a name over 255 characters`,
-        ],
-        [
-            'names that repeat after normalization',
-            [
-                { name: 'src/a.js', data: 'x' },
-                { name: './src//a.js', data: 'y' },
-            ],
-            'the path src/a.js appears more than once',
-        ],
-        ['an encrypted entry', [{ name: 'a.js', data: 'x', flags: 0x0001 }], 'entry a.js is encrypted'],
-        ['a strongly encrypted entry', [{ name: 'a.js', data: 'x', flags: 0x0040 }], 'entry a.js is encrypted'],
-        [
-            'an entry of an encrypted central directory',
-            [{ name: 'a.js', data: 'x', flags: 0x2000 }],
-            'entry a.js is encrypted',
-        ],
-        [
-            'a local header with another name',
-            [{ name: 'a.js', data: 'x', localName: 'b.js' }],
-            'entry a.js has a local header that does not match the central directory',
-        ],
-        [
-            'a local header with another compression method',
-            [{ name: 'a.js', data: 'x', localMethod: 0 }],
-            'entry a.js has a local header that does not match the central directory',
-        ],
-        [
-            'an unsupported compression method',
-            [{ name: 'a.js', data: 'x', method: 12 }],
-            'entry a.js uses compression method 12; only stored and deflated entries are read',
-        ],
-        [
-            'a symbolic link',
-            [{ name: 'link.js', data: '/etc/passwd', method: 0, externalAttributes: (0o120777 << 16) >>> 0 }],
-            'entry link.js is a symbolic link',
-        ],
-        [
-            'a special file',
-            [{ name: 'fifo', data: '', method: 0, externalAttributes: (0o010644 << 16) >>> 0 }],
-            'entry fifo is not a regular file or a folder',
-        ],
-        [
-            'a zip64 extra field',
-            [{ name: 'a.js', data: 'x', extraField: Buffer.from([0x01, 0x00, 0x00, 0x00]) }],
-            'entry a.js uses zip64',
-        ],
-        ['a zip64 size marker', [{ name: 'a.js', data: 'x', uncompressedSize: 0xffffffff }], 'entry a.js uses zip64'],
-        [
-            'a declared size smaller than the data',
-            [{ name: 'a.js', data: 'x'.repeat(1000), uncompressedSize: 10 }],
-            'entry a.js is corrupt or larger than it declares',
-        ],
-        [
-            'a declared size larger than the data',
-            [{ name: 'a.js', data: 'short', uncompressedSize: 1000 }],
-            'entry a.js is not the size it declares',
-        ],
-        [
-            'a stored entry with two different sizes',
-            [{ name: 'a.js', data: 'short', method: 0, compressedSize: 3 }],
-            'entry a.js is stored uncompressed but declares two different sizes',
-        ],
-        [
-            'a compressed size that runs past the data',
-            [{ name: 'a.js', data: 'x', compressedSize: 10_000 }],
-            'entry a.js points outside the archive',
-        ],
-        ['a bad CRC-32', [{ name: 'a.js', data: 'content', crc32: 12345 }], 'entry a.js fails its CRC-32 check'],
-        [
-            'a stored entry with a bad CRC-32',
-            [{ name: 'a.js', data: 'content', method: 0, crc32: 12345 }],
-            'entry a.js fails its CRC-32 check',
-        ],
-        [
-            // Exactly 64 MiB passes the total check, so the entry's own size check is what refuses it.
-            'a declared total of exactly 64 MiB only by the entry sizes',
-            [
-                { name: 'a.js', data: 'x', uncompressedSize: 32 * 1024 * 1024 },
-                { name: 'b.js', data: 'x', uncompressedSize: 32 * 1024 * 1024 },
-            ],
-            'entry a.js is not the size it declares',
-        ],
-        [
-            'a declared total over 64 MiB',
-            [
-                { name: 'a.js', data: 'x', uncompressedSize: 40 * 1024 * 1024 },
-                { name: 'b.js', data: 'x', uncompressedSize: 40 * 1024 * 1024 },
-            ],
-            'its entries declare more than 64 MiB uncompressed',
-        ],
-    ])('refuses %s', (_label, entries, reason) => {
-        expect(() => readSourceArchive(buildZipArchive(entries))).toThrow(`The version's zip was refused: ${reason}.`);
-    });
-
-    it('skips a root folder entry and a Unix folder without a trailing slash', () => {
-        const folderAttributes = (0o040755 << 16) >>> 0;
-
-        expect(
-            readPaths(
-                buildZipArchive([
-                    { name: './', method: 0 },
-                    { name: 'lib', method: 0, externalAttributes: folderAttributes },
-                    { name: 'a.js', data: 'a' },
-                ]),
-            ),
-        ).toEqual(['a.js']);
-    });
-
-    it('finds the data where the local header says when its extra field differs from the central one', () => {
-        // Info-ZIP writes an extended timestamp of 28 bytes locally and 24 bytes in the central directory.
-        const buildTimestampField = (dataLength: number) =>
-            Buffer.concat([Buffer.from([0x55, 0x54, dataLength, 0]), Buffer.alloc(dataLength, 1)]);
-        const files = readSourceArchive(
-            buildZipArchive([
-                {
-                    name: 'src/main.js',
-                    data: 'deflated',
-                    hasDataDescriptor: true,
-                    localExtraField: buildTimestampField(24),
-                    extraField: buildTimestampField(20),
-                },
-                { name: 'README.md', data: 'stored', method: 0, localExtraField: buildTimestampField(24) },
-            ]),
-        );
-
-        expect(Buffer.from(files.get('src/main.js')!).toString()).toBe('deflated');
-        expect(Buffer.from(files.get('README.md')!).toString()).toBe('stored');
-    });
-
-    it('refuses an end record that declares fewer entries than the central directory holds', () => {
-        const zip = buildZipArchive(
-            [
-                { name: 'a.js', data: 'a' },
-                { name: 'hidden.js', data: 'b' },
-            ],
-            { declaredEntryCount: 1 },
-        );
-
-        expect(() => readSourceArchive(zip)).toThrow(
-            "The version's zip was refused: its central directory does not match its end record.",
-        );
-    });
-
-    it('ignores an end record signature inside the comment', () => {
-        const comment = Buffer.concat([Buffer.from('PK\x05\x06', 'latin1'), Buffer.alloc(30, 0x78)]);
-
-        expect(readPaths(buildZipArchive([{ name: 'a.js', data: 'a' }], { comment }))).toEqual(['a.js']);
-    });
-
-    it('reads exactly 10,000 entries', () => {
-        const entries = Array.from({ length: 10_000 }, (_, index) => ({ name: `f${index}`, method: 0 }));
-
-        expect(readPaths(buildZipArchive(entries))).toHaveLength(10_000);
-    });
-
-    it('refuses more than 10,000 entries', () => {
-        const entries = Array.from({ length: 10_001 }, (_, index) => ({ name: `f${index}`, method: 0 }));
-
-        expect(() => readSourceArchive(buildZipArchive(entries))).toThrow(
-            "The version's zip was refused: it has 10001 entries, over the 10000 this tool reads.",
-        );
-    });
-
-    it('refuses a zip64 end of central directory locator', () => {
-        const zip = buildZipArchive([{ name: 'a.js', data: 'x' }], { hasZip64Locator: true });
-
-        expect(() => readSourceArchive(zip)).toThrow("The version's zip was refused: it is a zip64 archive.");
-    });
-
-    it('refuses bytes that are not a zip', () => {
-        expect(() => readSourceArchive(Buffer.from('not a zip at all, just some text'))).toThrow(
-            "The version's zip was refused: it is not a zip archive.",
-        );
-    });
-
-    it('refuses a truncated zip', () => {
-        const zip = buildZipArchive([{ name: 'a.js', data: 'x'.repeat(100) }]);
-
-        expect(() => readSourceArchive(zip.subarray(0, zip.length - 10))).toThrow('not a zip archive');
-    });
-});
-
-describe('getCrc32()', () => {
-    it('matches the standard check value', () => {
-        expect(getCrc32(Buffer.from('123456789'))).toBe(0xcbf43926);
-        expect(getCrc32(Buffer.alloc(0))).toBe(0);
     });
 });
