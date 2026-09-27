@@ -424,6 +424,19 @@ describe('readApiResource()', () => {
         expect(error.message).toContain('check APIFY_TOKEN');
     });
 
+    it('appends the back-off hint for a 429 response and classifies it as transient', async () => {
+        const uri = `${API}/v2/datasets/ds-1/items`;
+        const client = stubApifyClient({
+            request: requestFailing(429, 'Too Many Requests', { error: { message: 'Too many requests' } }),
+        });
+
+        const error = await expectReadError(readApiResource(uri, client));
+
+        expect(error).toBeInstanceOf(InternalError);
+        expect(error.message).toContain('HTTP 429: Too many requests');
+        expect(error.message).toContain('Rate limit exceeded');
+    });
+
     it('appends the private-resource hint for a 403 response', async () => {
         const uri = `${API}/v2/datasets/ds-1/items`;
         const client = stubApifyClient({
