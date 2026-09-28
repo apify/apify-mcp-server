@@ -86,7 +86,7 @@ describe('buildApiOperationIndex()', () => {
             'actorPermissionLevel',
             'versions',
         ]);
-        // Only the source fields the version schema declares; buildTag stays settable.
+        // buildTag is not a source field and stays settable.
         const versionSourceFields = [
             'sourceType',
             'sourceFiles',
@@ -144,6 +144,36 @@ describe('buildApiOperationIndex()', () => {
             'isPublic',
             'pricingInfos',
             'actorPermissionLevel',
+            'versions',
+        ]);
+
+        const updateVersion = withOperation('/v2/actors/{actorId}/versions/{versionNumber}', 'put', {
+            ...API_SPEC_FIXTURE.paths['/v2/actors/{actorId}/versions/{versionNumber}'].put,
+            operationId: 'actorVersion_update',
+        });
+        expect(buildApiOperationIndex(updateVersion).get('actorVersion_update')?.refusedBodyFields).toContain(
+            'envVars',
+        );
+        const createVersion = withOperation('/v2/actors/{actorId}/versions', 'post', {
+            ...API_SPEC_FIXTURE.paths['/v2/actors/{actorId}/versions'].post,
+            operationId: 'actorVersion_create',
+        });
+        expect(buildApiOperationIndex(createVersion).get('actorVersion_create')?.access).toBe(API_ACCESS.UNAVAILABLE);
+    });
+
+    it('refuses the source fields even where the schema does not declare them', () => {
+        const withoutEnvVars = withOperation('/v2/actors/{actorId}/versions/{versionNumber}', 'put', {
+            ...API_SPEC_FIXTURE.paths['/v2/actors/{actorId}/versions/{versionNumber}'].put,
+            requestBody: { content: { 'application/json': { schema: { type: 'object', properties: {} } } } },
+        });
+
+        expect(buildApiOperationIndex(withoutEnvVars).get('actor_version_put')?.refusedBodyFields).toEqual([
+            'sourceType',
+            'sourceFiles',
+            'tarballUrl',
+            'gitRepoUrl',
+            'gitHubGistUrl',
+            'envVars',
         ]);
     });
 

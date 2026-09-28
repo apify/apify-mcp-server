@@ -117,30 +117,32 @@ export const REFUSED_BODY_FIELDS: ReadonlySet<string> = new Set([
 /** Refused fields the API accepts on an operation although its body schema does not declare them. */
 const UNDECLARED_REFUSED_BODY_FIELDS = keyRules([['POST /v2/actors', ['pricingInfos', 'actorPermissionLevel']]]);
 
-/** Every rule key, each of which must match an operation of the spec. */
-const RULE_KEYS: readonly string[] = [
-    ...UNAVAILABLE_OPERATION_REASONS.keys(),
-    ...UNDECLARED_REFUSED_BODY_FIELDS.keys(),
-];
-
 /** Body fields of an Actor version that set its source or its environment variables. */
 const VERSION_SOURCE_FIELDS = ['sourceType', 'sourceFiles', 'tarballUrl', 'gitRepoUrl', 'gitHubGistUrl', 'envVars'];
 
 /**
- * Body fields that set an Actor's source, versions, or environment variables, by operation. Most replace
- * a whole source or list, so whatever the body leaves out is gone, secret variables included.
- * Dedicated source tools own these changes. Like the fields above, they are refused only where the
- * operation's schema declares them. The single-variable env var operations stay available.
+ * Body fields that set an Actor's source, versions, or environment variables, by method and path. Most
+ * replace a whole source or list, so whatever the body leaves out is gone, secret variables included.
+ * Unlike the fields above, they are refused whether or not the schema declares them: these bodies are
+ * not free-form, and the API takes the fields either way. The single-variable env var operations stay
+ * available.
  */
-const SOURCE_BODY_FIELDS_BY_OPERATION: ReadonlyMap<string, readonly string[]> = new Map([
-    ['actor_version_post', VERSION_SOURCE_FIELDS],
-    ['actor_version_put', VERSION_SOURCE_FIELDS],
-    ['actors_post', ['versions']],
-    ['actor_put', ['versions']],
+const SOURCE_BODY_FIELDS_BY_OPERATION = keyRules([
+    ['POST /v2/actors/{actorId}/versions/{versionNumber}', VERSION_SOURCE_FIELDS],
+    ['PUT /v2/actors/{actorId}/versions/{versionNumber}', VERSION_SOURCE_FIELDS],
+    ['POST /v2/actors', ['versions']],
+    ['PUT /v2/actors/{actorId}', ['versions']],
 ]);
 
 /** Every source field of `SOURCE_BODY_FIELDS_BY_OPERATION`, to tell its refusal from the others. */
 export const SOURCE_BODY_FIELDS: ReadonlySet<string> = new Set([...SOURCE_BODY_FIELDS_BY_OPERATION.values()].flat());
+
+/** Every rule key, each of which must match an operation of the spec. */
+const RULE_KEYS: readonly string[] = [
+    ...UNAVAILABLE_OPERATION_REASONS.keys(),
+    ...UNDECLARED_REFUSED_BODY_FIELDS.keys(),
+    ...SOURCE_BODY_FIELDS_BY_OPERATION.keys(),
+];
 
 /** Schema keywords that only cost context. `x-*` vendor extensions are dropped by prefix in `dereference()`. */
 const DROPPED_SCHEMA_KEYS: ReadonlySet<string> = new Set(['example', 'examples']);
@@ -309,9 +311,7 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
                     ...[...REFUSED_BODY_FIELDS].filter(
                         (field) => declaredBodyFields.has(field) || undeclaredRefusedFields.includes(field),
                     ),
-                    ...(SOURCE_BODY_FIELDS_BY_OPERATION.get(operationId) ?? []).filter((field) =>
-                        declaredBodyFields.has(field),
-                    ),
+                    ...(SOURCE_BODY_FIELDS_BY_OPERATION.get(ruleKey) ?? []),
                 ],
                 ...resolveAccess(method, path, ruleKey),
             });
