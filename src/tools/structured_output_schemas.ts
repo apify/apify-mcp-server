@@ -899,27 +899,24 @@ export const apifyApiSearchOutputSchema = {
             items: {
                 type: 'object' as const,
                 properties: {
-                    operationId: { type: 'string', description: 'Operation ID' },
                     method: { type: 'string', description: 'HTTP method' },
-                    path: { type: 'string', description: 'Path template' },
+                    path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
                     summary: { type: 'string', description: 'What the operation does' },
                     access: apiAccessProperty,
                     unavailableReason: apiUnavailableReasonProperty,
+                    docsUrl: { type: 'string', description: "The operation's page in the API reference" },
                 },
-                required: ['operationId', 'method', 'path', 'summary', 'access'],
+                required: ['method', 'path', 'summary', 'access', 'docsUrl'],
             },
         },
     },
     required: ['operations'],
 };
 
-/**
- * Schema for one operation's details (apify-api-details).
- */
-export const apifyApiDetailsOutputSchema = {
+/** One operation in the apify-api-details response. */
+const apiOperationDetailsSchema = {
     type: 'object' as const,
     properties: {
-        operationId: { type: 'string', description: 'Operation ID' },
         method: { type: 'string', description: 'HTTP method' },
         path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
         summary: { type: 'string', description: 'What the operation does' },
@@ -956,7 +953,22 @@ export const apifyApiDetailsOutputSchema = {
             description: 'Body fields the API tools refuse to set for this operation',
         },
     },
-    required: ['operationId', 'method', 'path', 'summary', 'description', 'access', 'parameters', 'refusedBodyFields'],
+    required: ['method', 'path', 'summary', 'description', 'access', 'parameters', 'refusedBodyFields'],
+};
+
+/**
+ * Schema for the operations on one path (apify-api-details).
+ */
+export const apifyApiDetailsOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operations: {
+            type: 'array' as const,
+            items: apiOperationDetailsSchema,
+            description: 'The operations on the path, or only the one with the given method',
+        },
+    },
+    required: ['operations'],
 };
 
 /**
@@ -965,9 +977,8 @@ export const apifyApiDetailsOutputSchema = {
 export const apifyApiCallOutputSchema = {
     type: 'object' as const,
     properties: {
-        operationId: { type: 'string', description: 'Operation ID' },
         method: { type: 'string', description: 'HTTP method' },
-        path: { type: 'string', description: 'Request path, with the path parameters filled in' },
+        path: { type: 'string', description: 'Request path as it was sent' },
         statusCode: { type: 'integer', description: 'HTTP status code' },
         contentType: { type: 'string', description: 'Content-Type of the response' },
         data: {
@@ -976,5 +987,5 @@ export const apifyApiCallOutputSchema = {
                 'over the inline limit',
         },
     },
-    required: ['operationId', 'method', 'path', 'statusCode', 'data'],
+    required: ['method', 'path', 'statusCode', 'data'],
 };

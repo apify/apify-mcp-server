@@ -225,6 +225,15 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ name: 'actorTaskId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
+        // The last run; a path with a run ID here matches nothing, since its operation is deprecated.
+        '/v2/actors/{actorId}/runs/last': {
+            get: {
+                operationId: 'actor_runs_last_get',
+                summary: 'Get last run',
+                tags: ['Last Actor run'],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
+            },
+        },
         '/v2/actors/{actorId}/runs/{runId}': {
             get: {
                 operationId: 'actors_run_get',
@@ -263,6 +272,17 @@ export const API_SPEC_FIXTURE = {
                     content: { '*/*': { schema: { type: 'object', additionalProperties: true } } },
                 },
             },
+        },
+        '/v2/users/{userId}': {
+            get: {
+                operationId: 'user_get',
+                summary: 'Get public user data',
+                tags: ['Users/Public information'],
+                parameters: [{ name: 'userId', in: 'path', required: true, schema: { type: 'string' } }],
+            },
+        },
+        '/v2/users/me': {
+            get: { operationId: 'users_me_get', summary: 'Get private user data', tags: ['Users/Private data'] },
         },
         '/v2/users/me/limits': {
             put: {

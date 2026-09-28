@@ -6,9 +6,15 @@ import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
 import { apifyApiRead } from '../../src/tools/api/apify_api_read.js';
-import { buildRequestPath, redactApiCallArgs, validateQueryParams } from '../../src/tools/api/apify_api_request.js';
+import {
+    parseApiPath,
+    redactApiCallArgs,
+    resolvePathOperations,
+    validateQueryParams,
+} from '../../src/tools/api/apify_api_request.js';
 import { apifyApiSearch } from '../../src/tools/api/apify_api_search.js';
 import type * as ApifyApiSpecModule from '../../src/tools/api/apify_api_spec.js';
+import type { ApiOperation } from '../../src/tools/api/apify_api_spec.js';
 import { buildApiOperationIndex } from '../../src/tools/api/apify_api_spec.js';
 import { apifyApiWrite } from '../../src/tools/api/apify_api_write.js';
 import {
@@ -61,31 +67,83 @@ beforeEach(() => {
     requestMock.mockReset();
 });
 
-describe('buildRequestPath()', () => {
-    const datasetItems = INDEX.get('dataset_items_get')!;
-
-    it('fills and encodes the path parameters, turning username/name into username~name', () => {
-        expect(buildRequestPath(datasetItems, { datasetId: 'john/my data' })).toEqual({
-            path: '/v2/datasets/john~my%20data/items',
-        });
-        expect(buildRequestPath(INDEX.get('webhooks_get')!)).toEqual({ path: '/v2/webhooks' });
-    });
-
-    it('sends a value that is not a resource ID, such as a record key, as it is', () => {
-        expect(
-            buildRequestPath(INDEX.get('keyValueStore_record_put')!, { storeId: 'john/store', recordKey: 'a/b' }),
-        ).toEqual({ path: '/v2/key-value-stores/john~store/records/a%2Fb' });
+describe('parseApiPath()', () => {
+    it.each([
+        ['/v2/datasets/john~my data/items', ['datasets', 'john~my%20data', 'items']],
+        ['/v2/datasets/john~my%20data/items', ['datasets', 'john~my%20data', 'items']],
+        ['/v2/datasets/john%7Emy-data', ['datasets', 'john~my-data']],
+        ['/v2/key-value-stores/store-1/records/a%2Fb', ['key-value-stores', 'store-1', 'records', 'a%2Fb']],
+        ['/v2/actor-runs/%3F', ['actor-runs', '%3F']],
+    ])('normalizes %s, so a value works encoded or not', (path, segments) => {
+        expect(parseApiPath(path)).toEqual({ segments });
     });
 
     it.each([
-        [{}, 'Missing path parameter datasetId'],
-        [{ datasetId: '' }, 'Missing path parameter datasetId'],
-        [{ datasetId: 'abc', runId: 'x' }, 'has no path parameter runId'],
-        [{ datasetId: '..' }, 'cannot be ".."'],
-        [{ datasetId: '.' }, 'cannot be "."'],
-    ])('refuses %j', (pathParams, reason) => {
-        const result = buildRequestPath(datasetItems, pathParams);
+        ['/datasets/abc', 'The path must start with /v2/'],
+        ['https://api.apify.com/v2/datasets', 'The path must start with /v2/'],
+        ['/v2/datasets?limit=1', 'The path cannot hold ? or #. Pass query parameters in query.'],
+        ['/v2/datasets#items', 'The path cannot hold ? or #.'],
+        ['/v2/datasets/', 'The path /v2/datasets/ has an empty segment.'],
+        ['/v2//datasets', 'has an empty segment'],
+        ['/v2/datasets/../users/me', 'The path cannot have a .. segment.'],
+        ['/v2/datasets/%2E%2E/users/me', 'The path cannot have a .. segment.'],
+        ['/v2/datasets/./items', 'The path cannot have a . segment.'],
+        ['/v2/datasets/%2e/items', 'The path cannot have a . segment.'],
+        ['/v2/datasets/100%', 'The path segment 100% is not valid URL encoding.'],
+        ['/v2/datasets/{datasetId}/items', 'Replace {datasetId} in the path with its value.'],
+    ])('refuses %s', (path, reason) => {
+        const result = parseApiPath(path);
         expect('error' in result && result.error).toContain(reason);
+    });
+
+    it('takes a template only when asked to', () => {
+        expect(parseApiPath('/v2/datasets/{datasetId}', true)).toEqual({ segments: ['datasets', '%7BdatasetId%7D'] });
+    });
+});
+
+describe('resolvePathOperations()', () => {
+    function resolveIds(path: string): string[] {
+        const result = resolvePathOperations({ index: INDEX, path, loadedToolNames: [] });
+        return 'error' in result ? [] : result.operations.map((operation) => operation.operationId);
+    }
+
+    it('returns every method on the matched template, with the path as it is sent', () => {
+        const result = resolvePathOperations({ index: INDEX, path: '/v2/datasets/my data', loadedToolNames: [] });
+
+        expect(result).toEqual({
+            path: '/v2/datasets/my%20data',
+            operations: [INDEX.get('dataset_get'), INDEX.get('dataset_put'), INDEX.get('dataset_delete')],
+        });
+    });
+
+    it('matches a literal segment only to itself and prefers the template with more literal segments', () => {
+        expect(resolveIds('/v2/users/me')).toEqual(['users_me_get']);
+        expect(resolveIds('/v2/users/abc')).toEqual(['user_get']);
+        expect(resolveIds('/v2/actors/abc/runs/last')).toEqual(['actor_runs_last_get']);
+        expect(resolveIds('/v2/actors/abc/runs/run-1')).toEqual([]);
+    });
+
+    it('matches a concrete path built from each template back to its own operation', () => {
+        for (const operation of INDEX.values()) {
+            const path = operation.path.replace(/\{[^}]+\}/g, 'value-1');
+            const result = resolvePathOperations({ index: INDEX, path, loadedToolNames: [] });
+
+            const { operations } = result as { operations: ApiOperation[] };
+            expect(operations).toContainEqual(operation);
+            expect(operations.filter((matched) => matched.path !== operation.path)).toEqual([]);
+        }
+    });
+
+    it('explains username~name on no match and names the search tool only when the session has it', () => {
+        const path = '/v2/actors/john/my-actor';
+        const withSearch = resolvePathOperations({ index: INDEX, path, loadedToolNames: [HELPER_TOOLS.API_SEARCH] });
+        const withoutSearch = resolvePathOperations({ index: INDEX, path, loadedToolNames: [] });
+
+        const message =
+            'No Apify API operation matches the path /v2/actors/john/my-actor. Write the path with its values ' +
+            'in it; a name is written username~name, as in /v2/actors/john~my-actor.';
+        expect(withSearch).toEqual({ error: `${message} Find the path with ${HELPER_TOOLS.API_SEARCH}.` });
+        expect(withoutSearch).toEqual({ error: message });
     });
 });
 
@@ -96,7 +154,7 @@ describe('validateQueryParams()', () => {
 
     it('refuses a parameter the operation does not declare, such as a token', () => {
         expect(validateQueryParams(INDEX.get('dataset_items_get')!, { format: 'json', token: 'secret' })).toBe(
-            'dataset_items_get does not take the query parameter token. It takes: limit, format.',
+            'GET /v2/datasets/{datasetId}/items does not take the query parameter token. It takes: limit, format.',
         );
     });
 
@@ -125,19 +183,19 @@ describe('validateQueryParams()', () => {
 });
 
 describe('apify-api-search', () => {
-    it('returns the matching operations with their access', async () => {
+    it('returns the matching operations by method and path, with their access and docs page', async () => {
         const result = await callTool(apifyApiSearch, { query: 'delete dataset', limit: 1 });
 
         expectSchemaConformingStructuredContent(result, apifyApiSearchOutputSchema);
         expect(result.structuredContent).toEqual({
             operations: [
                 {
-                    operationId: 'dataset_delete',
                     method: 'DELETE',
                     path: '/v2/datasets/{datasetId}',
                     summary: 'Delete dataset',
                     access: 'unavailable',
                     unavailableReason: expect.stringContaining('Deletion cannot be undone'),
+                    docsUrl: 'https://docs.apify.com/api/v2/dataset-delete',
                 },
             ],
         });
@@ -152,41 +210,61 @@ describe('apify-api-search', () => {
 });
 
 describe('apify-api-details', () => {
-    it('returns the parameters, body schema, and refused fields', async () => {
-        const result = await callTool(apifyApiDetails, { operationId: 'actor_put' });
+    it('returns every operation on a real path when no method is given', async () => {
+        const result = await callTool(apifyApiDetails, { path: '/v2/datasets/abc' });
 
         expectSchemaConformingStructuredContent(result, apifyApiDetailsOutputSchema);
-        expect(result.structuredContent).toMatchObject({
-            operationId: 'actor_put',
-            method: 'PUT',
-            path: '/v2/actors/{actorId}',
-            access: 'write',
-            parameters: [{ name: 'actorId', in: 'path', isRequired: true }],
-            requestBody: { isRequired: false },
-            refusedBodyFields: ['isPublic', 'pricingInfos', 'actorPermissionLevel', 'versions'],
+        const { operations } = result.structuredContent as { operations: { method: string; path: string }[] };
+        expect(operations.map(({ method, path }) => `${method} ${path}`)).toEqual([
+            'GET /v2/datasets/{datasetId}',
+            'PUT /v2/datasets/{datasetId}',
+            'DELETE /v2/datasets/{datasetId}',
+        ]);
+        expect(result.content[1].text).toBe('/v2/datasets/{datasetId}: GET (read), PUT (write), DELETE (unavailable).');
+    });
+
+    it('returns only the operation with the method, for a path template too', async () => {
+        const result = await callTool(apifyApiDetails, { path: '/v2/actors/{actorId}', method: 'PUT' });
+
+        expectSchemaConformingStructuredContent(result, apifyApiDetailsOutputSchema);
+        expect(result.structuredContent).toEqual({
+            operations: [
+                expect.objectContaining({
+                    method: 'PUT',
+                    path: '/v2/actors/{actorId}',
+                    access: 'write',
+                    parameters: [expect.objectContaining({ name: 'actorId', in: 'path', isRequired: true })],
+                    requestBody: expect.objectContaining({ isRequired: false }),
+                    refusedBodyFields: ['isPublic', 'pricingInfos', 'actorPermissionLevel', 'versions'],
+                }),
+            ],
         });
     });
 
-    it('names the search tool on an unknown operation only when the session has it', async () => {
-        const withSearch = await callTool(apifyApiDetails, { operationId: 'nope' });
-        const withoutSearch = await callTool(apifyApiDetails, { operationId: 'nope' }, [HELPER_TOOLS.API_DETAILS]);
+    it('refuses a method the path does not have and lists the ones it has', async () => {
+        const result = await callTool(apifyApiDetails, { path: '/v2/actors/abc', method: 'GET' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe('The path /v2/actors/abc has no GET operation; it matches method PUT.');
+    });
+
+    it('names the search tool on an unknown path only when the session has it', async () => {
+        const withSearch = await callTool(apifyApiDetails, { path: '/v2/nope' });
+        const withoutSearch = await callTool(apifyApiDetails, { path: '/v2/nope' }, [HELPER_TOOLS.API_DETAILS]);
 
         expectSoftFailInvalidInput(withSearch);
-        expect(withSearch.content[0].text).toBe(
-            `API operation nope not found. Find it with ${HELPER_TOOLS.API_SEARCH}.`,
-        );
-        expect(withoutSearch.content[0].text).toBe('API operation nope not found. Operation IDs are case-sensitive.');
+        expect(withSearch.content[0].text).toContain(`Find the path with ${HELPER_TOOLS.API_SEARCH}.`);
+        expect(withoutSearch.content[0].text).not.toContain(HELPER_TOOLS.API_SEARCH);
     });
 });
 
 describe('apify-api-read', () => {
-    it('sends one GET to the filled-in path and returns the body as the API sends it', async () => {
+    it('sends one GET to the path and returns the body as the API sends it', async () => {
         const body = { data: { total: 1, items: [{ id: 'abc' }] } };
         requestMock.mockResolvedValue(mockResponse(200, body));
 
         const result = await callTool(apifyApiRead, {
-            operationId: 'dataset_items_get',
-            pathParams: { datasetId: 'abc' },
+            path: '/v2/datasets/abc/items',
             query: { format: 'json', limit: 1 },
         });
 
@@ -200,7 +278,6 @@ describe('apify-api-read', () => {
         });
         expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
         expect(result.structuredContent).toEqual({
-            operationId: 'dataset_items_get',
             method: 'GET',
             path: '/v2/datasets/abc/items',
             statusCode: 200,
@@ -210,42 +287,45 @@ describe('apify-api-read', () => {
         expect(result.content[1].text).toBe('GET /v2/datasets/abc/items returned HTTP 200.');
     });
 
+    it('sends a value with a space encoded and keeps ~ as it is', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+        const result = await callTool(apifyApiRead, { path: '/v2/datasets/john~my data' });
+
+        expect(requestMock).toHaveBeenCalledWith(
+            expect.objectContaining({ url: `${BASE_URL}/datasets/john~my%20data` }),
+        );
+        expect(result.structuredContent).toMatchObject({ path: '/v2/datasets/john~my%20data' });
+    });
+
     it.each([
         [
-            'dataset_put',
-            'dataset_put is a PUT operation with write access; this tool has read access. ' +
-                `Call it with ${HELPER_TOOLS.API_WRITE}.`,
+            '/v2/actor-runs/run-1/abort',
+            'The path /v2/actor-runs/run-1/abort matches method POST, not GET; this tool sends only GET. ' +
+                'No tool in this session has write access.',
         ],
-        ['actor_runSync_get', 'The API tools do not call actor_runSync_get. It waits up to 300 seconds'],
-        ['nope', 'API operation nope not found.'],
-    ])('refuses %s without a request', async (operationId, reason) => {
-        const result = await callTool(apifyApiRead, { operationId, pathParams: { datasetId: 'abc', actorId: 'a' } });
+        [
+            '/v2/actors/abc/run-sync',
+            'The API tools do not call GET /v2/actors/abc/run-sync. It waits up to 300 seconds',
+        ],
+        ['/v2/nope', 'No Apify API operation matches the path /v2/nope.'],
+        ['/v2/datasets/{datasetId}', 'Replace {datasetId} in the path with its value.'],
+        ['/v2/datasets/abc?limit=1', 'Pass query parameters in query.'],
+    ])('refuses %s without a request', async (path, reason) => {
+        const result = await callTool(apifyApiRead, { path });
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain(reason);
         expect(requestMock).not.toHaveBeenCalled();
     });
 
-    it('names the write tool for a write operation only when the session has it', async () => {
-        const args = { operationId: 'dataset_put', pathParams: { datasetId: 'abc' } };
-        const withWrite = await callTool(apifyApiRead, args);
-        const withoutWrite = await callTool(apifyApiRead, args, [HELPER_TOOLS.API_READ]);
+    it('refuses an undeclared query parameter without a request', async () => {
+        const result = await callTool(apifyApiRead, { path: '/v2/datasets/abc', query: { token: 'secret' } });
 
-        expect(withWrite.content[0].text).toContain(`Call it with ${HELPER_TOOLS.API_WRITE}.`);
-        expect(withoutWrite.content[0].text).not.toContain(HELPER_TOOLS.API_WRITE);
-        expect(withoutWrite.content[0].text).toContain('No tool in this session has write access.');
-    });
-
-    it('refuses bad path or query parameters without a request', async () => {
-        const badPath = await callTool(apifyApiRead, { operationId: 'dataset_get', pathParams: { datasetId: '..' } });
-        const badQuery = await callTool(apifyApiRead, {
-            operationId: 'dataset_get',
-            pathParams: { datasetId: 'abc' },
-            query: { token: 'secret' },
-        });
-
-        expectSoftFailInvalidInput(badPath);
-        expectSoftFailInvalidInput(badQuery);
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            'GET /v2/datasets/{datasetId} does not take the query parameter token. It takes: none.',
+        );
         expect(requestMock).not.toHaveBeenCalled();
     });
 
@@ -254,7 +334,7 @@ describe('apify-api-read', () => {
             mockResponse(404, { error: { type: 'record-not-found', message: 'Dataset was not found' } }),
         );
 
-        const call = callTool(apifyApiRead, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } });
+        const call = callTool(apifyApiRead, { path: '/v2/datasets/abc' });
 
         await expect(call).rejects.toBeInstanceOf(ApifyApiError);
         await expect(call).rejects.toMatchObject({
@@ -269,11 +349,7 @@ describe('apify-api-read', () => {
             new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE'),
         );
 
-        const result = await callTool(apifyApiRead, {
-            operationId: 'dataset_items_get',
-            pathParams: { datasetId: 'abc' },
-            query: { format: 'json' },
-        });
+        const result = await callTool(apifyApiRead, { path: '/v2/datasets/abc/items', query: { format: 'json' } });
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
@@ -284,10 +360,7 @@ describe('apify-api-read', () => {
         const config = { headers: new AxiosHeaders({ Authorization: 'Bearer secret-token' }) };
         requestMock.mockRejectedValue(new AxiosError('socket hang up', 'ECONNRESET', config));
 
-        const error = await callTool(apifyApiRead, {
-            operationId: 'dataset_get',
-            pathParams: { datasetId: 'abc' },
-        }).catch((thrown: unknown) => thrown);
+        const error = await callTool(apifyApiRead, { path: '/v2/datasets/abc' }).catch((thrown: unknown) => thrown);
 
         expect(error).toBeInstanceOf(Error);
         expect(error).not.toBeInstanceOf(AxiosError);
@@ -299,10 +372,7 @@ describe('apify-api-read', () => {
         const controller = new AbortController();
         controller.abort();
         requestMock.mockRejectedValue(new CanceledError());
-        const context = stubToolCallContext(
-            { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } },
-            stubClient,
-        );
+        const context = stubToolCallContext({ path: '/v2/datasets/abc' }, stubClient);
         context.signal = controller.signal;
 
         await expect((apifyApiRead as HelperTool).call(context)).resolves.toEqual({});
@@ -311,7 +381,7 @@ describe('apify-api-read', () => {
     it('describes a binary body instead of returning it', async () => {
         requestMock.mockResolvedValue(mockResponse(200, Buffer.from([1, 2, 3]), 'application/zip'));
 
-        const result = await callTool(apifyApiRead, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } });
+        const result = await callTool(apifyApiRead, { path: '/v2/datasets/abc' });
 
         expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
         expect(result.structuredContent).toMatchObject({ contentType: 'application/zip', data: null });
@@ -322,15 +392,13 @@ describe('apify-api-read', () => {
 
     it('logs a storage signature, webhooks, or an undeclared token only as redacted', () => {
         const args = {
-            operationId: 'dataset_items_get',
-            pathParams: { datasetId: 'abc' },
+            path: '/v2/datasets/abc/items',
             query: { format: 'json', signature: 'sig-secret', webhooks: 'W3t9XQ==', token: 'token-secret' },
         };
 
         expect((apifyApiRead as HelperTool).redactArgs).toBe(redactApiCallArgs);
         expect(redactApiCallArgs(args)).toEqual({
-            operationId: 'dataset_items_get',
-            pathParams: { datasetId: 'abc' },
+            path: '/v2/datasets/abc/items',
             query: { format: 'json', signature: '[REDACTED]', webhooks: '[REDACTED]', token: '[REDACTED]' },
         });
         // The tool itself still gets the real values.
@@ -338,14 +406,15 @@ describe('apify-api-read', () => {
     });
 
     it('logs only the declared arguments and a body only as redacted', () => {
-        const logged = redactApiCallArgs({ operationId: 'dataset_get', body: { value: 'secret' }, extra: 'secret' });
-
-        expect(logged).toEqual({
-            operationId: 'dataset_get',
-            pathParams: undefined,
-            query: undefined,
-            body: '[REDACTED]',
+        const logged = redactApiCallArgs({
+            path: '/v2/datasets/abc',
+            method: 'PUT',
+            body: { value: 'secret' },
+            extra: 'secret',
         });
+
+        expect(logged).toEqual({ path: '/v2/datasets/abc', method: 'PUT', query: undefined, body: '[REDACTED]' });
+        expect(JSON.stringify(logged)).not.toContain('secret');
     });
 });
 

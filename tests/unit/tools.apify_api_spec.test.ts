@@ -16,7 +16,7 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(27);
+        expect(index.size).toBe(30);
     });
 
     it('resolves parameter references and keeps only path and query parameters', () => {
@@ -95,6 +95,14 @@ describe('buildApiOperationIndex()', () => {
         expect(index.get('actor_version_post')?.refusedBodyFields).toEqual(versionSourceFields);
         // A record body is free-form: a record may hold an isPublic key as plain data.
         expect(index.get('keyValueStore_record_put')?.refusedBodyFields).toEqual([]);
+    });
+
+    it('links each operation to its page in the API reference, at the operation ID in kebab case', () => {
+        expect(index.get('actorRun_abort_post')?.docsUrl).toBe('https://docs.apify.com/api/v2/actor-run-abort-post');
+        expect(index.get('PostChargeRun')?.docsUrl).toBe('https://docs.apify.com/api/v2/post-charge-run');
+        expect(index.get('keyValueStore_record_put')?.docsUrl).toBe(
+            'https://docs.apify.com/api/v2/key-value-store-record-put',
+        );
     });
 
     it('returns an empty index for a document without paths', () => {

@@ -9,21 +9,17 @@ import { isMaxContentLengthAbort } from '../../resources/api_resources.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
-import type { ApiAccess, ApiOperation } from './apify_api_spec.js';
+import type { ApiOperation } from './apify_api_spec.js';
 import { API_ACCESS, isRecord, SOURCE_BODY_FIELDS } from './apify_api_spec.js';
 
 /** Input fields the read and write tools share. */
 export const apiCallArgsShape = {
-    operationId: z
+    path: z
         .string()
         .min(1)
-        .describe('The operation ID, for example actor_get. Operation IDs are case-sensitive.'),
-    pathParams: z
-        .record(z.string(), z.string())
-        .optional()
         .describe(
-            'Values for the placeholders in the operation path, by name, for example {"actorId": "apify~web-scraper"}. ' +
-                'An Actor, task, or storage is given by its ID or as username~name.',
+            'The API path with its values in it, for example /v2/datasets/abc/items. A name is written ' +
+                'username~name, as in /v2/actors/john~my-actor. Query parameters go in query, not in the path.',
         ),
     query: z
         .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
@@ -37,15 +33,15 @@ export const apiCallArgsShape = {
 const SECRET_QUERY_PARAMS: readonly string[] = ['token', 'signature', 'webhooks'];
 
 /**
- * The logged copy of an API tool call's arguments (`redactArgs`). An allowlist: it keeps operationId and
- * pathParams, the query with the values of secret parameters redacted, and only a marker for the body,
+ * The logged copy of an API tool call's arguments (`redactArgs`). An allowlist: it keeps the path and
+ * method, the query with the values of secret parameters redacted, and only a marker for the body,
  * which can carry environment variable values, webhook headers, or stored records. An undeclared
  * `token` is redacted too, since it is logged before the query check refuses it.
  */
-export function redactApiCallArgs({ operationId, pathParams, query, body }: Record<string, unknown>) {
+export function redactApiCallArgs({ path, method, query, body }: Record<string, unknown>) {
     return {
-        operationId,
-        pathParams,
+        path,
+        method,
         query: isRecord(query)
             ? Object.fromEntries(
                   Object.entries(query).map(([name, value]) => [
@@ -58,76 +54,146 @@ export function redactApiCallArgs({ operationId, pathParams, query, body }: Reco
     };
 }
 
-/** The not-found text, naming the search tool only when the session has it. */
-export function formatOperationNotFoundMessage(operationId: string, loadedToolNames: readonly string[]): string {
-    const next = loadedToolNames.includes(HELPER_TOOLS.API_SEARCH)
-        ? `Find it with ${HELPER_TOOLS.API_SEARCH}.`
-        : 'Operation IDs are case-sensitive.';
-    return `API operation ${operationId} not found. ${next}`;
+const API_PATH_PREFIX = '/v2/';
+
+/** A template segment that is one path parameter, such as `{datasetId}`. */
+const PATH_PARAMETER_SEGMENT_REGEX = /^\{[^{}]+\}$/;
+
+/**
+ * Checks a request path and returns its segments after `/v2/`, each decoded and encoded again, so a
+ * value works both encoded and not. `~` stays as it is. A template placeholder is refused unless
+ * `canBeTemplate` is set: the API would take `{datasetId}` as the value.
+ */
+export function parseApiPath(path: string, canBeTemplate = false): { segments: string[] } | { error: string } {
+    if (!path.startsWith(API_PATH_PREFIX)) {
+        return { error: `The path must start with ${API_PATH_PREFIX}, for example /v2/actor-runs. Do not pass a URL.` };
+    }
+    if (path.includes('?') || path.includes('#')) {
+        return { error: 'The path cannot hold ? or #. Pass query parameters in query.' };
+    }
+    const segments: string[] = [];
+    for (const rawSegment of path.slice(API_PATH_PREFIX.length).split('/')) {
+        if (!rawSegment) return { error: `The path ${path} has an empty segment. Remove the extra slash.` };
+        if (!canBeTemplate && PATH_PARAMETER_SEGMENT_REGEX.test(rawSegment)) {
+            return { error: `Replace ${rawSegment} in the path with its value.` };
+        }
+        let value: string;
+        try {
+            value = decodeURIComponent(rawSegment);
+        } catch {
+            return { error: `The path segment ${rawSegment} is not valid URL encoding. Write a % as %25.` };
+        }
+        // Encoded or not, `.` and `..` would move the request to another route.
+        if (value === '.' || value === '..') return { error: `The path cannot have a ${value} segment.` };
+        segments.push(encodeURIComponent(value));
+    }
+    return { segments };
 }
 
-/** The operation a tool with the given access may call, or the reason it may not. */
-export function resolveOperationToCall(params: {
-    index: Map<string, ApiOperation>;
-    operationId: string;
-    access: Exclude<ApiAccess, 'unavailable'>;
-    loadedToolNames: readonly string[];
-}): { operation: ApiOperation } | { error: string } {
-    const { index, operationId, access, loadedToolNames } = params;
-    const operation = index.get(operationId);
-    if (!operation) return { error: formatOperationNotFoundMessage(operationId, loadedToolNames) };
-    if (operation.access === API_ACCESS.UNAVAILABLE) {
-        return { error: `The API tools do not call ${operationId}. ${operation.unavailableReason}` };
+/** How many literal segments of the template match the path segments, or `undefined` when it does not match. */
+function countMatchingLiterals(template: string, segments: string[]): number | undefined {
+    const templateSegments = template.slice(API_PATH_PREFIX.length).split('/');
+    if (templateSegments.length !== segments.length) return undefined;
+    let literalCount = 0;
+    for (const [position, templateSegment] of templateSegments.entries()) {
+        if (PATH_PARAMETER_SEGMENT_REGEX.test(templateSegment)) continue;
+        if (templateSegment !== segments[position]) return undefined;
+        literalCount += 1;
     }
-    if (operation.access !== access) {
-        const otherTool = operation.access === API_ACCESS.READ ? HELPER_TOOLS.API_READ : HELPER_TOOLS.API_WRITE;
-        const next = loadedToolNames.includes(otherTool)
-            ? `Call it with ${otherTool}.`
-            : `No tool in this session has ${operation.access} access.`;
+    return literalCount;
+}
+
+/**
+ * The operations on the one path template the segments match, in index order (GET, POST, PUT, DELETE).
+ * When several templates match, the one with more literal segments wins, so `/v2/actors/x/runs/last`
+ * is the last run, not a run with the ID `last`. The published spec has no tie; the first template wins one.
+ */
+function findPathOperations(index: Map<string, ApiOperation>, segments: string[]): ApiOperation[] {
+    let bestLiteralCount = -1;
+    let operations: ApiOperation[] = [];
+    for (const operation of index.values()) {
+        const literalCount = countMatchingLiterals(operation.path, segments);
+        if (literalCount === undefined || literalCount < bestLiteralCount) continue;
+        if (literalCount > bestLiteralCount) {
+            bestLiteralCount = literalCount;
+            operations = [operation];
+        } else if (operation.path === operations[0].path) {
+            operations.push(operation);
+        }
+    }
+    return operations;
+}
+
+/** Method names in a sentence, with an Oxford comma: `GET, PUT, and DELETE`. */
+function formatMethodList(operations: readonly ApiOperation[]): string {
+    const methods = operations.map((operation) => operation.method);
+    if (methods.length <= 2) return methods.join(' and ');
+    return `${methods.slice(0, -1).join(', ')}, and ${methods.at(-1)}`;
+}
+
+/** `method POST` or `methods GET and PUT`. */
+function formatMatchedMethods(operations: readonly ApiOperation[]): string {
+    return `${operations.length === 1 ? 'method' : 'methods'} ${formatMethodList(operations)}`;
+}
+
+/**
+ * The operations on the path template a request path matches, with the path as it is sent, or why
+ * the path is refused. The refusal names the search tool only when the session has it.
+ */
+export function resolvePathOperations(params: {
+    index: Map<string, ApiOperation>;
+    path: string;
+    loadedToolNames: readonly string[];
+    /** Lets the path be a template, such as `/v2/datasets/{datasetId}`; only for describing operations. */
+    canBeTemplate?: boolean;
+}): { path: string; operations: ApiOperation[] } | { error: string } {
+    const parsed = parseApiPath(params.path, params.canBeTemplate);
+    if ('error' in parsed) return parsed;
+    const path = `${API_PATH_PREFIX}${parsed.segments.join('/')}`;
+    const operations = findPathOperations(params.index, parsed.segments);
+    if (operations.length > 0) return { path, operations };
+    const next = params.loadedToolNames.includes(HELPER_TOOLS.API_SEARCH)
+        ? ` Find the path with ${HELPER_TOOLS.API_SEARCH}.`
+        : '';
+    return {
+        error:
+            `No Apify API operation matches the path ${path}. Write the path with its values in it; ` +
+            `a name is written username~name, as in /v2/actors/john~my-actor.${next}`,
+    };
+}
+
+/** The operation among the matched ones with the method, or why there is none. */
+export function resolveMethodOperation(
+    path: string,
+    operations: readonly ApiOperation[],
+    method: string,
+): { operation: ApiOperation } | { error: string } {
+    const operation = operations.find((candidate) => candidate.method === method);
+    if (operation) return { operation };
+    return { error: `The path ${path} has no ${method} operation; it matches ${formatMatchedMethods(operations)}.` };
+}
+
+/** The refusal of an operation the API tools do not call, or `undefined` when they call it. */
+export function formatUnavailableMessage(operation: ApiOperation, path: string): string | undefined {
+    if (operation.access !== API_ACCESS.UNAVAILABLE) return undefined;
+    return `The API tools do not call ${operation.method} ${path}. ${operation.unavailableReason}`;
+}
+
+/** The GET operation on the matched path, or why the read tool may not call the path. */
+export function resolveReadOperation(
+    path: string,
+    operations: readonly ApiOperation[],
+): { operation: ApiOperation } | { error: string } {
+    const operation = operations.find((candidate) => candidate.method === 'GET');
+    if (!operation) {
         return {
             error:
-                `${operationId} is a ${operation.method} operation with ${operation.access} access; this tool has ` +
-                `${access} access. ${next}`,
+                `The path ${path} matches ${formatMatchedMethods(operations)}, not GET; this tool sends only GET. ` +
+                'No tool in this session has write access.',
         };
     }
-    return { operation };
-}
-
-const PATH_PARAMETER_REGEX = /\{([^}]+)\}/g;
-
-/** Path parameters the API also resolves as username~name; other values, such as record keys, are sent as they are. */
-const RESOURCE_ID_PARAMETERS: ReadonlySet<string> = new Set([
-    'actorId',
-    'actorTaskId',
-    'storeId',
-    'datasetId',
-    'queueId',
-    'scheduleId',
-]);
-
-/** Fills the operation's path template; returns the reason instead when the parameters do not fit it. */
-export function buildRequestPath(
-    operation: ApiOperation,
-    pathParams: Record<string, string> = {},
-): { path: string } | { error: string } {
-    const names = [...operation.path.matchAll(PATH_PARAMETER_REGEX)].map((match) => match[1]);
-    const unknownNames = Object.keys(pathParams).filter((name) => !names.includes(name));
-    if (unknownNames.length > 0) {
-        return {
-            error: `${operation.operationId} has no path parameter ${unknownNames.join(', ')}. Its path is ${operation.path}.`,
-        };
-    }
-    let { path } = operation;
-    for (const name of names) {
-        const value = pathParams[name];
-        if (!value) return { error: `Missing path parameter ${name}. The path is ${operation.path}.` };
-        // Encoded, `.` and `..` stay as they are and would move the request to another route.
-        if (value === '.' || value === '..') return { error: `Path parameter ${name} cannot be "${value}".` };
-        // The API takes username~name; apify-client swaps the first slash of a resource ID the same way.
-        const apiValue = RESOURCE_ID_PARAMETERS.has(name) ? value.replace('/', '~') : value;
-        path = path.replace(`{${name}}`, encodeURIComponent(apiValue));
-    }
-    return { path };
+    const unavailableMessage = formatUnavailableMessage(operation, path);
+    return unavailableMessage ? { error: unavailableMessage } : { operation };
 }
 
 /** Query values the API reads as true. */
@@ -143,7 +209,7 @@ export function validateQueryParams(
     const unknownNames = Object.keys(query).filter((name) => !declaredNames.has(name));
     if (unknownNames.length > 0) {
         return (
-            `${operation.operationId} does not take the query parameter ${unknownNames.join(', ')}. ` +
+            `${operation.method} ${operation.path} does not take the query parameter ${unknownNames.join(', ')}. ` +
             `It takes: ${[...declaredNames].join(', ') || 'none'}.`
         );
     }
@@ -257,7 +323,7 @@ function toPlainRequestError(error: unknown): Error {
 }
 
 /**
- * Sends one request to a filled-in operation path and returns the response body.
+ * Sends one request to a matched operation's path and returns the response body.
  *
  * It goes through the client's axios instance, not `httpClient.call()`, like `readApiResource`: one
  * attempt and no retries, since a retried write could apply twice, and apify-client would retry the
@@ -324,7 +390,6 @@ export async function callApiOperation(params: {
     // apify-client parses JSON and text bodies; a binary body stays a Buffer and is not returned.
     const isBinary = Buffer.isBuffer(response.data);
     const structuredContent = {
-        operationId: operation.operationId,
         method: operation.method,
         path,
         statusCode: response.status,
