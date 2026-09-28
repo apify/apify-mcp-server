@@ -223,7 +223,7 @@ describe('fetchApiOperationIndex()', () => {
         const third = await fetchApiOperationIndex();
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(fetchMock).toHaveBeenCalledWith(APIFY_API_OPENAPI_URL);
+        expect(fetchMock).toHaveBeenCalledWith(APIFY_API_OPENAPI_URL, { signal: expect.any(AbortSignal) });
         expect(first.has('dataset_get')).toBe(true);
         expect(second).toBe(first);
         expect(third).toBe(first);
@@ -240,5 +240,22 @@ describe('fetchApiOperationIndex()', () => {
             index.has('dataset_get'),
         );
         expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+        ['a body that is not JSON', '<html>', 'the response is not JSON.'],
+        ['a spec without /v2/ operations', JSON.stringify({ openapi: '3.1.2' }), 'the spec lists no /v2/ operations.'],
+    ])('throws on %s, does not cache it, and tries again on the next call', async (_name, body, reason) => {
+        fetchMock
+            .mockResolvedValueOnce(new Response(body))
+            .mockResolvedValueOnce(new Response(JSON.stringify(API_SPEC_FIXTURE)));
+        const fetchApiOperationIndex = await importFetchApiOperationIndex();
+
+        await expect(fetchApiOperationIndex()).rejects.toThrow(
+            `Failed to load the Apify API operations from ${APIFY_API_OPENAPI_URL}: ${reason}`,
+        );
+        await expect(fetchApiOperationIndex()).resolves.toSatisfy((index: Map<string, unknown>) =>
+            index.has('dataset_get'),
+        );
     });
 });

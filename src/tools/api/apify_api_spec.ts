@@ -297,28 +297,46 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
     return index;
 }
 
+/** How long the spec download may take; MCP clients stop waiting for a tool call after 60 seconds. */
+const SPEC_DOWNLOAD_TIMEOUT_MS = 30_000;
+
 let pendingIndex: Promise<Map<string, ApiOperation>> | undefined;
+
+async function downloadApiOperationIndex(): Promise<Map<string, ApiOperation>> {
+    const failure = `Failed to load the Apify API operations from ${APIFY_API_OPENAPI_URL}`;
+    // Every session waits on this one download, so a stalled one must not hold them all.
+    const response = await fetch(APIFY_API_OPENAPI_URL, { signal: AbortSignal.timeout(SPEC_DOWNLOAD_TIMEOUT_MS) });
+    if (!response.ok) throw new Error(`${failure}: HTTP ${response.status}.`);
+    let spec: unknown;
+    try {
+        spec = await response.json();
+    } catch {
+        throw new Error(`${failure}: the response is not JSON.`);
+    }
+    // An index without operations, or without an operation a rule refuses, is not cached.
+    try {
+        return buildApiOperationIndex(spec);
+    } catch (error) {
+        throw new Error(`${failure}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
 
 /**
  * The operation index, from the published spec, cached for an hour. Concurrent calls share one
- * download. A failed download throws: the tools never call an operation the spec does not list.
+ * download. A failed download throws and is not cached: the tools never call an operation the spec
+ * does not list, and the next call tries again.
  */
 export async function fetchApiOperationIndex(): Promise<Map<string, ApiOperation>> {
     const cached = apifyApiOperationsCache.get(APIFY_API_OPENAPI_URL);
     if (cached) return cached;
-    pendingIndex ??= (async () => {
-        const response = await fetch(APIFY_API_OPENAPI_URL);
-        if (!response.ok) {
-            throw new Error(
-                `Failed to load the Apify API operations from ${APIFY_API_OPENAPI_URL}: HTTP ${response.status}.`,
-            );
-        }
-        const index = buildApiOperationIndex(await response.json());
-        apifyApiOperationsCache.set(APIFY_API_OPENAPI_URL, index);
-        return index;
-    })().finally(() => {
-        pendingIndex = undefined;
-    });
+    pendingIndex ??= downloadApiOperationIndex()
+        .then((index) => {
+            apifyApiOperationsCache.set(APIFY_API_OPENAPI_URL, index);
+            return index;
+        })
+        .finally(() => {
+            pendingIndex = undefined;
+        });
     return pendingIndex;
 }
 
