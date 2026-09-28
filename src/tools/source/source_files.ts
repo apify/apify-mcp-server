@@ -61,13 +61,11 @@ const HASH_HEX_LENGTH = 16;
 // `ignoreBOM` keeps a byte order mark in the text, so the text encodes back to the same bytes and hash.
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
-export type SourceFileFormat = ActorVersionSourceFile['format'];
-
 /** One regular file of a version. */
 export type SourceFile = {
     path: string;
     /** The format the version stores the file in. */
-    format: SourceFileFormat;
+    format: ActorVersionSourceFile['format'];
     /** How the content is returned: UTF-8 text as utf8 whatever its stored format, anything else as base64. */
     encoding: 'utf8' | 'base64';
     /** Length of the decoded bytes. */
@@ -90,8 +88,9 @@ export function hasBinaryExtension(path: string): boolean {
 }
 
 /**
- * A path relative to the Actor root, the way the build worker writes it: backslashes become `/`, and empty and `.`
- * segments are dropped. `..` segments are kept.
+ * A path relative to the Actor root: empty and `.` segments are dropped, as the build worker's path normalization does,
+ * and backslashes become `/`. The build worker keeps a backslash as part of an inline name, so the two can differ for
+ * such a name. `..` segments are kept.
  */
 export function parseSourcePath(name: string): string {
     return name
@@ -101,7 +100,7 @@ export function parseSourcePath(name: string): string {
 }
 
 /** The first 16 hex characters of the SHA-256; for a file's bytes, the same as `sha256sum <file> | cut -c1-16`. */
-export function getSha256Prefix(data: Uint8Array | string): string {
+function getSha256Prefix(data: Uint8Array | string): string {
     return createHash('sha256').update(data).digest('hex').slice(0, HASH_HEX_LENGTH);
 }
 
@@ -135,8 +134,8 @@ export function buildUrlRevision(sourceType: string, url: string): string {
  * building a string, so a listing holds only the bytes.
  */
 export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile {
-    const { name, format }: Partial<ActorVersionSourceFile> & { name: string } = file;
-    const content = (file as Partial<ActorVersionSourceFile>).content ?? '';
+    const { name, format, content: storedContent }: Partial<ActorVersionSourceFile> & { name: string } = file;
+    const content = storedContent ?? '';
     // A name that normalizes to nothing, such as `.`, is kept as stored rather than dropped.
     const path = parseSourcePath(name) || name;
     const bytes = format === 'BASE64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');

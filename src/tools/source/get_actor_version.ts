@@ -3,7 +3,6 @@ import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
@@ -345,7 +344,7 @@ function respondWithSummary(structuredContent: Record<string, unknown>, summary:
 }
 
 type ReadVersionParams = {
-    client: ApifyClient;
+    apiBaseUrl: string;
     target: VersionTarget;
     version: ActorVersion;
     args: GetActorVersionArgs;
@@ -410,7 +409,7 @@ const NOT_ON_APIFY_NOTE =
 
 /** Throws `UserInputError` for a hidden or unsupported source and for a version stored as a zip. */
 function readVersion(params: ReadVersionParams): ToolResponse {
-    const { client, target, version } = params;
+    const { apiBaseUrl, target, version } = params;
     // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
     const { sourceType }: { sourceType: string } = version;
     if (version.sourceType === ActorSourceType.SourceFiles) {
@@ -419,7 +418,7 @@ function readVersion(params: ReadVersionParams): ToolResponse {
     }
     if (version.sourceType === ActorSourceType.Tarball) {
         if (!version.tarballUrl) throw new UserInputError(buildHiddenSourceText(target));
-        if (isSourceRecordUrl(version.tarballUrl, client.baseUrl)) {
+        if (isSourceRecordUrl(version.tarballUrl, apiBaseUrl)) {
             // TODO: Read versions stored as a zip. The plan is yauzl to read the zip (yazl to build zips in tests),
             // with our own caps on the zip size, the entry count, and the inflated size, refusing symbolic links and
             // encrypted entries, and with name rules: no absolute path, no '..' segment, no NUL, no name over 255
@@ -437,7 +436,7 @@ function readVersion(params: ReadVersionParams): ToolResponse {
             url: tarballUrl,
             urlFields: { tarballUrl },
             sourceText: `the zip at ${tarballUrl}`,
-            fetchNote: 'Nothing outside the Apify API is fetched, so no files are returned.',
+            fetchNote: 'This tool does not download zips, so no files are returned.',
         });
     }
     if (version.sourceType === ActorSourceType.GitRepo) {
@@ -536,14 +535,14 @@ export const getActorVersion: ToolEntry = Object.freeze({
             const version = await client.actor(actor.id).version(versionNumber).get();
             if (!version) return respondUserError(`Actor '${parsed.actor}' has no version ${versionNumber}.`);
             return readVersion({
-                client,
+                apiBaseUrl: client.baseUrl,
                 target: { actorId: actor.id, fullName, versionNumber },
                 version,
                 args: parsed,
             });
         } catch (error) {
             if (error instanceof UserInputError) return respondUserError(error.message);
-            // For example a token scoped away from the Actor or its source store; respondServerError records a
+            // For example a token scoped away from the Actor; respondServerError records a
             // 401 or 403 as AUTH and any other 4xx as INVALID_INPUT.
             if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {
                 return respondServerError(error.message, { error });
