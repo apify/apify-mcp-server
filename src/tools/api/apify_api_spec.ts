@@ -60,17 +60,43 @@ const METAMORPH_REASON =
 /** Synchronous run paths. Some are GET, but every one of them starts a paid run. */
 const SYNC_RUN_PATH_REGEX = /\/run-sync(-get-dataset-items)?$/;
 
-/** Operations the API tools refuse by ID, with the reason they report. */
-const UNAVAILABLE_OPERATION_REASONS: ReadonlyMap<string, string> = new Map([
-    ['users_me_limits_put', "It changes the account's spending limits. The user can change them in Apify Console."],
-    ['PostChargeRun', 'It charges the user of a pay-per-event run. Only the Actor itself charges for its events.'],
-    ['actorRun_metamorph_post', METAMORPH_REASON],
-    ['actor_runs_last_metamorph_post', METAMORPH_REASON],
-    ['actorTask_runs_last_metamorph_post', METAMORPH_REASON],
+const PATH_PLACEHOLDER_REGEX = /\{[^{}]+\}/g;
+
+/**
+ * The key of an operation in the rules below: its method and path template, with every placeholder
+ * written `{}`, such as `POST /v2/actor-runs/{}/charge`. The rules are keyed by path, the API's
+ * contract, not by operation ID, which is docs metadata and can be renamed; `{}` keeps a renamed
+ * path parameter from lifting a rule.
+ */
+function toRuleKey(methodAndPath: string): string {
+    return methodAndPath.replace(PATH_PLACEHOLDER_REGEX, '{}');
+}
+
+function keyRules<Value>(rules: readonly (readonly [string, Value])[]): ReadonlyMap<string, Value> {
+    return new Map(rules.map(([methodAndPath, value]) => [toRuleKey(methodAndPath), value]));
+}
+
+const BROWSER_INFO_REASON =
+    'It returns the request headers, and with them the API token the server adds to every request.';
+
+/** Operations the API tools refuse by method and path, with the reason they report. */
+const UNAVAILABLE_OPERATION_REASONS = keyRules([
+    ['PUT /v2/users/me/limits', "It changes the account's spending limits. The user can change them in Apify Console."],
+    [
+        'POST /v2/actor-runs/{runId}/charge',
+        'It charges the user of a pay-per-event run. Only the Actor itself charges for its events.',
+    ],
+    ['POST /v2/actor-runs/{runId}/metamorph', METAMORPH_REASON],
+    ['POST /v2/actors/{actorId}/runs/last/metamorph', METAMORPH_REASON],
+    ['POST /v2/actor-tasks/{actorTaskId}/runs/last/metamorph', METAMORPH_REASON],
+    // A proxy test endpoint; its DELETE is refused like every DELETE.
+    ['GET /v2/browser-info', BROWSER_INFO_REASON],
+    ['POST /v2/browser-info', BROWSER_INFO_REASON],
+    ['PUT /v2/browser-info', BROWSER_INFO_REASON],
     // The API needs sourceType on create, and sourceFiles with the SOURCE_FILES type, which the write
     // tool refuses; a create without them fails. Updating a version checks only the fields it sends.
     [
-        'actor_versions_post',
+        'POST /v2/actors/{actorId}/versions',
         "It sets the new version's source and environment variables, which dedicated source tools or Apify " +
             'Console change.',
     ],
@@ -89,9 +115,13 @@ export const REFUSED_BODY_FIELDS: ReadonlySet<string> = new Set([
 ]);
 
 /** Refused fields the API accepts on an operation although its body schema does not declare them. */
-const UNDECLARED_REFUSED_BODY_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
-    ['actors_post', ['pricingInfos', 'actorPermissionLevel']],
-]);
+const UNDECLARED_REFUSED_BODY_FIELDS = keyRules([['POST /v2/actors', ['pricingInfos', 'actorPermissionLevel']]]);
+
+/** Every rule key, each of which must match an operation of the spec. */
+const RULE_KEYS: readonly string[] = [
+    ...UNAVAILABLE_OPERATION_REASONS.keys(),
+    ...UNDECLARED_REFUSED_BODY_FIELDS.keys(),
+];
 
 /** Body fields of an Actor version that set its source or its environment variables. */
 const VERSION_SOURCE_FIELDS = ['sourceType', 'sourceFiles', 'tarballUrl', 'gitRepoUrl', 'gitHubGistUrl', 'envVars'];
@@ -204,11 +234,11 @@ function splitWords(text: string): string[] {
 function resolveAccess(
     method: ApiMethod,
     path: string,
-    operationId: string,
+    ruleKey: string,
 ): Pick<ApiOperation, 'access' | 'unavailableReason'> {
     if (method === 'DELETE') return { access: API_ACCESS.UNAVAILABLE, unavailableReason: DELETE_REASON };
     if (SYNC_RUN_PATH_REGEX.test(path)) return { access: API_ACCESS.UNAVAILABLE, unavailableReason: SYNC_RUN_REASON };
-    const reason = UNAVAILABLE_OPERATION_REASONS.get(operationId);
+    const reason = UNAVAILABLE_OPERATION_REASONS.get(ruleKey);
     if (reason) return { access: API_ACCESS.UNAVAILABLE, unavailableReason: reason };
     return { access: method === 'GET' ? API_ACCESS.READ : API_ACCESS.WRITE };
 }
@@ -246,19 +276,25 @@ function parseRequestBody(rawRequestBody: unknown, spec: unknown): ApiOperation[
 /**
  * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations,
  * and anything outside `/v2/` are left out; malformed entries are skipped rather than failing the whole spec.
+ * It throws when the spec lists no operation, and when an operation a rule is about is missing from
+ * it: a moved path would otherwise lift the refusal, so the tools stop until the rules are updated.
  */
 export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation> {
     const index = new Map<string, ApiOperation>();
+    // Every operation the spec lists, deprecated or malformed ones too, to check the rules against.
+    const specRuleKeys = new Set<string>();
     const paths = isRecord(spec) && isRecord(spec.paths) ? spec.paths : {};
     for (const [path, pathItem] of Object.entries(paths)) {
         if (!path.startsWith('/v2/') || !isRecord(pathItem)) continue;
         for (const method of API_METHODS) {
+            const ruleKey = toRuleKey(`${method} ${path}`);
+            if (pathItem[method.toLowerCase()] !== undefined) specRuleKeys.add(ruleKey);
             const parsed = openApiOperationValidator.safeParse(pathItem[method.toLowerCase()]);
             if (!parsed.success || parsed.data.deprecated) continue;
             const { operationId, summary, description, tags, parameters, requestBody } = parsed.data;
             const body = parseRequestBody(requestBody, spec);
             const declaredBodyFields = extractTopLevelPropertyNames(body?.schema);
-            const undeclaredRefusedFields = UNDECLARED_REFUSED_BODY_FIELDS.get(operationId) ?? [];
+            const undeclaredRefusedFields = UNDECLARED_REFUSED_BODY_FIELDS.get(ruleKey) ?? [];
             index.set(operationId, {
                 operationId,
                 method,
@@ -277,35 +313,61 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
                         declaredBodyFields.has(field),
                     ),
                 ],
-                ...resolveAccess(method, path, operationId),
+                ...resolveAccess(method, path, ruleKey),
             });
         }
+    }
+    if (index.size === 0) throw new Error('the spec lists no /v2/ operations.');
+    const missingRuleKeys = RULE_KEYS.filter((ruleKey) => !specRuleKeys.has(ruleKey));
+    if (missingRuleKeys.length > 0) {
+        throw new Error(
+            `the spec no longer lists ${missingRuleKeys.join(', ')}, which the API tools have rules for. ` +
+                'Update the rules in apify_api_spec.ts.',
+        );
     }
     return index;
 }
 
+/** How long the spec download may take; MCP clients stop waiting for a tool call after 60 seconds. */
+const SPEC_DOWNLOAD_TIMEOUT_MS = 30_000;
+
 let pendingIndex: Promise<Map<string, ApiOperation>> | undefined;
+
+async function downloadApiOperationIndex(): Promise<Map<string, ApiOperation>> {
+    const failure = `Failed to load the Apify API operations from ${APIFY_API_OPENAPI_URL}`;
+    // Every session waits on this one download, so a stalled one must not hold them all.
+    const response = await fetch(APIFY_API_OPENAPI_URL, { signal: AbortSignal.timeout(SPEC_DOWNLOAD_TIMEOUT_MS) });
+    if (!response.ok) throw new Error(`${failure}: HTTP ${response.status}.`);
+    let spec: unknown;
+    try {
+        spec = await response.json();
+    } catch {
+        throw new Error(`${failure}: the response is not JSON.`);
+    }
+    // An index without operations, or without an operation a rule refuses, is not cached.
+    try {
+        return buildApiOperationIndex(spec);
+    } catch (error) {
+        throw new Error(`${failure}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
 
 /**
  * The operation index, from the published spec, cached for an hour. Concurrent calls share one
- * download. A failed download throws: the tools never call an operation the spec does not list.
+ * download. A failed download throws and is not cached: the tools never call an operation the spec
+ * does not list, and the next call tries again.
  */
 export async function fetchApiOperationIndex(): Promise<Map<string, ApiOperation>> {
     const cached = apifyApiOperationsCache.get(APIFY_API_OPENAPI_URL);
     if (cached) return cached;
-    pendingIndex ??= (async () => {
-        const response = await fetch(APIFY_API_OPENAPI_URL);
-        if (!response.ok) {
-            throw new Error(
-                `Failed to load the Apify API operations from ${APIFY_API_OPENAPI_URL}: HTTP ${response.status}.`,
-            );
-        }
-        const index = buildApiOperationIndex(await response.json());
-        apifyApiOperationsCache.set(APIFY_API_OPENAPI_URL, index);
-        return index;
-    })().finally(() => {
-        pendingIndex = undefined;
-    });
+    pendingIndex ??= downloadApiOperationIndex()
+        .then((index) => {
+            apifyApiOperationsCache.set(APIFY_API_OPENAPI_URL, index);
+            return index;
+        })
+        .finally(() => {
+            pendingIndex = undefined;
+        });
     return pendingIndex;
 }
 

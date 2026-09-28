@@ -1,6 +1,8 @@
 /**
  * A small OpenAPI document shaped like https://docs.apify.com/api/openapi.json: `$ref` parameters and
  * bodies, examples, and `x-*` extensions, and one operation of each kind the API tools treat differently.
+ * Each path has the methods it has in the published spec, and every operation a refusal rule is
+ * about is here, since the index refuses a spec without them.
  */
 export const API_SPEC_FIXTURE = {
     openapi: '3.1.2',
@@ -57,6 +59,12 @@ export const API_SPEC_FIXTURE = {
             head: { operationId: 'dataset_items_head', summary: 'Get dataset items headers' },
         },
         '/v2/actor-runs/{runId}/dataset': {
+            get: {
+                operationId: 'actorRun_dataset_get',
+                summary: 'Get default dataset',
+                tags: ['Default dataset'],
+                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
+            },
             put: {
                 operationId: 'actorRun_dataset_put',
                 summary: 'Update default dataset',
@@ -65,6 +73,12 @@ export const API_SPEC_FIXTURE = {
                 requestBody: {
                     content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateDatasetRequest' } } },
                 },
+            },
+            delete: {
+                operationId: 'actorRun_dataset_delete',
+                summary: 'Delete default dataset',
+                tags: ['Default dataset'],
+                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
         '/v2/actor-runs/{runId}': {
@@ -77,6 +91,19 @@ export const API_SPEC_FIXTURE = {
                     { name: 'waitForFinish', in: 'query', schema: { type: 'number' } },
                 ],
             },
+            put: {
+                operationId: 'actorRun_put',
+                summary: 'Update run',
+                tags: ['Actor runs'],
+                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
+                requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+            },
+            delete: {
+                operationId: 'actorRun_delete',
+                summary: 'Delete run',
+                tags: ['Actor runs'],
+                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
+            },
         },
         '/v2/actor-runs/{runId}/log': {
             get: {
@@ -86,6 +113,8 @@ export const API_SPEC_FIXTURE = {
                 parameters: [
                     { name: 'runId', in: 'path', required: true, schema: { type: 'string' } },
                     { name: 'stream', in: 'query', schema: { type: 'boolean' } },
+                    { name: 'download', in: 'query', schema: { type: 'boolean' } },
+                    { name: 'raw', in: 'query', schema: { type: 'boolean' } },
                 ],
             },
         },
@@ -114,6 +143,15 @@ export const API_SPEC_FIXTURE = {
             },
         },
         '/v2/actors': {
+            get: {
+                operationId: 'actors_get',
+                summary: 'Get list of Actors',
+                tags: ['Actors'],
+                parameters: [
+                    { name: 'offset', in: 'query', schema: { type: 'number' } },
+                    { name: 'limit', in: 'query', schema: { type: 'number' } },
+                ],
+            },
             post: {
                 operationId: 'actors_post',
                 summary: 'Create Actor',
@@ -125,6 +163,12 @@ export const API_SPEC_FIXTURE = {
             },
         },
         '/v2/actors/{actorId}': {
+            get: {
+                operationId: 'actor_get',
+                summary: 'Get Actor',
+                tags: ['Actors'],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
+            },
             put: {
                 operationId: 'actor_put',
                 summary: 'Update Actor',
@@ -133,6 +177,12 @@ export const API_SPEC_FIXTURE = {
                 requestBody: {
                     content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateActorRequest' } } },
                 },
+            },
+            delete: {
+                operationId: 'actor_delete',
+                summary: 'Delete Actor',
+                tags: ['Actors'],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
             },
         },
         '/v2/actors/{actorId}/versions': {
@@ -243,6 +293,13 @@ export const API_SPEC_FIXTURE = {
             },
         },
         '/v2/actors/{actorId}/run-sync': {
+            post: {
+                operationId: 'actor_runSync_post',
+                summary: 'Run Actor synchronously with input and return output',
+                tags: ['Actors/Actor runs'],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
+                requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
+            },
             get: {
                 operationId: 'actor_runSync_get',
                 summary: 'Run Actor synchronously without input',
@@ -259,6 +316,15 @@ export const API_SPEC_FIXTURE = {
             },
         },
         '/v2/key-value-stores/{storeId}/records/{recordKey}': {
+            get: {
+                operationId: 'keyValueStore_record_get',
+                summary: 'Get record',
+                tags: ['Storage/Key-value stores'],
+                parameters: [
+                    { name: 'storeId', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'recordKey', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+            },
             put: {
                 operationId: 'keyValueStore_record_put',
                 summary: 'Store record',
@@ -271,6 +337,28 @@ export const API_SPEC_FIXTURE = {
                     required: true,
                     content: { '*/*': { schema: { type: 'object', additionalProperties: true } } },
                 },
+            },
+            post: {
+                operationId: 'keyValueStore_record_post',
+                summary: 'Store record (POST)',
+                tags: ['Storage/Key-value stores'],
+                parameters: [
+                    { name: 'storeId', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'recordKey', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+                requestBody: {
+                    required: true,
+                    content: { '*/*': { schema: { type: 'object', additionalProperties: true } } },
+                },
+            },
+            delete: {
+                operationId: 'keyValueStore_record_delete',
+                summary: 'Delete record',
+                tags: ['Storage/Key-value stores'],
+                parameters: [
+                    { name: 'storeId', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'recordKey', in: 'path', required: true, schema: { type: 'string' } },
+                ],
             },
         },
         '/v2/users/{userId}': {
@@ -285,6 +373,7 @@ export const API_SPEC_FIXTURE = {
             get: { operationId: 'users_me_get', summary: 'Get private user data', tags: ['Users/Private data'] },
         },
         '/v2/users/me/limits': {
+            get: { operationId: 'users_me_limits_get', summary: 'Get limits', tags: ['Users/Usage'] },
             put: {
                 operationId: 'users_me_limits_put',
                 summary: 'Update limits',
@@ -294,6 +383,12 @@ export const API_SPEC_FIXTURE = {
         },
         '/v2/webhooks': {
             get: { operationId: 'webhooks_get', summary: 'Get list of webhooks', tags: ['Webhooks/Webhooks'] },
+            post: {
+                operationId: 'webhooks_post',
+                summary: 'Create webhook',
+                tags: ['Webhooks/Webhooks'],
+                requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+            },
         },
         '/v2/actors/{actorId}/webhooks': {
             get: {
@@ -324,6 +419,15 @@ export const API_SPEC_FIXTURE = {
                 ],
                 requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
             },
+            delete: {
+                operationId: 'requestQueue_request_delete',
+                summary: 'Delete request',
+                tags: ['Storage/Request queues/Requests'],
+                parameters: [
+                    { name: 'queueId', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'requestId', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+            },
         },
         '/v2/request-queues/{queueId}/requests/batch': {
             post: {
@@ -339,6 +443,13 @@ export const API_SPEC_FIXTURE = {
                 tags: ['Storage/Request queues'],
                 parameters: [{ name: 'queueId', in: 'path', required: true, schema: { type: 'string' } }],
             },
+        },
+        // Echoes the request headers, and with them the API token.
+        '/v2/browser-info': {
+            get: { operationId: 'tools_browser_info_get', summary: 'Get browser info', tags: ['Tools'] },
+            post: { operationId: 'tools_browser_info_post', summary: 'Post browser info', tags: ['Tools'] },
+            put: { operationId: 'tools_browser_info_put', summary: 'Put browser info', tags: ['Tools'] },
+            delete: { operationId: 'tools_browser_info_delete', summary: 'Delete browser info', tags: ['Tools'] },
         },
         '/outside/v2': { get: { operationId: 'outside_get', summary: 'Outside the API' } },
         '/v2/broken': { get: { summary: 'No operation ID' } },

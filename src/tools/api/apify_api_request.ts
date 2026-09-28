@@ -32,27 +32,35 @@ export const apiCallArgsShape = {
 /** Query parameters whose values grant access or carry secrets: a storage signature, and webhooks with headers. */
 const SECRET_QUERY_PARAMS: readonly string[] = ['token', 'signature', 'webhooks'];
 
+/** Stands in for a logged value that may carry a secret. */
+const REDACTED = '[REDACTED]';
+
 /**
  * The logged copy of an API tool call's arguments (`redactArgs`). An allowlist: it keeps the path and
  * method, the query with the values of secret parameters redacted, and only a marker for the body,
  * which can carry environment variable values, webhook headers, or stored records. An undeclared
  * `token` is redacted too, since it is logged before the query check refuses it. So is a query
  * written into the path, such as a public URL's `?signature=`, which the path check refuses only
- * after the arguments are logged.
+ * after the arguments are logged. A path or query of the wrong type, which AJV refuses after the
+ * arguments are logged, is logged only as a marker.
  */
 export function redactApiCallArgs({ path, method, query, body }: Record<string, unknown>) {
+    let loggedQuery: unknown;
+    if (isRecord(query)) {
+        loggedQuery = Object.fromEntries(
+            Object.entries(query).map(([name, value]) => [name, SECRET_QUERY_PARAMS.includes(name) ? REDACTED : value]),
+        );
+    } else if (query !== undefined) {
+        loggedQuery = REDACTED;
+    }
+    let loggedPath: unknown;
+    if (typeof path === 'string') loggedPath = path.replace(/[?#][\s\S]*$/, `?${REDACTED}`);
+    else if (path !== undefined) loggedPath = REDACTED;
     return {
-        path: typeof path === 'string' ? path.replace(/[?#][\s\S]*$/, '?[REDACTED]') : path,
+        path: loggedPath,
         method,
-        query: isRecord(query)
-            ? Object.fromEntries(
-                  Object.entries(query).map(([name, value]) => [
-                      name,
-                      SECRET_QUERY_PARAMS.includes(name) ? '[REDACTED]' : value,
-                  ]),
-              )
-            : query,
-        ...(body !== undefined && { body: '[REDACTED]' }),
+        query: loggedQuery,
+        ...(body !== undefined && { body: REDACTED }),
     };
 }
 
@@ -137,11 +145,18 @@ function findPathOperations(index: Map<string, ApiOperation>, segments: string[]
     return operations;
 }
 
-/** Method names in a sentence, with an Oxford comma: `GET, PUT, and DELETE`. */
+/** Words in a sentence, with an Oxford comma: `GET, PUT, and DELETE`. */
+function formatList(words: readonly string[], conjunction: 'and' | 'or'): string {
+    if (words.length <= 2) return words.join(` ${conjunction} `);
+    return `${words.slice(0, -1).join(', ')}, ${conjunction} ${words.at(-1)}`;
+}
+
+/** Method names in a sentence: `GET, PUT, and DELETE`. */
 function formatMethodList(operations: readonly ApiOperation[]): string {
-    const methods = operations.map((operation) => operation.method);
-    if (methods.length <= 2) return methods.join(' and ');
-    return `${methods.slice(0, -1).join(', ')}, and ${methods.at(-1)}`;
+    return formatList(
+        operations.map((operation) => operation.method),
+        'and',
+    );
 }
 
 /** `method POST` or `methods GET and PUT`. */
@@ -363,11 +378,32 @@ export function validateRequestBody(operation: ApiOperation, body: unknown): str
     return sentences.join(' ');
 }
 
-function formatOversizeMessage(operation: ApiOperation, path: string): string {
-    const next =
-        operation.method === 'GET'
-            ? 'Narrow the request, for example with the limit, offset, or fields query parameters if the operation declares them.'
-            : 'The request itself was sent; check its effect with an operation with read access.';
+/** Query parameters that make a response smaller. */
+const NARROWING_QUERY_PARAMS: readonly string[] = ['limit', 'offset', 'fields', 'omit'];
+
+/** The dedicated tool that returns the end of a log too large for the API tools, when the session has it. */
+function findLogToolName(path: string, loadedToolNames: readonly string[]): string | undefined {
+    if (!/\/log$|^\/v2\/logs\//.test(path)) return undefined;
+    const toolName = path.startsWith('/v2/actor-builds/') ? HELPER_TOOLS.ACTOR_BUILD_LOG : HELPER_TOOLS.ACTOR_RUNS_LOG;
+    return loadedToolNames.includes(toolName) ? toolName : undefined;
+}
+
+/** The refusal of a response over the inline limit, with the parameters the operation has to narrow it. */
+function formatOversizeMessage(operation: ApiOperation, path: string, loadedToolNames: readonly string[]): string {
+    const narrowingNames = operation.parameters
+        .filter((parameter) => parameter.in === 'query' && NARROWING_QUERY_PARAMS.includes(parameter.name))
+        .map((parameter) => parameter.name);
+    const logToolName = findLogToolName(operation.path, loadedToolNames);
+    let next: string;
+    if (operation.method !== 'GET') {
+        next = 'The request itself was sent; check its effect with an operation with read access.';
+    } else if (narrowingNames.length > 0) {
+        next = `Narrow the request with the ${formatList(narrowingNames, 'or')} query parameter.`;
+    } else if (logToolName) {
+        next = `Get the end of the log with ${logToolName} instead.`;
+    } else {
+        next = 'The operation has no query parameter that narrows it, so the API tools cannot return it.';
+    }
     return `The response of ${operation.method} ${path} is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned. ${next}`;
 }
 
@@ -409,6 +445,8 @@ export async function callApiOperation(params: {
     body?: unknown;
     /** Aborts the request when the client cancels the tool call. */
     signal?: AbortSignal;
+    /** The session's tools, to name a dedicated log tool when a log is too large. */
+    loadedToolNames: readonly string[];
 }): Promise<ToolResponse> {
     const { client, operation, path } = params;
     let response: AxiosResponse<unknown>;
@@ -445,7 +483,7 @@ export async function callApiOperation(params: {
                     `${MAX_INLINE_BYTES} bytes, so it is not returned; check the result with an operation with read access.`;
                 return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
             }
-            return respondUserError(formatOversizeMessage(operation, path));
+            return respondUserError(formatOversizeMessage(operation, path, params.loadedToolNames));
         }
         throw toPlainRequestError(error);
     }

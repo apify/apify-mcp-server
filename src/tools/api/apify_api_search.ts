@@ -29,7 +29,8 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         hasTool(HELPER_TOOLS.API_WRITE) && `${HELPER_TOOLS.API_WRITE} for write access`,
     ].filter(Boolean);
     const nextSteps = [
-        hasTool(HELPER_TOOLS.API_DETAILS) && `get its parameters with ${HELPER_TOOLS.API_DETAILS} by its path`,
+        hasTool(HELPER_TOOLS.API_DETAILS) &&
+            `get its parameters with ${HELPER_TOOLS.API_DETAILS} by its method and path`,
         callTools.length > 0 && `call it with ${callTools.join(' or ')}`,
     ].filter(Boolean);
     const renameExample = hasTool(HELPER_TOOLS.API_WRITE) ? '\n- user_input: Rename my dataset to leads-2026' : '';

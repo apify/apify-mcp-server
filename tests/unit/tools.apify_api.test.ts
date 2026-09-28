@@ -131,6 +131,7 @@ describe('resolvePathOperations()', () => {
         expect(resolveIds('/v2/request-queues/q/requests/r-1')).toEqual([
             'requestQueue_request_get',
             'requestQueue_request_put',
+            'requestQueue_request_delete',
         ]);
         expect(resolveIds('/v2/actors/abc/runs/last')).toEqual(['actor_runs_last_get']);
         expect(resolveIds('/v2/actors/abc/runs/run-1')).toEqual([]);
@@ -269,19 +270,45 @@ describe('apify-api-details', () => {
         });
     });
 
+    it('leaves the refused fields out of the body schema it returns', async () => {
+        const result = await callTool(apifyApiDetails, { path: '/v2/actors/abc', method: 'PUT' });
+
+        const [operation] = (result.structuredContent as { operations: { requestBody: { schema: unknown } }[] })
+            .operations;
+        expect(operation.requestBody.schema).toEqual({
+            allOf: [{ type: 'object', properties: {} }],
+            properties: { title: { type: 'string' } },
+        });
+        // The index keeps the full schema.
+        expect(INDEX.get('actor_put')?.requestBody?.schema).toMatchObject({
+            properties: { isPublic: { type: 'boolean' }, pricingInfos: { type: 'array' } },
+        });
+    });
+
     it('refuses a method the path does not have and lists the ones it has', async () => {
-        const result = await callTool(apifyApiDetails, { path: '/v2/actors/abc', method: 'GET' });
+        const result = await callTool(apifyApiDetails, { path: '/v2/actor-runs/abc/abort', method: 'GET' });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toBe('The path /v2/actors/abc has no GET operation; it matches method PUT.');
+        expect(result.content[0].text).toBe(
+            'The path /v2/actor-runs/abc/abort has no GET operation; it matches method POST.',
+        );
     });
 
     it('echoes a template path with its braces in a refusal', async () => {
-        const result = await callTool(apifyApiDetails, { path: '/v2/actors/{actorId}', method: 'GET' });
+        const result = await callTool(apifyApiDetails, { path: '/v2/actor-runs/{runId}/abort', method: 'GET' });
 
         expect(result.content[0].text).toBe(
-            'The path /v2/actors/{actorId} has no GET operation; it matches method PUT.',
+            'The path /v2/actor-runs/{runId}/abort has no GET operation; it matches method POST.',
         );
+    });
+
+    it('logs a query written into the path only as redacted', () => {
+        expect((apifyApiDetails as HelperTool).redactArgs).toBe(redactApiCallArgs);
+        expect(redactApiCallArgs({ path: '/v2/datasets/abc?token=token-secret', method: 'GET' })).toEqual({
+            path: '/v2/datasets/abc?[REDACTED]',
+            method: 'GET',
+            query: undefined,
+        });
     });
 
     it('names the search tool on an unknown path only when the session has it', async () => {
@@ -353,6 +380,10 @@ describe('apify-api-read', () => {
             '/v2/actors/abc/run-sync',
             'The API tools do not call GET /v2/actors/abc/run-sync. It waits up to 300 seconds',
         ],
+        [
+            '/v2/browser-info',
+            'The API tools do not call GET /v2/browser-info. It returns the request headers, and with them the API token',
+        ],
         ['/v2/nope', 'No Apify API operation matches the path /v2/nope.'],
         ['/v2/datasets/{datasetId}', 'Replace {datasetId} in the path with its value.'],
         ['/v2/datasets/abc?limit=1', 'Pass query parameters in query.'],
@@ -402,16 +433,39 @@ describe('apify-api-read', () => {
         });
     });
 
-    it('does not return a body over the inline limit', async () => {
-        requestMock.mockRejectedValue(
-            new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE'),
-        );
+    /** The abort axios throws for a body over `maxContentLength`; Node's request keeps the response status. */
+    function buildOversizeError(statusCode: number) {
+        return new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE', undefined, {
+            res: { statusCode },
+        });
+    }
+
+    it('does not return a body over the inline limit and names the parameters that narrow it', async () => {
+        requestMock.mockRejectedValue(buildOversizeError(200));
 
         const result = await callTool(apifyApiRead, { path: '/v2/datasets/abc/items', query: { format: 'json' } });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
-        expect(result.content[0].text).toContain('limit, offset, or fields');
+        expect(result.content[0].text).toBe(
+            `The response of GET /v2/datasets/abc/items is larger than ${MAX_INLINE_BYTES} bytes, so it is not ` +
+                'returned. Narrow the request with the limit query parameter.',
+        );
+    });
+
+    it('sends a log over the inline limit to the log tool when the session has it', async () => {
+        requestMock.mockRejectedValue(buildOversizeError(200));
+
+        const withLogTool = await callTool(apifyApiRead, { path: '/v2/actor-runs/abc/log' }, [
+            HELPER_TOOLS.ACTOR_RUNS_LOG,
+        ]);
+        const withoutLogTool = await callTool(apifyApiRead, { path: '/v2/actor-runs/abc/log' }, []);
+
+        expect(withLogTool.content[0].text).toContain(
+            `Get the end of the log with ${HELPER_TOOLS.ACTOR_RUNS_LOG} instead.`,
+        );
+        expect(withoutLogTool.content[0].text).toContain(
+            'The operation has no query parameter that narrows it, so the API tools cannot return it.',
+        );
     });
 
     it('rethrows any other request failure without the request config, which holds the token', async () => {
@@ -483,6 +537,19 @@ describe('apify-api-read', () => {
         expect(logged).toEqual({ path: '/v2/datasets/abc', method: 'PUT', query: undefined, body: '[REDACTED]' });
         expect(JSON.stringify(logged)).not.toContain('secret');
     });
+
+    it('logs a query or a path of the wrong type only as redacted', () => {
+        for (const args of [
+            { path: '/v2/datasets/abc', query: 'signature=sig-secret' },
+            { path: '/v2/datasets/abc', query: ['token=token-secret'] },
+            { path: ['/v2/datasets/abc?token=token-secret'] },
+        ]) {
+            const logged = redactApiCallArgs(args);
+
+            expect(JSON.stringify(logged)).not.toContain('secret');
+            expect(JSON.stringify(logged)).toContain('[REDACTED]');
+        }
+    });
 });
 
 describe('apify-api-write', () => {
@@ -537,7 +604,10 @@ describe('apify-api-write', () => {
             };
         };
         const call = async (body: unknown) => {
-            const context = stubToolCallContext({ path: '/v2/key-value-stores/s/records/a%2FK', body }, client);
+            const context = stubToolCallContext(
+                { path: '/v2/key-value-stores/s/records/a%2FK', method: 'PUT', body },
+                client,
+            );
             return (await (apifyApiWrite as HelperTool).call(context)) as TextToolResult;
         };
 
@@ -571,7 +641,10 @@ describe('apify-api-write', () => {
             { path: '/v2/datasets/abc', method: 'DELETE' },
             'The API tools do not call DELETE /v2/datasets/abc. Deletion cannot be undone',
         ],
-        [{ path: '/v2/users/me/limits', body: {} }, 'The API tools do not call PUT /v2/users/me/limits.'],
+        [
+            { path: '/v2/users/me/limits', method: 'PUT', body: {} },
+            'The API tools do not call PUT /v2/users/me/limits.',
+        ],
         [{ path: '/v2/actor-runs/run-1/metamorph' }, 'It turns the run into a run of another Actor'],
         [
             { path: '/v2/datasets/abc', method: 'GET' },
@@ -586,7 +659,7 @@ describe('apify-api-write', () => {
         ],
         [
             // A JSON-encoded string would otherwise get past the refused-field check.
-            { path: '/v2/actors/john~my-actor', body: '{"isPublic":true}' },
+            { path: '/v2/actors/john~my-actor', method: 'PUT', body: '{"isPublic":true}' },
             'Pass the body of PUT /v2/actors/{actorId} as a JSON object or array, not as a string.',
         ],
         [
@@ -594,11 +667,11 @@ describe('apify-api-write', () => {
             'POST /v2/actor-runs/{runId}/abort takes no request body.',
         ],
         [
-            { path: '/v2/actors/john~my-actor', body: { title: 'T', isPublic: false } },
+            { path: '/v2/actors/john~my-actor', method: 'PUT', body: { title: 'T', isPublic: false } },
             'The API tools do not set isPublic, whatever the value',
         ],
         [
-            { path: '/v2/actors', body: { name: 'x', actorPermissionLevel: 'FULL_PERMISSIONS' } },
+            { path: '/v2/actors', method: 'POST', body: { name: 'x', actorPermissionLevel: 'FULL_PERMISSIONS' } },
             'The API tools do not set actorPermissionLevel, whatever the value',
         ],
         [
@@ -621,7 +694,10 @@ describe('apify-api-write', () => {
             { path: '/v2/actors/john~my-actor/versions/0.1', method: 'PUT', body: { sourceFiles: [] } },
             'The API tools do not set sourceFiles',
         ],
-        [{ path: '/v2/actors/john~my-actor', body: { versions: [] } }, 'The API tools do not set versions'],
+        [
+            { path: '/v2/actors/john~my-actor', method: 'PUT', body: { versions: [] } },
+            'The API tools do not set versions',
+        ],
         [
             {
                 path: '/v2/actors/john~my-actor/versions/0.1',
@@ -657,6 +733,7 @@ describe('apify-api-write', () => {
     it('lists every refused field in one refusal and says to call again when the rest of the body sets something', async () => {
         const result = await callTool(apifyApiWrite, {
             path: '/v2/actors/john~my-actor',
+            method: 'PUT',
             body: { title: 'T', isPublic: true, versions: [] },
         });
 
@@ -681,10 +758,10 @@ describe('apify-api-write', () => {
     });
 
     it('uses the only method of a path whose only method is GET, and refuses it as a read', async () => {
-        const result = await callTool(apifyApiWrite, { path: '/v2/webhooks' });
+        const result = await callTool(apifyApiWrite, { path: '/v2/users/me' });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toContain('GET /v2/webhooks has read access; this tool has write access.');
+        expect(result.content[0].text).toContain('GET /v2/users/me has read access; this tool has write access.');
     });
 
     it('sends a version field that does not replace the source, such as buildTag', async () => {
@@ -710,6 +787,7 @@ describe('apify-api-write', () => {
 
         const result = await callTool(apifyApiWrite, {
             path: '/v2/key-value-stores/store-1/records/CONFIG',
+            method: 'PUT',
             body: { isPublic: true },
         });
 

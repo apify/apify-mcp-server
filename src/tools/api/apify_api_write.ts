@@ -114,6 +114,7 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
             query: parsed.query,
             body: parsed.body,
             signal: toolArgs.signal,
+            loadedToolNames: toolArgs.loadedToolNames,
         });
     },
 } as const);
