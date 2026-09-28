@@ -40,7 +40,7 @@ const apifyApiWriteArgs = z.object({
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const findPath = hasTool(HELPER_TOOLS.API_SEARCH) ? `\nFind the path with ${HELPER_TOOLS.API_SEARCH}.` : '';
     const getParameters = hasTool(HELPER_TOOLS.API_DETAILS)
-        ? `\nGet the operation's parameters and body schema first with ${HELPER_TOOLS.API_DETAILS}.`
+        ? `\nGet the operation's parameters and body schema first with ${HELPER_TOOLS.API_DETAILS} and the method.`
         : '';
     return dedent`
         Send a POST or PUT request to the Apify API at a path with its values in it, such as
