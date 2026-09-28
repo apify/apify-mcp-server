@@ -285,6 +285,24 @@ describe('apify-api-details', () => {
         );
     });
 
+    it('logs a query written into the path only as redacted', () => {
+        expect((apifyApiDetails as HelperTool).redactArgs).toBe(redactApiCallArgs);
+        expect(redactApiCallArgs({ path: '/v2/datasets/abc?token=token-secret', method: 'GET' })).toEqual({
+            path: '/v2/datasets/abc?[REDACTED]',
+            method: 'GET',
+            query: undefined,
+        });
+    });
+
+    it('names the search tool on an unknown path only when the session has it', async () => {
+        const withSearch = await callTool(apifyApiDetails, { path: '/v2/nope' });
+        const withoutSearch = await callTool(apifyApiDetails, { path: '/v2/nope' }, [HELPER_TOOLS.API_DETAILS]);
+
+        expectSoftFailInvalidInput(withSearch);
+        expect(withSearch.content[0].text).toContain(`Find the path with ${HELPER_TOOLS.API_SEARCH}.`);
+        expect(withoutSearch.content[0].text).not.toContain(HELPER_TOOLS.API_SEARCH);
+    });
+
     it('names the search tool on an unknown path only when the session has it', async () => {
         const withSearch = await callTool(apifyApiDetails, { path: '/v2/nope' });
         const withoutSearch = await callTool(apifyApiDetails, { path: '/v2/nope' }, [HELPER_TOOLS.API_DETAILS]);
@@ -465,5 +483,18 @@ describe('apify-api-read', () => {
 
         expect(logged).toEqual({ path: '/v2/datasets/abc', method: 'PUT', query: undefined, body: '[REDACTED]' });
         expect(JSON.stringify(logged)).not.toContain('secret');
+    });
+
+    it('logs a query or a path of the wrong type only as redacted', () => {
+        for (const args of [
+            { path: '/v2/datasets/abc', query: 'signature=sig-secret' },
+            { path: '/v2/datasets/abc', query: ['token=token-secret'] },
+            { path: ['/v2/datasets/abc?token=token-secret'] },
+        ]) {
+            const logged = redactApiCallArgs(args);
+
+            expect(JSON.stringify(logged)).not.toContain('secret');
+            expect(JSON.stringify(logged)).toContain('[REDACTED]');
+        }
     });
 });

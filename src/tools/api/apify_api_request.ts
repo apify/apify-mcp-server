@@ -31,27 +31,35 @@ export const apiCallArgsShape = {
 /** Query parameters whose values grant access or carry secrets: a storage signature, and webhooks with headers. */
 const SECRET_QUERY_PARAMS: readonly string[] = ['token', 'signature', 'webhooks'];
 
+/** Stands in for a logged value that may carry a secret. */
+const REDACTED = '[REDACTED]';
+
 /**
  * The logged copy of an API tool call's arguments (`redactArgs`). An allowlist: it keeps the path and
  * method, the query with the values of secret parameters redacted, and only a marker for the body,
  * which can carry environment variable values, webhook headers, or stored records. An undeclared
  * `token` is redacted too, since it is logged before the query check refuses it. So is a query
  * written into the path, such as a public URL's `?signature=`, which the path check refuses only
- * after the arguments are logged.
+ * after the arguments are logged. A path or query of the wrong type, which AJV refuses after the
+ * arguments are logged, is logged only as a marker.
  */
 export function redactApiCallArgs({ path, method, query, body }: Record<string, unknown>) {
+    let loggedQuery: unknown;
+    if (isRecord(query)) {
+        loggedQuery = Object.fromEntries(
+            Object.entries(query).map(([name, value]) => [name, SECRET_QUERY_PARAMS.includes(name) ? REDACTED : value]),
+        );
+    } else if (query !== undefined) {
+        loggedQuery = REDACTED;
+    }
+    let loggedPath: unknown;
+    if (typeof path === 'string') loggedPath = path.replace(/[?#][\s\S]*$/, `?${REDACTED}`);
+    else if (path !== undefined) loggedPath = REDACTED;
     return {
-        path: typeof path === 'string' ? path.replace(/[?#][\s\S]*$/, '?[REDACTED]') : path,
+        path: loggedPath,
         method,
-        query: isRecord(query)
-            ? Object.fromEntries(
-                  Object.entries(query).map(([name, value]) => [
-                      name,
-                      SECRET_QUERY_PARAMS.includes(name) ? '[REDACTED]' : value,
-                  ]),
-              )
-            : query,
-        ...(body !== undefined && { body: '[REDACTED]' }),
+        query: loggedQuery,
+        ...(body !== undefined && { body: REDACTED }),
     };
 }
 

@@ -7,7 +7,7 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { apifyApiDetailsOutputSchema } from '../structured_output_schemas.js';
-import { resolveMethodOperation, resolvePathOperations } from './apify_api_request.js';
+import { redactApiCallArgs, resolveMethodOperation, resolvePathOperations } from './apify_api_request.js';
 import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiDetailsArgs = z.object({
@@ -60,6 +60,8 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
         idempotentHint: true,
         openWorldHint: false,
     },
+    // Only path and method are declared; a query written into a pasted path, such as ?token=, is cut.
+    redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiDetailsArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
