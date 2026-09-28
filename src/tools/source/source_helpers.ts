@@ -329,12 +329,6 @@ function formatMissingDockerfileWarning(entries: readonly ActorVersionSourceFile
     );
 }
 
-/** The decoded bytes of a stored entry; a missing format or content reads as TEXT and empty, as the build worker reads it. */
-export function getSourceFileEntryBytes(entry: ActorVersionSourceFile): Buffer {
-    const { format, content = '' }: Partial<ActorVersionSourceFile> = entry;
-    return format === 'BASE64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
-}
-
 /**
  * Ported from the platform's `stringByteLength` (apify-core packages/utils/src/conversion.ts): the utf8 length, except that a surrogate pair counts 5 bytes rather than 4 (each
  * half is counted as a 3-byte code unit, then the trail half gives one back). Base64 counts its encoded length.

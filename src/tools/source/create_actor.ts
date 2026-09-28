@@ -17,6 +17,7 @@ import {
     buildFilesManifest,
     buildFilesRevision,
     buildUrlRevision,
+    decodeSourceFileEntry,
     isFolderEntry,
     parseStoredPath,
 } from './source_files.js';
@@ -27,7 +28,6 @@ import {
     formatBuildStartFailure,
     buildSentFilesWarnings,
     formatUrlWithoutSecrets,
-    getSourceFileEntryBytes,
     MAX_WRITE_FILES,
     parseInputFiles,
     respondToSourceToolError,
@@ -114,7 +114,7 @@ function buildFilesWarnings(
     const isConfigRewritten =
         sentConfig !== undefined &&
         storedConfig !== undefined &&
-        !getSourceFileEntryBytes(sentConfig).equals(getSourceFileEntryBytes(storedConfig));
+        !decodeSourceFileEntry(sentConfig).equals(decodeSourceFileEntry(storedConfig));
     const rewrittenWarning =
         `The platform set the name field of ${ACTOR_CONFIG_PATH} to the Actor name, so the stored file differs ` +
         'from the one sent; its hash in files, and the revision, are those of the stored file.';
