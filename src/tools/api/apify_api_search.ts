@@ -26,13 +26,16 @@ const apifyApiSearchArgs = z.object({
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const callTools = [hasTool(HELPER_TOOLS.API_READ) && `${HELPER_TOOLS.API_READ} for read access`].filter(Boolean);
     const nextSteps = [
-        hasTool(HELPER_TOOLS.API_DETAILS) && `get its parameters with ${HELPER_TOOLS.API_DETAILS}`,
+        hasTool(HELPER_TOOLS.API_DETAILS) && `get its parameters with ${HELPER_TOOLS.API_DETAILS} by its path`,
         callTools.length > 0 && `call it with ${callTools.join(' or ')}`,
     ].filter(Boolean);
     const nextStepsSentence = nextSteps.length > 0 ? `\nAfter finding an operation, ${nextSteps.join(', then ')}.` : '';
     return dedent`
-        Search the Apify API reference for operations by keywords. Returns each operation's ID, method,
-        path, summary, and access: read, write, or unavailable with the reason the API tools do not call it.${nextStepsSentence}
+        Search the Apify API reference for operations by keywords. Returns each operation's method, path
+        template, summary, link to the API reference, and access: read, write, or unavailable with the
+        reason the API tools do not call it.${nextStepsSentence}
+        To call an operation, fill its path template with real values: /v2/datasets/{datasetId}/items
+        becomes /v2/datasets/abc/items, and a name is written username~name.
         Prefer a dedicated Apify tool when one does what the user asks.
 
         USAGE:
@@ -68,12 +71,12 @@ export const apifyApiSearch: ToolEntry = Object.freeze({
         const parsed = apifyApiSearchArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
         const operations = searchApiOperations(index, parsed.query, parsed.limit).map((operation) => ({
-            operationId: operation.operationId,
             method: operation.method,
             path: operation.path,
             summary: operation.summary,
             access: operation.access,
             ...(operation.unavailableReason && { unavailableReason: operation.unavailableReason }),
+            docsUrl: operation.docsUrl,
         }));
         const result = { operations };
         const summary =

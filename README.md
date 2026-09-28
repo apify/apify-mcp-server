@@ -294,9 +294,9 @@ Legend for the **Enabled by default** column:
 | `get-actor-build` | builds | Get an Actor build's status. |  |
 | `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
 | `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
-| `apify-api-search` | api | Search the Apify API reference for operations by keywords. |  |
-| `apify-api-details` | api | Get an Apify API operation's parameters and request body schema. |  |
-| `apify-api-read` | api | Call a read-only (GET) Apify API operation by its operation ID. |  |
+| `apify-api-search` | api | Search the Apify API reference for operations by keywords. Returns each one's method, path, and docs page. |  |
+| `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. |  |
+| `apify-api-read` | api | Send a GET request to an Apify API path, such as `/v2/actor-runs`. |  |
 
 > **Note:**
 >

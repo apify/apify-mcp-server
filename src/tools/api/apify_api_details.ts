@@ -7,21 +7,30 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { apifyApiDetailsOutputSchema } from '../structured_output_schemas.js';
-import { apiCallArgsShape, formatOperationNotFoundMessage } from './apify_api_request.js';
-import { fetchApiOperationIndex } from './apify_api_spec.js';
+import { resolveMethodOperation, resolvePathOperations } from './apify_api_request.js';
+import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiDetailsArgs = z.object({
-    operationId: apiCallArgsShape.operationId,
+    path: z
+        .string()
+        .min(1)
+        .describe(
+            'The API path, as a template such as /v2/datasets/{datasetId} or with its values in it, ' +
+                'such as /v2/datasets/abc.',
+        ),
+    method: z
+        .enum(API_METHODS)
+        .optional()
+        .describe('HTTP method of the operation. Omit it to get every operation on the path.'),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const findOperation = hasTool(HELPER_TOOLS.API_SEARCH)
-        ? ` Find the operation ID with ${HELPER_TOOLS.API_SEARCH}.`
-        : '';
+    const findPath = hasTool(HELPER_TOOLS.API_SEARCH) ? ` Find the path with ${HELPER_TOOLS.API_SEARCH}.` : '';
     return dedent`
-        Get one Apify API operation: its method, path, description, path and query parameters, and the
-        JSON schema of its request body. Also returns its access (read, write, or unavailable with the
-        reason) and the body fields the API tools refuse to set.${findOperation}
+        Get the Apify API operations on a path: for each method, its description, path and query
+        parameters, and the JSON schema of its request body. Also returns each operation's access (read,
+        write, or unavailable with the reason) and the body fields the API tools refuse to set.${findPath}
+        Give a method to get only that operation, for example {"path": "/v2/datasets/abc", "method": "PUT"}.
 
         USAGE:
         - Use before calling an operation, to pass the right parameters and body.
@@ -33,7 +42,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 }
 
 /**
- * Returns one operation of the published Apify API spec, https://docs.apify.com/api/v2.
+ * Returns the operations on one path of the published Apify API spec, https://docs.apify.com/api/v2.
  */
 export const apifyApiDetails: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -54,23 +63,34 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiDetailsArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
-        const operation = index.get(parsed.operationId);
-        if (!operation) {
-            return respondUserError(formatOperationNotFoundMessage(parsed.operationId, toolArgs.loadedToolNames));
+        const matched = resolvePathOperations({
+            index,
+            path: parsed.path,
+            loadedToolNames: toolArgs.loadedToolNames,
+            canBeTemplate: true,
+        });
+        if ('error' in matched) return respondUserError(matched.error);
+        let { operations } = matched;
+        if (parsed.method) {
+            const resolved = resolveMethodOperation(matched.path, operations, parsed.method);
+            if ('error' in resolved) return respondUserError(resolved.error);
+            operations = [resolved.operation];
         }
         const result = {
-            operationId: operation.operationId,
-            method: operation.method,
-            path: operation.path,
-            summary: operation.summary,
-            description: operation.description,
-            access: operation.access,
-            ...(operation.unavailableReason && { unavailableReason: operation.unavailableReason }),
-            parameters: operation.parameters,
-            ...(operation.requestBody && { requestBody: operation.requestBody }),
-            refusedBodyFields: operation.refusedBodyFields,
+            operations: operations.map((operation) => ({
+                method: operation.method,
+                path: operation.path,
+                summary: operation.summary,
+                description: operation.description,
+                access: operation.access,
+                ...(operation.unavailableReason && { unavailableReason: operation.unavailableReason }),
+                parameters: operation.parameters,
+                ...(operation.requestBody && { requestBody: operation.requestBody }),
+                refusedBodyFields: operation.refusedBodyFields,
+            })),
         };
-        const summary = `${operation.operationId}: ${operation.method} ${operation.path}, ${operation.access} access.`;
+        const methods = operations.map((operation) => `${operation.method} (${operation.access})`).join(', ');
+        const summary = `${operations[0].path}: ${methods}.`;
         return respondOk([JSON.stringify(result), summary], { structuredContent: result });
     },
 } as const);

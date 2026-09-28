@@ -13,8 +13,11 @@ export const API_ACCESS = {
 export type ApiAccess = (typeof API_ACCESS)[keyof typeof API_ACCESS];
 
 /** HEAD is left out: it returns no body, and each HEAD operation has a GET twin. */
-const INDEXED_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const;
-type ApiMethod = (typeof INDEXED_METHODS)[number];
+export const API_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const;
+export type ApiMethod = (typeof API_METHODS)[number];
+
+/** The API reference has one page per operation, at the operation ID in kebab case. */
+const API_DOCS_BASE_URL = 'https://docs.apify.com/api/v2';
 
 export type ApiParameter = {
     name: string;
@@ -25,12 +28,15 @@ export type ApiParameter = {
 };
 
 export type ApiOperation = {
+    /** The spec's key for the operation. Internal: the tools find operations by method and path. */
     operationId: string;
     method: ApiMethod;
     /** Path template, for example `/v2/actors/{actorId}`. */
     path: string;
     summary: string;
     description: string;
+    /** The operation's page in the API reference. */
+    docsUrl: string;
     tags: string[];
     /** Path and query parameters; header parameters are left out, the tools never send them. */
     parameters: ApiParameter[];
@@ -47,7 +53,7 @@ const DELETE_REASON =
     'Deletion cannot be undone, so the API tools do not delete. The user can delete it in Apify Console.';
 const SYNC_RUN_REASON =
     'It waits up to 300 seconds for the run to finish, longer than MCP clients wait for a tool call. ' +
-    'Start the run with actors_runs_post or actorTask_runs_post instead.';
+    'Start the run with POST /v2/actors/{actorId}/runs or POST /v2/actor-tasks/{actorTaskId}/runs instead.';
 const METAMORPH_REASON =
     'It turns the run into a run of another Actor, which cannot be undone. Only the Actor itself metamorphs its run.';
 
@@ -160,6 +166,15 @@ function extractTopLevelPropertyNames(schema: unknown): Set<string> {
     return names;
 }
 
+/** Lowercase words of a text, splitting camelCase, snake_case, kebab-case, and paths. */
+function splitWords(text: string): string[] {
+    return text
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter(Boolean);
+}
+
 function resolveAccess(
     method: ApiMethod,
     path: string,
@@ -211,7 +226,7 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
     const paths = isRecord(spec) && isRecord(spec.paths) ? spec.paths : {};
     for (const [path, pathItem] of Object.entries(paths)) {
         if (!path.startsWith('/v2/') || !isRecord(pathItem)) continue;
-        for (const method of INDEXED_METHODS) {
+        for (const method of API_METHODS) {
             const parsed = openApiOperationValidator.safeParse(pathItem[method.toLowerCase()]);
             if (!parsed.success || parsed.data.deprecated) continue;
             const { operationId, summary, description, tags, parameters, requestBody } = parsed.data;
@@ -224,6 +239,7 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
                 path,
                 summary: summary ?? '',
                 description: description ?? '',
+                docsUrl: `${API_DOCS_BASE_URL}/${splitWords(operationId).join('-')}`,
                 tags: tags ?? [],
                 parameters: parseParameters(parameters, spec),
                 ...(body && { requestBody: body }),
@@ -277,15 +293,6 @@ const SEARCH_STOP_WORDS: ReadonlySet<string> = new Set([
     'to',
     'with',
 ]);
-
-/** Lowercase words of a text, splitting camelCase, snake_case, kebab-case, and paths. */
-function splitWords(text: string): string[] {
-    return text
-        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-        .toLowerCase()
-        .split(/[^a-z0-9]+/)
-        .filter(Boolean);
-}
 
 /** Verbs for what each method does, so a verb the summary does not use, such as rename, still counts. */
 const METHOD_VERBS: Record<ApiMethod, readonly string[]> = {

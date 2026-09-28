@@ -9,25 +9,28 @@ import { respondUserError } from '../../utils/mcp.js';
 import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
 import {
     apiCallArgsShape,
-    buildRequestPath,
     callApiOperation,
     redactApiCallArgs,
-    resolveOperationToCall,
+    resolvePathOperations,
+    resolveReadOperation,
     validateQueryParams,
 } from './apify_api_request.js';
-import { API_ACCESS, fetchApiOperationIndex } from './apify_api_spec.js';
+import { fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiReadArgs = z.object(apiCallArgsShape);
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    const findPath = hasTool(HELPER_TOOLS.API_SEARCH) ? `\nFind the path with ${HELPER_TOOLS.API_SEARCH}.` : '';
     const getParameters = hasTool(HELPER_TOOLS.API_DETAILS)
-        ? `\nGet the operation's parameters first with ${HELPER_TOOLS.API_DETAILS}.`
+        ? `\nGet the operation's query parameters first with ${HELPER_TOOLS.API_DETAILS}.`
         : '';
     return dedent`
-        Call one Apify API operation with read access (GET), by its operation ID. The server builds the
-        URL from the operation's path and pathParams and adds the API token: never pass a URL or a token.${getParameters}
+        Send a GET request to the Apify API at a path with its values in it, such as /v2/actor-runs/abc.
+        The server adds the host and the API token: never pass a URL or a token.${findPath}${getParameters}
         Returns the response body as the API sends it, JSON with its data wrapper included; a body over
         ${MAX_INLINE_BYTES} bytes is not returned.
+
+        Example call: {"path": "/v2/datasets/abc/items", "query": {"format": "json", "limit": 10}}
 
         USAGE:
         - Use for data no dedicated tool returns, such as webhooks, usage, and limits.
@@ -39,7 +42,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 }
 
 /**
- * Calls one GET operation of the published Apify API spec, https://docs.apify.com/api/v2.
+ * Sends a GET to a path of the published Apify API spec, https://docs.apify.com/api/v2.
  */
 export const apifyApiRead: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -62,24 +65,23 @@ export const apifyApiRead: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiReadArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
-        const resolved = resolveOperationToCall({
+        const matched = resolvePathOperations({
             index,
-            operationId: parsed.operationId,
-            access: API_ACCESS.READ,
+            path: parsed.path,
             loadedToolNames: toolArgs.loadedToolNames,
         });
+        if ('error' in matched) return respondUserError(matched.error);
+        const resolved = resolveReadOperation(matched.path, matched.operations);
         if ('error' in resolved) return respondUserError(resolved.error);
         const { operation } = resolved;
 
-        const request = buildRequestPath(operation, parsed.pathParams);
-        if ('error' in request) return respondUserError(request.error);
         const queryError = validateQueryParams(operation, parsed.query);
         if (queryError) return respondUserError(queryError);
 
         return callApiOperation({
             client: toolArgs.apifyClient,
             operation,
-            path: request.path,
+            path: matched.path,
             query: parsed.query,
             signal: toolArgs.signal,
         });
