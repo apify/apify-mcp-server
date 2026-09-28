@@ -186,6 +186,12 @@ export const API_SPEC_FIXTURE = {
             },
         },
         '/v2/actors/{actorId}/versions': {
+            get: {
+                operationId: 'actor_versions_get',
+                summary: 'Get list of versions',
+                tags: ['Actors/Actor versions'],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
+            },
             post: {
                 operationId: 'actor_versions_post',
                 summary: 'Create version',
@@ -198,6 +204,15 @@ export const API_SPEC_FIXTURE = {
             },
         },
         '/v2/actors/{actorId}/versions/{versionNumber}': {
+            get: {
+                operationId: 'actor_version_get',
+                summary: 'Get version',
+                tags: ['Actors/Actor versions'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+            },
             post: {
                 operationId: 'actor_version_post',
                 summary: 'Update version (POST)',
@@ -223,6 +238,15 @@ export const API_SPEC_FIXTURE = {
                     required: true,
                     content: { 'application/json': { schema: { $ref: '#/components/schemas/VersionRequest' } } },
                 },
+            },
+            delete: {
+                operationId: 'actor_version_delete',
+                summary: 'Delete version',
+                tags: ['Actors/Actor versions'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                ],
             },
         },
         // The single-variable env var operations, which the envVars refusal points to.
@@ -301,6 +325,12 @@ export const API_SPEC_FIXTURE = {
             },
         },
         '/v2/actors/{actorId}/runs': {
+            get: {
+                operationId: 'actor_runs_get',
+                summary: 'Get list of runs',
+                tags: ['Actors/Actor runs'],
+                parameters: [{ $ref: '#/components/parameters/actorId' }],
+            },
             post: {
                 operationId: 'actors_runs_post',
                 summary: 'Run Actor',

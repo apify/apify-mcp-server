@@ -396,13 +396,13 @@ describe('apify-api-read', () => {
     });
 
     it('names the write tool for a path without GET only when the session has it', async () => {
-        const args = { path: '/v2/actors/john~my-actor/versions/0.1' };
+        const args = { path: '/v2/request-queues/q/requests/batch' };
         const withWrite = await callTool(apifyApiRead, args);
         const withoutWrite = await callTool(apifyApiRead, args, [HELPER_TOOLS.API_READ]);
 
         expect(withWrite.content[0].text).toBe(
-            'The path /v2/actors/john~my-actor/versions/0.1 matches methods POST and PUT, not GET; this tool ' +
-                `sends only GET. Call it with ${HELPER_TOOLS.API_WRITE} and method POST or PUT.`,
+            'The path /v2/request-queues/q/requests/batch matches methods POST and DELETE, not GET; this tool ' +
+                `sends only GET. Call it with ${HELPER_TOOLS.API_WRITE} and method POST.`,
         );
         expect(withoutWrite.content[0].text).not.toContain(HELPER_TOOLS.API_WRITE);
         expect(withoutWrite.content[0].text).toContain('No tool in this session has write access.');
@@ -718,16 +718,21 @@ describe('apify-api-write', () => {
         [
             {
                 path: '/v2/actors/john~my-actor/versions',
+                method: 'POST',
                 body: { versionNumber: '0.2', envVars: [{ name: 'API_KEY', value: 'x' }] },
             },
             "The API tools do not call POST /v2/actors/john~my-actor/versions. It sets the new version's source",
         ],
         [
-            { path: '/v2/actors/john~my-actor/runs', query: { forcePermissionLevel: 'FULL_PERMISSIONS' } },
+            {
+                path: '/v2/actors/john~my-actor/runs',
+                method: 'POST',
+                query: { forcePermissionLevel: 'FULL_PERMISSIONS' },
+            },
             'The API tools do not set forcePermissionLevel, whatever the value',
         ],
         [
-            { path: '/v2/actors/john~my-actor/runs', query: { waitForFinish: 60 } },
+            { path: '/v2/actors/john~my-actor/runs', method: 'POST', query: { waitForFinish: 60 } },
             'call GET /v2/actor-runs/{runId} or GET /v2/actor-builds/{buildId} with waitForFinish; calling this ' +
                 'operation again starts another one.',
         ],
