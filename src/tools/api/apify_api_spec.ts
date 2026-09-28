@@ -60,13 +60,39 @@ const METAMORPH_REASON =
 /** Synchronous run paths. Some are GET, but every one of them starts a paid run. */
 const SYNC_RUN_PATH_REGEX = /\/run-sync(-get-dataset-items)?$/;
 
-/** Operations the API tools refuse by ID, with the reason they report. */
-const UNAVAILABLE_OPERATION_REASONS: ReadonlyMap<string, string> = new Map([
-    ['users_me_limits_put', "It changes the account's spending limits. The user can change them in Apify Console."],
-    ['PostChargeRun', 'It charges the user of a pay-per-event run. Only the Actor itself charges for its events.'],
-    ['actorRun_metamorph_post', METAMORPH_REASON],
-    ['actor_runs_last_metamorph_post', METAMORPH_REASON],
-    ['actorTask_runs_last_metamorph_post', METAMORPH_REASON],
+const PATH_PLACEHOLDER_REGEX = /\{[^{}]+\}/g;
+
+/**
+ * The key of an operation in the rules below: its method and path template, with every placeholder
+ * written `{}`, such as `POST /v2/actor-runs/{}/charge`. The rules are keyed by path, the API's
+ * contract, not by operation ID, which is docs metadata and can be renamed; `{}` keeps a renamed
+ * path parameter from lifting a rule.
+ */
+function toRuleKey(methodAndPath: string): string {
+    return methodAndPath.replace(PATH_PLACEHOLDER_REGEX, '{}');
+}
+
+function keyRules<Value>(rules: readonly (readonly [string, Value])[]): ReadonlyMap<string, Value> {
+    return new Map(rules.map(([methodAndPath, value]) => [toRuleKey(methodAndPath), value]));
+}
+
+const BROWSER_INFO_REASON =
+    'It returns the request headers, and with them the API token the server adds to every request.';
+
+/** Operations the API tools refuse by method and path, with the reason they report. */
+const UNAVAILABLE_OPERATION_REASONS = keyRules([
+    ['PUT /v2/users/me/limits', "It changes the account's spending limits. The user can change them in Apify Console."],
+    [
+        'POST /v2/actor-runs/{runId}/charge',
+        'It charges the user of a pay-per-event run. Only the Actor itself charges for its events.',
+    ],
+    ['POST /v2/actor-runs/{runId}/metamorph', METAMORPH_REASON],
+    ['POST /v2/actors/{actorId}/runs/last/metamorph', METAMORPH_REASON],
+    ['POST /v2/actor-tasks/{actorTaskId}/runs/last/metamorph', METAMORPH_REASON],
+    // A proxy test endpoint; its DELETE is refused like every DELETE.
+    ['GET /v2/browser-info', BROWSER_INFO_REASON],
+    ['POST /v2/browser-info', BROWSER_INFO_REASON],
+    ['PUT /v2/browser-info', BROWSER_INFO_REASON],
 ]);
 
 /**
@@ -82,9 +108,13 @@ export const REFUSED_BODY_FIELDS: ReadonlySet<string> = new Set([
 ]);
 
 /** Refused fields the API accepts on an operation although its body schema does not declare them. */
-const UNDECLARED_REFUSED_BODY_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
-    ['actors_post', ['pricingInfos', 'actorPermissionLevel']],
-]);
+const UNDECLARED_REFUSED_BODY_FIELDS = keyRules([['POST /v2/actors', ['pricingInfos', 'actorPermissionLevel']]]);
+
+/** Every rule key, each of which must match an operation of the spec. */
+const RULE_KEYS: readonly string[] = [
+    ...UNAVAILABLE_OPERATION_REASONS.keys(),
+    ...UNDECLARED_REFUSED_BODY_FIELDS.keys(),
+];
 
 /** Schema keywords that only cost context. `x-*` vendor extensions are dropped by prefix in `dereference()`. */
 const DROPPED_SCHEMA_KEYS: ReadonlySet<string> = new Set(['example', 'examples']);
@@ -178,11 +208,11 @@ function splitWords(text: string): string[] {
 function resolveAccess(
     method: ApiMethod,
     path: string,
-    operationId: string,
+    ruleKey: string,
 ): Pick<ApiOperation, 'access' | 'unavailableReason'> {
     if (method === 'DELETE') return { access: API_ACCESS.UNAVAILABLE, unavailableReason: DELETE_REASON };
     if (SYNC_RUN_PATH_REGEX.test(path)) return { access: API_ACCESS.UNAVAILABLE, unavailableReason: SYNC_RUN_REASON };
-    const reason = UNAVAILABLE_OPERATION_REASONS.get(operationId);
+    const reason = UNAVAILABLE_OPERATION_REASONS.get(ruleKey);
     if (reason) return { access: API_ACCESS.UNAVAILABLE, unavailableReason: reason };
     return { access: method === 'GET' ? API_ACCESS.READ : API_ACCESS.WRITE };
 }
@@ -220,19 +250,25 @@ function parseRequestBody(rawRequestBody: unknown, spec: unknown): ApiOperation[
 /**
  * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations,
  * and anything outside `/v2/` are left out; malformed entries are skipped rather than failing the whole spec.
+ * It throws when the spec lists no operation, and when an operation a rule is about is missing from
+ * it: a moved path would otherwise lift the refusal, so the tools stop until the rules are updated.
  */
 export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation> {
     const index = new Map<string, ApiOperation>();
+    // Every operation the spec lists, deprecated or malformed ones too, to check the rules against.
+    const specRuleKeys = new Set<string>();
     const paths = isRecord(spec) && isRecord(spec.paths) ? spec.paths : {};
     for (const [path, pathItem] of Object.entries(paths)) {
         if (!path.startsWith('/v2/') || !isRecord(pathItem)) continue;
         for (const method of API_METHODS) {
+            const ruleKey = toRuleKey(`${method} ${path}`);
+            if (pathItem[method.toLowerCase()] !== undefined) specRuleKeys.add(ruleKey);
             const parsed = openApiOperationValidator.safeParse(pathItem[method.toLowerCase()]);
             if (!parsed.success || parsed.data.deprecated) continue;
             const { operationId, summary, description, tags, parameters, requestBody } = parsed.data;
             const body = parseRequestBody(requestBody, spec);
             const declaredBodyFields = extractTopLevelPropertyNames(body?.schema);
-            const undeclaredRefusedFields = UNDECLARED_REFUSED_BODY_FIELDS.get(operationId) ?? [];
+            const undeclaredRefusedFields = UNDECLARED_REFUSED_BODY_FIELDS.get(ruleKey) ?? [];
             index.set(operationId, {
                 operationId,
                 method,
@@ -246,9 +282,17 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
                 refusedBodyFields: [...REFUSED_BODY_FIELDS].filter(
                     (field) => declaredBodyFields.has(field) || undeclaredRefusedFields.includes(field),
                 ),
-                ...resolveAccess(method, path, operationId),
+                ...resolveAccess(method, path, ruleKey),
             });
         }
+    }
+    if (index.size === 0) throw new Error('the spec lists no /v2/ operations.');
+    const missingRuleKeys = RULE_KEYS.filter((ruleKey) => !specRuleKeys.has(ruleKey));
+    if (missingRuleKeys.length > 0) {
+        throw new Error(
+            `the spec no longer lists ${missingRuleKeys.join(', ')}, which the API tools have rules for. ` +
+                'Update the rules in apify_api_spec.ts.',
+        );
     }
     return index;
 }

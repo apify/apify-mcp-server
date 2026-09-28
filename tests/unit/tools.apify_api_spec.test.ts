@@ -16,7 +16,7 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(30);
+        expect(index.size).toBe(48);
     });
 
     it('resolves parameter references and keeps only path and query parameters', () => {
@@ -60,6 +60,10 @@ describe('buildApiOperationIndex()', () => {
         ['actor_runs_last_metamorph_post', 'cannot be undone'],
         ['actorTask_runs_last_metamorph_post', 'cannot be undone'],
         ['actor_runSyncGetDatasetItems_post', 'waits up to 300 seconds'],
+        ['actor_runSync_post', 'waits up to 300 seconds'],
+        ['tools_browser_info_get', 'the API token'],
+        ['tools_browser_info_post', 'the API token'],
+        ['tools_browser_info_put', 'the API token'],
     ])('makes %s unavailable with the reason', (operationId, reason) => {
         const operation = index.get(operationId);
         expect(operation?.access).toBe(API_ACCESS.UNAVAILABLE);
@@ -87,9 +91,59 @@ describe('buildApiOperationIndex()', () => {
         );
     });
 
-    it('returns an empty index for a document without paths', () => {
-        expect(buildApiOperationIndex({}).size).toBe(0);
-        expect(buildApiOperationIndex('not a spec').size).toBe(0);
+    it('throws for a document without /v2/ operations', () => {
+        expect(() => buildApiOperationIndex({})).toThrow('the spec lists no /v2/ operations.');
+        expect(() => buildApiOperationIndex('not a spec')).toThrow('the spec lists no /v2/ operations.');
+    });
+
+    /** The fixture with the operation at the path and method replaced. */
+    function withOperation(path: string, method: string, operation: Record<string, unknown> | undefined) {
+        const paths: Record<string, Record<string, unknown>> = structuredClone(API_SPEC_FIXTURE.paths);
+        paths[path] = { ...paths[path], [method]: operation };
+        return { ...API_SPEC_FIXTURE, paths };
+    }
+
+    it('keys the refusals by method and path, not by the operation ID or the parameter names', () => {
+        const renamed = buildApiOperationIndex(
+            withOperation('/v2/actor-runs/{runId}/charge', 'post', {
+                operationId: 'actorRun_charge_post',
+                summary: 'Charge events in run',
+            }),
+        );
+        expect(renamed.get('actorRun_charge_post')?.access).toBe(API_ACCESS.UNAVAILABLE);
+
+        const paths: Record<string, unknown> = structuredClone(API_SPEC_FIXTURE.paths);
+        paths['/v2/actor-runs/{id}/metamorph'] = paths['/v2/actor-runs/{runId}/metamorph'];
+        delete paths['/v2/actor-runs/{runId}/metamorph'];
+        const reparameterized = buildApiOperationIndex({ ...API_SPEC_FIXTURE, paths });
+        expect(reparameterized.get('actorRun_metamorph_post')?.access).toBe(API_ACCESS.UNAVAILABLE);
+
+        const createActor = withOperation('/v2/actors', 'post', {
+            ...API_SPEC_FIXTURE.paths['/v2/actors'].post,
+            operationId: 'actor_create',
+        });
+        expect(buildApiOperationIndex(createActor).get('actor_create')?.refusedBodyFields).toEqual([
+            'isPublic',
+            'pricingInfos',
+            'actorPermissionLevel',
+        ]);
+    });
+
+    it('throws when an operation a rule is about is missing, rather than lift the rule', () => {
+        const moved = withOperation('/v2/users/me/limits', 'put', undefined);
+
+        expect(() => buildApiOperationIndex(moved)).toThrow(
+            'the spec no longer lists PUT /v2/users/me/limits, which the API tools have rules for.',
+        );
+    });
+
+    it('checks the rules against a deprecated operation too', () => {
+        const deprecated = withOperation('/v2/users/me/limits', 'put', {
+            ...API_SPEC_FIXTURE.paths['/v2/users/me/limits'].put,
+            deprecated: true,
+        });
+
+        expect(buildApiOperationIndex(deprecated).has('users_me_limits_put')).toBe(false);
     });
 });
 
@@ -107,11 +161,12 @@ describe('searchApiOperations()', () => {
 
     it('matches word prefixes and ignores stop words', () => {
         // Without the stop words, "with" would also match "Run Actor synchronously without input".
-        expect(searchIds('webhook with')).toEqual(['webhooks_get', 'actor_webhooks_get']);
+        expect(searchIds('webhook with')).toEqual(['webhooks_get', 'webhooks_post', 'actor_webhooks_get']);
     });
 
     it('matches a plural to its singular and drops one-letter terms', () => {
-        expect(searchIds('abort runs')[0]).toBe('actorRun_abort_post');
+        // No word starts with "aborts"; only the plural rule matches it to "abort".
+        expect(searchIds('aborts')).toEqual(['actorRun_abort_post']);
         expect(searchIds("dataset's")).toEqual(searchIds('dataset'));
     });
 

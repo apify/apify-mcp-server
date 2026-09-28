@@ -129,6 +129,7 @@ describe('resolvePathOperations()', () => {
         expect(resolveIds('/v2/request-queues/q/requests/r-1')).toEqual([
             'requestQueue_request_get',
             'requestQueue_request_put',
+            'requestQueue_request_delete',
         ]);
         expect(resolveIds('/v2/actors/abc/runs/last')).toEqual(['actor_runs_last_get']);
         expect(resolveIds('/v2/actors/abc/runs/run-1')).toEqual([]);
@@ -268,17 +269,19 @@ describe('apify-api-details', () => {
     });
 
     it('refuses a method the path does not have and lists the ones it has', async () => {
-        const result = await callTool(apifyApiDetails, { path: '/v2/actors/abc', method: 'GET' });
+        const result = await callTool(apifyApiDetails, { path: '/v2/actor-runs/abc/abort', method: 'GET' });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toBe('The path /v2/actors/abc has no GET operation; it matches method PUT.');
+        expect(result.content[0].text).toBe(
+            'The path /v2/actor-runs/abc/abort has no GET operation; it matches method POST.',
+        );
     });
 
     it('echoes a template path with its braces in a refusal', async () => {
-        const result = await callTool(apifyApiDetails, { path: '/v2/actors/{actorId}', method: 'GET' });
+        const result = await callTool(apifyApiDetails, { path: '/v2/actor-runs/{runId}/abort', method: 'GET' });
 
         expect(result.content[0].text).toBe(
-            'The path /v2/actors/{actorId} has no GET operation; it matches method PUT.',
+            'The path /v2/actor-runs/{runId}/abort has no GET operation; it matches method POST.',
         );
     });
 
@@ -341,6 +344,10 @@ describe('apify-api-read', () => {
         [
             '/v2/actors/abc/run-sync',
             'The API tools do not call GET /v2/actors/abc/run-sync. It waits up to 300 seconds',
+        ],
+        [
+            '/v2/browser-info',
+            'The API tools do not call GET /v2/browser-info. It returns the request headers, and with them the API token',
         ],
         ['/v2/nope', 'No Apify API operation matches the path /v2/nope.'],
         ['/v2/datasets/{datasetId}', 'Replace {datasetId} in the path with its value.'],
