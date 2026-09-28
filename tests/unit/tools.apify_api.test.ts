@@ -302,15 +302,6 @@ describe('apify-api-details', () => {
         expect(withSearch.content[0].text).toContain(`Find the path with ${HELPER_TOOLS.API_SEARCH}.`);
         expect(withoutSearch.content[0].text).not.toContain(HELPER_TOOLS.API_SEARCH);
     });
-
-    it('names the search tool on an unknown path only when the session has it', async () => {
-        const withSearch = await callTool(apifyApiDetails, { path: '/v2/nope' });
-        const withoutSearch = await callTool(apifyApiDetails, { path: '/v2/nope' }, [HELPER_TOOLS.API_DETAILS]);
-
-        expectSoftFailInvalidInput(withSearch);
-        expect(withSearch.content[0].text).toContain(`Find the path with ${HELPER_TOOLS.API_SEARCH}.`);
-        expect(withoutSearch.content[0].text).not.toContain(HELPER_TOOLS.API_SEARCH);
-    });
 });
 
 describe('apify-api-read', () => {
