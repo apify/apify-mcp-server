@@ -37,7 +37,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     PUT). `apify_api_spec.ts` builds the operation index from the spec (cached for an hour) and decides
     each operation's access: read, write, or unavailable with a reason, plus the body fields the write
     tool refuses. Fields that set an Actor's source, versions, or whole env var list are refused; the
-    single-variable env var operations stay callable, since each changes one variable. The rules are
+    single-variable env var operations stay callable, since each changes one variable; the two that
+    replace a variable require `isSecret`, since the API stores a variable sent without it as plain
+    text. The rules are
     keyed by method and path template, not by operation ID, and a spec that no longer lists an
     operation a rule is about is refused, like a failed download. The tools take and return method and
     path only. `apify_api_request.ts` normalizes the real path the agent gives, matches it to a path

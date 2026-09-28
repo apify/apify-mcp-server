@@ -341,6 +341,13 @@ export function validateRequestBody(operation: ApiOperation, body: unknown): str
         );
     }
     if (!isRecord(body)) return undefined;
+    if (operation.replacesEnvVar && typeof body.isSecret !== 'boolean') {
+        return (
+            `${operation.method} ${operation.path} replaces the whole variable, and the API stores a variable ` +
+            'sent without isSecret as plain text. Send isSecret: true to keep a secret variable secret, or ' +
+            'isSecret: false.'
+        );
+    }
     const refusedFields = operation.refusedBodyFields.filter((field) => field in body);
     if (refusedFields.length === 0) return undefined;
     // One refusal lists every refused field, so the agent does not learn of them one call at a time.
@@ -365,7 +372,7 @@ export function validateRequestBody(operation: ApiOperation, body: unknown): str
             'To add or change one environment variable, call POST ' +
                 '/v2/actors/{actorId}/versions/{versionNumber}/env-vars or PUT ' +
                 '/v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName}; each leaves the other ' +
-                'variables as they are.',
+                'variables as they are. The PUT replaces the whole variable, so send isSecret with it.',
         );
     }
     // Sending the rest of an otherwise empty body would succeed and change nothing.

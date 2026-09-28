@@ -688,7 +688,8 @@ describe('apify-api-write', () => {
                 'which dedicated source tools or Apify Console change. To add or change one environment ' +
                 'variable, call POST /v2/actors/{actorId}/versions/{versionNumber}/env-vars or PUT ' +
                 '/v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName}; each leaves the other ' +
-                'variables as they are. Without the refused fields the body sets nothing, so do not call again with it.',
+                'variables as they are. The PUT replaces the whole variable, so send isSecret with it. Without ' +
+                'the refused fields the body sets nothing, so do not call again with it.',
         ],
         [
             { path: '/v2/actors/john~my-actor/versions/0.1', method: 'PUT', body: { sourceFiles: [] } },
@@ -762,6 +763,52 @@ describe('apify-api-write', () => {
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain('GET /v2/users/me has read access; this tool has write access.');
+    });
+
+    it.each(['PUT', 'POST'])(
+        'refuses a %s that replaces an env var without isSecret, which would store it as plain text',
+        async (method) => {
+            const result = await callTool(apifyApiWrite, {
+                path: '/v2/actors/john~my-actor/versions/0.1/env-vars/API_KEY',
+                method,
+                body: { name: 'API_KEY', value: 'new-value' },
+            });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                `${method} /v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName} replaces the whole ` +
+                    'variable, and the API stores a variable sent without isSecret as plain text. Send isSecret: ' +
+                    'true to keep a secret variable secret, or isSecret: false.',
+            );
+            expect(requestMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it('sends the single-variable env var operations the envVars refusal points to', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: { name: 'API_KEY' } }));
+
+        await callTool(apifyApiWrite, {
+            path: '/v2/actors/john~my-actor/versions/0.1/env-vars/API_KEY',
+            method: 'PUT',
+            body: { name: 'API_KEY', value: 'new-value', isSecret: true },
+        });
+        await callTool(apifyApiWrite, {
+            path: '/v2/actors/john~my-actor/versions/0.1/env-vars',
+            method: 'POST',
+            body: { name: 'REGION', value: 'eu' },
+        });
+
+        expect(requestMock.mock.calls.map(([config]) => `${config.method} ${config.url}`)).toEqual([
+            `PUT ${BASE_URL}/actors/john~my-actor/versions/0.1/env-vars/API_KEY`,
+            `POST ${BASE_URL}/actors/john~my-actor/versions/0.1/env-vars`,
+        ]);
+        const details = await callTool(apifyApiDetails, {
+            path: '/v2/actors/john~my-actor/versions/0.1/env-vars/API_KEY',
+            method: 'PUT',
+        });
+        expect(details.structuredContent).toMatchObject({
+            operations: [{ access: 'write', refusedBodyFields: [] }],
+        });
     });
 
     it('sends a version field that does not replace the source, such as buildTag', async () => {

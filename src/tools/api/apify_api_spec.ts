@@ -44,6 +44,8 @@ export type ApiOperation = {
     requestBody?: { isRequired: boolean; schema: unknown };
     /** Top-level body fields the write tool refuses for this operation. */
     refusedBodyFields: string[];
+    /** Set when the body replaces a whole environment variable, so the write tool requires `isSecret`. */
+    replacesEnvVar?: true;
     access: ApiAccess;
     /** Why the API tools do not call the operation; set exactly when `access` is unavailable. */
     unavailableReason?: string;
@@ -137,11 +139,23 @@ const SOURCE_BODY_FIELDS_BY_OPERATION = keyRules([
 /** Every source field of `SOURCE_BODY_FIELDS_BY_OPERATION`, to tell its refusal from the others. */
 export const SOURCE_BODY_FIELDS: ReadonlySet<string> = new Set([...SOURCE_BODY_FIELDS_BY_OPERATION.values()].flat());
 
+/**
+ * The operations that replace one environment variable with the body. The API stores a variable sent
+ * without `isSecret` as plain text, so a secret variable whose value is changed would lose its secrecy.
+ */
+const ENV_VAR_REPLACE_OPERATIONS: ReadonlySet<string> = new Set(
+    [
+        'PUT /v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName}',
+        'POST /v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName}',
+    ].map(toRuleKey),
+);
+
 /** Every rule key, each of which must match an operation of the spec. */
 const RULE_KEYS: readonly string[] = [
     ...UNAVAILABLE_OPERATION_REASONS.keys(),
     ...UNDECLARED_REFUSED_BODY_FIELDS.keys(),
     ...SOURCE_BODY_FIELDS_BY_OPERATION.keys(),
+    ...ENV_VAR_REPLACE_OPERATIONS,
 ];
 
 /** Schema keywords that only cost context. `x-*` vendor extensions are dropped by prefix in `dereference()`. */
@@ -313,6 +327,7 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
                     ),
                     ...(SOURCE_BODY_FIELDS_BY_OPERATION.get(ruleKey) ?? []),
                 ],
+                ...(ENV_VAR_REPLACE_OPERATIONS.has(ruleKey) && { replacesEnvVar: true }),
                 ...resolveAccess(method, path, ruleKey),
             });
         }

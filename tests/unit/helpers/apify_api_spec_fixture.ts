@@ -225,6 +225,81 @@ export const API_SPEC_FIXTURE = {
                 },
             },
         },
+        // The single-variable env var operations, which the envVars refusal points to.
+        '/v2/actors/{actorId}/versions/{versionNumber}/env-vars': {
+            get: {
+                operationId: 'actor_version_envVars_get',
+                summary: 'Get list of environment variables',
+                tags: ['Actors/Environment variables'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+            },
+            post: {
+                operationId: 'actor_version_envVars_post',
+                summary: 'Create environment variable',
+                tags: ['Actors/Environment variables'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/EnvVar' } } },
+                },
+            },
+        },
+        '/v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName}': {
+            get: {
+                operationId: 'actor_version_envVar_get',
+                summary: 'Get environment variable',
+                tags: ['Actors/Environment variables'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'envVarName', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+            },
+            put: {
+                operationId: 'actor_version_envVar_put',
+                summary: 'Update environment variable',
+                tags: ['Actors/Environment variables'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'envVarName', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/EnvVar' } } },
+                },
+            },
+            post: {
+                operationId: 'actor_version_envVar_post',
+                summary: 'Update environment variable (POST)',
+                tags: ['Actors/Environment variables'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'envVarName', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/EnvVar' } } },
+                },
+            },
+            delete: {
+                operationId: 'actor_version_envVar_delete',
+                summary: 'Delete environment variable',
+                tags: ['Actors/Environment variables'],
+                parameters: [
+                    { $ref: '#/components/parameters/actorId' },
+                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'envVarName', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+            },
+        },
         '/v2/actors/{actorId}/runs': {
             post: {
                 operationId: 'actors_runs_post',
@@ -493,6 +568,10 @@ export const API_SPEC_FIXTURE = {
                     pricingInfos: { type: 'array' },
                     versions: { type: 'array' },
                 },
+            },
+            EnvVar: {
+                type: 'object',
+                properties: { name: { type: 'string' }, value: { type: 'string' }, isSecret: { type: 'boolean' } },
             },
             VersionRequest: {
                 type: 'object',
