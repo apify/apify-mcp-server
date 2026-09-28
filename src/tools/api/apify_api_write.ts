@@ -49,7 +49,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         The request is sent once and applies at once. Refused: deletions, synchronous runs, metamorphs,
         spending limits, run charging, and creating Actor versions; fields that publish an Actor or task,
         change its pricing or permissions, or change who can read a storage; and fields that set an Actor's
-        source, versions, or environment variables, which dedicated source tools or Apify Console change.
+        source, versions, or environment variables, which the user can change in Apify Console.
         Returns the response body as the API sends it; a body over ${MAX_INLINE_BYTES} bytes is not returned.
 
         Example call: {"path": "/v2/datasets/abc", "method": "PUT", "body": {"name": "leads-2026"}}

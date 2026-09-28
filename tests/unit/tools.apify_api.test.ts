@@ -693,7 +693,7 @@ describe('apify-api-write', () => {
                 body: { envVars: [{ name: 'API_KEY', value: 'x', isSecret: true }] },
             },
             "The API tools do not set envVars: they set an Actor's source, versions, or environment variables, " +
-                'which dedicated source tools or Apify Console change. To add or change one environment ' +
+                'which the user can change in Apify Console. To add or change one environment ' +
                 'variable, call POST /v2/actors/{actorId}/versions/{versionNumber}/env-vars or PUT ' +
                 '/v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName}; each leaves the other ' +
                 'variables as they are. The PUT replaces the whole variable, so send isSecret with it. Without ' +
@@ -750,7 +750,7 @@ describe('apify-api-write', () => {
         expect(result.content[0].text).toBe(
             'The API tools do not set isPublic, whatever the value: publishing, pricing, permission, and sharing ' +
                 "changes need a dedicated tool or Apify Console. The API tools do not set versions: they set an Actor's " +
-                'source, versions, or environment variables, which dedicated source tools or Apify Console change. ' +
+                'source, versions, or environment variables, which the user can change in Apify Console. ' +
                 'Remove the refused fields and call again.',
         );
         expect(requestMock).not.toHaveBeenCalled();

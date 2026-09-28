@@ -363,7 +363,7 @@ export function validateRequestBody(operation: ApiOperation, body: unknown): str
     if (sourceFields.length > 0) {
         sentences.push(
             `The API tools do not set ${sourceFields.join(', ')}: they set an Actor's source, versions, or ` +
-                'environment variables, which dedicated source tools or Apify Console change.',
+                'environment variables, which the user can change in Apify Console.',
         );
     }
     // Paths, not tool names: this same tool calls them, and each changes one variable.
