@@ -268,6 +268,21 @@ describe('apify-api-details', () => {
         });
     });
 
+    it('leaves the refused fields out of the body schema it returns', async () => {
+        const result = await callTool(apifyApiDetails, { path: '/v2/actors/abc', method: 'PUT' });
+
+        const [operation] = (result.structuredContent as { operations: { requestBody: { schema: unknown } }[] })
+            .operations;
+        expect(operation.requestBody.schema).toEqual({
+            allOf: [{ type: 'object', properties: {} }],
+            properties: { title: { type: 'string' } },
+        });
+        // The index keeps the full schema.
+        expect(INDEX.get('actor_put')?.requestBody?.schema).toMatchObject({
+            properties: { isPublic: { type: 'boolean' }, pricingInfos: { type: 'array' } },
+        });
+    });
+
     it('refuses a method the path does not have and lists the ones it has', async () => {
         const result = await callTool(apifyApiDetails, { path: '/v2/actor-runs/abc/abort', method: 'GET' });
 

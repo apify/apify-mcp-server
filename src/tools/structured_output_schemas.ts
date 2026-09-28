@@ -942,7 +942,7 @@ const apiOperationDetailsSchema = {
             type: 'object' as const,
             properties: {
                 isRequired: { type: 'boolean', description: 'Whether the body is required' },
-                schema: { description: 'JSON schema of the body, sent as JSON' },
+                schema: { description: 'JSON schema of the body, sent as JSON, without the refused body fields' },
             },
             required: ['isRequired', 'schema'],
             description: 'Only when the operation takes a body',
