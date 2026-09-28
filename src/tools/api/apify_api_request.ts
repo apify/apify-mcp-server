@@ -183,17 +183,60 @@ export function formatUnavailableMessage(operation: ApiOperation, path: string):
 export function resolveReadOperation(
     path: string,
     operations: readonly ApiOperation[],
+    loadedToolNames: readonly string[],
 ): { operation: ApiOperation } | { error: string } {
     const operation = operations.find((candidate) => candidate.method === 'GET');
     if (!operation) {
         return {
             error:
                 `The path ${path} matches ${formatMatchedMethods(operations)}, not GET; this tool sends only GET. ` +
-                'No tool in this session has write access.',
+                formatReadNextStep(operations, loadedToolNames),
         };
     }
     const unavailableMessage = formatUnavailableMessage(operation, path);
     return unavailableMessage ? { error: unavailableMessage } : { operation };
+}
+
+/** Where to call a path without GET: the write tool when it may, else why not. */
+function formatReadNextStep(operations: readonly ApiOperation[], loadedToolNames: readonly string[]): string {
+    // Without GET, each operation has write access or is unavailable.
+    const hasWriteOperation = operations.some((candidate) => candidate.access === API_ACCESS.WRITE);
+    if (!hasWriteOperation) return `The API tools do not call it. ${operations[0].unavailableReason}`;
+    return loadedToolNames.includes(HELPER_TOOLS.API_WRITE)
+        ? `Call it with ${HELPER_TOOLS.API_WRITE}.`
+        : 'No tool in this session has write access.';
+}
+
+/**
+ * The POST or PUT operation on the matched path, or why the write tool may not call it. Without a
+ * method, the path's only method is used; a path with several needs the method, since guessing
+ * between, say, a create and a delete is not safe.
+ */
+export function resolveWriteOperation(params: {
+    path: string;
+    operations: readonly ApiOperation[];
+    method?: string;
+    loadedToolNames: readonly string[];
+}): { operation: ApiOperation } | { error: string } {
+    const { path, operations, method, loadedToolNames } = params;
+    if (method === undefined && operations.length > 1) {
+        return {
+            error: `The path matches methods ${formatMethodList(operations)}; specify which one to call the endpoint with.`,
+        };
+    }
+    const resolved =
+        method === undefined ? { operation: operations[0] } : resolveMethodOperation(path, operations, method);
+    if ('error' in resolved) return resolved;
+    const { operation } = resolved;
+    const unavailableMessage = formatUnavailableMessage(operation, path);
+    if (unavailableMessage) return { error: unavailableMessage };
+    if (operation.access === API_ACCESS.READ) {
+        const next = loadedToolNames.includes(HELPER_TOOLS.API_READ)
+            ? `Call it with ${HELPER_TOOLS.API_READ}.`
+            : 'No tool in this session has read access.';
+        return { error: `${operation.method} ${path} has read access; this tool has write access. ${next}` };
+    }
+    return { operation };
 }
 
 /** Query values the API reads as true. */
@@ -248,15 +291,17 @@ export function validateQueryParams(
 /** Checks the body against the operation; returns the reason on failure. */
 export function validateRequestBody(operation: ApiOperation, body: unknown): string | undefined {
     if (!operation.requestBody) {
-        return body === undefined ? undefined : `${operation.operationId} takes no request body.`;
+        return body === undefined ? undefined : `${operation.method} ${operation.path} takes no request body.`;
     }
     if (body === undefined) {
-        return operation.requestBody.isRequired ? `${operation.operationId} needs a request body.` : undefined;
+        return operation.requestBody.isRequired
+            ? `${operation.method} ${operation.path} needs a request body.`
+            : undefined;
     }
     // A JSON-encoded string would reach the API as a string, not as the object, and skip the checks below.
     if (typeof body === 'string' || body === null) {
         return (
-            `Pass the body of ${operation.operationId} as a JSON object or array, not as ` +
+            `Pass the body of ${operation.method} ${operation.path} as a JSON object or array, not as ` +
             `${body === null ? 'null' : 'a string'}.`
         );
     }
@@ -279,11 +324,13 @@ export function validateRequestBody(operation: ApiOperation, body: unknown): str
                 'environment variables, which dedicated source tools or Apify Console change.',
         );
     }
-    // Operation IDs, not tool names: this same tool calls them, and each changes one variable.
+    // Paths, not tool names: this same tool calls them, and each changes one variable.
     if (sourceFields.includes('envVars')) {
         sentences.push(
-            'To add or change one environment variable, call actor_version_envVars_post or ' +
-                'actor_version_envVar_put; each leaves the other variables as they are.',
+            'To add or change one environment variable, call POST ' +
+                '/v2/actors/{actorId}/versions/{versionNumber}/env-vars or PUT ' +
+                '/v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName}; each leaves the other ' +
+                'variables as they are.',
         );
     }
     // Sending the rest of an otherwise empty body would succeed and change nothing.
@@ -368,7 +415,6 @@ export async function callApiOperation(params: {
             const statusCode = readAbortedResponseStatus(error);
             if (operation.method !== 'GET' && statusCode !== undefined && statusCode < 300) {
                 const structuredContent = {
-                    operationId: operation.operationId,
                     method: operation.method,
                     path,
                     statusCode,

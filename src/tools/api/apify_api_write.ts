@@ -9,17 +9,25 @@ import { respondUserError } from '../../utils/mcp.js';
 import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
 import {
     apiCallArgsShape,
-    buildRequestPath,
     callApiOperation,
     redactApiCallArgs,
-    resolveOperationToCall,
+    resolvePathOperations,
+    resolveWriteOperation,
     validateQueryParams,
     validateRequestBody,
 } from './apify_api_request.js';
-import { API_ACCESS, fetchApiOperationIndex } from './apify_api_spec.js';
+import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiWriteArgs = z.object({
-    ...apiCallArgsShape,
+    path: apiCallArgsShape.path,
+    method: z
+        .enum(API_METHODS)
+        .optional()
+        .describe(
+            'HTTP method: POST or PUT. Required when the path has several methods, for example GET, PUT, and ' +
+                'DELETE; omit it when the path has one.',
+        ),
+    query: apiCallArgsShape.query,
     body: z
         .unknown()
         .optional()
@@ -30,17 +38,21 @@ const apifyApiWriteArgs = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    const findPath = hasTool(HELPER_TOOLS.API_SEARCH) ? `\nFind the path with ${HELPER_TOOLS.API_SEARCH}.` : '';
     const getParameters = hasTool(HELPER_TOOLS.API_DETAILS)
         ? `\nGet the operation's parameters and body schema first with ${HELPER_TOOLS.API_DETAILS}.`
         : '';
     return dedent`
-        Call one Apify API operation with write access (POST or PUT), by its operation ID. The server builds
-        the URL from the operation's path and pathParams and adds the API token: never pass a URL or a token.${getParameters}
+        Send a POST or PUT request to the Apify API at a path with its values in it, such as
+        /v2/datasets/abc. Give the method when the path has several. The server adds the host and the API
+        token: never pass a URL or a token.${findPath}${getParameters}
         The request is sent once and applies at once. Refused: deletions, synchronous runs, metamorphs,
         spending limits, run charging, and creating Actor versions; fields that publish an Actor or task,
         change its pricing or permissions, or change who can read a storage; and fields that set an Actor's
         source, versions, or environment variables, which dedicated source tools or Apify Console change.
         Returns the response body as the API sends it; a body over ${MAX_INLINE_BYTES} bytes is not returned.
+
+        Example call: {"path": "/v2/datasets/abc", "method": "PUT", "body": {"name": "leads-2026"}}
 
         USAGE:
         - Use to change something no dedicated tool changes, such as a dataset's name or a webhook.
@@ -53,7 +65,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 }
 
 /**
- * Calls one POST or PUT operation of the published Apify API spec, https://docs.apify.com/api/v2.
+ * Sends a POST or PUT to a path of the published Apify API spec, https://docs.apify.com/api/v2.
  */
 export const apifyApiWrite: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -77,24 +89,28 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiWriteArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
-        const resolved = resolveOperationToCall({
+        const matched = resolvePathOperations({
             index,
-            operationId: parsed.operationId,
-            access: API_ACCESS.WRITE,
+            path: parsed.path,
+            loadedToolNames: toolArgs.loadedToolNames,
+        });
+        if ('error' in matched) return respondUserError(matched.error);
+        const resolved = resolveWriteOperation({
+            path: matched.path,
+            operations: matched.operations,
+            method: parsed.method,
             loadedToolNames: toolArgs.loadedToolNames,
         });
         if ('error' in resolved) return respondUserError(resolved.error);
         const { operation } = resolved;
 
-        const request = buildRequestPath(operation, parsed.pathParams);
-        if ('error' in request) return respondUserError(request.error);
         const inputError = validateQueryParams(operation, parsed.query) ?? validateRequestBody(operation, parsed.body);
         if (inputError) return respondUserError(inputError);
 
         return callApiOperation({
             client: toolArgs.apifyClient,
             operation,
-            path: request.path,
+            path: matched.path,
             query: parsed.query,
             body: parsed.body,
             signal: toolArgs.signal,

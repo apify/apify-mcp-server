@@ -302,7 +302,11 @@ describe('apify-api-read', () => {
         [
             '/v2/actor-runs/run-1/abort',
             'The path /v2/actor-runs/run-1/abort matches method POST, not GET; this tool sends only GET. ' +
-                'No tool in this session has write access.',
+                `Call it with ${HELPER_TOOLS.API_WRITE}.`,
+        ],
+        [
+            '/v2/actor-runs/run-1/metamorph',
+            'matches method POST, not GET; this tool sends only GET. The API tools do not call it. It turns the run',
         ],
         [
             '/v2/actors/abc/run-sync',
@@ -317,6 +321,19 @@ describe('apify-api-read', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain(reason);
         expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('names the write tool for a path without GET only when the session has it', async () => {
+        const args = { path: '/v2/actors/john~my-actor/versions/0.1' };
+        const withWrite = await callTool(apifyApiRead, args);
+        const withoutWrite = await callTool(apifyApiRead, args, [HELPER_TOOLS.API_READ]);
+
+        expect(withWrite.content[0].text).toBe(
+            'The path /v2/actors/john~my-actor/versions/0.1 matches methods POST and PUT, not GET; this tool ' +
+                `sends only GET. Call it with ${HELPER_TOOLS.API_WRITE}.`,
+        );
+        expect(withoutWrite.content[0].text).not.toContain(HELPER_TOOLS.API_WRITE);
+        expect(withoutWrite.content[0].text).toContain('No tool in this session has write access.');
     });
 
     it('refuses an undeclared query parameter without a request', async () => {
@@ -426,8 +443,8 @@ describe('apify-api-write', () => {
         requestMock.mockResolvedValue(mockResponse(200, body));
 
         const result = await callTool(apifyApiWrite, {
-            operationId: 'dataset_put',
-            pathParams: { datasetId: 'abc' },
+            path: '/v2/datasets/abc',
+            method: 'PUT',
             body: { name: 'leads-2026' },
         });
 
@@ -443,10 +460,10 @@ describe('apify-api-write', () => {
         expect(result.structuredContent).toMatchObject({ method: 'PUT', path: '/v2/datasets/abc', data: body });
     });
 
-    it('sends an operation without a body when none is given', async () => {
+    it("uses the path's only method when none is given, and sends no body when none is given", async () => {
         requestMock.mockResolvedValue(mockResponse(200, { data: { id: 'run-1', status: 'ABORTING' } }));
 
-        await callTool(apifyApiWrite, { operationId: 'actorRun_abort_post', pathParams: { runId: 'run-1' } });
+        await callTool(apifyApiWrite, { path: '/v2/actor-runs/run-1/abort' });
 
         expect(requestMock).toHaveBeenCalledWith({
             ...REQUEST_BASE,
@@ -457,9 +474,9 @@ describe('apify-api-write', () => {
 
     it('sends the body as application/json through the real apify-client axios instance', async () => {
         const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com' });
-        const sent: { data?: unknown; contentType?: unknown }[] = [];
+        const sent: { url?: string; data?: unknown; contentType?: unknown }[] = [];
         client.httpClient.axios.defaults.adapter = async (config) => {
-            sent.push({ data: config.data, contentType: config.headers.get('Content-Type') });
+            sent.push({ url: config.url, data: config.data, contentType: config.headers.get('Content-Type') });
             return {
                 status: 201,
                 statusText: 'Created',
@@ -470,10 +487,7 @@ describe('apify-api-write', () => {
             };
         };
         const call = async (body: unknown) => {
-            const context = stubToolCallContext(
-                { operationId: 'keyValueStore_record_put', pathParams: { storeId: 's', recordKey: 'K' }, body },
-                client,
-            );
+            const context = stubToolCallContext({ path: '/v2/key-value-stores/s/records/a%2FK', body }, client);
             return (await (apifyApiWrite as HelperTool).call(context)) as TextToolResult;
         };
 
@@ -482,104 +496,103 @@ describe('apify-api-write', () => {
         expect(results.map((result) => result.structuredContent)).toEqual(
             Array(3).fill(expect.objectContaining({ statusCode: 201, data: { data: {} } })),
         );
+        const url = 'https://api.apify.com/v2/key-value-stores/s/records/a%2FK';
         expect(sent).toEqual([
-            { data: '{"name":"x"}', contentType: 'application/json' },
-            { data: '42', contentType: 'application/json' },
-            { data: '[1,2]', contentType: 'application/json' },
+            { url, data: '{"name":"x"}', contentType: 'application/json' },
+            { url, data: '42', contentType: 'application/json' },
+            { url, data: '[1,2]', contentType: 'application/json' },
         ]);
     });
 
     it.each([
-        [{ operationId: 'dataset_delete', pathParams: { datasetId: 'abc' } }, 'Deletion cannot be undone'],
-        [{ operationId: 'users_me_limits_put', body: {} }, 'spending limits'],
-        [{ operationId: 'actorRun_metamorph_post', pathParams: { runId: 'run-1' } }, 'cannot be undone'],
         [
-            { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } },
-            `dataset_get is a GET operation with read access; this tool has write access. Call it with ${HELPER_TOOLS.API_READ}.`,
+            { path: '/v2/datasets/abc', body: { name: 'x' } },
+            'The path matches methods GET, PUT, and DELETE; specify which one to call the endpoint with.',
         ],
-        [{ operationId: 'dataset_put', pathParams: { datasetId: 'abc' } }, 'dataset_put needs a request body.'],
         [
-            { operationId: 'dataset_put', pathParams: { datasetId: 'abc' }, body: null },
-            'Pass the body of dataset_put as a JSON object or array, not as null.',
+            { path: '/v2/datasets/abc/items', body: [] },
+            'The path matches methods GET and POST; specify which one to call the endpoint with.',
+        ],
+        [
+            { path: '/v2/actor-runs/run-1/abort', method: 'PUT' },
+            'The path /v2/actor-runs/run-1/abort has no PUT operation; it matches method POST.',
+        ],
+        [
+            { path: '/v2/datasets/abc', method: 'DELETE' },
+            'The API tools do not call DELETE /v2/datasets/abc. Deletion cannot be undone',
+        ],
+        [{ path: '/v2/users/me/limits', body: {} }, 'The API tools do not call PUT /v2/users/me/limits.'],
+        [{ path: '/v2/actor-runs/run-1/metamorph' }, 'It turns the run into a run of another Actor'],
+        [
+            { path: '/v2/datasets/abc', method: 'GET' },
+            `GET /v2/datasets/abc has read access; this tool has write access. Call it with ${HELPER_TOOLS.API_READ}.`,
+        ],
+        [{ path: '/v2/nope', body: {} }, 'No Apify API operation matches the path /v2/nope.'],
+        [{ path: '/v2/datasets/../users/me/limits', body: {} }, 'The path cannot have a .. segment.'],
+        [{ path: '/v2/datasets/abc', method: 'PUT' }, 'PUT /v2/datasets/{datasetId} needs a request body.'],
+        [
+            { path: '/v2/datasets/abc', method: 'PUT', body: null },
+            'Pass the body of PUT /v2/datasets/{datasetId} as a JSON object or array, not as null.',
         ],
         [
             // A JSON-encoded string would otherwise get past the refused-field check.
-            { operationId: 'actor_put', pathParams: { actorId: 'john~my-actor' }, body: '{"isPublic":true}' },
-            'Pass the body of actor_put as a JSON object or array, not as a string.',
+            { path: '/v2/actors/john~my-actor', body: '{"isPublic":true}' },
+            'Pass the body of PUT /v2/actors/{actorId} as a JSON object or array, not as a string.',
         ],
         [
-            { operationId: 'actorRun_abort_post', pathParams: { runId: 'run-1' }, body: { gracefully: true } },
-            'actorRun_abort_post takes no request body.',
+            { path: '/v2/actor-runs/run-1/abort', body: { gracefully: true } },
+            'POST /v2/actor-runs/{runId}/abort takes no request body.',
         ],
         [
-            {
-                operationId: 'actor_put',
-                pathParams: { actorId: 'john~my-actor' },
-                body: { title: 'T', isPublic: false },
-            },
+            { path: '/v2/actors/john~my-actor', body: { title: 'T', isPublic: false } },
             'The API tools do not set isPublic, whatever the value',
         ],
         [
-            { operationId: 'actors_post', body: { name: 'x', actorPermissionLevel: 'FULL_PERMISSIONS' } },
+            { path: '/v2/actors', body: { name: 'x', actorPermissionLevel: 'FULL_PERMISSIONS' } },
             'The API tools do not set actorPermissionLevel, whatever the value',
         ],
         [
-            {
-                operationId: 'dataset_put',
-                pathParams: { datasetId: 'abc' },
-                body: { generalAccess: 'ANYONE_WITH_ID_CAN_READ' },
-            },
+            { path: '/v2/datasets/abc', method: 'PUT', body: { generalAccess: 'ANYONE_WITH_ID_CAN_READ' } },
             'The API tools do not set generalAccess',
         ],
         [
             {
-                operationId: 'actor_version_put',
-                pathParams: { actorId: 'john~my-actor', versionNumber: '0.1' },
+                path: '/v2/actors/john~my-actor/versions/0.1',
+                method: 'PUT',
                 body: { envVars: [{ name: 'API_KEY', value: 'x', isSecret: true }] },
             },
             "The API tools do not set envVars: they set an Actor's source, versions, or environment variables, " +
                 'which dedicated source tools or Apify Console change. To add or change one environment ' +
-                'variable, call actor_version_envVars_post or actor_version_envVar_put; each leaves the other ' +
+                'variable, call POST /v2/actors/{actorId}/versions/{versionNumber}/env-vars or PUT ' +
+                '/v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName}; each leaves the other ' +
                 'variables as they are. Without the refused fields the body sets nothing, so do not call again with it.',
         ],
         [
-            {
-                operationId: 'actor_version_put',
-                pathParams: { actorId: 'john~my-actor', versionNumber: '0.1' },
-                body: { sourceFiles: [] },
-            },
+            { path: '/v2/actors/john~my-actor/versions/0.1', method: 'PUT', body: { sourceFiles: [] } },
             'The API tools do not set sourceFiles',
         ],
-        [
-            { operationId: 'actor_put', pathParams: { actorId: 'john~my-actor' }, body: { versions: [] } },
-            'The API tools do not set versions',
-        ],
+        [{ path: '/v2/actors/john~my-actor', body: { versions: [] } }, 'The API tools do not set versions'],
         [
             {
-                operationId: 'actor_version_post',
-                pathParams: { actorId: 'john~my-actor', versionNumber: '0.1' },
+                path: '/v2/actors/john~my-actor/versions/0.1',
+                method: 'POST',
                 body: { buildTag: 'beta', gitHubGistUrl: 'https://gist.github.com/x' },
             },
             'The API tools do not set gitHubGistUrl',
         ],
         [
             {
-                operationId: 'actor_versions_post',
-                pathParams: { actorId: 'john~my-actor' },
+                path: '/v2/actors/john~my-actor/versions',
                 body: { versionNumber: '0.2', envVars: [{ name: 'API_KEY', value: 'x' }] },
             },
-            "The API tools do not call actor_versions_post. It sets the new version's source",
+            "The API tools do not call POST /v2/actors/john~my-actor/versions. It sets the new version's source",
         ],
         [
-            {
-                operationId: 'actors_runs_post',
-                pathParams: { actorId: 'john~my-actor' },
-                query: { forcePermissionLevel: 'FULL_PERMISSIONS' },
-            },
+            { path: '/v2/actors/john~my-actor/runs', query: { forcePermissionLevel: 'FULL_PERMISSIONS' } },
             'The API tools do not set forcePermissionLevel, whatever the value',
         ],
         [
-            { operationId: 'actors_runs_post', pathParams: { actorId: 'john~my-actor' }, query: { waitForFinish: 60 } },
+            { path: '/v2/actors/john~my-actor/runs', query: { waitForFinish: 60 } },
             "call the run's or build's GET operation with waitForFinish; calling this operation again starts another one.",
         ],
     ])('refuses %j without a request', async (args, reason) => {
@@ -592,8 +605,7 @@ describe('apify-api-write', () => {
 
     it('lists every refused field in one refusal and says to call again when the rest of the body sets something', async () => {
         const result = await callTool(apifyApiWrite, {
-            operationId: 'actor_put',
-            pathParams: { actorId: 'john~my-actor' },
+            path: '/v2/actors/john~my-actor',
             body: { title: 'T', isPublic: true, versions: [] },
         });
 
@@ -608,7 +620,7 @@ describe('apify-api-write', () => {
     });
 
     it('does not name the read tool for a read operation when the session lacks it', async () => {
-        const result = await callTool(apifyApiWrite, { operationId: 'dataset_get', pathParams: { datasetId: 'abc' } }, [
+        const result = await callTool(apifyApiWrite, { path: '/v2/datasets/abc', method: 'GET' }, [
             HELPER_TOOLS.API_WRITE,
         ]);
 
@@ -617,24 +629,36 @@ describe('apify-api-write', () => {
         expect(result.content[0].text).toContain('No tool in this session has read access.');
     });
 
+    it('uses the only method of a path whose only method is GET, and refuses it as a read', async () => {
+        const result = await callTool(apifyApiWrite, { path: '/v2/webhooks' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain('GET /v2/webhooks has read access; this tool has write access.');
+    });
+
     it('sends a version field that does not replace the source, such as buildTag', async () => {
         requestMock.mockResolvedValue(mockResponse(200, { data: { versionNumber: '0.1', buildTag: 'beta' } }));
 
         await callTool(apifyApiWrite, {
-            operationId: 'actor_version_put',
-            pathParams: { actorId: 'john~my-actor', versionNumber: '0.1' },
+            path: '/v2/actors/john~my-actor/versions/0.1',
+            method: 'PUT',
             body: { buildTag: 'beta' },
         });
 
-        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ data: '{"buildTag":"beta"}' }));
+        expect(requestMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                url: `${BASE_URL}/actors/john~my-actor/versions/0.1`,
+                method: 'PUT',
+                data: '{"buildTag":"beta"}',
+            }),
+        );
     });
 
     it('sends a refused field name when the body is free-form, such as a stored record', async () => {
         requestMock.mockResolvedValue(mockResponse(201, undefined, ''));
 
         const result = await callTool(apifyApiWrite, {
-            operationId: 'keyValueStore_record_put',
-            pathParams: { storeId: 'store-1', recordKey: 'CONFIG' },
+            path: '/v2/key-value-stores/store-1/records/CONFIG',
             body: { isPublic: true },
         });
 
@@ -654,15 +678,14 @@ describe('apify-api-write', () => {
         );
 
         const result = await callTool(apifyApiWrite, {
-            operationId: 'dataset_put',
-            pathParams: { datasetId: 'abc' },
+            path: '/v2/datasets/abc',
+            method: 'PUT',
             body: { name: 'leads-2026' },
         });
 
         expect(result.isError).toBe(false);
         expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
         expect(result.structuredContent).toEqual({
-            operationId: 'dataset_put',
             method: 'PUT',
             path: '/v2/datasets/abc',
             statusCode: 200,
@@ -680,8 +703,8 @@ describe('apify-api-write', () => {
         );
 
         const result = await callTool(apifyApiWrite, {
-            operationId: 'dataset_put',
-            pathParams: { datasetId: 'abc' },
+            path: '/v2/datasets/abc',
+            method: 'PUT',
             body: { name: 'leads-2026' },
         });
 
@@ -692,35 +715,34 @@ describe('apify-api-write', () => {
         const { redactArgs } = apifyApiWrite as HelperTool;
 
         it('shares the read tool redactor, so an undeclared token is redacted too', () => {
-            const args = { operationId: 'dataset_put', pathParams: { datasetId: 'abc' }, query: { token: 'secret' } };
+            const args = { path: '/v2/datasets/abc', method: 'PUT', query: { token: 'secret' } };
 
             expect(redactArgs).toBe(redactApiCallArgs);
             expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
         });
 
         it('redacts the body in the logged copy without changing the arguments', () => {
-            const args = { operationId: 'actor_version_envVar_put', body: { value: 'secret' } };
+            const path = '/v2/actors/john~my-actor/versions/0.1/env-vars/API_KEY';
+            const args = { path, method: 'PUT', body: { value: 'secret' } };
 
-            expect(redactArgs?.(args)).toMatchObject({ operationId: 'actor_version_envVar_put', body: '[REDACTED]' });
+            expect(redactArgs?.(args)).toEqual({ path, method: 'PUT', body: '[REDACTED]' });
             expect(args.body).toEqual({ value: 'secret' });
         });
 
         it('logs only the declared arguments, so a body under another key is left out', () => {
-            const args = { operationId: 'actor_version_envVar_put', requestBody: { value: 'secret' } };
+            const args = { path: '/v2/datasets/abc', requestBody: { value: 'secret' } };
 
             expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
         });
 
         it('redacts the webhooks query parameter, whose webhooks carry headers', () => {
             const args = {
-                operationId: 'actors_runs_post',
-                pathParams: { actorId: 'john~my-actor' },
+                path: '/v2/actors/john~my-actor/runs',
                 query: { memory: 1024, webhooks: 'W3siaGVhZGVyc1RlbXBsYXRlIjoic2VjcmV0In1d' },
             };
 
             expect(redactArgs?.(args)).toEqual({
-                operationId: 'actors_runs_post',
-                pathParams: { actorId: 'john~my-actor' },
+                path: '/v2/actors/john~my-actor/runs',
                 query: { memory: 1024, webhooks: '[REDACTED]' },
             });
             expect(args.query.webhooks).not.toBe('[REDACTED]');

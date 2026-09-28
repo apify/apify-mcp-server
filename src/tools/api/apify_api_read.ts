@@ -71,7 +71,7 @@ export const apifyApiRead: ToolEntry = Object.freeze({
             loadedToolNames: toolArgs.loadedToolNames,
         });
         if ('error' in matched) return respondUserError(matched.error);
-        const resolved = resolveReadOperation(matched.path, matched.operations);
+        const resolved = resolveReadOperation(matched.path, matched.operations, toolArgs.loadedToolNames);
         if ('error' in resolved) return respondUserError(resolved.error);
         const { operation } = resolved;
 
