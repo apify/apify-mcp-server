@@ -99,7 +99,7 @@ const UNAVAILABLE_OPERATION_REASONS = keyRules([
     // tool refuses; a create without them fails. Updating a version checks only the fields it sends.
     [
         'POST /v2/actors/{actorId}/versions',
-        "It sets the new version's source and environment variables, which the user can change in Apify " + 'Console.',
+        "It sets the new version's source and environment variables, which the user can change in Apify Console.",
     ],
 ]);
 
