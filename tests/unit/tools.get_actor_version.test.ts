@@ -274,6 +274,64 @@ describe('get-actor-version', () => {
             expect(reencoded.content[1].text).toContain(' Base64 files are returned only when named in paths: 1 file');
         });
 
+        it('returns a BASE64 file with a text extension as base64 when its bytes are not valid UTF-8', async () => {
+            const bytes = Buffer.from([0x61, 0xc3, 0x28, 0xff]);
+            const content = bytes.toString('base64');
+            versionGetMock.mockResolvedValue(
+                mockVersion({ sourceFiles: [MAIN_JS_SOURCE, { name: 'data.txt', format: 'BASE64', content }] }),
+            );
+
+            const named = await callTool({ paths: ['data.txt'] });
+            const listed = await callTool({});
+
+            expect(named.structuredContent.files).toContainEqual({
+                path: 'data.txt',
+                sizeBytes: 4,
+                hash: sha256Prefix(bytes),
+                format: 'BASE64',
+            });
+            expect(named.structuredContent.contents).toEqual([{ path: 'data.txt', content, encoding: 'base64' }]);
+            expect(listed.structuredContent.contents.map(({ path }) => path)).toEqual(['src/main.js']);
+            expect(listed.content[1].text).toContain(
+                ' Base64 files are returned only when named in paths: 1 file left out.',
+            );
+        });
+
+        it('keeps the byte order mark of a UTF-8 file stored as BASE64', async () => {
+            const text = '\uFEFFwith bom';
+            const bytes = Buffer.from(text, 'utf8');
+            versionGetMock.mockResolvedValue(
+                mockVersion({
+                    sourceFiles: [{ name: 'bom.txt', format: 'BASE64', content: bytes.toString('base64') }],
+                }),
+            );
+
+            const result = await callTool({});
+
+            expect(result.structuredContent.files).toEqual([
+                { path: 'bom.txt', sizeBytes: bytes.length, hash: sha256Prefix(bytes), format: 'BASE64' },
+            ]);
+            expect(result.structuredContent.contents).toEqual([{ path: 'bom.txt', content: text, encoding: 'utf8' }]);
+        });
+
+        it('keeps the last stored entry when two entries normalize to the same path', async () => {
+            versionGetMock.mockResolvedValue(
+                mockVersion({
+                    sourceFiles: [
+                        { name: 'a.js', format: 'TEXT', content: '1' },
+                        { name: './a.js', format: 'TEXT', content: '2' },
+                    ],
+                }),
+            );
+
+            const result = await callTool({});
+
+            expect(result.structuredContent.files).toEqual([
+                { path: 'a.js', sizeBytes: 1, hash: sha256Prefix('2'), format: 'TEXT' },
+            ]);
+            expect(result.structuredContent.contents).toEqual([{ path: 'a.js', content: '2', encoding: 'utf8' }]);
+        });
+
         it('reads an inline file stored without format as TEXT and one without content as empty', async () => {
             versionGetMock.mockResolvedValue(
                 mockVersion({
@@ -300,7 +358,7 @@ describe('get-actor-version', () => {
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
         });
 
-        it('normalizes inline paths the way the build worker does', async () => {
+        it('drops empty and . segments and turns backslashes into /', async () => {
             const first = await callTool({ paths: [] });
             versionGetMock.mockResolvedValue(
                 mockVersion({
@@ -886,7 +944,7 @@ describe('get-actor-version', () => {
                 'https://api.example.test/v2/actor-builds/abc?token=secret-signature',
                 'https://api.example.test/v2/actor-builds/abc',
             ],
-            // A record URL on another host is not read from this API as if it were one of its stores.
+            // A record URL on another host is reported as an outside zip, not refused as one of this API's stores.
             [
                 `https://evil.example.test${RECORD_PATH}?signature=secret-signature`,
                 `https://evil.example.test${RECORD_PATH}`,
@@ -909,7 +967,7 @@ describe('get-actor-version', () => {
             });
             expect(JSON.stringify(result)).not.toContain('secret-signature');
             expect(result.content[1].text).toMatch(
-                / builds from the zip at \S+, revision [0-9a-f]{16}\. Nothing outside the Apify API is fetched, so no files are returned\.$/,
+                / builds from the zip at \S+, revision [0-9a-f]{16}\. This tool does not download zips, so no files are returned\.$/,
             );
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
         });
