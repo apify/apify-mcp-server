@@ -17,6 +17,7 @@ import {
     buildFilesManifest,
     buildFilesRevision,
     buildUrlRevision,
+    decodeSourceFileEntry,
     isFolderEntry,
     parseStoredPath,
 } from './source_files.js';
@@ -28,7 +29,6 @@ import {
     formatEmptyFilesWarning,
     formatMissingDockerfileWarning,
     formatUrlWithoutSecrets,
-    getSourceFileEntryBytes,
     MAX_WRITE_FILES,
     parseInputFiles,
     respondToSourceToolError,
@@ -126,7 +126,7 @@ function buildFilesWarnings(
     const isConfigRewritten =
         sentConfig !== undefined &&
         storedConfig !== undefined &&
-        !getSourceFileEntryBytes(sentConfig).equals(getSourceFileEntryBytes(storedConfig));
+        !decodeSourceFileEntry(sentConfig).equals(decodeSourceFileEntry(storedConfig));
     return [
         formatMissingDockerfileWarning(sentEntries),
         isConfigRewritten &&

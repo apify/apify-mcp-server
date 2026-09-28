@@ -20,6 +20,7 @@ import {
     buildInlineSourceFile,
     buildUrlRevision,
     compareSourcePaths,
+    decodeSourceFileEntry,
     formatMib,
     isFolderEntry,
     MAX_SOURCE_PATH_LENGTH,
@@ -34,7 +35,6 @@ import {
     formatEmptyFilesWarning,
     formatUrlWithoutSecrets,
     getInlineSourceBytes,
-    getSourceFileEntryBytes,
     hasUrlSecrets,
     MAX_INLINE_SOURCE_BYTES,
     MAX_WRITE_FILES,
@@ -401,7 +401,7 @@ function applyWrite(state: ApplyState, operation: Extract<PreparedOperation, { t
         return;
     }
     // A retried write finds its own content, which is reported as unchanged rather than as a conflict.
-    if (getSourceFileEntryBytes(existing.entry).equals(getSourceFileEntryBytes(entry))) return;
+    if (decodeSourceFileEntry(existing.entry).equals(decodeSourceFileEntry(entry))) return;
     if (expectedHash === undefined) {
         throw new PreconditionError(
             PRECONDITION_REASON.FILE_EXISTS,

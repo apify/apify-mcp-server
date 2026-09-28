@@ -149,6 +149,12 @@ export function buildUrlRevision(sourceType: string, url: string): string {
     return getSha256Prefix(`${sourceType}\0${url}`);
 }
 
+/** The decoded bytes of a stored entry; a missing format or content reads as TEXT and empty, as the build worker reads it. */
+export function decodeSourceFileEntry(entry: ActorVersionSourceFile): Buffer {
+    const { format, content }: Partial<ActorVersionSourceFile> = entry;
+    return Buffer.from(content ?? '', format === 'BASE64' ? 'base64' : 'utf8');
+}
+
 /**
  * A file stored inline in the version; its format is the one the platform stored. The platform stores a file without
  * `format` or `content` as given, and the build worker reads them as TEXT and as empty, so the same defaults apply.
@@ -160,7 +166,7 @@ export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile 
     const { name, format, content: storedContent }: Partial<ActorVersionSourceFile> & { name: string } = file;
     const content = storedContent ?? '';
     const path = parseStoredPath(name);
-    const bytes = format === 'BASE64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
+    const bytes = decodeSourceFileEntry(file);
     const common = { path, sizeBytes: bytes.length, hash: getSha256Prefix(bytes) };
     if (format !== 'BASE64') {
         return { ...common, format: 'TEXT', encoding: 'utf8', contentBytes: bytes.length, readContent: () => content };
