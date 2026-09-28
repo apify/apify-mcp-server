@@ -36,11 +36,13 @@ const SECRET_QUERY_PARAMS: readonly string[] = ['token', 'signature', 'webhooks'
  * The logged copy of an API tool call's arguments (`redactArgs`). An allowlist: it keeps the path and
  * method, the query with the values of secret parameters redacted, and only a marker for the body,
  * which can carry environment variable values, webhook headers, or stored records. An undeclared
- * `token` is redacted too, since it is logged before the query check refuses it.
+ * `token` is redacted too, since it is logged before the query check refuses it. So is a query
+ * written into the path, such as a public URL's `?signature=`, which the path check refuses only
+ * after the arguments are logged.
  */
 export function redactApiCallArgs({ path, method, query, body }: Record<string, unknown>) {
     return {
-        path,
+        path: typeof path === 'string' ? path.replace(/[?#][\s\S]*$/, '?[REDACTED]') : path,
         method,
         query: isRecord(query)
             ? Object.fromEntries(
@@ -61,31 +63,41 @@ const PATH_PARAMETER_SEGMENT_REGEX = /^\{[^{}]+\}$/;
 
 /**
  * Checks a request path and returns its segments after `/v2/`, each decoded and encoded again, so a
- * value works both encoded and not. `~` stays as it is. A template placeholder is refused unless
- * `canBeTemplate` is set: the API would take `{datasetId}` as the value.
+ * value works both encoded and not. `~` stays as it is. A template placeholder, encoded or not, is
+ * refused unless `canBeTemplate` is set: the API would take `{datasetId}` as the value. With
+ * `canBeTemplate`, a placeholder stays as the agent wrote it, since it only matches a template's.
  */
 export function parseApiPath(path: string, canBeTemplate = false): { segments: string[] } | { error: string } {
     if (!path.startsWith(API_PATH_PREFIX)) {
         return { error: `The path must start with ${API_PATH_PREFIX}, for example /v2/actor-runs. Do not pass a URL.` };
     }
     if (path.includes('?') || path.includes('#')) {
-        return { error: 'The path cannot hold ? or #. Pass query parameters in query.' };
+        return {
+            error: canBeTemplate
+                ? 'The path cannot hold ? or #. Remove the query.'
+                : 'The path cannot hold ? or #. Pass query parameters in query.',
+        };
     }
     const segments: string[] = [];
     for (const rawSegment of path.slice(API_PATH_PREFIX.length).split('/')) {
         if (!rawSegment) return { error: `The path ${path} has an empty segment. Remove the extra slash.` };
-        if (!canBeTemplate && PATH_PARAMETER_SEGMENT_REGEX.test(rawSegment)) {
-            return { error: `Replace ${rawSegment} in the path with its value.` };
-        }
         let value: string;
+        let segment: string;
         try {
             value = decodeURIComponent(rawSegment);
+            // A lone surrogate decodes, but does not encode.
+            segment = encodeURIComponent(value);
         } catch {
             return { error: `The path segment ${rawSegment} is not valid URL encoding. Write a % as %25.` };
         }
+        if (PATH_PARAMETER_SEGMENT_REGEX.test(value)) {
+            if (!canBeTemplate) return { error: `Replace ${value} in the path with its value.` };
+            segments.push(value);
+            continue;
+        }
         // Encoded or not, `.` and `..` would move the request to another route.
         if (value === '.' || value === '..') return { error: `The path cannot have a ${value} segment.` };
-        segments.push(encodeURIComponent(value));
+        segments.push(segment);
     }
     return { segments };
 }
@@ -105,8 +117,9 @@ function countMatchingLiterals(template: string, segments: string[]): number | u
 
 /**
  * The operations on the one path template the segments match, in index order (GET, POST, PUT, DELETE).
- * When several templates match, the one with more literal segments wins, so `/v2/actors/x/runs/last`
- * is the last run, not a run with the ID `last`. The published spec has no tie; the first template wins one.
+ * When several templates match, the one with more literal segments wins, so
+ * `/v2/request-queues/x/requests/batch` is the batch operation, not a request with the ID `batch`.
+ * The published spec has no tie; the first template wins one.
  */
 function findPathOperations(index: Map<string, ApiOperation>, segments: string[]): ApiOperation[] {
     let bestLiteralCount = -1;
@@ -155,10 +168,12 @@ export function resolvePathOperations(params: {
     const next = params.loadedToolNames.includes(HELPER_TOOLS.API_SEARCH)
         ? ` Find the path with ${HELPER_TOOLS.API_SEARCH}.`
         : '';
+    // A template is fine for describing operations, so only the call tools ask for the values.
+    const nameRule = params.canBeTemplate
+        ? 'A name is written username~name'
+        : 'Write the path with its values in it; a name is written username~name';
     return {
-        error:
-            `No Apify API operation matches the path ${path}. Write the path with its values in it; ` +
-            `a name is written username~name, as in /v2/actors/john~my-actor.${next}`,
+        error: `No Apify API operation matches the path ${path}. ${nameRule}, as in /v2/actors/john~my-actor.${next}`,
     };
 }
 
@@ -174,7 +189,7 @@ export function resolveMethodOperation(
 }
 
 /** The refusal of an operation the API tools do not call, or `undefined` when they call it. */
-export function formatUnavailableMessage(operation: ApiOperation, path: string): string | undefined {
+function formatUnavailableMessage(operation: ApiOperation, path: string): string | undefined {
     if (operation.access !== API_ACCESS.UNAVAILABLE) return undefined;
     return `The API tools do not call ${operation.method} ${path}. ${operation.unavailableReason}`;
 }

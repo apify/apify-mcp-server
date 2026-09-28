@@ -91,13 +91,18 @@ describe('parseApiPath()', () => {
         ['/v2/datasets/%2e/items', 'The path cannot have a . segment.'],
         ['/v2/datasets/100%', 'The path segment 100% is not valid URL encoding.'],
         ['/v2/datasets/{datasetId}/items', 'Replace {datasetId} in the path with its value.'],
+        ['/v2/datasets/%7BdatasetId%7D/items', 'Replace {datasetId} in the path with its value.'],
+        ['/v2/datasets/\ud800', 'The path segment \ud800 is not valid URL encoding.'],
     ])('refuses %s', (path, reason) => {
         const result = parseApiPath(path);
         expect('error' in result && result.error).toContain(reason);
     });
 
-    it('takes a template only when asked to', () => {
-        expect(parseApiPath('/v2/datasets/{datasetId}', true)).toEqual({ segments: ['datasets', '%7BdatasetId%7D'] });
+    it('takes a template only when asked to, and keeps its placeholders as they are', () => {
+        expect(parseApiPath('/v2/datasets/{datasetId}', true)).toEqual({ segments: ['datasets', '{datasetId}'] });
+        expect(parseApiPath('/v2/datasets/%7BdatasetId%7D', true)).toEqual({ segments: ['datasets', '{datasetId}'] });
+        const withQuery = parseApiPath('/v2/datasets/{datasetId}?limit=1', true);
+        expect('error' in withQuery && withQuery.error).toBe('The path cannot hold ? or #. Remove the query.');
     });
 });
 
@@ -119,6 +124,14 @@ describe('resolvePathOperations()', () => {
     it('matches a literal segment only to itself and prefers the template with more literal segments', () => {
         expect(resolveIds('/v2/users/me')).toEqual(['users_me_get']);
         expect(resolveIds('/v2/users/abc')).toEqual(['user_get']);
+        expect(resolveIds('/v2/request-queues/q/requests/batch')).toEqual([
+            'requestQueue_requests_batch_post',
+            'requestQueue_requests_batch_delete',
+        ]);
+        expect(resolveIds('/v2/request-queues/q/requests/r-1')).toEqual([
+            'requestQueue_request_get',
+            'requestQueue_request_put',
+        ]);
         expect(resolveIds('/v2/actors/abc/runs/last')).toEqual(['actor_runs_last_get']);
         expect(resolveIds('/v2/actors/abc/runs/run-1')).toEqual([]);
     });
@@ -144,6 +157,21 @@ describe('resolvePathOperations()', () => {
             'in it; a name is written username~name, as in /v2/actors/john~my-actor.';
         expect(withSearch).toEqual({ error: `${message} Find the path with ${HELPER_TOOLS.API_SEARCH}.` });
         expect(withoutSearch).toEqual({ error: message });
+    });
+
+    it('echoes a template as it was written and does not ask a template for its values', () => {
+        const result = resolvePathOperations({
+            index: INDEX,
+            path: '/v2/datasets/{datasetId}/nothing',
+            loadedToolNames: [],
+            canBeTemplate: true,
+        });
+
+        expect(result).toEqual({
+            error:
+                'No Apify API operation matches the path /v2/datasets/{datasetId}/nothing. A name is written ' +
+                'username~name, as in /v2/actors/john~my-actor.',
+        });
     });
 });
 
@@ -246,6 +274,14 @@ describe('apify-api-details', () => {
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe('The path /v2/actors/abc has no GET operation; it matches method PUT.');
+    });
+
+    it('echoes a template path with its braces in a refusal', async () => {
+        const result = await callTool(apifyApiDetails, { path: '/v2/actors/{actorId}', method: 'GET' });
+
+        expect(result.content[0].text).toBe(
+            'The path /v2/actors/{actorId} has no GET operation; it matches method PUT.',
+        );
     });
 
     it('names the search tool on an unknown path only when the session has it', async () => {
@@ -420,6 +456,15 @@ describe('apify-api-read', () => {
         });
         // The tool itself still gets the real values.
         expect(args.query.signature).toBe('sig-secret');
+    });
+
+    it('logs a query written into the path only as redacted', () => {
+        for (const path of ['/v2/datasets/abc/items?signature=sig-secret', '/v2/datasets/abc?token=token-secret#x']) {
+            const logged = redactApiCallArgs({ path });
+
+            expect(logged.path).toBe(`${path.slice(0, path.indexOf('?'))}?[REDACTED]`);
+            expect(JSON.stringify(logged)).not.toContain('secret');
+        }
     });
 
     it('logs only the declared arguments and a body only as redacted', () => {

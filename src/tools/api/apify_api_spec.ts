@@ -14,7 +14,7 @@ export type ApiAccess = (typeof API_ACCESS)[keyof typeof API_ACCESS];
 
 /** HEAD is left out: it returns no body, and each HEAD operation has a GET twin. */
 export const API_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const;
-export type ApiMethod = (typeof API_METHODS)[number];
+type ApiMethod = (typeof API_METHODS)[number];
 
 /** The API reference has one page per operation, at the operation ID in kebab case. */
 const API_DOCS_BASE_URL = 'https://docs.apify.com/api/v2';

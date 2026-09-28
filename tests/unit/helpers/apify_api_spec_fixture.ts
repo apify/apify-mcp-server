@@ -303,6 +303,43 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ $ref: '#/components/parameters/actorId' }],
             },
         },
+        // The batch template and a request's template both match /v2/request-queues/q/requests/batch.
+        '/v2/request-queues/{queueId}/requests/{requestId}': {
+            get: {
+                operationId: 'requestQueue_request_get',
+                summary: 'Get request',
+                tags: ['Storage/Request queues/Requests'],
+                parameters: [
+                    { name: 'queueId', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'requestId', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+            },
+            put: {
+                operationId: 'requestQueue_request_put',
+                summary: 'Update request',
+                tags: ['Storage/Request queues/Requests'],
+                parameters: [
+                    { name: 'queueId', in: 'path', required: true, schema: { type: 'string' } },
+                    { name: 'requestId', in: 'path', required: true, schema: { type: 'string' } },
+                ],
+                requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+            },
+        },
+        '/v2/request-queues/{queueId}/requests/batch': {
+            post: {
+                operationId: 'requestQueue_requests_batch_post',
+                summary: 'Add requests',
+                tags: ['Storage/Request queues'],
+                parameters: [{ name: 'queueId', in: 'path', required: true, schema: { type: 'string' } }],
+                requestBody: { required: true, content: { 'application/json': { schema: { type: 'array' } } } },
+            },
+            delete: {
+                operationId: 'requestQueue_requests_batch_delete',
+                summary: 'Delete requests',
+                tags: ['Storage/Request queues'],
+                parameters: [{ name: 'queueId', in: 'path', required: true, schema: { type: 'string' } }],
+            },
+        },
         '/outside/v2': { get: { operationId: 'outside_get', summary: 'Outside the API' } },
         '/v2/broken': { get: { summary: 'No operation ID' } },
     },
