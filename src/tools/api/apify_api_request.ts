@@ -212,13 +212,18 @@ export function resolveReadOperation(
     return unavailableMessage ? { error: unavailableMessage } : { operation };
 }
 
-/** Where to call a path without GET: the write tool when it may, else why not. */
+/**
+ * Where to call a path without GET: the write tool with the method it may call, else why not. The
+ * method is named since a path with several methods needs it, such as a POST and a DELETE.
+ */
 function formatReadNextStep(operations: readonly ApiOperation[], loadedToolNames: readonly string[]): string {
     // Without GET, each operation has write access or is unavailable.
-    const hasWriteOperation = operations.some((candidate) => candidate.access === API_ACCESS.WRITE);
-    if (!hasWriteOperation) return `The API tools do not call it. ${operations[0].unavailableReason}`;
+    const writeMethods = operations
+        .filter((candidate) => candidate.access === API_ACCESS.WRITE)
+        .map((candidate) => candidate.method);
+    if (writeMethods.length === 0) return `The API tools do not call it. ${operations[0].unavailableReason}`;
     return loadedToolNames.includes(HELPER_TOOLS.API_WRITE)
-        ? `Call it with ${HELPER_TOOLS.API_WRITE}.`
+        ? `Call it with ${HELPER_TOOLS.API_WRITE} and method ${writeMethods.join(' or ')}.`
         : 'No tool in this session has write access.';
 }
 
@@ -282,8 +287,8 @@ export function validateQueryParams(
         const next =
             operation.method === 'GET'
                 ? 'Call the operation again to keep waiting.'
-                : "To keep waiting after that, call the run's or build's GET operation with waitForFinish; " +
-                  'calling this operation again starts another one.';
+                : 'To keep waiting after that, call GET /v2/actor-runs/{runId} or GET /v2/actor-builds/{buildId} ' +
+                  'with waitForFinish; calling this operation again starts another one.';
         return `waitForFinish can be at most ${WAIT_SECS_MAX} seconds. ${next}`;
     }
     // It sets the run's permission level, like the refused actorPermissionLevel body field.

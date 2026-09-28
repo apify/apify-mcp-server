@@ -338,7 +338,12 @@ describe('apify-api-read', () => {
         [
             '/v2/actor-runs/run-1/abort',
             'The path /v2/actor-runs/run-1/abort matches method POST, not GET; this tool sends only GET. ' +
-                `Call it with ${HELPER_TOOLS.API_WRITE}.`,
+                `Call it with ${HELPER_TOOLS.API_WRITE} and method POST.`,
+        ],
+        [
+            '/v2/request-queues/q/requests/batch',
+            'The path /v2/request-queues/q/requests/batch matches methods POST and DELETE, not GET; this tool ' +
+                `sends only GET. Call it with ${HELPER_TOOLS.API_WRITE} and method POST.`,
         ],
         [
             '/v2/actor-runs/run-1/metamorph',
@@ -366,7 +371,7 @@ describe('apify-api-read', () => {
 
         expect(withWrite.content[0].text).toBe(
             'The path /v2/actors/john~my-actor/versions/0.1 matches methods POST and PUT, not GET; this tool ' +
-                `sends only GET. Call it with ${HELPER_TOOLS.API_WRITE}.`,
+                `sends only GET. Call it with ${HELPER_TOOLS.API_WRITE} and method POST or PUT.`,
         );
         expect(withoutWrite.content[0].text).not.toContain(HELPER_TOOLS.API_WRITE);
         expect(withoutWrite.content[0].text).toContain('No tool in this session has write access.');
@@ -638,7 +643,8 @@ describe('apify-api-write', () => {
         ],
         [
             { path: '/v2/actors/john~my-actor/runs', query: { waitForFinish: 60 } },
-            "call the run's or build's GET operation with waitForFinish; calling this operation again starts another one.",
+            'call GET /v2/actor-runs/{runId} or GET /v2/actor-builds/{buildId} with waitForFinish; calling this ' +
+                'operation again starts another one.',
         ],
     ])('refuses %j without a request', async (args, reason) => {
         const result = await callTool(apifyApiWrite, args);
