@@ -32,8 +32,8 @@ const apifyApiWriteArgs = z.object({
         .unknown()
         .optional()
         .describe(
-            'The request body as a JSON object or array, not a JSON-encoded string. It is sent as JSON. ' +
-                'Required when the operation needs one; omit it otherwise.',
+            'The request body, usually a JSON object; any JSON value but a string or null. Do not pass a ' +
+                'JSON-encoded string. Required when the operation needs one; omit it otherwise.',
         ),
 });
 

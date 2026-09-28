@@ -336,7 +336,7 @@ export function validateRequestBody(operation: ApiOperation, body: unknown): str
     // A JSON-encoded string would reach the API as a string, not as the object, and skip the checks below.
     if (typeof body === 'string' || body === null) {
         return (
-            `Pass the body of ${operation.method} ${operation.path} as a JSON object or array, not as ` +
+            `Pass the body of ${operation.method} ${operation.path} as JSON, usually an object, not as ` +
             `${body === null ? 'null' : 'a string'}.`
         );
     }

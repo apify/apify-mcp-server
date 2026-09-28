@@ -663,12 +663,12 @@ describe('apify-api-write', () => {
         [{ path: '/v2/datasets/abc', method: 'PUT' }, 'PUT /v2/datasets/{datasetId} needs a request body.'],
         [
             { path: '/v2/datasets/abc', method: 'PUT', body: null },
-            'Pass the body of PUT /v2/datasets/{datasetId} as a JSON object or array, not as null.',
+            'Pass the body of PUT /v2/datasets/{datasetId} as JSON, usually an object, not as null.',
         ],
         [
             // A JSON-encoded string would otherwise get past the refused-field check.
             { path: '/v2/actors/john~my-actor', method: 'PUT', body: '{"isPublic":true}' },
-            'Pass the body of PUT /v2/actors/{actorId} as a JSON object or array, not as a string.',
+            'Pass the body of PUT /v2/actors/{actorId} as JSON, usually an object, not as a string.',
         ],
         [
             { path: '/v2/actor-runs/run-1/abort', body: { gracefully: true } },
