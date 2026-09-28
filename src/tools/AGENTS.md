@@ -35,11 +35,14 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
     operations on a path, and send a GET to a path. `apify_api_spec.ts` builds the operation index from
     the spec (cached for an hour) and decides each operation's access: read, write, or unavailable with
-    a reason. Operation IDs are internal keys for these rules; the tools take and return method and
-    path only. `apify_api_request.ts` normalizes the real path the agent gives, matches it to a path
-    template (more literal segments win), checks the query, and sends one request with no retries.
-    The call tools log their arguments through `redactApiCallArgs` (`redactArgs`): only the declared
-    keys, with the body and the `token`, `signature`, and `webhooks` query values redacted.
+    a reason. The rules are keyed by method and path template, not by operation ID, and a spec that no
+    longer lists an operation a rule is about is refused, like a failed download. The tools take and
+    return method and path only. `apify_api_request.ts` normalizes the real path the agent gives,
+    matches it to a path template (more literal segments win), checks the query, and sends one request
+    with no retries. The details and call tools log their arguments through `redactApiCallArgs`
+    (`redactArgs`): an allowlist of path, method, query, and body, with the body and the `token`,
+    `signature`, and `webhooks` query values redacted, and a query written into the path cut to
+    `?[REDACTED]`.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
