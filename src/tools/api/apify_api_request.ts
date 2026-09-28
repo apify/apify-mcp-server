@@ -490,6 +490,13 @@ export async function callApiOperation(params: {
                     `${MAX_INLINE_BYTES} bytes, so it is not returned; check the result with an operation with read access.`;
                 return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
             }
+            // The status says the write failed; the generic message would say it may have applied.
+            if (operation.method !== 'GET' && statusCode !== undefined) {
+                return respondUserError(
+                    `${operation.method} ${path} failed with HTTP ${statusCode}. Its error body is larger than ` +
+                        `${MAX_INLINE_BYTES} bytes, so it is not returned.`,
+                );
+            }
             return respondUserError(formatOversizeMessage(operation, path, params.loadedToolNames));
         }
         throw toPlainRequestError(error);

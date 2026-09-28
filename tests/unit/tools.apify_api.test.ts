@@ -873,6 +873,26 @@ describe('apify-api-write', () => {
         );
     });
 
+    it('reports a failed write whose error body is over the inline limit with its status', async () => {
+        requestMock.mockRejectedValue(
+            new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE', undefined, {
+                res: { statusCode: 400 },
+            }),
+        );
+
+        const result = await callTool(apifyApiWrite, {
+            path: '/v2/datasets/abc',
+            method: 'PUT',
+            body: { name: 'leads-2026' },
+        });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            `PUT /v2/datasets/abc failed with HTTP 400. Its error body is larger than ${MAX_INLINE_BYTES} bytes, ` +
+                'so it is not returned.',
+        );
+    });
+
     it('says the request was sent when an oversize response has no status', async () => {
         requestMock.mockRejectedValue(
             new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE'),
