@@ -81,7 +81,8 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
         readOnlyHint: false,
         destructiveHint: true,
         idempotentHint: false,
-        openWorldHint: false,
+        // It starts runs and builds, and creates webhooks that call any URL, like the tools that start runs.
+        openWorldHint: true,
     },
     // A body can carry secrets: environment variable values, webhook headers, stored records. So can the
     // webhooks query parameter of a run, whose webhooks carry headers.

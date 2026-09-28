@@ -555,6 +555,14 @@ describe('apify-api-read', () => {
 describe('apify-api-write', () => {
     const REQUEST_BASE = { params: undefined, maxContentLength: MAX_INLINE_BYTES, signal: expect.any(AbortSignal) };
 
+    it('is annotated as destructive and open-world, since it starts runs and creates webhooks to any URL', () => {
+        expect(apifyApiWrite.annotations).toMatchObject({
+            readOnlyHint: false,
+            destructiveHint: true,
+            openWorldHint: true,
+        });
+    });
+
     it('sends one request with the body serialized as JSON and returns the response', async () => {
         const body = { data: { id: 'abc', name: 'leads-2026' } };
         requestMock.mockResolvedValue(mockResponse(200, body));
