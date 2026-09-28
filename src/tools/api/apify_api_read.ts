@@ -84,6 +84,7 @@ export const apifyApiRead: ToolEntry = Object.freeze({
             path: matched.path,
             query: parsed.query,
             signal: toolArgs.signal,
+            loadedToolNames: toolArgs.loadedToolNames,
         });
     },
 } as const);

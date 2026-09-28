@@ -394,16 +394,39 @@ describe('apify-api-read', () => {
         });
     });
 
-    it('does not return a body over the inline limit', async () => {
-        requestMock.mockRejectedValue(
-            new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE'),
-        );
+    /** The abort axios throws for a body over `maxContentLength`; Node's request keeps the response status. */
+    function buildOversizeError(statusCode: number) {
+        return new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE', undefined, {
+            res: { statusCode },
+        });
+    }
+
+    it('does not return a body over the inline limit and names the parameters that narrow it', async () => {
+        requestMock.mockRejectedValue(buildOversizeError(200));
 
         const result = await callTool(apifyApiRead, { path: '/v2/datasets/abc/items', query: { format: 'json' } });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
-        expect(result.content[0].text).toContain('limit, offset, or fields');
+        expect(result.content[0].text).toBe(
+            `The response of GET /v2/datasets/abc/items is larger than ${MAX_INLINE_BYTES} bytes, so it is not ` +
+                'returned. Narrow the request with the limit query parameter.',
+        );
+    });
+
+    it('sends a log over the inline limit to the log tool when the session has it', async () => {
+        requestMock.mockRejectedValue(buildOversizeError(200));
+
+        const withLogTool = await callTool(apifyApiRead, { path: '/v2/actor-runs/abc/log' }, [
+            HELPER_TOOLS.ACTOR_RUNS_LOG,
+        ]);
+        const withoutLogTool = await callTool(apifyApiRead, { path: '/v2/actor-runs/abc/log' }, []);
+
+        expect(withLogTool.content[0].text).toContain(
+            `Get the end of the log with ${HELPER_TOOLS.ACTOR_RUNS_LOG} instead.`,
+        );
+        expect(withoutLogTool.content[0].text).toContain(
+            'The operation has no query parameter that narrows it, so the API tools cannot return it.',
+        );
     });
 
     it('rethrows any other request failure without the request config, which holds the token', async () => {

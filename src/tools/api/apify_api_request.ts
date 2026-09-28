@@ -144,11 +144,18 @@ function findPathOperations(index: Map<string, ApiOperation>, segments: string[]
     return operations;
 }
 
-/** Method names in a sentence, with an Oxford comma: `GET, PUT, and DELETE`. */
+/** Words in a sentence, with an Oxford comma: `GET, PUT, and DELETE`. */
+function formatList(words: readonly string[], conjunction: 'and' | 'or'): string {
+    if (words.length <= 2) return words.join(` ${conjunction} `);
+    return `${words.slice(0, -1).join(', ')}, ${conjunction} ${words.at(-1)}`;
+}
+
+/** Method names in a sentence: `GET, PUT, and DELETE`. */
 function formatMethodList(operations: readonly ApiOperation[]): string {
-    const methods = operations.map((operation) => operation.method);
-    if (methods.length <= 2) return methods.join(' and ');
-    return `${methods.slice(0, -1).join(', ')}, and ${methods.at(-1)}`;
+    return formatList(
+        operations.map((operation) => operation.method),
+        'and',
+    );
 }
 
 /** `method POST` or `methods GET and PUT`. */
@@ -254,11 +261,31 @@ export function validateQueryParams(
     return undefined;
 }
 
-function formatOversizeMessage(operation: ApiOperation, path: string): string {
-    return (
-        `The response of ${operation.method} ${path} is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned. ` +
-        'Narrow the request, for example with the limit, offset, or fields query parameters if the operation declares them.'
-    );
+/** Query parameters that make a response smaller. */
+const NARROWING_QUERY_PARAMS: readonly string[] = ['limit', 'offset', 'fields', 'omit'];
+
+/** The dedicated tool that returns the end of a log too large for the API tools, when the session has it. */
+function findLogToolName(path: string, loadedToolNames: readonly string[]): string | undefined {
+    if (!/\/log$|^\/v2\/logs\//.test(path)) return undefined;
+    const toolName = path.startsWith('/v2/actor-builds/') ? HELPER_TOOLS.ACTOR_BUILD_LOG : HELPER_TOOLS.ACTOR_RUNS_LOG;
+    return loadedToolNames.includes(toolName) ? toolName : undefined;
+}
+
+/** The refusal of a response over the inline limit, with the parameters the operation has to narrow it. */
+function formatOversizeMessage(operation: ApiOperation, path: string, loadedToolNames: readonly string[]): string {
+    const narrowingNames = operation.parameters
+        .filter((parameter) => parameter.in === 'query' && NARROWING_QUERY_PARAMS.includes(parameter.name))
+        .map((parameter) => parameter.name);
+    const logToolName = findLogToolName(operation.path, loadedToolNames);
+    let next: string;
+    if (narrowingNames.length > 0) {
+        next = `Narrow the request with the ${formatList(narrowingNames, 'or')} query parameter.`;
+    } else if (logToolName) {
+        next = `Get the end of the log with ${logToolName} instead.`;
+    } else {
+        next = 'The operation has no query parameter that narrows it, so the API tools cannot return it.';
+    }
+    return `The response of ${operation.method} ${path} is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned. ${next}`;
 }
 
 /**
@@ -290,6 +317,8 @@ export async function callApiOperation(params: {
     query?: Record<string, string | number | boolean>;
     /** Aborts the request when the client cancels the tool call. */
     signal?: AbortSignal;
+    /** The session's tools, to name a dedicated log tool when a log is too large. */
+    loadedToolNames: readonly string[];
 }): Promise<ToolResponse> {
     const { client, operation, path } = params;
     let response: AxiosResponse<unknown>;
@@ -305,7 +334,8 @@ export async function callApiOperation(params: {
     } catch (error) {
         // A cancelled call is not a tool error; like the run and build tools, it gets the empty response.
         if (params.signal?.aborted) return respondAborted();
-        if (isMaxContentLengthAbort(error)) return respondUserError(formatOversizeMessage(operation, path));
+        if (isMaxContentLengthAbort(error))
+            return respondUserError(formatOversizeMessage(operation, path, params.loadedToolNames));
         throw toPlainRequestError(error);
     }
     if (response.status >= 300) throw new ApifyApiError(response, 1);
