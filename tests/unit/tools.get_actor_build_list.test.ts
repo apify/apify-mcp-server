@@ -86,7 +86,7 @@ describe('get-actor-build-list', () => {
         // content: [0] data, [1] summary with its next step.
         expect(content).toHaveLength(2);
         expect(content[1].text).toBe(
-            `Actor john/my-actor has 1 builds; showing 1 from offset 0.\nCheck a build with ${HELPER_TOOLS.ACTOR_BUILD_GET} using its buildId.`,
+            `Actor john/my-actor has 1 build; showing 1 from offset 0.\nCheck a build with ${HELPER_TOOLS.ACTOR_BUILD_GET} using its buildId.`,
         );
     });
 
@@ -212,7 +212,7 @@ describe('get-actor-build-list', () => {
                 const { content } = await callTool({ actorId: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
 
                 expect(content[1].text).toBe(
-                    `Actor actor-1 has 1 builds; showing 1 from offset 0.\nRead why build 0.1.9 failed with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-9.`,
+                    `Actor actor-1 has 1 build; showing 1 from offset 0.\nRead why build 0.1.9 failed with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-9.`,
                 );
             },
         );
@@ -226,7 +226,7 @@ describe('get-actor-build-list', () => {
                 const { content } = await callTool({ actorId: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_GET]);
 
                 expect(content[1].text).toBe(
-                    'Actor actor-1 has 1 builds; showing 1 from offset 0.\nRead the log of build 0.1.9 (ID build-9) to see why it failed.',
+                    'Actor actor-1 has 1 build; showing 1 from offset 0.\nRead the log of build 0.1.9 (ID build-9) to see why it failed.',
                 );
             },
         );

@@ -40,11 +40,12 @@ export function buildWaitSecsField(zeroMeans: string) {
 
 /**
  * The build subset returned by the build tools. Allowlisted so internal fields on the API
- * document (userId, meta, options, inspectorId) never reach the client.
- * `apifyConsoleUrl` is set only for Console UI token sessions (see `getConsoleLinkContext`).
- * get-actor-build-list repeats the other fields in `toBuildListItem`; change both together.
+ * document (userId, meta, options, inspectorId) never reach the client. get-actor-build-list returns
+ * it as is; get-actor-build and build-actor add the Console link (`toBuildResult`).
  */
-export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | undefined) {
+export function toBuildItem(
+    build: Pick<Build, 'id' | 'actId' | 'buildNumber' | 'status' | 'startedAt' | 'finishedAt'>,
+) {
     return {
         id: build.id,
         actorId: build.actId,
@@ -53,6 +54,16 @@ export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | un
         // Normalized because the client parses these into `Date` objects; the output schema promises strings.
         startedAt: toIsoString(build.startedAt) ?? null,
         finishedAt: toIsoString(build.finishedAt) ?? null,
+    };
+}
+
+/**
+ * `toBuildItem` plus `apifyConsoleUrl`, which is set only for Console UI token sessions
+ * (see `getConsoleLinkContext`).
+ */
+export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | undefined) {
+    return {
+        ...toBuildItem(build),
         apifyConsoleUrl: buildConsoleBuildUrl(linkContext, build.actId, build.buildNumber),
     };
 }

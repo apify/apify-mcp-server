@@ -6,9 +6,9 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { toIsoString } from '../actors/actor_run_response.js';
 import { catchNotFound } from '../storage/storage_helpers.js';
 import { getActorBuildListToolOutputSchema } from '../structured_output_schemas.js';
+import { toBuildItem } from './build_helpers.js';
 
 const getActorBuildListArgs = z.object({
     actorId: z
@@ -42,22 +42,6 @@ type BuildListItem = BuildCollectionClientListItem & Pick<Build, 'actId' | 'buil
 
 /** Statuses of a build that ended without succeeding; the next step points at the newest one's log. */
 const FAILED_BUILD_STATUSES: ReadonlySet<string> = new Set(['FAILED', 'TIMED-OUT', 'ABORTED']);
-
-/**
- * The build subset returned per item. Allowlisted so userId, meta and usage never reach the client.
- * The same fields as `toBuildResult` in build_helpers.ts without the Console link; change both together.
- */
-function toBuildListItem(build: BuildListItem) {
-    return {
-        id: build.id,
-        actorId: build.actId,
-        buildNumber: build.buildNumber,
-        status: build.status,
-        // Normalized because the client parses these into `Date` objects; the output schema promises strings.
-        startedAt: toIsoString(build.startedAt) ?? null,
-        finishedAt: toIsoString(build.finishedAt) ?? null,
-    };
-}
 
 /**
  * The one next step after a page of builds. A failed build is the usual reason to list builds, so the
@@ -146,10 +130,10 @@ export const getActorBuildList: ToolEntry = Object.freeze({
             offset: builds.offset,
             limit: builds.limit,
             desc: builds.desc,
-            items: items.map(toBuildListItem),
+            items: items.map(toBuildItem),
         };
         const owner = parsed.actorId ? `Actor ${parsed.actorId}` : 'Your account';
-        const summary = `${owner} has ${builds.total} builds; showing ${builds.count} from offset ${builds.offset}.`;
+        const summary = `${owner} has ${builds.total} ${builds.total === 1 ? 'build' : 'builds'}; showing ${builds.count} from offset ${builds.offset}.`;
         const nextStep = buildNextStepForBuildList(items, builds.desc, loadedToolNames);
         return respondOk([JSON.stringify(structuredContent), nextStep ? `${summary}\n${nextStep}` : summary], {
             structuredContent,
