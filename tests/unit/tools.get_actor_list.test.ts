@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { getActorList } from '../../src/tools/actors/get_actor_list.js';
+import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { actorListOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { ALL_TOOLS_PRESENT } from '../../src/types.js';
@@ -62,7 +63,7 @@ describe('get-actor-list', () => {
 
         const { content, structuredContent } = await callTool({});
 
-        expect(structuredContent).toEqual({
+        const page = {
             total: 1,
             count: 1,
             offset: 0,
@@ -79,14 +80,14 @@ describe('get-actor-list', () => {
                     lastRunStartedAt: '2026-09-03T10:00:00.000Z',
                 },
             ],
-        });
-        // content: [0] the data, [1] summary and next step.
+        };
+        const summary = 'Your account has 1 Actor; showing 1 from offset 0.';
+        const nextStep = `Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with an Actor's fullName to see its input schema and README.`;
+        expect(structuredContent).toEqual({ ...page, summary, nextStep });
+        // content: [0] the page, [1] summary and next step.
         expect(content).toHaveLength(2);
-        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
-        expect(content[1].text).toBe(
-            'Your account has 1 Actor; showing 1 from offset 0.\n' +
-                `Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with an Actor's fullName to see its input schema and README.`,
-        );
+        expect(JSON.parse(content[0].text)).toEqual(page);
+        expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
     it("lists the account's own Actors with the default paging", async () => {
@@ -199,5 +200,14 @@ describe('get-actor-list', () => {
         expect(full).toContain(HELPER_TOOLS.STORE_SEARCH);
         expect(alone).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         expect(alone).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+    });
+
+    // Both directions of the routing: search-actors never returns private Actors, so it points at this tool.
+    it("makes search-actors send the user's own Actors here only when this tool is served", () => {
+        const full = searchActors.buildDescription!(ALL_TOOLS_PRESENT);
+        const alone = searchActors.buildDescription!(only(HELPER_TOOLS.STORE_SEARCH));
+
+        expect(full).toContain(`Use ${HELPER_TOOLS.ACTOR_LIST_GET} for those.`);
+        expect(alone).not.toContain(HELPER_TOOLS.ACTOR_LIST_GET);
     });
 });

@@ -752,8 +752,14 @@ const actorListItemSchema = {
     required: ['id', 'name', 'fullName', 'title', 'createdAt', 'modifiedAt', 'lastRunStartedAt'],
 };
 
-/** Schema for get-actor-list output (paginated list of the account's Actors). */
-export const actorListOutputSchema = paginatedListOutputSchema(actorListItemSchema, 'Actors.');
+const actorListPageSchema = paginatedListOutputSchema(actorListItemSchema, 'Actors.');
+
+/** Schema for get-actor-list output: a page of the account's Actors, with summary and nextStep like get-dataset-list. */
+export const actorListOutputSchema = {
+    ...actorListPageSchema,
+    properties: { ...actorListPageSchema.properties, summary: summaryProperty, nextStep: nextStepProperty },
+    required: [...actorListPageSchema.required, 'summary', 'nextStep'],
+};
 
 /**
  * Schema for dataset items retrieval tools (get-dataset-items).

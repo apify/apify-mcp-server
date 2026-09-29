@@ -6,7 +6,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
-import { respondOk } from '../../utils/mcp.js';
+import { buildStorageResponse } from '../storage/storage_helpers.js';
 import { actorListOutputSchema } from '../structured_output_schemas.js';
 import { toIsoString } from './actor_run_response.js';
 
@@ -126,6 +126,6 @@ export const getActorList: ToolEntry = Object.freeze({
             { total: list.total, count: items.length, offset: list.offset },
             loadedToolNames,
         );
-        return respondOk([JSON.stringify(structuredContent), `${summary}\n${nextStep}`], { structuredContent });
+        return buildStorageResponse({ structuredContent, summary, nextStep });
     },
 } as const);
