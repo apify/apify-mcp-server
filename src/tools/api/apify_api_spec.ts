@@ -6,7 +6,7 @@ import { apifyApiOperationsCache } from '../../state.js';
 export const APIFY_API_OPENAPI_URL = 'https://docs.apify.com/api/openapi.json';
 
 /** HEAD is left out: it returns no body, and each HEAD operation has a GET twin. */
-export const API_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const;
+export const API_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 export type ApiMethod = (typeof API_METHODS)[number];
 
 /** The API reference has one page per operation, at the operation ID in kebab case. */
@@ -237,6 +237,7 @@ const METHOD_VERBS: Record<ApiMethod, readonly string[]> = {
     GET: ['get', 'list', 'read'],
     POST: ['add', 'create', 'push', 'start'],
     PUT: ['update', 'set', 'rename', 'change'],
+    PATCH: ['update', 'patch', 'change'],
     DELETE: ['delete', 'remove'],
 };
 
