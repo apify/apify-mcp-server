@@ -249,7 +249,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
 - **Builds**: Build an Actor version, check the status of a build, and retrieve its build log.
-- **Apify API**: Search the Apify API reference, inspect an operation, and call read-only operations.
+- **Apify API**: Search the Apify API reference, inspect an operation, and send GET requests to the API.
 
 ### Overview of available tools
 
@@ -296,7 +296,7 @@ Legend for the **Enabled by default** column:
 | `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
 | `apify-api-search` | api | Search the Apify API reference for operations by keywords. Returns each one's method, path, and docs page. |  |
 | `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. |  |
-| `apify-api-read` | api | Send a GET request to an Apify API path, such as `/v2/actor-runs`. |  |
+| `apify-api-read` | api | Send a GET request to any Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. |  |
 
 > **Note:**
 >

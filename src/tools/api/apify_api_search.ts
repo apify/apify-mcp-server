@@ -33,15 +33,13 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const nextStepsSentence = nextSteps.length > 0 ? `\nAfter finding an operation, ${nextSteps.join(', then ')}.` : '';
     return dedent`
         Search the Apify API reference for operations by keywords. Returns each operation's method, path
-        template, summary, link to the API reference, and access: read, write, or unavailable with the
-        reason the API tools do not call it.${nextStepsSentence}
+        template, summary, and link to the API reference.${nextStepsSentence}
         To call an operation, fill its path template with real values: /v2/datasets/{datasetId}/items
         becomes /v2/datasets/abc/items, and a name is written username~name.
         Prefer a dedicated Apify tool when one does what the user asks.
 
         USAGE:
         - Use when no dedicated tool does what the user asks and the Apify API might.
-        - Tell the user the reason when the operation they need is unavailable.
 
         USAGE EXAMPLES:
         - user_input: List the webhooks on my account
@@ -75,8 +73,6 @@ export const apifyApiSearch: ToolEntry = Object.freeze({
             method: operation.method,
             path: operation.path,
             summary: operation.summary,
-            access: operation.access,
-            ...(operation.unavailableReason && { unavailableReason: operation.unavailableReason }),
             docsUrl: operation.docsUrl,
         }));
         const result = { operations };

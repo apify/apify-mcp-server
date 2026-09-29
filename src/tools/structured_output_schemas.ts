@@ -878,16 +878,6 @@ export const keyValueStoreRecordOutputSchema = {
     required: ['keyValueStoreId', 'key', 'value', 'summary'],
 };
 
-const apiAccessProperty = {
-    type: 'string' as const,
-    enum: ['read', 'write', 'unavailable'],
-    description: 'read (GET) or write (POST, PUT) access, or unavailable when the API tools do not call it',
-};
-const apiUnavailableReasonProperty = {
-    type: 'string' as const,
-    description: 'Why the API tools do not call the operation; only when access is unavailable',
-};
-
 /**
  * Schema for the operations found by apify-api-search.
  */
@@ -902,11 +892,9 @@ export const apifyApiSearchOutputSchema = {
                     method: { type: 'string', description: 'HTTP method' },
                     path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
                     summary: { type: 'string', description: 'What the operation does' },
-                    access: apiAccessProperty,
-                    unavailableReason: apiUnavailableReasonProperty,
                     docsUrl: { type: 'string', description: "The operation's page in the API reference" },
                 },
-                required: ['method', 'path', 'summary', 'access', 'docsUrl'],
+                required: ['method', 'path', 'summary', 'docsUrl'],
             },
         },
     },
@@ -921,8 +909,6 @@ const apiOperationDetailsSchema = {
         path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
         summary: { type: 'string', description: 'What the operation does' },
         description: { type: 'string', description: 'Full description from the API reference' },
-        access: apiAccessProperty,
-        unavailableReason: apiUnavailableReasonProperty,
         parameters: {
             type: 'array' as const,
             items: {
@@ -942,18 +928,13 @@ const apiOperationDetailsSchema = {
             type: 'object' as const,
             properties: {
                 isRequired: { type: 'boolean', description: 'Whether the body is required' },
-                schema: { description: 'JSON schema of the body, sent as JSON, without the refused body fields' },
+                schema: { description: 'JSON schema of the body, sent as JSON' },
             },
             required: ['isRequired', 'schema'],
             description: 'Only when the operation takes a body',
         },
-        refusedBodyFields: {
-            type: 'array' as const,
-            items: { type: 'string' },
-            description: 'Body fields the API tools refuse to set for this operation',
-        },
     },
-    required: ['method', 'path', 'summary', 'description', 'access', 'parameters', 'refusedBodyFields'],
+    required: ['method', 'path', 'summary', 'description', 'parameters'],
 };
 
 /**

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-    API_ACCESS,
     APIFY_API_OPENAPI_URL,
     buildApiOperationIndex,
     searchApiOperations,
@@ -16,7 +15,7 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(48);
+        expect(index.size).toBe(37);
     });
 
     it('resolves parameter references and keeps only path and query parameters', () => {
@@ -44,48 +43,8 @@ describe('buildApiOperationIndex()', () => {
         expect(index.get('actorRun_abort_post')?.requestBody).toBeUndefined();
     });
 
-    it('gives GET read access and POST and PUT write access', () => {
-        expect(index.get('dataset_get')?.access).toBe(API_ACCESS.READ);
-        expect(index.get('dataset_put')?.access).toBe(API_ACCESS.WRITE);
-        expect(index.get('actorRun_abort_post')?.access).toBe(API_ACCESS.WRITE);
-    });
-
-    it.each([
-        ['dataset_delete', 'Deletion cannot be undone'],
-        ['actor_runSync_get', 'waits up to 300 seconds'],
-        ['actorTask_runSyncGetDatasetItems_get', 'waits up to 300 seconds'],
-        ['users_me_limits_put', 'spending limits'],
-        ['PostChargeRun', 'Only the Actor itself charges'],
-        ['actorRun_metamorph_post', 'cannot be undone'],
-        ['actor_runs_last_metamorph_post', 'cannot be undone'],
-        ['actorTask_runs_last_metamorph_post', 'cannot be undone'],
-        ['actor_runSyncGetDatasetItems_post', 'waits up to 300 seconds'],
-        ['actor_runSync_post', 'waits up to 300 seconds'],
-        ['tools_browser_info_get', 'the API token'],
-        ['tools_browser_info_post', 'the API token'],
-        ['tools_browser_info_put', 'the API token'],
-    ])('makes %s unavailable with the reason', (operationId, reason) => {
-        const operation = index.get(operationId);
-        expect(operation?.access).toBe(API_ACCESS.UNAVAILABLE);
-        expect(operation?.unavailableReason).toContain(reason);
-    });
-
-    it('refuses publishing, pricing, permission, and sharing fields only where the body schema declares them', () => {
-        expect(index.get('actor_put')?.refusedBodyFields).toEqual(['isPublic', 'pricingInfos', 'actorPermissionLevel']);
-        expect(index.get('dataset_put')?.refusedBodyFields).toEqual(['generalAccess']);
-        // The API takes these on create, although the create schema does not declare them.
-        expect(index.get('actors_post')?.refusedBodyFields).toEqual([
-            'isPublic',
-            'pricingInfos',
-            'actorPermissionLevel',
-        ]);
-        // A record body is free-form: a record may hold an isPublic key as plain data.
-        expect(index.get('keyValueStore_record_put')?.refusedBodyFields).toEqual([]);
-    });
-
     it('links each operation to its page in the API reference, at the operation ID in kebab case', () => {
         expect(index.get('actorRun_abort_post')?.docsUrl).toBe('https://docs.apify.com/api/v2/actor-run-abort-post');
-        expect(index.get('PostChargeRun')?.docsUrl).toBe('https://docs.apify.com/api/v2/post-charge-run');
         expect(index.get('keyValueStore_record_put')?.docsUrl).toBe(
             'https://docs.apify.com/api/v2/key-value-store-record-put',
         );
@@ -94,56 +53,6 @@ describe('buildApiOperationIndex()', () => {
     it('throws for a document without /v2/ operations', () => {
         expect(() => buildApiOperationIndex({})).toThrow('the spec lists no /v2/ operations.');
         expect(() => buildApiOperationIndex('not a spec')).toThrow('the spec lists no /v2/ operations.');
-    });
-
-    /** The fixture with the operation at the path and method replaced. */
-    function withOperation(path: string, method: string, operation: Record<string, unknown> | undefined) {
-        const paths: Record<string, Record<string, unknown>> = structuredClone(API_SPEC_FIXTURE.paths);
-        paths[path] = { ...paths[path], [method]: operation };
-        return { ...API_SPEC_FIXTURE, paths };
-    }
-
-    it('keys the refusals by method and path, not by the operation ID or the parameter names', () => {
-        const renamed = buildApiOperationIndex(
-            withOperation('/v2/actor-runs/{runId}/charge', 'post', {
-                operationId: 'actorRun_charge_post',
-                summary: 'Charge events in run',
-            }),
-        );
-        expect(renamed.get('actorRun_charge_post')?.access).toBe(API_ACCESS.UNAVAILABLE);
-
-        const paths: Record<string, unknown> = structuredClone(API_SPEC_FIXTURE.paths);
-        paths['/v2/actor-runs/{id}/metamorph'] = paths['/v2/actor-runs/{runId}/metamorph'];
-        delete paths['/v2/actor-runs/{runId}/metamorph'];
-        const reparameterized = buildApiOperationIndex({ ...API_SPEC_FIXTURE, paths });
-        expect(reparameterized.get('actorRun_metamorph_post')?.access).toBe(API_ACCESS.UNAVAILABLE);
-
-        const createActor = withOperation('/v2/actors', 'post', {
-            ...API_SPEC_FIXTURE.paths['/v2/actors'].post,
-            operationId: 'actor_create',
-        });
-        expect(buildApiOperationIndex(createActor).get('actor_create')?.refusedBodyFields).toEqual([
-            'isPublic',
-            'pricingInfos',
-            'actorPermissionLevel',
-        ]);
-    });
-
-    it('throws when an operation a rule is about is missing, rather than lift the rule', () => {
-        const moved = withOperation('/v2/users/me/limits', 'put', undefined);
-
-        expect(() => buildApiOperationIndex(moved)).toThrow(
-            'the spec no longer lists PUT /v2/users/me/limits, which the API tools have rules for.',
-        );
-    });
-
-    it('checks the rules against a deprecated operation too', () => {
-        const deprecated = withOperation('/v2/users/me/limits', 'put', {
-            ...API_SPEC_FIXTURE.paths['/v2/users/me/limits'].put,
-            deprecated: true,
-        });
-
-        expect(buildApiOperationIndex(deprecated).has('users_me_limits_put')).toBe(false);
     });
 });
 
@@ -175,7 +84,7 @@ describe('searchApiOperations()', () => {
         expect(searchIds('rename')).toEqual([]);
     });
 
-    it("ranks a storage's own operation above a run's copy of it and above an unavailable one", () => {
+    it("ranks a storage's own operation above a run's copy of it and above a synchronous run", () => {
         // Both competitors name the dataset in their summary; the storage's own operation does not.
         const ids = searchIds('add items to a dataset');
         expect(ids[0]).toBe('dataset_items_post');
