@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
 import { createActor } from '../../src/tools/source/create_actor.js';
 import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
-import { buildFilesRevision, buildUrlRevision } from '../../src/tools/source/source_files.js';
+import { buildFilesRevision } from '../../src/tools/source/source_files.js';
+import { buildUrlRevision } from '../../src/tools/source/source_helpers.js';
 import { createActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {

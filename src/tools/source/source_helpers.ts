@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { Actor, ActorVersionSourceFile, Build } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
 import { z } from 'zod';
@@ -10,15 +12,53 @@ import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { ABORT } from '../actors/actor_run_response.js';
 import { listVersionNumbers, startBuild } from '../builds/build_helpers.js';
-import {
-    ABSOLUTE_NAME_REGEX,
-    buildInlineSourceFile,
-    BYTES_PER_MIB,
-    formatMib,
-    hasBinaryExtension,
-    MAX_SOURCE_PATH_LENGTH,
-    parseSourcePath,
-} from './source_files.js';
+import { buildInlineSourceFile, hasBinaryExtension } from './source_files.js';
+
+export const BYTES_PER_MIB = 1024 * 1024;
+
+/** The platform keeps file names up to this length; the write tools apply the same cap. */
+export const MAX_SOURCE_PATH_LENGTH = 255;
+
+/** A POSIX root (`/abs`), a backslash root, or a Windows drive (`C:\abs`, `C:abs`). */
+const ABSOLUTE_NAME_REGEX = /^(?:[\\/]|[a-zA-Z]:)/;
+
+/** Rounded up to one decimal, so a size just over a limit never prints as the limit itself. */
+export function formatMib(bytes: number): string {
+    return (Math.ceil((bytes / BYTES_PER_MIB) * 10) / 10).toFixed(1);
+}
+
+/** Lines with their line endings kept, so joined back they give the exact text. */
+export function splitLines(text: string): string[] {
+    if (text === '') return [];
+    return text.split(/(?<=\n)/);
+}
+
+/**
+ * A path relative to the Actor root: empty and `.` segments are dropped, as the build worker's path normalization does,
+ * and backslashes become `/`. `..` segments are kept.
+ */
+function parseSourcePath(name: string): string {
+    return name
+        .split(/[\\/]/)
+        .filter((segment) => segment !== '' && segment !== '.')
+        .join('/');
+}
+
+/** The path of a stored entry; a name that normalizes to nothing, such as `.`, is kept as stored rather than dropped. */
+export function parseStoredPath(name: string): string {
+    return parseSourcePath(name) || name;
+}
+
+/** Identifies a version whose source lives at a URL: the URL is all the platform holds for it. */
+export function buildUrlRevision(sourceType: string, url: string): string {
+    return createHash('sha256').update(`${sourceType}\0${url}`).digest('hex').slice(0, 16);
+}
+
+/** The decoded bytes of a stored entry; a missing format or content reads as TEXT and empty, as the build worker reads it. */
+export function decodeSourceFileEntry(entry: ActorVersionSourceFile): Buffer {
+    const { format, content }: Partial<ActorVersionSourceFile> = entry;
+    return Buffer.from(content ?? '', format === 'BASE64' ? 'base64' : 'utf8');
+}
 
 /**
  * The platform refuses a version whose inline files measure more than this (`MAX_MULTIFILE_BYTES` in `@apify/consts`);

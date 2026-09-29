@@ -1,4 +1,4 @@
-import { splitLines } from './source_files.js';
+import { splitLines } from './source_helpers.js';
 
 /** A half-open range of character offsets, `[start, end)`, in the text as it stands now. */
 export type TextRange = { start: number; end: number };

@@ -13,17 +13,12 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondAborted } from '../../utils/mcp.js';
 import { buildNextStepForBuild, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
 import { createActorToolOutputSchema } from '../structured_output_schemas.js';
-import {
-    buildFilesManifest,
-    buildFilesRevision,
-    buildUrlRevision,
-    decodeSourceFileEntry,
-    isFolderEntry,
-    parseStoredPath,
-} from './source_files.js';
+import { buildFilesManifest, buildFilesRevision, isFolderEntry } from './source_files.js';
 import type { BuildAfterWriteResult } from './source_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
+    buildUrlRevision,
+    decodeSourceFileEntry,
     formatBuildLaterHint,
     formatBuildStartFailure,
     formatEmptyFilesWarning,
@@ -31,6 +26,7 @@ import {
     formatUrlWithoutSecrets,
     MAX_WRITE_FILES,
     parseInputFiles,
+    parseStoredPath,
     respondToSourceToolError,
     sourceFileArgs,
     startBuildAfterWrite,
@@ -278,7 +274,7 @@ export const createActor: ToolEntry = Object.freeze({
                 sourceType: source.kind === 'files' ? ActorSourceType.SourceFiles : ActorSourceType.GitRepo,
                 buildTag: parsed.buildTag,
                 revision,
-                files: files.map(({ path, sizeBytes, hash, format }) => ({ path, sizeBytes, hash, format })),
+                files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
                 warnings: source.kind === 'files' ? buildFilesWarnings(source.entries, storedEntries) : [],
                 ...(buildResult?.build && { build: toBuildResult(buildResult.build, linkContext) }),
                 ...(buildResult?.buildErrMessage !== undefined && { buildError: buildResult.buildErrMessage }),

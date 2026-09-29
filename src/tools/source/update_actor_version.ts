@@ -15,30 +15,25 @@ import { updateActorVersionToolOutputSchema } from '../structured_output_schemas
 import type { TextEdit, TextExcerpt, TextRange } from './source_edits.js';
 import { applyTextEdits, buildTextExcerpts, limitTextExcerpts } from './source_edits.js';
 import type { SourceFile } from './source_files.js';
-import {
-    buildFilesRevision,
-    buildInlineSourceFile,
-    buildUrlRevision,
-    compareSourcePaths,
-    decodeSourceFileEntry,
-    formatMib,
-    isFolderEntry,
-    MAX_SOURCE_PATH_LENGTH,
-    parseStoredPath,
-} from './source_files.js';
+import { buildFilesRevision, buildInlineSourceFile, compareSourcePaths, isFolderEntry } from './source_files.js';
 import type { BuildAfterWriteResult } from './source_helpers.js';
 import {
     ACTOR_CONFIG_PATH,
     buildSourceFileEntry,
+    buildUrlRevision,
+    decodeSourceFileEntry,
     formatBuildLaterHint,
     formatBuildStartFailure,
     formatEmptyFilesWarning,
+    formatMib,
     formatUrlWithoutSecrets,
     getInlineSourceBytes,
     hasUrlSecrets,
     MAX_INLINE_SOURCE_BYTES,
+    MAX_SOURCE_PATH_LENGTH,
     MAX_WRITE_FILES,
     parseInputPath,
+    parseStoredPath,
     resolveOwnActor,
     resolveVersionNumber,
     respondToSourceToolError,
@@ -443,7 +438,7 @@ function applyEdit(state: ApplyState, operation: Extract<PreparedOperation, { ty
     state.touchedPaths.add(path);
     state.editedRanges.set(path, result.changedRanges);
     // The file keeps its stored format: a UTF-8 file that `apify push` stored as BASE64 stays BASE64.
-    const { format } = existing.file;
+    const format = existing.entry.format === 'BASE64' ? 'BASE64' : 'TEXT';
     const content = format === 'BASE64' ? Buffer.from(result.text, 'utf8').toString('base64') : result.text;
     state.files.set(path, buildWorkingFile({ name: path, format, content }, existing.originPath));
 }
