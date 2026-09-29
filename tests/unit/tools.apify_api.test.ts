@@ -108,9 +108,15 @@ describe('findPathOperations()', () => {
             'requestQueue_request_put',
             'requestQueue_request_delete',
         ]);
-        expect(findIds('acts/abc/runs/last')).toEqual(['actor_runs_last_get']);
-        expect(findIds('acts/abc/runs/run-1')).toEqual([]);
+        expect(findIds('actors/abc/runs/last')).toEqual(['actor_runs_last_get']);
+        expect(findIds('actors/abc/runs/run-1')).toEqual([]);
         expect(findIds('datasets/')).toEqual([]);
+    });
+
+    it('looks up a legacy acts path as the actors path the spec lists', () => {
+        expect(findIds('acts/john~my-actor')).toEqual(['actor_get', 'actor_put', 'actor_delete']);
+        expect(findIds('acts/abc/runs/last?token=x')).toEqual(findIds('actors/abc/runs/last'));
+        expect(findIds('actsx/abc')).toEqual([]);
     });
 
     it('matches a concrete path built from each template back to its own operation', () => {
@@ -130,6 +136,12 @@ describe('findClosestApiPaths()', () => {
 
         expect(paths.slice(0, 2)).toEqual(['/v2/datasets/{datasetId}/items', '/v2/datasets/{datasetId}']);
         expect(paths.length).toBeLessThanOrEqual(5);
+    });
+
+    it('ranks a legacy acts path as the actors path', () => {
+        expect(findClosestApiPaths(INDEX, 'acts/abc/runs/lastt')).toEqual(
+            findClosestApiPaths(INDEX, 'actors/abc/runs/lastt'),
+        );
     });
 });
 
@@ -176,14 +188,14 @@ describe('apify-api-details', () => {
     );
 
     it('returns only the operation with the method, for a path template too', async () => {
-        const result = await callTool(apifyApiDetails, { path: '/v2/acts/{actorId}', method: 'PUT' });
+        const result = await callTool(apifyApiDetails, { path: '/v2/actors/{actorId}', method: 'PUT' });
 
         expectSchemaConformingStructuredContent(result, apifyApiDetailsOutputSchema);
         expect(result.structuredContent).toEqual({
             operations: [
                 {
                     method: 'PUT',
-                    path: '/v2/acts/{actorId}',
+                    path: '/v2/actors/{actorId}',
                     summary: 'Update Actor',
                     description: '',
                     parameters: [expect.objectContaining({ name: 'actorId', in: 'path', isRequired: true })],
@@ -194,6 +206,12 @@ describe('apify-api-details', () => {
                 },
             ],
         });
+    });
+
+    it('returns the actors operations for a legacy acts path', async () => {
+        const result = await callTool(apifyApiDetails, { path: 'acts/john~my-actor' });
+
+        expect(result.content[1].text).toBe('/v2/actors/{actorId}: GET, PUT, DELETE.');
     });
 
     it('lists the methods the path has when it has not the one asked for', async () => {
@@ -222,7 +240,7 @@ describe('apify-api-details', () => {
 
         const message =
             'The path /v2/acts/john/my-actor is not in the API spec. A name is written username~name, as in ' +
-            '/v2/acts/john~my-actor.';
+            '/v2/actors/john~my-actor.';
         expectSoftFailInvalidInput(withSearch);
         expect(withSearch.content[0].text).toBe(`${message} Find the path with ${HELPER_TOOLS.API_SEARCH}.`);
         expect(withoutSearch.content[0].text).toBe(message);
@@ -230,6 +248,10 @@ describe('apify-api-details', () => {
 });
 
 describe('apify-api-read', () => {
+    it('is annotated as read-only', () => {
+        expect(apifyApiRead.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    });
+
     it('sends one GET to the path and returns the body as the API sends it', async () => {
         const body = { data: { total: 1, items: [{ id: 'abc' }] } };
         requestMock.mockResolvedValue(mockResponse(200, body));
@@ -320,6 +342,28 @@ describe('apify-api-read', () => {
         expect(JSON.stringify(result)).not.toContain('test-token');
     });
 
+    it('masks the session token in a text body', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, 'Authorization: Bearer test-token', 'text/plain'));
+
+        const result = await callTool(apifyApiRead, { path: 'browser-info' });
+
+        expect(result.structuredContent).toMatchObject({ data: 'Authorization: Bearer [REDACTED]' });
+        expect(JSON.stringify(result)).not.toContain('test-token');
+    });
+
+    it.each([
+        ['JSON', { error: { type: 'invalid-input', message: 'Bearer test-token rejected' } }, 'application/json'],
+        ['binary', Buffer.from('{"error":{"message":"Bearer test-token rejected"}}'), 'application/octet-stream'],
+    ])('masks the session token in a %s error body', async (_kind, body, contentType) => {
+        requestMock.mockResolvedValue(mockResponse(400, body, contentType));
+
+        const error = await callTool(apifyApiRead, { path: 'datasets/abc' }).catch((thrown: unknown) => thrown);
+
+        expect(error).toBeInstanceOf(ApifyApiError);
+        expect(error).toMatchObject({ statusCode: 400, message: 'Bearer [REDACTED] rejected' });
+        expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain('test-token');
+    });
+
     it('masks nothing when the session has no token', async () => {
         const body = { data: { headers: { authorization: 'Bearer ' } } };
         requestMock.mockResolvedValue(mockResponse(200, body));
@@ -340,6 +384,17 @@ describe('apify-api-read', () => {
 
         await expect(call).rejects.toBeInstanceOf(ApifyApiError);
         await expect(call).rejects.toMatchObject({ statusCode: 400, type: 'invalid-input', message: 'Invalid limit' });
+    });
+
+    it('keeps a query written into the path out of the thrown error, whose stack a 5xx logs', async () => {
+        requestMock.mockResolvedValue(mockResponse(500, { error: { type: 'internal-error', message: 'Failed' } }));
+
+        const error = await callTool(apifyApiRead, { path: 'datasets/abc?signature=sig-secret' }).catch(
+            (thrown: unknown) => thrown,
+        );
+
+        expect(error).toMatchObject({ statusCode: 500, path: '/v2/datasets/abc' });
+        expect((error as Error).stack).not.toContain('sig-secret');
     });
 
     it('adds the closest paths of the spec to a 404', async () => {
@@ -366,6 +421,19 @@ describe('apify-api-read', () => {
         await expect(callTool(apifyApiRead, { path: 'datasets/abc/itemz' })).rejects.toMatchObject({
             message: 'Page not found.',
         });
+    });
+
+    it('does not wait for a stalled spec download for the 404 hint once the call is cancelled', async () => {
+        vi.mocked(fetchApiOperationIndex).mockReturnValueOnce(new Promise(() => undefined));
+        requestMock.mockResolvedValue(
+            mockResponse(404, { error: { type: 'page-not-found', message: 'Page not found.' } }),
+        );
+        const controller = new AbortController();
+        controller.abort();
+        const context = stubToolCallContext({ path: 'datasets/abc/itemz' }, stubClient);
+        context.signal = controller.signal;
+
+        await expect((apifyApiRead as HelperTool).call(context)).rejects.toMatchObject({ message: 'Page not found.' });
     });
 
     /** The abort axios throws for a body over `maxContentLength`; Node's request keeps the response status. */

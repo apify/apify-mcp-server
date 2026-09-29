@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from 'node:timers/promises';
+
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { isAxiosError } from 'axios';
@@ -18,8 +20,9 @@ export const apiCallArgsShape = {
         .string()
         .min(1)
         .describe(
-            'The API path with its values in it: acts, v2/acts, and /v2/acts are the same. A name is written ' +
-                'username~name, as in /v2/acts/john~my-actor. A query string written into the path is sent too.',
+            'The API path with its values in it: actors, v2/actors, and /v2/actors are the same. A name is ' +
+                'written username~name, as in /v2/actors/john~my-actor. A query string written into the path is ' +
+                'sent too.',
         ),
     query: z
         .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
@@ -29,7 +32,7 @@ export const apiCallArgsShape = {
 
 /** The shared description lines of the read and write tools. */
 export const API_CALL_DESCRIPTION = `A proxy to the Apify API, like apify api in the Apify CLI; the server adds the host and the API token.
-Write the path as acts, v2/acts, or /v2/acts, with its values in it; a name is written username~name.
+Write the path as actors, v2/actors, or /v2/actors, with its values in it; a name is written username~name.
 Synchronous runs, and waitForFinish above ${WAIT_SECS_MAX} seconds, outlast the usual 60-second tool-call timeout,
 so prefer asynchronous runs.`;
 
@@ -67,8 +70,8 @@ export function redactApiCallArgs({ path, method, query, body }: Record<string, 
 }
 
 /**
- * A path as the Apify CLI's `apify api` takes it, without its `v2/` prefix: `acts`, `v2/acts`, and
- * `/v2/acts` all become `acts`. One leading slash is removed, then the prefix, in any case.
+ * A path as the Apify CLI's `apify api` takes it, without its `v2/` prefix: `actors`, `v2/actors`, and
+ * `/v2/actors` all become `actors`. One leading slash is removed, then the prefix, in any case.
  */
 export function normalizeApiPath(path: string): string {
     return path.replace(/^\//, '').replace(/^v2\//i, '');
@@ -82,6 +85,14 @@ export function formatApiPath(normalizedPath: string): string {
 /** A path without the query string or fragment written into it. */
 function stripQuery(path: string): string {
     return path.replace(/[?#][\s\S]*$/, '');
+}
+
+/**
+ * A normalized path as the spec lists it, without its query. The API routes the legacy `acts` prefix,
+ * which apify-client and the CLI send, to the same handler as `actors`, the only prefix the spec lists.
+ */
+function toSpecPath(normalizedPath: string): string {
+    return stripQuery(normalizedPath).replace(/^acts(?=\/|$)/, 'actors');
 }
 
 const PATH_PARAMETER_SEGMENT_REGEX = /^\{[^{}]+\}$/;
@@ -109,7 +120,7 @@ function countMatchingLiterals(template: string, segments: string[]): number | u
  * request with the ID `batch`. The published spec has no tie; the first template wins one.
  */
 export function findPathOperations(index: Map<string, ApiOperation>, normalizedPath: string): ApiOperation[] {
-    const segments = stripQuery(normalizedPath).split('/');
+    const segments = toSpecPath(normalizedPath).split('/');
     let bestLiteralCount = -1;
     let operations: ApiOperation[] = [];
     for (const operation of index.values()) {
@@ -130,7 +141,7 @@ export function findPathOperations(index: Map<string, ApiOperation>, normalizedP
  * `findClosestEndpoints`.
  */
 export function findClosestApiPaths(index: Map<string, ApiOperation>, normalizedPath: string): string[] {
-    const input = stripQuery(normalizedPath).toLowerCase();
+    const input = toSpecPath(normalizedPath).toLowerCase();
     const inputSegments = input.split('/').filter(Boolean);
     const scores = new Map<string, number>();
     for (const template of new Set([...index.values()].map((operation) => operation.path))) {
@@ -156,9 +167,18 @@ export function formatList(words: readonly string[], conjunction: 'and' | 'or'):
     return `${words.slice(0, -1).join(', ')}, ${conjunction} ${words.at(-1)}`;
 }
 
-/** The index, or `undefined` when the spec cannot be loaded; for the hints that only help. */
-async function fetchApiOperationIndexIfAvailable(): Promise<Map<string, ApiOperation> | undefined> {
-    return fetchApiOperationIndex().catch(() => undefined);
+/** How long a hint waits for the spec, so a stalled download does not hold back the API's answer. */
+const HINT_SPEC_TIMEOUT_MS = 5_000;
+
+/**
+ * The index, or `undefined` when the spec cannot be loaded within a few seconds or the call is
+ * cancelled; for the hints that only help.
+ */
+async function fetchApiOperationIndexIfAvailable(signal?: AbortSignal): Promise<Map<string, ApiOperation> | undefined> {
+    return Promise.race([
+        fetchApiOperationIndex(),
+        sleep(HINT_SPEC_TIMEOUT_MS, undefined, { signal, ref: false }),
+    ]).catch(() => undefined);
 }
 
 /** Query parameters that make a response smaller. */
@@ -179,11 +199,12 @@ async function formatOversizeMessage(
     method: ApiMethod,
     normalizedPath: string,
     loadedToolNames: readonly string[],
+    signal?: AbortSignal,
 ): Promise<string> {
     const path = formatApiPath(normalizedPath);
     const message = `The response of ${method} ${path} is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned.`;
     if (method !== 'GET') return `${message} The request itself was sent; check its effect with a GET.`;
-    const index = await fetchApiOperationIndexIfAvailable();
+    const index = await fetchApiOperationIndexIfAvailable(signal);
     const operation = index && findPathOperations(index, normalizedPath).find((match) => match.method === method);
     const narrowingNames = (operation?.parameters ?? [])
         .filter((parameter) => parameter.in === 'query' && NARROWING_QUERY_PARAMS.includes(parameter.name))
@@ -203,8 +224,8 @@ function readAbortedResponseStatus(error: unknown): number | undefined {
 }
 
 /** Adds the closest paths of the spec to a 404 error, when the spec is available. */
-async function addClosestPaths(error: ApifyApiError, normalizedPath: string): Promise<void> {
-    const index = await fetchApiOperationIndexIfAvailable();
+async function addClosestPaths(error: ApifyApiError, normalizedPath: string, signal?: AbortSignal): Promise<void> {
+    const index = await fetchApiOperationIndexIfAvailable(signal);
     const paths = index ? findClosestApiPaths(index, normalizedPath) : [];
     if (paths.length === 0) return;
     error.message = `${error.message.replace(/\.$/, '')}. The closest paths in the API spec: ${paths.join(', ')}`;
@@ -212,10 +233,16 @@ async function addClosestPaths(error: ApifyApiError, normalizedPath: string): Pr
 
 /**
  * A copy of a response body with the session's token replaced, for example in `GET /v2/browser-info`,
- * which echoes the request headers. A binary body is returned as it is; it is never shown.
+ * which echoes the request headers. A binary body is masked too, since apify-client reads an error
+ * body that stays a Buffer into the error message.
  */
 function maskToken(data: unknown, token: string | undefined): unknown {
-    if (!token || data === undefined || Buffer.isBuffer(data)) return data;
+    if (!token || data === undefined) return data;
+    if (Buffer.isBuffer(data)) {
+        // The token is ASCII, so a latin1 round trip keeps every other byte as it is.
+        const bytes = data.toString('latin1');
+        return bytes.includes(token) ? Buffer.from(bytes.replaceAll(token, REDACTED), 'latin1') : data;
+    }
     const text = JSON.stringify(data);
     // The token as it appears inside a JSON string.
     const escapedToken = JSON.stringify(token).slice(1, -1);
@@ -238,7 +265,7 @@ function toPlainRequestError(error: unknown): Error {
  *
  * The URL is the client's base URL and the normalized path, with a query string in the path kept
  * and the query parameters added after it. The path is not checked or encoded again: the agent
- * encodes values. Only the origin is checked, so the token never goes to another host.
+ * encodes values. The URL starts with the base URL's `/v2/`, so no path can lead to another host.
  *
  * It goes through the client's axios instance, not `httpClient.call()`, like `readApiResource`: one
  * attempt and no retries, since a retried write could apply twice, and apify-client would retry the
@@ -267,9 +294,9 @@ export async function callApi(params: {
     const path = formatApiPath(normalizedPath);
     // `client.baseUrl` already ends with /v2.
     const url = `${client.baseUrl}/${normalizedPath}`;
-    if (new URL(url).origin !== new URL(client.baseUrl).origin) {
-        return respondUserError(`The path ${path} leads outside the Apify API. Pass a path, not a URL.`);
-    }
+    // An assertion: nothing after the base URL's `/v2/` can change the host that gets the token.
+    if (new URL(url).origin !== new URL(client.baseUrl).origin)
+        throw new Error(`The URL ${url} is not on the API host.`);
     let response: AxiosResponse<unknown>;
     try {
         response = await client.httpClient.axios.request<unknown>({
@@ -305,14 +332,18 @@ export async function callApi(params: {
                         `${MAX_INLINE_BYTES} bytes, so it is not returned.`,
                 );
             }
-            return respondUserError(await formatOversizeMessage(method, normalizedPath, params.loadedToolNames));
+            return respondUserError(
+                await formatOversizeMessage(method, normalizedPath, params.loadedToolNames, params.signal),
+            );
         }
         throw toPlainRequestError(error);
     }
     const data = maskToken(response.data, params.token);
     if (response.status >= 300) {
-        const error = new ApifyApiError({ ...response, data }, 1);
-        if (response.status === 404) await addClosestPaths(error, normalizedPath);
+        // Without the query written into the path: apify-client puts the URL into the error's path and
+        // stack, and a 5xx error is logged, so a signature or token there would reach the log.
+        const error = new ApifyApiError({ ...response, data, config: { ...response.config, url: stripQuery(url) } }, 1);
+        if (response.status === 404) await addClosestPaths(error, normalizedPath, params.signal);
         throw error;
     }
 

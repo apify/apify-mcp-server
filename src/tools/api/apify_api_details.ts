@@ -79,7 +79,7 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
                 : '';
             return respondUserError(
                 `The path ${path} is not in the API spec. A name is written username~name, as in ` +
-                    `/v2/acts/john~my-actor.${next}`,
+                    `/v2/actors/john~my-actor.${next}`,
             );
         }
         const operations = parsed.method ? matched.filter((operation) => operation.method === parsed.method) : matched;

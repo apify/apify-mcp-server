@@ -84,10 +84,7 @@ export const API_SPEC_FIXTURE = {
                 operationId: 'actorRun_get',
                 summary: 'Get run',
                 tags: ['Actor runs'],
-                parameters: [
-                    { name: 'runId', in: 'path', required: true, schema: { type: 'string' } },
-                    { name: 'waitForFinish', in: 'query', schema: { type: 'number' } },
-                ],
+                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
             },
             put: {
                 operationId: 'actorRun_put',
@@ -108,12 +105,7 @@ export const API_SPEC_FIXTURE = {
                 operationId: 'actorRun_log_get',
                 summary: 'Get log',
                 tags: ['Logs'],
-                parameters: [
-                    { name: 'runId', in: 'path', required: true, schema: { type: 'string' } },
-                    { name: 'stream', in: 'query', schema: { type: 'boolean' } },
-                    { name: 'download', in: 'query', schema: { type: 'boolean' } },
-                    { name: 'raw', in: 'query', schema: { type: 'boolean' } },
-                ],
+                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
         '/v2/actor-runs/{runId}/abort': {
@@ -124,7 +116,7 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
-        '/v2/acts': {
+        '/v2/actors': {
             get: {
                 operationId: 'actors_get',
                 summary: 'Get list of Actors',
@@ -144,7 +136,7 @@ export const API_SPEC_FIXTURE = {
                 },
             },
         },
-        '/v2/acts/{actorId}': {
+        '/v2/actors/{actorId}': {
             get: {
                 operationId: 'actor_get',
                 summary: 'Get Actor',
@@ -169,7 +161,7 @@ export const API_SPEC_FIXTURE = {
         },
         // A run's copy of the dataset operation, and a synchronous run, both of which name the dataset
         // in their summary: search must still rank the storage's own operation first.
-        '/v2/acts/{actorId}/runs/last/dataset/items': {
+        '/v2/actors/{actorId}/runs/last/dataset/items': {
             post: {
                 operationId: 'actor_runs_last_dataset_items_post',
                 summary: "Store items in last run's dataset",
@@ -178,7 +170,7 @@ export const API_SPEC_FIXTURE = {
                 requestBody: { required: true, content: { 'application/json': { schema: { type: 'array' } } } },
             },
         },
-        '/v2/acts/{actorId}/run-sync-get-dataset-items': {
+        '/v2/actors/{actorId}/run-sync-get-dataset-items': {
             post: {
                 operationId: 'actor_runSyncGetDatasetItems_post',
                 summary: 'Run Actor synchronously and get dataset items',
@@ -188,7 +180,7 @@ export const API_SPEC_FIXTURE = {
             },
         },
         // The last run; a path with a run ID here matches nothing, since its operation is deprecated.
-        '/v2/acts/{actorId}/runs/last': {
+        '/v2/actors/{actorId}/runs/last': {
             get: {
                 operationId: 'actor_runs_last_get',
                 summary: 'Get last run',
@@ -196,7 +188,7 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ $ref: '#/components/parameters/actorId' }],
             },
         },
-        '/v2/acts/{actorId}/runs/{runId}': {
+        '/v2/actors/{actorId}/runs/{runId}': {
             get: {
                 operationId: 'actors_run_get',
                 summary: 'Get run',
@@ -204,7 +196,7 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ $ref: '#/components/parameters/actorId' }],
             },
         },
-        '/v2/acts/{actorId}/run-sync': {
+        '/v2/actors/{actorId}/run-sync': {
             post: {
                 operationId: 'actor_runSync_post',
                 summary: 'Run Actor synchronously with input and return output',
@@ -285,7 +277,7 @@ export const API_SPEC_FIXTURE = {
                 requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
             },
         },
-        '/v2/acts/{actorId}/webhooks': {
+        '/v2/actors/{actorId}/webhooks': {
             get: {
                 operationId: 'actor_webhooks_get',
                 summary: 'Get list of webhooks',

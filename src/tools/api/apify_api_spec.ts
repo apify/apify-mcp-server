@@ -24,7 +24,7 @@ export type ApiOperation = {
     /** The spec's key for the operation. Internal: the tools find operations by method and path. */
     operationId: string;
     method: ApiMethod;
-    /** Path template, for example `/v2/acts/{actorId}`. */
+    /** Path template, for example `/v2/actors/{actorId}`. */
     path: string;
     summary: string;
     description: string;
