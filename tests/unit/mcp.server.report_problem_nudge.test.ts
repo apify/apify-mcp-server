@@ -20,6 +20,10 @@ vi.mock('../../src/tools/actors/actor_executor.js', () => ({
     actorExecutor: { executeActorTool: vi.fn() },
 }));
 
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(async () => ({ userId: 'test-user', userPlanTier: 'FREE', isOrganization: false })),
+}));
+
 type HandlerFn = (req: Record<string, unknown>, extra: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
 const emptySchema = { type: 'object', properties: {} };
