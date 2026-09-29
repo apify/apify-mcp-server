@@ -4,26 +4,20 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { createActorVersion } from '../../src/tools/source/create_actor_version.js';
 import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
-import { buildFilesRevision, buildUrlRevision } from '../../src/tools/source/source_files.js';
+import { buildFilesRevision } from '../../src/tools/source/source_files.js';
 import { createActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
-    mockUserInfo,
     only,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
-
-vi.mock('../../src/utils/userid_cache.js', () => ({
-    getUserInfoCached: vi.fn(),
-}));
 
 const actorGetMock = vi.fn();
 const versionGetMock = vi.fn();
@@ -62,10 +56,9 @@ type CreateVersionOutput = {
     actorId: string;
     fullName: string;
     versionNumber: string;
-    sourceType: string;
     buildTag?: string;
     revision: string;
-    files: { path: string; sizeBytes: number; hash: string; format: string }[];
+    files: { path: string; sizeBytes: number; hash: string }[];
     copiedFromVersion?: string;
     secretEnvVarsNotCopied?: string[];
     warnings: string[];
@@ -81,7 +74,6 @@ type CreateVersionResult = TextToolResult & {
 function mockActor(overrides: Record<string, unknown> = {}) {
     return {
         id: 'actor-1',
-        userId: 'user-1',
         name: 'my-actor',
         username: 'john',
         versions: [{ versionNumber: '0.1', sourceType: 'SOURCE_FILES', buildTag: 'latest' }],
@@ -144,7 +136,6 @@ function expectNoToolNamed(text: string) {
 describe('create-actor-version', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: 'user-1' }));
         actorGetMock.mockResolvedValue(mockActor());
         versionGetMock.mockResolvedValue(mockSourceVersion());
         versionsCreateMock.mockImplementation(async (body: Record<string, unknown>) => body);
@@ -214,26 +205,25 @@ describe('create-actor-version', () => {
                     path: '.actor/actor.json',
                     sizeBytes: ACTOR_JSON.content.length,
                     hash: sha256Prefix(ACTOR_JSON.content),
-                    format: 'TEXT',
                 },
                 {
                     path: 'assets/logo.png',
                     sizeBytes: LOGO_BYTES.length,
                     hash: sha256Prefix(LOGO_BYTES),
-                    format: 'BASE64',
                 },
                 // The last entry for a path wins, as the build writes them in order.
                 {
                     path: 'src/main.js',
                     sizeBytes: MAIN_JS.content.length,
                     hash: sha256Prefix(MAIN_JS.content),
-                    format: 'TEXT',
                 },
             ];
             expect(result.structuredContent.files).toEqual(files);
             expect(result.structuredContent.revision).toBe(buildFilesRevision(files));
             expect(result.structuredContent.copiedFromVersion).toBe('0.1');
 
+            // get-actor-version reads the versions from the Actor GET.
+            actorGetMock.mockResolvedValue(mockActor({ versions: [mockSourceVersion()] }));
             const read = (await (getActorVersion as HelperTool).call(
                 stubToolCallContext({ actor: 'john/my-actor', versionNumber: '0.1', paths: [] }, stubClient),
             )) as TextToolResult & { structuredContent: { revision: string; files: unknown[] } };
@@ -282,69 +272,26 @@ describe('create-actor-version', () => {
             expect(result.content[1].text).toContain('no build tag, so its builds do not move tags such as latest');
         });
 
-        it('copies a Git URL with its stored credentials, which are never shown', async () => {
-            const gitRepoUrl = 'https://user:s3cret@github.com/john/repo.git#main:actor';
-            versionGetMock.mockResolvedValue(
-                mockSourceVersion({ sourceType: 'GIT_REPO', gitRepoUrl, sourceFiles: undefined }),
-            );
-            const result = await callTool({ copyFromVersion: '0.1' });
-            expectSchemaConformingStructuredContent(result, createActorVersionToolOutputSchema);
-            expect(getPostBody()).toEqual(
-                expect.objectContaining({ versionNumber: '0.2', sourceType: 'GIT_REPO', gitRepoUrl }),
-            );
-            expect(getPostBody()).not.toHaveProperty('sourceFiles');
-            expect(result.structuredContent.sourceType).toBe('GIT_REPO');
-            expect(result.structuredContent.files).toEqual([]);
-            expect(result.structuredContent.revision).toBe(
-                buildUrlRevision('GIT_REPO', 'https://github.com/john/repo.git#main:actor'),
-            );
-            expect(result.structuredContent.warnings).toEqual([
-                'The credentials stored with the URL of version 0.1 were copied too; they are not shown.',
-            ]);
-            const output = result.content.map(({ text }) => text).join('\n');
-            expect(output).toContain('building from the Git repository https://github.com/john/repo.git#main:actor');
-            expect(output).not.toContain('s3cret');
-        });
-
-        it('copies a GitHub gist URL', async () => {
-            const gitHubGistUrl = 'https://gist.github.com/john/abc123';
-            versionGetMock.mockResolvedValue(
-                mockSourceVersion({ sourceType: 'GITHUB_GIST', gitHubGistUrl, sourceFiles: undefined }),
-            );
-            const result = await callTool({ copyFromVersion: '0.1' });
-            expect(getPostBody()).toEqual(expect.objectContaining({ sourceType: 'GITHUB_GIST', gitHubGistUrl }));
-            expect(result.structuredContent.revision).toBe(buildUrlRevision('GITHUB_GIST', gitHubGistUrl));
-            expect(result.structuredContent.warnings).toEqual([]);
-            expect(result.content[1].text).toContain(`building from the GitHub gist ${gitHubGistUrl}`);
-        });
-
-        it('refuses a zip-stored (TARBALL) version before any write', async () => {
+        it('refuses a version not stored as files, naming its URL without credentials', async () => {
             versionGetMock.mockResolvedValue(
                 mockSourceVersion({
                     sourceType: 'TARBALL',
-                    tarballUrl: 'https://x.test/a.zip',
+                    tarballUrl: 'https://x.test/a.zip?signature=secret',
                     sourceFiles: undefined,
                 }),
             );
             const text = await callToolExpectingUserError({ copyFromVersion: '0.1' });
             expect(text).toBe(
-                'Version 0.1 of john/my-actor is stored as a zip (TARBALL), and this tool cannot copy zip-stored ' +
-                    'versions yet. Give the source as files or gitRepoUrl instead. Or upload your local project ' +
-                    'folder (not the stored zip) with the Apify CLI and a build tag no other version uses: apify ' +
-                    'push --version 0.2 --build-tag wip-0-2. Without --build-tag, apify push takes the tag from ' +
-                    '.actor/actor.json, often latest, and it builds right away.',
+                'Version 0.1 of john/my-actor is not stored as files (source type TARBALL, https://x.test/a.zip), ' +
+                    'and this tool works only on versions stored as files.',
             );
             expect(versionsCreateMock).not.toHaveBeenCalled();
         });
 
-        it('refuses a version whose source the API hid, or an unknown source type', async () => {
+        it('refuses a version whose source the API hid', async () => {
             versionGetMock.mockResolvedValue(mockSourceVersion({ sourceFiles: undefined }));
-            expect(await callToolExpectingUserError({ copyFromVersion: '0.1' })).toBe(
-                'Version 0.1 of john/my-actor came back without its source, so it cannot be copied.',
-            );
-            versionGetMock.mockResolvedValue(mockSourceVersion({ sourceType: 'SOURCE_CODE' }));
-            expect(await callToolExpectingUserError({ copyFromVersion: '0.1' })).toBe(
-                'Version 0.1 of john/my-actor has source type SOURCE_CODE, which this tool cannot copy.',
+            expect(await callToolExpectingUserError({ copyFromVersion: '0.1' })).toContain(
+                'Version 0.1 of john/my-actor came back without its source',
             );
             expect(versionsCreateMock).not.toHaveBeenCalled();
         });
@@ -364,7 +311,7 @@ describe('create-actor-version', () => {
         });
     });
 
-    describe('files and gitRepoUrl', () => {
+    describe('files', () => {
         it('creates a version from files in one POST', async () => {
             const result = await callTool({ files: [MAIN_JS, ACTOR_JSON, DOCKERFILE], buildTag: 'beta' });
             expectSchemaConformingStructuredContent(result, createActorVersionToolOutputSchema);
@@ -383,13 +330,11 @@ describe('create-actor-version', () => {
                 path,
                 sizeBytes: content.length,
                 hash: sha256Prefix(content),
-                format: 'TEXT',
             }));
             expect(result.structuredContent).toEqual({
                 actorId: 'actor-1',
                 fullName: 'john/my-actor',
                 versionNumber: '0.2',
-                sourceType: 'SOURCE_FILES',
                 buildTag: 'beta',
                 revision: buildFilesRevision(files),
                 files,
@@ -397,60 +342,15 @@ describe('create-actor-version', () => {
             });
             expect(result.content[1].text).toBe(
                 `Created version 0.2 of john/my-actor from 3 files, build tag beta, revision ${buildFilesRevision(files)}.\n` +
-                    `The version has no build yet, so it cannot run until it is built. Build it with ${HELPER_TOOLS.ACTOR_BUILD}.`,
+                    'Runs use these files once the version is built.',
             );
         });
 
-        it('applies the create-actor file rules', async () => {
-            expect(await callToolExpectingUserError({ files: [MAIN_JS, DOCKERFILE] })).toContain(
-                'files must include .actor/actor.json',
-            );
-            expect(await callToolExpectingUserError({ files: [ACTOR_JSON, { path: '../x.js', content: 'x' }] })).toBe(
-                "files[1] path ../x.js has a '..' segment.",
-            );
-            expect(
-                await callToolExpectingUserError({
-                    files: [ACTOR_JSON, MAIN_JS, { path: './src/main.js', content: '' }],
-                }),
-            ).toBe('files has src/main.js more than once.');
-            expect(
-                await callToolExpectingUserError({ files: [ACTOR_JSON, { path: 'a.png', content: 'not base64!' }] }),
-            ).toContain('files[1] content for a.png has encoding base64, but its content is not valid base64');
-            expect(
-                await callToolExpectingUserError({ files: [ACTOR_JSON, { path: 'a'.repeat(256), content: 'x' }] }),
-            ).toBe('files[1] path is over 255 characters.');
-            expect(actorMock).not.toHaveBeenCalled();
-        });
-
-        it('refuses more than 2 MiB of content before any request, naming update-actor-version only when loaded', async () => {
-            const files = [ACTOR_JSON, { path: 'big.txt', content: 'x'.repeat(2 * 1024 * 1024) }];
-            expect(await callToolExpectingUserError({ files })).toContain(
-                `Create the version with fewer files, then add the rest in later calls with ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}.`,
-            );
-            const bare = await callToolExpectingUserError({ files }, [HELPER_TOOLS.ACTOR_VERSION_CREATE]);
-            expect(bare).toContain('Create the version with fewer files, then add the rest in later calls.');
-            expectNoToolNamed(bare);
-            expect(actorMock).not.toHaveBeenCalled();
-        });
-
-        it('warns about a missing Dockerfile and empty files', async () => {
+        it('warns about empty files, which the build skips', async () => {
             const result = await callTool({ files: [ACTOR_JSON, { path: 'src/empty.js', content: '' }] });
             expect(result.structuredContent.warnings).toEqual([
-                expect.stringContaining('No Dockerfile found'),
                 'These files are empty, and the build skips empty files, so they will not exist in the build: src/empty.js.',
             ]);
-        });
-
-        it('creates a version built from Git, never showing the credentials', async () => {
-            const gitRepoUrl = 'https://user:token@github.com/john/repo.git#main';
-            const result = await callTool({ gitRepoUrl });
-            expectSchemaConformingStructuredContent(result, createActorVersionToolOutputSchema);
-            expect(getPostBody()).toEqual({ versionNumber: '0.2', sourceType: 'GIT_REPO', gitRepoUrl });
-            expect(result.structuredContent.revision).toBe(
-                buildUrlRevision('GIT_REPO', 'https://github.com/john/repo.git#main'),
-            );
-            expect(result.content[1].text).toContain('from the Git repository https://github.com/john/repo.git#main');
-            expect(result.content.map(({ text }) => text).join('\n')).not.toContain('token@');
         });
     });
 
@@ -463,42 +363,30 @@ describe('create-actor-version', () => {
             expect(result.structuredContent.revision).toBe(buildFilesRevision([]));
             expect(result.content[1].text).toBe(
                 `Created version 0.2 of john/my-actor with no files, no build tag, so its builds do not move tags such as latest, revision ${buildFilesRevision([])}.\n` +
-                    `The version has no files yet: add them with ${HELPER_TOOLS.ACTOR_VERSION_UPDATE}, then build it.`,
+                    'Runs use these files once the version is built.',
             );
-            const bare = await callTool({}, [HELPER_TOOLS.ACTOR_VERSION_CREATE]);
-            expect(bare.content[1].text).toContain('The version has no files yet: add them, then build it.');
-            expectNoToolNamed(bare.content[1].text);
         });
 
         it('refuses autoBuild for an empty version before any request', async () => {
             expect(await callToolExpectingUserError({ autoBuild: true })).toBe(
-                'An empty version has nothing to build. Give copyFromVersion, files, or gitRepoUrl, or leave out autoBuild.',
+                'An empty version has nothing to build. Give copyFromVersion or files, or leave out autoBuild.',
             );
             expect(actorMock).not.toHaveBeenCalled();
         });
     });
 
     describe('input rules', () => {
-        it('refuses more than one source', async () => {
-            const expected = 'Give at most one of copyFromVersion, files, or gitRepoUrl.';
-            expect(await callToolExpectingUserError({ copyFromVersion: '0.1', files: [ACTOR_JSON] })).toBe(expected);
-            expect(await callToolExpectingUserError({ copyFromVersion: '0.1', gitRepoUrl: 'https://x' })).toBe(
-                expected,
+        it('refuses both files and copyFromVersion', async () => {
+            expect(await callToolExpectingUserError({ copyFromVersion: '0.1', files: [ACTOR_JSON] })).toBe(
+                'Give at most one of copyFromVersion or files.',
             );
-            expect(await callToolExpectingUserError({ files: [ACTOR_JSON], gitRepoUrl: 'https://x' })).toBe(expected);
             expect(actorMock).not.toHaveBeenCalled();
         });
 
-        it('leaves the versionNumber format to the platform and returns its message', async () => {
-            versionsCreateMock.mockRejectedValue(apiError(400, 'Version number must be in MAJOR.MINOR format'));
-            const result = await callTool({ versionNumber: '0.1.2' });
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('Version number must be in MAJOR.MINOR format');
-        });
-
-        it('caps files at 500 in the input schema', () => {
-            const files = Array.from({ length: 501 }, (_, index) => ({ path: `f${index}.txt`, content: 'x' }));
-            expect(createActorVersion.ajvValidate({ actor: 'john/my-actor', versionNumber: '0.2', files })).toBe(false);
+        it('lets the platform refuse a versionNumber format, with its error unchanged', async () => {
+            const error = apiError(400, 'Version number must be in MAJOR.MINOR format');
+            versionsCreateMock.mockRejectedValue(error);
+            await expect(callTool({ versionNumber: '0.1.2' })).rejects.toBe(error);
         });
 
         it('refuses a versionNumber the Actor already has, suggesting a free one first', async () => {
@@ -631,19 +519,8 @@ describe('create-actor-version', () => {
             expect(versionsCreateMock).toHaveBeenCalledTimes(1);
             expect(result.structuredContent.buildError).toBe('Not enough credit');
             expect(result.content[1].text).toContain(
-                `The version was created, but the build could not be started: Not enough credit. Start it again with ${HELPER_TOOLS.ACTOR_BUILD}.`,
+                'The build could not be started; start it again to run these files.',
             );
-            const bare = await callTool({ copyFromVersion: '0.1', autoBuild: true }, [
-                HELPER_TOOLS.ACTOR_VERSION_CREATE,
-            ]);
-            expect(bare.content[1].text).toContain('Start the build again to make this version runnable.');
-            expectNoToolNamed(bare.content[1].text);
-        });
-
-        it('names build-actor after a create without autoBuild only when loaded', async () => {
-            const bare = await callTool({ files: [ACTOR_JSON, DOCKERFILE] }, [HELPER_TOOLS.ACTOR_VERSION_CREATE]);
-            expect(bare.content[1].text).toContain('The version has no build yet, so it cannot run until it is built.');
-            expectNoToolNamed(bare.content[1].text);
         });
     });
 
@@ -673,60 +550,21 @@ describe('create-actor-version', () => {
         });
     });
 
-    describe('ownership', () => {
-        it('refuses a session without a token before any request', async () => {
-            const context = {
-                ...stubToolCallContext({ actor: 'john/my-actor', versionNumber: '0.2' }, stubClient),
-                apifyToken: '',
-            };
-            const result = (await (createActorVersion as HelperTool).call(context)) as CreateVersionResult;
-            expect(result.isError).toBe(true);
-            expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureCategory: FAILURE_CATEGORY.AUTH }));
-            expect(result.content[0].text).toBe(
-                "Changing an Actor's source needs an Apify API token, and this session has none.",
-            );
-            expect(actorMock).not.toHaveBeenCalled();
-        });
-
+    describe('Actor', () => {
         it('refuses an Actor that does not exist or a bare name', async () => {
             actorGetMock.mockResolvedValue(undefined);
             expect(await callToolExpectingUserError({ actor: 'my-actor' })).toBe(
-                'Actor my-actor not found. Give its ID or its full name, username/name; a name without the username is not enough.',
+                "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
             );
-            expect(versionsCreateMock).not.toHaveBeenCalled();
-        });
-
-        it('refuses when the account cannot be confirmed', async () => {
-            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
-            const result = await callTool({ copyFromVersion: '0.1' });
-            expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureCategory: FAILURE_CATEGORY.AUTH }));
-            expect(versionGetMock).not.toHaveBeenCalled();
-            expect(versionsCreateMock).not.toHaveBeenCalled();
-        });
-
-        it("refuses someone else's Actor", async () => {
-            actorGetMock.mockResolvedValue(mockActor({ userId: 'someone-else' }));
-            expect(await callToolExpectingUserError({ copyFromVersion: '0.1' })).toBe(
-                'john/my-actor is not in your account; this tool changes only your own Actors.',
-            );
-            expect(versionGetMock).not.toHaveBeenCalled();
             expect(versionsCreateMock).not.toHaveBeenCalled();
         });
     });
 
     describe('API errors', () => {
-        it('returns a 4xx from the POST as the API message', async () => {
-            versionsCreateMock.mockRejectedValue(
-                apiError(403, 'The Actor can have at most 10 versions.', 'too-many-versions'),
-            );
-            const result = await callTool({ copyFromVersion: '0.1' });
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('The Actor can have at most 10 versions.');
-        });
-
-        it('rethrows a 5xx', async () => {
-            versionsCreateMock.mockRejectedValue(apiError(500, 'Internal'));
-            await expect(callTool({ copyFromVersion: '0.1' })).rejects.toThrow('Internal');
+        it('lets an API error from the POST through unchanged', async () => {
+            const error = apiError(403, 'The Actor can have at most 10 versions.', 'too-many-versions');
+            versionsCreateMock.mockRejectedValue(error);
+            await expect(callTool({ copyFromVersion: '0.1' })).rejects.toBe(error);
         });
     });
 });

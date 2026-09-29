@@ -32,19 +32,17 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
     shared `waitSecs` field, the shared build response and the by-status next-step text.
-  - `source/`: `get-actor-version` (an Actor version's metadata, file manifest with hashes, revision,
-    and requested content), `create-actor` (a new Actor with one version in a single POST),
-    `update-actor-version` (file operations applied all-or-nothing to a fresh read, stored with one
-    version PUT that carries only the source keys and buildTag), `create-actor-version` (a new version
-    in one POST: a copy of another version made on the server, files, Git, or empty, with no default
-    buildTag), and `delete-actor-version` (reads first, refuses the last version). `source_files.ts`
-    holds the file shape, the manifest builder, the path rules, the hash and revision rules, and the
-    text-or-base64 detection; `source_helpers.ts` holds the own-account check (`resolveOwnActor`), path
-    and base64 input rules, the files input rules shared by the create tools, the platform's 3 MiB size
-    measure, and the build start after a write; `source_edits.ts` applies text edits and builds the
-    excerpts of changed lines. Versions stored as a zip are refused for now, and the write tools store
-    files inline only: they also refuse results over 3 MiB, and `create-actor-version` refuses to copy
-    a zip-stored version.
+  - `source/`: `get-actor-version` (an Actor version's file manifest with hashes, revision, and
+    requested content), `create-actor` (a new Actor with one version in a single POST),
+    `update-actor-version` (write, edit, and delete operations applied all-or-nothing to a fresh read,
+    stored with one version PUT that carries only the source keys), `create-actor-version` (a new
+    version in one POST, from files or as a copy of another version's files and non-secret env vars,
+    with no default buildTag), and `delete-actor-version` (reads the Actor first, since apify-client
+    reports a delete of a missing version as done). `source_files.ts` holds the file shape, the
+    manifest builder, the hash and revision rules, and the text-or-base64 detection;
+    `source_helpers.ts` holds the Actor and version lookup, the file input shape, and the response
+    after a write, which starts the build for autoBuild. Versions not stored as files (Git repository,
+    gist, or zip) are refused.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).

@@ -9,7 +9,7 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondAborted, respondOk } from '../../utils/mcp.js';
 import { deleteActorVersionToolOutputSchema } from '../structured_output_schemas.js';
-import { resolveOwnActor, resolveVersionNumber, respondToSourceToolError } from './source_helpers.js';
+import { fetchActor, resolveVersion, respondToSourceToolError } from './source_helpers.js';
 
 /** The error type the platform returns for a delete that would leave the Actor with no version. */
 const TOO_FEW_VERSIONS_ERROR_TYPE = 'too-few-versions';
@@ -20,7 +20,7 @@ const deleteActorVersionArgs = z.object({
         .min(1)
         .describe(
             'The Actor to delete the version from: its ID, or its full name as username/name or username~name. ' +
-                'A name without the username is not enough. It must be in your own account.',
+                'A name without the username is not enough.',
         ),
     versionNumber: z.string().min(1).describe('The version to delete, in MAJOR.MINOR form, for example 0.2.'),
 });
@@ -39,7 +39,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         ? ` such as a working copy made with ${HELPER_TOOLS.ACTOR_VERSION_CREATE}`
         : '';
     return dedent`
-        Delete one version of one of your own Actors, with its source and environment variables.
+        Delete one version of an Actor, with its source and environment variables.
         An Actor must keep at least one version, so its last version cannot be deleted; delete the Actor instead.
         The version's builds stay, and so do the tags that point to them: a run with such a tag still uses that build.
 
@@ -77,11 +77,11 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, signal } = toolArgs;
+        const { args, apifyClient: client, signal } = toolArgs;
         const parsed = deleteActorVersionArgs.parse(args);
         try {
-            const { actor, fullName } = await resolveOwnActor({ client, apifyToken, actorSelector: parsed.actor });
-            const versionNumber = resolveVersionNumber(actor, parsed.versionNumber, parsed.actor);
+            const { actor, fullName } = await fetchActor(client, parsed.actor);
+            const { versionNumber } = resolveVersion(actor, parsed.versionNumber, parsed.actor);
             if (actor.versions.length <= 1) throw new UserInputError(formatLastVersionText(fullName, versionNumber));
             // A cancel before the DELETE deletes nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();

@@ -2,24 +2,18 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { deleteActorVersion } from '../../src/tools/source/delete_actor_version.js';
 import { deleteActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
-    mockUserInfo,
     only,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
-
-vi.mock('../../src/utils/userid_cache.js', () => ({
-    getUserInfoCached: vi.fn(),
-}));
 
 const actorGetMock = vi.fn();
 const versionDeleteMock = vi.fn();
@@ -41,7 +35,6 @@ type DeleteResult = TextToolResult & {
 function mockActor(overrides: Record<string, unknown> = {}) {
     return {
         id: 'actor-1',
-        userId: 'user-1',
         name: 'my-actor',
         username: 'john',
         versions: [
@@ -80,7 +73,6 @@ const LAST_VERSION_TEXT =
 describe('delete-actor-version', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: 'user-1' }));
         actorGetMock.mockResolvedValue(mockActor());
         versionDeleteMock.mockResolvedValue(undefined);
     });
@@ -165,53 +157,19 @@ describe('delete-actor-version', () => {
         expect(versionDeleteMock).not.toHaveBeenCalled();
     });
 
-    describe('ownership', () => {
-        it('refuses a session without a token before any request', async () => {
-            const context = {
-                ...stubToolCallContext({ actor: 'john/my-actor', versionNumber: '0.2' }, stubClient),
-                apifyToken: '',
-            };
-            const result = (await (deleteActorVersion as HelperTool).call(context)) as DeleteResult;
-            expect(result.isError).toBe(true);
-            expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureCategory: FAILURE_CATEGORY.AUTH }));
-            expect(actorMock).not.toHaveBeenCalled();
-        });
-
-        it('refuses an Actor that does not exist or a bare name', async () => {
-            actorGetMock.mockResolvedValue(undefined);
-            expect(await callToolExpectingUserError({ actor: 'my-actor' })).toBe(
-                'Actor my-actor not found. Give its ID or its full name, username/name; a name without the username is not enough.',
-            );
-            expect(versionDeleteMock).not.toHaveBeenCalled();
-        });
-
-        it('refuses when the account cannot be confirmed', async () => {
-            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
-            const result = await callTool({});
-            expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureCategory: FAILURE_CATEGORY.AUTH }));
-            expect(versionDeleteMock).not.toHaveBeenCalled();
-        });
-
-        it("refuses someone else's Actor", async () => {
-            actorGetMock.mockResolvedValue(mockActor({ userId: 'someone-else' }));
-            expect(await callToolExpectingUserError({})).toBe(
-                'john/my-actor is not in your account; this tool changes only your own Actors.',
-            );
-            expect(versionDeleteMock).not.toHaveBeenCalled();
-        });
+    it('refuses an Actor that does not exist or a bare name', async () => {
+        actorGetMock.mockResolvedValue(undefined);
+        expect(await callToolExpectingUserError({ actor: 'my-actor' })).toBe(
+            "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
+        );
+        expect(versionDeleteMock).not.toHaveBeenCalled();
     });
 
     describe('API errors', () => {
-        it('returns a 4xx from the DELETE as the API message', async () => {
-            versionDeleteMock.mockRejectedValue(apiError(403, 'Insufficient permissions'));
-            const result = await callTool({});
-            expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain('Insufficient permissions');
-        });
-
-        it('rethrows a 5xx', async () => {
-            versionDeleteMock.mockRejectedValue(apiError(500, 'Internal'));
-            await expect(callTool({})).rejects.toThrow('Internal');
+        it('lets an API error from the DELETE through unchanged', async () => {
+            const error = apiError(403, 'Insufficient permissions');
+            versionDeleteMock.mockRejectedValue(error);
+            await expect(callTool({})).rejects.toBe(error);
         });
     });
 });
