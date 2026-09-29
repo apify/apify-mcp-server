@@ -7,8 +7,14 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { apifyApiDetailsOutputSchema } from '../structured_output_schemas.js';
-import { redactApiCallArgs, resolveMethodOperation, resolvePathOperations } from './apify_api_request.js';
-import { API_METHODS, fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
+import {
+    findPathOperations,
+    formatApiPath,
+    formatList,
+    normalizeApiPath,
+    redactApiCallArgs,
+} from './apify_api_request.js';
+import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiDetailsArgs = z.object({
     path: z
@@ -16,7 +22,7 @@ const apifyApiDetailsArgs = z.object({
         .min(1)
         .describe(
             'The API path, as a template such as /v2/datasets/{datasetId} or with its values in it, ' +
-                'such as /v2/datasets/abc.',
+                'such as /v2/datasets/abc. datasets/abc, v2/datasets/abc, and /v2/datasets/abc are the same.',
         ),
     method: z
         .enum(API_METHODS)
@@ -24,34 +30,11 @@ const apifyApiDetailsArgs = z.object({
         .describe('HTTP method of the operation. Omit it to get every operation on the path.'),
 });
 
-/**
- * A copy of a body schema without the refused fields, at its top level and in its `allOf`/`anyOf`/`oneOf`
- * parts, the same places the refusal looks. The agent may not send them, and their schemas cost context.
- */
-function omitRefusedFields(schema: unknown, refusedBodyFields: readonly string[]): unknown {
-    if (!isRecord(schema)) return schema;
-    const result: Record<string, unknown> = { ...schema };
-    if (isRecord(schema.properties)) {
-        result.properties = Object.fromEntries(
-            Object.entries(schema.properties).filter(([name]) => !refusedBodyFields.includes(name)),
-        );
-    }
-    if (Array.isArray(schema.required)) {
-        result.required = schema.required.filter((name) => !refusedBodyFields.includes(name));
-    }
-    for (const key of ['allOf', 'anyOf', 'oneOf']) {
-        const parts = schema[key];
-        if (Array.isArray(parts)) result[key] = parts.map((part) => omitRefusedFields(part, refusedBodyFields));
-    }
-    return result;
-}
-
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const findPath = hasTool(HELPER_TOOLS.API_SEARCH) ? ` Find the path with ${HELPER_TOOLS.API_SEARCH}.` : '';
     return dedent`
         Get the Apify API operations on a path: for each method, its description, path and query
-        parameters, and the JSON schema of its request body. Also returns each operation's access (read,
-        write, or unavailable with the reason) and the body fields the API tools refuse to set.${findPath}
+        parameters, and the JSON schema of its request body.${findPath}
         Give a method to get only that operation, for example {"path": "/v2/datasets/abc", "method": "PUT"}.
 
         USAGE:
@@ -87,18 +70,28 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiDetailsArgs.parse(toolArgs.args);
         const index = await fetchApiOperationIndex();
-        const matched = resolvePathOperations({
-            index,
-            path: parsed.path,
-            loadedToolNames: toolArgs.loadedToolNames,
-            canBeTemplate: true,
-        });
-        if ('error' in matched) return respondUserError(matched.error);
-        let { operations } = matched;
-        if (parsed.method) {
-            const resolved = resolveMethodOperation(matched.path, operations, parsed.method);
-            if ('error' in resolved) return respondUserError(resolved.error);
-            operations = [resolved.operation];
+        const normalizedPath = normalizeApiPath(parsed.path);
+        const path = formatApiPath(normalizedPath);
+        const matched = findPathOperations(index, normalizedPath);
+        if (matched.length === 0) {
+            const next = toolArgs.loadedToolNames.includes(HELPER_TOOLS.API_SEARCH)
+                ? ` Find the path with ${HELPER_TOOLS.API_SEARCH}.`
+                : '';
+            return respondUserError(
+                `The path ${path} is not in the API spec. A name is written username~name, as in ` +
+                    `/v2/acts/john~my-actor.${next}`,
+            );
+        }
+        const operations = parsed.method ? matched.filter((operation) => operation.method === parsed.method) : matched;
+        if (operations.length === 0) {
+            const noun = matched.length === 1 ? 'method' : 'methods';
+            const methods = formatList(
+                matched.map((operation) => operation.method),
+                'and',
+            );
+            return respondUserError(
+                `The path ${path} has no ${parsed.method} operation; it matches ${noun} ${methods}.`,
+            );
         }
         const result = {
             operations: operations.map((operation) => ({
@@ -106,20 +99,11 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
                 path: operation.path,
                 summary: operation.summary,
                 description: operation.description,
-                access: operation.access,
-                ...(operation.unavailableReason && { unavailableReason: operation.unavailableReason }),
                 parameters: operation.parameters,
-                ...(operation.requestBody && {
-                    requestBody: {
-                        ...operation.requestBody,
-                        schema: omitRefusedFields(operation.requestBody.schema, operation.refusedBodyFields),
-                    },
-                }),
-                refusedBodyFields: operation.refusedBodyFields,
+                ...(operation.requestBody && { requestBody: operation.requestBody }),
             })),
         };
-        const methods = operations.map((operation) => `${operation.method} (${operation.access})`).join(', ');
-        const summary = `${operations[0].path}: ${methods}.`;
+        const summary = `${operations[0].path}: ${operations.map((operation) => operation.method).join(', ')}.`;
         return respondOk([JSON.stringify(result), summary], { structuredContent: result });
     },
 } as const);

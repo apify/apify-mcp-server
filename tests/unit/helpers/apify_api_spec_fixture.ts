@@ -1,8 +1,6 @@
 /**
  * A small OpenAPI document shaped like https://docs.apify.com/api/openapi.json: `$ref` parameters and
- * bodies, examples, and `x-*` extensions, and one operation of each kind the API tools treat differently.
- * Each path has the methods it has in the published spec, and every operation a refusal rule is
- * about is here, since the index refuses a spec without them.
+ * bodies, examples, and `x-*` extensions. Each path has the methods it has in the published spec.
  */
 export const API_SPEC_FIXTURE = {
     openapi: '3.1.2',
@@ -118,22 +116,6 @@ export const API_SPEC_FIXTURE = {
                 ],
             },
         },
-        '/v2/actor-runs/{runId}/metamorph': {
-            post: {
-                operationId: 'actorRun_metamorph_post',
-                summary: 'Metamorph run',
-                tags: ['Actor runs'],
-                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
-            },
-        },
-        '/v2/actor-runs/{runId}/charge': {
-            post: {
-                operationId: 'PostChargeRun',
-                summary: 'Charge events in run',
-                tags: ['Actor runs'],
-                parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
-            },
-        },
         '/v2/actor-runs/{runId}/abort': {
             post: {
                 operationId: 'actorRun_abort_post',
@@ -142,7 +124,7 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ name: 'runId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
-        '/v2/actors': {
+        '/v2/acts': {
             get: {
                 operationId: 'actors_get',
                 summary: 'Get list of Actors',
@@ -162,7 +144,7 @@ export const API_SPEC_FIXTURE = {
                 },
             },
         },
-        '/v2/actors/{actorId}': {
+        '/v2/acts/{actorId}': {
             get: {
                 operationId: 'actor_get',
                 summary: 'Get Actor',
@@ -185,168 +167,9 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ $ref: '#/components/parameters/actorId' }],
             },
         },
-        '/v2/actors/{actorId}/versions': {
-            get: {
-                operationId: 'actor_versions_get',
-                summary: 'Get list of versions',
-                tags: ['Actors/Actor versions'],
-                parameters: [{ $ref: '#/components/parameters/actorId' }],
-            },
-            post: {
-                operationId: 'actor_versions_post',
-                summary: 'Create version',
-                tags: ['Actors/Actor versions'],
-                parameters: [{ $ref: '#/components/parameters/actorId' }],
-                requestBody: {
-                    required: true,
-                    content: { 'application/json': { schema: { $ref: '#/components/schemas/VersionRequest' } } },
-                },
-            },
-        },
-        '/v2/actors/{actorId}/versions/{versionNumber}': {
-            get: {
-                operationId: 'actor_version_get',
-                summary: 'Get version',
-                tags: ['Actors/Actor versions'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-            },
-            post: {
-                operationId: 'actor_version_post',
-                summary: 'Update version (POST)',
-                tags: ['Actors/Actor versions'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-                requestBody: {
-                    required: true,
-                    content: { 'application/json': { schema: { $ref: '#/components/schemas/VersionRequest' } } },
-                },
-            },
-            put: {
-                operationId: 'actor_version_put',
-                summary: 'Update version',
-                tags: ['Actors/Versions'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-                requestBody: {
-                    required: true,
-                    content: { 'application/json': { schema: { $ref: '#/components/schemas/VersionRequest' } } },
-                },
-            },
-            delete: {
-                operationId: 'actor_version_delete',
-                summary: 'Delete version',
-                tags: ['Actors/Actor versions'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-            },
-        },
-        // The single-variable env var operations, which the envVars refusal points to.
-        '/v2/actors/{actorId}/versions/{versionNumber}/env-vars': {
-            get: {
-                operationId: 'actor_version_envVars_get',
-                summary: 'Get list of environment variables',
-                tags: ['Actors/Environment variables'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-            },
-            post: {
-                operationId: 'actor_version_envVars_post',
-                summary: 'Create environment variable',
-                tags: ['Actors/Environment variables'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-                requestBody: {
-                    required: true,
-                    content: { 'application/json': { schema: { $ref: '#/components/schemas/EnvVar' } } },
-                },
-            },
-        },
-        '/v2/actors/{actorId}/versions/{versionNumber}/env-vars/{envVarName}': {
-            get: {
-                operationId: 'actor_version_envVar_get',
-                summary: 'Get environment variable',
-                tags: ['Actors/Environment variables'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                    { name: 'envVarName', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-            },
-            put: {
-                operationId: 'actor_version_envVar_put',
-                summary: 'Update environment variable',
-                tags: ['Actors/Environment variables'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                    { name: 'envVarName', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-                requestBody: {
-                    required: true,
-                    content: { 'application/json': { schema: { $ref: '#/components/schemas/EnvVar' } } },
-                },
-            },
-            post: {
-                operationId: 'actor_version_envVar_post',
-                summary: 'Update environment variable (POST)',
-                tags: ['Actors/Environment variables'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                    { name: 'envVarName', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-                requestBody: {
-                    required: true,
-                    content: { 'application/json': { schema: { $ref: '#/components/schemas/EnvVar' } } },
-                },
-            },
-            delete: {
-                operationId: 'actor_version_envVar_delete',
-                summary: 'Delete environment variable',
-                tags: ['Actors/Environment variables'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'versionNumber', in: 'path', required: true, schema: { type: 'string' } },
-                    { name: 'envVarName', in: 'path', required: true, schema: { type: 'string' } },
-                ],
-            },
-        },
-        '/v2/actors/{actorId}/runs': {
-            get: {
-                operationId: 'actor_runs_get',
-                summary: 'Get list of runs',
-                tags: ['Actors/Actor runs'],
-                parameters: [{ $ref: '#/components/parameters/actorId' }],
-            },
-            post: {
-                operationId: 'actors_runs_post',
-                summary: 'Run Actor',
-                tags: ['Actors/Actor runs'],
-                parameters: [
-                    { $ref: '#/components/parameters/actorId' },
-                    { name: 'waitForFinish', in: 'query', schema: { type: 'number' } },
-                    { name: 'webhooks', in: 'query', schema: { type: 'string' } },
-                    { name: 'forcePermissionLevel', in: 'query', schema: { type: 'string' } },
-                ],
-                requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
-            },
-        },
         // A run's copy of the dataset operation, and a synchronous run, both of which name the dataset
         // in their summary: search must still rank the storage's own operation first.
-        '/v2/actors/{actorId}/runs/last/dataset/items': {
+        '/v2/acts/{actorId}/runs/last/dataset/items': {
             post: {
                 operationId: 'actor_runs_last_dataset_items_post',
                 summary: "Store items in last run's dataset",
@@ -355,7 +178,7 @@ export const API_SPEC_FIXTURE = {
                 requestBody: { required: true, content: { 'application/json': { schema: { type: 'array' } } } },
             },
         },
-        '/v2/actors/{actorId}/run-sync-get-dataset-items': {
+        '/v2/acts/{actorId}/run-sync-get-dataset-items': {
             post: {
                 operationId: 'actor_runSyncGetDatasetItems_post',
                 summary: 'Run Actor synchronously and get dataset items',
@@ -364,24 +187,8 @@ export const API_SPEC_FIXTURE = {
                 requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
             },
         },
-        '/v2/actors/{actorId}/runs/last/metamorph': {
-            post: {
-                operationId: 'actor_runs_last_metamorph_post',
-                summary: "Metamorph Actor's last run",
-                tags: ["Last Actor run's metamorph"],
-                parameters: [{ $ref: '#/components/parameters/actorId' }],
-            },
-        },
-        '/v2/actor-tasks/{actorTaskId}/runs/last/metamorph': {
-            post: {
-                operationId: 'actorTask_runs_last_metamorph_post',
-                summary: "Metamorph Actor task's last run",
-                tags: ["Last Actor task run's metamorph"],
-                parameters: [{ name: 'actorTaskId', in: 'path', required: true, schema: { type: 'string' } }],
-            },
-        },
         // The last run; a path with a run ID here matches nothing, since its operation is deprecated.
-        '/v2/actors/{actorId}/runs/last': {
+        '/v2/acts/{actorId}/runs/last': {
             get: {
                 operationId: 'actor_runs_last_get',
                 summary: 'Get last run',
@@ -389,7 +196,7 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ $ref: '#/components/parameters/actorId' }],
             },
         },
-        '/v2/actors/{actorId}/runs/{runId}': {
+        '/v2/acts/{actorId}/runs/{runId}': {
             get: {
                 operationId: 'actors_run_get',
                 summary: 'Get run',
@@ -397,7 +204,7 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ $ref: '#/components/parameters/actorId' }],
             },
         },
-        '/v2/actors/{actorId}/run-sync': {
+        '/v2/acts/{actorId}/run-sync': {
             post: {
                 operationId: 'actor_runSync_post',
                 summary: 'Run Actor synchronously with input and return output',
@@ -410,14 +217,6 @@ export const API_SPEC_FIXTURE = {
                 summary: 'Run Actor synchronously without input',
                 tags: ['Actors/Actor runs'],
                 parameters: [{ $ref: '#/components/parameters/actorId' }],
-            },
-        },
-        '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items': {
-            get: {
-                operationId: 'actorTask_runSyncGetDatasetItems_get',
-                summary: 'Run task synchronously and get dataset items',
-                tags: ['Actor tasks'],
-                parameters: [{ name: 'actorTaskId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
         '/v2/key-value-stores/{storeId}/records/{recordKey}': {
@@ -477,15 +276,6 @@ export const API_SPEC_FIXTURE = {
         '/v2/users/me': {
             get: { operationId: 'users_me_get', summary: 'Get private user data', tags: ['Users/Private data'] },
         },
-        '/v2/users/me/limits': {
-            get: { operationId: 'users_me_limits_get', summary: 'Get limits', tags: ['Users/Usage'] },
-            put: {
-                operationId: 'users_me_limits_put',
-                summary: 'Update limits',
-                tags: ['Users/Usage'],
-                requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
-            },
-        },
         '/v2/webhooks': {
             get: { operationId: 'webhooks_get', summary: 'Get list of webhooks', tags: ['Webhooks/Webhooks'] },
             post: {
@@ -495,7 +285,7 @@ export const API_SPEC_FIXTURE = {
                 requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
             },
         },
-        '/v2/actors/{actorId}/webhooks': {
+        '/v2/acts/{actorId}/webhooks': {
             get: {
                 operationId: 'actor_webhooks_get',
                 summary: 'Get list of webhooks',
@@ -549,13 +339,6 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ name: 'queueId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
-        // Echoes the request headers, and with them the API token.
-        '/v2/browser-info': {
-            get: { operationId: 'tools_browser_info_get', summary: 'Get browser info', tags: ['Tools'] },
-            post: { operationId: 'tools_browser_info_post', summary: 'Post browser info', tags: ['Tools'] },
-            put: { operationId: 'tools_browser_info_put', summary: 'Put browser info', tags: ['Tools'] },
-            delete: { operationId: 'tools_browser_info_delete', summary: 'Delete browser info', tags: ['Tools'] },
-        },
         '/outside/v2': { get: { operationId: 'outside_get', summary: 'Outside the API' } },
         '/v2/broken': { get: { summary: 'No operation ID' } },
     },
@@ -581,45 +364,11 @@ export const API_SPEC_FIXTURE = {
                 type: 'object',
                 properties: {
                     name: { type: 'string' },
-                    generalAccess: { type: 'string' },
                     example: { type: 'string', description: 'A property that happens to be named example.' },
                 },
             },
-            // Like the published spec, it does not declare pricingInfos or actorPermissionLevel.
-            CreateActorRequest: {
-                type: 'object',
-                properties: { name: { type: 'string' }, isPublic: { type: 'boolean' }, versions: { type: 'array' } },
-            },
-            UpdateActorRequest: {
-                allOf: [{ $ref: '#/components/schemas/ActorPermissionFields' }],
-                properties: {
-                    title: { type: 'string' },
-                    isPublic: { type: 'boolean' },
-                    pricingInfos: { type: 'array' },
-                    versions: { type: 'array' },
-                },
-            },
-            EnvVar: {
-                type: 'object',
-                properties: { name: { type: 'string' }, value: { type: 'string' }, isSecret: { type: 'boolean' } },
-            },
-            VersionRequest: {
-                type: 'object',
-                properties: {
-                    versionNumber: { type: 'string' },
-                    buildTag: { type: 'string' },
-                    sourceType: { type: 'string' },
-                    sourceFiles: { type: 'array' },
-                    gitRepoUrl: { type: 'string' },
-                    tarballUrl: { type: 'string' },
-                    gitHubGistUrl: { type: 'string' },
-                    envVars: { type: 'array' },
-                },
-            },
-            ActorPermissionFields: {
-                type: 'object',
-                properties: { actorPermissionLevel: { type: 'string' } },
-            },
+            CreateActorRequest: { type: 'object', properties: { name: { type: 'string' } } },
+            UpdateActorRequest: { type: 'object', properties: { title: { type: 'string' } } },
         },
     },
 };

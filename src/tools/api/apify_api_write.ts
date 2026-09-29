@@ -8,33 +8,25 @@ import { compileSchema } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
 import {
+    API_CALL_DESCRIPTION,
     apiCallArgsShape,
-    callApiOperation,
+    callApi,
+    findPathOperations,
+    formatList,
+    normalizeApiPath,
     redactApiCallArgs,
-    resolvePathOperations,
-    resolveWriteOperation,
-    validateQueryParams,
-    validateRequestBody,
 } from './apify_api_request.js';
-import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
+import type { ApiMethod } from './apify_api_spec.js';
+import { fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiWriteArgs = z.object({
     path: apiCallArgsShape.path,
     method: z
-        .enum(API_METHODS)
+        .enum(['POST', 'PUT', 'DELETE'])
         .optional()
-        .describe(
-            'HTTP method: POST or PUT. Required when the path has several methods, for example GET, PUT, and ' +
-                'DELETE; omit it when the path has one.',
-        ),
+        .describe('HTTP method: POST, PUT, or DELETE. Omit it only when the path has one method in the API spec.'),
     query: apiCallArgsShape.query,
-    body: z
-        .unknown()
-        .optional()
-        .describe(
-            'The request body, usually a JSON object; any JSON value but a string or null. Do not pass a ' +
-                'JSON-encoded string. Required when the operation needs one; omit it otherwise.',
-        ),
+    body: z.unknown().optional().describe('The request body: any JSON value, usually an object, sent as JSON.'),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -43,14 +35,10 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         ? `\nGet the operation's parameters and body schema first with ${HELPER_TOOLS.API_DETAILS} and the method.`
         : '';
     return dedent`
-        Send a POST or PUT request to the Apify API at a path with its values in it, such as
-        /v2/datasets/abc. Give the method when the path has several. The server adds the host and the API
-        token: never pass a URL or a token.${findPath}${getParameters}
-        The request is sent once and applies at once. Refused: deletions, synchronous runs, metamorphs,
-        spending limits, run charging, and creating Actor versions; fields that publish an Actor or task,
-        change its pricing or permissions, or change who can read a storage; and fields that set an Actor's
-        source, versions, or environment variables, which the user can change in Apify Console.
-        Returns the response body as the API sends it; a body over ${MAX_INLINE_BYTES} bytes is not returned.
+        Send a POST, PUT, or DELETE request to the Apify API at a path, such as /v2/datasets/abc.
+        ${API_CALL_DESCRIPTION}${findPath}${getParameters}
+        The request is sent once and applies at once. Returns the response body as the API sends it; a body
+        over ${MAX_INLINE_BYTES} bytes is not returned.
 
         Example call: {"path": "/v2/datasets/abc", "method": "PUT", "body": {"name": "leads-2026"}}
 
@@ -65,7 +53,24 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 }
 
 /**
- * Sends a POST or PUT to a path of the published Apify API spec, https://docs.apify.com/api/v2.
+ * The only method of the path in the spec, or why the agent must give one. Only a call without a
+ * method needs the spec.
+ */
+async function inferMethod(path: string): Promise<{ method: ApiMethod } | { error: string }> {
+    const operations = findPathOperations(await fetchApiOperationIndex(), normalizeApiPath(path));
+    if (operations.length === 0) return { error: 'The path is not in the API spec; specify the method.' };
+    if (operations.length > 1) {
+        const methods = formatList(
+            operations.map((operation) => operation.method),
+            'and',
+        );
+        return { error: `The path matches methods ${methods}; specify which one to call the endpoint with.` };
+    }
+    return { method: operations[0].method };
+}
+
+/**
+ * Sends a POST, PUT, or DELETE to a path of the Apify API, https://docs.apify.com/api/v2, as a proxy.
  */
 export const apifyApiWrite: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -89,29 +94,13 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
     redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiWriteArgs.parse(toolArgs.args);
-        const index = await fetchApiOperationIndex();
-        const matched = resolvePathOperations({
-            index,
-            path: parsed.path,
-            loadedToolNames: toolArgs.loadedToolNames,
-        });
-        if ('error' in matched) return respondUserError(matched.error);
-        const resolved = resolveWriteOperation({
-            path: matched.path,
-            operations: matched.operations,
-            method: parsed.method,
-            loadedToolNames: toolArgs.loadedToolNames,
-        });
+        const resolved = parsed.method ? { method: parsed.method } : await inferMethod(parsed.path);
         if ('error' in resolved) return respondUserError(resolved.error);
-        const { operation } = resolved;
-
-        const inputError = validateQueryParams(operation, parsed.query) ?? validateRequestBody(operation, parsed.body);
-        if (inputError) return respondUserError(inputError);
-
-        return callApiOperation({
+        return callApi({
             client: toolArgs.apifyClient,
-            operation,
-            path: matched.path,
+            token: toolArgs.apifyToken,
+            method: resolved.method,
+            path: parsed.path,
             query: parsed.query,
             body: parsed.body,
             signal: toolArgs.signal,

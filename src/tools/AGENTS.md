@@ -32,21 +32,19 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
     shared `waitSecs` field, the shared build response and the by-status next-step text.
-  - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get
-    the operations on a path, and send a request to a path with read access (GET) or write access
-    (POST, PUT). `apify_api_spec.ts` builds the operation index from the spec (cached for an hour)
-    and decides each operation's access: read, write, or unavailable with a reason, plus the body
-    fields the write tool refuses. Fields that set an Actor's source, versions, or whole env var
-    list are refused; the single-variable env var operations stay callable, since each changes one
-    variable; the two that replace a variable require `isSecret`, since the API stores a variable
-    sent without it as plain text. The rules are keyed by method and path template, not by operation
-    ID, and a spec that no longer lists an operation a rule is about is refused, like a failed
-    download. The tools take and return method and path only. `apify_api_request.ts` normalizes the
-    real path the agent gives, matches it to a path template (more literal segments win), picks the
-    method, checks the query and body, and sends one request with no retries. The details and call
-    tools log their arguments through `redactApiCallArgs` (`redactArgs`): an allowlist of path,
-    method, query, and body, with the body and the `token`, `signature`, and `webhooks` query values
-    redacted, and a query written into the path cut to `?[REDACTED]`.
+  - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
+    operations on a path, and send a GET, or a POST, PUT, or DELETE, to a path. The call tools are
+    proxies to the API, like `apify api` in the Apify CLI: they refuse nothing the API accepts.
+    `apify_api_spec.ts` builds the operation index from the spec (cached for an hour); search and
+    details use it, the write tool uses it to choose a method that was not given, and a call uses it
+    otherwise only for hints, so a failed download does not stop a call. `apify_api_request.ts`
+    normalizes the path as the CLI does (`acts`, `v2/acts`, and `/v2/acts` are the same), sends it as
+    written with the query added after any query string in it, checks only that the URL stays on the
+    API origin, sends one request with no retries, masks the session token in the response, and adds
+    the closest spec paths to a 404. The details and call tools log their arguments through
+    `redactApiCallArgs` (`redactArgs`): an allowlist of path, method, query, and body, with the body and
+    the `token`, `signature`, and `webhooks` query values redacted, and a query written into the path
+    cut to `?[REDACTED]`.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
