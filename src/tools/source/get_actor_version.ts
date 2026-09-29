@@ -1,5 +1,3 @@
-import type { Actor, ActorVersion } from 'apify-client';
-import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -9,10 +7,10 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { listVersionNumbers } from '../builds/build_helpers.js';
 import { getActorVersionToolOutputSchema } from '../structured_output_schemas.js';
 import type { SourceFile } from './source_files.js';
 import { buildFilesManifest, buildFilesRevision } from './source_files.js';
+import { extractSourceFiles, fetchActor, resolveVersion, respondToSourceToolError } from './source_helpers.js';
 
 const INLINE_LIMIT_KIB = MAX_INLINE_BYTES / 1024;
 
@@ -63,87 +61,6 @@ type ReturnedContent = {
     endLine?: number;
     totalLines?: number;
 };
-
-/** The requested version, or the only one when none is requested; throws `UserInputError` otherwise. */
-function resolveVersion(
-    actor: Pick<Actor, 'versions'>,
-    requestedVersionNumber: string | undefined,
-    actorSelector: string,
-): ActorVersion & { versionNumber: string } {
-    const versionNumbers = listVersionNumbers(actor);
-    if (requestedVersionNumber === undefined && versionNumbers.length !== 1) {
-        // The source type and build tag tell the caller which version holds the code it is after.
-        const versions = actor.versions
-            .filter((version) => version.versionNumber !== undefined)
-            .map(({ versionNumber, sourceType, buildTag }) => {
-                const tag = buildTag ? `, build tag ${buildTag}` : '';
-                return `${versionNumber} (${sourceType}${tag})`;
-            });
-        throw new UserInputError(`Specify versionNumber; this Actor has versions: ${versions.join(', ')}.`);
-    }
-    const versionNumber = requestedVersionNumber ?? versionNumbers[0];
-    const version = actor.versions.find((candidate) => candidate.versionNumber === versionNumber);
-    if (!version) {
-        throw new UserInputError(
-            `Actor '${actorSelector}' has no version ${versionNumber}; available versions: ${versionNumbers.join(', ')}.`,
-        );
-    }
-    return { ...version, versionNumber };
-}
-
-/**
- * The URL without what can grant access to it: the query string (for example a store signature), the password, and,
- * for http and https, the user. An SSH user such as `git@` is not a secret and stays. A URL the parser cannot read,
- * such as `git@github.com:user/repo.git`, loses only its query string.
- */
-function formatUrlWithoutSecrets(url: string): string {
-    if (URL.canParse(url)) {
-        const parsed = new URL(url);
-        parsed.search = '';
-        parsed.password = '';
-        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-            parsed.username = '';
-        }
-        return parsed.href;
-    }
-    const queryIndex = url.indexOf('?');
-    if (queryIndex === -1) return url;
-    const hashIndex = url.indexOf('#', queryIndex);
-    return url.slice(0, queryIndex) + (hashIndex === -1 ? '' : url.slice(hashIndex));
-}
-
-/** Picked by source type, since a version can keep the fields of a source type it used before. */
-function getSourceUrl(version: ActorVersion): string | undefined {
-    if (version.sourceType === ActorSourceType.GitRepo) return version.gitRepoUrl;
-    if (version.sourceType === ActorSourceType.Tarball) return version.tarballUrl;
-    if (version.sourceType === ActorSourceType.GitHubGist) return version.gitHubGistUrl;
-    return undefined;
-}
-
-/** Throws `UserInputError` for a version not stored as files and for one whose source the API hides. */
-function extractVersionFiles(version: ActorVersion, versionLabel: string): SourceFile[] {
-    if (version.sourceType !== ActorSourceType.SourceFiles) {
-        // TODO(#1452): Read a version that `apify push` stored as a zip in the Actor's source store (TARBALL), with
-        // adm-zip 0.6.1 or later: download only from the session's API host, cap the entry count and the unpacked size,
-        // and refuse symbolic links, encrypted entries, and unsafe names. The Apify API has no way to read single files
-        // of an Actor's source, so returning even one file will download and unpack the whole zip; read only the files
-        // asked for once it can.
-        // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
-        const { sourceType }: { sourceType: string } = version;
-        const url = getSourceUrl(version);
-        const source = url ? `${sourceType}, ${formatUrlWithoutSecrets(url)}` : sourceType;
-        throw new UserInputError(
-            `${versionLabel} is not stored as files (source type ${source}), and this tool reads only versions stored as files.`,
-        );
-    }
-    // The API returns only the number, type, and build tag of a version whose source it hides from this account.
-    if (!version.sourceFiles) {
-        throw new UserInputError(
-            `${versionLabel} came back without its source: the API hides it from accounts that cannot modify the Actor. Ask the Actor's owner for the source.`,
-        );
-    }
-    return buildFilesManifest(version.sourceFiles);
-}
 
 /** Lines with their line endings kept, so joined back they give the exact text. */
 function splitLines(text: string): string[] {
@@ -253,18 +170,11 @@ export const getActorVersion: ToolEntry = Object.freeze({
         try {
             // TODO: The Actor GET returns every stored file of every version even when one file is asked for: the
             // Apify API has no way to read or change single files of an Actor's source. Use such an API once it exists.
-            // apify-client turns username/name into the API's username~name.
-            const actor = await client.actor(parsed.actor).get();
-            // Extra path segments, such as username/name/runs/last, reach a sub-resource that is not an Actor.
-            if (!actor || typeof actor.name !== 'string' || typeof actor.username !== 'string') {
-                return respondUserError(
-                    `Actor '${parsed.actor}' not found. Give its ID or its full name, username/name; ` +
-                        'a name without the username is not enough.',
-                );
-            }
-            const fullName = `${actor.username}/${actor.name}`;
+            const { actor, fullName } = await fetchActor(client, parsed.actor);
             const version = resolveVersion(actor, parsed.versionNumber, parsed.actor);
-            const files = extractVersionFiles(version, `Version ${version.versionNumber} of ${fullName}`);
+            const files = buildFilesManifest(
+                extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`),
+            );
             const lineRange = isLineRange ? { startLine: startLine ?? 1, lineCount } : undefined;
             const structuredContent = {
                 actorId: actor.id,
@@ -277,8 +187,7 @@ export const getActorVersion: ToolEntry = Object.freeze({
             const summary = `Read version ${version.versionNumber} of ${fullName}.`;
             return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
         } catch (error) {
-            if (error instanceof UserInputError) return respondUserError(error.message);
-            throw error;
+            return respondToSourceToolError(error);
         }
     },
 } as const);

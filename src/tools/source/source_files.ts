@@ -74,6 +74,8 @@ export type SourceFile = {
     contentBytes: number;
     /** Built on demand, so content that is not returned is never decoded. */
     readContent: () => string;
+    /** The entry as stored, which a write sends back for a file it leaves alone. */
+    entry: ActorVersionSourceFile;
 };
 
 export function hasBinaryExtension(path: string): boolean {
@@ -115,7 +117,7 @@ export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile 
     const content = storedContent ?? '';
     const path = posix.normalize(name);
     const bytes = Buffer.from(content, format === 'BASE64' ? 'base64' : 'utf8');
-    const common = { path, sizeBytes: bytes.length, hash: getSha256Prefix(bytes) };
+    const common = { path, sizeBytes: bytes.length, hash: getSha256Prefix(bytes), entry: file };
     if (format !== 'BASE64') {
         return { ...common, encoding: 'utf8', contentBytes: bytes.length, readContent: () => content };
     }
