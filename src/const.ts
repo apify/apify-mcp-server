@@ -43,6 +43,7 @@ export const HELPER_TOOLS = {
     ACTOR_BUILD: 'build-actor',
     ACTOR_BUILD_GET: 'get-actor-build',
     ACTOR_BUILD_LOG: 'get-actor-build-log',
+    ACTOR_BUILD_LIST_GET: 'get-actor-build-list',
     ACTOR_CALL: 'call-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
