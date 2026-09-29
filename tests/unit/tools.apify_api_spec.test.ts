@@ -18,6 +18,14 @@ describe('buildApiOperationIndex()', () => {
         expect(index.size).toBe(37);
     });
 
+    it('indexes a PATCH operation, which the published spec does not have yet', () => {
+        const spec = {
+            paths: { '/v2/things/{thingId}': { patch: { operationId: 'thing_patch', summary: 'Patch thing' } } },
+        };
+
+        expect(buildApiOperationIndex(spec).get('thing_patch')?.method).toBe('PATCH');
+    });
+
     it('resolves parameter references and keeps only path and query parameters', () => {
         expect(index.get('dataset_items_get')?.parameters).toEqual([
             {
