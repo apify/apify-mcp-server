@@ -297,7 +297,7 @@ Legend for the **Enabled by default** column:
 | `apify-api-search` | api | Search the Apify API reference for operations by keywords. Returns each one's method, path, and docs page. |  |
 | `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. |  |
 | `apify-api-read` | api | Send a GET request to any Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. |  |
-| `apify-api-write` | api | Send a POST, PUT, or DELETE request to any Apify API path, with a JSON body, like `apify api` in the Apify CLI. |  |
+| `apify-api-write` | api | Send a POST, PUT, PATCH, or DELETE request to any Apify API path, with a JSON body, like `apify api` in the Apify CLI. |  |
 
 > **Note:**
 >

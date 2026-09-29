@@ -33,7 +33,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
     shared `waitSecs` field, the shared build response and the by-status next-step text.
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
-    operations on a path, and send a GET, or a POST, PUT, or DELETE, to a path. The call tools are
+    operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. The call tools are
     proxies to the API, like `apify api` in the Apify CLI: they refuse nothing the API accepts.
     `apify_api_spec.ts` builds the operation index from the spec (cached for an hour); search and
     details use it, the write tool uses it to choose a method that was not given, and a call uses it

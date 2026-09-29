@@ -22,9 +22,11 @@ import { fetchApiOperationIndex } from './apify_api_spec.js';
 const apifyApiWriteArgs = z.object({
     path: apiCallArgsShape.path,
     method: z
-        .enum(['POST', 'PUT', 'DELETE'])
+        .enum(['POST', 'PUT', 'PATCH', 'DELETE'])
         .optional()
-        .describe('HTTP method: POST, PUT, or DELETE. Omit it only when the path has one method in the API spec.'),
+        .describe(
+            'HTTP method: POST, PUT, PATCH, or DELETE. Omit it only when the path has one method in the API spec.',
+        ),
     query: apiCallArgsShape.query,
     body: z.unknown().optional().describe('The request body: any JSON value, usually an object, sent as JSON.'),
 });
@@ -35,7 +37,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         ? `\nGet the operation's parameters and body schema first with ${HELPER_TOOLS.API_DETAILS} and the method.`
         : '';
     return dedent`
-        Send a POST, PUT, or DELETE request to the Apify API at a path, such as /v2/datasets/abc.
+        Send a POST, PUT, PATCH, or DELETE request to the Apify API at a path, such as /v2/datasets/abc.
         ${API_CALL_DESCRIPTION}${findPath}${getParameters}
         The request is sent once and applies at once. Returns the response body as the API sends it; a body
         over ${MAX_INLINE_BYTES} bytes is not returned.
@@ -54,9 +56,12 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 
 /**
  * The only method of the path in the spec, or why the agent must give one. Only a call without a
- * method needs the spec.
+ * method needs the spec. A path whose only method is GET is sent to the read tool, never as a GET here.
  */
-async function inferMethod(path: string): Promise<{ method: ApiMethod } | { error: string }> {
+async function inferMethod(
+    path: string,
+    loadedToolNames: readonly string[],
+): Promise<{ method: Exclude<ApiMethod, 'GET'> } | { error: string }> {
     const index = await fetchApiOperationIndex().catch(() => undefined);
     if (!index) return { error: 'The API spec could not be loaded to choose the method; specify the method.' };
     const operations = findPathOperations(index, normalizeApiPath(path));
@@ -68,11 +73,18 @@ async function inferMethod(path: string): Promise<{ method: ApiMethod } | { erro
         );
         return { error: `The path matches methods ${methods}; specify which one to call the endpoint with.` };
     }
-    return { method: operations[0].method };
+    const [{ method }] = operations;
+    if (method === 'GET') {
+        const readTool = loadedToolNames.includes(HELPER_TOOLS.API_READ)
+            ? `; call it with ${HELPER_TOOLS.API_READ}`
+            : '';
+        return { error: `The path has only the GET method, which this tool does not send${readTool}.` };
+    }
+    return { method };
 }
 
 /**
- * Sends a POST, PUT, or DELETE to a path of the Apify API, https://docs.apify.com/api/v2, as a proxy.
+ * Sends a POST, PUT, PATCH, or DELETE to a path of the Apify API, https://docs.apify.com/api/v2, as a proxy.
  */
 export const apifyApiWrite: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -96,7 +108,9 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
     redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiWriteArgs.parse(toolArgs.args);
-        const resolved = parsed.method ? { method: parsed.method } : await inferMethod(parsed.path);
+        const resolved = parsed.method
+            ? { method: parsed.method }
+            : await inferMethod(parsed.path, toolArgs.loadedToolNames);
         if ('error' in resolved) return respondUserError(resolved.error);
         return callApi({
             client: toolArgs.apifyClient,

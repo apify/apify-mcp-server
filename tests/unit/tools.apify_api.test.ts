@@ -623,6 +623,28 @@ describe('apify-api-write', () => {
         expect(result.structuredContent).toMatchObject({ method: 'DELETE', statusCode: 204, data: null });
     });
 
+    it('sends a PATCH', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+        await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PATCH', body: { name: 'leads' } });
+
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'PATCH' }));
+    });
+
+    it.each([
+        [
+            [HELPER_TOOLS.API_WRITE, HELPER_TOOLS.API_READ],
+            `The path has only the GET method, which this tool does not send; call it with ${HELPER_TOOLS.API_READ}.`,
+        ],
+        [[HELPER_TOOLS.API_WRITE], 'The path has only the GET method, which this tool does not send.'],
+    ])('never sends a GET for a path whose only method is GET (session %j)', async (loadedToolNames, message) => {
+        const result = await callTool(apifyApiWrite, { path: 'users/me' }, loadedToolNames);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(message);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
     it('does not need the spec when the method is given, even for a path the spec does not list', async () => {
         requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
 
