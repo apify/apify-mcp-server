@@ -294,7 +294,7 @@ Legend for the **Enabled by default** column:
 | `get-actor-build` | builds | Get an Actor build's status. |  |
 | `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
 | `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
-| `get-actor-version` | source | Get an Actor version's metadata, its file listing with hashes, and the content of the files you ask for. |  |
+| `get-actor-version` | source | Get an Actor version's file listing with hashes and the content of the files you ask for. |  |
 | `create-actor` | source | Create a private Actor in your account from files or a Git repository, optionally starting a build. |  |
 | `update-actor-version` | source | Write, edit, delete, or move files of your Actor's version in one all-or-nothing write, or point it at a Git repository. |  |
 
