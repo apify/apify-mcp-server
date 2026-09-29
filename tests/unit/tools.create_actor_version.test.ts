@@ -256,15 +256,14 @@ describe('create-actor-version', () => {
             ]);
         });
 
-        it('leaves a call with neither files nor copyFromVersion to the platform', async () => {
-            await callTool({});
-
-            expect(getPostBody()).toEqual({ versionNumber: '0.2', sourceType: 'SOURCE_FILES', sourceFiles: [] });
+        it('refuses a call with neither files nor copyFromVersion before any request', async () => {
+            expect(await callToolExpectingUserError({})).toBe('Give either files or copyFromVersion.');
+            expect(actorMock).not.toHaveBeenCalled();
         });
 
         it('refuses both files and copyFromVersion before any request', async () => {
             expect(await callToolExpectingUserError({ copyFromVersion: '0.1', files: [ACTOR_JSON] })).toBe(
-                'Give files or copyFromVersion, not both.',
+                'Give either files or copyFromVersion.',
             );
             expect(actorMock).not.toHaveBeenCalled();
         });

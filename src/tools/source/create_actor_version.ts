@@ -87,8 +87,8 @@ export const createActorVersion: ToolEntry = Object.freeze({
         const { args, apifyClient: client, signal } = toolArgs;
         const parsed = createActorVersionArgs.parse(args);
         const { versionNumber, copyFromVersion } = parsed;
-        if (copyFromVersion !== undefined && parsed.files !== undefined) {
-            return respondUserError('Give files or copyFromVersion, not both.');
+        if ((copyFromVersion === undefined) === (parsed.files === undefined)) {
+            return respondUserError('Give either files or copyFromVersion.');
         }
         try {
             const { actor, fullName } = await fetchActor(client, parsed.actor);
@@ -99,7 +99,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
                 copyFromVersion === undefined ? undefined : resolveVersion(actor, copyFromVersion, parsed.actor);
             const sourceFiles = copied
                 ? extractSourceFiles(copied, `Version ${copied.versionNumber} of ${fullName}`)
-                : (parsed.files ?? []).map(buildSourceFileEntry);
+                : parsed.files!.map(buildSourceFileEntry);
             // A cancel during the read creates nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
             await client
