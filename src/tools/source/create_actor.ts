@@ -25,10 +25,8 @@ const createActorArgs = z.object({
     title: z.string().min(1).optional().describe('Display title, for example My Scraper.'),
     description: z.string().optional().describe('A short description of what the Actor does.'),
     files: z.array(sourceFileArgs).min(1).describe("The Actor's files, each with its whole content."),
-    versionNumber: z
-        .string()
-        .optional()
-        .describe('Number of the version in MAJOR.MINOR form. The platform uses 0.0 when it is omitted.'),
+    // The platform refuses a version without a number, so this defaults to what `apify push` uses.
+    versionNumber: z.string().default('0.0').describe('Number of the version in MAJOR.MINOR form. Default: 0.0.'),
     buildTag: z
         .string()
         .min(1)
@@ -62,7 +60,7 @@ export const createActor: ToolEntry = Object.freeze({
 
         USAGE EXAMPLES:
         - user_input: Create an Actor called hacker-news-scraper from these files`,
-    // `fixZodSchemaRequired` strips `autoBuild` from `required` because it has a default.
+    // `fixZodSchemaRequired` strips `versionNumber` and `autoBuild` from `required` because they have defaults.
     inputSchema: fixZodSchemaRequired(z.toJSONSchema(createActorArgs)) as ToolInputSchema,
     outputSchema: createActorToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(createActorArgs)),
@@ -86,7 +84,7 @@ export const createActor: ToolEntry = Object.freeze({
                 ...(parsed.description !== undefined && { description: parsed.description }),
                 versions: [
                     {
-                        ...(parsed.versionNumber !== undefined && { versionNumber: parsed.versionNumber }),
+                        versionNumber: parsed.versionNumber,
                         ...(parsed.buildTag !== undefined && { buildTag: parsed.buildTag }),
                         sourceType: ActorSourceType.SourceFiles,
                         sourceFiles: parsed.files.map(buildSourceFileEntry),

@@ -51,12 +51,12 @@ type SentVersion = {
 };
 
 /**
- * What the platform stores on create: the version gets 0.0 and latest when they are not sent, and
- * `.actor/actor.json` gets `name` set to the Actor name.
+ * What the platform stores on create: the only version gets the build tag latest when none is sent, and
+ * `.actor/actor.json` gets `name` set to the Actor name. The version number is not defaulted: the platform refuses a
+ * version without one.
  */
 function buildStoredVersions(body: { name: string; versions: SentVersion[] }) {
     return body.versions.map((version) => ({
-        versionNumber: '0.0',
         buildTag: 'latest',
         ...version,
         sourceFiles: version.sourceFiles.map((file) => {
@@ -117,7 +117,7 @@ describe('create-actor', () => {
         expect((createActor as HelperTool).paymentRequired).toBeUndefined();
     });
 
-    it('creates the Actor and its version in one POST, with no env vars and the platform defaults', async () => {
+    it('creates the Actor and version 0.0 in one POST, with no env vars and no build tag', async () => {
         const result = await callTool({
             title: 'My Actor',
             description: 'Does things.',
@@ -132,6 +132,7 @@ describe('create-actor', () => {
             description: 'Does things.',
             versions: [
                 {
+                    versionNumber: '0.0',
                     sourceType: 'SOURCE_FILES',
                     sourceFiles: [
                         { name: 'src/main.js', format: 'TEXT', content: MAIN_JS.content },

@@ -148,7 +148,7 @@ describe('update-actor-version', () => {
         expect(actorMock).toHaveBeenNthCalledWith(1, 'john/my-actor');
         expect(actorMock).toHaveBeenNthCalledWith(2, 'actor-1');
         expect(versionMock).toHaveBeenCalledWith('0.1');
-        // Folder entries go back as stored; the files follow in path order, untouched ones as stored.
+        // Folder entries go back as stored, then the stored files in path order; new files follow in the order written.
         expect(versionUpdateMock).toHaveBeenCalledWith({
             sourceType: 'SOURCE_FILES',
             sourceFiles: [
