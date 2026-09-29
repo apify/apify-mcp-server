@@ -57,19 +57,19 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     const appsCategories = getCategoryTools('apps');
 
     describe('per-mode tool lists', () => {
-        it('should have correct tools in actors category (both modes)', () => {
+        it('has correct tools in actors category (both modes)', () => {
             const expected = [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.ACTOR_CALL];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
             expect(toolNames(appsCategories.actors)).toEqual(expected);
         });
 
-        it('should have correct tools in docs category (both modes)', () => {
+        it('has correct tools in docs category (both modes)', () => {
             const expected = [HELPER_TOOLS.DOCS_SEARCH, HELPER_TOOLS.DOCS_FETCH];
             expect(toolNames(defaultCategories.docs)).toEqual(expected);
             expect(toolNames(appsCategories.docs)).toEqual(expected);
         });
 
-        it('should have correct tools in runs category (both modes)', () => {
+        it('has correct tools in runs category (both modes)', () => {
             const expected = [
                 HELPER_TOOLS.ACTOR_RUNS_GET,
                 HELPER_TOOLS.ACTOR_RUN_LIST_GET,
@@ -80,7 +80,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.runs)).toEqual(expected);
         });
 
-        it('should have correct tools in storage category (both modes)', () => {
+        it('has correct tools in storage category (both modes)', () => {
             const expected = [
                 HELPER_TOOLS.DATASET_GET,
                 HELPER_TOOLS.DATASET_GET_ITEMS,
@@ -95,7 +95,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.storage)).toEqual(expected);
         });
 
-        it('should have correct tools in tasks category (both modes)', () => {
+        it('has correct tools in tasks category (both modes)', () => {
             const expected = [
                 HELPER_TOOLS.ACTOR_TASK_CREATE,
                 HELPER_TOOLS.ACTOR_TASK_GET,
@@ -107,7 +107,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.tasks)).toEqual(expected);
         });
 
-        it('should have correct tools in schedules category (both modes)', () => {
+        it('has correct tools in schedules category (both modes)', () => {
             const expected = [
                 HELPER_TOOLS.SCHEDULE_CREATE,
                 HELPER_TOOLS.SCHEDULE_GET,
@@ -118,13 +118,13 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.schedules)).toEqual(expected);
         });
 
-        it('should have correct tools in builds category (both modes)', () => {
+        it('has correct tools in builds category (both modes)', () => {
             const expected = [HELPER_TOOLS.ACTOR_BUILD_GET, HELPER_TOOLS.ACTOR_BUILD_LOG, HELPER_TOOLS.ACTOR_BUILD];
             expect(toolNames(defaultCategories.builds)).toEqual(expected);
             expect(toolNames(appsCategories.builds)).toEqual(expected);
         });
 
-        it('should have correct tools in dev category (both modes)', () => {
+        it('has correct tools in dev category (both modes)', () => {
             const expected = [HELPER_TOOLS.PROBLEM_REPORT];
             expect(toolNames(defaultCategories.dev)).toEqual(expected);
             expect(toolNames(appsCategories.dev)).toEqual(expected);
@@ -195,7 +195,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
         // Locks the invariant that search-actors-widget reuses the shared base schema
         // verbatim (see #700). Prevents silent drift on limit/offset/keywords.
-        it('should use searchActorsBaseArgsSchema.strict() for search-actors-widget inputSchema', () => {
+        it('uses searchActorsBaseArgsSchema.strict() for search-actors-widget inputSchema', () => {
             const widgetTool = WIDGET_BY_BASE_TOOL.get(HELPER_TOOLS.STORE_SEARCH);
             expect(widgetTool).toBeDefined();
             expect(widgetTool!.name).toBe(HELPER_TOOLS.STORE_SEARCH_WIDGET);
@@ -428,7 +428,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
         },
     };
 
-    it('should strip openai/ and ui _meta keys when filterWidgetMeta is true and not in apps mode', () => {
+    it('strips openai/ and ui _meta keys when filterWidgetMeta is true and not in apps mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
             filterWidgetMeta: true,
             mode: 'default',
@@ -440,7 +440,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
         expect(result._meta).not.toHaveProperty('ui');
     });
 
-    it('should preserve all _meta keys in apps mode', () => {
+    it('preserves all _meta keys in apps mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
             filterWidgetMeta: true,
             mode: 'apps',
@@ -448,14 +448,14 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
         expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
     });
 
-    it('should preserve all _meta keys when filterWidgetMeta is false', () => {
+    it('preserves all _meta keys when filterWidgetMeta is false', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
             filterWidgetMeta: false,
         });
         expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
     });
 
-    it('should return undefined _meta when all keys are widget-specific and mode is not apps', () => {
+    it('returns undefined _meta when all keys are widget-specific and mode is not apps', () => {
         const toolWithOnlyWidgetMeta = {
             ...toolWithOpenAiMeta,
             _meta: {
@@ -472,7 +472,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
 });
 
 describe('getToolPublicFieldOnly inputSchema normalization', () => {
-    it('should not expose Zod-defaulted fields as JSON Schema required (search-apify-docs)', () => {
+    it('does not expose Zod-defaulted fields as JSON Schema required (search-apify-docs)', () => {
         const { inputSchema } = getToolPublicFieldOnly(searchApifyDocs, { filterWidgetMeta: false });
         const schema = inputSchema as { required?: string[]; properties?: Record<string, { default?: unknown }> };
 
@@ -483,7 +483,7 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
     });
 
     // Regression: #637 — Actor required fields were dropped from tools/list output.
-    it('should preserve required fields from Apify Actor-shape inputSchemas', () => {
+    it('preserves required fields from Apify Actor-shape inputSchemas', () => {
         const actorShapeTool = {
             name: 'apify--some-actor',
             description: 'Test Actor tool',

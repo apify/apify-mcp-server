@@ -21,7 +21,7 @@ describe('telemetry', () => {
         vi.clearAllMocks();
     });
 
-    it('should send correct payload structure to Segment with userId', () => {
+    it('sends correct payload structure to Segment with userId', () => {
         const userId = 'test-user-123';
         const properties = {
             app: 'mcp' as const,
@@ -112,7 +112,7 @@ describe('telemetry', () => {
         expect(callArgs.anonymousId).not.toBe('');
     });
 
-    it('should preserve optional failure diagnostics in the payload', () => {
+    it('preserves optional failure diagnostics in the payload', () => {
         const properties = {
             app: 'mcp' as const,
             app_version: '0.5.6',
