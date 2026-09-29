@@ -57,7 +57,9 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
  * method needs the spec.
  */
 async function inferMethod(path: string): Promise<{ method: ApiMethod } | { error: string }> {
-    const operations = findPathOperations(await fetchApiOperationIndex(), normalizeApiPath(path));
+    const index = await fetchApiOperationIndex().catch(() => undefined);
+    if (!index) return { error: 'The API spec could not be loaded to choose the method; specify the method.' };
+    const operations = findPathOperations(index, normalizeApiPath(path));
     if (operations.length === 0) return { error: 'The path is not in the API spec; specify the method.' };
     if (operations.length > 1) {
         const methods = formatList(

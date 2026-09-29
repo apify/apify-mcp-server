@@ -644,6 +644,27 @@ describe('apify-api-write', () => {
         });
     });
 
+    it('uses the method of the actors path for a legacy acts path', async () => {
+        requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
+
+        await callTool(apifyApiWrite, { path: 'acts/john~my-actor/runs/last/dataset/items', body: [] });
+
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST' }));
+        expect(readSentUrl()).toBe(`${BASE_URL}/acts/john~my-actor/runs/last/dataset/items`);
+    });
+
+    it('asks for the method when the spec cannot be loaded to choose it', async () => {
+        vi.mocked(fetchApiOperationIndex).mockRejectedValueOnce(new Error('Failed to load the Apify API operations'));
+
+        const result = await callTool(apifyApiWrite, { path: 'actor-runs/run-1/abort' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            'The API spec could not be loaded to choose the method; specify the method.',
+        );
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
     it.each([
         ['datasets/abc', 'The path matches methods GET, PUT, and DELETE; specify which one to call the endpoint with.'],
         [
