@@ -44,7 +44,7 @@ describe('isReportProblemExplicitlySelected()', () => {
 describe('loadToolsFromInput explicit-empty semantics', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
 
-    it('should not auto-add apps ui tools when tools are explicitly empty', async () => {
+    it('does not auto-add apps UI tools when tools are explicitly empty', async () => {
         const tools = await loadToolsFromInput(
             {
                 tools: [],
@@ -56,7 +56,7 @@ describe('loadToolsFromInput explicit-empty semantics', () => {
         expect(tools).toHaveLength(0);
     });
 
-    it('should not auto-add apps ui tools when actors are explicitly empty', async () => {
+    it('does not auto-add apps UI tools when actors are explicitly empty', async () => {
         const tools = await loadToolsFromInput(
             {
                 actors: [],
@@ -68,7 +68,7 @@ describe('loadToolsFromInput explicit-empty semantics', () => {
         expect(tools).toHaveLength(0);
     });
 
-    it('should not pair widgets whose base tool was not selected (apps mode, tools: ["docs"])', async () => {
+    it('does not pair widgets whose base tool was not selected (apps mode, tools: ["docs"])', async () => {
         const tools = await loadToolsFromInput(
             {
                 tools: ['docs'],
@@ -90,32 +90,32 @@ describe('loadToolsFromInput explicit-empty semantics', () => {
 });
 
 describe('toolNamesToInput', () => {
-    it('should keep internal tool names in tools and move actor names to actors', () => {
+    it('keeps internal tool names in tools and moves actor names to actors', () => {
         expect(toolNamesToInput([HELPER_TOOLS.STORE_SEARCH, 'apify/rag-web-browser'])).toEqual({
             tools: [HELPER_TOOLS.STORE_SEARCH],
             actors: ['apify/rag-web-browser'],
         });
     });
 
-    it('should suppress default categories when restoring only actor tools', () => {
+    it('suppresses default categories when restoring only actor tools', () => {
         expect(toolNamesToInput(['apify/rag-web-browser'])).toEqual({
             tools: [],
             actors: ['apify/rag-web-browser'],
         });
     });
 
-    it('should classify widget tool names as internal tools, not actor IDs', () => {
+    it('classifies widget tool names as internal tools, not actor IDs', () => {
         expect(toolNamesToInput([HELPER_TOOLS.STORE_SEARCH_WIDGET])).toEqual({
             tools: [HELPER_TOOLS.STORE_SEARCH_WIDGET],
         });
     });
 });
 
-describe('loadToolsFromInput auto-injection of storage tools', () => {
+describe('storage tool auto-injection', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
 
-    it('auto-injects storage and abort tools when call-actor is in the default tool set', async () => {
-        const tools = await loadToolsFromInput({}, apifyClient);
+    it('auto-injects storage and abort tools when call-actor is in the default tool set', () => {
+        const tools = getToolsForServerMode({}, [], 'default');
         const toolNames = tools.map((t) => t.name);
 
         expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
@@ -223,13 +223,13 @@ describe('getToolsForServerMode report-problem default injection', () => {
 describe('loadToolsFromInput explicit widget selection', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
 
-    it('should resolve an explicit widget name to the widget tool in apps mode', async () => {
+    it('resolves an explicit widget name to the widget tool in apps mode', async () => {
         const tools = await loadToolsFromInput({ tools: [HELPER_TOOLS.STORE_SEARCH_WIDGET] }, apifyClient, 'apps');
         const toolNames = tools.map((t) => t.name);
         expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
     });
 
-    it('should not duplicate the widget when both base and widget are explicitly selected', async () => {
+    it('does not duplicate the widget when both base and widget are explicitly selected', async () => {
         const tools = await loadToolsFromInput(
             { tools: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.STORE_SEARCH_WIDGET] },
             apifyClient,
