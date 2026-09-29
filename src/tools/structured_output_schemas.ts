@@ -523,38 +523,25 @@ export const buildActorToolOutputSchema = {
     required: ['build'],
 };
 
-/**
- * Schema for get-actor-version: the version's metadata, its file manifest, and the content returned. The URL fields
- * are set only for a version whose source is a URL.
- */
+/** Schema for get-actor-version: the version's file manifest, its revision, and the content returned. */
 export const getActorVersionToolOutputSchema = {
     type: 'object' as const,
     properties: {
         actorId: { type: 'string', description: 'Actor ID' },
         fullName: { type: 'string', description: 'Actor full name, username/name' },
         versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
-        sourceType: {
-            type: 'string',
-            description: 'Where the source lives: SOURCE_FILES, TARBALL, GIT_REPO, or GITHUB_GIST',
-        },
-        buildTag: { type: 'string', description: 'Tag that builds of this version get, e.g. latest' },
-        revision: {
-            type: 'string',
-            description:
-                'Identifies the whole file set, or the URL for a version built from one; changes when any file changes',
-        },
+        revision: { type: 'string', description: 'Identifies the whole file set; changes when any file changes' },
         files: {
             type: 'array',
-            description: 'Regular files sorted by path, folders excluded; empty for a version built from a URL',
+            description: 'Regular files sorted by path, folders excluded',
             items: {
                 type: 'object',
                 properties: {
                     path: { type: 'string', description: 'Path relative to the Actor root' },
                     sizeBytes: { type: 'number', description: 'Size of the decoded bytes' },
                     hash: { type: 'string', description: 'First 16 hex characters of the SHA-256 of the bytes' },
-                    format: { type: 'string', enum: ['TEXT', 'BASE64'], description: 'How the file is stored' },
                 },
-                required: ['path', 'sizeBytes', 'hash', 'format'],
+                required: ['path', 'sizeBytes', 'hash'],
             },
         },
         contents: {
@@ -586,23 +573,8 @@ export const getActorVersionToolOutputSchema = {
             items: { type: 'string' },
             description: 'Requested paths the version has no file at',
         },
-        envVars: {
-            type: 'array',
-            description: 'Environment variables of the version, without their values',
-            items: {
-                type: 'object',
-                properties: { name: { type: 'string' }, isSecret: { type: 'boolean' } },
-                required: ['name', 'isSecret'],
-            },
-        },
-        gitRepoUrl: { type: 'string', description: 'Git source as stored, repository#branch:directory' },
-        repository: { type: 'string', description: 'Git repository URL' },
-        branch: { type: 'string', description: 'Git branch, when the URL names one' },
-        directory: { type: 'string', description: 'Directory in the repository, when the URL names one' },
-        gitHubGistUrl: { type: 'string', description: 'GitHub gist URL' },
-        tarballUrl: { type: 'string', description: 'URL of a zip outside the Apify API, without its query string' },
     },
-    required: ['actorId', 'fullName', 'versionNumber', 'sourceType', 'revision', 'files', 'contents', 'envVars'],
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files', 'contents'],
 };
 
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves

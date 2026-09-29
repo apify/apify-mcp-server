@@ -1,5 +1,6 @@
 import { isUtf8 } from 'node:buffer';
 import { createHash } from 'node:crypto';
+import { posix } from 'node:path';
 
 import type { ActorVersionSourceFile } from 'apify-client';
 
@@ -64,8 +65,6 @@ const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 /** One regular file of a version. */
 export type SourceFile = {
     path: string;
-    /** The format the version stores the file in. */
-    format: ActorVersionSourceFile['format'];
     /** How the content is returned: UTF-8 text as utf8 whatever its stored format, anything else as base64. */
     encoding: 'utf8' | 'base64';
     /** Length of the decoded bytes. */
@@ -77,26 +76,9 @@ export type SourceFile = {
     readContent: () => string;
 };
 
-/** Rounded up to one decimal, so a size just over a limit never prints as the limit itself. */
-export function formatKib(bytes: number): string {
-    return (Math.ceil((bytes / 1024) * 10) / 10).toFixed(1);
-}
-
 export function hasBinaryExtension(path: string): boolean {
     const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
     return path.includes('.') && BINARY_EXTENSIONS.has(extension);
-}
-
-/**
- * A path relative to the Actor root: empty and `.` segments are dropped, as the build worker's path normalization does,
- * and backslashes become `/`. The build worker keeps a backslash as part of an inline name, so the two can differ for
- * such a name. `..` segments are kept.
- */
-export function parseSourcePath(name: string): string {
-    return name
-        .split(/[\\/]/)
-        .filter((segment) => segment !== '' && segment !== '.')
-        .join('/');
 }
 
 /** The first 16 hex characters of the SHA-256; for a file's bytes, the same as `sha256sum <file> | cut -c1-16`. */
@@ -121,40 +103,28 @@ export function buildFilesRevision(files: readonly Pick<SourceFile, 'path' | 'ha
     return getSha256Prefix(lines.join(''));
 }
 
-/** Identifies a version whose source lives at a URL: the URL is all the platform holds for it. */
-export function buildUrlRevision(sourceType: string, url: string): string {
-    return getSha256Prefix(`${sourceType}\0${url}`);
-}
-
 /**
- * A file stored inline in the version; its format is the one the platform stored. The platform stores a file without
- * `format` or `content` as given, and the build worker reads them as TEXT and as empty, so the same defaults apply.
- * A BASE64 file is returned as text when the extension is not a binary one and the bytes are valid UTF-8 (`apify push`
- * picks the format by MIME type), and as its stored base64 otherwise, so no byte is lost. `isUtf8` checks without
- * building a string, so a listing holds only the bytes.
+ * A file stored inline in the version. The platform stores a file without `format` or `content` as given, and the build
+ * worker reads them as TEXT and as empty, so the same defaults apply. The name is normalized the way the build worker
+ * normalizes it before writing the file. A BASE64 file is returned as text when the extension is not a binary one and
+ * the bytes are valid UTF-8 (`apify push` picks the format by MIME type), and as its stored base64 otherwise, so no
+ * byte is lost. `isUtf8` checks without building a string, so a listing holds only the bytes.
  */
 export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile {
     const { name, format, content: storedContent }: Partial<ActorVersionSourceFile> & { name: string } = file;
     const content = storedContent ?? '';
-    // A name that normalizes to nothing, such as `.`, is kept as stored rather than dropped.
-    const path = parseSourcePath(name) || name;
-    const bytes = format === 'BASE64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
+    const path = posix.normalize(name);
+    const bytes = Buffer.from(content, format === 'BASE64' ? 'base64' : 'utf8');
     const common = { path, sizeBytes: bytes.length, hash: getSha256Prefix(bytes) };
     if (format !== 'BASE64') {
-        return { ...common, format: 'TEXT', encoding: 'utf8', contentBytes: bytes.length, readContent: () => content };
+        return { ...common, encoding: 'utf8', contentBytes: bytes.length, readContent: () => content };
     }
     if (!hasBinaryExtension(path) && isUtf8(bytes)) {
         // Valid UTF-8 decoded with the BOM kept encodes back to the same bytes, so its length is the byte count.
         const readContent = () => UTF8_DECODER.decode(bytes);
-        return { ...common, format, encoding: 'utf8', contentBytes: bytes.length, readContent };
+        return { ...common, encoding: 'utf8', contentBytes: bytes.length, readContent };
     }
-    return {
-        ...common,
-        format,
-        encoding: 'base64',
-        contentBytes: Buffer.byteLength(content),
-        readContent: () => content,
-    };
+    return { ...common, encoding: 'base64', contentBytes: Buffer.byteLength(content), readContent: () => content };
 }
 
 /** Console keeps an empty folder as a `{ name, folder: true }` entry with no content; apify-client's type leaves it out. */
