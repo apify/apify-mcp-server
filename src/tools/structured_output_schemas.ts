@@ -612,33 +612,18 @@ export const createActorToolOutputSchema = {
     required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files'],
 };
 
-/** Schema for create-actor-version: the new version, its files, and what a copy could not take over. */
+/** Schema for create-actor-version: the new version and its files. */
 export const createActorVersionToolOutputSchema = {
     type: 'object' as const,
     properties: {
         actorId: { type: 'string', description: 'Actor ID' },
         fullName: { type: 'string', description: 'Actor full name, username/name' },
         versionNumber: { type: 'string', description: 'Number of the new version, e.g. 0.2' },
-        buildTag: { type: 'string', description: 'Tag that builds of the version get; absent when none was given' },
-        revision: {
-            type: 'string',
-            description: 'Identifies the file set; the same value a later read of the version returns',
-        },
-        files: {
-            type: 'array',
-            description: 'The files as stored, sorted by path; empty for an empty version',
-            items: getActorVersionToolOutputSchema.properties.files.items,
-        },
-        copiedFromVersion: { type: 'string', description: 'The version the source was copied from' },
-        secretEnvVarsNotCopied: {
-            type: 'array',
-            items: { type: 'string' },
-            description:
-                'Names of secret environment variables a copy could not take over, since their values cannot be read',
-        },
+        revision: createActorToolOutputSchema.properties.revision,
+        files: createActorToolOutputSchema.properties.files,
         ...sourceWriteBuildProperties,
     },
-    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files', 'warnings'],
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files'],
 };
 
 /** Schema for delete-actor-version: the version that was deleted. */

@@ -1,55 +1,23 @@
-import { ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import { UserInputError } from '../../errors.js';
-import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
-import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondAborted, respondOk } from '../../utils/mcp.js';
 import { deleteActorVersionToolOutputSchema } from '../structured_output_schemas.js';
 import { fetchActor, resolveVersion, respondToSourceToolError } from './source_helpers.js';
-
-/** The error type the platform returns for a delete that would leave the Actor with no version. */
-const TOO_FEW_VERSIONS_ERROR_TYPE = 'too-few-versions';
 
 const deleteActorVersionArgs = z.object({
     actor: z
         .string()
         .min(1)
         .describe(
-            'The Actor to delete the version from: its ID, or its full name as username/name or username~name. ' +
-                'A name without the username is not enough.',
+            'The Actor to delete the version from: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
         ),
     versionNumber: z.string().min(1).describe('The version to delete, in MAJOR.MINOR form, for example 0.2.'),
 });
-
-// TODO(#1439): name HELPER_TOOLS.ACTOR_DELETE here, gated on loadedToolNames, once delete-actor is registered.
-function formatLastVersionText(fullName: string, versionNumber: string): string {
-    return (
-        `Nothing was deleted: version ${versionNumber} is the only version of ${fullName}, and an Actor must keep ` +
-        'at least one version. To remove it, delete the Actor instead.'
-    );
-}
-
-// TODO(#1439): name HELPER_TOOLS.ACTOR_DELETE in the last-version sentence, gated on hasTool, once delete-actor is registered.
-function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const copyNote = hasTool(HELPER_TOOLS.ACTOR_VERSION_CREATE)
-        ? ` such as a working copy made with ${HELPER_TOOLS.ACTOR_VERSION_CREATE}`
-        : '';
-    return dedent`
-        Delete one version of an Actor, with its source and environment variables.
-        An Actor must keep at least one version, so its last version cannot be deleted; delete the Actor instead.
-        The version's builds stay, and so do the tags that point to them: a run with such a tag still uses that build.
-
-        USAGE:
-        - Use to remove a version that is no longer needed${copyNote}.
-
-        USAGE EXAMPLES:
-        - user_input: Delete version 0.2 of my Actor john/my-scraper
-        - user_input: Remove the working copies of my Actor now that the fix is in 0.1`;
-}
 
 /**
  * https://docs.apify.com/api/v2/actor-get
@@ -64,8 +32,15 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HELPER_TOOLS.ACTOR_VERSION_DELETE,
     title: 'Delete Actor version',
-    description: buildDescription(ALL_TOOLS_PRESENT),
-    buildDescription,
+    description: dedent`
+        Delete one version of an Actor, with its source and environment variables. The platform refuses to delete an Actor's last version.
+        The version's builds stay, and so do the tags that point to them: a run with such a tag still uses that build.
+
+        USAGE:
+        - Use to remove a version that is no longer needed, such as a working copy.
+
+        USAGE EXAMPLES:
+        - user_input: Delete version 0.2 of my Actor john/my-scraper`,
     inputSchema: z.toJSONSchema(deleteActorVersionArgs) as ToolInputSchema,
     outputSchema: deleteActorVersionToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(deleteActorVersionArgs)),
@@ -82,22 +57,11 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
         try {
             const { actor, fullName } = await fetchActor(client, parsed.actor);
             const { versionNumber } = resolveVersion(actor, parsed.versionNumber, parsed.actor);
-            if (actor.versions.length <= 1) throw new UserInputError(formatLastVersionText(fullName, versionNumber));
             // A cancel before the DELETE deletes nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
-            try {
-                await client.actor(actor.id).version(versionNumber).delete();
-            } catch (error) {
-                // Another writer deleted the other versions since the read.
-                if (error instanceof ApifyApiError && error.type === TOO_FEW_VERSIONS_ERROR_TYPE) {
-                    throw new UserInputError(formatLastVersionText(fullName, versionNumber));
-                }
-                throw error;
-            }
+            await client.actor(actor.id).version(versionNumber).delete();
             const structuredContent = { actorId: actor.id, fullName, versionNumber, deleted: true };
-            const summary =
-                `Deleted version ${versionNumber} of ${fullName}. Its builds stay, and so do the tags that point to ` +
-                'them: a run with such a tag still uses that build.';
+            const summary = `Deleted version ${versionNumber} of ${fullName}.`;
             return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
         } catch (error) {
             return respondToSourceToolError(error);
