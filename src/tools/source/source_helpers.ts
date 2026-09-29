@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 
 import type { Actor, ActorVersion, ActorVersionSourceFile, Build } from 'apify-client';
-import { ActorSourceType } from 'apify-client';
+import { ActorSourceType, ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
@@ -157,8 +157,8 @@ export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: 
 
 /**
  * The response to a committed write. With autoBuild, a build of the version starts first, with no tag so the version's
- * buildTag applies, and is not waited for. The write stands either way, so a failed start goes to `buildError` rather
- * than being thrown.
+ * buildTag applies, and is not waited for. The write stands either way, so an API error from the start goes to
+ * `buildError` rather than being thrown.
  */
 export async function respondAfterWrite(params: {
     toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames'>;
@@ -181,9 +181,10 @@ export async function respondAfterWrite(params: {
         // No signal is passed: a committed write never aborts the build it started.
         build = await startBuild(client, target.actorId, target.versionNumber, { useCache: true, waitSecs: 0 });
     } catch (error) {
-        const buildError = error instanceof Error ? error.message : String(error);
+        // Only the API's refusal is a failed start; anything else is a bug and goes to the tool-call engine.
+        if (!(error instanceof ApifyApiError)) throw error;
         return respondWithBuild({
-            structuredContent: { ...structuredContent, buildError },
+            structuredContent: { ...structuredContent, buildError: error.message },
             summary,
             nextStep: 'The build could not be started; start it again to run these files.',
         });

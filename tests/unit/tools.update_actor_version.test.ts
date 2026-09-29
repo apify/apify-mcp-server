@@ -597,5 +597,12 @@ describe('update-actor-version', () => {
                 'The build could not be started; start it again to run these files.',
             );
         });
+
+        it('rethrows an error from the build start that is not an API error', async () => {
+            buildMock.mockRejectedValue(new TypeError('Cannot read properties of undefined'));
+
+            await expect(callTool({ autoBuild: true, operations: [write('b.js', 'b')] })).rejects.toThrow(TypeError);
+            expect(versionUpdateMock).toHaveBeenCalledTimes(1);
+        });
     });
 });
