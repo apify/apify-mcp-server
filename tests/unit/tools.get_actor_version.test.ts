@@ -216,6 +216,15 @@ describe('get-actor-version', () => {
             expect(structuredContent.contents).toEqual([{ path: 'data.txt', content, encoding: 'base64' }]);
         });
 
+        it('returns a BASE64 file with a binary extension as base64 even when its bytes are valid UTF-8', async () => {
+            const content = Buffer.from('ascii').toString('base64');
+            mockVersionRead({ sourceFiles: [{ name: 'data.bin', format: 'BASE64', content }] });
+
+            const { structuredContent } = await callTool({ paths: ['data.bin'] });
+
+            expect(structuredContent.contents).toEqual([{ path: 'data.bin', content, encoding: 'base64' }]);
+        });
+
         it('keeps the byte order mark of a UTF-8 file stored as BASE64', async () => {
             const text = '\uFEFFwith bom';
             const bytes = Buffer.from(text, 'utf8');
@@ -502,6 +511,11 @@ describe('get-actor-version', () => {
                 'GIT_REPO',
                 { gitRepoUrl: 'ssh://git@github.com/john/repo.git?x=secret-query#main' },
                 'ssh://git@github.com/john/repo.git#main',
+            ],
+            [
+                'GIT_REPO',
+                { gitRepoUrl: 'ssh://deploy:secret-password@github.com/john/repo.git#main' },
+                'ssh://deploy@github.com/john/repo.git#main',
             ],
             [
                 'GIT_REPO',

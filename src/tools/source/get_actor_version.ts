@@ -92,17 +92,17 @@ function resolveVersion(
 }
 
 /**
- * The URL without what can grant access to it: the query string (for example a store signature) and, for http and
- * https, the user and password. An SSH user such as `git@` is not a secret and stays. A URL the parser cannot read,
+ * The URL without what can grant access to it: the query string (for example a store signature), the password, and,
+ * for http and https, the user. An SSH user such as `git@` is not a secret and stays. A URL the parser cannot read,
  * such as `git@github.com:user/repo.git`, loses only its query string.
  */
 function formatUrlWithoutSecrets(url: string): string {
     if (URL.canParse(url)) {
         const parsed = new URL(url);
         parsed.search = '';
+        parsed.password = '';
         if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
             parsed.username = '';
-            parsed.password = '';
         }
         return parsed.href;
     }
