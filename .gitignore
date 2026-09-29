@@ -8,7 +8,6 @@
 apify_storage
 crawlee_storage
 node_modules
-coverage/
 dist
 tsconfig.tsbuildinfo
 storage/*
