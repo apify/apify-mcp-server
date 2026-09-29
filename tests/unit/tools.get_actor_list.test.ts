@@ -84,9 +84,9 @@ describe('get-actor-list', () => {
         const summary = 'Your account has 1 Actor; showing 1 from offset 0.';
         const nextStep = `Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with an Actor's fullName to see its input schema and README.`;
         expect(structuredContent).toEqual({ ...page, summary, nextStep });
-        // content: [0] the page, [1] summary and next step.
+        // content: [0] the data, [1] summary and next step.
         expect(content).toHaveLength(2);
-        expect(JSON.parse(content[0].text)).toEqual(page);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 

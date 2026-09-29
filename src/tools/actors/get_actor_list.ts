@@ -6,7 +6,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
-import { buildStorageResponse } from '../storage/storage_helpers.js';
+import { respondOk } from '../../utils/mcp.js';
 import { actorListOutputSchema } from '../structured_output_schemas.js';
 import { toIsoString } from './actor_run_response.js';
 
@@ -112,6 +112,12 @@ export const getActorList: ToolEntry = Object.freeze({
             modifiedAt: toIsoString(actor.modifiedAt) ?? null,
             lastRunStartedAt: toIsoString(actor.stats?.lastRunStartedAt) ?? null,
         }));
+        const noun = list.total === 1 ? 'Actor' : 'Actors';
+        const summary = `Your account has ${list.total} ${noun}; showing ${items.length} from offset ${list.offset}.`;
+        const nextStep = buildNextStep(
+            { total: list.total, count: items.length, offset: list.offset },
+            loadedToolNames,
+        );
         const structuredContent = {
             total: list.total,
             count: items.length,
@@ -119,13 +125,9 @@ export const getActorList: ToolEntry = Object.freeze({
             limit: list.limit,
             desc: list.desc,
             items,
+            summary,
+            nextStep,
         };
-        const noun = list.total === 1 ? 'Actor' : 'Actors';
-        const summary = `Your account has ${list.total} ${noun}; showing ${items.length} from offset ${list.offset}.`;
-        const nextStep = buildNextStep(
-            { total: list.total, count: items.length, offset: list.offset },
-            loadedToolNames,
-        );
-        return buildStorageResponse({ structuredContent, summary, nextStep });
+        return respondOk([JSON.stringify(structuredContent), `${summary}\n${nextStep}`], { structuredContent });
     },
 } as const);
