@@ -83,7 +83,13 @@ export const registrationCases: Case[] = [
             const names = getToolNames(tools);
 
             // Equivalent to tools=actors,docs,apify/rag-web-browser,apify/web-fetch (no widgets outside apps).
-            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor', 'delete-actor'];
+            const expectedActorsTools = [
+                'fetch-actor-details',
+                'search-actors',
+                'call-actor',
+                'get-actor-list',
+                'delete-actor',
+            ];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
             const expectedActors = [
                 actorNameToToolName('apify/rag-web-browser'),
@@ -190,6 +196,7 @@ export const registrationCases: Case[] = [
             expect(names).not.toContain('search-actors');
             expect(names).not.toContain('fetch-actor-details');
             expect(names).not.toContain('call-actor');
+            expect(names).not.toContain('get-actor-list');
             expect(names).not.toContain('search-apify-docs');
             expect(names).not.toContain('fetch-apify-docs');
         }),

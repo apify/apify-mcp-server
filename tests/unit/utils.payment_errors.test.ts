@@ -5,12 +5,14 @@
  */
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import type { ApifyClient } from '../../src/apify_client.js';
 import {
     buildPaymentRequiredResponse,
     buildPermissionApprovalResponse,
     isX402PaymentRequiredError,
+    registerPaymentRequiredInterceptor,
 } from '../../src/utils/payment_errors.js';
 import { textOf } from './helpers/tool_context.js';
 
@@ -21,6 +23,48 @@ const SAMPLE_PAYMENT_REQUIRED = {
         { scheme: 'upto', network: 'eip155:8453', amount: '500000' },
     ],
 } as const;
+
+describe('registerPaymentRequiredInterceptor()', () => {
+    it('forwards a 402 payment-required header into the MCP response', async () => {
+        const use = vi.fn();
+        const client = { httpClient: { axios: { interceptors: { response: { use } } } } } as unknown as ApifyClient;
+        registerPaymentRequiredInterceptor(client);
+
+        const onRejected = use.mock.calls[0][1] as (error: unknown) => Promise<never>;
+        const error = Object.assign(new Error('Payment required'), {
+            response: {
+                status: 402,
+                headers: {
+                    'payment-required': Buffer.from(JSON.stringify(SAMPLE_PAYMENT_REQUIRED)).toString('base64'),
+                },
+            },
+        });
+
+        await expect(onRejected(error)).rejects.toBe(error);
+        const response = buildPaymentRequiredResponse(error);
+        expect(response.structuredContent).toEqual(SAMPLE_PAYMENT_REQUIRED);
+        expect(response.content?.[0]).toEqual({ type: 'text', text: JSON.stringify(SAMPLE_PAYMENT_REQUIRED) });
+    });
+
+    it('does not attach payment data to a non-402 response', async () => {
+        const use = vi.fn();
+        const client = { httpClient: { axios: { interceptors: { response: { use } } } } } as unknown as ApifyClient;
+        registerPaymentRequiredInterceptor(client);
+
+        const onRejected = use.mock.calls[0][1] as (error: unknown) => Promise<never>;
+        const error = Object.assign(new Error('Request failed'), {
+            response: {
+                status: 403,
+                headers: {
+                    'payment-required': Buffer.from(JSON.stringify(SAMPLE_PAYMENT_REQUIRED)).toString('base64'),
+                },
+            },
+        });
+
+        await expect(onRejected(error)).rejects.toBe(error);
+        expect(buildPaymentRequiredResponse(error).structuredContent).toBeUndefined();
+    });
+});
 
 describe('isX402PaymentRequiredError()', () => {
     it('returns true for a plain 402, false for the concurrent-run limit arriving as 402', () => {
