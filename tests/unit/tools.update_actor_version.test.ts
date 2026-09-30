@@ -1356,6 +1356,38 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).toHaveBeenCalledTimes(1);
             expect(buildMock).not.toHaveBeenCalled();
         });
+
+        it('keeps the build it started when the request is cancelled during the build start', async () => {
+            const controller = new AbortController();
+            buildMock.mockImplementation(async () => {
+                controller.abort();
+                return {
+                    id: 'build-1',
+                    actId: 'actor-1',
+                    buildNumber: '0.1.5',
+                    status: 'RUNNING',
+                    startedAt: new Date('2026-09-01T10:00:00.000Z'),
+                };
+            });
+            // The build client is what aborts a build.
+            const abortMock = vi.fn(async () => ({}));
+            buildClientMock.mockReturnValueOnce({ abort: abortMock });
+
+            const result = await callTool({ autoBuild: true, operations: [write('b.js', 'b')] }, controller.signal);
+
+            expect(versionUpdateMock).toHaveBeenCalledTimes(1);
+            expect(buildMock).toHaveBeenCalledTimes(1);
+            expect(buildClientMock).not.toHaveBeenCalled();
+            expect(abortMock).not.toHaveBeenCalled();
+            expect(result.structuredContent.build).toEqual({
+                id: 'build-1',
+                actorId: 'actor-1',
+                buildNumber: '0.1.5',
+                status: 'RUNNING',
+                startedAt: '2026-09-01T10:00:00.000Z',
+                finishedAt: null,
+            });
+        });
     });
 
     describe('autoBuild', () => {
