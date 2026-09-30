@@ -33,6 +33,9 @@ const MAIN_JS = { name: 'src/main.js', format: 'TEXT', content: 'const a = 1;\nc
 const LOGO_BYTES = Buffer.from([137, 80, 78, 71, 0, 255]);
 const LOGO = { name: 'assets/logo.png', format: 'BASE64', content: LOGO_BYTES.toString('base64') };
 const FOLDER = { name: 'storage', folder: true };
+const EMPTY_INIT = { name: 'src/__init__.py', format: 'TEXT', content: '' };
+// Stored without content, which the build worker reads as empty.
+const NO_CONTENT = { name: 'src/blank.js', format: 'TEXT' };
 
 type UpdateOutput = {
     revision: string;
@@ -242,7 +245,17 @@ describe('update-actor-version', () => {
         const nestedFolder = { name: 'src/empty', folder: true };
 
         it('sends every file it leaves alone back exactly as stored, before and after the changed one', async () => {
-            mockFiles(MAIN_JS, FOLDER, readmeAsBase64, noFormat, ACTOR_JSON, LOGO, nestedFolder);
+            mockFiles(
+                MAIN_JS,
+                FOLDER,
+                readmeAsBase64,
+                noFormat,
+                EMPTY_INIT,
+                ACTOR_JSON,
+                NO_CONTENT,
+                LOGO,
+                nestedFolder,
+            );
 
             const result = await callTool({
                 operations: [edit('.actor/actor.json', { oldText: '1', newText: '2' })],
@@ -253,7 +266,17 @@ describe('update-actor-version', () => {
                 [
                     {
                         sourceType: 'SOURCE_FILES',
-                        sourceFiles: [FOLDER, nestedFolder, actorJson, readmeAsBase64, LOGO, MAIN_JS, noFormat],
+                        sourceFiles: [
+                            FOLDER,
+                            nestedFolder,
+                            actorJson,
+                            readmeAsBase64,
+                            LOGO,
+                            EMPTY_INIT,
+                            NO_CONTENT,
+                            MAIN_JS,
+                            noFormat,
+                        ],
                     },
                 ],
             ]);
@@ -450,12 +473,14 @@ describe('update-actor-version', () => {
                 operations: [write('assets/icon.png', icon), write('README.md', readme, { encoding: 'base64' })],
             });
 
-            expect(getPutFiles()).toEqual(
-                expect.arrayContaining([
-                    { name: 'assets/icon.png', format: 'BASE64', content: icon },
-                    { name: 'README.md', format: 'BASE64', content: readme },
-                ]),
-            );
+            expect(getPutFiles()).toStrictEqual([
+                FOLDER,
+                ACTOR_JSON,
+                LOGO,
+                MAIN_JS,
+                { name: 'assets/icon.png', format: 'BASE64', content: icon },
+                { name: 'README.md', format: 'BASE64', content: readme },
+            ]);
             expect(result.structuredContent.changes).toContainEqual({
                 path: 'assets/icon.png',
                 action: 'created',
@@ -463,17 +488,24 @@ describe('update-actor-version', () => {
             });
         });
 
-        it('warns about an empty file, which the build skips', async () => {
+        it('saves an empty file and warns that the build skips it', async () => {
             const result = await callTool({ operations: [write('src/__init__.py', '')] });
 
             expectSchemaConformingStructuredContent(result, updateActorVersionToolOutputSchema);
+            expect(getPutFiles()).toStrictEqual([
+                FOLDER,
+                ACTOR_JSON,
+                LOGO,
+                MAIN_JS,
+                { name: 'src/__init__.py', format: 'TEXT', content: '' },
+            ]);
             expect(result.structuredContent.warnings).toEqual([
                 'These files are empty, and the build skips empty files, so they will not exist in the build: src/__init__.py.',
             ]);
         });
 
-        it('warns about the files the call leaves empty, not about an empty file it leaves alone', async () => {
-            mockFiles(ACTOR_JSON, MAIN_JS, { name: 'src/__init__.py', format: 'TEXT', content: '' });
+        it('saves every empty file, and warns about the ones the call leaves empty, not the ones it leaves alone', async () => {
+            mockFiles(ACTOR_JSON, MAIN_JS, EMPTY_INIT, NO_CONTENT);
 
             const result = await callTool({
                 operations: [
@@ -482,6 +514,13 @@ describe('update-actor-version', () => {
                 ],
             });
 
+            expect(getPutFiles()).toStrictEqual([
+                ACTOR_JSON,
+                EMPTY_INIT,
+                NO_CONTENT,
+                { name: 'src/main.js', format: 'TEXT', content: '' },
+                { name: 'assets/blank.png', format: 'BASE64', content: '' },
+            ]);
             expect(result.structuredContent.warnings).toEqual([
                 'These files are empty, and the build skips empty files, so they will not exist in the build: assets/blank.png, src/main.js.',
             ]);
@@ -507,7 +546,35 @@ describe('update-actor-version', () => {
             });
 
             const content = 'const a = 3;\nconsole.log(a);\nexport {};\n';
-            expect(getPutFiles()).toContainEqual({ name: 'src/main.js', format: 'TEXT', content });
+            expect(getPutFiles()).toStrictEqual([
+                FOLDER,
+                ACTOR_JSON,
+                LOGO,
+                { name: 'src/main.js', format: 'TEXT', content },
+            ]);
+            expect(result.structuredContent.changes).toEqual([
+                { path: 'src/main.js', action: 'updated', hash: sha256Prefix(content) },
+            ]);
+        });
+
+        it('keeps every edit of an operation that changes different parts of the file', async () => {
+            const result = await callTool({
+                operations: [
+                    edit(
+                        'src/main.js',
+                        { oldText: 'const a = 1;', newText: 'const a = 22;' },
+                        { oldText: 'export {};', newText: 'export { a };' },
+                    ),
+                ],
+            });
+
+            const content = 'const a = 22;\nconsole.log(a);\nexport { a };\n';
+            expect(getPutFiles()).toStrictEqual([
+                FOLDER,
+                ACTOR_JSON,
+                LOGO,
+                { name: 'src/main.js', format: 'TEXT', content },
+            ]);
             expect(result.structuredContent.changes).toEqual([
                 { path: 'src/main.js', action: 'updated', hash: sha256Prefix(content) },
             ]);
@@ -764,6 +831,12 @@ describe('update-actor-version', () => {
                 ],
             });
 
+            expect(getPutFiles()).toStrictEqual([
+                FOLDER,
+                ACTOR_JSON,
+                LOGO,
+                { name: 'src/index.js', format: 'TEXT', content: MAIN_JS.content },
+            ]);
             expect(result.structuredContent.changes).toEqual([
                 { path: 'src/index.js', action: 'created', hash: MAIN_JS_HASH },
                 { path: 'src/main.js', action: 'deleted' },
@@ -892,6 +965,7 @@ describe('update-actor-version', () => {
                 operations: [{ type: 'delete', path: './src//main.js', expectedHash: MAIN_JS_HASH }],
             });
 
+            expect(getPutFiles()).toStrictEqual([FOLDER, ACTOR_JSON, LOGO]);
             expect(result.structuredContent.changes).toEqual([{ path: 'src/main.js', action: 'deleted' }]);
         });
 
@@ -1009,6 +1083,50 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).toHaveBeenCalledTimes(1);
         });
 
+        it.each<[string, (revision: string) => string]>([
+            ['an empty expectedRevision', () => ''],
+            ['the first 8 characters of the revision', (revision) => revision.slice(0, 8)],
+        ])('refuses %s, since it must match the whole revision (REVISION_MISMATCH)', async (_, getExpectedRevision) => {
+            const revision = await readRevision();
+            const expectedRevision = getExpectedRevision(revision);
+
+            const text = await callToolExpectingUserError({
+                autoBuild: true,
+                expectedRevision,
+                operations: [write('b.js', 'b')],
+            });
+
+            expect(text).toBe(
+                'Nothing was written: expectedRevision failed with REVISION_MISMATCH. ' +
+                    `The version's revision is ${revision}, not ${expectedRevision}.`,
+            );
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
+        const hashPrefix = MAIN_JS_HASH.slice(0, 8);
+        it.each([
+            ['write', 'an empty expectedHash', '', write('src/main.js', 'x', { expectedHash: '' })],
+            ['delete', 'an empty expectedHash', '', remove('src/main.js', '')],
+            [
+                'write',
+                "the first 8 characters of the file's hash",
+                hashPrefix,
+                write('src/main.js', 'x', { expectedHash: hashPrefix }),
+            ],
+            ['delete', "the first 8 characters of the file's hash", hashPrefix, remove('src/main.js', hashPrefix)],
+        ])(
+            'refuses a %s given %s, since it must match the whole hash (HASH_MISMATCH)',
+            async (type, _, expectedHash, operation) => {
+                const text = await callToolExpectingUserError({ autoBuild: true, operations: [operation] });
+
+                expect(text).toBe(
+                    `${failedWith(0, type, 'src/main.js', 'HASH_MISMATCH')} ` +
+                        `src/main.js has hash ${MAIN_JS_HASH}, not ${expectedHash}.`,
+                );
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
         it('computes the revision over the files only', async () => {
             const result = await callTool({ operations: [] });
 
@@ -1057,6 +1175,19 @@ describe('update-actor-version', () => {
             );
         });
 
+        it.each([
+            ['no versions', []],
+            ['only a version without a number', [{ sourceType: 'SOURCE_FILES', sourceFiles: [MAIN_JS] }]],
+        ])('needs versionNumber when the Actor has %s', async (_, versions) => {
+            actorGetMock.mockResolvedValue({ id: 'actor-1', name: 'my-actor', username: 'john', versions });
+
+            const text = await callToolExpectingUserError({ autoBuild: true, operations: [write('a.js', 'a')] });
+
+            expect(text).toBe('Specify versionNumber; this Actor has versions: .');
+            expect(versionMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
         it('refuses a version the Actor does not have', async () => {
             const text = await callToolExpectingUserError({ versionNumber: '0.2', operations: [write('a.js', 'a')] });
 
@@ -1101,6 +1232,11 @@ describe('update-actor-version', () => {
                 'GIT_REPO',
                 { gitRepoUrl: 'https://user:secret@github.com/john/repo.git' },
                 'https://github.com/john/repo.git',
+            ],
+            [
+                'GIT_REPO',
+                { gitRepoUrl: 'http://john:secret-password@git.example.com/repo.git' },
+                'http://git.example.com/repo.git',
             ],
             [
                 'GIT_REPO',
