@@ -86,7 +86,6 @@ export type ActorDetailsResult = {
 
 type FetchActorDetailsOptions = {
     cardOptions?: ActorCardOptions;
-    /** When it can proxy pictures, the Store search for the picture URL is skipped. */
     actorStore?: ActorStore;
 };
 
@@ -104,7 +103,7 @@ export async function fetchActorDetails(
             await Promise.all([
                 actor.get(),
                 actor.defaultBuild().then(async (build) => build.get()),
-                // The Store search is only needed to get a proxied picture URL when the host cannot provide one.
+                // Only needed when the host cannot proxy picture URLs.
                 actorStore?.getProxiedPictureUrl
                     ? []
                     : searchActorsByKeywords({
