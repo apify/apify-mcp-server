@@ -27,16 +27,6 @@ const X402_TOOL_INSTRUCTIONS = [
 ].join(' ');
 
 /**
- * Preferred scheme order when selecting the flat fields exposed on `_meta.x402`.
- *
- * `exact` first to keep the flat-fields contract back-compatible with clients
- * that don't iterate `accepts[]` — they continue to sign `exact` payments as
- * before this PR. Clients that walk `accepts[]` (post-#876 — the current
- * mcpc, the canary) can opt into `upto` via their scheme preference.
- */
-const X402_PREFERRED_SCHEMES = ['exact', 'upto'] as const;
-
-/**
  * One entry in a 402 `accepts` array. Mirrors the public x402 v2 wire shape;
  * carried verbatim from the Apify API.
  */
@@ -223,25 +213,11 @@ export class X402PaymentProvider implements PaymentProvider {
         return new X402PaymentProvider(requirements);
     }
 
-    /**
-     * Picks the preferred accept entry for flat `_meta.x402` advertising.
-     * Order follows `X402_PREFERRED_SCHEMES`; falls back to the first entry
-     * when no preferred scheme matches.
-     */
-    private selectPreferredAcceptEntry(accepts: X402PaymentAccept[]): X402PaymentAccept {
-        for (const preferred of X402_PREFERRED_SCHEMES) {
-            const match = accepts.find((entry) => entry.scheme === preferred);
-            if (match) return match;
-        }
-        return accepts[0];
-    }
-
     decorateToolSchema(tool: ToolEntry): ToolEntry {
         if (!tool.paymentRequired) return tool;
 
         const cloned = cloneToolEntry(tool);
 
-        // Flat preferred fields stay for back-compat with clients that don't iterate `accepts[]`.
         if (!cloned._meta) {
             cloned._meta = {};
         }
@@ -250,10 +226,8 @@ export class X402PaymentProvider implements PaymentProvider {
             const reqs = this.requirements ? structuredClone(this.requirements) : undefined;
             const acceptsRaw = reqs?.accepts;
             const accepts = Array.isArray(acceptsRaw) && acceptsRaw.length > 0 ? acceptsRaw : undefined;
-            const preferred = accepts ? this.selectPreferredAcceptEntry(accepts) : undefined;
             metaRecord.x402 = {
                 paymentRequired: true,
-                ...(preferred ?? {}),
                 ...(accepts && { accepts }),
             };
         }

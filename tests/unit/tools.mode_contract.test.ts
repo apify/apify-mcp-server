@@ -58,7 +58,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
     describe('per-mode tool lists', () => {
         it('has correct tools in actors category (both modes)', () => {
-            const expected = [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.ACTOR_CALL];
+            const expected = [
+                HELPER_TOOLS.STORE_SEARCH,
+                HELPER_TOOLS.ACTOR_GET_DETAILS,
+                HELPER_TOOLS.ACTOR_CALL,
+                HELPER_TOOLS.ACTOR_LIST_GET,
+            ];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
             expect(toolNames(appsCategories.actors)).toEqual(expected);
         });
@@ -119,7 +124,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
 
         it('has correct tools in builds category (both modes)', () => {
-            const expected = [HELPER_TOOLS.ACTOR_BUILD_GET, HELPER_TOOLS.ACTOR_BUILD_LOG, HELPER_TOOLS.ACTOR_BUILD];
+            const expected = [
+                HELPER_TOOLS.ACTOR_BUILD_GET,
+                HELPER_TOOLS.ACTOR_BUILD_LOG,
+                HELPER_TOOLS.ACTOR_BUILD_LIST_GET,
+                HELPER_TOOLS.ACTOR_BUILD,
+            ];
             expect(toolNames(defaultCategories.builds)).toEqual(expected);
             expect(toolNames(appsCategories.builds)).toEqual(expected);
         });
