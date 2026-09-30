@@ -910,6 +910,26 @@ export const actorsCases: Case[] = [
         }),
     },
     {
+        // The `my=1` branch of GET /v2/acts projects its own field set; check it against the output schema.
+        name: 'returns the account Actors via get-actor-list matching outputSchema',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['get-actor-list'] }, async (client) => {
+            // listTools caches the outputSchema, so the SDK validates structuredContent on the call.
+            await client.listTools();
+            const result = await client.callTool({ name: HELPER_TOOLS.ACTOR_LIST_GET, arguments: { limit: 2 } });
+
+            expect(result.isError).not.toBe(true);
+            validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_LIST_GET, 'default');
+            const sc = (result as { structuredContent?: { limit?: number; items?: { fullName: string }[] } })
+                .structuredContent;
+            expect(sc?.limit).toBe(2);
+            expect(sc!.items!.length).toBeLessThanOrEqual(2);
+            for (const item of sc!.items!) {
+                expect(item.fullName).toMatch(/^[^/]+\/[^/]+$/);
+            }
+        }),
+    },
+    {
         name: 'should return structured output for get-actor-run matching outputSchema',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {

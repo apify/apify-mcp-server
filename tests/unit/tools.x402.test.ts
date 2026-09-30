@@ -155,56 +155,32 @@ describe('decorateToolSchema()', () => {
         expect(decorated._meta).toBeUndefined();
     });
 
-    it('selects the exact entry over upto for flat fields and exposes both in accepts[]', () => {
-        // Back-compat: clients that read only flat fields keep signing `exact` like before #876.
+    it('exposes every scheme in accepts[] and no flat fields', () => {
         const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [EXACT_ACCEPT, UPTO_ACCEPT] };
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
 
         const x402 = getX402Meta(decorated);
-        expect(x402?.paymentRequired).toBe(true);
-        expect(x402?.scheme).toBe('exact');
-        expect(x402?.amount).toBe(EXACT_ACCEPT.amount);
-        expect(x402?.accepts).toEqual([EXACT_ACCEPT, UPTO_ACCEPT]);
+        expect(x402).toEqual({ paymentRequired: true, accepts: [EXACT_ACCEPT, UPTO_ACCEPT] });
     });
 
-    it('falls back to upto when exact is not present', () => {
-        const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [UPTO_ACCEPT] };
-        const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
-
-        const x402 = getX402Meta(decorated);
-        expect(x402?.scheme).toBe('upto');
-        expect(x402?.accepts).toEqual([UPTO_ACCEPT]);
-    });
-
-    it('falls back to the first entry when neither exact nor upto is present', () => {
-        const customAccept = { ...EXACT_ACCEPT, scheme: 'custom-scheme' };
-        const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [customAccept] };
-        const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
-
-        const x402 = getX402Meta(decorated);
-        expect(x402?.scheme).toBe('custom-scheme');
-        expect(x402?.accepts).toEqual([customAccept]);
-    });
-
-    it('preserves the configured order in accepts[] regardless of preference selection', () => {
+    it('preserves the configured order in accepts[]', () => {
         // Server-emitted order may be non-deterministic upstream; whatever we receive is
-        // what we forward. Preference only drives the flat-field selection.
+        // what we forward.
         const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [UPTO_ACCEPT, EXACT_ACCEPT] };
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
 
         const x402 = getX402Meta(decorated);
         expect(x402?.accepts).toEqual([UPTO_ACCEPT, EXACT_ACCEPT]);
-        expect(x402?.scheme).toBe('exact');
     });
 
-    it('marks paymentRequired without flat fields or accepts[] when requirements were not fetched', () => {
+    it('marks paymentRequired without accepts[] when requirements were not fetched', () => {
         const decorated = new X402PaymentProvider(undefined).decorateToolSchema(makePaidTool());
 
         const x402 = getX402Meta(decorated);
         expect(x402).toEqual({ paymentRequired: true });
     });
 
-    it('marks paymentRequired without flat fields or accepts[] when accepts is empty', () => {
+    it('marks paymentRequired without accepts[] when accepts is empty', () => {
         const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [] };
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
 
