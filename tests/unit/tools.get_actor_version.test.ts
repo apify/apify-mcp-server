@@ -922,7 +922,7 @@ describe('get-actor-version', () => {
 
                 expectSoftFailInvalidInput(result);
                 expect(result.content[0].text).toBe(
-                    `Version 0.1 of john/my-actor is not stored as files (source type ${sourceType}), and this tool reads only versions stored as files.`,
+                    `Version 0.1 of john/my-actor is not stored as files (source type ${sourceType}), and this tool works only on versions stored as files.`,
                 );
                 expect(JSON.stringify(result)).not.toMatch(/secret|oauth2|github/);
             },
