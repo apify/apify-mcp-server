@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { getCategoryTools, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
 import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
+import { compareSourcePaths } from '../../src/tools/source/source_files.js';
 import { getActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
@@ -248,6 +249,38 @@ describe('get-actor-version', () => {
 
             expect(reordered.structuredContent.revision).toBe(first.structuredContent.revision);
             expect(changed.structuredContent.revision).not.toBe(first.structuredContent.revision);
+        });
+
+        it('gives a new revision when a file is added, removed, or renamed', async () => {
+            const first = await callTool({});
+            mockVersionRead({
+                sourceFiles: [MAIN_JS_SOURCE, ACTOR_JSON_SOURCE, LOGO_SOURCE, { name: 'empty.md', format: 'TEXT' }],
+            });
+            const added = await callTool({});
+            mockVersionRead({ sourceFiles: [MAIN_JS_SOURCE, ACTOR_JSON_SOURCE] });
+            const removed = await callTool({});
+            mockVersionRead({
+                sourceFiles: [{ ...MAIN_JS_SOURCE, name: 'src/index.js' }, ACTOR_JSON_SOURCE, LOGO_SOURCE],
+            });
+            const renamed = await callTool({});
+
+            const revisions = [first, added, removed, renamed].map(
+                ({ structuredContent }) => structuredContent.revision,
+            );
+            expect(new Set(revisions).size).toBe(4);
+            // The renamed file keeps its hash; only its path changed.
+            expect(renamed.structuredContent.files.map(({ hash }) => hash)).toEqual(
+                first.structuredContent.files.map(({ hash }) => hash),
+            );
+        });
+
+        it('hashes as sha256sum does: the first 16 hex characters of the SHA-256 of the bytes', async () => {
+            // printf 'hello\n' | sha256sum | cut -c1-16
+            mockVersionRead({ sourceFiles: [{ name: 'hello.txt', format: 'TEXT', content: 'hello\n' }] });
+
+            const { structuredContent } = await callTool({});
+
+            expect(structuredContent.files).toEqual([{ path: 'hello.txt', sizeBytes: 6, hash: '5891b5b522d5df08' }]);
         });
 
         it('hashes the decoded bytes and returns a UTF-8 file stored as BASE64 as text', async () => {
@@ -764,6 +797,17 @@ describe('get-actor-version', () => {
                 'git@github.com:john/repo.git#main',
             ],
             [
+                'GIT_REPO',
+                { gitRepoUrl: 'git@github.com:john/repo.git?private_token=secret-token' },
+                'git@github.com:john/repo.git',
+            ],
+            ['GIT_REPO', { gitRepoUrl: 'git@github.com:john/repo.git' }, 'git@github.com:john/repo.git'],
+            [
+                'GIT_REPO',
+                { gitRepoUrl: 'http://john:secret-password@git.example.com/repo.git' },
+                'http://git.example.com/repo.git',
+            ],
+            [
                 'GITHUB_GIST',
                 { gitHubGistUrl: 'https://gist.github.com/john/abc123?secret=secret-query' },
                 'https://gist.github.com/john/abc123',
@@ -809,5 +853,29 @@ describe('get-actor-version', () => {
                 );
             },
         );
+
+        it.each(['SOURCE_CODE', 'SOMETHING_NEW'])(
+            'refuses a %s version without naming a URL left over from another source type',
+            async (sourceType) => {
+                mockVersionRead({ sourceType, gitRepoUrl: 'https://oauth2:secret-token@github.com/john/old.git' });
+
+                const result = await callTool({});
+
+                expectSoftFailInvalidInput(result);
+                expect(result.content[0].text).toBe(
+                    `Version 0.1 of john/my-actor is not stored as files (source type ${sourceType}), and this tool reads only versions stored as files.`,
+                );
+                expect(JSON.stringify(result)).not.toMatch(/secret|oauth2|github/);
+            },
+        );
+    });
+});
+
+describe('compareSourcePaths()', () => {
+    it('orders paths by UTF-16 code units, and compares equal paths as equal', () => {
+        expect(compareSourcePaths('src/main.js', 'src/main.js')).toBe(0);
+        expect(compareSourcePaths('README.md', 'package.json')).toBe(-1);
+        expect(compareSourcePaths('package.json', 'README.md')).toBe(1);
+        expect(compareSourcePaths('\u{1F600}.txt', 'ｚ.txt')).toBe(-1);
     });
 });
