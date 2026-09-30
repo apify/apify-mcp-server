@@ -16,8 +16,12 @@ import {
 
 const actorGetMock = vi.fn();
 const versionDeleteMock = vi.fn();
-const versionMock = vi.fn(() => ({ delete: versionDeleteMock }));
-const actorMock = vi.fn(() => ({ get: actorGetMock, version: versionMock }));
+// The version client's other writes, which this tool never calls.
+const versionUpdateMock = vi.fn();
+const versionMock = vi.fn(() => ({ delete: versionDeleteMock, update: versionUpdateMock }));
+// The Actor client's methods that change or delete the Actor, create a version, or build, which this tool never calls.
+const actorWriteMocks = { update: vi.fn(), delete: vi.fn(), versions: vi.fn(), build: vi.fn() };
+const actorMock = vi.fn(() => ({ get: actorGetMock, version: versionMock, ...actorWriteMocks }));
 
 const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyClient'];
 
@@ -56,6 +60,13 @@ async function callToolExpectingUserError(args: Record<string, unknown>) {
     return result.content[0].text;
 }
 
+function expectNoOtherWrite() {
+    expect(versionUpdateMock).not.toHaveBeenCalled();
+    for (const [name, mock] of Object.entries(actorWriteMocks)) {
+        expect(mock, name).not.toHaveBeenCalled();
+    }
+}
+
 describe('delete-actor-version', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -75,26 +86,43 @@ describe('delete-actor-version', () => {
         expect((deleteActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
-    it('deletes the version with one DELETE', async () => {
-        const result = await callTool({});
+    it('requires the actor and versionNumber, so it never picks a version itself', () => {
+        const tool = deleteActorVersion as HelperTool;
 
-        expectSchemaConformingStructuredContent(result, deleteActorVersionToolOutputSchema);
-        expect(actorMock).toHaveBeenCalledWith('actor-1');
-        expect(versionMock).toHaveBeenCalledWith('0.2');
-        expect(versionDeleteMock).toHaveBeenCalledTimes(1);
-        expect(result.structuredContent).toEqual({
-            actorId: 'actor-1',
-            fullName: 'john/my-actor',
-            versionNumber: '0.2',
-            deleted: true,
-        });
-        expect(result.content[1].text).toBe('Deleted version 0.2 of john/my-actor.');
+        expect(tool.inputSchema.required).toEqual(['actor', 'versionNumber']);
+        expect(tool.ajvValidate({ actor: 'john/my-actor' })).toBe(false);
+        expect(tool.ajvValidate({ actor: 'john/my-actor', versionNumber: '' })).toBe(false);
+        expect(tool.ajvValidate({ actor: 'john/my-actor', versionNumber: '0.2' })).toBe(true);
     });
+
+    it.each(['0.1', '0.2'])(
+        'deletes only version %s of the Actor it resolved, with one DELETE',
+        async (versionNumber) => {
+            const result = await callTool({ versionNumber });
+
+            expectSchemaConformingStructuredContent(result, deleteActorVersionToolOutputSchema);
+            // The Actor GET by the name given, then the DELETE by the Actor ID it returned.
+            expect(actorMock.mock.calls).toEqual([['john/my-actor'], ['actor-1']]);
+            expect(versionMock.mock.calls).toEqual([[versionNumber]]);
+            expect(versionDeleteMock).toHaveBeenCalledTimes(1);
+            expectNoOtherWrite();
+            expect(result.structuredContent).toEqual({
+                actorId: 'actor-1',
+                fullName: 'john/my-actor',
+                versionNumber,
+                deleted: true,
+            });
+            expect(result.content[1].text).toBe(`Deleted version ${versionNumber} of john/my-actor.`);
+        },
+    );
 
     it('refuses a version the Actor does not have, which apify-client would report as deleted', async () => {
         expect(await callToolExpectingUserError({ versionNumber: '0.9' })).toBe(
             "Actor 'john/my-actor' has no version 0.9; available versions: 0.1, 0.2.",
         );
+        expect(actorMock.mock.calls).toEqual([['john/my-actor']]);
+        expect(versionMock).not.toHaveBeenCalled();
+        expectNoOtherWrite();
     });
 
     it('reports a missing Actor', async () => {
@@ -103,6 +131,9 @@ describe('delete-actor-version', () => {
         expect(await callToolExpectingUserError({ actor: 'my-actor' })).toBe(
             "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
         );
+        expect(actorMock.mock.calls).toEqual([['my-actor']]);
+        expect(versionMock).not.toHaveBeenCalled();
+        expectNoOtherWrite();
     });
 
     it("lets the platform's refusal to delete the last version through unchanged", async () => {
@@ -111,6 +142,10 @@ describe('delete-actor-version', () => {
         versionDeleteMock.mockRejectedValue(error);
 
         await expect(callTool({ versionNumber: '0.1' })).rejects.toBe(error);
+        // The tool leaves the check to the platform, and does nothing else after the refusal.
+        expect(versionMock.mock.calls).toEqual([['0.1']]);
+        expect(versionDeleteMock).toHaveBeenCalledTimes(1);
+        expectNoOtherWrite();
     });
 
     it('sends nothing when the request is cancelled before the DELETE', async () => {
@@ -124,5 +159,6 @@ describe('delete-actor-version', () => {
 
         expect(result).toEqual({});
         expect(versionDeleteMock).not.toHaveBeenCalled();
+        expectNoOtherWrite();
     });
 });
