@@ -13,7 +13,9 @@ const getUserRunsListArgs = z.object({
         .string()
         .min(1)
         .optional()
-        .describe('Only list runs of this Actor; accepts an Actor ID or username/name.'),
+        .describe(
+            'Only list runs of this Actor: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
+        ),
     offset: z
         .number()
         .describe('Number of array elements that should be skipped at the start. The default value is 0.')

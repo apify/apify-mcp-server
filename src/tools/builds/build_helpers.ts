@@ -1,0 +1,194 @@
+import type { Actor, ActorBuildOptions, Build } from 'apify-client';
+import { z } from 'zod';
+
+import type { ApifyClient } from '../../apify_client.js';
+import { HELPER_TOOLS } from '../../const.js';
+import type { ConsoleLinkContext } from '../../types.js';
+import { buildConsoleBuildUrl } from '../../utils/console_link.js';
+import { logHttpError } from '../../utils/logging.js';
+import type { ToolResponse } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
+import type { ProgressTracker } from '../../utils/progress.js';
+import { formatBuildStatusMessage, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
+import { ABORT, raceAbort, toIsoString, WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
+
+/** The MAJOR.MINOR numbers of the Actor's versions; a version document without one is skipped. */
+export function listVersionNumbers(actor: Pick<Actor, 'versions'>): string[] {
+    return actor.versions.flatMap((version) => version.versionNumber ?? []);
+}
+
+/** The build tools wait this long by default, the same as `get-actor-run` and `call-actor`, so a loop of build and run calls behaves alike. */
+export const BUILD_WAIT_SECS_DEFAULT = 30;
+
+/**
+ * The `waitSecs` field shared by the tools that report a build, so they agree on the cap and the
+ * default. `zeroMeans` says what a caller gets back with 0: the current status, or a build just started.
+ */
+export function buildWaitSecsField(zeroMeans: string) {
+    return z
+        .number()
+        .int()
+        .min(0)
+        .max(WAIT_SECS_MAX)
+        .optional()
+        .default(BUILD_WAIT_SECS_DEFAULT)
+        .describe(
+            `Maximum seconds to wait for the build to reach a terminal state (SUCCEEDED, FAILED, ABORTED, TIMED-OUT). ${zeroMeans} Cap: ${WAIT_SECS_MAX}. Default: ${BUILD_WAIT_SECS_DEFAULT}.`,
+        );
+}
+
+/**
+ * The build subset returned by the build tools. Allowlisted so internal fields on the API
+ * document (userId, meta, options, inspectorId) never reach the client. get-actor-build-list returns
+ * it as is; get-actor-build and build-actor add the Console link (`toBuildResult`).
+ */
+export function toBuildItem(
+    build: Pick<Build, 'id' | 'actId' | 'buildNumber' | 'status' | 'startedAt' | 'finishedAt'>,
+) {
+    return {
+        id: build.id,
+        actorId: build.actId,
+        buildNumber: build.buildNumber,
+        status: build.status,
+        // Normalized because the client parses these into `Date` objects; the output schema promises strings.
+        startedAt: toIsoString(build.startedAt) ?? null,
+        finishedAt: toIsoString(build.finishedAt) ?? null,
+    };
+}
+
+/**
+ * `toBuildItem` plus `apifyConsoleUrl`, which is set only for Console UI token sessions
+ * (see `getConsoleLinkContext`).
+ */
+export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | undefined) {
+    return {
+        ...toBuildItem(build),
+        apifyConsoleUrl: buildConsoleBuildUrl(linkContext, build.actId, build.buildNumber),
+    };
+}
+
+/**
+ * Aborts a build the tool started when the client cancels the request, the way `call-actor` aborts its
+ * run. Failures are logged and swallowed so a transient API error does not override the cancellation.
+ */
+async function abortBuildOnSignal(buildId: string, client: ApifyClient): Promise<void> {
+    await client
+        .build(buildId)
+        .abort()
+        .catch((error: unknown) => {
+            logHttpError(error, 'Error aborting Actor build', { buildId });
+        });
+}
+
+/**
+ * Starts a build of an Actor version and waits up to `waitSecs` for it to finish, reporting progress
+ * meanwhile. The wait is raced against `signal`; a cancelled request aborts the build it started and
+ * resolves to {@link ABORT}, so a build nobody waits for does not run on, the same as `call-actor`
+ * does with its run.
+ */
+export async function startBuild(
+    client: ApifyClient,
+    actorId: string,
+    versionNumber: string,
+    options: {
+        tag?: string;
+        useCache: boolean;
+        waitSecs: number;
+        signal?: AbortSignal;
+        progressTracker?: ProgressTracker | null;
+    },
+): Promise<Build | typeof ABORT> {
+    const { tag, useCache, waitSecs, signal, progressTracker } = options;
+    const started = await client
+        .actor(actorId)
+        .build(versionNumber, { ...(tag !== undefined && { tag }), useCache } satisfies ActorBuildOptions);
+    // The cancel can arrive while the start call is in flight; the build exists by then.
+    if (signal?.aborted) {
+        await abortBuildOnSignal(started.id, client);
+        return ABORT;
+    }
+    if (waitSecs === 0) return started;
+    const finished = await waitForBuild(client, started, { waitSecs, signal, progressTracker });
+    if (finished === ABORT) await abortBuildOnSignal(started.id, client);
+    return finished;
+}
+
+/**
+ * The one next step after a build reaches `status`, shared by every tool that reports a build.
+ * Sibling tools are named only when the session was served them (`loadedToolNames`), and each hint
+ * keeps a fallback so the text is never a dead end. A still-running build points at get-actor-build;
+ * only get-actor-build itself passes `nonTerminalNextStep`, because only the calling tool may name
+ * itself ("call this tool again").
+ */
+export function buildNextStepForBuild(
+    build: Pick<Build, 'id' | 'buildNumber' | 'status'>,
+    options: { loadedToolNames: readonly string[]; nonTerminalNextStep?: string },
+): string {
+    const { loadedToolNames } = options;
+    if (build.status === 'SUCCEEDED') {
+        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)
+            ? `Run the Actor with ${HELPER_TOOLS.ACTOR_CALL} and set callOptions.build to ${build.buildNumber}.`
+            : `The Actor is ready to run with build ${build.buildNumber}.`;
+    }
+    if (TERMINAL_RUN_STATUSES.has(build.status)) {
+        return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_LOG)
+            ? `Read the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId ${build.id}; pass lines 0 for the whole log.`
+            : 'Read the build log for the error, fix the source, and build again.';
+    }
+    if (options.nonTerminalNextStep !== undefined) return options.nonTerminalNextStep;
+    return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_GET)
+        ? `Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET} using buildId ${build.id} (it waits up to ${WAIT_SECS_MAX} seconds per call).`
+        : 'The build is still running; check its status again in a few seconds.';
+}
+
+/**
+ * The response every tool that reports a build returns: the JSON first, then the summary with
+ * its one next step, then the Console link when the session has one. Shared so the tools cannot drift
+ * in ordering or in how they treat the link.
+ */
+export function respondWithBuild(params: {
+    structuredContent: Record<string, unknown> & { build?: { apifyConsoleUrl?: string } };
+    summary: string;
+    nextStep: string;
+}): ToolResponse {
+    const { structuredContent, summary, nextStep } = params;
+    const consoleLinkText = apifyConsoleLinkText(structuredContent.build?.apifyConsoleUrl);
+    return respondOk(
+        [JSON.stringify(structuredContent), `${summary}\n${nextStep}`, ...(consoleLinkText ? [consoleLinkText] : [])],
+        { structuredContent },
+    );
+}
+
+/** The subject the progress notifications lead with, the same one the summary lines use. */
+function formatBuildLabel(build: Pick<Build, 'buildNumber' | 'actId'>): string {
+    return `Build ${build.buildNumber} of Actor ${build.actId}`;
+}
+
+/**
+ * Waits up to `waitSecs` for an unfinished build, emitting its status changes as progress notifications
+ * while it does, the way the run tools do; the wait is raced against `signal`. Returns the build as it
+ * stands when the wait ends, or {@link ABORT} when the request was cancelled.
+ */
+export async function waitForBuild(
+    client: ApifyClient,
+    build: Build,
+    options: { waitSecs: number; signal?: AbortSignal; progressTracker?: ProgressTracker | null },
+): Promise<Build | typeof ABORT> {
+    const { waitSecs, signal, progressTracker } = options;
+    const label = formatBuildLabel(build);
+    if (progressTracker) {
+        await progressTracker.updateProgress(formatBuildStatusMessage(label, build));
+        progressTracker.startActorBuildUpdates(build.id, client, label, build);
+    }
+    try {
+        const finished = await raceAbort(client.build(build.id).get({ waitForFinish: waitSecs }), signal);
+        if (finished === ABORT) return ABORT;
+        // `get()` is undefined only for a build that does not exist; this one was just fetched.
+        const current = finished ?? build;
+        await progressTracker?.updateProgress(formatBuildStatusMessage(label, current));
+        return current;
+    } finally {
+        progressTracker?.stop();
+    }
+}

@@ -26,6 +26,11 @@ export function formatRunStatusMessage(
     return showStatusMessage ? `${actorName}: ${run.status} — ${run.statusMessage}` : `${actorName}: ${run.status}`;
 }
 
+/** Leads with the status like `formatRunStatusMessage`; builds carry no status message. */
+export function formatBuildStatusMessage(label: string, build: { status: string }): string {
+    return `${label}: ${build.status}`;
+}
+
 export class ProgressTracker {
     private progressToken?: string | number;
     private sendNotification?: (notification: ProgressNotification) => Promise<void>;
@@ -105,35 +110,64 @@ export class ProgressTracker {
         actorName: string,
         initial?: { status?: string; statusMessage?: string | null },
     ): void {
+        this.startStatusUpdates(
+            async () => {
+                const run = await apifyClient.run(runId).get();
+                return run && { status: run.status, message: formatRunStatusMessage(actorName, run) };
+            },
+            initial &&
+                formatRunStatusMessage(actorName, {
+                    status: initial.status ?? '',
+                    statusMessage: initial.statusMessage,
+                }),
+        );
+    }
+
+    startActorBuildUpdates(
+        buildId: string,
+        apifyClient: ApifyClient,
+        label: string,
+        initial?: { status: string },
+    ): void {
+        this.startStatusUpdates(
+            async () => {
+                const build = await apifyClient.build(buildId).get();
+                return build && { status: build.status, message: formatBuildStatusMessage(label, build) };
+            },
+            initial && formatBuildStatusMessage(label, initial),
+        );
+    }
+
+    /**
+     * Polls `fetchStatus` every `PROGRESS_NOTIFICATION_INTERVAL_MS` and emits its message whenever it
+     * changes, stopping once the status is terminal. `initialMessage` is what the caller emitted before
+     * starting, so the first tick does not repeat it.
+     */
+    private startStatusUpdates(
+        fetchStatus: () => Promise<{ status: string; message: string } | undefined>,
+        initialMessage: string | undefined,
+    ): void {
         this.stop();
         this.stopped = false;
-        let lastStatus = initial?.status ?? '';
-        let lastStatusMessage = initial?.statusMessage || '';
+        let lastMessage = initialMessage;
         let tickInProgress = false;
 
         this.intervalId = setInterval(async () => {
-            // Skip if a previous tick is still awaiting run.get() / updateProgress() — otherwise
+            // Skip if a previous tick is still awaiting the fetch / updateProgress() — otherwise
             // a slow tick can overlap with the next one and cause out-of-order emissions.
             if (tickInProgress) return;
             tickInProgress = true;
             try {
-                const run = await apifyClient.run(runId).get();
-                // stop() may have been called while run.get() was awaiting; clearInterval can't
+                const current = await fetchStatus();
+                // stop() may have been called while the fetch was awaiting; clearInterval can't
                 // abort an in-flight tick, so guard here to avoid a late duplicate emission.
-                if (this.stopped || !run) return;
+                if (this.stopped || !current) return;
 
-                const { status, statusMessage } = run;
-                const normalizedStatusMessage = statusMessage || '';
+                if (current.message !== lastMessage) {
+                    lastMessage = current.message;
+                    await this.updateProgress(current.message);
 
-                // Only send notification if status or statusMessage changed
-                if (status !== lastStatus || normalizedStatusMessage !== lastStatusMessage) {
-                    lastStatus = status;
-                    lastStatusMessage = normalizedStatusMessage;
-
-                    await this.updateProgress(formatRunStatusMessage(actorName, run));
-
-                    // Stop polling if Actor finished
-                    if (TERMINAL_RUN_STATUSES.has(status)) {
+                    if (TERMINAL_RUN_STATUSES.has(current.status)) {
                         this.stop();
                     }
                 }
