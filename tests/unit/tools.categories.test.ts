@@ -5,14 +5,14 @@ import { CATEGORY_NAMES, getCategoryTools, toolCategories } from '../../src/tool
 import type { ToolCategory, ToolEntry } from '../../src/types.js';
 
 describe('CATEGORY_NAMES', () => {
-    it('should match the keys of toolCategories', () => {
+    it('matches the keys of toolCategories', () => {
         const staticKeys = Object.keys(toolCategories);
         expect([...CATEGORY_NAMES]).toEqual(staticKeys);
     });
 });
 
 describe('getCategoryTools', () => {
-    it('should return all category keys matching CATEGORY_NAMES', () => {
+    it('returns all category keys matching CATEGORY_NAMES', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
@@ -22,7 +22,7 @@ describe('getCategoryTools', () => {
         }
     });
 
-    it('should return no undefined entries in any category (circular-init safety)', () => {
+    it('returns no undefined entries in any category (circular-init safety)', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
@@ -38,7 +38,7 @@ describe('getCategoryTools', () => {
         }
     });
 
-    it('should share the same call-actor tool across modes (mode-independent object; widget addendum is session-gated)', () => {
+    it('shares the same call-actor tool across modes (mode-independent object; widget addendum is session-gated)', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
@@ -49,7 +49,7 @@ describe('getCategoryTools', () => {
         expect(defaultCallActor).toBe(appsCallActor);
     });
 
-    it('should share the same get-actor-run tool across modes (mode-independent)', () => {
+    it('shares the same get-actor-run tool across modes (mode-independent)', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
@@ -62,7 +62,7 @@ describe('getCategoryTools', () => {
         expect(defaultGetRun).toBe(appsGetRun);
     });
 
-    it('should share identical tools for mode-independent categories', () => {
+    it('shares identical tools for mode-independent categories', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
@@ -72,7 +72,7 @@ describe('getCategoryTools', () => {
         }
     });
 
-    it('should preserve tool ordering within categories', () => {
+    it('preserves tool ordering within categories', () => {
         const result = getCategoryTools('default');
         const actorNames = result.actors.map((t: ToolEntry) => t.name);
 

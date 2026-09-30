@@ -17,6 +17,7 @@ import {
     AUTO_INJECTED_TOOLS,
     HELPER_TOOLS,
     toolCategoriesEnabledByDefault,
+    UNCATEGORIZED_TOOLS,
 } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import type { CaseCtx, SuiteClient, Transport } from './types.js';
@@ -128,7 +129,7 @@ export function findToolByName(name: string, mode: SERVER_MODE): ToolEntry | und
         const tool = tools.find((t) => t.name === name);
         if (tool) return tool;
     }
-    return undefined;
+    return UNCATEGORIZED_TOOLS.find((t) => t.name === name);
 }
 
 export function validateStructuredOutputForTool(result: unknown, toolName: string, mode: SERVER_MODE): void {

@@ -486,27 +486,33 @@ export const getActorBuildLogToolOutputSchema = {
     required: ['log'],
 };
 
-/**
- * Schema for get-actor-build: the allowlisted build subset (`toBuildResult`).
- */
+/** Schema for one build: the allowlisted build subset (`toBuildItem`), as get-actor-build-list returns it. */
+const actorBuildItemSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Build ID' },
+        actorId: { type: 'string', description: 'ID of the Actor the build belongs to' },
+        buildNumber: { type: 'string', description: 'Build number, e.g. 0.1.12' },
+        status: { type: 'string', description: 'Build status, e.g. RUNNING, SUCCEEDED, FAILED' },
+        startedAt: { type: ['string', 'null'], description: 'ISO timestamp' },
+        finishedAt: { type: ['string', 'null'], description: 'ISO timestamp; null while the build is running' },
+    },
+    required: ['id', 'actorId', 'buildNumber', 'status', 'startedAt', 'finishedAt'],
+};
+
+/** Schema for get-actor-build: one build with its Console link (`toBuildResult`). */
 export const getActorBuildToolOutputSchema = {
     type: 'object' as const,
     properties: {
         build: {
-            type: 'object',
+            ...actorBuildItemSchema,
             properties: {
-                id: { type: 'string', description: 'Build ID' },
-                actorId: { type: 'string', description: 'ID of the Actor the build belongs to' },
-                buildNumber: { type: 'string', description: 'Build number, e.g. 0.1.12' },
-                status: { type: 'string', description: 'Build status, e.g. RUNNING, SUCCEEDED, FAILED' },
-                startedAt: { type: ['string', 'null'], description: 'ISO timestamp' },
-                finishedAt: { type: ['string', 'null'], description: 'ISO timestamp; null while the build is running' },
+                ...actorBuildItemSchema.properties,
                 apifyConsoleUrl: {
                     type: 'string',
                     description: 'Personalized Apify Console link to the build; present only for Console sessions',
                 },
             },
-            required: ['id', 'actorId', 'buildNumber', 'status', 'startedAt', 'finishedAt'],
         },
     },
     required: ['build'],
@@ -733,6 +739,39 @@ const actorRunListItemSchema = {
 
 /** Schema for get-actor-run-list output (paginated list of runs). */
 export const actorRunListOutputSchema = paginatedListOutputSchema(actorRunListItemSchema, 'Actor runs.');
+
+/** Schema for one Actor in get-actor-list: the allowlisted subset of the `GET /v2/acts` item. */
+const actorListItemSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Actor ID.' },
+        name: { type: 'string', description: 'Actor name, unique within the owner account.' },
+        fullName: { type: 'string', description: 'Full Actor name, username/name; the username is the owner.' },
+        title: { type: ['string', 'null'], description: 'Display title; null when the Actor has none.' },
+        createdAt: { type: ['string', 'null'], description: 'ISO timestamp when the Actor was created.' },
+        modifiedAt: { type: ['string', 'null'], description: 'ISO timestamp when the Actor was last modified.' },
+        lastRunStartedAt: {
+            type: ['string', 'null'],
+            description: 'ISO timestamp when the last run of the Actor started; null when it has never run.',
+        },
+    },
+    required: ['id', 'name', 'fullName', 'title', 'createdAt', 'modifiedAt', 'lastRunStartedAt'],
+};
+
+const actorListPageSchema = paginatedListOutputSchema(actorListItemSchema, 'Actors.');
+
+/** Schema for get-actor-list output: a page of the account's Actors, with summary and nextStep like get-dataset-list. */
+export const actorListOutputSchema = {
+    ...actorListPageSchema,
+    properties: { ...actorListPageSchema.properties, summary: summaryProperty, nextStep: nextStepProperty },
+    required: [...actorListPageSchema.required, 'summary', 'nextStep'],
+};
+
+/** Schema for get-actor-build-list output (paginated list of builds). */
+export const getActorBuildListToolOutputSchema = paginatedListOutputSchema(
+    actorBuildItemSchema,
+    'Builds, newest first by default.',
+);
 
 /**
  * Schema for dataset items retrieval tools (get-dataset-items).

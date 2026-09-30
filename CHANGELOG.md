@@ -2,21 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.16.1 - **not yet released**
+## [0.17.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.1) (2026-09-30)
+
+### 🐛 Bug Fixes
+
+- Move get-actor-list out of the default actors category ([#1465](https://github.com/apify/apify-mcp-server/pull/1465)) ([9b2a34c](https://github.com/apify/apify-mcp-server/commit/9b2a34c769da31daeff7005811ef9d144a0a511f)) by [@jirispilka](https://github.com/jirispilka), closes [#1464](https://github.com/apify/apify-mcp-server/issues/1464)
+
+
+## [0.17.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.0) (2026-09-30)
 
 ### 🚀 Features
 
 - Add get-actor-build and get-actor-build-log tools ([#1331](https://github.com/apify/apify-mcp-server/pull/1331)) ([3c1744b](https://github.com/apify/apify-mcp-server/commit/3c1744bb3df41a2ee3a3485e06f57c75f9cc39cd)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1352](https://github.com/apify/apify-mcp-server/issues/1352)
 - Run against a non-production platform with matching links ([#1422](https://github.com/apify/apify-mcp-server/pull/1422)) ([5199c88](https://github.com/apify/apify-mcp-server/commit/5199c8841c827fb4fd8f7410e1b423f7beea27c3)) by [@mfori](https://github.com/mfori)
 - Add build-actor tool ([#1332](https://github.com/apify/apify-mcp-server/pull/1332)) ([624dbd1](https://github.com/apify/apify-mcp-server/commit/624dbd1d5470d1956d0441244a7d17203a51ff54)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1353](https://github.com/apify/apify-mcp-server/issues/1353)
+- Add get-actor-build-list tool ([#1431](https://github.com/apify/apify-mcp-server/pull/1431)) ([1435ec6](https://github.com/apify/apify-mcp-server/commit/1435ec6f76187f553363fa71ef7c4a62d639d687)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1407](https://github.com/apify/apify-mcp-server/issues/1407)
+- Add get-actor-list tool ([#1434](https://github.com/apify/apify-mcp-server/pull/1434)) ([2e8f026](https://github.com/apify/apify-mcp-server/commit/2e8f026aa916c6a826fd695be182ca281ca4628d)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1415](https://github.com/apify/apify-mcp-server/issues/1415)
 
 ### 🐛 Bug Fixes
 
 - State the new published task limits in publish-actor-task ([#1404](https://github.com/apify/apify-mcp-server/pull/1404)) ([18d3a24](https://github.com/apify/apify-mcp-server/commit/18d3a24b5bc278db8d24efa04369d65fceaa0ce3)) by [@Janjiran](https://github.com/Janjiran), closes [#30452](https://github.com/apify/apify-mcp-server/issues/30452)
 
+### 🚜 Refactor
 
-<!-- git-cliff-unreleased-end -->
+- **x402:** [**breaking**] Drop flat back-compat fields from _meta.x402 ([#1458](https://github.com/apify/apify-mcp-server/pull/1458)) ([90a2d4f](https://github.com/apify/apify-mcp-server/commit/90a2d4fb6047d915d1f1948d6da87951d34dcfdf)) by [@MQ37](https://github.com/MQ37), closes [#892](https://github.com/apify/apify-mcp-server/issues/892)
+
+
 ## [0.16.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.16.0) (2026-09-17)
 
 ### 🚀 Features
