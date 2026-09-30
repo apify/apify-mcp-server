@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.16.1 - **not yet released**
+## [0.17.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.0) (2026-09-30)
 
 ### 🚀 Features
 
@@ -22,7 +21,6 @@ All notable changes to this project will be documented in this file.
 - **x402:** [**breaking**] Drop flat back-compat fields from _meta.x402 ([#1458](https://github.com/apify/apify-mcp-server/pull/1458)) ([90a2d4f](https://github.com/apify/apify-mcp-server/commit/90a2d4fb6047d915d1f1948d6da87951d34dcfdf)) by [@MQ37](https://github.com/MQ37), closes [#892](https://github.com/apify/apify-mcp-server/issues/892)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.16.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.16.0) (2026-09-17)
 
 ### 🚀 Features
