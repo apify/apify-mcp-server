@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 import {
     AUTO_INJECTED_TOOLS,
     getToolsForServerMode,
@@ -237,10 +238,24 @@ describe('get-actor-list selection (in no category)', () => {
         expect(toolNames).toEqual([HELPER_TOOLS.ACTOR_LIST_GET]);
     });
 
-    it('excludes get-actor-list from the default set', () => {
-        const toolNames = getToolsForServerMode({}, [], 'default').map((t) => t.name);
+    it.each(['default', 'apps'] as const)('excludes get-actor-list from the default set in %s mode', (mode) => {
+        const toolNames = getToolsForServerMode({}, [], mode).map((t) => t.name);
         expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_LIST_GET);
     });
+
+    it.each(['default', 'apps'] as const)(
+        'serves the actors tools and get-actor-list for tools=actors,get-actor-list in %s mode',
+        (mode) => {
+            const tools = getToolsForServerMode({ tools: ['actors', HELPER_TOOLS.ACTOR_LIST_GET] }, [], mode);
+            const toolNames = tools.map((t) => t.name);
+            const actorsToolNames = getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name);
+            expect(toolNames).toEqual(expect.arrayContaining([...actorsToolNames, HELPER_TOOLS.ACTOR_LIST_GET]));
+
+            const searchActorsTool = tools.find((t) => t.name === HELPER_TOOLS.STORE_SEARCH);
+            const { description } = getToolPublicFieldOnly(searchActorsTool!, { presentTools: new Set(toolNames) });
+            expect(description).toContain(`Use ${HELPER_TOOLS.ACTOR_LIST_GET} for those.`);
+        },
+    );
 });
 
 describe('loadToolsFromInput explicit widget selection', () => {

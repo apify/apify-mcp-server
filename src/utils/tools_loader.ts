@@ -49,9 +49,9 @@ const ALL_INTERNAL_TOOL_NAMES: Set<string> = (() => {
     for (const name of CATEGORY_NAMES) {
         for (const tool of categories[name]) names.add(tool.name);
     }
+    for (const tool of UNCATEGORIZED_TOOLS) names.add(tool.name);
     // Widgets live in no category — ALL_WIDGET_TOOLS covers every widget, paired or not.
     for (const widget of ALL_WIDGET_TOOLS) names.add(widget.name);
-    for (const tool of UNCATEGORIZED_TOOLS) names.add(tool.name);
     return names;
 })();
 
