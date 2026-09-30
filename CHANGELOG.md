@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.17.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Move get-actor-list out of the default actors category ([#1465](https://github.com/apify/apify-mcp-server/pull/1465)) ([9b2a34c](https://github.com/apify/apify-mcp-server/commit/9b2a34c769da31daeff7005811ef9d144a0a511f)) by [@jirispilka](https://github.com/jirispilka), closes [#1464](https://github.com/apify/apify-mcp-server/issues/1464)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.17.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.0) (2026-09-30)
 
 ### 🚀 Features
