@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { getCategoryTools, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
 import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
+import { buildFilesRevision, compareSourcePaths } from '../../src/tools/source/source_files.js';
 import { getActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
@@ -18,14 +19,19 @@ import {
 } from './helpers/tool_context.js';
 
 const actorGetMock = vi.fn();
-const actorMock = vi.fn(() => ({ get: actorGetMock }));
+// The Actor client's other methods, which lead to every write and build, and `actors()`, which creates Actors.
+const writeMocks = { update: vi.fn(), delete: vi.fn(), build: vi.fn(), version: vi.fn(), versions: vi.fn() };
+const actorsMock = vi.fn();
+const actorMock = vi.fn(() => ({ get: actorGetMock, ...writeMocks }));
 
-const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyClient'];
+const stubClient = { actor: actorMock, actors: actorsMock } as unknown as InternalToolArgs['apifyClient'];
 
 const ACTOR_JSON_SOURCE = { name: '.actor/actor.json', format: 'TEXT', content: '{"actorSpecification": 1}' };
 const MAIN_JS_SOURCE = { name: 'src/main.js', format: 'TEXT', content: 'console.log("hi");\n' };
 const LOGO_BYTES = Buffer.from([137, 80, 78, 71, 0, 255]);
 const LOGO_SOURCE = { name: 'assets/logo.png', format: 'BASE64', content: LOGO_BYTES.toString('base64') };
+/** The env var names and values of `mockVersion()` and the internal `userId` of `mockActor()`. */
+const LEAKABLE_VALUES = ['user-secret', 'API_KEY', 'secret-value', 'secret-hash', 'MODE', 'plain-value'];
 
 type VersionOutput = {
     revision: string;
@@ -112,6 +118,68 @@ describe('get-actor-version', () => {
         expect((getActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
+    it('states the 256 KiB limit of the spec in its description and in the paths description', () => {
+        // Literal: MAX_INLINE_BYTES is shared with the storage tools, so a change for them would move this limit.
+        const { paths } = getActorVersion.inputSchema.properties as Record<string, { description: string }>;
+
+        expect(getActorVersion.description).toContain('up to 256 KiB of content');
+        expect(paths.description).toContain('they fill the 256 KiB limit');
+    });
+
+    it.each<{ outcome: string; args: Record<string, unknown>; setup?: () => void; succeeds?: boolean }>([
+        { outcome: 'the listing', args: {}, succeeds: true },
+        { outcome: 'file contents', args: { paths: ['src/main.js', 'assets/logo.png', 'missing.js'] }, succeeds: true },
+        { outcome: 'a line range', args: { paths: ['src/main.js'], startLine: 1, lineCount: 1 }, succeeds: true },
+        { outcome: 'a startLine past the end', args: { paths: ['src/main.js'], startLine: 2 } },
+        { outcome: 'a line range on a base64 file', args: { paths: ['assets/logo.png'], startLine: 1 } },
+        { outcome: 'a missing version', args: { versionNumber: '9.9' } },
+        {
+            outcome: 'several versions and no versionNumber',
+            args: {},
+            setup: () =>
+                actorGetMock.mockResolvedValue(mockActor([mockVersion(), mockVersion({ versionNumber: '0.2' })])),
+        },
+        { outcome: 'a hidden source', args: {}, setup: () => mockVersionRead({ sourceFiles: undefined }) },
+        {
+            outcome: 'a Git repository',
+            args: {},
+            setup: () => mockVersionRead({ sourceType: 'GIT_REPO', gitRepoUrl: 'https://github.com/john/repo.git' }),
+        },
+        {
+            outcome: 'a gist',
+            args: {},
+            setup: () =>
+                mockVersionRead({ sourceType: 'GITHUB_GIST', gitHubGistUrl: 'https://gist.github.com/john/1' }),
+        },
+        {
+            outcome: 'a TARBALL',
+            args: {},
+            setup: () => mockVersionRead({ sourceType: 'TARBALL', tarballUrl: 'https://example.com/source.zip' }),
+        },
+        { outcome: 'a legacy source type', args: {}, setup: () => mockVersionRead({ sourceType: 'SOURCE_CODE' }) },
+        { outcome: 'a missing Actor', args: {}, setup: () => actorGetMock.mockResolvedValue(undefined) },
+        {
+            // The version document carries the env vars.
+            outcome: 'a sub-resource that is not an Actor',
+            args: { actor: 'john/my-actor/versions/0.1' },
+            setup: () => actorGetMock.mockResolvedValue(mockVersion()),
+        },
+    ])('makes only the Actor GET and returns no env var for $outcome', async ({ args, setup, succeeds = false }) => {
+        setup?.();
+
+        const result = await callTool(args);
+
+        expect(result.isError ?? false).toBe(!succeeds);
+        expect(actorGetMock).toHaveBeenCalledTimes(1);
+        for (const [name, mock] of Object.entries({ ...writeMocks, actors: actorsMock })) {
+            expect(mock, name).not.toHaveBeenCalled();
+        }
+        const serialized = JSON.stringify(result);
+        for (const value of LEAKABLE_VALUES) {
+            expect(serialized).not.toContain(value);
+        }
+    });
+
     it('is served in the source category, which is not enabled by default', () => {
         expect(getCategoryTools().source.map((tool) => tool.name)).toEqual([
             HELPER_TOOLS.ACTOR_VERSION_GET,
@@ -149,7 +217,7 @@ describe('get-actor-version', () => {
                 expect(result.content[1].text).toBe('Read version 0.1 of john/my-actor.');
                 expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
                 const serialized = JSON.stringify(result);
-                for (const secret of ['user-secret', 'API_KEY', 'secret-value', 'secret-hash', 'plain-value']) {
+                for (const secret of LEAKABLE_VALUES) {
                     expect(serialized).not.toContain(secret);
                 }
             },
@@ -187,6 +255,38 @@ describe('get-actor-version', () => {
 
             expect(reordered.structuredContent.revision).toBe(first.structuredContent.revision);
             expect(changed.structuredContent.revision).not.toBe(first.structuredContent.revision);
+        });
+
+        it('gives a new revision when a file is added, removed, or renamed', async () => {
+            const first = await callTool({});
+            mockVersionRead({
+                sourceFiles: [MAIN_JS_SOURCE, ACTOR_JSON_SOURCE, LOGO_SOURCE, { name: 'empty.md', format: 'TEXT' }],
+            });
+            const added = await callTool({});
+            mockVersionRead({ sourceFiles: [MAIN_JS_SOURCE, ACTOR_JSON_SOURCE] });
+            const removed = await callTool({});
+            mockVersionRead({
+                sourceFiles: [{ ...MAIN_JS_SOURCE, name: 'src/index.js' }, ACTOR_JSON_SOURCE, LOGO_SOURCE],
+            });
+            const renamed = await callTool({});
+
+            const revisions = [first, added, removed, renamed].map(
+                ({ structuredContent }) => structuredContent.revision,
+            );
+            expect(new Set(revisions).size).toBe(4);
+            // The renamed file keeps its hash; only its path changed.
+            expect(renamed.structuredContent.files.map(({ hash }) => hash)).toEqual(
+                first.structuredContent.files.map(({ hash }) => hash),
+            );
+        });
+
+        it('hashes as sha256sum does: the first 16 hex characters of the SHA-256 of the bytes', async () => {
+            // printf 'hello\n' | sha256sum | cut -c1-16
+            mockVersionRead({ sourceFiles: [{ name: 'hello.txt', format: 'TEXT', content: 'hello\n' }] });
+
+            const { structuredContent } = await callTool({});
+
+            expect(structuredContent.files).toEqual([{ path: 'hello.txt', sizeBytes: 6, hash: '5891b5b522d5df08' }]);
         });
 
         it('hashes the decoded bytes and returns a UTF-8 file stored as BASE64 as text', async () => {
@@ -231,6 +331,27 @@ describe('get-actor-version', () => {
             expect(structuredContent.contents).toEqual([{ path: 'data.bin', content, encoding: 'base64' }]);
         });
 
+        it('matches a binary extension in any case, and returns base64 exactly as stored', async () => {
+            // YXNjaWk is ascii without its padding, so encoding the bytes again would give YXNjaWk=.
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'LOGO.PNG', format: 'BASE64', content: Buffer.from('ascii').toString('base64') },
+                    { name: 'data.bin', format: 'BASE64', content: 'YXNjaWk' },
+                ],
+            });
+
+            const { structuredContent } = await callTool({ paths: ['LOGO.PNG', 'data.bin'] });
+
+            expect(structuredContent.files).toEqual([
+                { path: 'LOGO.PNG', sizeBytes: 5, hash: sha256Prefix('ascii') },
+                { path: 'data.bin', sizeBytes: 5, hash: sha256Prefix('ascii') },
+            ]);
+            expect(structuredContent.contents).toEqual([
+                { path: 'LOGO.PNG', content: 'YXNjaWk=', encoding: 'base64' },
+                { path: 'data.bin', content: 'YXNjaWk', encoding: 'base64' },
+            ]);
+        });
+
         it('keeps the byte order mark of a UTF-8 file stored as BASE64', async () => {
             const text = '\uFEFFwith bom';
             const bytes = Buffer.from(text, 'utf8');
@@ -244,6 +365,48 @@ describe('get-actor-version', () => {
                 { path: 'bom.txt', sizeBytes: bytes.length, hash: sha256Prefix(bytes) },
             ]);
             expect(structuredContent.contents).toEqual([{ path: 'bom.txt', content: text, encoding: 'utf8' }]);
+        });
+
+        it('returns text byte for byte, whether stored as TEXT or as BASE64', async () => {
+            // A BOM, CRLF, 2-, 3-, and 4-byte characters, and no trailing newline.
+            const text = '﻿const a = "é€";\r\n// \u{1F600} done';
+            const bytes = Buffer.from(text, 'utf8');
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'text.js', format: 'TEXT', content: text },
+                    { name: 'base64.js', format: 'BASE64', content: bytes.toString('base64') },
+                ],
+            });
+
+            const result = await callTool({ paths: ['text.js', 'base64.js'] });
+            const { structuredContent } = result;
+
+            expect(structuredContent.files).toEqual([
+                { path: 'base64.js', sizeBytes: bytes.length, hash: sha256Prefix(bytes) },
+                { path: 'text.js', sizeBytes: bytes.length, hash: sha256Prefix(bytes) },
+            ]);
+            expect(structuredContent.contents).toEqual([
+                { path: 'text.js', content: text, encoding: 'utf8' },
+                { path: 'base64.js', content: text, encoding: 'utf8' },
+            ]);
+            // Most clients show the model the text block, not structuredContent.
+            expect(JSON.parse(result.content[0].text)).toEqual(structuredContent);
+        });
+
+        it('returns a TEXT file as text whatever its extension, and takes a name without a dot for no extension', async () => {
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'notes.bin', format: 'TEXT', content: 'plain' },
+                    { name: 'bin', format: 'BASE64', content: Buffer.from('ascii').toString('base64') },
+                ],
+            });
+
+            const { structuredContent } = await callTool({ paths: ['notes.bin', 'bin'] });
+
+            expect(structuredContent.contents).toEqual([
+                { path: 'notes.bin', content: 'plain', encoding: 'utf8' },
+                { path: 'bin', content: 'ascii', encoding: 'utf8' },
+            ]);
         });
 
         it('normalizes stored names as the build worker does, and keeps the last entry for a path', async () => {
@@ -264,26 +427,29 @@ describe('get-actor-version', () => {
             expect(structuredContent.contents.map(({ content }) => content)).toEqual(['2', 'main']);
         });
 
-        it('reads an inline file stored without format as TEXT and one without content as empty', async () => {
+        it('reads an inline file stored without format as TEXT, whatever its extension, and one without content as empty', async () => {
             mockVersionRead({
                 sourceFiles: [
                     { name: 'a.js', content: 'a' },
                     { name: 'b.js', format: 'TEXT' },
                     { name: 'c.js', format: 'BASE64' },
+                    { name: 'd.png', content: 'x' },
                 ],
             });
 
-            const result = await callTool({ paths: ['a.js', 'b.js', 'c.js'] });
+            const result = await callTool({ paths: ['a.js', 'b.js', 'c.js', 'd.png'] });
 
             expect(result.structuredContent.files).toEqual([
                 { path: 'a.js', sizeBytes: 1, hash: sha256Prefix('a') },
                 { path: 'b.js', sizeBytes: 0, hash: sha256Prefix('') },
                 { path: 'c.js', sizeBytes: 0, hash: sha256Prefix('') },
+                { path: 'd.png', sizeBytes: 1, hash: sha256Prefix('x') },
             ]);
             expect(result.structuredContent.contents).toEqual([
                 { path: 'a.js', content: 'a', encoding: 'utf8' },
                 { path: 'b.js', content: '', encoding: 'utf8' },
                 { path: 'c.js', content: '', encoding: 'utf8' },
+                { path: 'd.png', content: 'x', encoding: 'utf8' },
             ]);
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
         });
@@ -305,6 +471,7 @@ describe('get-actor-version', () => {
             ]);
             expect(structuredContent.omittedPaths).toEqual(['file-00.txt']);
             expect(structuredContent.notFoundPaths).toEqual(['missing.js']);
+            expect(JSON.parse(result.content[0].text)).toEqual(structuredContent);
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
         });
 
@@ -319,7 +486,7 @@ describe('get-actor-version', () => {
             expect(structuredContent.omittedPaths).toEqual(['big.txt']);
         });
 
-        it('omits a single file over the limit, and returns one of exactly the limit', async () => {
+        it('omits a single file over the limit, and returns one of exactly the limit after a path with no file', async () => {
             mockVersionRead({
                 sourceFiles: [
                     { name: 'big.js', format: 'TEXT', content: 'x'.repeat(MAX_INLINE_BYTES + 1) },
@@ -328,11 +495,69 @@ describe('get-actor-version', () => {
             });
 
             const big = await callTool({ paths: ['big.js'] });
-            const fits = await callTool({ paths: ['fits.js'] });
+            // A path with no file uses none of the limit.
+            const fits = await callTool({ paths: ['missing.js', 'fits.js'] });
 
             expect(big.structuredContent.contents).toEqual([]);
             expect(big.structuredContent.omittedPaths).toEqual(['big.js']);
-            expect(fits.structuredContent.contents.map(({ path }) => path)).toEqual(['fits.js']);
+            expect(fits.structuredContent.contents).toEqual([
+                { path: 'fits.js', content: 'x'.repeat(MAX_INLINE_BYTES), encoding: 'utf8' },
+            ]);
+            expect(fits.structuredContent.omittedPaths).toBeUndefined();
+            expect(fits.structuredContent.notFoundPaths).toEqual(['missing.js']);
+        });
+
+        it('counts text in bytes against the limit, whether stored as TEXT or as BASE64', async () => {
+            // Each é is 2 bytes, so this is the limit in bytes, half of it in characters, and more in base64.
+            const atLimit = 'é'.repeat(MAX_INLINE_BYTES / 2);
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'fits.txt', format: 'TEXT', content: atLimit },
+                    { name: 'fits-base64.txt', format: 'BASE64', content: Buffer.from(atLimit).toString('base64') },
+                    { name: 'over.txt', format: 'TEXT', content: `${atLimit}x` },
+                    {
+                        name: 'over-base64.txt',
+                        format: 'BASE64',
+                        content: Buffer.from(`${atLimit}x`).toString('base64'),
+                    },
+                ],
+            });
+
+            const fits = await callTool({ paths: ['fits.txt'] });
+            const fitsBase64 = await callTool({ paths: ['fits-base64.txt'] });
+            const over = await callTool({ paths: ['over.txt', 'over-base64.txt'] });
+
+            expect(fits.structuredContent.contents).toEqual([{ path: 'fits.txt', content: atLimit, encoding: 'utf8' }]);
+            expect(fits.structuredContent.omittedPaths).toBeUndefined();
+            expect(fitsBase64.structuredContent.contents).toEqual([
+                { path: 'fits-base64.txt', content: atLimit, encoding: 'utf8' },
+            ]);
+            expect(fitsBase64.structuredContent.omittedPaths).toBeUndefined();
+            expect(over.structuredContent.contents).toEqual([]);
+            expect(over.structuredContent.omittedPaths).toEqual(['over.txt', 'over-base64.txt']);
+        });
+
+        it('counts a base64 file by the length of its base64 against the limit', async () => {
+            // 3 bytes take 4 characters of base64, so the first file's base64 is exactly the limit.
+            const fitting = Buffer.alloc((MAX_INLINE_BYTES / 4) * 3, 0xff);
+            const over = Buffer.alloc(fitting.length + 1, 0xff);
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'fits.bin', format: 'BASE64', content: fitting.toString('base64') },
+                    { name: 'over.bin', format: 'BASE64', content: over.toString('base64') },
+                ],
+            });
+
+            const { structuredContent } = await callTool({ paths: ['over.bin', 'fits.bin'] });
+
+            expect(structuredContent.files).toEqual([
+                { path: 'fits.bin', sizeBytes: fitting.length, hash: sha256Prefix(fitting) },
+                { path: 'over.bin', sizeBytes: over.length, hash: sha256Prefix(over) },
+            ]);
+            expect(structuredContent.contents).toEqual([
+                { path: 'fits.bin', content: fitting.toString('base64'), encoding: 'base64' },
+            ]);
+            expect(structuredContent.omittedPaths).toEqual(['over.bin']);
         });
 
         it('treats a name like __proto__ as an ordinary file', async () => {
@@ -342,6 +567,22 @@ describe('get-actor-version', () => {
 
             expect(structuredContent.contents).toEqual([{ path: '__proto__', content: 'plain', encoding: 'utf8' }]);
             expect(structuredContent.notFoundPaths).toEqual(['constructor']);
+        });
+
+        it('reads a version with no files as an empty listing, not as a hidden source', async () => {
+            mockVersionRead({ sourceFiles: [] });
+
+            const result = await callTool({});
+
+            expect(result.isError ?? false).toBe(false);
+            expect(result.structuredContent).toEqual({
+                actorId: 'actor-1',
+                fullName: 'john/my-actor',
+                versionNumber: '0.1',
+                revision: sha256Prefix(''),
+                files: [],
+                contents: [],
+            });
         });
     });
 
@@ -365,6 +606,7 @@ describe('get-actor-version', () => {
                     totalLines: 4,
                 },
             ]);
+            expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
         });
 
@@ -372,16 +614,67 @@ describe('get-actor-version', () => {
             const toEnd = await callTool({ paths: ['src/lines.js'], startLine: 3 });
             const fromStart = await callTool({ paths: ['src/lines.js'], lineCount: 1 });
 
-            expect(toEnd.structuredContent.contents[0]).toMatchObject({
-                content: 'three\nfour',
-                startLine: 3,
-                endLine: 4,
-            });
-            expect(fromStart.structuredContent.contents[0]).toMatchObject({
-                content: 'one\r\n',
-                startLine: 1,
-                endLine: 1,
-            });
+            expect(toEnd.structuredContent.contents).toEqual([
+                {
+                    path: 'src/lines.js',
+                    content: 'three\nfour',
+                    encoding: 'utf8',
+                    startLine: 3,
+                    endLine: 4,
+                    totalLines: 4,
+                },
+            ]);
+            expect(fromStart.structuredContent.contents).toEqual([
+                { path: 'src/lines.js', content: 'one\r\n', encoding: 'utf8', startLine: 1, endLine: 1, totalLines: 4 },
+            ]);
+        });
+
+        it('returns the last line for a startLine equal to the line count, and clips a lineCount past the end', async () => {
+            const lastLine = await callTool({ paths: ['src/lines.js'], startLine: 4 });
+            const clipped = await callTool({ paths: ['src/lines.js'], startLine: 3, lineCount: 10 });
+
+            expect(lastLine.structuredContent.contents).toEqual([
+                { path: 'src/lines.js', content: 'four', encoding: 'utf8', startLine: 4, endLine: 4, totalLines: 4 },
+            ]);
+            expect(clipped.structuredContent.contents).toEqual([
+                {
+                    path: 'src/lines.js',
+                    content: 'three\nfour',
+                    encoding: 'utf8',
+                    startLine: 3,
+                    endLine: 4,
+                    totalLines: 4,
+                },
+            ]);
+        });
+
+        it('returns a range of a UTF-8 file stored as BASE64', async () => {
+            const content = Buffer.from(LINES_SOURCE.content).toString('base64');
+            mockVersionRead({ sourceFiles: [{ ...LINES_SOURCE, format: 'BASE64', content }] });
+
+            const { structuredContent } = await callTool({ paths: ['src/lines.js'], startLine: 1, lineCount: 2 });
+
+            expect(structuredContent.contents).toEqual([
+                {
+                    path: 'src/lines.js',
+                    content: 'one\r\ntwo\n',
+                    encoding: 'utf8',
+                    startLine: 1,
+                    endLine: 2,
+                    totalLines: 4,
+                },
+            ]);
+        });
+
+        it('counts a range of multi-byte text in bytes against the limit', async () => {
+            // The first line is 1 byte over the limit in bytes, and about half of it in characters.
+            const content = `${'é'.repeat(MAX_INLINE_BYTES / 2)}\nx`;
+            mockVersionRead({ sourceFiles: [{ name: 'wide.txt', format: 'TEXT', content }] });
+
+            const { structuredContent } = await callTool({ paths: ['wide.txt'], lineCount: 1 });
+
+            expect(structuredContent.contents).toEqual([]);
+            expect(structuredContent.omittedPaths).toEqual(['wide.txt']);
         });
 
         it('returns a range of a file over the limit, and omits a range over the limit', async () => {
@@ -411,7 +704,8 @@ describe('get-actor-version', () => {
 
             expect(text).toBe('startLine and lineCount need exactly one path in paths.');
             expect(withoutPaths).toBe(text);
-            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(actorMock).not.toHaveBeenCalled();
+            expect(actorsMock).not.toHaveBeenCalled();
         });
 
         it('refuses a startLine past the end of the file', async () => {
@@ -419,6 +713,17 @@ describe('get-actor-version', () => {
 
             expect(text).toBe('src/lines.js has 4 lines, so startLine 5 is past its end.');
         });
+
+        it.each([{ startLine: 1 }, { lineCount: 1 }])(
+            'refuses %o on an empty file, which has no lines',
+            async (range) => {
+                mockVersionRead({ sourceFiles: [{ name: 'empty.js', format: 'TEXT', content: '' }] });
+
+                const text = await callToolExpectingUserError({ paths: ['empty.js'], ...range });
+
+                expect(text).toBe('empty.js has 0 lines, so startLine 1 is past its end.');
+            },
+        );
 
         it('refuses a line range on a base64 file', async () => {
             const text = await callToolExpectingUserError({ paths: ['assets/logo.png'], startLine: 1 });
@@ -441,6 +746,8 @@ describe('get-actor-version', () => {
                 mockActor([
                     { versionNumber: '0.1', sourceType: 'SOURCE_FILES', buildTag: 'latest' },
                     { versionNumber: '0.2', sourceType: 'GIT_REPO', buildTag: 'beta' },
+                    // A version without a number cannot be requested, so it is not listed.
+                    { sourceType: 'SOURCE_FILES' },
                     { versionNumber: '0.3', sourceType: 'TARBALL' },
                 ]),
             );
@@ -476,6 +783,28 @@ describe('get-actor-version', () => {
 
             expect(text).toBe(
                 "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
+            );
+        });
+
+        it.each([
+            ['a run', 'john/my-actor/runs/last', { id: 'run-1', actId: 'actor-1', status: 'SUCCEEDED' }],
+            ['a version', 'john/my-actor/versions/0.1', mockVersion()],
+            // Has a name but no username.
+            ['an env var', 'john/my-actor/versions/0.1/env-vars/API_KEY', { name: 'API_KEY', value: 'secret-value' }],
+            // Has a username but no name, as a run's default storage does.
+            [
+                "a run's key-value store",
+                'john/my-actor/runs/last/key-value-store',
+                { id: 'kvs-1', userId: 'user-secret', username: 'john' },
+            ],
+        ])('reports %s, reached by extra path segments, as a missing Actor', async (_, actor, document) => {
+            actorGetMock.mockResolvedValue(document);
+
+            const text = await callToolExpectingUserError({ actor });
+
+            expect(actorMock).toHaveBeenCalledWith(actor);
+            expect(text).toBe(
+                `Actor '${actor}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
             );
         });
 
@@ -529,6 +858,17 @@ describe('get-actor-version', () => {
                 'git@github.com:john/repo.git#main',
             ],
             [
+                'GIT_REPO',
+                { gitRepoUrl: 'git@github.com:john/repo.git?private_token=secret-token' },
+                'git@github.com:john/repo.git',
+            ],
+            ['GIT_REPO', { gitRepoUrl: 'git@github.com:john/repo.git' }, 'git@github.com:john/repo.git'],
+            [
+                'GIT_REPO',
+                { gitRepoUrl: 'http://john:secret-password@git.example.com/repo.git' },
+                'http://git.example.com/repo.git',
+            ],
+            [
                 'GITHUB_GIST',
                 { gitHubGistUrl: 'https://gist.github.com/john/abc123?secret=secret-query' },
                 'https://gist.github.com/john/abc123',
@@ -574,5 +914,40 @@ describe('get-actor-version', () => {
                 );
             },
         );
+
+        it.each(['SOURCE_CODE', 'SOMETHING_NEW'])(
+            'refuses a %s version without naming a URL left over from another source type',
+            async (sourceType) => {
+                mockVersionRead({ sourceType, gitRepoUrl: 'https://oauth2:secret-token@github.com/john/old.git' });
+
+                const result = await callTool({});
+
+                expectSoftFailInvalidInput(result);
+                expect(result.content[0].text).toBe(
+                    `Version 0.1 of john/my-actor is not stored as files (source type ${sourceType}), and this tool works only on versions stored as files.`,
+                );
+                expect(JSON.stringify(result)).not.toMatch(/secret|oauth2|github/);
+            },
+        );
+    });
+});
+
+describe('compareSourcePaths()', () => {
+    it('orders paths by UTF-16 code units, and compares equal paths as equal', () => {
+        expect(compareSourcePaths('src/main.js', 'src/main.js')).toBe(0);
+        expect(compareSourcePaths('README.md', 'package.json')).toBe(-1);
+        expect(compareSourcePaths('package.json', 'README.md')).toBe(1);
+        expect(compareSourcePaths('\u{1F600}.txt', 'ｚ.txt')).toBe(-1);
+    });
+});
+
+describe('buildFilesRevision()', () => {
+    it('sorts the files by path itself, so callers can pass them in any order', () => {
+        const revision = buildFilesRevision([
+            { path: 'b', hash: 'hash-b' },
+            { path: 'a', hash: 'hash-a' },
+        ]);
+
+        expect(revision).toBe(sha256Prefix('a\0hash-a\nb\0hash-b\n'));
     });
 });
