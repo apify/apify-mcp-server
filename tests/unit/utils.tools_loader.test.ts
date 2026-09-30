@@ -9,6 +9,7 @@ import {
     getToolsForServerMode,
     isReportProblemExplicitlySelected,
     loadToolsFromInput,
+    resolveActorsToLoad,
     resolveToolNamesFromInput,
     toolNamesToInput,
 } from '../../src/utils/tools_loader.js';
@@ -107,6 +108,12 @@ describe('toolNamesToInput', () => {
     it('classifies widget tool names as internal tools, not actor IDs', () => {
         expect(toolNamesToInput([HELPER_TOOLS.STORE_SEARCH_WIDGET])).toEqual({
             tools: [HELPER_TOOLS.STORE_SEARCH_WIDGET],
+        });
+    });
+
+    it('classifies get-actor-list (in no category) as an internal tool, not an actor ID', () => {
+        expect(toolNamesToInput([HELPER_TOOLS.ACTOR_LIST_GET])).toEqual({
+            tools: [HELPER_TOOLS.ACTOR_LIST_GET],
         });
     });
 });
@@ -217,6 +224,22 @@ describe('getToolsForServerMode report-problem default injection', () => {
     it('includes report-problem via the dev category selector (tools=dev)', () => {
         const toolNames = getToolsForServerMode({ tools: ['dev'] }, [], 'default').map((t) => t.name);
         expect(toolNames).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+    });
+});
+
+describe('get-actor-list selection (in no category)', () => {
+    it('does not treat tools=get-actor-list as an Actor name', () => {
+        expect(resolveActorsToLoad({ tools: [HELPER_TOOLS.ACTOR_LIST_GET] })).toEqual([]);
+    });
+
+    it.each(['default', 'apps'] as const)('serves only get-actor-list for tools=get-actor-list in %s mode', (mode) => {
+        const toolNames = getToolsForServerMode({ tools: [HELPER_TOOLS.ACTOR_LIST_GET] }, [], mode).map((t) => t.name);
+        expect(toolNames).toEqual([HELPER_TOOLS.ACTOR_LIST_GET]);
+    });
+
+    it('excludes get-actor-list from the default set', () => {
+        const toolNames = getToolsForServerMode({}, [], 'default').map((t) => t.name);
+        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_LIST_GET);
     });
 });
 
