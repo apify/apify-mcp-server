@@ -117,6 +117,14 @@ describe('get-actor-version', () => {
         expect((getActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
+    it('states the limit of MAX_INLINE_BYTES in its description and in the paths description', () => {
+        const limit = `${MAX_INLINE_BYTES / 1024} KiB`;
+        const { paths } = getActorVersion.inputSchema.properties as Record<string, { description: string }>;
+
+        expect(getActorVersion.description).toContain(`up to ${limit} of content`);
+        expect(paths.description).toContain(`they fill the ${limit} limit`);
+    });
+
     it.each<{ outcome: string; args: Record<string, unknown>; setup?: () => void; succeeds?: boolean }>([
         { outcome: 'the listing', args: {}, succeeds: true },
         { outcome: 'file contents', args: { paths: ['src/main.js', 'assets/logo.png', 'missing.js'] }, succeeds: true },
@@ -299,6 +307,45 @@ describe('get-actor-version', () => {
             expect(structuredContent.contents).toEqual([{ path: 'bom.txt', content: text, encoding: 'utf8' }]);
         });
 
+        it('returns text byte for byte, whether stored as TEXT or as BASE64', async () => {
+            // A BOM, CRLF, 2-, 3-, and 4-byte characters, and no trailing newline.
+            const text = '﻿const a = "é€";\r\n// \u{1F600} done';
+            const bytes = Buffer.from(text, 'utf8');
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'text.js', format: 'TEXT', content: text },
+                    { name: 'base64.js', format: 'BASE64', content: bytes.toString('base64') },
+                ],
+            });
+
+            const { structuredContent } = await callTool({ paths: ['text.js', 'base64.js'] });
+
+            expect(structuredContent.files).toEqual([
+                { path: 'base64.js', sizeBytes: bytes.length, hash: sha256Prefix(bytes) },
+                { path: 'text.js', sizeBytes: bytes.length, hash: sha256Prefix(bytes) },
+            ]);
+            expect(structuredContent.contents).toEqual([
+                { path: 'text.js', content: text, encoding: 'utf8' },
+                { path: 'base64.js', content: text, encoding: 'utf8' },
+            ]);
+        });
+
+        it('returns a TEXT file as text whatever its extension, and takes a name without a dot for no extension', async () => {
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'notes.bin', format: 'TEXT', content: 'plain' },
+                    { name: 'bin', format: 'BASE64', content: Buffer.from('ascii').toString('base64') },
+                ],
+            });
+
+            const { structuredContent } = await callTool({ paths: ['notes.bin', 'bin'] });
+
+            expect(structuredContent.contents).toEqual([
+                { path: 'notes.bin', content: 'plain', encoding: 'utf8' },
+                { path: 'bin', content: 'ascii', encoding: 'utf8' },
+            ]);
+        });
+
         it('normalizes stored names as the build worker does, and keeps the last entry for a path', async () => {
             mockVersionRead({
                 sourceFiles: [
@@ -385,7 +432,63 @@ describe('get-actor-version', () => {
 
             expect(big.structuredContent.contents).toEqual([]);
             expect(big.structuredContent.omittedPaths).toEqual(['big.js']);
-            expect(fits.structuredContent.contents.map(({ path }) => path)).toEqual(['fits.js']);
+            expect(fits.structuredContent.contents).toEqual([
+                { path: 'fits.js', content: 'x'.repeat(MAX_INLINE_BYTES), encoding: 'utf8' },
+            ]);
+            expect(fits.structuredContent.omittedPaths).toBeUndefined();
+        });
+
+        it('counts text in bytes against the limit, whether stored as TEXT or as BASE64', async () => {
+            // Each é is 2 bytes, so this is the limit in bytes, half of it in characters, and more in base64.
+            const atLimit = 'é'.repeat(MAX_INLINE_BYTES / 2);
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'fits.txt', format: 'TEXT', content: atLimit },
+                    { name: 'fits-base64.txt', format: 'BASE64', content: Buffer.from(atLimit).toString('base64') },
+                    { name: 'over.txt', format: 'TEXT', content: `${atLimit}x` },
+                    {
+                        name: 'over-base64.txt',
+                        format: 'BASE64',
+                        content: Buffer.from(`${atLimit}x`).toString('base64'),
+                    },
+                ],
+            });
+
+            const fits = await callTool({ paths: ['fits.txt'] });
+            const fitsBase64 = await callTool({ paths: ['fits-base64.txt'] });
+            const over = await callTool({ paths: ['over.txt', 'over-base64.txt'] });
+
+            expect(fits.structuredContent.contents).toEqual([{ path: 'fits.txt', content: atLimit, encoding: 'utf8' }]);
+            expect(fits.structuredContent.omittedPaths).toBeUndefined();
+            expect(fitsBase64.structuredContent.contents).toEqual([
+                { path: 'fits-base64.txt', content: atLimit, encoding: 'utf8' },
+            ]);
+            expect(fitsBase64.structuredContent.omittedPaths).toBeUndefined();
+            expect(over.structuredContent.contents).toEqual([]);
+            expect(over.structuredContent.omittedPaths).toEqual(['over.txt', 'over-base64.txt']);
+        });
+
+        it('counts a base64 file by the length of its base64 against the limit', async () => {
+            // 3 bytes take 4 characters of base64, so the first file's base64 is exactly the limit.
+            const fitting = Buffer.alloc((MAX_INLINE_BYTES / 4) * 3, 0xff);
+            const over = Buffer.alloc(fitting.length + 1, 0xff);
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'fits.bin', format: 'BASE64', content: fitting.toString('base64') },
+                    { name: 'over.bin', format: 'BASE64', content: over.toString('base64') },
+                ],
+            });
+
+            const { structuredContent } = await callTool({ paths: ['over.bin', 'fits.bin'] });
+
+            expect(structuredContent.files).toEqual([
+                { path: 'fits.bin', sizeBytes: fitting.length, hash: sha256Prefix(fitting) },
+                { path: 'over.bin', sizeBytes: over.length, hash: sha256Prefix(over) },
+            ]);
+            expect(structuredContent.contents).toEqual([
+                { path: 'fits.bin', content: fitting.toString('base64'), encoding: 'base64' },
+            ]);
+            expect(structuredContent.omittedPaths).toEqual(['over.bin']);
         });
 
         it('treats a name like __proto__ as an ordinary file', async () => {
@@ -425,16 +528,67 @@ describe('get-actor-version', () => {
             const toEnd = await callTool({ paths: ['src/lines.js'], startLine: 3 });
             const fromStart = await callTool({ paths: ['src/lines.js'], lineCount: 1 });
 
-            expect(toEnd.structuredContent.contents[0]).toMatchObject({
-                content: 'three\nfour',
-                startLine: 3,
-                endLine: 4,
-            });
-            expect(fromStart.structuredContent.contents[0]).toMatchObject({
-                content: 'one\r\n',
-                startLine: 1,
-                endLine: 1,
-            });
+            expect(toEnd.structuredContent.contents).toEqual([
+                {
+                    path: 'src/lines.js',
+                    content: 'three\nfour',
+                    encoding: 'utf8',
+                    startLine: 3,
+                    endLine: 4,
+                    totalLines: 4,
+                },
+            ]);
+            expect(fromStart.structuredContent.contents).toEqual([
+                { path: 'src/lines.js', content: 'one\r\n', encoding: 'utf8', startLine: 1, endLine: 1, totalLines: 4 },
+            ]);
+        });
+
+        it('returns the last line for a startLine equal to the line count, and clips a lineCount past the end', async () => {
+            const lastLine = await callTool({ paths: ['src/lines.js'], startLine: 4 });
+            const clipped = await callTool({ paths: ['src/lines.js'], startLine: 3, lineCount: 10 });
+
+            expect(lastLine.structuredContent.contents).toEqual([
+                { path: 'src/lines.js', content: 'four', encoding: 'utf8', startLine: 4, endLine: 4, totalLines: 4 },
+            ]);
+            expect(clipped.structuredContent.contents).toEqual([
+                {
+                    path: 'src/lines.js',
+                    content: 'three\nfour',
+                    encoding: 'utf8',
+                    startLine: 3,
+                    endLine: 4,
+                    totalLines: 4,
+                },
+            ]);
+        });
+
+        it('returns a range of a UTF-8 file stored as BASE64', async () => {
+            const content = Buffer.from(LINES_SOURCE.content).toString('base64');
+            mockVersionRead({ sourceFiles: [{ ...LINES_SOURCE, format: 'BASE64', content }] });
+
+            const { structuredContent } = await callTool({ paths: ['src/lines.js'], startLine: 1, lineCount: 2 });
+
+            expect(structuredContent.contents).toEqual([
+                {
+                    path: 'src/lines.js',
+                    content: 'one\r\ntwo\n',
+                    encoding: 'utf8',
+                    startLine: 1,
+                    endLine: 2,
+                    totalLines: 4,
+                },
+            ]);
+        });
+
+        it('counts a range of multi-byte text in bytes against the limit', async () => {
+            // The first line is 1 byte over the limit in bytes, and about half of it in characters.
+            const content = `${'é'.repeat(MAX_INLINE_BYTES / 2)}\nx`;
+            mockVersionRead({ sourceFiles: [{ name: 'wide.txt', format: 'TEXT', content }] });
+
+            const { structuredContent } = await callTool({ paths: ['wide.txt'], lineCount: 1 });
+
+            expect(structuredContent.contents).toEqual([]);
+            expect(structuredContent.omittedPaths).toEqual(['wide.txt']);
         });
 
         it('returns a range of a file over the limit, and omits a range over the limit', async () => {
@@ -473,6 +627,17 @@ describe('get-actor-version', () => {
 
             expect(text).toBe('src/lines.js has 4 lines, so startLine 5 is past its end.');
         });
+
+        it.each([{ startLine: 1 }, { lineCount: 1 }])(
+            'refuses %o on an empty file, which has no lines',
+            async (range) => {
+                mockVersionRead({ sourceFiles: [{ name: 'empty.js', format: 'TEXT', content: '' }] });
+
+                const text = await callToolExpectingUserError({ paths: ['empty.js'], ...range });
+
+                expect(text).toBe('empty.js has 0 lines, so startLine 1 is past its end.');
+            },
+        );
 
         it('refuses a line range on a base64 file', async () => {
             const text = await callToolExpectingUserError({ paths: ['assets/logo.png'], startLine: 1 });
