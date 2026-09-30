@@ -84,10 +84,16 @@ export type ActorDetailsResult = {
     readmeSummary?: string;
 };
 
+type FetchActorDetailsOptions = {
+    cardOptions?: ActorCardOptions;
+    /** When it can proxy pictures, the Store search for the picture URL is skipped. */
+    actorStore?: ActorStore;
+};
+
 export async function fetchActorDetails(
     apifyClient: ApifyClient,
     actorName: string,
-    { cardOptions, actorStore }: { cardOptions?: ActorCardOptions; actorStore?: ActorStore } = {},
+    { cardOptions, actorStore }: FetchActorDetailsOptions = {},
 ): Promise<ActorDetailsResult | null> {
     try {
         // Use only the actor name part (after '/') for better keyword search relevance —
