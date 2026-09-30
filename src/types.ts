@@ -547,8 +547,10 @@ export type ActorExecutor = {
 
 /**
  * External store for Actor metadata that can be injected by the hosting environment.
- * Provides access to Actor output schemas inferred from historical run data.
- * When not provided, tools use generic output schemas without field-level detail.
+ * Provides access to Actor output schemas inferred from historical run data and to
+ * image-proxy URLs for Actor pictures.
+ * When not provided, tools use generic output schemas without field-level detail and
+ * Actor pictures are resolved through the Apify Store search.
  */
 export type ActorStore = {
     /**
@@ -577,6 +579,14 @@ export type ActorStore = {
      * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
      */
     getActorOutputSchemaAsTypeObject(actorFullName: string): Promise<Record<string, unknown> | null>;
+
+    /**
+     * Returns the Actor picture URL served through the image proxy (resized, CORS-enabled),
+     * so widgets can render it. Optional: without it, the picture URL comes from the Store search.
+     *
+     * @param pictureUrl - Raw Actor picture URL as returned by the Apify API
+     */
+    getProxiedPictureUrl?(pictureUrl: string): string;
 };
 
 /**
