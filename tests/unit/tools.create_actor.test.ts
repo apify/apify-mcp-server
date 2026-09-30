@@ -20,10 +20,13 @@ const actorsCreateMock = vi.fn();
 const buildMock = vi.fn();
 const actorGetMock = vi.fn();
 const actorMock = vi.fn(() => ({ build: buildMock, get: actorGetMock }));
+// The build client, which only waiting for a build uses.
+const buildClientMock = vi.fn();
 
 const stubClient = {
     actors: () => ({ create: actorsCreateMock }),
     actor: actorMock,
+    build: buildClientMock,
 } as unknown as InternalToolArgs['apifyClient'];
 
 /** Already names the Actor, so the platform stores it unchanged. */
@@ -157,13 +160,48 @@ describe('create-actor', () => {
         expect(result.content[1].text).toBe(
             'Created the private Actor john/my-actor.\nRuns use these files once the version is built.',
         );
+        // No other call: nothing reads or updates an existing Actor, and no build starts.
+        expect(actorMock).not.toHaveBeenCalled();
         expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('sends only the name and the version when title and description are not given', async () => {
+        await callTool({ files: [MAIN_JS] });
+
+        expect(actorsCreateMock.mock.calls).toStrictEqual([
+            [
+                {
+                    name: 'my-actor',
+                    versions: [
+                        {
+                            versionNumber: '0.0',
+                            sourceType: 'SOURCE_FILES',
+                            sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: MAIN_JS.content }],
+                        },
+                    ],
+                },
+            ],
+        ]);
     });
 
     it('sends versionNumber and buildTag when given', async () => {
         const result = await callTool({ versionNumber: '1.2', buildTag: 'beta', files: [ACTOR_JSON] });
 
-        expect(getSentVersion()).toEqual(expect.objectContaining({ versionNumber: '1.2', buildTag: 'beta' }));
+        expect(actorsCreateMock.mock.calls).toStrictEqual([
+            [
+                {
+                    name: 'my-actor',
+                    versions: [
+                        {
+                            versionNumber: '1.2',
+                            buildTag: 'beta',
+                            sourceType: 'SOURCE_FILES',
+                            sourceFiles: [{ name: '.actor/actor.json', format: 'TEXT', content: ACTOR_JSON.content }],
+                        },
+                    ],
+                },
+            ],
+        ]);
         expect(result.structuredContent.versionNumber).toBe('1.2');
     });
 
@@ -212,10 +250,50 @@ describe('create-actor', () => {
         });
     });
 
-    it('normalizes paths the way get-actor-version lists them', async () => {
-        await callTool({ files: [{ path: './src//main.js', content: 'x' }] });
+    it.each([
+        ['assets/icon.png', undefined, 'BASE64'],
+        ['assets/ICON.PNG', undefined, 'BASE64'],
+        ['fonts/a.woff2', undefined, 'BASE64'],
+        ['src/main.ts', undefined, 'TEXT'],
+        ['assets/icon.svg', undefined, 'TEXT'],
+        ['Dockerfile', undefined, 'TEXT'],
+        ['assets/icon.png', 'utf8', 'TEXT'],
+        ['README.md', 'base64', 'BASE64'],
+    ])('stores %s with encoding %s as %s, with the content as sent', async (path, encoding, format) => {
+        const content = 'aGk=';
 
-        expect(getSentVersion().sourceFiles).toEqual([{ name: 'src/main.js', format: 'TEXT', content: 'x' }]);
+        await callTool({ files: [{ path, content, ...(encoding !== undefined && { encoding }) }] });
+
+        expect(getSentVersion().sourceFiles).toStrictEqual([{ name: path, format, content }]);
+    });
+
+    it('sends utf8 content byte for byte', async () => {
+        const content = '\uFEFFline one  \r\nnázev = "🙂"\n\tend\r';
+
+        await callTool({ files: [{ path: 'src/main.js', content, encoding: 'utf8' }] });
+
+        expect(getSentVersion().sourceFiles).toStrictEqual([{ name: 'src/main.js', format: 'TEXT', content }]);
+    });
+
+    it('normalizes paths the way get-actor-version lists them', async () => {
+        const result = await callTool({
+            files: [
+                { path: './src//main.js', content: 'x' },
+                { path: 'src/../README.md', content: 'y' },
+                { path: 'src/./lib/util.js', content: 'z' },
+            ],
+        });
+
+        expect(getSentVersion().sourceFiles).toEqual([
+            { name: 'src/main.js', format: 'TEXT', content: 'x' },
+            { name: 'README.md', format: 'TEXT', content: 'y' },
+            { name: 'src/lib/util.js', format: 'TEXT', content: 'z' },
+        ]);
+        expect(result.structuredContent.files.map(({ path }) => path)).toEqual([
+            'README.md',
+            'src/lib/util.js',
+            'src/main.js',
+        ]);
     });
 
     it('warns about empty files, which the build skips', async () => {
@@ -237,11 +315,30 @@ describe('create-actor', () => {
         expect(result).toEqual({});
     });
 
-    it('lets an API error through unchanged, such as a name already taken', async () => {
+    it('keeps the Actor and starts no build when the request is cancelled during the POST', async () => {
+        const controller = new AbortController();
+        const create = actorsCreateMock.getMockImplementation();
+        actorsCreateMock.mockImplementation(async (body: { name: string; versions: SentVersion[] }) => {
+            controller.abort();
+            return create?.(body);
+        });
+
+        const result = await callTool({ autoBuild: true, files: [ACTOR_JSON] }, controller.signal);
+
+        expect(result).toEqual({});
+        expect(actorsCreateMock).toHaveBeenCalledTimes(1);
+        expect(actorMock).not.toHaveBeenCalled();
+        expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('lets an API error through unchanged, such as a name already taken, with no other call', async () => {
         const error = apiError(409, 'Some other Actor already has this name.', 'actor-name-not-unique');
         actorsCreateMock.mockRejectedValue(error);
 
-        await expect(callTool({ files: [ACTOR_JSON] })).rejects.toBe(error);
+        await expect(callTool({ autoBuild: true, files: [ACTOR_JSON] })).rejects.toBe(error);
+        expect(actorsCreateMock).toHaveBeenCalledTimes(1);
+        expect(actorMock).not.toHaveBeenCalled();
+        expect(buildMock).not.toHaveBeenCalled();
     });
 
     describe('autoBuild', () => {
@@ -253,6 +350,19 @@ describe('create-actor', () => {
             expect(buildMock).toHaveBeenCalledWith('0.0', { useCache: true });
             expect(result.structuredContent.build).toEqual(
                 expect.objectContaining({ id: 'build-1', buildNumber: '0.0.1', status: 'READY' }),
+            );
+        });
+
+        it('builds the version it created without waiting for the build', async () => {
+            buildMock.mockResolvedValue({ id: 'build-2', actId: 'actor-9', buildNumber: '1.2.1', status: 'RUNNING' });
+
+            const result = await callTool({ autoBuild: true, versionNumber: '1.2', files: [ACTOR_JSON] });
+
+            expect(actorMock.mock.calls).toEqual([['actor-9']]);
+            expect(buildMock.mock.calls).toEqual([['1.2', { useCache: true }]]);
+            expect(buildClientMock).not.toHaveBeenCalled();
+            expect(result.structuredContent.build).toEqual(
+                expect.objectContaining({ id: 'build-2', buildNumber: '1.2.1', status: 'RUNNING' }),
             );
         });
 
