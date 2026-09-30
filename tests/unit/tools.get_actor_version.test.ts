@@ -18,14 +18,19 @@ import {
 } from './helpers/tool_context.js';
 
 const actorGetMock = vi.fn();
-const actorMock = vi.fn(() => ({ get: actorGetMock }));
+// The Actor client's other methods, which lead to every write and build, and `actors()`, which creates Actors.
+const writeMocks = { update: vi.fn(), delete: vi.fn(), build: vi.fn(), version: vi.fn(), versions: vi.fn() };
+const actorsMock = vi.fn();
+const actorMock = vi.fn(() => ({ get: actorGetMock, ...writeMocks }));
 
-const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyClient'];
+const stubClient = { actor: actorMock, actors: actorsMock } as unknown as InternalToolArgs['apifyClient'];
 
 const ACTOR_JSON_SOURCE = { name: '.actor/actor.json', format: 'TEXT', content: '{"actorSpecification": 1}' };
 const MAIN_JS_SOURCE = { name: 'src/main.js', format: 'TEXT', content: 'console.log("hi");\n' };
 const LOGO_BYTES = Buffer.from([137, 80, 78, 71, 0, 255]);
 const LOGO_SOURCE = { name: 'assets/logo.png', format: 'BASE64', content: LOGO_BYTES.toString('base64') };
+/** The env var names and values of `mockVersion()` and the internal `userId` of `mockActor()`. */
+const LEAKABLE_VALUES = ['user-secret', 'API_KEY', 'secret-value', 'secret-hash', 'MODE', 'plain-value'];
 
 type VersionOutput = {
     revision: string;
@@ -112,6 +117,60 @@ describe('get-actor-version', () => {
         expect((getActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
+    it.each<{ outcome: string; args: Record<string, unknown>; setup?: () => void; succeeds?: boolean }>([
+        { outcome: 'the listing', args: {}, succeeds: true },
+        { outcome: 'file contents', args: { paths: ['src/main.js', 'assets/logo.png', 'missing.js'] }, succeeds: true },
+        { outcome: 'a line range', args: { paths: ['src/main.js'], startLine: 1, lineCount: 1 }, succeeds: true },
+        { outcome: 'a startLine past the end', args: { paths: ['src/main.js'], startLine: 2 } },
+        { outcome: 'a line range on a base64 file', args: { paths: ['assets/logo.png'], startLine: 1 } },
+        { outcome: 'a missing version', args: { versionNumber: '9.9' } },
+        {
+            outcome: 'several versions and no versionNumber',
+            args: {},
+            setup: () =>
+                actorGetMock.mockResolvedValue(mockActor([mockVersion(), mockVersion({ versionNumber: '0.2' })])),
+        },
+        { outcome: 'a hidden source', args: {}, setup: () => mockVersionRead({ sourceFiles: undefined }) },
+        {
+            outcome: 'a Git repository',
+            args: {},
+            setup: () => mockVersionRead({ sourceType: 'GIT_REPO', gitRepoUrl: 'https://github.com/john/repo.git' }),
+        },
+        {
+            outcome: 'a gist',
+            args: {},
+            setup: () =>
+                mockVersionRead({ sourceType: 'GITHUB_GIST', gitHubGistUrl: 'https://gist.github.com/john/1' }),
+        },
+        {
+            outcome: 'a TARBALL',
+            args: {},
+            setup: () => mockVersionRead({ sourceType: 'TARBALL', tarballUrl: 'https://example.com/source.zip' }),
+        },
+        { outcome: 'a legacy source type', args: {}, setup: () => mockVersionRead({ sourceType: 'SOURCE_CODE' }) },
+        { outcome: 'a missing Actor', args: {}, setup: () => actorGetMock.mockResolvedValue(undefined) },
+        {
+            // The version document carries the env vars.
+            outcome: 'a sub-resource that is not an Actor',
+            args: { actor: 'john/my-actor/versions/0.1' },
+            setup: () => actorGetMock.mockResolvedValue(mockVersion()),
+        },
+    ])('makes only the Actor GET and returns no env var for $outcome', async ({ args, setup, succeeds = false }) => {
+        setup?.();
+
+        const result = await callTool(args);
+
+        expect(result.isError ?? false).toBe(!succeeds);
+        expect(actorGetMock).toHaveBeenCalledTimes(1);
+        for (const [name, mock] of Object.entries({ ...writeMocks, actors: actorsMock })) {
+            expect(mock, name).not.toHaveBeenCalled();
+        }
+        const serialized = JSON.stringify(result);
+        for (const value of LEAKABLE_VALUES) {
+            expect(serialized).not.toContain(value);
+        }
+    });
+
     it('is served in the source category, which is not enabled by default', () => {
         expect(getCategoryTools().source.map((tool) => tool.name)).toEqual([HELPER_TOOLS.ACTOR_VERSION_GET]);
         expect(toolCategoriesEnabledByDefault).not.toContain('source');
@@ -143,7 +202,7 @@ describe('get-actor-version', () => {
                 expect(result.content[1].text).toBe('Read version 0.1 of john/my-actor.');
                 expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
                 const serialized = JSON.stringify(result);
-                for (const secret of ['user-secret', 'API_KEY', 'secret-value', 'secret-hash', 'plain-value']) {
+                for (const secret of LEAKABLE_VALUES) {
                     expect(serialized).not.toContain(secret);
                 }
             },
@@ -405,7 +464,8 @@ describe('get-actor-version', () => {
 
             expect(text).toBe('startLine and lineCount need exactly one path in paths.');
             expect(withoutPaths).toBe(text);
-            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(actorMock).not.toHaveBeenCalled();
+            expect(actorsMock).not.toHaveBeenCalled();
         });
 
         it('refuses a startLine past the end of the file', async () => {
@@ -470,6 +530,22 @@ describe('get-actor-version', () => {
 
             expect(text).toBe(
                 "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
+            );
+        });
+
+        it.each([
+            ['a run', 'john/my-actor/runs/last', { id: 'run-1', actId: 'actor-1', status: 'SUCCEEDED' }],
+            ['a version', 'john/my-actor/versions/0.1', mockVersion()],
+            // Has a name but no username.
+            ['an env var', 'john/my-actor/versions/0.1/env-vars/API_KEY', { name: 'API_KEY', value: 'secret-value' }],
+        ])('reports %s, reached by extra path segments, as a missing Actor', async (_, actor, document) => {
+            actorGetMock.mockResolvedValue(document);
+
+            const text = await callToolExpectingUserError({ actor });
+
+            expect(actorMock).toHaveBeenCalledWith(actor);
+            expect(text).toBe(
+                `Actor '${actor}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
             );
         });
 
