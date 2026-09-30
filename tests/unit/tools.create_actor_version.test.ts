@@ -248,6 +248,45 @@ describe('create-actor-version', () => {
             expect(JSON.stringify(result)).not.toMatch(/API_KEY|secret-value/);
         });
 
+        it('copies the files and env vars of the version it names, not of another version', async () => {
+            const copiedFiles = [
+                { name: 'main.py', format: 'TEXT', content: 'print(3)\n' },
+                { name: 'data', folder: true },
+                { name: 'data/seed.bin', format: 'BASE64', content: 'AAE=' },
+            ];
+            // The copied version sits between two others, so a copy of the first or the last sends another body.
+            actorGetMock.mockResolvedValue({
+                id: 'actor-1',
+                name: 'my-actor',
+                username: 'john',
+                versions: [
+                    mockSourceVersion({ applyEnvVarsToBuild: false }),
+                    mockSourceVersion({
+                        versionNumber: '0.3',
+                        buildTag: 'beta',
+                        envVars: [
+                            { name: 'MODE', value: 'test' },
+                            { name: 'TOKEN', isSecret: true, valueHash: 'def456' },
+                        ],
+                        applyEnvVarsToBuild: true,
+                        sourceFiles: structuredClone(copiedFiles),
+                    }),
+                    mockSourceVersion({ versionNumber: '0.5', applyEnvVarsToBuild: false }),
+                ],
+            });
+
+            const result = await callTool({ copyFromVersion: '0.3' });
+
+            expect(getPostBody()).toStrictEqual({
+                versionNumber: '0.2',
+                sourceType: 'SOURCE_FILES',
+                sourceFiles: copiedFiles,
+                envVars: [{ name: 'MODE', value: 'test' }],
+                applyEnvVarsToBuild: true,
+            });
+            expect(result.structuredContent.files.map(({ path }) => path)).toEqual(['data/seed.bin', 'main.py']);
+        });
+
         it.each([false, undefined])(
             'copies applyEnvVarsToBuild %s as the version has it',
             async (applyEnvVarsToBuild) => {
@@ -345,6 +384,13 @@ describe('create-actor-version', () => {
                     { path: 'README.md', content: Buffer.from(readme).toString('base64'), encoding: 'base64' },
                 ],
             });
+            // The path is stored normalized, the way get-actor-version lists it.
+            expect(getPostBody().sourceFiles).toStrictEqual([
+                { name: 'src/main.js', format: 'TEXT', content: MAIN_JS.content },
+                { name: '.actor/actor.json', format: 'TEXT', content: ACTOR_JSON.content },
+                { name: 'assets/logo.png', format: 'BASE64', content: LOGO_BYTES.toString('base64') },
+                { name: 'README.md', format: 'BASE64', content: Buffer.from(readme).toString('base64') },
+            ]);
             actorGetMock.mockResolvedValue({
                 id: 'actor-1',
                 name: 'my-actor',
@@ -491,6 +537,37 @@ describe('create-actor-version', () => {
             expect(result.content[1].text).toBe(
                 'Created version 0.2 of john/my-actor.\nRuns use these files once the version is built.',
             );
+        });
+
+        it('keeps the build it started when the request is cancelled during the build start', async () => {
+            const controller = new AbortController();
+            buildMock.mockImplementation(async () => {
+                controller.abort();
+                return {
+                    id: 'build-1',
+                    actId: 'actor-1',
+                    buildNumber: '0.2.1',
+                    status: 'RUNNING',
+                    startedAt: new Date('2026-09-01T10:00:00.000Z'),
+                };
+            });
+            // The build client is what aborts a build.
+            const abortMock = vi.fn(async () => ({}));
+            buildClientMock.mockReturnValueOnce({ abort: abortMock });
+
+            const result = await callTool({ copyFromVersion: '0.1', autoBuild: true }, controller.signal);
+
+            expect(buildMock).toHaveBeenCalledTimes(1);
+            expect(buildClientMock).not.toHaveBeenCalled();
+            expect(abortMock).not.toHaveBeenCalled();
+            expect(result.structuredContent.build).toEqual({
+                id: 'build-1',
+                actorId: 'actor-1',
+                buildNumber: '0.2.1',
+                status: 'RUNNING',
+                startedAt: '2026-09-01T10:00:00.000Z',
+                finishedAt: null,
+            });
         });
 
         it('reports a build that failed to start with the version still created', async () => {
