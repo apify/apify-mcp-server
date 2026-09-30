@@ -242,13 +242,13 @@ One of the most powerful features of using MCP with Apify is dynamic tool discov
 It allows an AI agent to find new tools (Actors) as needed and incorporate them.
 Here are some special MCP operations and how the Apify MCP Server supports them:
 
-- **Apify Actors**: Search for Actors, view their details, and use them as tools for the AI.
+- **Apify Actors**: Search for Actors, list the Actors in your account, view their details, and use them as tools for the AI.
 - **Apify documentation**: Search the Apify documentation and fetch specific documents to provide context to the AI.
 - **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
 - **Apify storage**: Access data from your datasets and key-value stores.
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
-- **Builds**: Build an Actor version, check the status of a build, and retrieve its build log.
+- **Builds**: Build an Actor version, list builds, check the status of a build, and retrieve its build log.
 - **Actor source**: Read an Actor version's files, with a hash for each file and a revision for the whole set, create an Actor from files, and change a version's files with checks that catch changes made since your last read.
 
 ### Overview of available tools
@@ -265,6 +265,7 @@ Legend for the **Enabled by default** column:
 | `search-actors` | actors | Search for Actors in Apify Store. | ✅ |
 | `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README (summary when available, full otherwise), pricing, and Actor output schema. | ✅ |
 | `call-actor` | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ✅ |
+| `get-actor-list` | actors | List the Actors you own and those shared with you, including private ones. | ✅ |
 | `get-actor-run` | runs | Get detailed information about a specific Actor run. | ⚡ |
 | `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. | ⚡ |
 | `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. | ⚡ |
@@ -293,6 +294,7 @@ Legend for the **Enabled by default** column:
 | `delete-schedule` | schedules | Delete a schedule. |  |
 | `get-actor-build` | builds | Get an Actor build's status. |  |
 | `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
+| `get-actor-build-list` | builds | List the account's builds, or one Actor's, in every status, newest first. |  |
 | `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
 | `get-actor-version` | source | Get an Actor version's file listing with hashes and the content of the files you ask for. |  |
 | `create-actor` | source | Create a private Actor in your account from files, optionally starting a build. |  |
