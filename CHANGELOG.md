@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.17.2 - **not yet released**
+
+### 🚀 Features
+
+- Add get-actor-version tool ([#1450](https://github.com/apify/apify-mcp-server/pull/1450)) ([0c1c93e](https://github.com/apify/apify-mcp-server/commit/0c1c93e10aed623e3c8b93a4137eee127167b9aa)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1460](https://github.com/apify/apify-mcp-server/issues/1460)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.17.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.1) (2026-09-30)
 
 ### 🐛 Bug Fixes
