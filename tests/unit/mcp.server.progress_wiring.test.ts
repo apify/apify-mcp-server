@@ -51,6 +51,22 @@ describe('tools/call progressToken wiring', () => {
         expect(received.progressTracker).toBeInstanceOf(ProgressTracker);
     });
 
+    it('creates a ProgressTracker for get-actor-build when _meta.progressToken is provided', async () => {
+        const received = await runRecorder(HELPER_TOOLS.ACTOR_BUILD_GET, {
+            progressToken: 'tok-1',
+            mcpSessionId: 'sess-1',
+        });
+        expect(received.progressTracker).toBeInstanceOf(ProgressTracker);
+    });
+
+    it('creates a ProgressTracker for build-actor when _meta.progressToken is provided', async () => {
+        const received = await runRecorder(HELPER_TOOLS.ACTOR_BUILD, {
+            progressToken: 'tok-1',
+            mcpSessionId: 'sess-1',
+        });
+        expect(received.progressTracker).toBeInstanceOf(ProgressTracker);
+    });
+
     it('passes null progressTracker for get-actor-run when no progressToken is provided', async () => {
         const received = await runRecorder(HELPER_TOOLS.ACTOR_RUNS_GET, { mcpSessionId: 'sess-1' });
         expect(received.progressTracker).toBeNull();

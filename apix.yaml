@@ -1,0 +1,28 @@
+# Config for the Apify internal dev environment, which runs the whole platform
+# on one machine. Ignored everywhere else.
+
+name: apify-mcp-server
+
+# `setup:` runs as a single bash login shell. nvm is loaded from ~/.bashrc and
+# NPM_CONFIG_PREFIX/PREFIX are unset, so `nvm install` needs no boilerplate.
+setup:
+  - nvm install                            # reads .nvmrc (Node 24)
+  - pnpm install --no-frozen-lockfile      # corepack pins pnpm@11.11.0
+  # Widget bundles are read from src/web/dist at runtime; when they are missing
+  # the widget resources are absent rather than failing loudly.
+  - pnpm run build:web
+
+services:
+  mcp-server:
+    # The server takes the caller's Apify token from each request, so it needs no
+    # secrets of its own. APIFY_API_BASE_URL points it at the local platform API
+    # instead of api.apify.com, and UI_MODE serves the `*-widget` tools to clients
+    # that do not advertise MCP Apps support.
+    command: 'APIFY_API_BASE_URL=http://localhost:3333 APIFY_CONSOLE_BASE_URL=http://localhost:3000 UI_MODE=true pnpm start'
+    description: >-
+      The Apify MCP server on :3001, running against the local platform API.
+    requires:
+      - apify-core/api
+    ready_when: 'MCP server listening'
+    ports:
+      - 3001

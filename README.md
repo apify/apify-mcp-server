@@ -242,12 +242,13 @@ One of the most powerful features of using MCP with Apify is dynamic tool discov
 It allows an AI agent to find new tools (Actors) as needed and incorporate them.
 Here are some special MCP operations and how the Apify MCP Server supports them:
 
-- **Apify Actors**: Search for Actors, view their details, and use them as tools for the AI.
+- **Apify Actors**: Search for Actors, list the Actors in your account, view their details, and use them as tools for the AI.
 - **Apify documentation**: Search the Apify documentation and fetch specific documents to provide context to the AI.
 - **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
 - **Apify storage**: Access data from your datasets and key-value stores.
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
+- **Builds**: Build an Actor version, list builds, check the status of a build, and retrieve its build log.
 
 ### Overview of available tools
 
@@ -272,6 +273,7 @@ Legend for the **Enabled by default** column:
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
 | [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to fetch a URL and return its content. | ✅ |
 | `report-problem` | dev | Report a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
+| `get-actor-list` | none (select by name: `tools=get-actor-list`) | List the Actors you own and those shared with you, including private ones. |  |
 | `get-actor-run-list` | runs | Get a list of Actor runs, filterable by Actor and status. |  |
 | `get-actor-run-log` | runs | Retrieve the logs for a specific Actor run. |  |
 | `get-dataset` | storage | Get metadata about a specific dataset. |  |
@@ -289,6 +291,10 @@ Legend for the **Enabled by default** column:
 | `get-schedule` | schedules | Get a schedule, its cron expression, state, and the actions it runs. |  |
 | `update-schedule` | schedules | Update a schedule: cron expression, time zone, enabled state, or actions. |  |
 | `delete-schedule` | schedules | Delete a schedule. |  |
+| `get-actor-build` | builds | Get an Actor build's status. |  |
+| `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
+| `get-actor-build-list` | builds | List the account's builds, or one Actor's, in every status, newest first. |  |
+| `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
 
 > **Note:**
 >

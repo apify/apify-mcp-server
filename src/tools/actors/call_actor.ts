@@ -308,7 +308,7 @@ export const callOptionsSchema = z.object({
 /** Zod schema for call-actor arguments — shared between default and apps variants. */
 export const callActorArgs = z.object({
     actor: z.string().describe(dedent`
-            The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").
+            The Actor to call: its ID, or its name in the "username/name" form (e.g., "apify/rag-web-browser").
 
             For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "apify/actors-mcp-server:fetch-apify-docs").
         `),

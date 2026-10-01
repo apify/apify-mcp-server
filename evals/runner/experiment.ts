@@ -444,7 +444,6 @@ export function createExperimentTask(options: McpAgentTaskOptions) {
     };
 
     async function runItem(item: McpAgentItem, itemMcpToolsOnly: boolean): Promise<McpAgentTaskOutput> {
-        const { iteration } = item.metadata;
         if (item.metadata.kind === 'tool-call') {
             return await runToolCallItem(item, {
                 agentModel,
@@ -454,56 +453,81 @@ export function createExperimentTask(options: McpAgentTaskOptions) {
             });
         }
 
-        // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
-        // "agent" items; this task only runs those in this branch, so a missing
-        // expectedOutput here is a caller bug.
-        if (item.expectedOutput === undefined) {
-            throw new Error('kind "agent" item has no expectedOutput; this task only runs agent items');
-        }
-
-        const runOptions = {
-            prompt: item.input.query,
-            model: agentModel,
+        return await runAgentItem(item, {
+            agentModel,
             apifyToken,
-            tools: item.metadata.tools,
-            failTools: item.metadata.failTools,
-            maxTurns: item.metadata.maxTurns,
-            toolTimeoutSeconds: toolTimeout,
+            toolTimeout,
             mcpToolsOnly: itemMcpToolsOnly,
-        };
-        const { adapted, startedAt } = await runAgentWithRetry(item.id, runOptions);
-        emitTrace(item.id, item.input.query, agentModel, itemMcpToolsOnly, adapted, startedAt);
-
-        const { conversation, transcript } = adapted;
-        const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
-
-        // Server tools only: a failed Claude Code built-in (Bash, WebFetch) says nothing
-        // about the server under test. Failures of tools the harness force-failed itself
-        // are not errors of the run either. First line only: the full text already sits
-        // on the tool span. Known blind spot: the adapter drops subagent activity, so a
-        // server tool failing inside a Task-spawned subagent never reaches this gate.
-        const expectedErrorTools = new Set(item.metadata.expectedErrors ?? []);
-        const injected = new Set(item.metadata.failTools ?? []);
-        const toolErrors: ToolError[] = adapted.toolInvocations
-            .filter(
-                (invocation) => invocation.isMcpTool && !invocation.result.success && !injected.has(invocation.name),
-            )
-            .map((invocation) => ({
-                tool: invocation.name,
-                error: invocation.result.error?.split('\n')[0] || 'unknown error',
-                expected: expectedErrorTools.has(invocation.name),
-            }));
-
-        return {
-            kind: 'agent',
-            id: item.id,
-            ...(iteration !== undefined && { iteration }),
-            judgeResult,
-            totalTokens: conversation.totalTokens,
-            transcript,
-            toolErrors,
-        };
+            judgeModel,
+            llmClient,
+        });
     }
+}
+
+/**
+ * The agent branch: runs the item's prompt to completion against its own MCP server, then
+ * judges the resulting conversation and collects server tool errors.
+ */
+async function runAgentItem(
+    item: McpAgentItem,
+    options: {
+        agentModel: string;
+        apifyToken: string;
+        toolTimeout: number;
+        mcpToolsOnly: boolean;
+        judgeModel: string;
+        llmClient: JudgeClient;
+    },
+): Promise<McpAgentTaskOutput> {
+    const { agentModel, apifyToken, toolTimeout, mcpToolsOnly, judgeModel, llmClient } = options;
+
+    // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
+    // "agent" items; this task only runs those in this branch, so a missing
+    // expectedOutput here is a caller bug.
+    if (item.expectedOutput === undefined) {
+        throw new Error('kind "agent" item has no expectedOutput; this task only runs agent items');
+    }
+
+    const runOptions = {
+        prompt: item.input.query,
+        model: agentModel,
+        apifyToken,
+        tools: item.metadata.tools,
+        failTools: item.metadata.failTools,
+        maxTurns: item.metadata.maxTurns,
+        toolTimeoutSeconds: toolTimeout,
+        mcpToolsOnly,
+    };
+    const { adapted, startedAt } = await runAgentWithRetry(item.id, runOptions);
+    emitTrace(item.id, item.input.query, agentModel, mcpToolsOnly, adapted, startedAt);
+
+    const { conversation, transcript } = adapted;
+    const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
+
+    // Server tools only: a failed Claude Code built-in (Bash, WebFetch) says nothing
+    // about the server under test. Failures of tools the harness force-failed itself
+    // are not errors of the run either. First line only: the full text already sits
+    // on the tool span. Known blind spot: the adapter drops subagent activity, so a
+    // server tool failing inside a Task-spawned subagent never reaches this gate.
+    const expectedErrorTools = new Set(item.metadata.expectedErrors ?? []);
+    const injected = new Set(item.metadata.failTools ?? []);
+    const toolErrors: ToolError[] = adapted.toolInvocations
+        .filter((invocation) => invocation.isMcpTool && !invocation.result.success && !injected.has(invocation.name))
+        .map((invocation) => ({
+            tool: invocation.name,
+            error: invocation.result.error?.split('\n')[0] || 'unknown error',
+            expected: expectedErrorTools.has(invocation.name),
+        }));
+
+    return {
+        kind: 'agent',
+        id: item.id,
+        ...(item.metadata.iteration !== undefined && { iteration: item.metadata.iteration }),
+        judgeResult,
+        totalTokens: conversation.totalTokens,
+        transcript,
+        toolErrors,
+    };
 }
 
 /**

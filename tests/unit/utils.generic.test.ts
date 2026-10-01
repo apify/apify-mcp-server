@@ -1,93 +1,96 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseBooleanOrNull } from '@apify/utilities';
-
-import { parseCommaSeparatedList, parseQueryParamList, stripQuoteWrappers } from '../../src/utils/generic.js';
+import {
+    computeValueBytes,
+    parseCommaSeparatedList,
+    parseQueryParamList,
+    stripQuoteWrappers,
+} from '../../src/utils/generic.js';
 
 describe('parseCommaSeparatedList', () => {
-    it('should parse comma-separated list with trimming', () => {
+    it('parses comma-separated list with trimming', () => {
         const result = parseCommaSeparatedList('field1, field2,field3 ');
         expect(result).toEqual(['field1', 'field2', 'field3']);
     });
 
-    it('should handle empty input', () => {
+    it('handles empty input', () => {
         const result = parseCommaSeparatedList();
         expect(result).toEqual([]);
     });
 
-    it('should handle empty string', () => {
+    it('handles empty string', () => {
         const result = parseCommaSeparatedList('');
         expect(result).toEqual([]);
     });
 
-    it('should filter empty strings', () => {
+    it('filters empty strings', () => {
         const result = parseCommaSeparatedList(' field1, , field2,,field3 ');
         expect(result).toEqual(['field1', 'field2', 'field3']);
     });
 
-    it('should handle only commas and spaces', () => {
+    it('handles only commas and spaces', () => {
         const result = parseCommaSeparatedList(' ,  , ');
         expect(result).toEqual([]);
     });
 
-    it('should handle single item', () => {
+    it('handles a single item', () => {
         const result = parseCommaSeparatedList(' single ');
         expect(result).toEqual(['single']);
     });
 });
 
 describe('parseQueryParamList', () => {
-    it('should parse comma-separated string', () => {
+    it('parses a comma-separated string', () => {
         const result = parseQueryParamList('tool1, tool2, tool3');
         expect(result).toEqual(['tool1', 'tool2', 'tool3']);
     });
 
-    it('should parse comma-separated string without spaces', () => {
+    it('parses a comma-separated string without spaces', () => {
         const result = parseQueryParamList('tool1,tool2,tool3');
         expect(result).toEqual(['tool1', 'tool2', 'tool3']);
     });
 
-    it('should parse array of strings', () => {
+    it('parses an array of strings', () => {
         const result = parseQueryParamList(['tool1', 'tool2', 'tool3']);
         expect(result).toEqual(['tool1', 'tool2', 'tool3']);
     });
 
-    it('should handle undefined input', () => {
+    it('handles undefined input', () => {
         const result = parseQueryParamList(undefined);
         expect(result).toEqual([]);
     });
 
-    it('should handle empty string', () => {
+    it('handles an empty string', () => {
         const result = parseQueryParamList('');
         expect(result).toEqual([]);
     });
 
-    it('should handle empty array', () => {
+    it('handles an empty array', () => {
         const result = parseQueryParamList([]);
         expect(result).toEqual([]);
     });
 
-    it('should flatten array with comma-separated values', () => {
+    it('flattens an array with comma-separated values', () => {
         const result = parseQueryParamList(['tool1, tool2', 'tool3, tool4']);
         expect(result).toEqual(['tool1', 'tool2', 'tool3', 'tool4']);
     });
 
-    it('should filter empty strings from array', () => {
+    it('filters empty strings from an array', () => {
         const result = parseQueryParamList(['tool1', '', 'tool2']);
         expect(result).toEqual(['tool1', 'tool2']);
     });
 
-    it('should handle single tool in string', () => {
+    it('handles a single tool in a string', () => {
         const result = parseQueryParamList('single-tool');
         expect(result).toEqual(['single-tool']);
     });
 
-    it('should handle single tool in array', () => {
+    it('handles a single tool in an array', () => {
         const result = parseQueryParamList(['single-tool']);
         expect(result).toEqual(['single-tool']);
     });
 
-    it('should trim whitespace from array items and their comma-separated values', () => {
+    it('trims whitespace from array items and their comma-separated values', () => {
         const result = parseQueryParamList([' tool1 , tool2 ', ' tool3']);
         expect(result).toEqual(['tool1', 'tool2', 'tool3']);
     });
@@ -126,48 +129,19 @@ describe('stripQuoteWrappers', () => {
     });
 });
 
-describe('parseBooleanOrNull', () => {
-    it('should return boolean values directly', () => {
-        expect(parseBooleanOrNull(true)).toBe(true);
-        expect(parseBooleanOrNull(false)).toBe(false);
+describe('computeValueBytes()', () => {
+    it('counts UTF-8 bytes in strings and buffers', () => {
+        expect(computeValueBytes('é')).toBe(2);
+        expect(computeValueBytes(Buffer.from('é'))).toBe(2);
     });
 
-    it('should parse "true" and "1" as true', () => {
-        expect(parseBooleanOrNull('true')).toBe(true);
-        expect(parseBooleanOrNull('TRUE')).toBe(true);
-        expect(parseBooleanOrNull('True')).toBe(true);
-        expect(parseBooleanOrNull('1')).toBe(true);
-        expect(parseBooleanOrNull('  true  ')).toBe(true);
-        expect(parseBooleanOrNull('  1  ')).toBe(true);
+    it('counts serialized bytes in objects', () => {
+        expect(computeValueBytes({ name: 'é' })).toBe(Buffer.byteLength('{"name":"é"}'));
     });
 
-    it('should parse "false" and "0" as false', () => {
-        expect(parseBooleanOrNull('false')).toBe(false);
-        expect(parseBooleanOrNull('FALSE')).toBe(false);
-        expect(parseBooleanOrNull('False')).toBe(false);
-        expect(parseBooleanOrNull('0')).toBe(false);
-        expect(parseBooleanOrNull('  false  ')).toBe(false);
-        expect(parseBooleanOrNull('  0  ')).toBe(false);
-    });
-
-    it('should return null for null and undefined', () => {
-        expect(parseBooleanOrNull(null)).toBeNull();
-        expect(parseBooleanOrNull(undefined)).toBeNull();
-    });
-
-    it('should return null for empty strings', () => {
-        expect(parseBooleanOrNull('')).toBeNull();
-        expect(parseBooleanOrNull('   ')).toBeNull();
-        expect(parseBooleanOrNull('\t')).toBeNull();
-        expect(parseBooleanOrNull('\n')).toBeNull();
-    });
-
-    it('should return null for unrecognized strings', () => {
-        expect(parseBooleanOrNull('yes')).toBeNull();
-        expect(parseBooleanOrNull('no')).toBeNull();
-        expect(parseBooleanOrNull('2')).toBeNull();
-        expect(parseBooleanOrNull('maybe')).toBeNull();
-        expect(parseBooleanOrNull('on')).toBeNull();
-        expect(parseBooleanOrNull('off')).toBeNull();
+    it('returns undefined when a value cannot be serialized', () => {
+        const circular: { self?: unknown } = {};
+        circular.self = circular;
+        expect(computeValueBytes(circular)).toBeUndefined();
     });
 });

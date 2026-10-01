@@ -44,13 +44,16 @@ const ITEM_COUNT_PROBE_LIMIT = 1;
 const ITEM_COUNT_PROBE_DELAYS_MS = [0, 1000, 2000, 2000] as const;
 
 /** Sentinel used by `raceAbort` to signal that the abort signal won the race. */
-const ABORT = Symbol('ABORT');
+export const ABORT = Symbol('ABORT');
 
 /**
  * Race a promise against an abort signal. Returns the resolved value, or {@link ABORT} if the
  * signal fires first. Cleans up its abort listener on either branch so callers never leak.
  */
-async function raceAbort<T>(promise: Promise<T>, abortSignal: AbortSignal | undefined): Promise<T | typeof ABORT> {
+export async function raceAbort<T>(
+    promise: Promise<T>,
+    abortSignal: AbortSignal | undefined,
+): Promise<T | typeof ABORT> {
     if (!abortSignal) return promise;
     // Already aborted: `addEventListener('abort', ...)` won't fire (the event has passed), so the
     // listener would never resolve and the race would block on `promise`.
