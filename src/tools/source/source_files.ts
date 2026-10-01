@@ -72,8 +72,8 @@ export type SourceFile = {
     hash: string;
     /** UTF-8 length of the content as returned: the text itself, or its base64. */
     contentBytes: number;
-    /** Built on demand, so content that is not returned is never decoded. */
-    readContent: () => string;
+    /** The content as returned: the text for utf8, the base64 for base64. */
+    content: string;
 };
 
 export function hasBinaryExtension(path: string): boolean {
@@ -104,11 +104,9 @@ export function buildFilesRevision(files: readonly Pick<SourceFile, 'path' | 'ha
 }
 
 /**
- * A file stored inline in the version. The platform stores a file without `format` or `content` as given, and the build
- * worker reads them as TEXT and as empty, so the same defaults apply. The name is normalized the way the build worker
- * normalizes it before writing the file. A BASE64 file is returned as text when the extension is not a binary one and
- * the bytes are valid UTF-8 (`apify push` picks the format by MIME type), and as its stored base64 otherwise, so no
- * byte is lost. `isUtf8` checks without building a string, so a listing holds only the bytes.
+ * A file stored inline in the version, read as the build worker reads it: no `format` is TEXT, no `content` is empty,
+ * and the name is normalized. A BASE64 file whose extension is not binary and whose bytes are valid UTF-8 is returned
+ * as text; any other BASE64 file as its stored base64, so no byte is lost.
  */
 export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile {
     const { name, format, content: storedContent }: Partial<ActorVersionSourceFile> & { name: string } = file;
@@ -117,14 +115,13 @@ export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile 
     const bytes = Buffer.from(content, format === 'BASE64' ? 'base64' : 'utf8');
     const common = { path, sizeBytes: bytes.length, hash: getSha256Prefix(bytes) };
     if (format !== 'BASE64') {
-        return { ...common, encoding: 'utf8', contentBytes: bytes.length, readContent: () => content };
+        return { ...common, encoding: 'utf8', contentBytes: bytes.length, content };
     }
     if (!hasBinaryExtension(path) && isUtf8(bytes)) {
         // Valid UTF-8 decoded with the BOM kept encodes back to the same bytes, so its length is the byte count.
-        const readContent = () => UTF8_DECODER.decode(bytes);
-        return { ...common, encoding: 'utf8', contentBytes: bytes.length, readContent };
+        return { ...common, encoding: 'utf8', contentBytes: bytes.length, content: UTF8_DECODER.decode(bytes) };
     }
-    return { ...common, encoding: 'base64', contentBytes: Buffer.byteLength(content), readContent: () => content };
+    return { ...common, encoding: 'base64', contentBytes: Buffer.byteLength(content), content };
 }
 
 /** Console keeps an empty folder as a `{ name, folder: true }` entry with no content; apify-client's type leaves it out. */
@@ -132,10 +129,7 @@ export function isFolderEntry(file: ActorVersionSourceFile): boolean {
     return (file as { folder?: boolean }).folder === true;
 }
 
-/**
- * The version's regular files, one per path (the last stored entry wins), sorted by path, so the manifest reads the
- * same whatever order the version stores its files in; folder entries are left out.
- */
+/** The version's regular files sorted by path, one per path (the last stored entry wins); folders are left out. */
 export function buildFilesManifest(entries: readonly ActorVersionSourceFile[]): SourceFile[] {
     const filesByPath = new Map<string, SourceFile>();
     for (const entry of entries) {

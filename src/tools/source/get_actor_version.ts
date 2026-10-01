@@ -123,11 +123,8 @@ function getSourceUrl(version: ActorVersion): string | undefined {
 /** Throws `UserInputError` for a version not stored as files and for one whose source the API hides. */
 function extractVersionFiles(version: ActorVersion, versionLabel: string): SourceFile[] {
     if (version.sourceType !== ActorSourceType.SourceFiles) {
-        // TODO(#1452): Read a version that `apify push` stored as a zip in the Actor's source store (TARBALL), with
-        // adm-zip 0.6.1 or later: download only from the session's API host, cap the entry count and the unpacked size,
-        // and refuse symbolic links, encrypted entries, and unsafe names. The Apify API has no way to read single files
-        // of an Actor's source, so returning even one file will download and unpack the whole zip; read only the files
-        // asked for once it can.
+        // TODO(#1452): Read zip-stored (TARBALL) versions with adm-zip 0.6.1 or later, within the download and unpacking
+        // limits the issue lists.
         // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
         const { sourceType }: { sourceType: string } = version;
         const url = getSourceUrl(version);
@@ -158,7 +155,7 @@ function extractLineRange(file: SourceFile, { startLine, lineCount }: LineRange)
             `${file.path} is returned as base64, and startLine and lineCount work only on text files.`,
         );
     }
-    const lines = splitLines(file.readContent());
+    const lines = splitLines(file.content);
     if (startLine > lines.length) {
         throw new UserInputError(`${file.path} has ${lines.length} lines, so startLine ${startLine} is past its end.`);
     }
@@ -178,12 +175,13 @@ function extractLineRange(file: SourceFile, { startLine, lineCount }: LineRange)
  * the files after it still get their turn.
  */
 function selectContents(files: readonly SourceFile[], paths: readonly string[], lineRange: LineRange | undefined) {
+    const filesByPath = new Map(files.map((file) => [file.path, file]));
     const contents: ReturnedContent[] = [];
     const omittedPaths: string[] = [];
     const notFoundPaths: string[] = [];
     let remainingBytes = MAX_INLINE_BYTES;
     for (const path of new Set(paths)) {
-        const file = files.find((candidate) => candidate.path === path);
+        const file = filesByPath.get(path);
         if (!file) {
             notFoundPaths.push(path);
             continue;
@@ -194,7 +192,7 @@ function selectContents(files: readonly SourceFile[], paths: readonly string[], 
             omittedPaths.push(path);
             continue;
         }
-        contents.push(range ?? { path, content: file.readContent(), encoding: file.encoding });
+        contents.push(range ?? { path, content: file.content, encoding: file.encoding });
         remainingBytes -= bytes;
     }
     return {
@@ -208,8 +206,7 @@ function selectContents(files: readonly SourceFile[], paths: readonly string[], 
  * https://docs.apify.com/api/v2/actor-get
  *  /v2/actors/{actorId}
  *
- * The Actor GET returns each version with its source, hidden the same way as the version GET hides it, so one call is
- * enough. The hashes and the revision do not depend on the stored format, so a caller can compare them across reads.
+ * The Actor GET returns each version with its source, so one call is enough.
  */
 export const getActorVersion: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -246,26 +243,24 @@ export const getActorVersion: ToolEntry = Object.freeze({
         const { args, apifyClient: client } = toolArgs;
         const parsed = getActorVersionArgs.parse(args);
         const { paths = [], startLine, lineCount } = parsed;
-        const isLineRange = startLine !== undefined || lineCount !== undefined;
-        if (isLineRange && paths.length !== 1) {
+        const lineRange =
+            startLine !== undefined || lineCount !== undefined ? { startLine: startLine ?? 1, lineCount } : undefined;
+        if (lineRange && paths.length !== 1) {
             return respondUserError('startLine and lineCount need exactly one path in paths.');
         }
         try {
-            // TODO: The Actor GET returns every stored file of every version even when one file is asked for: the
-            // Apify API has no way to read or change single files of an Actor's source. Use such an API once it exists.
+            // TODO: The Actor GET returns every file of every version; read only the files asked for once the API can.
             // apify-client turns username/name into the API's username~name.
             const actor = await client.actor(parsed.actor).get();
             // Extra path segments, such as username/name/runs/last, reach a sub-resource that is not an Actor.
             if (!actor || typeof actor.name !== 'string' || typeof actor.username !== 'string') {
                 return respondUserError(
-                    `Actor '${parsed.actor}' not found. Give its ID or its full name, username/name; ` +
-                        'a name without the username is not enough.',
+                    `Actor '${parsed.actor}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
                 );
             }
             const fullName = `${actor.username}/${actor.name}`;
             const version = resolveVersion(actor, parsed.versionNumber, parsed.actor);
             const files = extractVersionFiles(version, `Version ${version.versionNumber} of ${fullName}`);
-            const lineRange = isLineRange ? { startLine: startLine ?? 1, lineCount } : undefined;
             const structuredContent = {
                 actorId: actor.id,
                 fullName,
