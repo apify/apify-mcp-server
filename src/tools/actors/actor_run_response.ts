@@ -27,6 +27,9 @@ import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 /** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
 const TIP_KVS_KEY = 'TIP';
 
+/** Limit the TIP pilot to RAG Web Browser, including calls made by Actor ID. */
+const RAG_WEB_BROWSER_ID = '3ox4R101TgZz67sLr';
+
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
 export const WIDGET_NO_POLL_NEXT_STEP =
     'Widget is rendering live progress. Do NOT poll — the widget self-updates until completion.';
@@ -963,7 +966,7 @@ export async function fetchActorRunData(params: {
     const displayedKeys = defaultKv?.keys ?? [];
     const kvTruncated = defaultKv?.keyCount === undefined && displayedKeys.length === KV_KEYS_LIMIT;
     const hasTipKey =
-        isTerminal && defaultKv
+        isTerminal && run.actId === RAG_WEB_BROWSER_ID && defaultKv
             ? displayedKeys.includes(TIP_KVS_KEY) ||
               (kvTruncated && (await keyValueStoreHasTipKey(client, defaultKv.id, mcpSessionId)))
             : false;

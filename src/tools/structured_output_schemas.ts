@@ -698,7 +698,7 @@ export const actorRunOutputSchema = {
         },
         tip: {
             type: 'object' as const,
-            description: 'Advisory guidance an Actor wrote to its key-value store under the reserved "TIP" key',
+            description: 'Advisory guidance RAG Web Browser wrote to its key-value store under the reserved "TIP" key',
             properties: {
                 message: {
                     type: 'string',

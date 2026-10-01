@@ -25,7 +25,7 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
- * — with no inlined dataset items or KV record bodies, except the reserved `TIP` key.
+ * — with no inlined dataset items or KV record bodies, except RAG Web Browser's reserved `TIP` key.
  * Tests cover shape invariants and the branching status templates (SUCCEEDED, TIMED-OUT).
  * Pure-template states (READY, RUNNING, TIMING-OUT, ABORTING, FAILED, ABORTED) are intentionally
  * not asserted here — see the comment above `describe('buildStatusTemplate', ...)` below.
@@ -547,11 +547,11 @@ describe('get-actor-run default response', () => {
         };
     }
 
-    function makeRunClient(kvStoreClient: unknown) {
-        const run = mockSucceededRun();
+    function makeRunClient(kvStoreClient: unknown, actorId = '3ox4R101TgZz67sLr', actor = ACTOR) {
+        const run = mockSucceededRun({ actId: actorId });
         return {
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
-            actor: (_id: string) => ({ get: async () => ACTOR }),
+            actor: (_id: string) => ({ get: async () => actor }),
             dataset: (_id: string) => ({
                 get: async () => mockDataset(),
                 listItems: async () => ({ items: [], total: 0 }),
@@ -579,6 +579,36 @@ describe('get-actor-run default response', () => {
         expect(getRecordCalls()).toBe(1);
         expect(listKeysCalls()).toHaveLength(1);
     });
+
+    it.each([false, true])(
+        'skips TIP reads for another Actor when the key page is truncated=%s',
+        async (isTruncated) => {
+            const { client, getRecordCalls, recordExistsCalls } = makeKvStoreClient({
+                displayedKeys: isTruncated
+                    ? Array.from({ length: 50 }, (_, i) => ({ key: `KEY_${i}` }))
+                    : [{ key: 'TIP' }],
+                displayTruncated: isTruncated,
+                hasTipKey: true,
+                tipRecordValue: { message: 'Use a specialized Actor.', level: 'info' },
+            });
+
+            const result = await (getActorRun as HelperTool).call(
+                stubToolCallContext(
+                    { runId: 'run-1', waitSecs: 0 },
+                    makeRunClient(client, 'shu8hvrXbJbY3Eb9W', { username: 'another-user', name: 'rag-web-browser' }),
+                ),
+            );
+            const { structuredContent, content } = result as {
+                structuredContent: RunResponse;
+                content: { type: string; text: string }[];
+            };
+
+            expect(structuredContent.tip).toBeUndefined();
+            expect(content[1].text).not.toContain('Tip from Actor');
+            expect(getRecordCalls()).toBe(0);
+            expect(recordExistsCalls()).toEqual([]);
+        },
+    );
 
     it('omits tip and never fetches the TIP record when a non-truncated store does not have it', async () => {
         const { client, getRecordCalls, listKeysCalls } = makeKvStoreClient({
