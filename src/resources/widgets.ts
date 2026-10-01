@@ -40,16 +40,31 @@ const OPENAI_WIDGET_CSP = {
     resource_domains: RESOURCE_DOMAINS,
 } as const;
 
-const WIDGET_BASE_UI = {
-    visibility: ['model', 'app'] as const,
+// MCP Apps spec (SEP-1865): `csp`/`prefersBorder` are UI-resource metadata (`McpUiResourceMeta`) —
+// "hosts read it from the resources/read content item (with resources/list entry as fallback) and
+// ignore it here [on the tool]"; `McpUiToolMeta` types `csp`/`permissions` as `never` and carries
+// only `resourceUri`/`visibility`. Claude's host warns at runtime when they're mixed up
+// ("declares _meta.ui.csp/permissions, which is ignored"), so each surface gets only its own fields.
+const WIDGET_RESOURCE_UI = {
     prefersBorder: true,
     csp: WIDGET_CSP,
+} as const;
+
+const WIDGET_TOOL_UI = {
+    visibility: ['model', 'app'] as const,
 } as const;
 
 export const WIDGET_URIS = {
     SEARCH_ACTORS: 'ui://widget/search-actors.html',
     ACTOR_RUN: 'ui://widget/actor-run.html',
 } as const;
+
+/** Resource-level `_meta` (`resources/list` entry and `resources/read` content item). */
+type WidgetResourceMeta = NonNullable<Resource['_meta']> & {
+    'openai/widgetCSP'?: typeof OPENAI_WIDGET_CSP;
+    'openai/widgetDomain'?: string;
+    ui: typeof WIDGET_RESOURCE_UI;
+};
 
 type WidgetMeta = NonNullable<Resource['_meta']> & {
     // ChatGPT UX hints (does not affect MCP Jam renderer detection)
@@ -63,13 +78,20 @@ type WidgetMeta = NonNullable<Resource['_meta']> & {
     // 'openai/widgetPrefersBorder'?: boolean;
     'openai/widgetDomain'?: string;
     // MCP Apps standard metadata (SEP-1865)
-    ui: {
-        resourceUri: string;
-        visibility: readonly string[];
-        prefersBorder: boolean;
-        csp: typeof WIDGET_CSP;
-    };
+    ui: typeof WIDGET_TOOL_UI & { resourceUri: string };
+    // Legacy alias for `ui.resourceUri`; the ext-apps SDK's `registerAppTool` populates both
+    // "for compatibility with older hosts" and Claude Desktop's host reads it.
+    'ui/resourceUri': string;
 };
+
+/** Resource `_meta`: CSP and border preference, the fields hosts read off the UI resource. */
+function createWidgetResourceMeta(): WidgetResourceMeta {
+    return {
+        'openai/widgetCSP': OPENAI_WIDGET_CSP,
+        'openai/widgetDomain': WIDGET_DOMAIN,
+        ui: WIDGET_RESOURCE_UI,
+    };
+}
 
 /**
  * Creates widget metadata for tool definitions.
@@ -100,9 +122,10 @@ function createWidgetMeta(params: { resourceUri: string; invoking: string; invok
         // what ChatGPT public apps read — re-add them if ChatGPT public-app support regresses.
         // 'openai/widgetAccessible': true,
         'openai/widgetCSP': OPENAI_WIDGET_CSP,
-        // 'openai/widgetPrefersBorder': WIDGET_BASE_UI.prefersBorder,
+        // 'openai/widgetPrefersBorder': WIDGET_RESOURCE_UI.prefersBorder,
         'openai/widgetDomain': WIDGET_DOMAIN,
-        ui: { ...WIDGET_BASE_UI, resourceUri },
+        ui: { ...WIDGET_TOOL_UI, resourceUri },
+        'ui/resourceUri': resourceUri,
     };
 }
 
@@ -112,7 +135,10 @@ export type WidgetConfig = {
     description: NonNullable<Resource['description']>;
     jsFilename: string;
     title: NonNullable<Resource['title']>;
+    /** Tool-descriptor and tool-result `_meta`. */
     meta: WidgetMeta;
+    /** `resources/list` and `resources/read` `_meta`. */
+    resourceMeta: WidgetResourceMeta;
 };
 
 /**
@@ -130,6 +156,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
             invoking: 'Searching Apify Store...',
             invoked: 'Found Actors matching your criteria',
         }),
+        resourceMeta: createWidgetResourceMeta(),
     },
     [WIDGET_URIS.ACTOR_RUN]: {
         uri: WIDGET_URIS.ACTOR_RUN,
@@ -142,6 +169,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
             invoking: 'Running Apify Actor...',
             invoked: 'Actor run started',
         }),
+        resourceMeta: createWidgetResourceMeta(),
     },
 };
 
