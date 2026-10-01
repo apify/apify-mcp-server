@@ -529,6 +529,60 @@ export const buildActorToolOutputSchema = {
     required: ['build'],
 };
 
+/** Schema for get-actor-version: the version's file manifest, its revision, and the content returned. */
+export const getActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        revision: { type: 'string', description: 'Identifies the whole file set; changes when any file changes' },
+        files: {
+            type: 'array',
+            description: 'Regular files sorted by path, folders excluded',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'Path relative to the Actor root' },
+                    sizeBytes: { type: 'number', description: 'Size of the decoded bytes' },
+                    hash: { type: 'string', description: 'First 16 hex characters of the SHA-256 of the bytes' },
+                },
+                required: ['path', 'sizeBytes', 'hash'],
+            },
+        },
+        contents: {
+            type: 'array',
+            description: 'Content of the returned files, raw with no line numbers',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string' },
+                    content: { type: 'string' },
+                    encoding: { type: 'string', enum: ['utf8', 'base64'] },
+                    startLine: {
+                        type: 'integer',
+                        description: 'First returned line, counting from 1; set for a line range',
+                    },
+                    endLine: { type: 'integer', description: 'Last returned line; set for a line range' },
+                    totalLines: { type: 'integer', description: 'Lines in the whole file; set for a line range' },
+                },
+                required: ['path', 'content', 'encoding'],
+            },
+        },
+        omittedPaths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Requested files left out to stay within the content limit',
+        },
+        notFoundPaths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Requested paths the version has no file at',
+        },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files', 'contents'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
