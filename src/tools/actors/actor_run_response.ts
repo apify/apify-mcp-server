@@ -27,8 +27,8 @@ import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 /** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
 const TIP_KVS_KEY = 'TIP';
 
-/** Page size for the targeted `TIP` key lookup (server-side `prefix` filter, not pagination). */
-const TIP_SEARCH_LIMIT = 1000;
+/** Limit the TIP pilot to RAG Web Browser, including calls made by Actor ID. */
+const RAG_WEB_BROWSER_ID = '3ox4R101TgZz67sLr';
 
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
 export const WIDGET_NO_POLL_NEXT_STEP =
@@ -339,15 +339,18 @@ function parseActorTip(value: unknown): RunResponse['tip'] {
     return {
         message: truncated,
         ...(level === 'info' || level === 'warning' ? { level } : {}),
-        ...(typeof recommendedActorId === 'string' && recommendedActorId ? { recommendedActorId } : {}),
+        ...(typeof recommendedActorId === 'string' &&
+        recommendedActorId.length === 17 &&
+        /^[a-zA-Z0-9]{17}$/.test(recommendedActorId)
+            ? { recommendedActorId }
+            : {}),
     };
 }
 
-/** Targeted `TIP` key lookup via the API's `prefix` filter — works for stores of any size, one request. */
+/** Check the exact `TIP` key without fetching another page of keys. */
 async function keyValueStoreHasTipKey(client: ApifyClient, id: string, mcpSessionId?: string): Promise<boolean> {
     try {
-        const page = await client.keyValueStore(id).listKeys({ prefix: TIP_KVS_KEY, limit: TIP_SEARCH_LIMIT });
-        return page.items.some((item) => item.key === TIP_KVS_KEY);
+        return await client.keyValueStore(id).recordExists(TIP_KVS_KEY);
     } catch (error) {
         log.warning('Failed to look up Actor tip key', {
             keyValueStoreId: id,
@@ -371,6 +374,18 @@ async function fetchActorTip(
         log.warning('Failed to fetch Actor tip', { keyValueStoreId, mcpSessionId, errMessage: errMessage(error) });
         return undefined;
     }
+}
+
+/** Fetch the run's tip; looks the key up separately only when the listed keys are truncated. */
+async function fetchRunTip(
+    client: ApifyClient,
+    { id, keys = [], keyCount }: RunKeyValueStore,
+    mcpSessionId?: string,
+): Promise<RunResponse['tip']> {
+    const isTruncated = keyCount === undefined && keys.length === KV_KEYS_LIMIT;
+    const hasTipKey =
+        keys.includes(TIP_KVS_KEY) || (isTruncated && (await keyValueStoreHasTipKey(client, id, mcpSessionId)));
+    return hasTipKey ? fetchActorTip(client, id, mcpSessionId) : undefined;
 }
 
 /**
@@ -957,17 +972,11 @@ export async function fetchActorRunData(params: {
         keyValueStore: keyValueStores?.default,
     });
 
-    // Targeted lookup only when the displayed (KV_KEYS_LIMIT-capped) page is truncated and lacks TIP —
-    // avoids an extra round trip in the common case while still catching TIP beyond that page.
     const defaultKv = keyValueStores?.default;
-    const displayedKeys = defaultKv?.keys ?? [];
-    const kvTruncated = defaultKv?.keyCount === undefined && displayedKeys.length === KV_KEYS_LIMIT;
-    const hasTipKey =
-        isTerminal && defaultKv
-            ? displayedKeys.includes(TIP_KVS_KEY) ||
-              (kvTruncated && (await keyValueStoreHasTipKey(client, defaultKv.id, mcpSessionId)))
-            : false;
-    const tip = hasTipKey && defaultKv ? await fetchActorTip(client, defaultKv.id, mcpSessionId) : undefined;
+    const tip =
+        isTerminal && run.actId === RAG_WEB_BROWSER_ID && defaultKv
+            ? await fetchRunTip(client, defaultKv, mcpSessionId)
+            : undefined;
 
     const structuredContent: RunResponse = {
         runId: run.id,
