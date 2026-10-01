@@ -269,7 +269,20 @@ export const getActorVersion: ToolEntry = Object.freeze({
                 files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
                 ...selectContents(files, paths, lineRange),
             };
-            const summary = `Read version ${version.versionNumber} of ${fullName}.`;
+            const { omittedPaths, notFoundPaths } = structuredContent;
+            const omittedHint = lineRange
+                ? 'ask for fewer lines with lineCount'
+                : 'ask for a file alone, or for part of it with startLine and lineCount';
+            // Names the requested files that did not come back, for a caller that reads only the text.
+            const summary = [
+                `Read version ${version.versionNumber} of ${fullName}.`,
+                omittedPaths &&
+                    `Left out over the ${INLINE_LIMIT_KIB} KiB limit: ${omittedPaths.join(', ')}; ${omittedHint}.`,
+                notFoundPaths &&
+                    `Not found: ${notFoundPaths.join(', ')}; check the paths against files (folders are not files).`,
+            ]
+                .filter(Boolean)
+                .join(' ');
             return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
         } catch (error) {
             if (error instanceof UserInputError) return respondUserError(error.message);

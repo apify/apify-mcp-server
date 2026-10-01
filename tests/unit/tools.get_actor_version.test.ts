@@ -734,6 +734,58 @@ describe('get-actor-version', () => {
         });
     });
 
+    describe('summary', () => {
+        const BIG_LINES_SOURCE = { name: 'big.js', format: 'TEXT', content: `${'x'.repeat(1023)}\n`.repeat(300) };
+
+        beforeEach(() => {
+            mockVersionRead({
+                sourceFiles: [...buildTextSources(4, 100 * 1024), BIG_LINES_SOURCE, { name: 'src', folder: true }],
+            });
+        });
+
+        it.each<{ outcome: string; args: Record<string, unknown>; summary: string }>([
+            {
+                outcome: 'only the read sentence when every file comes back',
+                args: { paths: ['file-00.txt'] },
+                summary: 'Read version 0.1 of john/my-actor.',
+            },
+            {
+                outcome: 'the files left out over the limit',
+                args: { paths: ['file-00.txt', 'file-01.txt', 'file-02.txt', 'file-03.txt'] },
+                summary:
+                    'Read version 0.1 of john/my-actor. Left out over the 256 KiB limit: file-02.txt, file-03.txt; ask for a file alone, or for part of it with startLine and lineCount.',
+            },
+            {
+                outcome: 'the paths with no file, a folder among them',
+                args: { paths: ['file-00.txt', 'missing.js', 'src'] },
+                summary:
+                    'Read version 0.1 of john/my-actor. Not found: missing.js, src; check the paths against files (folders are not files).',
+            },
+            {
+                outcome: 'both the files left out and the paths with no file',
+                args: { paths: ['file-00.txt', 'file-01.txt', 'file-02.txt', 'missing.js'] },
+                summary:
+                    'Read version 0.1 of john/my-actor. Left out over the 256 KiB limit: file-02.txt; ask for a file alone, or for part of it with startLine and lineCount. Not found: missing.js; check the paths against files (folders are not files).',
+            },
+            {
+                outcome: 'a line range left out over the limit, with a hint to ask for fewer lines',
+                args: { paths: ['big.js'], lineCount: 257 },
+                summary:
+                    'Read version 0.1 of john/my-actor. Left out over the 256 KiB limit: big.js; ask for fewer lines with lineCount.',
+            },
+            {
+                outcome: 'a line range of a path with no file',
+                args: { paths: ['nope.js'], startLine: 1 },
+                summary:
+                    'Read version 0.1 of john/my-actor. Not found: nope.js; check the paths against files (folders are not files).',
+            },
+        ])('says $outcome', async ({ args, summary }) => {
+            const result = await callTool(args);
+
+            expect(result.content[1].text).toBe(summary);
+        });
+    });
+
     describe('Actor and version resolution', () => {
         it('lists each version with its source type and build tag when versionNumber is needed', async () => {
             actorGetMock.mockResolvedValue(
