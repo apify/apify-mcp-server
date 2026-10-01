@@ -323,6 +323,18 @@ describe('deriveResourceIds', () => {
         expect(deriveResourceIds({ query: 'web scraper' }, { structuredContent: { items: [] } })).toEqual({});
     });
 
+    it('reads tip_recommended_actor_id off structuredContent.tip', () => {
+        const result = {
+            structuredContent: { runId: 'run1', status: 'SUCCEEDED', tip: { recommendedActorId: 'shu8hvrXbJbY3Eb9W' } },
+        };
+        expect(deriveResourceIds({}, result).tip_recommended_actor_id).toBe('shu8hvrXbJbY3Eb9W');
+    });
+
+    it('omits tip_recommended_actor_id when the tip names no Actor', () => {
+        const result = { structuredContent: { runId: 'run1', status: 'SUCCEEDED', tip: { message: 'x' } } };
+        expect(deriveResourceIds({}, result)).not.toHaveProperty('tip_recommended_actor_id');
+    });
+
     // Regression guard: ties deriveResourceIds to the REAL run-response shape. If a run builder ever
     // stops emitting runId/status in structuredContent, this goes red (the runtime drift a type can't catch).
     it('extracts run_id/run_status from a real buildStartRunResponse output', () => {

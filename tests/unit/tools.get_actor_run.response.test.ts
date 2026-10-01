@@ -1,6 +1,7 @@
 import type { ActorRun } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
 import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
@@ -24,7 +25,7 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
- * — with no inlined dataset items or KV record bodies.
+ * — with no inlined dataset items or KV record bodies, except the reserved `TIP` key.
  * Tests cover shape invariants and the branching status templates (SUCCEEDED, TIMED-OUT).
  * Pure-template states (READY, RUNNING, TIMING-OUT, ABORTING, FAILED, ABORTED) are intentionally
  * not asserted here — see the comment above `describe('buildStatusTemplate', ...)` below.
@@ -510,6 +511,251 @@ describe('get-actor-run default response', () => {
             keys: ['shot-1', 'shot-2'],
             keyCount: 2,
         });
+    });
+
+    /** Stubs `listKeys`, branching on `prefix` to serve the display page vs. the targeted TIP lookup. */
+    function makeKvStoreClient(opts: {
+        displayedKeys: { key: string }[];
+        displayTruncated?: boolean;
+        prefixLookupItems?: { key: string }[];
+        tipRecordValue?: unknown;
+    }) {
+        let getRecordCalls = 0;
+        const listKeysCalls: { limit: number; prefix?: string }[] = [];
+        return {
+            client: {
+                keyValueStore: (_id: string) => ({
+                    listKeys: async (listOpts: { limit: number; prefix?: string }) => {
+                        listKeysCalls.push(listOpts);
+                        if (listOpts.prefix === undefined) {
+                            return { items: opts.displayedKeys, isTruncated: opts.displayTruncated ?? false };
+                        }
+                        return { items: opts.prefixLookupItems ?? [], isTruncated: false };
+                    },
+                    getRecord: async (key: string) => {
+                        getRecordCalls += 1;
+                        return key === 'TIP' && opts.tipRecordValue !== undefined
+                            ? { key, value: opts.tipRecordValue }
+                            : undefined;
+                    },
+                }),
+            } as unknown as InternalToolArgs['apifyClient'],
+            getRecordCalls: () => getRecordCalls,
+            listKeysCalls: () => listKeysCalls,
+        };
+    }
+
+    function makeRunClient(kvStoreClient: unknown) {
+        const run = mockSucceededRun();
+        return {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => mockDataset(),
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            ...(kvStoreClient as object),
+        } as unknown as InternalToolArgs['apifyClient'];
+    }
+
+    it('fetches and surfaces the TIP record when the key-value store lists a TIP key', async () => {
+        const { client, getRecordCalls, listKeysCalls } = makeKvStoreClient({
+            displayedKeys: [{ key: 'OUTPUT' }, { key: 'TIP' }],
+            tipRecordValue: { message: 'Use the Instagram Scraper instead.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.tip).toEqual({ message: 'Use the Instagram Scraper instead.', level: 'info' });
+        expect(content[1].text.endsWith('\nTip from Actor:\n```\nUse the Instagram Scraper instead.\n```')).toBe(true);
+        expect(getRecordCalls()).toBe(1);
+        expect(listKeysCalls()).toHaveLength(1);
+    });
+
+    it('omits tip and never fetches the TIP record when a non-truncated store does not have it', async () => {
+        const { client, getRecordCalls, listKeysCalls } = makeKvStoreClient({
+            displayedKeys: [{ key: 'OUTPUT' }],
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.tip).toBeUndefined();
+        expect(content[1].text).not.toContain('Tip');
+        expect(getRecordCalls()).toBe(0);
+        expect(listKeysCalls()).toHaveLength(1);
+    });
+
+    it('finds a TIP key via a targeted lookup when the displayed page is truncated', async () => {
+        const displayedKeys = Array.from({ length: 50 }, (_, i) => ({ key: `KEY_${i}` }));
+        const { client, getRecordCalls, listKeysCalls } = makeKvStoreClient({
+            displayedKeys,
+            displayTruncated: true,
+            prefixLookupItems: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'Use a specialized Actor.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({ message: 'Use a specialized Actor.', level: 'info' });
+        expect(getRecordCalls()).toBe(1);
+        expect(listKeysCalls()).toEqual([{ limit: KV_KEYS_LIMIT }, { prefix: 'TIP', limit: expect.any(Number) }]);
+    });
+
+    it("omits tip and skips getRecord when the truncated page's targeted lookup finds nothing", async () => {
+        const displayedKeys = Array.from({ length: 50 }, (_, i) => ({ key: `KEY_${i}` }));
+        const { client, getRecordCalls, listKeysCalls } = makeKvStoreClient({
+            displayedKeys,
+            displayTruncated: true,
+            prefixLookupItems: [],
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toBeUndefined();
+        expect(getRecordCalls()).toBe(0);
+        expect(listKeysCalls()).toHaveLength(2);
+    });
+
+    it('discards a malformed TIP record instead of throwing', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { level: 'warning' }, // no `message`
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toBeUndefined();
+    });
+
+    it(`truncates a TIP message longer than ${TIP_MESSAGE_LIMIT} characters`, async () => {
+        const longMessage = 'x'.repeat(TIP_MESSAGE_LIMIT + 100);
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: longMessage, level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip?.message).toBe(`${'x'.repeat(TIP_MESSAGE_LIMIT)}…`);
+    });
+
+    it('truncates on Unicode code points, not UTF-16 units, so a trailing emoji is not split', async () => {
+        const message = `${'x'.repeat(TIP_MESSAGE_LIMIT - 1)}🚀extra`;
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message, level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip?.message).toBe(`${'x'.repeat(TIP_MESSAGE_LIMIT - 1)}🚀…`);
+    });
+
+    it('omits an unrecognized TIP level instead of coercing it to "info"', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'Try a different Actor.', level: 'critical' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({ message: 'Try a different Actor.' });
+        expect(structuredContent.tip).not.toHaveProperty('level');
+    });
+
+    it('surfaces recommendedActorId when the TIP record names one', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: {
+                message: 'Use the Instagram Scraper instead.',
+                level: 'info',
+                recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+            },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({
+            message: 'Use the Instagram Scraper instead.',
+            level: 'info',
+            recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+        });
+    });
+
+    it('omits recommendedActorId when the TIP record does not name one', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'General advice, no specific Actor.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).not.toHaveProperty('recommendedActorId');
+    });
+
+    it('discards a non-string recommendedActorId instead of surfacing a malformed value', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'Use a specialized Actor.', level: 'info', recommendedActorId: 12345 },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({ message: 'Use a specialized Actor.', level: 'info' });
+        expect(structuredContent.tip).not.toHaveProperty('recommendedActorId');
+    });
+
+    it('renders the tip in a fenced code block in the text response', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'Use a different Actor.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { content } = result as { content: { type: string; text: string }[] };
+
+        expect(content[1].text).toContain('Tip from Actor:\n```\nUse a different Actor.\n```');
     });
 
     it('emits progress with formatted status messages on wait + terminal flip', async () => {
