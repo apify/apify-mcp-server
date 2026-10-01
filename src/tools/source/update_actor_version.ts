@@ -196,7 +196,7 @@ function applyOperation(files: Map<string, SourceFile>, operation: OperationArgs
         const detail = `${path} is not UTF-8 text; replace it with a write.`;
         throw buildPreconditionError(label, PRECONDITION_REASON.NOT_TEXT, detail);
     }
-    const text = applyTextEdits(existing.readContent(), edits, label);
+    const text = applyTextEdits(existing.content, edits, label);
     // A UTF-8 file that `apify push` stored as BASE64 stays BASE64.
     const isBase64 = existing.entry.format === 'BASE64';
     const newContent = isBase64 ? Buffer.from(text).toString('base64') : text;
