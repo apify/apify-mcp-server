@@ -34,10 +34,13 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
     shared `waitSecs` field, the shared build response and the by-status next-step text.
   - `source/`: `get-actor-version` (an Actor version's file manifest with hashes, revision, and
-    requested content), `create-actor` (a new Actor with one version in a single POST), and
+    requested content), `create-actor` (a new Actor with one version in a single POST),
     `update-actor-version` (write, edit, and delete operations applied all-or-nothing to a fresh read,
-    stored with one version PUT that carries only the source keys). `source_files.ts` holds the file
-    shape, the manifest builder, the hash and revision rules, and the text-or-base64 detection;
+    stored with one version PUT that carries only the source keys), `create-actor-version` (a new
+    version in one POST, from files or as a copy of another version's files and non-secret env vars,
+    with no default buildTag), and `delete-actor-version` (reads the Actor first, since apify-client
+    reports a delete of a missing version as done). `source_files.ts` holds the file shape, the
+    manifest builder, the hash and revision rules, and the text-or-base64 detection;
     `source_helpers.ts` holds the Actor and version lookup, the file input shape, and the response
     after a write, which starts the build for autoBuild. Versions not stored as files (Git repository,
     gist, or zip) are refused.

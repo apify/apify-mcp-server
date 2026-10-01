@@ -618,6 +618,32 @@ export const createActorToolOutputSchema = {
     required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files'],
 };
 
+/** Schema for create-actor-version: the new version and its files. */
+export const createActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Number of the new version, e.g. 0.2' },
+        revision: createActorToolOutputSchema.properties.revision,
+        files: createActorToolOutputSchema.properties.files,
+        ...sourceWriteBuildProperties,
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files'],
+};
+
+/** Schema for delete-actor-version: the version that was deleted. */
+export const deleteActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Number of the deleted version' },
+        deleted: { type: 'boolean', description: 'Always true' },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'deleted'],
+};
+
 /** Schema for update-actor-version: the new revision and what changed. */
 export const updateActorVersionToolOutputSchema = {
     type: 'object' as const,
