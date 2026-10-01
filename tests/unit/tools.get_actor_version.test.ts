@@ -305,24 +305,17 @@ describe('get-actor-version', () => {
             ]);
         });
 
-        it('returns a BASE64 file with a text extension as base64 when its bytes are not valid UTF-8', async () => {
-            const bytes = Buffer.from([0x61, 0xc3, 0x28, 0xff]);
+        it.each([
+            ['a text extension when its bytes are not valid UTF-8', 'data.txt', Buffer.from([0x61, 0xc3, 0x28, 0xff])],
+            ['a binary extension even when its bytes are valid UTF-8', 'data.bin', Buffer.from('ascii')],
+        ])('returns a BASE64 file with %s as base64', async (_, path, bytes) => {
             const content = bytes.toString('base64');
-            mockVersionRead({ sourceFiles: [{ name: 'data.txt', format: 'BASE64', content }] });
+            mockVersionRead({ sourceFiles: [{ name: path, format: 'BASE64', content }] });
 
-            const { structuredContent } = await callTool({ paths: ['data.txt'] });
+            const { structuredContent } = await callTool({ paths: [path] });
 
-            expect(structuredContent.files).toEqual([{ path: 'data.txt', sizeBytes: 4, hash: sha256Prefix(bytes) }]);
-            expect(structuredContent.contents).toEqual([{ path: 'data.txt', content, encoding: 'base64' }]);
-        });
-
-        it('returns a BASE64 file with a binary extension as base64 even when its bytes are valid UTF-8', async () => {
-            const content = Buffer.from('ascii').toString('base64');
-            mockVersionRead({ sourceFiles: [{ name: 'data.bin', format: 'BASE64', content }] });
-
-            const { structuredContent } = await callTool({ paths: ['data.bin'] });
-
-            expect(structuredContent.contents).toEqual([{ path: 'data.bin', content, encoding: 'base64' }]);
+            expect(structuredContent.files).toEqual([{ path, sizeBytes: bytes.length, hash: sha256Prefix(bytes) }]);
+            expect(structuredContent.contents).toEqual([{ path, content, encoding: 'base64' }]);
         });
 
         it('matches a binary extension in any case, and returns base64 exactly as stored', async () => {
@@ -616,62 +609,45 @@ describe('get-actor-version', () => {
         const LINES_SOURCE = { name: 'src/lines.js', format: 'TEXT', content: 'one\r\ntwo\nthree\nfour' };
 
         beforeEach(() => {
-            mockVersionRead({ sourceFiles: [LINES_SOURCE, LOGO_SOURCE] });
+            mockVersionRead({
+                sourceFiles: [LINES_SOURCE, LOGO_SOURCE, { name: 'empty.js', format: 'TEXT', content: '' }],
+            });
         });
 
-        it('returns the requested lines raw, with their line endings', async () => {
-            const result = await callTool({ paths: ['src/lines.js'], startLine: 2, lineCount: 2 });
+        it.each([
+            {
+                outcome: 'the requested lines raw, with their line endings',
+                range: { startLine: 2, lineCount: 2 },
+                expected: { content: 'two\nthree\n', startLine: 2, endLine: 3 },
+            },
+            {
+                outcome: 'the lines to the end without lineCount',
+                range: { startLine: 3 },
+                expected: { content: 'three\nfour', startLine: 3, endLine: 4 },
+            },
+            {
+                outcome: 'the lines from line 1 without startLine',
+                range: { lineCount: 1 },
+                expected: { content: 'one\r\n', startLine: 1, endLine: 1 },
+            },
+            {
+                outcome: 'the last line for a startLine equal to the line count',
+                range: { startLine: 4 },
+                expected: { content: 'four', startLine: 4, endLine: 4 },
+            },
+            {
+                outcome: 'the lines to the end for a lineCount past it',
+                range: { startLine: 3, lineCount: 10 },
+                expected: { content: 'three\nfour', startLine: 3, endLine: 4 },
+            },
+        ])('returns $outcome', async ({ range, expected }) => {
+            const result = await callTool({ paths: ['src/lines.js'], ...range });
 
             expect(result.structuredContent.contents).toEqual([
-                {
-                    path: 'src/lines.js',
-                    content: 'two\nthree\n',
-                    encoding: 'utf8',
-                    startLine: 2,
-                    endLine: 3,
-                    totalLines: 4,
-                },
+                { path: 'src/lines.js', encoding: 'utf8', totalLines: 4, ...expected },
             ]);
             expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
             expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
-        });
-
-        it('reads to the end without lineCount, and from line 1 without startLine', async () => {
-            const toEnd = await callTool({ paths: ['src/lines.js'], startLine: 3 });
-            const fromStart = await callTool({ paths: ['src/lines.js'], lineCount: 1 });
-
-            expect(toEnd.structuredContent.contents).toEqual([
-                {
-                    path: 'src/lines.js',
-                    content: 'three\nfour',
-                    encoding: 'utf8',
-                    startLine: 3,
-                    endLine: 4,
-                    totalLines: 4,
-                },
-            ]);
-            expect(fromStart.structuredContent.contents).toEqual([
-                { path: 'src/lines.js', content: 'one\r\n', encoding: 'utf8', startLine: 1, endLine: 1, totalLines: 4 },
-            ]);
-        });
-
-        it('returns the last line for a startLine equal to the line count, and clips a lineCount past the end', async () => {
-            const lastLine = await callTool({ paths: ['src/lines.js'], startLine: 4 });
-            const clipped = await callTool({ paths: ['src/lines.js'], startLine: 3, lineCount: 10 });
-
-            expect(lastLine.structuredContent.contents).toEqual([
-                { path: 'src/lines.js', content: 'four', encoding: 'utf8', startLine: 4, endLine: 4, totalLines: 4 },
-            ]);
-            expect(clipped.structuredContent.contents).toEqual([
-                {
-                    path: 'src/lines.js',
-                    content: 'three\nfour',
-                    encoding: 'utf8',
-                    startLine: 3,
-                    endLine: 4,
-                    totalLines: 4,
-                },
-            ]);
         });
 
         it('returns a range of a UTF-8 file stored as BASE64', async () => {
@@ -734,29 +710,29 @@ describe('get-actor-version', () => {
             expect(actorsMock).not.toHaveBeenCalled();
         });
 
-        it('refuses a startLine past the end of the file', async () => {
-            const text = await callToolExpectingUserError({ paths: ['src/lines.js'], startLine: 5 });
-
-            expect(text).toBe('src/lines.js has 4 lines, so startLine 5 is past its end.');
-        });
-
-        it.each([{ startLine: 1 }, { lineCount: 1 }])(
-            'refuses %o on an empty file, which has no lines',
-            async (range) => {
-                mockVersionRead({ sourceFiles: [{ name: 'empty.js', format: 'TEXT', content: '' }] });
-
-                const text = await callToolExpectingUserError({ paths: ['empty.js'], ...range });
-
-                expect(text).toBe('empty.js has 0 lines, so startLine 1 is past its end.');
+        it.each([
+            {
+                outcome: 'a startLine past the end of the file',
+                args: { paths: ['src/lines.js'], startLine: 5 },
+                text: 'src/lines.js has 4 lines, so startLine 5 is past its end.',
             },
-        );
-
-        it('refuses a line range on a base64 file', async () => {
-            const text = await callToolExpectingUserError({ paths: ['assets/logo.png'], startLine: 1 });
-
-            expect(text).toBe(
-                'assets/logo.png is returned as base64, and startLine and lineCount work only on text files.',
-            );
+            {
+                outcome: 'a startLine on an empty file, which has no lines',
+                args: { paths: ['empty.js'], startLine: 1 },
+                text: 'empty.js has 0 lines, so startLine 1 is past its end.',
+            },
+            {
+                outcome: 'a lineCount on an empty file, which has no lines',
+                args: { paths: ['empty.js'], lineCount: 1 },
+                text: 'empty.js has 0 lines, so startLine 1 is past its end.',
+            },
+            {
+                outcome: 'a line range on a base64 file',
+                args: { paths: ['assets/logo.png'], startLine: 1 },
+                text: 'assets/logo.png is returned as base64, and startLine and lineCount work only on text files.',
+            },
+        ])('refuses $outcome', async ({ args, text }) => {
+            expect(await callToolExpectingUserError(args)).toBe(text);
         });
 
         it('reports a missing file in notFoundPaths', async () => {
@@ -854,28 +830,27 @@ describe('get-actor-version', () => {
             expect(text).toBe("Actor 'john/my-actor' has no version 9.9; available versions: 0.1.");
         });
 
-        it('reports a missing Actor and that a bare name is not enough', async () => {
-            actorGetMock.mockResolvedValue(undefined);
-
-            const text = await callToolExpectingUserError({ actor: 'my-actor' });
-
-            expect(text).toBe(
-                "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
-            );
-        });
-
         it.each([
-            ['a run', 'john/my-actor/runs/last', { id: 'run-1', actId: 'actor-1', status: 'SUCCEEDED' }],
-            ['a version', 'john/my-actor/versions/0.1', mockVersion()],
+            ['a bare name the API does not find', 'my-actor', undefined],
+            [
+                'a run reached by extra path segments',
+                'john/my-actor/runs/last',
+                { id: 'run-1', actId: 'actor-1', status: 'SUCCEEDED' },
+            ],
+            ['a version reached by extra path segments', 'john/my-actor/versions/0.1', mockVersion()],
             // Has a name but no username.
-            ['an env var', 'john/my-actor/versions/0.1/env-vars/API_KEY', { name: 'API_KEY', value: 'secret-value' }],
+            [
+                'an env var reached by extra path segments',
+                'john/my-actor/versions/0.1/env-vars/API_KEY',
+                { name: 'API_KEY', value: 'secret-value' },
+            ],
             // Has a username but no name, as a run's default storage does.
             [
-                "a run's key-value store",
+                "a run's key-value store reached by extra path segments",
                 'john/my-actor/runs/last/key-value-store',
                 { id: 'kvs-1', userId: 'user-secret', username: 'john' },
             ],
-        ])('reports %s, reached by extra path segments, as a missing Actor', async (_, actor, document) => {
+        ])('reports %s as a missing Actor, and that a bare name is not enough', async (_, actor, document) => {
             actorGetMock.mockResolvedValue(document);
 
             const text = await callToolExpectingUserError({ actor });
