@@ -27,9 +27,6 @@ import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 /** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
 const TIP_KVS_KEY = 'TIP';
 
-/** Page size for the targeted `TIP` key lookup (server-side `prefix` filter, not pagination). */
-const TIP_SEARCH_LIMIT = 1000;
-
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
 export const WIDGET_NO_POLL_NEXT_STEP =
     'Widget is rendering live progress. Do NOT poll — the widget self-updates until completion.';
@@ -339,15 +336,18 @@ function parseActorTip(value: unknown): RunResponse['tip'] {
     return {
         message: truncated,
         ...(level === 'info' || level === 'warning' ? { level } : {}),
-        ...(typeof recommendedActorId === 'string' && recommendedActorId ? { recommendedActorId } : {}),
+        ...(typeof recommendedActorId === 'string' &&
+        recommendedActorId.length === 17 &&
+        /^[a-zA-Z0-9]{17}$/.test(recommendedActorId)
+            ? { recommendedActorId }
+            : {}),
     };
 }
 
-/** Targeted `TIP` key lookup via the API's `prefix` filter — works for stores of any size, one request. */
+/** Check the exact `TIP` key without fetching another page of keys. */
 async function keyValueStoreHasTipKey(client: ApifyClient, id: string, mcpSessionId?: string): Promise<boolean> {
     try {
-        const page = await client.keyValueStore(id).listKeys({ prefix: TIP_KVS_KEY, limit: TIP_SEARCH_LIMIT });
-        return page.items.some((item) => item.key === TIP_KVS_KEY);
+        return await client.keyValueStore(id).recordExists(TIP_KVS_KEY);
     } catch (error) {
         log.warning('Failed to look up Actor tip key', {
             keyValueStoreId: id,

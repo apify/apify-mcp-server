@@ -513,24 +513,25 @@ describe('get-actor-run default response', () => {
         });
     });
 
-    /** Stubs `listKeys`, branching on `prefix` to serve the display page vs. the targeted TIP lookup. */
     function makeKvStoreClient(opts: {
         displayedKeys: { key: string }[];
         displayTruncated?: boolean;
-        prefixLookupItems?: { key: string }[];
+        hasTipKey?: boolean;
         tipRecordValue?: unknown;
     }) {
         let getRecordCalls = 0;
-        const listKeysCalls: { limit: number; prefix?: string }[] = [];
+        const listKeysCalls: { limit: number }[] = [];
+        const recordExistsCalls: string[] = [];
         return {
             client: {
                 keyValueStore: (_id: string) => ({
-                    listKeys: async (listOpts: { limit: number; prefix?: string }) => {
+                    listKeys: async (listOpts: { limit: number }) => {
                         listKeysCalls.push(listOpts);
-                        if (listOpts.prefix === undefined) {
-                            return { items: opts.displayedKeys, isTruncated: opts.displayTruncated ?? false };
-                        }
-                        return { items: opts.prefixLookupItems ?? [], isTruncated: false };
+                        return { items: opts.displayedKeys, isTruncated: opts.displayTruncated ?? false };
+                    },
+                    recordExists: async (key: string) => {
+                        recordExistsCalls.push(key);
+                        return key === 'TIP' && (opts.hasTipKey ?? false);
                     },
                     getRecord: async (key: string) => {
                         getRecordCalls += 1;
@@ -542,6 +543,7 @@ describe('get-actor-run default response', () => {
             } as unknown as InternalToolArgs['apifyClient'],
             getRecordCalls: () => getRecordCalls,
             listKeysCalls: () => listKeysCalls,
+            recordExistsCalls: () => recordExistsCalls,
         };
     }
 
@@ -599,10 +601,10 @@ describe('get-actor-run default response', () => {
 
     it('finds a TIP key via a targeted lookup when the displayed page is truncated', async () => {
         const displayedKeys = Array.from({ length: 50 }, (_, i) => ({ key: `KEY_${i}` }));
-        const { client, getRecordCalls, listKeysCalls } = makeKvStoreClient({
+        const { client, getRecordCalls, listKeysCalls, recordExistsCalls } = makeKvStoreClient({
             displayedKeys,
             displayTruncated: true,
-            prefixLookupItems: [{ key: 'TIP' }],
+            hasTipKey: true,
             tipRecordValue: { message: 'Use a specialized Actor.', level: 'info' },
         });
 
@@ -613,15 +615,15 @@ describe('get-actor-run default response', () => {
 
         expect(structuredContent.tip).toEqual({ message: 'Use a specialized Actor.', level: 'info' });
         expect(getRecordCalls()).toBe(1);
-        expect(listKeysCalls()).toEqual([{ limit: KV_KEYS_LIMIT }, { prefix: 'TIP', limit: expect.any(Number) }]);
+        expect(listKeysCalls()).toEqual([{ limit: KV_KEYS_LIMIT }]);
+        expect(recordExistsCalls()).toEqual(['TIP']);
     });
 
     it("omits tip and skips getRecord when the truncated page's targeted lookup finds nothing", async () => {
         const displayedKeys = Array.from({ length: 50 }, (_, i) => ({ key: `KEY_${i}` }));
-        const { client, getRecordCalls, listKeysCalls } = makeKvStoreClient({
+        const { client, getRecordCalls, listKeysCalls, recordExistsCalls } = makeKvStoreClient({
             displayedKeys,
             displayTruncated: true,
-            prefixLookupItems: [],
         });
 
         const result = await (getActorRun as HelperTool).call(
@@ -631,7 +633,8 @@ describe('get-actor-run default response', () => {
 
         expect(structuredContent.tip).toBeUndefined();
         expect(getRecordCalls()).toBe(0);
-        expect(listKeysCalls()).toHaveLength(2);
+        expect(listKeysCalls()).toHaveLength(1);
+        expect(recordExistsCalls()).toEqual(['TIP']);
     });
 
     it('discards a malformed TIP record instead of throwing', async () => {
@@ -729,10 +732,17 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.tip).not.toHaveProperty('recommendedActorId');
     });
 
-    it('discards a non-string recommendedActorId instead of surfacing a malformed value', async () => {
+    it.each([
+        ['a number', 12345],
+        ['an empty string', ''],
+        ['prose', 'Use the Instagram Scraper instead.'],
+        ['an oversized string', 'x'.repeat(100_000)],
+        ['an invalid character', 'shu8hvrXbJbY3Eb9_'],
+        ['a trailing newline', 'shu8hvrXbJbY3Eb9W\n'],
+    ])('omits recommendedActorId when it is %s', async (_name, recommendedActorId) => {
         const { client } = makeKvStoreClient({
             displayedKeys: [{ key: 'TIP' }],
-            tipRecordValue: { message: 'Use a specialized Actor.', level: 'info', recommendedActorId: 12345 },
+            tipRecordValue: { message: 'Use a specialized Actor.', level: 'info', recommendedActorId },
         });
 
         const result = await (getActorRun as HelperTool).call(
