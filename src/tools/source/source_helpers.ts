@@ -44,8 +44,7 @@ export async function fetchActor(
     // Extra path segments, such as username/name/runs/last, reach a sub-resource that is not an Actor.
     if (!actor || typeof actor.name !== 'string' || typeof actor.username !== 'string') {
         throw new UserInputError(
-            `Actor '${actorSelector}' not found. Give its ID or its full name, username/name; ` +
-                'a name without the username is not enough.',
+            `Actor '${actorSelector}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
         );
     }
     return { actor, fullName: `${actor.username}/${actor.name}` };
@@ -79,9 +78,9 @@ export function resolveVersion(
 }
 
 /**
- * The URL without what can grant access to it: the query string (for example a store signature), the password, and,
- * for http and https, the user. An SSH user such as `git@` is not a secret and stays. A URL the parser cannot read,
- * such as `git@github.com:user/repo.git`, loses only its query string.
+ * The URL without what can grant access to it: the query string, the password, and, for http and https, the user. An
+ * SSH user such as `git@` is not a secret and stays. A URL the parser cannot read, such as
+ * `git@github.com:user/repo.git`, loses only its query string.
  */
 function formatUrlWithoutSecrets(url: string): string {
     if (URL.canParse(url)) {
@@ -99,12 +98,27 @@ function formatUrlWithoutSecrets(url: string): string {
     return url.slice(0, queryIndex) + (hashIndex === -1 ? '' : url.slice(hashIndex));
 }
 
-/** Picked by source type, since a version can keep the fields of a source type it used before. */
-function getSourceUrl(version: ActorVersion): string | undefined {
-    if (version.sourceType === ActorSourceType.GitRepo) return version.gitRepoUrl;
-    if (version.sourceType === ActorSourceType.Tarball) return version.tarballUrl;
-    if (version.sourceType === ActorSourceType.GitHubGist) return version.gitHubGistUrl;
-    return undefined;
+/**
+ * Why a version not stored as files is refused, and what to use instead. A version keeps the URL fields of a source
+ * type it used before, so only the URL of its current type is named.
+ */
+function formatSourceTypeRefusal(version: ActorVersion, versionLabel: string): string {
+    if (version.sourceType === ActorSourceType.GitRepo) {
+        const url = version.gitRepoUrl ? ` ${formatUrlWithoutSecrets(version.gitRepoUrl)}` : '';
+        return `${versionLabel} has its files in the Git repository${url}, not stored on Apify, so this tool cannot work on them; use the repository.`;
+    }
+    if (version.sourceType === ActorSourceType.GitHubGist) {
+        const url = version.gitHubGistUrl ? ` ${formatUrlWithoutSecrets(version.gitHubGistUrl)}` : '';
+        return `${versionLabel} has its files in the GitHub gist${url}, not stored on Apify, so this tool cannot work on them; use the gist.`;
+    }
+    // TODO(#1452): Read and write zip-stored (TARBALL) versions with adm-zip 0.6.1 or later, within the download and
+    // unpacking limits the issue lists.
+    if (version.sourceType === ActorSourceType.Tarball) {
+        return `${versionLabel} is stored as a zip archive (apify push does this for sources over 3 MiB), and this tool cannot work on zip-stored versions yet.`;
+    }
+    // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
+    const { sourceType }: { sourceType: string } = version;
+    return `${versionLabel} has source type ${sourceType}, which this tool cannot work on; only versions stored as files are supported.`;
 }
 
 /**
@@ -113,18 +127,7 @@ function getSourceUrl(version: ActorVersion): string | undefined {
  */
 export function extractSourceFiles(version: ActorVersion, versionLabel: string): ActorVersionSourceFile[] {
     if (version.sourceType !== ActorSourceType.SourceFiles) {
-        // TODO(#1452): Read and write a version that `apify push` stored as a zip in the Actor's source store
-        // (TARBALL), with adm-zip 0.6.1 or later: download only from the session's API host, cap the entry count and
-        // the unpacked size, and refuse symbolic links, encrypted entries, and unsafe names. The Apify API has no way
-        // to read or change single files of an Actor's source, so even one file will download and unpack the whole
-        // zip, and a write will upload a whole new one; work on single files once it can.
-        // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
-        const { sourceType }: { sourceType: string } = version;
-        const url = getSourceUrl(version);
-        const source = url ? `${sourceType}, ${formatUrlWithoutSecrets(url)}` : sourceType;
-        throw new UserInputError(
-            `${versionLabel} is not stored as files (source type ${source}), and this tool works only on versions stored as files.`,
-        );
+        throw new UserInputError(formatSourceTypeRefusal(version, versionLabel));
     }
     // The API returns only the number, type, and build tag of a version whose source it hides from this account.
     if (!version.sourceFiles) {

@@ -1,3 +1,5 @@
+import { posix } from 'node:path';
+
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -75,7 +77,7 @@ function extractLineRange(file: SourceFile, { startLine, lineCount }: LineRange)
             `${file.path} is returned as base64, and startLine and lineCount work only on text files.`,
         );
     }
-    const lines = splitLines(file.readContent());
+    const lines = splitLines(file.content);
     if (startLine > lines.length) {
         throw new UserInputError(`${file.path} has ${lines.length} lines, so startLine ${startLine} is past its end.`);
     }
@@ -92,17 +94,23 @@ function extractLineRange(file: SourceFile, { startLine, lineCount }: LineRange)
 
 /**
  * The named files in order while they fit in `MAX_INLINE_BYTES`; a file that does not fit goes to `omittedPaths`, and
- * the files after it still get their turn.
+ * the files after it still get their turn. Paths are normalized as stored names are; one with no file goes to
+ * `notFoundPaths` as written.
  */
 function selectContents(files: readonly SourceFile[], paths: readonly string[], lineRange: LineRange | undefined) {
+    const filesByPath = new Map(files.map((file) => [file.path, file]));
     const contents: ReturnedContent[] = [];
     const omittedPaths: string[] = [];
     const notFoundPaths: string[] = [];
+    const seenPaths = new Set<string>();
     let remainingBytes = MAX_INLINE_BYTES;
-    for (const path of new Set(paths)) {
-        const file = files.find((candidate) => candidate.path === path);
+    for (const requestedPath of paths) {
+        const path = posix.normalize(requestedPath);
+        if (seenPaths.has(path)) continue;
+        seenPaths.add(path);
+        const file = filesByPath.get(path);
         if (!file) {
-            notFoundPaths.push(path);
+            notFoundPaths.push(requestedPath);
             continue;
         }
         const range = lineRange && extractLineRange(file, lineRange);
@@ -111,7 +119,7 @@ function selectContents(files: readonly SourceFile[], paths: readonly string[], 
             omittedPaths.push(path);
             continue;
         }
-        contents.push(range ?? { path, content: file.readContent(), encoding: file.encoding });
+        contents.push(range ?? { path, content: file.content, encoding: file.encoding });
         remainingBytes -= bytes;
     }
     return {
@@ -125,8 +133,7 @@ function selectContents(files: readonly SourceFile[], paths: readonly string[], 
  * https://docs.apify.com/api/v2/actor-get
  *  /v2/actors/{actorId}
  *
- * The Actor GET returns each version with its source, hidden the same way as the version GET hides it, so one call is
- * enough. The hashes and the revision do not depend on the stored format, so a caller can compare them across reads.
+ * The Actor GET returns each version with its source, so one call is enough.
  */
 export const getActorVersion: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -163,19 +170,18 @@ export const getActorVersion: ToolEntry = Object.freeze({
         const { args, apifyClient: client } = toolArgs;
         const parsed = getActorVersionArgs.parse(args);
         const { paths = [], startLine, lineCount } = parsed;
-        const isLineRange = startLine !== undefined || lineCount !== undefined;
-        if (isLineRange && paths.length !== 1) {
+        const lineRange =
+            startLine !== undefined || lineCount !== undefined ? { startLine: startLine ?? 1, lineCount } : undefined;
+        if (lineRange && paths.length !== 1) {
             return respondUserError('startLine and lineCount need exactly one path in paths.');
         }
         try {
-            // TODO: The Actor GET returns every stored file of every version even when one file is asked for: the
-            // Apify API has no way to read or change single files of an Actor's source. Use such an API once it exists.
+            // TODO: The Actor GET returns every file of every version; read only the files asked for once the API can.
             const { actor, fullName } = await fetchActor(client, parsed.actor);
             const version = resolveVersion(actor, parsed.versionNumber, parsed.actor);
             const files = buildFilesManifest(
                 extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`),
             );
-            const lineRange = isLineRange ? { startLine: startLine ?? 1, lineCount } : undefined;
             const structuredContent = {
                 actorId: actor.id,
                 fullName,
@@ -184,7 +190,20 @@ export const getActorVersion: ToolEntry = Object.freeze({
                 files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
                 ...selectContents(files, paths, lineRange),
             };
-            const summary = `Read version ${version.versionNumber} of ${fullName}.`;
+            const { omittedPaths, notFoundPaths } = structuredContent;
+            const omittedHint = lineRange
+                ? 'ask for fewer lines with lineCount'
+                : 'ask for a file alone, or for part of it with startLine and lineCount';
+            // Names the requested files that did not come back, for a caller that reads only the text.
+            const summary = [
+                `Read version ${version.versionNumber} of ${fullName}.`,
+                omittedPaths &&
+                    `Left out over the ${INLINE_LIMIT_KIB} KiB limit: ${omittedPaths.join(', ')}; ${omittedHint}.`,
+                notFoundPaths &&
+                    `Not found: ${notFoundPaths.join(', ')}; check the paths against files (folders are not files).`,
+            ]
+                .filter(Boolean)
+                .join(' ');
             return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
         } catch (error) {
             return respondToSourceToolError(error);
