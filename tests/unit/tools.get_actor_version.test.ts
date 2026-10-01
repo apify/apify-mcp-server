@@ -911,102 +911,116 @@ describe('get-actor-version', () => {
             );
         });
 
+        const ZIP_REFUSAL =
+            'Version 0.1 of john/my-actor is stored as a zip archive (apify push does this for sources over 3 MiB), and this tool cannot work on zip-stored versions yet.';
+
         it.each([
             [
-                'GIT_REPO',
-                {
-                    gitRepoUrl:
-                        'https://oauth2:secret-token@gitlab.com/john/repo.git?private_token=secret-query#main:src',
-                },
+                'https://oauth2:secret-token@gitlab.com/john/repo.git?private_token=secret-query#main:src',
                 'https://gitlab.com/john/repo.git#main:src',
             ],
+            ['ssh://git@github.com/john/repo.git?x=secret-query#main', 'ssh://git@github.com/john/repo.git#main'],
             [
-                'GIT_REPO',
-                { gitRepoUrl: 'ssh://git@github.com/john/repo.git?x=secret-query#main' },
-                'ssh://git@github.com/john/repo.git#main',
-            ],
-            [
-                'GIT_REPO',
-                { gitRepoUrl: 'ssh://deploy:secret-password@github.com/john/repo.git#main' },
+                'ssh://deploy:secret-password@github.com/john/repo.git#main',
                 'ssh://deploy@github.com/john/repo.git#main',
             ],
-            [
-                'GIT_REPO',
-                { gitRepoUrl: 'git@github.com:john/repo.git?x=secret-query#main' },
-                'git@github.com:john/repo.git#main',
-            ],
-            [
-                'GIT_REPO',
-                { gitRepoUrl: 'git@github.com:john/repo.git?private_token=secret-token' },
-                'git@github.com:john/repo.git',
-            ],
-            ['GIT_REPO', { gitRepoUrl: 'git@github.com:john/repo.git' }, 'git@github.com:john/repo.git'],
-            [
-                'GIT_REPO',
-                { gitRepoUrl: 'http://john:secret-password@git.example.com/repo.git' },
-                'http://git.example.com/repo.git',
-            ],
-            [
-                'GITHUB_GIST',
-                { gitHubGistUrl: 'https://gist.github.com/john/abc123?secret=secret-query' },
-                'https://gist.github.com/john/abc123',
-            ],
-            [
-                'TARBALL',
-                {
-                    tarballUrl:
-                        'https://api.example.test/v2/key-value-stores/store-1/records/version-0.1.zip?signature=secret-signature',
-                    // A field left over from an earlier source type is not the source.
-                    gitRepoUrl: 'https://github.com/john/old.git',
-                },
-                'https://api.example.test/v2/key-value-stores/store-1/records/version-0.1.zip',
-            ],
-            [
-                'TARBALL',
-                { tarballUrl: 'https://user:secret-signature@downloads.example.com/source.zip' },
-                'https://downloads.example.com/source.zip',
-            ],
-        ])('refuses a %s version, naming its URL without credentials', async (sourceType, urlFields, cleanUrl) => {
+            ['git@github.com:john/repo.git?x=secret-query#main', 'git@github.com:john/repo.git#main'],
+            ['git@github.com:john/repo.git?private_token=secret-token', 'git@github.com:john/repo.git'],
+            ['git@github.com:john/repo.git', 'git@github.com:john/repo.git'],
+            ['http://john:secret-password@git.example.com/repo.git', 'http://git.example.com/repo.git'],
+        ])('refuses a GIT_REPO version at %s, naming its URL as %s', async (gitRepoUrl, cleanUrl) => {
             // A version switched to another source type keeps its old files, which must not be returned.
-            mockVersionRead({ sourceType, ...urlFields });
+            mockVersionRead({ sourceType: 'GIT_REPO', gitRepoUrl });
 
             const result = await callTool({ paths: ['src/main.js'] });
 
             expectSoftFailInvalidInput(result);
             expect(result.content[0].text).toBe(
-                `Version 0.1 of john/my-actor is not stored as files (source type ${sourceType}, ${cleanUrl}), and this tool reads only versions stored as files.`,
+                `Version 0.1 of john/my-actor has its files in the Git repository ${cleanUrl}, not stored on Apify, so this tool cannot work on them; use the repository.`,
             );
             expect(JSON.stringify(result)).not.toMatch(/secret|oauth2/);
         });
 
-        it.each(['GIT_REPO', 'SOURCE_CODE', 'SOMETHING_NEW'])(
-            'refuses a %s version that comes back without a URL',
-            async (sourceType) => {
-                // What the API returns to a reader that cannot modify the Actor: the number, type, and build tag only.
-                actorGetMock.mockResolvedValue(mockActor([{ versionNumber: '0.1', sourceType, buildTag: 'latest' }]));
-
-                const text = await callToolExpectingUserError({});
-
-                expect(text).toBe(
-                    `Version 0.1 of john/my-actor is not stored as files (source type ${sourceType}), and this tool reads only versions stored as files.`,
-                );
+        it.each<{ outcome: string; version: Record<string, unknown>; text: string }>([
+            {
+                outcome: 'a GITHUB_GIST version, naming its URL without credentials',
+                version: {
+                    sourceType: 'GITHUB_GIST',
+                    gitHubGistUrl: 'https://gist.github.com/john/abc123?secret=secret-query',
+                },
+                text: 'Version 0.1 of john/my-actor has its files in the GitHub gist https://gist.github.com/john/abc123, not stored on Apify, so this tool cannot work on them; use the gist.',
             },
-        );
-
-        it.each(['SOURCE_CODE', 'SOMETHING_NEW'])(
-            'refuses a %s version without naming a URL left over from another source type',
-            async (sourceType) => {
-                mockVersionRead({ sourceType, gitRepoUrl: 'https://oauth2:secret-token@github.com/john/old.git' });
-
-                const result = await callTool({});
-
-                expectSoftFailInvalidInput(result);
-                expect(result.content[0].text).toBe(
-                    `Version 0.1 of john/my-actor is not stored as files (source type ${sourceType}), and this tool reads only versions stored as files.`,
-                );
-                expect(JSON.stringify(result)).not.toMatch(/secret|oauth2|github/);
+            {
+                outcome: 'a TARBALL version without naming its URL',
+                version: {
+                    sourceType: 'TARBALL',
+                    tarballUrl:
+                        'https://api.example.test/v2/key-value-stores/store-1/records/version-0.1.zip?signature=secret-signature',
+                    // A field left over from an earlier source type is not the source.
+                    gitRepoUrl: 'https://github.com/john/old.git',
+                },
+                text: ZIP_REFUSAL,
             },
-        );
+            {
+                outcome: 'a TARBALL version without naming its URL, which has credentials',
+                version: {
+                    sourceType: 'TARBALL',
+                    tarballUrl: 'https://user:secret-signature@downloads.example.com/source.zip',
+                },
+                text: ZIP_REFUSAL,
+            },
+            {
+                outcome: 'a SOURCE_CODE version without naming a URL left over from another source type',
+                version: {
+                    sourceType: 'SOURCE_CODE',
+                    gitRepoUrl: 'https://oauth2:secret-token@github.com/john/old.git',
+                },
+                text: 'Version 0.1 of john/my-actor has source type SOURCE_CODE, which this tool cannot work on; only versions stored as files are supported.',
+            },
+            {
+                outcome: 'a version of an unknown source type without naming a URL left over from another source type',
+                version: {
+                    sourceType: 'SOMETHING_NEW',
+                    gitRepoUrl: 'https://oauth2:secret-token@github.com/john/old.git',
+                },
+                text: 'Version 0.1 of john/my-actor has source type SOMETHING_NEW, which this tool cannot work on; only versions stored as files are supported.',
+            },
+        ])('refuses $outcome', async ({ version, text }) => {
+            mockVersionRead(version);
+
+            const result = await callTool({ paths: ['src/main.js'] });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(text);
+            expect(JSON.stringify(result)).not.toMatch(/secret|oauth2|example|old\.git/);
+        });
+
+        it.each([
+            [
+                'GIT_REPO',
+                'Version 0.1 of john/my-actor has its files in the Git repository, not stored on Apify, so this tool cannot work on them; use the repository.',
+            ],
+            [
+                'GITHUB_GIST',
+                'Version 0.1 of john/my-actor has its files in the GitHub gist, not stored on Apify, so this tool cannot work on them; use the gist.',
+            ],
+            ['TARBALL', ZIP_REFUSAL],
+            [
+                'SOURCE_CODE',
+                'Version 0.1 of john/my-actor has source type SOURCE_CODE, which this tool cannot work on; only versions stored as files are supported.',
+            ],
+            [
+                'SOMETHING_NEW',
+                'Version 0.1 of john/my-actor has source type SOMETHING_NEW, which this tool cannot work on; only versions stored as files are supported.',
+            ],
+        ])('refuses a %s version that comes back without a URL', async (sourceType, expectedText) => {
+            // What the API returns to a reader that cannot modify the Actor: the number, type, and build tag only.
+            actorGetMock.mockResolvedValue(mockActor([{ versionNumber: '0.1', sourceType, buildTag: 'latest' }]));
+
+            const text = await callToolExpectingUserError({});
+
+            expect(text).toBe(expectedText);
+        });
     });
 });
 

@@ -94,9 +94,9 @@ function resolveVersion(
 }
 
 /**
- * The URL without what can grant access to it: the query string (for example a store signature), the password, and,
- * for http and https, the user. An SSH user such as `git@` is not a secret and stays. A URL the parser cannot read,
- * such as `git@github.com:user/repo.git`, loses only its query string.
+ * The URL without what can grant access to it: the query string, the password, and, for http and https, the user. An
+ * SSH user such as `git@` is not a secret and stays. A URL the parser cannot read, such as
+ * `git@github.com:user/repo.git`, loses only its query string.
  */
 function formatUrlWithoutSecrets(url: string): string {
     if (URL.canParse(url)) {
@@ -114,26 +114,33 @@ function formatUrlWithoutSecrets(url: string): string {
     return url.slice(0, queryIndex) + (hashIndex === -1 ? '' : url.slice(hashIndex));
 }
 
-/** Picked by source type, since a version can keep the fields of a source type it used before. */
-function getSourceUrl(version: ActorVersion): string | undefined {
-    if (version.sourceType === ActorSourceType.GitRepo) return version.gitRepoUrl;
-    if (version.sourceType === ActorSourceType.Tarball) return version.tarballUrl;
-    if (version.sourceType === ActorSourceType.GitHubGist) return version.gitHubGistUrl;
-    return undefined;
+/**
+ * Why a version not stored as files is refused, and what to use instead. A version keeps the URL fields of a source
+ * type it used before, so only the URL of its current type is named.
+ */
+function formatSourceTypeRefusal(version: ActorVersion, versionLabel: string): string {
+    if (version.sourceType === ActorSourceType.GitRepo) {
+        const url = version.gitRepoUrl ? ` ${formatUrlWithoutSecrets(version.gitRepoUrl)}` : '';
+        return `${versionLabel} has its files in the Git repository${url}, not stored on Apify, so this tool cannot work on them; use the repository.`;
+    }
+    if (version.sourceType === ActorSourceType.GitHubGist) {
+        const url = version.gitHubGistUrl ? ` ${formatUrlWithoutSecrets(version.gitHubGistUrl)}` : '';
+        return `${versionLabel} has its files in the GitHub gist${url}, not stored on Apify, so this tool cannot work on them; use the gist.`;
+    }
+    // TODO(#1452): Read zip-stored (TARBALL) versions with adm-zip 0.6.1 or later, within the download and unpacking
+    // limits the issue lists.
+    if (version.sourceType === ActorSourceType.Tarball) {
+        return `${versionLabel} is stored as a zip archive (apify push does this for sources over 3 MiB), and this tool cannot work on zip-stored versions yet.`;
+    }
+    // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
+    const { sourceType }: { sourceType: string } = version;
+    return `${versionLabel} has source type ${sourceType}, which this tool cannot work on; only versions stored as files are supported.`;
 }
 
 /** Throws `UserInputError` for a version not stored as files and for one whose source the API hides. */
 function extractVersionFiles(version: ActorVersion, versionLabel: string): SourceFile[] {
     if (version.sourceType !== ActorSourceType.SourceFiles) {
-        // TODO(#1452): Read zip-stored (TARBALL) versions with adm-zip 0.6.1 or later, within the download and unpacking
-        // limits the issue lists.
-        // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
-        const { sourceType }: { sourceType: string } = version;
-        const url = getSourceUrl(version);
-        const source = url ? `${sourceType}, ${formatUrlWithoutSecrets(url)}` : sourceType;
-        throw new UserInputError(
-            `${versionLabel} is not stored as files (source type ${source}), and this tool reads only versions stored as files.`,
-        );
+        throw new UserInputError(formatSourceTypeRefusal(version, versionLabel));
     }
     // The API returns only the number, type, and build tag of a version whose source it hides from this account.
     if (!version.sourceFiles) {
