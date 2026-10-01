@@ -421,6 +421,38 @@ describe('get-actor-version', () => {
             expect(structuredContent.contents.map(({ content }) => content)).toEqual(['2', 'main']);
         });
 
+        it('normalizes requested paths as it normalizes stored names, and names the files by their listed paths', async () => {
+            mockVersionRead({
+                sourceFiles: [
+                    MAIN_JS_SOURCE,
+                    { name: 'big.js', format: 'TEXT', content: 'x'.repeat(MAX_INLINE_BYTES + 1) },
+                ],
+            });
+
+            const { structuredContent } = await callTool({ paths: ['./src/main.js', './big.js'] });
+
+            expect(structuredContent.contents).toEqual([
+                { path: 'src/main.js', content: MAIN_JS_SOURCE.content, encoding: 'utf8' },
+            ]);
+            expect(structuredContent.omittedPaths).toEqual(['big.js']);
+            expect(structuredContent.notFoundPaths).toBeUndefined();
+        });
+
+        it('counts requested paths to the same file once, and reports a path with no file as written', async () => {
+            const result = await callTool({
+                paths: ['src/main.js', './src/main.js', 'src//lib/../main.js', './missing.js', 'missing.js', 'src/'],
+            });
+            const { structuredContent } = result;
+
+            expect(structuredContent.contents).toEqual([
+                { path: 'src/main.js', content: MAIN_JS_SOURCE.content, encoding: 'utf8' },
+            ]);
+            expect(structuredContent.notFoundPaths).toEqual(['./missing.js', 'src/']);
+            expect(result.content[1].text).toBe(
+                'Read version 0.1 of john/my-actor. Not found: ./missing.js, src/; check the paths against files (folders are not files).',
+            );
+        });
+
         it('reads an inline file stored without format as TEXT, whatever its extension, and one without content as empty', async () => {
             mockVersionRead({
                 sourceFiles: [

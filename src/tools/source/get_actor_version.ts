@@ -1,3 +1,5 @@
+import { posix } from 'node:path';
+
 import type { Actor, ActorVersion } from 'apify-client';
 import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
@@ -172,18 +174,23 @@ function extractLineRange(file: SourceFile, { startLine, lineCount }: LineRange)
 
 /**
  * The named files in order while they fit in `MAX_INLINE_BYTES`; a file that does not fit goes to `omittedPaths`, and
- * the files after it still get their turn.
+ * the files after it still get their turn. Paths are normalized as stored names are; one with no file goes to
+ * `notFoundPaths` as written.
  */
 function selectContents(files: readonly SourceFile[], paths: readonly string[], lineRange: LineRange | undefined) {
     const filesByPath = new Map(files.map((file) => [file.path, file]));
     const contents: ReturnedContent[] = [];
     const omittedPaths: string[] = [];
     const notFoundPaths: string[] = [];
+    const seenPaths = new Set<string>();
     let remainingBytes = MAX_INLINE_BYTES;
-    for (const path of new Set(paths)) {
+    for (const requestedPath of paths) {
+        const path = posix.normalize(requestedPath);
+        if (seenPaths.has(path)) continue;
+        seenPaths.add(path);
         const file = filesByPath.get(path);
         if (!file) {
-            notFoundPaths.push(path);
+            notFoundPaths.push(requestedPath);
             continue;
         }
         const range = lineRange && extractLineRange(file, lineRange);
