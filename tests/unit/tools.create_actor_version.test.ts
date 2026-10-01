@@ -298,43 +298,45 @@ describe('create-actor-version', () => {
             },
         );
 
-        it.each([
-            [
-                'GIT_REPO',
-                { gitRepoUrl: 'https://oauth2:secret-token@gitlab.com/john/repo.git#main' },
-                'https://gitlab.com/john/repo.git#main',
-            ],
-            [
-                'GITHUB_GIST',
-                { gitHubGistUrl: 'https://gist.github.com/john/abc123?secret=secret-query' },
-                'https://gist.github.com/john/abc123',
-            ],
-            [
-                'TARBALL',
-                {
+        it.each<{ outcome: string; version: Record<string, unknown>; text: string }>([
+            {
+                outcome: 'a GIT_REPO version, naming its URL without credentials',
+                version: {
+                    sourceType: 'GIT_REPO',
+                    gitRepoUrl: 'https://oauth2:secret-token@gitlab.com/john/repo.git#main',
+                },
+                text: 'Version 0.1 of john/my-actor has its files in the Git repository https://gitlab.com/john/repo.git#main, not stored on Apify, so this tool cannot work on them; use the repository.',
+            },
+            {
+                outcome: 'a GITHUB_GIST version, naming its URL without credentials',
+                version: {
+                    sourceType: 'GITHUB_GIST',
+                    gitHubGistUrl: 'https://gist.github.com/john/abc123?secret=secret-query',
+                },
+                text: 'Version 0.1 of john/my-actor has its files in the GitHub gist https://gist.github.com/john/abc123, not stored on Apify, so this tool cannot work on them; use the gist.',
+            },
+            {
+                outcome: 'a TARBALL version without naming its URL',
+                version: {
+                    sourceType: 'TARBALL',
                     tarballUrl:
                         'https://api.example.test/v2/key-value-stores/s/records/version-0.1.zip?signature=secret',
                 },
-                'https://api.example.test/v2/key-value-stores/s/records/version-0.1.zip',
-            ],
-        ])(
-            'refuses a %s version with no POST, naming its URL without credentials',
-            async (sourceType, urlFields, url) => {
-                // The version keeps the files it had as SOURCE_FILES, which must not be copied.
-                mockActorRead({ sourceType, ...urlFields });
-
-                const result = await callTool({ copyFromVersion: '0.1', autoBuild: true });
-
-                expectSoftFailInvalidInput(result);
-                expect(result.content[0].text).toBe(
-                    `Version 0.1 of john/my-actor is not stored as files (source type ${sourceType}, ${url}), and this tool works only on versions stored as files.`,
-                );
-                expect(JSON.stringify(result)).not.toMatch(/secret|oauth2/);
-                expect(versionsCreateMock).not.toHaveBeenCalled();
-                expectNoOtherWrite();
-                expect(buildMock).not.toHaveBeenCalled();
+                text: 'Version 0.1 of john/my-actor is stored as a zip archive (apify push does this for sources over 3 MiB), and this tool cannot work on zip-stored versions yet.',
             },
-        );
+        ])('refuses $outcome, with no POST', async ({ version, text }) => {
+            // The version keeps the files it had as SOURCE_FILES, which must not be copied.
+            mockActorRead(version);
+
+            const result = await callTool({ copyFromVersion: '0.1', autoBuild: true });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(text);
+            expect(JSON.stringify(result)).not.toMatch(/secret|oauth2|example|key-value-stores/);
+            expect(versionsCreateMock).not.toHaveBeenCalled();
+            expectNoOtherWrite();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
 
         it('refuses a version whose source the API hides', async () => {
             mockActorRead({ sourceFiles: undefined });
