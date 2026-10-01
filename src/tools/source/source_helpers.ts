@@ -1,0 +1,209 @@
+import { posix } from 'node:path';
+
+import type { Actor, ActorVersion, ActorVersionSourceFile, Build } from 'apify-client';
+import { ActorSourceType, ApifyApiError } from 'apify-client';
+import { z } from 'zod';
+
+import type { ApifyClient } from '../../apify_client.js';
+import { UserInputError } from '../../errors.js';
+import type { InternalToolArgs } from '../../types.js';
+import { getConsoleLinkContext } from '../../utils/console_link.js';
+import type { ToolResponse } from '../../utils/mcp.js';
+import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import { ABORT } from '../actors/actor_run_response.js';
+import {
+    buildNextStepForBuild,
+    listVersionNumbers,
+    respondWithBuild,
+    startBuild,
+    toBuildResult,
+} from '../builds/build_helpers.js';
+import { hasBinaryExtension } from './source_files.js';
+
+/** The input shape of one file sent whole. */
+export const sourceFileArgs = z.object({
+    path: z.string().min(1).describe('Path relative to the Actor root, for example src/main.js.'),
+    content: z.string().describe('The whole file content: text as is, or base64 when encoding is base64.'),
+    encoding: z
+        .enum(['utf8', 'base64'])
+        .optional()
+        .describe(
+            'utf8 for text, base64 for binary files. Defaults to base64 for binary extensions such as .png and to utf8 otherwise.',
+        ),
+});
+
+/**
+ * The Actor by its ID or full name, `username/name` or `username~name` (apify-client turns username/name into the
+ * API's username~name); throws `UserInputError` when there is none.
+ */
+export async function fetchActor(
+    client: ApifyClient,
+    actorSelector: string,
+): Promise<{ actor: Actor; fullName: string }> {
+    const actor = await client.actor(actorSelector).get();
+    // Extra path segments, such as username/name/runs/last, reach a sub-resource that is not an Actor.
+    if (!actor || typeof actor.name !== 'string' || typeof actor.username !== 'string') {
+        throw new UserInputError(
+            `Actor '${actorSelector}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
+        );
+    }
+    return { actor, fullName: `${actor.username}/${actor.name}` };
+}
+
+/** The requested version, or the only one when none is requested; throws `UserInputError` otherwise. */
+export function resolveVersion(
+    actor: Pick<Actor, 'versions'>,
+    requestedVersionNumber: string | undefined,
+    actorSelector: string,
+): ActorVersion & { versionNumber: string } {
+    const versionNumbers = listVersionNumbers(actor);
+    if (requestedVersionNumber === undefined && versionNumbers.length !== 1) {
+        // The source type and build tag tell the caller which version holds the code it is after.
+        const versions = actor.versions
+            .filter((version) => version.versionNumber !== undefined)
+            .map(({ versionNumber, sourceType, buildTag }) => {
+                const tag = buildTag ? `, build tag ${buildTag}` : '';
+                return `${versionNumber} (${sourceType}${tag})`;
+            });
+        throw new UserInputError(`Specify versionNumber; this Actor has versions: ${versions.join(', ')}.`);
+    }
+    const versionNumber = requestedVersionNumber ?? versionNumbers[0];
+    const version = actor.versions.find((candidate) => candidate.versionNumber === versionNumber);
+    if (!version) {
+        throw new UserInputError(
+            `Actor '${actorSelector}' has no version ${versionNumber}; available versions: ${versionNumbers.join(', ')}.`,
+        );
+    }
+    return { ...version, versionNumber };
+}
+
+/**
+ * The URL without what can grant access to it: the query string, the password, and, for http and https, the user. An
+ * SSH user such as `git@` is not a secret and stays. A URL the parser cannot read, such as
+ * `git@github.com:user/repo.git`, loses only its query string.
+ */
+function formatUrlWithoutSecrets(url: string): string {
+    if (URL.canParse(url)) {
+        const parsed = new URL(url);
+        parsed.search = '';
+        parsed.password = '';
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            parsed.username = '';
+        }
+        return parsed.href;
+    }
+    const queryIndex = url.indexOf('?');
+    if (queryIndex === -1) return url;
+    const hashIndex = url.indexOf('#', queryIndex);
+    return url.slice(0, queryIndex) + (hashIndex === -1 ? '' : url.slice(hashIndex));
+}
+
+/**
+ * Why a version not stored as files is refused, and what to use instead. A version keeps the URL fields of a source
+ * type it used before, so only the URL of its current type is named.
+ */
+function formatSourceTypeRefusal(version: ActorVersion, versionLabel: string): string {
+    if (version.sourceType === ActorSourceType.GitRepo) {
+        const url = version.gitRepoUrl ? ` ${formatUrlWithoutSecrets(version.gitRepoUrl)}` : '';
+        return `${versionLabel} has its files in the Git repository${url}, not stored on Apify, so this tool cannot work on them; use the repository.`;
+    }
+    if (version.sourceType === ActorSourceType.GitHubGist) {
+        const url = version.gitHubGistUrl ? ` ${formatUrlWithoutSecrets(version.gitHubGistUrl)}` : '';
+        return `${versionLabel} has its files in the GitHub gist${url}, not stored on Apify, so this tool cannot work on them; use the gist.`;
+    }
+    // TODO(#1452): Read and write zip-stored (TARBALL) versions with adm-zip 0.6.1 or later, within the download and
+    // unpacking limits the issue lists.
+    if (version.sourceType === ActorSourceType.Tarball) {
+        return `${versionLabel} is stored as a zip archive (apify push does this for sources over 3 MiB), and this tool cannot work on zip-stored versions yet.`;
+    }
+    // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
+    const { sourceType }: { sourceType: string } = version;
+    return `${versionLabel} has source type ${sourceType}, which this tool cannot work on; only versions stored as files are supported.`;
+}
+
+/**
+ * The version's stored entries, folders included. Throws `UserInputError` for a version not stored as files and for
+ * one whose source the API hides.
+ */
+export function extractSourceFiles(version: ActorVersion, versionLabel: string): ActorVersionSourceFile[] {
+    if (version.sourceType !== ActorSourceType.SourceFiles) {
+        throw new UserInputError(formatSourceTypeRefusal(version, versionLabel));
+    }
+    // The API returns only the number, type, and build tag of a version whose source it hides from this account.
+    if (!version.sourceFiles) {
+        throw new UserInputError(
+            `${versionLabel} came back without its source: the API hides it from accounts that cannot modify the Actor. Ask the Actor's owner for the source.`,
+        );
+    }
+    return version.sourceFiles;
+}
+
+/**
+ * The entry to store for a file sent whole: TEXT for utf8, BASE64 for base64, where no encoding means base64 for a
+ * binary extension, the rule get-actor-version reads by. The path is normalized the way get-actor-version lists it.
+ */
+export function buildSourceFileEntry({
+    path,
+    content,
+    encoding,
+}: z.infer<typeof sourceFileArgs>): ActorVersionSourceFile {
+    const isBase64 = (encoding ?? (hasBinaryExtension(path) ? 'base64' : 'utf8')) === 'base64';
+    return { name: posix.normalize(path), format: isBase64 ? 'BASE64' : 'TEXT', content };
+}
+
+/** The build worker skips a file whose content is empty, so the caller hears of such files. */
+export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: string[] } {
+    if (paths.length === 0) return {};
+    const warning = `These files are empty, and the build skips empty files, so they will not exist in the build: ${paths.join(', ')}.`;
+    return { warnings: [warning] };
+}
+
+/**
+ * The response to a committed write. With autoBuild, a build of the version starts first, with no tag so the version's
+ * buildTag applies, and is not waited for. The write stands either way, so an API error from the start goes to
+ * `buildError` rather than being thrown.
+ */
+export async function respondAfterWrite(params: {
+    toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames'>;
+    autoBuild: boolean;
+    target: { actorId: string; versionNumber: string };
+    structuredContent: Record<string, unknown>;
+    summary: string;
+}): Promise<ToolResponse> {
+    const { toolArgs, autoBuild, target, structuredContent, summary } = params;
+    const { apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
+    if (!autoBuild) {
+        return respondWithBuild({
+            structuredContent,
+            summary,
+            nextStep: 'Runs use these files once the version is built.',
+        });
+    }
+    let build: Build | typeof ABORT;
+    try {
+        // No signal is passed: a committed write never aborts the build it started.
+        build = await startBuild(client, target.actorId, target.versionNumber, { useCache: true, waitSecs: 0 });
+    } catch (error) {
+        // Only the API's refusal is a failed start; anything else is a bug and goes to the tool-call engine.
+        if (!(error instanceof ApifyApiError)) throw error;
+        return respondWithBuild({
+            structuredContent: { ...structuredContent, buildError: error.message },
+            summary,
+            nextStep: 'The build could not be started; start it again to run these files.',
+        });
+    }
+    // startBuild returns ABORT only for a passed signal; the check narrows the type.
+    if (build === ABORT) return respondAborted();
+    const linkContext = await getConsoleLinkContext(apifyToken, client);
+    return respondWithBuild({
+        structuredContent: { ...structuredContent, build: toBuildResult(build, linkContext) },
+        summary,
+        nextStep: buildNextStepForBuild(build, { loadedToolNames }),
+    });
+}
+
+/** A `UserInputError` as a soft failure; anything else is rethrown for the tool-call engine to report. */
+export function respondToSourceToolError(error: unknown): ToolResponse {
+    if (error instanceof UserInputError) return respondUserError(error.message);
+    throw error;
+}

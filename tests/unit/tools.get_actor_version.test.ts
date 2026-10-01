@@ -181,7 +181,11 @@ describe('get-actor-version', () => {
     });
 
     it('is served in the source category, which is not enabled by default', () => {
-        expect(getCategoryTools().source.map((tool) => tool.name)).toEqual([HELPER_TOOLS.ACTOR_VERSION_GET]);
+        expect(getCategoryTools().source.map((tool) => tool.name)).toEqual([
+            HELPER_TOOLS.ACTOR_VERSION_GET,
+            HELPER_TOOLS.ACTOR_CREATE,
+            HELPER_TOOLS.ACTOR_VERSION_UPDATE,
+        ]);
         expect(toolCategoriesEnabledByDefault).not.toContain('source');
     });
 

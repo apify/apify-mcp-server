@@ -1,7 +1,5 @@
 import { posix } from 'node:path';
 
-import type { Actor, ActorVersion } from 'apify-client';
-import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -11,10 +9,10 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { listVersionNumbers } from '../builds/build_helpers.js';
 import { getActorVersionToolOutputSchema } from '../structured_output_schemas.js';
 import type { SourceFile } from './source_files.js';
 import { buildFilesManifest, buildFilesRevision } from './source_files.js';
+import { extractSourceFiles, fetchActor, resolveVersion, respondToSourceToolError } from './source_helpers.js';
 
 const INLINE_LIMIT_KIB = MAX_INLINE_BYTES / 1024;
 
@@ -65,91 +63,6 @@ type ReturnedContent = {
     endLine?: number;
     totalLines?: number;
 };
-
-/** The requested version, or the only one when none is requested; throws `UserInputError` otherwise. */
-function resolveVersion(
-    actor: Pick<Actor, 'versions'>,
-    requestedVersionNumber: string | undefined,
-    actorSelector: string,
-): ActorVersion & { versionNumber: string } {
-    const versionNumbers = listVersionNumbers(actor);
-    if (requestedVersionNumber === undefined && versionNumbers.length !== 1) {
-        // The source type and build tag tell the caller which version holds the code it is after.
-        const versions = actor.versions
-            .filter((version) => version.versionNumber !== undefined)
-            .map(({ versionNumber, sourceType, buildTag }) => {
-                const tag = buildTag ? `, build tag ${buildTag}` : '';
-                return `${versionNumber} (${sourceType}${tag})`;
-            });
-        throw new UserInputError(`Specify versionNumber; this Actor has versions: ${versions.join(', ')}.`);
-    }
-    const versionNumber = requestedVersionNumber ?? versionNumbers[0];
-    const version = actor.versions.find((candidate) => candidate.versionNumber === versionNumber);
-    if (!version) {
-        throw new UserInputError(
-            `Actor '${actorSelector}' has no version ${versionNumber}; available versions: ${versionNumbers.join(', ')}.`,
-        );
-    }
-    return { ...version, versionNumber };
-}
-
-/**
- * The URL without what can grant access to it: the query string, the password, and, for http and https, the user. An
- * SSH user such as `git@` is not a secret and stays. A URL the parser cannot read, such as
- * `git@github.com:user/repo.git`, loses only its query string.
- */
-function formatUrlWithoutSecrets(url: string): string {
-    if (URL.canParse(url)) {
-        const parsed = new URL(url);
-        parsed.search = '';
-        parsed.password = '';
-        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-            parsed.username = '';
-        }
-        return parsed.href;
-    }
-    const queryIndex = url.indexOf('?');
-    if (queryIndex === -1) return url;
-    const hashIndex = url.indexOf('#', queryIndex);
-    return url.slice(0, queryIndex) + (hashIndex === -1 ? '' : url.slice(hashIndex));
-}
-
-/**
- * Why a version not stored as files is refused, and what to use instead. A version keeps the URL fields of a source
- * type it used before, so only the URL of its current type is named.
- */
-function formatSourceTypeRefusal(version: ActorVersion, versionLabel: string): string {
-    if (version.sourceType === ActorSourceType.GitRepo) {
-        const url = version.gitRepoUrl ? ` ${formatUrlWithoutSecrets(version.gitRepoUrl)}` : '';
-        return `${versionLabel} has its files in the Git repository${url}, not stored on Apify, so this tool cannot work on them; use the repository.`;
-    }
-    if (version.sourceType === ActorSourceType.GitHubGist) {
-        const url = version.gitHubGistUrl ? ` ${formatUrlWithoutSecrets(version.gitHubGistUrl)}` : '';
-        return `${versionLabel} has its files in the GitHub gist${url}, not stored on Apify, so this tool cannot work on them; use the gist.`;
-    }
-    // TODO(#1452): Read zip-stored (TARBALL) versions with adm-zip 0.6.1 or later, within the download and unpacking
-    // limits the issue lists.
-    if (version.sourceType === ActorSourceType.Tarball) {
-        return `${versionLabel} is stored as a zip archive (apify push does this for sources over 3 MiB), and this tool cannot work on zip-stored versions yet.`;
-    }
-    // The API's legacy SOURCE_CODE type and any type added later are not in apify-client's enum.
-    const { sourceType }: { sourceType: string } = version;
-    return `${versionLabel} has source type ${sourceType}, which this tool cannot work on; only versions stored as files are supported.`;
-}
-
-/** Throws `UserInputError` for a version not stored as files and for one whose source the API hides. */
-function extractVersionFiles(version: ActorVersion, versionLabel: string): SourceFile[] {
-    if (version.sourceType !== ActorSourceType.SourceFiles) {
-        throw new UserInputError(formatSourceTypeRefusal(version, versionLabel));
-    }
-    // The API returns only the number, type, and build tag of a version whose source it hides from this account.
-    if (!version.sourceFiles) {
-        throw new UserInputError(
-            `${versionLabel} came back without its source: the API hides it from accounts that cannot modify the Actor. Ask the Actor's owner for the source.`,
-        );
-    }
-    return buildFilesManifest(version.sourceFiles);
-}
 
 /** Lines with their line endings kept, so joined back they give the exact text. */
 function splitLines(text: string): string[] {
@@ -264,17 +177,11 @@ export const getActorVersion: ToolEntry = Object.freeze({
         }
         try {
             // TODO: The Actor GET returns every file of every version; read only the files asked for once the API can.
-            // apify-client turns username/name into the API's username~name.
-            const actor = await client.actor(parsed.actor).get();
-            // Extra path segments, such as username/name/runs/last, reach a sub-resource that is not an Actor.
-            if (!actor || typeof actor.name !== 'string' || typeof actor.username !== 'string') {
-                return respondUserError(
-                    `Actor '${parsed.actor}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
-                );
-            }
-            const fullName = `${actor.username}/${actor.name}`;
+            const { actor, fullName } = await fetchActor(client, parsed.actor);
             const version = resolveVersion(actor, parsed.versionNumber, parsed.actor);
-            const files = extractVersionFiles(version, `Version ${version.versionNumber} of ${fullName}`);
+            const files = buildFilesManifest(
+                extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`),
+            );
             const structuredContent = {
                 actorId: actor.id,
                 fullName,
@@ -299,8 +206,7 @@ export const getActorVersion: ToolEntry = Object.freeze({
                 .join(' ');
             return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
         } catch (error) {
-            if (error instanceof UserInputError) return respondUserError(error.message);
-            throw error;
+            return respondToSourceToolError(error);
         }
     },
 } as const);
