@@ -8,6 +8,11 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add get-actor-version tool ([#1450](https://github.com/apify/apify-mcp-server/pull/1450)) ([0c1c93e](https://github.com/apify/apify-mcp-server/commit/0c1c93e10aed623e3c8b93a4137eee127167b9aa)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1460](https://github.com/apify/apify-mcp-server/issues/1460)
+- **actors:** Surface run tip from key-value store ([#1363](https://github.com/apify/apify-mcp-server/pull/1363)) ([6830279](https://github.com/apify/apify-mcp-server/commit/683027922c5df28658e2e1d784b071a1aa7574b3)) by [@MQ37](https://github.com/MQ37), closes [#1361](https://github.com/apify/apify-mcp-server/issues/1361)
+
+### 🐛 Bug Fixes
+
+- **actors:** Limit and validate the RAG Web Browser TIP pilot ([#1468](https://github.com/apify/apify-mcp-server/pull/1468)) ([fb731c5](https://github.com/apify/apify-mcp-server/commit/fb731c549fc837e67f0f4b04dd8d243e74f59b56)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
