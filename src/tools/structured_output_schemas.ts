@@ -44,7 +44,19 @@ const pricingEventsSchema = {
             title: { type: 'string', description: 'Event title' },
             description: { type: 'string', description: 'Event description' },
             priceUsd: { type: 'number', description: 'Price in USD' },
+            paidPlanPriceUsd: {
+                type: 'number',
+                description: 'Price in USD on the cheapest public paid plan, present only when below priceUsd',
+            },
             tieredPricing: eventTieredPricingSchema,
+            isPrimaryEvent: {
+                type: 'boolean',
+                description: 'Whether this is the primary event shown on the public Store pricing badge',
+            },
+            isOneTimeEvent: {
+                type: 'boolean',
+                description: 'Whether the event is charged once per run rather than per result',
+            },
         },
     },
     description: 'Event-based pricing information',
@@ -82,6 +94,10 @@ export const pricingSchema = {
                 "The user's plan tier used to resolve pricing (always the user's tier, even if a different tier was used as fallback)",
         },
         pricePerUnit: { type: 'number', description: 'Price per unit (for non-free models)' },
+        paidPlanPricePerUnit: {
+            type: 'number',
+            description: 'Price per unit on the cheapest public paid plan, present only when below pricePerUnit',
+        },
         unitName: { type: 'string', description: 'Unit name for pricing' },
         trialMinutes: { type: 'number', description: 'Trial period in minutes' },
         tieredPricing: tieredPricingSchema,
