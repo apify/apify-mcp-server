@@ -204,7 +204,7 @@ describe('buildFetchActorDetailsResult()', () => {
 
         expect(getUserInfoCached).toHaveBeenCalledOnce();
         // linkContext is forwarded to the card formatters.
-        expect(vi.mocked(fetchActorDetails).mock.calls[0][2]).toMatchObject({
+        expect(vi.mocked(fetchActorDetails).mock.calls[0][2]?.cardOptions).toMatchObject({
             linkContext: {},
         });
         expect(content[0].text).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');

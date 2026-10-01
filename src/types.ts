@@ -577,6 +577,9 @@ export type ActorStore = {
      * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
      */
     getActorOutputSchemaAsTypeObject(actorFullName: string): Promise<Record<string, unknown> | null>;
+
+    /** Returns the Actor picture URL via the image proxy (CORS-enabled). Without it, the Store search is used. */
+    getProxiedPictureUrl?(pictureUrl: string): string;
 };
 
 /**

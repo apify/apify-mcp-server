@@ -5,13 +5,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ApifyClient } from '../../src/apify_client.js';
 import { CODE_RUNTIME_ACTOR_NAME } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
-import type { ActorDefinitionWithInfo } from '../../src/types.js';
+import type { ActorDefinitionWithInfo, ActorStore } from '../../src/types.js';
 import {
     fetchActorDetails,
     getMcpToolsMessage,
     resolveReadmeContent,
     typeObjectToString,
 } from '../../src/utils/actor_details.js';
+import { searchActorsByKeywords } from '../../src/utils/actor_search.js';
 
 vi.mock('../../src/utils/actor_search.js', () => ({
     searchActorsByKeywords: vi.fn().mockResolvedValue([]),
@@ -21,12 +22,12 @@ function apifyApiError(status: number, message: string): ApifyApiError {
     return new ApifyApiError({ data: { error: { type: message, message } }, status } as AxiosResponse, 1);
 }
 
-function stubApifyClient(getActor: () => Promise<unknown>): ApifyClient {
+function stubApifyClient(getActor: () => Promise<unknown>, getBuild = getActor): ApifyClient {
     return {
         token: 'test-token',
         actor: () => ({
             get: getActor,
-            defaultBuild: async () => ({ get: getActor }),
+            defaultBuild: async () => ({ get: getBuild }),
         }),
     } as unknown as ApifyClient;
 }
@@ -167,6 +168,37 @@ describe('typeObjectToString', () => {
 });
 
 describe('fetchActorDetails()', () => {
+    const RAW_PICTURE_URL = 'https://bucket.s3.amazonaws.com/picture.png';
+    const stubActorWithPicture = () =>
+        stubApifyClient(
+            async () => ({ id: 'actor-id', pictureUrl: RAW_PICTURE_URL }),
+            async () => ({ actorDefinition: { input: { type: 'object', properties: {} } } }),
+        );
+
+    it('uses the picture URL proxied by the Actor store and skips the Store search', async () => {
+        vi.mocked(searchActorsByKeywords).mockClear();
+        const actorStore: ActorStore = {
+            getActorOutputSchema: vi.fn(),
+            getActorOutputSchemaAsTypeObject: vi.fn(),
+            getProxiedPictureUrl: (url) => `https://proxy.example.com/${url}`,
+        };
+
+        const result = await fetchActorDetails(stubActorWithPicture(), 'apify/web-scraper', { actorStore });
+
+        expect(result?.actorInfo.pictureUrl).toBe(`https://proxy.example.com/${RAW_PICTURE_URL}`);
+        expect(searchActorsByKeywords).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the Store search picture URL when the Actor store cannot proxy pictures', async () => {
+        vi.mocked(searchActorsByKeywords).mockResolvedValueOnce([
+            { id: 'actor-id', pictureUrl: 'https://images.example.com/store-picture.webp' },
+        ] as Awaited<ReturnType<typeof searchActorsByKeywords>>);
+
+        const result = await fetchActorDetails(stubActorWithPicture(), 'apify/web-scraper');
+
+        expect(result?.actorInfo.pictureUrl).toBe('https://images.example.com/store-picture.webp');
+    });
+
     it('returns null on a genuine 404 (Actor does not exist)', async () => {
         const client = stubApifyClient(() => Promise.reject(apifyApiError(404, 'Actor was not found')));
 

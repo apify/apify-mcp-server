@@ -269,7 +269,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     // Console UI tokens hit the same cached users/me lookup; non-UI tokens short-circuit.
     const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
     const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier, linkContext };
-    const details = await fetchActorDetailsFromApi(apifyClient, actorName, cardOptions);
+    const details = await fetchActorDetailsFromApi(apifyClient, actorName, { cardOptions, actorStore });
     if (!details) {
         return buildActorNotFoundResponse(actorName, loadedToolNames);
     }

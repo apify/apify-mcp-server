@@ -6,7 +6,14 @@ import { ActorLoadError } from '../errors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
-import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
+import type {
+    Actor,
+    ActorCardOptions,
+    ActorInputSchema,
+    ActorStore,
+    ActorStoreList,
+    StructuredActorCard,
+} from '../types.js';
 import { ACTOR_TOOL_MODE } from '../types.js';
 import { getActorToolResolutionCached } from './actor.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
@@ -77,10 +84,15 @@ export type ActorDetailsResult = {
     readmeSummary?: string;
 };
 
+type FetchActorDetailsOptions = {
+    cardOptions?: ActorCardOptions;
+    actorStore?: ActorStore;
+};
+
 export async function fetchActorDetails(
     apifyClient: ApifyClient,
     actorName: string,
-    cardOptions?: ActorCardOptions,
+    { cardOptions, actorStore }: FetchActorDetailsOptions = {},
 ): Promise<ActorDetailsResult | null> {
     try {
         // Use only the actor name part (after '/') for better keyword search relevance —
@@ -91,16 +103,22 @@ export async function fetchActorDetails(
             await Promise.all([
                 actor.get(),
                 actor.defaultBuild().then(async (build) => build.get()),
-                searchActorsByKeywords({
-                    search: actorSlug,
-                    apifyClient,
-                    limit: ACTOR_DETAILS_PICTURE_SEARCH_LIMIT,
-                }).catch(() => []),
+                // Only needed when the host cannot proxy picture URLs.
+                actorStore?.getProxiedPictureUrl
+                    ? []
+                    : searchActorsByKeywords({
+                          search: actorSlug,
+                          apifyClient,
+                          limit: ACTOR_DETAILS_PICTURE_SEARCH_LIMIT,
+                      }).catch(() => []),
             ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
 
         const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
-        const pictureUrl = storeActor?.pictureUrl;
+        const pictureUrl =
+            actorStore?.getProxiedPictureUrl && actorInfo.pictureUrl
+                ? actorStore.getProxiedPictureUrl(actorInfo.pictureUrl)
+                : storeActor?.pictureUrl;
         const actorInfoWithPicture = { ...actorInfo, pictureUrl: pictureUrl || actorInfo.pictureUrl } as Actor & {
             pictureUrl?: string;
         };
