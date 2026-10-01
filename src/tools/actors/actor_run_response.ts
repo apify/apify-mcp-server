@@ -376,6 +376,18 @@ async function fetchActorTip(
     }
 }
 
+/** Fetch the run's tip; looks the key up separately only when the listed keys are truncated. */
+async function fetchRunTip(
+    client: ApifyClient,
+    { id, keys = [], keyCount }: RunKeyValueStore,
+    mcpSessionId?: string,
+): Promise<RunResponse['tip']> {
+    const isTruncated = keyCount === undefined && keys.length === KV_KEYS_LIMIT;
+    const hasTipKey =
+        keys.includes(TIP_KVS_KEY) || (isTruncated && (await keyValueStoreHasTipKey(client, id, mcpSessionId)));
+    return hasTipKey ? fetchActorTip(client, id, mcpSessionId) : undefined;
+}
+
 /**
  * For Console UI token sessions, sets the Apify Console `apifyConsoleUrl` on the run and its default
  * storages and returns the narrative suffix (the links + the verbatim nudge) in a single pass.
@@ -960,17 +972,11 @@ export async function fetchActorRunData(params: {
         keyValueStore: keyValueStores?.default,
     });
 
-    // Targeted lookup only when the displayed (KV_KEYS_LIMIT-capped) page is truncated and lacks TIP —
-    // avoids an extra round trip in the common case while still catching TIP beyond that page.
     const defaultKv = keyValueStores?.default;
-    const displayedKeys = defaultKv?.keys ?? [];
-    const kvTruncated = defaultKv?.keyCount === undefined && displayedKeys.length === KV_KEYS_LIMIT;
-    const hasTipKey =
+    const tip =
         isTerminal && run.actId === RAG_WEB_BROWSER_ID && defaultKv
-            ? displayedKeys.includes(TIP_KVS_KEY) ||
-              (kvTruncated && (await keyValueStoreHasTipKey(client, defaultKv.id, mcpSessionId)))
-            : false;
-    const tip = hasTipKey && defaultKv ? await fetchActorTip(client, defaultKv.id, mcpSessionId) : undefined;
+            ? await fetchRunTip(client, defaultKv, mcpSessionId)
+            : undefined;
 
     const structuredContent: RunResponse = {
         runId: run.id,
