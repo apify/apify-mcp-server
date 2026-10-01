@@ -1230,7 +1230,10 @@ describe('update-actor-version', () => {
         it.each([
             ['https://user:secret@github.com/john/repo.git', 'https://github.com/john/repo.git'],
             ['http://john:secret-password@git.example.com/repo.git', 'http://git.example.com/repo.git'],
-            ['ssh://deploy:secret@github.com/john/repo.git?x=secret#main', 'ssh://deploy@github.com/john/repo.git#main'],
+            [
+                'ssh://deploy:secret@github.com/john/repo.git?x=secret#main',
+                'ssh://deploy@github.com/john/repo.git#main',
+            ],
             ['git@github.com:john/repo.git', 'git@github.com:john/repo.git'],
             ['git@github.com:john/repo.git?token=secret', 'git@github.com:john/repo.git'],
             ['git@github.com:john/repo.git?token=secret#main:src', 'git@github.com:john/repo.git#main:src'],
