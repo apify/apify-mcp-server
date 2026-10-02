@@ -2,6 +2,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
+import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
@@ -202,6 +203,7 @@ async function formatOversizeMessage(
 ): Promise<string> {
     const path = formatApiPath(normalizedPath);
     const message = `The response of ${method} ${path} is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned.`;
+    if (method !== 'GET') return `${message} The request itself was sent; check its effect with a GET.`;
     const index = await fetchApiOperationIndexIfAvailable(signal);
     const operation = index && findPathOperations(index, normalizedPath).find((match) => match.method === method);
     const narrowingNames = (operation?.parameters ?? [])
@@ -212,6 +214,13 @@ async function formatOversizeMessage(
     }
     const logToolName = findLogToolName(stripQuery(path), loadedToolNames);
     return logToolName ? `${message} Get the end of the log with ${logToolName} instead.` : message;
+}
+
+/** The status of a response axios aborted mid-body; Node's request object keeps the response it got. */
+function readAbortedResponseStatus(error: unknown): number | undefined {
+    const request: unknown = isAxiosError(error) ? error.request : undefined;
+    const statusCode = isRecord(request) && isRecord(request.res) ? request.res.statusCode : undefined;
+    return typeof statusCode === 'number' ? statusCode : undefined;
 }
 
 /** Adds the closest paths of the spec to a 404 error, when the spec is available. */
@@ -259,12 +268,13 @@ function toPlainRequestError(error: unknown): Error {
  * encodes values. The URL starts with the base URL's `/v2/`, so no path can lead to another host;
  * the API resource's origin gate, `isApifyApiUri`, asserts it.
  *
- * It sends the request with the API resource's `sendApifyApiRequest`, which says why that is one
- * attempt with no retries and the body capped at `MAX_INLINE_BYTES`, and the resource's
- * `isMaxContentLengthAbort` detects the abort of a larger body. Unlike the resource, it does not
- * stream the body, so the instance parses JSON and text bodies. Like the resource, the instance adds
- * the token and the request-origin and payment headers. A non-2xx response is thrown as the
- * `ApifyApiError` apify-client itself builds, so it gets the usual tool error text and telemetry.
+ * It sends the request, with a write's JSON body, through the API resource's `sendApifyApiRequest`,
+ * which says why that is one attempt with no retries and the response body capped at
+ * `MAX_INLINE_BYTES`, and the resource's `isMaxContentLengthAbort` detects the abort of a larger
+ * body. Unlike the resource, it does not stream the response, so the instance parses JSON and text
+ * bodies. Like the resource, the instance adds the token and the request-origin and payment headers.
+ * A non-2xx response is thrown as the `ApifyApiError` apify-client itself builds, so it gets the
+ * usual tool error text and telemetry.
  */
 export async function callApi(params: {
     client: ApifyClient;
@@ -273,6 +283,8 @@ export async function callApi(params: {
     method: ApiMethod;
     path: string;
     query?: Record<string, string | number | boolean>;
+    /** JSON request body; only the write tool sends one. */
+    body?: unknown;
     /** Aborts the request when the client cancels the tool call. */
     signal?: AbortSignal;
     /** The session's tools, to name a dedicated log tool when a log is too large. */
@@ -288,11 +300,38 @@ export async function callApi(params: {
     if (!isApifyApiUri(url)) throw new Error(`The URL ${url} is not on the API host.`);
     let response: AxiosResponse<unknown>;
     try {
-        response = await sendApifyApiRequest(client, { url, method, params: params.query, signal: params.signal });
+        response = await sendApifyApiRequest(client, {
+            url,
+            method,
+            params: params.query,
+            // Serialized here: axios would send a string as a form and refuse a number. With only the JSON
+            // header, a JSON-looking string would reach the API as the object it holds.
+            ...(params.body !== undefined && {
+                data: JSON.stringify(params.body),
+                headers: { 'Content-Type': 'application/json' },
+            }),
+            signal: params.signal,
+        });
     } catch (error) {
         // A cancelled call is not a tool error; like the run and build tools, it gets the empty response.
         if (params.signal?.aborted) return respondAborted();
         if (isMaxContentLengthAbort(error)) {
+            // A write has applied by the time its response arrives, so a large response is not a failure.
+            const statusCode = method === 'GET' ? undefined : readAbortedResponseStatus(error);
+            if (statusCode !== undefined && statusCode < 300) {
+                const structuredContent = { method, path, statusCode, data: null };
+                const summary =
+                    `${method} ${path} returned HTTP ${statusCode}. The response is larger than ` +
+                    `${MAX_INLINE_BYTES} bytes, so it is not returned; check the result with a GET.`;
+                return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
+            }
+            // The status says the write failed; the generic message would say it may have applied.
+            if (statusCode !== undefined) {
+                return respondUserError(
+                    `${method} ${path} failed with HTTP ${statusCode}. Its error body is larger than ` +
+                        `${MAX_INLINE_BYTES} bytes, so it is not returned.`,
+                );
+            }
             return respondUserError(
                 await formatOversizeMessage(method, normalizedPath, params.loadedToolNames, params.signal),
             );
