@@ -146,8 +146,8 @@ describe('delete-actor', () => {
     });
 
     it.each([
-        [1, '1 unfinished run was aborted.'],
-        [2, '2 unfinished runs were aborted.'],
+        [1, '1 unfinished run was running just before the deletion and aborted with it.'],
+        [2, '2 unfinished runs were running just before the deletion and aborted with it.'],
     ])('deletes with abortRunningRuns while %i runs are unfinished and reports them', async (count, aborted) => {
         runsListMock.mockResolvedValue(mockRunList(Array.from({ length: count }, (_, i) => `run-${i}`)));
 

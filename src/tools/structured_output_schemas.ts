@@ -538,7 +538,11 @@ export const deleteActorToolOutputSchema = {
         actorId: { type: 'string', description: 'ID of the deleted Actor' },
         fullName: { type: 'string', description: 'Full name of the deleted Actor, username/name' },
         deleted: { type: 'boolean', description: 'Always true; the Actor no longer exists' },
-        abortedRunCount: { type: 'integer', description: 'Number of unfinished runs the deletion aborted' },
+        abortedRunCount: {
+            type: 'integer',
+            description:
+                'Unfinished runs found just before the deletion. The platform aborts them; a run that starts in between is aborted and not included.',
+        },
     },
     required: ['actorId', 'fullName', 'deleted', 'abortedRunCount'],
 };

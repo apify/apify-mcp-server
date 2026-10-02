@@ -11,19 +11,16 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { deleteActorToolOutputSchema } from '../structured_output_schemas.js';
 
 const deleteActorArgs = z.object({
-    actor: z
-        .string()
-        .min(1)
-        .describe(
-            'The Actor to delete: its ID, or its full name as username/name or username~name. ' +
-                'A name without the username is not enough. It must be in your own account.',
-        ),
+    actor: z.string().min(1).describe(dedent`
+            The Actor to delete: its ID, or its full name as username/name or username~name.
+            A name without the username is not enough. It must be in your own account.
+        `),
     abortRunningRuns: z
         .boolean()
-        .describe(
-            'Delete even while the Actor has unfinished runs, which the deletion aborts. Set it only after the user ' +
-                'agreed to abort them. Default: false.',
-        )
+        .describe(dedent`
+            Delete even while the Actor has unfinished runs, which the deletion aborts.
+            Set it only after the user agreed to abort them. Default: false.
+        `)
         .default(false),
 });
 
@@ -133,13 +130,16 @@ export const deleteActor: ToolEntry = Object.freeze({
             const result = { actorId: actor.id, fullName, deleted: true, abortedRunCount: unfinishedRunCount };
             const aborted =
                 unfinishedRunCount > 0
-                    ? ` ${unfinishedRunCount} unfinished ${unfinishedRunCount === 1 ? 'run was' : 'runs were'} aborted.`
+                    ? ` ${unfinishedRunCount} unfinished ${
+                          unfinishedRunCount === 1 ? 'run was' : 'runs were'
+                      } running just before the deletion and aborted with it.`
                     : '';
             const summary = `Deleted ${fullName}. This cannot be undone.${aborted}`;
             return respondOk([JSON.stringify(result), summary], { structuredContent: result });
         } catch (error) {
-            // For example a token without write access, or a critical Actor; the API's message says why, and
-            // respondServerError records a 401/403 as AUTH and any other 4xx as INVALID_INPUT.
+            // Caught here so the shared 403 hint ("may be private or your token may lack access") is not
+            // appended. That hint is wrong for cannot-delete-critical-actor; the API message is the reason.
+            // 401/403 still record as AUTH, other 4xx as INVALID_INPUT.
             if (error instanceof ApifyApiError && error.statusCode >= 400 && error.statusCode < 500) {
                 return respondServerError(error.message, { error });
             }
