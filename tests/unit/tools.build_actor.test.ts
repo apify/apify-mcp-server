@@ -11,6 +11,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    mockApifyClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -26,7 +27,7 @@ const actorMock = vi.fn(() => ({ get: getMock, build: buildMock }));
 const buildGetMock = vi.fn();
 const buildAbortMock = vi.fn();
 const buildClientMock = vi.fn(() => ({ get: buildGetMock, abort: buildAbortMock }));
-const stubClient = { actor: actorMock, build: buildClientMock } as unknown as InternalToolArgs['apifyClient'];
+const stubClient = mockApifyClient({ actor: actorMock, build: buildClientMock });
 
 /** An Actor API document; `versions` carries the internal fields the tool must ignore. */
 function mockActor(versionNumbers: string[] = ['0.1']) {

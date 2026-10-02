@@ -1,5 +1,6 @@
 import { ACTOR_PRICING_MODEL } from '../../src/const.js';
 import type { ActorStoreList, InternalToolArgs } from '../../src/types.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 /** Minimal store-list row for formatActorToStructuredCard / formatActorForWidget. */
 export const MOCK_STORE_ACTOR = {
@@ -34,7 +35,7 @@ export function stubInternalToolArgs(
     return {
         args,
         apifyToken: 'test-token',
-        apifyClient: {} as InternalToolArgs['apifyClient'],
+        apifyClient: mockApifyClient(),
         signal: new AbortController().signal,
         paymentProvider: undefined,
         loadedToolNames,

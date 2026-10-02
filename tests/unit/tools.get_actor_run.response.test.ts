@@ -15,7 +15,7 @@ import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 // Only Console UI token sessions reach the users/me lookup; the default 'test-token'
 // stub never triggers it.
@@ -71,7 +71,7 @@ function stubClient(opts: {
     listItemsProbe?: { items: unknown[]; total?: number };
 }): InternalToolArgs['apifyClient'] {
     const { run, dataset, listKeys, listItemsProbe } = opts;
-    return {
+    return mockApifyClient({
         run: (_id: string) => ({
             get: async () => run,
             waitForFinish: async () => run,
@@ -84,7 +84,7 @@ function stubClient(opts: {
         keyValueStore: (_id: string) => ({
             listKeys: async () => listKeys ?? { items: [], count: 0, isTruncated: false, limit: 50 },
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-actor-run default response', () => {
@@ -166,7 +166,7 @@ describe('get-actor-run default response', () => {
         let datasetCalls = 0;
         let kvCalls = 0;
         const run = { ...mockSucceededRun({ status: 'RUNNING', finishedAt: undefined }), exitCode: undefined };
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => {
@@ -180,7 +180,7 @@ describe('get-actor-run default response', () => {
                 kvCalls += 1;
                 return { listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }) };
             },
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -223,7 +223,7 @@ describe('get-actor-run default response', () => {
         const run = mockSucceededRun({
             storageIds: { datasets: { default: 'dataset-xyz', results: 'dataset-results' } },
         });
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (id: string) => ({
@@ -235,7 +235,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -253,7 +253,7 @@ describe('get-actor-run default response', () => {
             const run = mockSucceededRun();
             const dataset = mockDataset({ itemCount: 0 });
             let probeCalls = 0;
-            const client = {
+            const client = mockApifyClient({
                 run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
                 actor: (_id: string) => ({ get: async () => ACTOR }),
                 dataset: (_id: string) => ({
@@ -266,7 +266,7 @@ describe('get-actor-run default response', () => {
                 keyValueStore: (_id: string) => ({
                     listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
                 }),
-            } as unknown as InternalToolArgs['apifyClient'];
+            });
 
             const callPromise = (getActorRun as HelperTool).call(
                 stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client),
@@ -290,7 +290,7 @@ describe('get-actor-run default response', () => {
             const run = mockSucceededRun();
             const dataset = mockDataset({ itemCount: 0 });
             let probeCalls = 0;
-            const client = {
+            const client = mockApifyClient({
                 run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
                 actor: (_id: string) => ({ get: async () => ACTOR }),
                 dataset: (_id: string) => ({
@@ -303,7 +303,7 @@ describe('get-actor-run default response', () => {
                 keyValueStore: (_id: string) => ({
                     listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
                 }),
-            } as unknown as InternalToolArgs['apifyClient'];
+            });
 
             const callPromise = (getActorRun as HelperTool).call(
                 stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client),
@@ -326,7 +326,7 @@ describe('get-actor-run default response', () => {
         const run = mockSucceededRun();
         const dataset = mockDataset({ itemCount: 0 });
         let probeCalls = 0;
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => ({
@@ -339,7 +339,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         await (getActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client));
         // Exactly one immediate probe — no delayed retries.
@@ -353,7 +353,7 @@ describe('get-actor-run default response', () => {
         controller.abort();
 
         let getCalls = 0;
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({
                 get: async () => {
                     getCalls += 1;
@@ -371,7 +371,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call({
             ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -397,7 +397,7 @@ describe('get-actor-run default response', () => {
 
     it('degrades gracefully when dataset metadata fetch fails: keeps SUCCEEDED, points at dataset', async () => {
         const run = mockSucceededRun();
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => ({
@@ -409,7 +409,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -435,7 +435,7 @@ describe('get-actor-run default response', () => {
 
     it('degrades gracefully when KV listKeys fails: keeps dataset, omits KV', async () => {
         const run = mockSucceededRun();
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => ({
@@ -447,7 +447,7 @@ describe('get-actor-run default response', () => {
                     throw new Error('transient KV error');
                 },
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -479,7 +479,7 @@ describe('get-actor-run default response', () => {
             'kv-xyz': [{ key: 'OUTPUT' }],
             'kv-screenshots': [{ key: 'shot-1' }, { key: 'shot-2' }],
         };
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (id: string) => ({
@@ -489,7 +489,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (id: string) => ({
                 listKeys: async () => ({ items: kvKeysById[id] ?? [], isTruncated: false }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -816,7 +816,7 @@ describe('get-actor-run default response', () => {
         });
 
         let runFetchCount = 0;
-        const client = {
+        const client = mockApifyClient({
             // First .get() returns RUNNING; the post-waitForFinish re-fetch returns the terminal run.
             run: (_id: string) => ({
                 get: async () => {
@@ -833,7 +833,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const updateProgressCalls: string[] = [];
         const startActorRunUpdatesCalls: string[] = [];
@@ -868,10 +868,10 @@ describe('get-actor-run default response', () => {
     });
 
     it('returns isError on a missing run', async () => {
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => undefined }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
         const result = (await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'missing', waitSecs: 0 }, client),
         )) as TextToolResult;
