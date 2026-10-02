@@ -36,6 +36,15 @@ describe('isApiTokenRequired', () => {
         ).toBe(false);
     });
 
+    it('does not require token for the API search and details tools, which read only the public spec', () => {
+        expect(isApiTokenRequired({ toolCategoryKeys: ['apify-api-search', 'apify-api-details'] })).toBe(false);
+    });
+
+    it('requires token for the API call tools and the api category', () => {
+        expect(isApiTokenRequired({ toolCategoryKeys: ['apify-api-read'] })).toBe(true);
+        expect(isApiTokenRequired({ toolCategoryKeys: ['api'] })).toBe(true);
+    });
+
     it('requires token if any private tool is included', () => {
         expect(
             isApiTokenRequired({

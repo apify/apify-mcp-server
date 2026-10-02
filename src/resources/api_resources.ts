@@ -3,6 +3,7 @@ import type {
     ReadResourceResult,
     TextResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { isAxiosError } from 'axios';
 
 import type { ApifyClient } from '../apify_client.js';
@@ -60,7 +61,7 @@ function throwReadFailure(uri: string, status: number | undefined, message: stri
  * hand it Apify API URLs — never an arbitrary host. Userinfo-bearing URLs
  * (`user@api.apify.com`) are rejected even when the host is genuinely ours: axios drops
  * the default `Authorization` header for credentials-bearing URLs, so the read would
- * silently run unauthenticated.
+ * silently run unauthenticated. The API tools' `callApi` asserts its request URL with it too.
  */
 export function isApifyApiUri(uri: string): boolean {
     try {
@@ -137,9 +138,40 @@ async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promis
     );
 }
 
-/** The mid-consumption abort axios raises when a streamed body crosses `maxContentLength`. */
-function isMaxContentLengthAbort(err: unknown): boolean {
+/**
+ * The mid-consumption abort axios raises when a body crosses `maxContentLength`. The API tools'
+ * `callApi` detects its oversized responses with it too.
+ */
+export function isMaxContentLengthAbort(err: unknown): boolean {
     return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
+}
+
+/**
+ * Sends one request to the Apify API with the body capped at `MAX_INLINE_BYTES`. `readApiResource` and
+ * the API tools' `callApi` both send their requests with it; each checks the URL with `isApifyApiUri`
+ * first and detects a larger body with `isMaxContentLengthAbort`.
+ *
+ * The request goes straight through `apifyClient.httpClient.axios`, the axios instance apify-client
+ * builds, so the token and the request-origin (and any payment) headers still apply, instead of
+ * `httpClient.call()`. One attempt, no retries: `call()` retries a failed request, so a retried write
+ * could apply twice, it retries the `maxContentLength` abort as a network error, and with
+ * `responseType: 'stream'` it hands a non-2xx response to `ApifyApiError` as an unconsumed stream, so
+ * the message degrades to junk and each retry strands an unread socket. The instance's
+ * `validateStatus: null` resolves a non-2xx response instead of throwing it, so callers check the
+ * status. Skipping `call()` also skips its setup (`ensureNodeInit()`), so the request does not honor
+ * `HTTPS_PROXY` and goes out with axios's default User-Agent instead of apify-client's. Fine for
+ * direct egress; a proxy-mandatory deployment needs an apify-client init hook.
+ *
+ * axios enforces `maxContentLength` itself, for a streamed body too (verified in axios@1.16.1: the
+ * adapter wraps a streamed response in a byte-counting generator that throws `ERR_BAD_RESPONSE` when
+ * the decoded size crosses the limit), so a larger body is aborted at ~`MAX_INLINE_BYTES`, never
+ * buffered whole.
+ */
+export async function sendApifyApiRequest(
+    apifyClient: ApifyClient,
+    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'responseType' | 'signal'>,
+): Promise<AxiosResponse<unknown>> {
+    return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
 }
 
 /** `charset` parameter of a Content-Type header, lowercased; `undefined` when absent. */
@@ -182,14 +214,8 @@ function parseApiErrorMessage(body: Buffer | undefined): string | undefined {
  * resource (see SEP-2164). A body over `MAX_INLINE_BYTES` is NOT a failure — it is a
  * successful read returning a download pointer.
  *
- * The request goes straight through `apifyClient.httpClient.axios` (the same axios instance
- * apify-client builds internally, so token/origin headers still apply) instead of
- * `httpClient.call()`: with `responseType: 'stream'`, a non-2xx reaches `call()` as an unconsumed
- * stream — its `ApifyApiError` message degrades to junk and each retry attempt strands an unread
- * socket. One attempt, no retries. `maxContentLength` is enforced by axios itself mid-consumption
- * (verified in axios@1.16.1: the adapter wraps streamed responses in a byte-counting generator
- * that throws `ERR_BAD_RESPONSE` when the decoded size crosses the limit), so an oversized body
- * is aborted at ~`MAX_INLINE_BYTES`, never buffered whole.
+ * The request is one attempt through `sendApifyApiRequest`, which says why it skips
+ * `httpClient.call()`; axios aborts an oversized body mid-stream, so it is never buffered whole.
  */
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
     if (!isApifyApiUri(uri)) {
@@ -206,15 +232,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
 
     let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
     try {
-        // The raw axios instance skips `httpClient.call()` → `ensureNodeInit()`, so reads do NOT honor
-        // `HTTPS_PROXY` (auth + MCP-origin headers are instance defaults and still apply — not a leak).
-        // Fine for direct egress; a proxy-mandatory deployment needs an apify-client init hook.
-        response = await apifyClient.httpClient.axios.request<unknown>({
-            url: uri,
-            method: 'GET',
-            responseType: 'stream',
-            maxContentLength: MAX_INLINE_BYTES,
-        });
+        response = await sendApifyApiRequest(apifyClient, { url: uri, method: 'GET', responseType: 'stream' });
     } catch (err) {
         logHttpError(err, `resources/read request failed`, { uri });
         throwReadFailure(uri, getHttpStatusCode(err), err instanceof Error ? err.message : String(err));
