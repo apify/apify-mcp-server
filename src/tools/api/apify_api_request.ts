@@ -263,11 +263,12 @@ function toPlainRequestError(error: unknown): Error {
  * `httpClient.call()`, with `maxContentLength` at `MAX_INLINE_BYTES`, and the resource's
  * `isMaxContentLengthAbort` detects the abort of a larger body. One attempt and no retries, since a
  * retried write could apply twice, and apify-client would retry the `maxContentLength` abort as a
- * network error. Unlike the resource, it does not stream the body: the instance adds the token and
- * the request-origin and payment headers, and parses JSON and text bodies. Like `readApiResource`,
- * the request skips the setup `httpClient.call()` runs first, so it does not honor `HTTPS_PROXY` and
- * goes out with axios's default User-Agent instead of apify-client's. A non-2xx response is thrown as
- * the `ApifyApiError` apify-client itself builds, so it gets the usual tool error text and telemetry.
+ * network error. Unlike the resource, it does not stream the body, so the instance parses JSON and
+ * text bodies. Like the resource, the instance adds the token and the request-origin and payment
+ * headers. Like `readApiResource`, the request skips the setup `httpClient.call()` runs first, so it
+ * does not honor `HTTPS_PROXY` and goes out with axios's default User-Agent instead of apify-client's.
+ * A non-2xx response is thrown as the `ApifyApiError` apify-client itself builds, so it gets the usual
+ * tool error text and telemetry.
  */
 export async function callApi(params: {
     client: ApifyClient;
