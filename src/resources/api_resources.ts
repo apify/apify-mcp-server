@@ -147,9 +147,9 @@ export function isMaxContentLengthAbort(err: unknown): boolean {
 }
 
 /**
- * Sends one request to the Apify API with the body capped at `MAX_INLINE_BYTES`. `readApiResource` and
- * the API tools' `callApi` both send their requests with it; each checks the URL with `isApifyApiUri`
- * first and detects a larger body with `isMaxContentLengthAbort`.
+ * Sends one request to the Apify API with the response body capped at `MAX_INLINE_BYTES`.
+ * `readApiResource` and the API tools' `callApi` both send their requests with it; each checks the URL
+ * with `isApifyApiUri` first and detects a larger body with `isMaxContentLengthAbort`.
  *
  * The request goes straight through `apifyClient.httpClient.axios`, the axios instance apify-client
  * builds, so the token and the request-origin (and any payment) headers still apply, instead of
@@ -169,7 +169,7 @@ export function isMaxContentLengthAbort(err: unknown): boolean {
  */
 export async function sendApifyApiRequest(
     apifyClient: ApifyClient,
-    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'responseType' | 'signal'>,
+    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal'>,
 ): Promise<AxiosResponse<unknown>> {
     return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
 }

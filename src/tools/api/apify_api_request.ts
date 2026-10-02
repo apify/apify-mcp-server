@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import { isApifyApiUri, isMaxContentLengthAbort } from '../../resources/api_resources.js';
+import { isApifyApiUri, isMaxContentLengthAbort, sendApifyApiRequest } from '../../resources/api_resources.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
@@ -268,12 +268,13 @@ function toPlainRequestError(error: unknown): Error {
  * encodes values. The URL starts with the base URL's `/v2/`, so no path can lead to another host;
  * the API resource's origin gate, `isApifyApiUri`, asserts it.
  *
- * It sends the request with the API resource's `sendApifyApiRequest`, which says why that is one
- * attempt with no retries and the body capped at `MAX_INLINE_BYTES`, and the resource's
- * `isMaxContentLengthAbort` detects the abort of a larger body. Unlike the resource, it does not
- * stream the body, so the instance parses JSON and text bodies. Like the resource, the instance adds
- * the token and the request-origin and payment headers. A non-2xx response is thrown as the
- * `ApifyApiError` apify-client itself builds, so it gets the usual tool error text and telemetry.
+ * It sends the request, with a write's JSON body, through the API resource's `sendApifyApiRequest`,
+ * which says why that is one attempt with no retries and the response body capped at
+ * `MAX_INLINE_BYTES`, and the resource's `isMaxContentLengthAbort` detects the abort of a larger
+ * body. Unlike the resource, it does not stream the response, so the instance parses JSON and text
+ * bodies. Like the resource, the instance adds the token and the request-origin and payment headers.
+ * A non-2xx response is thrown as the `ApifyApiError` apify-client itself builds, so it gets the
+ * usual tool error text and telemetry.
  */
 export async function callApi(params: {
     client: ApifyClient;
@@ -299,7 +300,7 @@ export async function callApi(params: {
     if (!isApifyApiUri(url)) throw new Error(`The URL ${url} is not on the API host.`);
     let response: AxiosResponse<unknown>;
     try {
-        response = await client.httpClient.axios.request<unknown>({
+        response = await sendApifyApiRequest(client, {
             url,
             method,
             params: params.query,
@@ -309,7 +310,6 @@ export async function callApi(params: {
                 data: JSON.stringify(params.body),
                 headers: { 'Content-Type': 'application/json' },
             }),
-            maxContentLength: MAX_INLINE_BYTES,
             signal: params.signal,
         });
     } catch (error) {
