@@ -45,7 +45,7 @@ read here to surface the API's message.
 
 Genuine failures **throw** a domain error carrying `data: { uri }` (SEP-2164 / draft spec: the
 `server.ts` boundary turns it into a JSON-RPC error, never success-shaped content): 3xx/4xx except
-429 → `InvalidParamsError`; 429, 5xx, no status (network, mid-stream drop) → `InternalError`. 401/403
+429 → `InvalidParamsError`; 429, 5xx, no status (network, mid-stream drop) → `InternalError`. 401/403/429/5xx
 append a hint via `getHttpErrorHint()`
 (shared with `tools/call`); failures are logged via `logHttpError` (5xx → exception). Size
 link-outs are **successful** reads returning a download pointer, not failures. Discovery is the
