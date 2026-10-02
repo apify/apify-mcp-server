@@ -155,6 +155,8 @@ export type RunResponse = {
         computeUnits?: number;
         memMaxBytes?: number;
     };
+    /** Total run cost in USD, from the Apify run record. */
+    usageTotalUsd?: number;
     storages: RunStorages;
     /** Advisory guidance an Actor wrote under the reserved {@link TIP_KVS_KEY}, if any. */
     tip?: { message: string; level?: 'info' | 'warning'; recommendedActorId?: string };
@@ -988,6 +990,7 @@ export async function fetchActorRunData(params: {
         startedAt: toIsoString(run.startedAt),
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
+        usageTotalUsd: run.usageTotalUsd ?? undefined,
         storages: {
             ...(datasets && { datasets }),
             ...(keyValueStores && { keyValueStores }),
