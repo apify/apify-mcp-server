@@ -33,6 +33,9 @@ export type SchemaProperties = {
     items?: SchemaProperties;
     editor?: string;
     examples?: unknown[];
+    isSecret?: boolean;
+    resourceType?: string;
+    resourcePermissions?: string[];
 
     properties?: Record<string, SchemaProperties>;
     required?: string[];
