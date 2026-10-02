@@ -16,7 +16,7 @@ import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
-import { ALL_WIDGET_TOOLS, WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';
+import { ALL_WIDGET_TOOLS, UNCATEGORIZED_TOOLS, WIDGET_BY_BASE_TOOL } from '../../src/tools/registry.js';
 import type { ActorInfo, Input, ToolBase, ToolEntry } from '../../src/types.js';
 import { SERVER_MODES, SERVER_MODE } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -58,13 +58,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
     describe('per-mode tool lists', () => {
         it('has correct tools in actors category (both modes)', () => {
-            const expected = [
-                HELPER_TOOLS.STORE_SEARCH,
-                HELPER_TOOLS.ACTOR_GET_DETAILS,
-                HELPER_TOOLS.ACTOR_CALL,
-                HELPER_TOOLS.ACTOR_LIST_GET,
-                HELPER_TOOLS.ACTOR_DELETE,
-            ];
+            const expected = [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.ACTOR_CALL];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
             expect(toolNames(appsCategories.actors)).toEqual(expected);
         });
@@ -133,6 +127,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             ];
             expect(toolNames(defaultCategories.builds)).toEqual(expected);
             expect(toolNames(appsCategories.builds)).toEqual(expected);
+        });
+
+        it('has correct tools in source category (both modes)', () => {
+            const expected = [HELPER_TOOLS.ACTOR_VERSION_GET];
+            expect(toolNames(defaultCategories.source)).toEqual(expected);
+            expect(toolNames(appsCategories.source)).toEqual(expected);
         });
 
         it('has correct tools in dev category (both modes)', () => {
@@ -264,6 +264,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 expect(Object.isFrozen(widget)).toBe(true);
             });
         }
+
+        for (const tool of UNCATEGORIZED_TOOLS) {
+            it(`${tool.name} (no category) should be frozen`, () => {
+                expect(Object.isFrozen(tool)).toBe(true);
+            });
+        }
     });
 
     describe('all tool names match HELPER_TOOLS values', () => {
@@ -284,6 +290,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         for (const widget of ALL_WIDGET_TOOLS) {
             it(`${widget.name} widget should be a known HELPER_TOOLS value`, () => {
                 expect(allHelperToolNames.has(widget.name as HelperToolName)).toBe(true);
+            });
+        }
+
+        for (const tool of UNCATEGORIZED_TOOLS) {
+            it(`${tool.name} (no category) should be a known HELPER_TOOLS value`, () => {
+                expect(allHelperToolNames.has(tool.name as HelperToolName)).toBe(true);
             });
         }
     });
@@ -549,6 +561,7 @@ describe('tool descriptions never name a tool absent from the session', () => {
         { label: "tools: ['storage']", input: { tools: ['storage'] }, actorTools: [] },
         { label: "tools: ['actors']", input: { tools: ['actors'] }, actorTools: [] },
         { label: "tools: ['schedules']", input: { tools: ['schedules'] }, actorTools: [] },
+        { label: "tools: ['source']", input: { tools: ['source'] }, actorTools: [] },
         ...ALL_TOOL_NAMES.map((name) => ({
             label: `tools: ['${name}']`,
             input: { tools: [name] },

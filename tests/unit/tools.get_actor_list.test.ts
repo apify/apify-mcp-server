@@ -4,10 +4,11 @@ import { HELPER_TOOLS } from '../../src/const.js';
 import { getActorList } from '../../src/tools/actors/get_actor_list.js';
 import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { actorListOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { HelperTool } from '../../src/types.js';
 import { ALL_TOOLS_PRESENT } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
+    mockApifyClient,
     only,
     stubToolCallContext,
     type TextToolResult,
@@ -16,7 +17,7 @@ import {
 const listMock = vi.fn();
 const actorsMock = vi.fn(() => ({ list: listMock }));
 
-const stubClient = { actors: actorsMock } as unknown as InternalToolArgs['apifyClient'];
+const stubClient = mockApifyClient({ actors: actorsMock });
 
 /** An item of `GET /v2/acts`, with a field the tool must not pass through. */
 function mockActor(overrides: Record<string, unknown> = {}) {

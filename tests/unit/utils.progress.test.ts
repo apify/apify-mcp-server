@@ -8,6 +8,7 @@ import {
     PROGRESS_NOTIFICATION_INTERVAL_MS,
     ProgressTracker,
 } from '../../src/utils/progress.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 describe('ProgressTracker', () => {
     it('sends progress notifications correctly', async () => {
@@ -205,7 +206,7 @@ describe('ProgressTracker', () => {
             const mockSendNotification = vi.fn();
             const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
             const get = vi.fn().mockResolvedValue({ status: 'RUNNING', statusMessage: null });
-            const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
+            const apifyClient = mockApifyClient({ run: vi.fn().mockReturnValue({ get }) });
 
             tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING', statusMessage: null });
             await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
@@ -230,7 +231,7 @@ describe('ProgressTracker', () => {
                         resolveGet = resolve;
                     }),
             );
-            const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
+            const apifyClient = mockApifyClient({ run: vi.fn().mockReturnValue({ get }) });
 
             tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
             // First tick fires; run.get() is now in-flight.
@@ -264,7 +265,7 @@ describe('ProgressTracker', () => {
                         resolveGet = resolve;
                     }),
             );
-            const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
+            const apifyClient = mockApifyClient({ run: vi.fn().mockReturnValue({ get }) });
 
             tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
             await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
@@ -294,7 +295,7 @@ describe('startActorBuildUpdates', () => {
                 .mockResolvedValueOnce({ status: 'SUCCEEDED' });
             const build = vi.fn().mockReturnValue({ get });
 
-            tracker.startActorBuildUpdates('build-1', { build } as never, 'Build 0.1 of Actor a', {
+            tracker.startActorBuildUpdates('build-1', mockApifyClient({ build }), 'Build 0.1 of Actor a', {
                 status: 'RUNNING',
             });
             await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS * 3 + 500);

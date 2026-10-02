@@ -2,7 +2,6 @@ import { Readable } from 'node:stream';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ApifyClient } from '../../src/apify_client.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
 import { SKYFIRE_README_CONTENT } from '../../src/payments/const.js';
 import { resolvePaymentProvider } from '../../src/payments/index.js';
@@ -10,6 +9,7 @@ import type { PaymentProvider } from '../../src/payments/types.js';
 import { createResourceService } from '../../src/resources/resource_service.js';
 import type { AvailableWidget } from '../../src/resources/widgets.js';
 import { WIDGET_REGISTRY, WIDGET_URIS } from '../../src/resources/widgets.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 vi.mock('node:fs', () => ({
     readFileSync: vi.fn(),
@@ -124,7 +124,7 @@ describe('createResourceService()', () => {
             // http(s) URIs route to readApiResource; a resolved 5xx maps to the InternalError class,
             // which must survive back out of readResource untouched (message + data preserved).
             const uri = 'https://api.apify.com/v2/datasets/ds-1/items';
-            const apifyClient = {
+            const apifyClient = mockApifyClient({
                 httpClient: {
                     axios: {
                         request: async () => ({
@@ -135,7 +135,7 @@ describe('createResourceService()', () => {
                         }),
                     },
                 },
-            } as unknown as ApifyClient;
+            });
             const service = createResourceService({
                 getMode: () => 'default',
                 getAvailableWidgets: () => new Map(),

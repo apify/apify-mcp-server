@@ -37,6 +37,7 @@ import { createSchedule } from './schedules/create_schedule.js';
 import { deleteSchedule } from './schedules/delete_schedule.js';
 import { getSchedule } from './schedules/get_schedule.js';
 import { updateSchedule } from './schedules/update_schedule.js';
+import { getActorVersion } from './source/get_actor_version.js';
 import { getDataset } from './storage/get_dataset.js';
 import { getDatasetItems } from './storage/get_dataset_items.js';
 import { getDatasetList } from './storage/get_dataset_list.js';
@@ -57,7 +58,7 @@ import { searchActorsWidget } from './widgets/search_actors_widget.js';
 
 /** Unified tool category definitions — single source of truth. */
 export const toolCategories = {
-    actors: [searchActors, fetchActorDetails, callActor, getActorList, deleteActor],
+    actors: [searchActors, fetchActorDetails, callActor],
     docs: [searchApifyDocs, fetchApifyDocs],
     runs: [getActorRun, getActorRunList, getActorRunLog, abortActorRun],
     storage: [
@@ -73,6 +74,7 @@ export const toolCategories = {
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
+    source: [getActorVersion],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 
@@ -101,6 +103,12 @@ export const ALL_WIDGET_TOOLS: readonly ToolEntry[] = [
     callActorWidget,
     getActorRunWidget,
 ];
+
+/**
+ * Non-widget tools in no category: never served by default or by a category, only when named in
+ * `tools=`, in every mode. Temporary: `get-actor-list` returns to a category once evals cover it.
+ */
+export const UNCATEGORIZED_TOOLS: readonly ToolEntry[] = [getActorList, deleteActor];
 
 /**
  * Apps-mode auto-pairing: a widget is added iff its base tool is present — see

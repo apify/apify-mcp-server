@@ -1,3 +1,5 @@
+import { TIP_MESSAGE_LIMIT } from '../const.js';
+
 /**
  * Shared JSON schema definitions for structured output across tools.
  * These schemas define the format of structured data returned by various tools.
@@ -541,6 +543,60 @@ export const deleteActorToolOutputSchema = {
     required: ['actorId', 'fullName', 'deleted', 'abortedRunCount'],
 };
 
+/** Schema for get-actor-version: the version's file manifest, its revision, and the content returned. */
+export const getActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        revision: { type: 'string', description: 'Identifies the whole file set; changes when any file changes' },
+        files: {
+            type: 'array',
+            description: 'Regular files sorted by path, folders excluded',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'Path relative to the Actor root' },
+                    sizeBytes: { type: 'number', description: 'Size of the decoded bytes' },
+                    hash: { type: 'string', description: 'First 16 hex characters of the SHA-256 of the bytes' },
+                },
+                required: ['path', 'sizeBytes', 'hash'],
+            },
+        },
+        contents: {
+            type: 'array',
+            description: 'Content of the returned files, raw with no line numbers',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string' },
+                    content: { type: 'string' },
+                    encoding: { type: 'string', enum: ['utf8', 'base64'] },
+                    startLine: {
+                        type: 'integer',
+                        description: 'First returned line, counting from 1; set for a line range',
+                    },
+                    endLine: { type: 'integer', description: 'Last returned line; set for a line range' },
+                    totalLines: { type: 'integer', description: 'Lines in the whole file; set for a line range' },
+                },
+                required: ['path', 'content', 'encoding'],
+            },
+        },
+        omittedPaths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Requested files left out to stay within the content limit',
+        },
+        notFoundPaths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Requested paths the version has no file at',
+        },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files', 'contents'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
@@ -651,6 +707,27 @@ export const actorRunOutputSchema = {
                     additionalProperties: buildKeyValueStoreEntrySchema(),
                 },
             },
+        },
+        tip: {
+            type: 'object' as const,
+            description: 'Advisory guidance RAG Web Browser wrote to its key-value store under the reserved "TIP" key',
+            properties: {
+                message: {
+                    type: 'string',
+                    description: `Truncated to ${TIP_MESSAGE_LIMIT} characters, with a trailing ellipsis if the Actor's message was longer`,
+                },
+                level: {
+                    type: 'string',
+                    enum: ['info', 'warning'],
+                    description: 'Omitted when the Actor wrote an unrecognized level',
+                },
+                recommendedActorId: {
+                    type: 'string',
+                    description:
+                        'Apify Actor ID the tip recommends running next, when it names one — pass directly as `actor` to call-actor or fetch-actor-details',
+                },
+            },
+            required: ['message'],
         },
         summary: { type: 'string', description: 'Past-tense summary of the run state' },
         nextStep: { type: 'string', description: 'One primary follow-up action with identifiers interpolated' },

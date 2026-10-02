@@ -12,6 +12,7 @@ import {
     resolveReadmeContent,
     typeObjectToString,
 } from '../../src/utils/actor_details.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/actor_search.js', () => ({
     searchActorsByKeywords: vi.fn().mockResolvedValue([]),
@@ -22,13 +23,13 @@ function apifyApiError(status: number, message: string): ApifyApiError {
 }
 
 function stubApifyClient(getActor: () => Promise<unknown>): ApifyClient {
-    return {
+    return mockApifyClient({
         token: 'test-token',
         actor: () => ({
             get: getActor,
             defaultBuild: async () => ({ get: getActor }),
         }),
-    } as unknown as ApifyClient;
+    });
 }
 
 const OTHER_ACTOR = { username: 'someone', name: 'some-other-actor' };

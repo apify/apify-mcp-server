@@ -18,6 +18,7 @@ import { compileSchema } from '../../src/utils/ajv.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
 import { getRequestHandler, makeRecorderTool, withServer, withStatelessServer } from './helpers/mcp_server.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 // Stub getActors so a facade can be given tool sources without a network fetch. The compose path
 // (getToolsForServerMode + the report-problem gate) stays real — that is what these tests exercise.
@@ -38,7 +39,7 @@ const resolveAvailableWidgetsMock = vi.mocked(resolveAvailableWidgets);
 
 async function loadSource(server: ActorsMcpServer, actorTools: ToolEntry[], input: Input = { tools: [] }) {
     getActorsMock.mockResolvedValue(actorTools);
-    await server.loadToolsFromInput(input, {} as never);
+    await server.loadToolsFromInput(input, mockApifyClient());
 }
 
 function toolNames(result: Record<string, unknown> | undefined): string[] {

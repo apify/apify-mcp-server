@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.17.2 - **not yet released**
+
+### 🚀 Features
+
+- Add get-actor-version tool ([#1450](https://github.com/apify/apify-mcp-server/pull/1450)) ([0c1c93e](https://github.com/apify/apify-mcp-server/commit/0c1c93e10aed623e3c8b93a4137eee127167b9aa)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1460](https://github.com/apify/apify-mcp-server/issues/1460)
+- **actors:** Surface run tip from key-value store ([#1363](https://github.com/apify/apify-mcp-server/pull/1363)) ([6830279](https://github.com/apify/apify-mcp-server/commit/683027922c5df28658e2e1d784b071a1aa7574b3)) by [@MQ37](https://github.com/MQ37), closes [#1361](https://github.com/apify/apify-mcp-server/issues/1361)
+
+### 🐛 Bug Fixes
+
+- **actors:** Limit and validate the RAG Web Browser TIP pilot ([#1468](https://github.com/apify/apify-mcp-server/pull/1468)) ([fb731c5](https://github.com/apify/apify-mcp-server/commit/fb731c549fc837e67f0f4b04dd8d243e74f59b56)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.17.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.1) (2026-09-30)
+
+### 🐛 Bug Fixes
+
+- Move get-actor-list out of the default actors category ([#1465](https://github.com/apify/apify-mcp-server/pull/1465)) ([9b2a34c](https://github.com/apify/apify-mcp-server/commit/9b2a34c769da31daeff7005811ef9d144a0a511f)) by [@jirispilka](https://github.com/jirispilka), closes [#1464](https://github.com/apify/apify-mcp-server/issues/1464)
+
+
 ## [0.17.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.0) (2026-09-30)
 
 ### 🚀 Features
