@@ -4,7 +4,7 @@ import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
 import { getActorRunWidget } from '../../src/tools/widgets/get_actor_run_widget.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext } from './helpers/tool_context.js';
+import { mockApifyClient, stubToolCallContext } from './helpers/tool_context.js';
 
 /**
  * Apps / UI mode: get-actor-run-widget renders an interactive UI element (widget)
@@ -28,14 +28,14 @@ const MOCK_ACTOR = {
 };
 
 function stubApifyClient(): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         run: (_id: string) => ({
             get: async () => MOCK_RUN_RUNNING,
         }),
         actor: (_id: string) => ({
             get: async () => MOCK_ACTOR,
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-actor-run-widget response', () => {

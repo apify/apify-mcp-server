@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
 import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
-import type { ActorStoreInputSchema, ActorStoreList, HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
     DEFAULT_CARD_OPTIONS,
     formatActorToActorCard,
@@ -11,7 +11,7 @@ import {
 } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockUserInfo } from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo } from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 /**
@@ -193,7 +193,7 @@ describe('search-actors without widget (searchActors)', () => {
 
     it('searches using the request-scoped apifyClient, not a token-only client', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
-        const taggedApifyClient = { marker: 'tagged-client' } as unknown as InternalToolArgs['apifyClient'];
+        const taggedApifyClient = mockApifyClient({ marker: 'tagged-client' });
 
         await (searchActors as HelperTool).call({
             ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),

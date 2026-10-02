@@ -93,13 +93,13 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('validatePayment', () => {
-    it('should return error when neither _meta nor HTTP header is present', () => {
+    it('returns error when neither _meta nor HTTP header is present', () => {
         const result = provider.validatePayment({}, undefined, undefined);
         expect(result).toBeTypeOf('string');
         expect(result).toContain('x402');
     });
 
-    it('should accept payment from lowercase HTTP header (case-insensitive, no _meta)', () => {
+    it('accepts payment from lowercase HTTP header (case-insensitive, no _meta)', () => {
         // The SDK may normalize headers to lowercase depending on transport
         const headers: RequestHeaders = { 'payment-signature': SAMPLE_PAYMENT_BASE64 };
         const result = provider.validatePayment({}, undefined, headers);
@@ -112,21 +112,21 @@ describe('validatePayment', () => {
 // ---------------------------------------------------------------------------
 
 describe('getPaymentHeaders', () => {
-    it('should base64-encode _meta["x402/payment"] JSON for the outbound PAYMENT-SIGNATURE header', () => {
+    it('base64-encodes _meta["x402/payment"] JSON for the outbound PAYMENT-SIGNATURE header', () => {
         const meta: PaymentMeta = { 'x402/payment': SAMPLE_PAYMENT };
         const result = provider.getPaymentHeaders({}, meta, undefined);
 
         expect(result).toEqual({ 'PAYMENT-SIGNATURE': SAMPLE_PAYMENT_BASE64, 'x-apify-payment-protocol': 'x402' });
     });
 
-    it('should forward the HTTP PAYMENT-SIGNATURE header directly (already base64)', () => {
+    it('forwards the HTTP PAYMENT-SIGNATURE header directly (already base64)', () => {
         const headers: RequestHeaders = { 'PAYMENT-SIGNATURE': SAMPLE_PAYMENT_BASE64 };
         const result = provider.getPaymentHeaders({}, undefined, headers);
 
         expect(result).toEqual({ 'PAYMENT-SIGNATURE': SAMPLE_PAYMENT_BASE64, 'x-apify-payment-protocol': 'x402' });
     });
 
-    it('should prefer _meta over HTTP header when both are present', () => {
+    it('prefers _meta over HTTP header when both are present', () => {
         const metaPayment = { x402Version: 2, payload: { signature: 'from-meta' } };
         const metaBase64 = Buffer.from(JSON.stringify(metaPayment)).toString('base64');
         const headerBase64 = Buffer.from(
@@ -155,56 +155,32 @@ describe('decorateToolSchema()', () => {
         expect(decorated._meta).toBeUndefined();
     });
 
-    it('selects the exact entry over upto for flat fields and exposes both in accepts[]', () => {
-        // Back-compat: clients that read only flat fields keep signing `exact` like before #876.
+    it('exposes every scheme in accepts[] and no flat fields', () => {
         const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [EXACT_ACCEPT, UPTO_ACCEPT] };
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
 
         const x402 = getX402Meta(decorated);
-        expect(x402?.paymentRequired).toBe(true);
-        expect(x402?.scheme).toBe('exact');
-        expect(x402?.amount).toBe(EXACT_ACCEPT.amount);
-        expect(x402?.accepts).toEqual([EXACT_ACCEPT, UPTO_ACCEPT]);
+        expect(x402).toEqual({ paymentRequired: true, accepts: [EXACT_ACCEPT, UPTO_ACCEPT] });
     });
 
-    it('falls back to upto when exact is not present', () => {
-        const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [UPTO_ACCEPT] };
-        const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
-
-        const x402 = getX402Meta(decorated);
-        expect(x402?.scheme).toBe('upto');
-        expect(x402?.accepts).toEqual([UPTO_ACCEPT]);
-    });
-
-    it('falls back to the first entry when neither exact nor upto is present', () => {
-        const customAccept = { ...EXACT_ACCEPT, scheme: 'custom-scheme' };
-        const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [customAccept] };
-        const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
-
-        const x402 = getX402Meta(decorated);
-        expect(x402?.scheme).toBe('custom-scheme');
-        expect(x402?.accepts).toEqual([customAccept]);
-    });
-
-    it('preserves the configured order in accepts[] regardless of preference selection', () => {
+    it('preserves the configured order in accepts[]', () => {
         // Server-emitted order may be non-deterministic upstream; whatever we receive is
-        // what we forward. Preference only drives the flat-field selection.
+        // what we forward.
         const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [UPTO_ACCEPT, EXACT_ACCEPT] };
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
 
         const x402 = getX402Meta(decorated);
         expect(x402?.accepts).toEqual([UPTO_ACCEPT, EXACT_ACCEPT]);
-        expect(x402?.scheme).toBe('exact');
     });
 
-    it('marks paymentRequired without flat fields or accepts[] when requirements were not fetched', () => {
+    it('marks paymentRequired without accepts[] when requirements were not fetched', () => {
         const decorated = new X402PaymentProvider(undefined).decorateToolSchema(makePaidTool());
 
         const x402 = getX402Meta(decorated);
         expect(x402).toEqual({ paymentRequired: true });
     });
 
-    it('marks paymentRequired without flat fields or accepts[] when accepts is empty', () => {
+    it('marks paymentRequired without accepts[] when accepts is empty', () => {
         const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [] };
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
 

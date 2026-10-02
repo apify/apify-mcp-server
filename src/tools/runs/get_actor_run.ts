@@ -70,10 +70,11 @@ export function buildGetActorRunResponse(
 
     // Mints the `apifyConsoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
     const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
+    const tipText = structuredContent.tip ? `\nTip from Actor:\n\`\`\`\n${structuredContent.tip.message}\n\`\`\`` : '';
     return respondOk(
         [
             JSON.stringify(structuredContent),
-            `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinks}`,
+            `${structuredContent.summary}\n${structuredContent.nextStep}${consoleLinks}${tipText}`,
         ],
         { structuredContent, meta: buildUsageMeta(run) },
     );

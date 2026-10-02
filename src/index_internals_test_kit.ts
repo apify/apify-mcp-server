@@ -9,6 +9,7 @@ import { SKYFIRE_ENABLED_TOOLS } from './payments/const.js';
 import { RESOURCE_MIME_TYPE } from './resources/widgets.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from './tools/actors/call_actor.js';
 import { toolCategoriesEnabledByDefault } from './tools/index.js';
+import { UNCATEGORIZED_TOOLS } from './tools/registry.js';
 import { actorRunOutputSchema } from './tools/structured_output_schemas.js';
 import type { SERVER_MODE, TelemetryEnv, ToolEntry } from './types.js';
 import { APIFY_ACTOR_RUN_META_KEY } from './utils/mcp.js';
@@ -22,6 +23,7 @@ export {
     RESOURCE_MIME_TYPE,
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     toolCategoriesEnabledByDefault,
+    UNCATEGORIZED_TOOLS,
     actorRunOutputSchema,
     type SERVER_MODE,
     type TelemetryEnv,

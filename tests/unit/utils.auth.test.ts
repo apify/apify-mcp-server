@@ -5,12 +5,12 @@ import { isApiTokenRequired } from '../../src/utils/auth.js';
 const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview', 'get-actor-log'] as const;
 
 describe('isApiTokenRequired', () => {
-    it('should require token if no tools are specified', () => {
+    it('requires token if no tools are specified', () => {
         expect(isApiTokenRequired({})).toBe(true);
         expect(isApiTokenRequired({ toolCategoryKeys: [] })).toBe(true);
     });
 
-    it('should NOT require token for only public tools', () => {
+    it('does not require token for only public tools', () => {
         expect(
             isApiTokenRequired({
                 toolCategoryKeys: ['search-actors'],
@@ -36,16 +36,16 @@ describe('isApiTokenRequired', () => {
         ).toBe(false);
     });
 
-    it('should NOT require token for the API search and details tools, which read only the public spec', () => {
+    it('does not require token for the API search and details tools, which read only the public spec', () => {
         expect(isApiTokenRequired({ toolCategoryKeys: ['apify-api-search', 'apify-api-details'] })).toBe(false);
     });
 
-    it('should require token for the API call tools and the api category', () => {
+    it('requires token for the API call tools and the api category', () => {
         expect(isApiTokenRequired({ toolCategoryKeys: ['apify-api-read'] })).toBe(true);
         expect(isApiTokenRequired({ toolCategoryKeys: ['api'] })).toBe(true);
     });
 
-    it('should require token if any private tool is included', () => {
+    it('requires token if any private tool is included', () => {
         expect(
             isApiTokenRequired({
                 toolCategoryKeys: ['search-actors', 'call-actor'],
@@ -53,7 +53,7 @@ describe('isApiTokenRequired', () => {
         ).toBe(true);
     });
 
-    it('should require token if any non-public category is used', () => {
+    it('requires token if any non-public category is used', () => {
         expect(
             isApiTokenRequired({
                 toolCategoryKeys: ['actors'],
@@ -61,7 +61,7 @@ describe('isApiTokenRequired', () => {
         ).toBe(true);
     });
 
-    it('should require token if specifically requested actors subset', () => {
+    it('requires token if specifically requested actors subset', () => {
         expect(
             isApiTokenRequired({
                 toolCategoryKeys: ['search-actors'],
@@ -85,7 +85,7 @@ describe('isApiTokenRequired', () => {
         expect(isApiTokenRequired({ toolCategoryKeys: [...RETIRED_SELECTORS, 'call-actor'] })).toBe(true);
     });
 
-    it('should handle unknown keys as potentially unsafe (requiring token)', () => {
+    it('handles unknown keys as potentially unsafe (requiring token)', () => {
         expect(
             isApiTokenRequired({
                 toolCategoryKeys: ['some-unknown-potential-actor-name'],
