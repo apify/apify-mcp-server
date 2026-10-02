@@ -11,8 +11,8 @@ import {
 } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo } from './helpers/tool_context.js';
-import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
+import { mockApifyClient, mockUserInfo, stubToolCallContext } from './helpers/tool_context.js';
+import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
  * Default server mode: search-actors returns markdown + structured cards for the LLM only
@@ -50,7 +50,9 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
         const result = await (searchActors as HelperTool).call(
-            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [HELPER_TOOLS.ACTOR_GET_DETAILS]),
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS],
+            }),
         );
 
         const { structuredContent, content } = result as {
@@ -109,11 +111,15 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue(actors);
 
         const result = await (searchActors as HelperTool).call(
-            stubInternalToolArgs({
-                keywords: SEARCH_KEYWORDS,
-                limit: 5,
-                offset: 0,
-            }),
+            stubToolCallContext(
+                {
+                    keywords: SEARCH_KEYWORDS,
+                    limit: 5,
+                    offset: 0,
+                },
+                mockApifyClient(),
+                { loadedToolNames: [] },
+            ),
         );
 
         const { structuredContent, content } = result as {
@@ -147,11 +153,15 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
         const result = await (searchActors as HelperTool).call(
-            stubInternalToolArgs({
-                keywords: SEARCH_KEYWORDS,
-                limit: 5,
-                offset: 0,
-            }),
+            stubToolCallContext(
+                {
+                    keywords: SEARCH_KEYWORDS,
+                    limit: 5,
+                    offset: 0,
+                },
+                mockApifyClient(),
+                { loadedToolNames: [] },
+            ),
         );
 
         const { structuredContent, content } = result as {
@@ -196,7 +206,9 @@ describe('search-actors without widget (searchActors)', () => {
         const taggedApifyClient = mockApifyClient({ marker: 'tagged-client' });
 
         await (searchActors as HelperTool).call({
-            ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+            ...stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+                loadedToolNames: [],
+            }),
             apifyClient: taggedApifyClient,
         });
 
@@ -210,7 +222,9 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
         const result = await (searchActors as HelperTool).call({
-            ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+            ...stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+                loadedToolNames: [],
+            }),
             apifyToken: 'apify_ui_test',
         });
         const { structuredContent, content } = result as {
@@ -230,7 +244,9 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
         const result = await (searchActors as HelperTool).call(
-            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+                loadedToolNames: [],
+            }),
         );
         const { structuredContent, content } = result as {
             structuredContent: { instructions?: string };
@@ -247,7 +263,9 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
         const result = await (searchActors as HelperTool).call(
-            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+                loadedToolNames: [],
+            }),
         );
         const { structuredContent, content } = result as {
             structuredContent: { instructions?: string };
@@ -262,7 +280,9 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
         const result = await (searchActors as HelperTool).call(
-            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [HELPER_TOOLS.ACTOR_CALL]),
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+            }),
         );
         const { structuredContent, content } = result as {
             structuredContent: { instructions?: string };
@@ -277,7 +297,10 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
         const result = await (searchActors as HelperTool).call(
-            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [], [MOCK_STORE_ACTOR.id]),
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+                loadedToolNames: [],
+                loadedActorIds: [MOCK_STORE_ACTOR.id],
+            }),
         );
         const { structuredContent, content } = result as {
             structuredContent: { instructions?: string };
@@ -293,7 +316,10 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR, otherActor]);
 
         const result = await (searchActors as HelperTool).call(
-            stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, [], [MOCK_STORE_ACTOR.id]),
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+                loadedToolNames: [],
+                loadedActorIds: [MOCK_STORE_ACTOR.id],
+            }),
         );
         const { structuredContent, content } = result as {
             structuredContent: { instructions?: string };

@@ -45,7 +45,7 @@ export function mockApifyClient(methods: Record<string, unknown> = {}): ApifyCli
 /** Minimal `InternalToolArgs` stub for unit tests. Defaults to every helper tool loaded, no Actor tools. */
 export function stubToolCallContext(
     args: Record<string, unknown>,
-    client: InternalToolArgs['apifyClient'] = mockApifyClient(),
+    client: InternalToolArgs['apifyClient'],
     {
         loadedToolNames = Object.values(HELPER_TOOLS),
         loadedActorIds = [],

@@ -7,8 +7,7 @@ import type { HelperTool } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockUserInfo, textOf } from './helpers/tool_context.js';
-import { stubInternalToolArgs } from './tools.search_actors.fixtures.js';
+import { mockApifyClient, mockUserInfo, stubToolCallContext, textOf } from './helpers/tool_context.js';
 
 /**
  * Apps / UI mode: fetch-actor-details-widget renders an interactive UI element
@@ -67,7 +66,9 @@ describe('fetch-actor-details-widget response', () => {
 
         // call-actor loaded: this assertion is about the widget's content shape, not the guidance.
         const result = await (fetchActorDetailsWidget as HelperTool).call(
-            stubInternalToolArgs({ actor: 'apify/web-scraper' }, [HELPER_TOOLS.ACTOR_CALL]),
+            stubToolCallContext({ actor: 'apify/web-scraper' }, mockApifyClient(), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+            }),
         );
 
         const { structuredContent, content, _meta } = result as {
@@ -142,14 +143,16 @@ describe('fetch-actor-details-widget response', () => {
         vi.mocked(fetchActorDetails).mockResolvedValue(null as unknown as ActorDetailsResult);
 
         const served = await (fetchActorDetailsWidget as HelperTool).call(
-            stubInternalToolArgs({ actor: 'jane.doe/typo' }, [HELPER_TOOLS.STORE_SEARCH]),
+            stubToolCallContext({ actor: 'jane.doe/typo' }, mockApifyClient(), {
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH],
+            }),
         );
         const servedText = (served.content ?? []).map(textOf).join('\n');
         expect(servedText).toContain('was not found');
         expect(servedText).toContain(HELPER_TOOLS.STORE_SEARCH);
 
         const unserved = await (fetchActorDetailsWidget as HelperTool).call(
-            stubInternalToolArgs({ actor: 'jane.doe/typo' }),
+            stubToolCallContext({ actor: 'jane.doe/typo' }, mockApifyClient(), { loadedToolNames: [] }),
         );
         const unservedText = (unserved.content ?? []).map(textOf).join('\n');
         expect(unservedText).toContain('was not found');
@@ -160,7 +163,7 @@ describe('fetch-actor-details-widget response', () => {
         vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
 
         const result = await (fetchActorDetailsWidget as HelperTool).call(
-            stubInternalToolArgs({ actor: 'apify/web-scraper' }),
+            stubToolCallContext({ actor: 'apify/web-scraper' }, mockApifyClient(), { loadedToolNames: [] }),
         );
         const text = ((result.content ?? []) as { text: string }[]).map((c) => c.text).join('\n');
 
@@ -171,7 +174,9 @@ describe('fetch-actor-details-widget response', () => {
         vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
 
         const result = await (fetchActorDetailsWidget as HelperTool).call(
-            stubInternalToolArgs({ actor: 'apify/web-scraper' }, [HELPER_TOOLS.ACTOR_CALL]),
+            stubToolCallContext({ actor: 'apify/web-scraper' }, mockApifyClient(), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+            }),
         );
         const text = ((result.content ?? []) as { text: string }[]).map((c) => c.text).join('\n');
 
@@ -188,7 +193,9 @@ describe('fetch-actor-details-widget response', () => {
         );
 
         await expect(
-            (fetchActorDetailsWidget as HelperTool).call(stubInternalToolArgs({ actor: 'apify/web-scraper' })),
+            (fetchActorDetailsWidget as HelperTool).call(
+                stubToolCallContext({ actor: 'apify/web-scraper' }, mockApifyClient(), { loadedToolNames: [] }),
+            ),
         ).rejects.toMatchObject({ statusCode: 401 });
     });
 });
