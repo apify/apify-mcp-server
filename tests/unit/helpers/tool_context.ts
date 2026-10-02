@@ -42,10 +42,14 @@ export function mockApifyClient(methods: Record<string, unknown> = {}): ApifyCli
     return methods as unknown as ApifyClient;
 }
 
-/** Minimal `InternalToolArgs` stub for unit tests. */
+/** Minimal `InternalToolArgs` stub for unit tests. Defaults to every helper tool loaded, no Actor tools. */
 export function stubToolCallContext(
     args: Record<string, unknown>,
-    client: InternalToolArgs['apifyClient'],
+    client: InternalToolArgs['apifyClient'] = mockApifyClient(),
+    {
+        loadedToolNames = Object.values(HELPER_TOOLS),
+        loadedActorIds = [],
+    }: { loadedToolNames?: readonly string[]; loadedActorIds?: readonly string[] } = {},
 ): InternalToolArgs {
     return {
         args,
@@ -54,8 +58,9 @@ export function stubToolCallContext(
         signal: new AbortController().signal,
         paymentProvider: undefined,
         actorStore: undefined,
-        loadedToolNames: Object.values(HELPER_TOOLS),
-    } as unknown as InternalToolArgs;
+        loadedToolNames,
+        loadedActorIds: new Set(loadedActorIds),
+    };
 }
 
 /** Assert not-found style soft-fail responses with INVALID_INPUT telemetry. */
