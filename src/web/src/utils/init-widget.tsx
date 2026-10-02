@@ -92,6 +92,7 @@ const McpWidgetHost: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 await app?.requestDisplayMode({ mode });
             },
             maxHeight: maxHeight ?? undefined,
+            callTool: app ? async (name, args) => app.callServerTool({ name, arguments: args }) : undefined,
         }),
         [app, maxHeight],
     );
