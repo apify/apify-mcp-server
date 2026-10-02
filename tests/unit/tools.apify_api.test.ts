@@ -1,6 +1,6 @@
 import { ApifyApiError } from 'apify-client';
 import axios, { AxiosError, AxiosHeaders, CanceledError } from 'axios';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
@@ -61,8 +61,15 @@ async function callTool(tool: unknown, args: Record<string, unknown>, loadedTool
 }
 
 beforeEach(() => {
+    // The tools check every URL against the configured API origin; pin it so the shell's
+    // APIFY_API_BASE_URL does not fail the tests.
+    vi.stubEnv('APIFY_API_BASE_URL', new URL(BASE_URL).origin);
     requestMock.mockReset();
     vi.mocked(fetchApiOperationIndex).mockClear();
+});
+
+afterEach(() => {
+    vi.unstubAllEnvs();
 });
 
 /** The URL axios sends for the last request, with the query parameters added. */
@@ -314,6 +321,21 @@ describe('apify-api-read', () => {
             await callTool(apifyApiRead, { path }).catch(() => undefined);
 
             expect(new URL(readSentUrl()).origin).toBe(new URL(BASE_URL).origin);
+        },
+    );
+
+    it.each(['https://example.com/v2', 'https://user:pass@api.apify.com/v2'])(
+        'sends nothing when the client base URL %s is not the configured API origin',
+        async (baseUrl) => {
+            const client = {
+                baseUrl,
+                httpClient: { axios: { request: requestMock } },
+            } as unknown as InternalToolArgs['apifyClient'];
+
+            await expect(
+                (apifyApiRead as HelperTool).call(stubToolCallContext({ path: 'datasets/abc' }, client)),
+            ).rejects.toThrow(`The URL ${baseUrl}/datasets/abc is not on the API host.`);
+            expect(requestMock).not.toHaveBeenCalled();
         },
     );
 
