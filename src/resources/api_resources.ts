@@ -60,7 +60,7 @@ function throwReadFailure(uri: string, status: number | undefined, message: stri
  * hand it Apify API URLs — never an arbitrary host. Userinfo-bearing URLs
  * (`user@api.apify.com`) are rejected even when the host is genuinely ours: axios drops
  * the default `Authorization` header for credentials-bearing URLs, so the read would
- * silently run unauthenticated.
+ * silently run unauthenticated. The API tools' `callApi` asserts its request URL with it too.
  */
 export function isApifyApiUri(uri: string): boolean {
     try {
@@ -137,7 +137,10 @@ async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promis
     );
 }
 
-/** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
+/**
+ * The mid-consumption abort axios raises when a body crosses `maxContentLength`. The API tools'
+ * `callApi` detects its oversized responses with it too.
+ */
 export function isMaxContentLengthAbort(err: unknown): boolean {
     return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
 }

@@ -26,7 +26,9 @@ scheme guidance (SHOULD only be used for client-fetchable URLs — ours are toke
 identity with the platform's own URLs is the feature. Revisit when tools start emitting
 `resource_link`s, where clients may fetch `https://` URIs directly. `isApifyApiUri()` gates reads
 to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
-header for those, silently degrading to unauthenticated).
+header for those, silently degrading to unauthenticated). The API tools' `callApi`
+(`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()` and `isMaxContentLengthAbort()`, so
+a change to either changes the tools too.
 
 `readApiResource()` streams the body verbatim —
 `httpClient.axios.request({ method: 'GET', responseType: 'stream', maxContentLength: MAX_INLINE_BYTES })`
