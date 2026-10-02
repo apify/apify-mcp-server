@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import { isMaxContentLengthAbort } from '../../resources/api_resources.js';
+import { isApifyApiUri, isMaxContentLengthAbort } from '../../resources/api_resources.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
@@ -265,15 +265,15 @@ function toPlainRequestError(error: unknown): Error {
  *
  * The URL is the client's base URL and the normalized path, with a query string in the path kept
  * and the query parameters added after it. The path is not checked or encoded again: the agent
- * encodes values. The URL starts with the base URL's `/v2/`, so no path can lead to another host.
+ * encodes values. The URL starts with the base URL's `/v2/`, so no path can lead to another host;
+ * the API resource's origin gate, `isApifyApiUri`, asserts it.
  *
- * It goes through the client's axios instance, not `httpClient.call()`, like `readApiResource`: one
- * attempt and no retries, since a retried write could apply twice, and apify-client would retry the
- * `maxContentLength` abort as a network error. The instance still adds the token and the request-origin
- * and payment headers, and parses JSON and text bodies. Like `readApiResource`, the request skips the
- * setup `httpClient.call()` runs first, so it does not honor `HTTPS_PROXY` and goes out with axios's
- * default User-Agent instead of apify-client's. A non-2xx response is thrown as the `ApifyApiError`
- * apify-client itself builds, so it gets the usual tool error text and telemetry.
+ * It sends the request with the API resource's `sendApifyApiRequest`, which says why that is one
+ * attempt with no retries and the body capped at `MAX_INLINE_BYTES`, and the resource's
+ * `isMaxContentLengthAbort` detects the abort of a larger body. Unlike the resource, it does not
+ * stream the body, so the instance parses JSON and text bodies. Like the resource, the instance adds
+ * the token and the request-origin and payment headers. A non-2xx response is thrown as the
+ * `ApifyApiError` apify-client itself builds, so it gets the usual tool error text and telemetry.
  */
 export async function callApi(params: {
     client: ApifyClient;
@@ -294,9 +294,9 @@ export async function callApi(params: {
     const path = formatApiPath(normalizedPath);
     // `client.baseUrl` already ends with /v2.
     const url = `${client.baseUrl}/${normalizedPath}`;
-    // An assertion: nothing after the base URL's `/v2/` can change the host that gets the token.
-    if (new URL(url).origin !== new URL(client.baseUrl).origin)
-        throw new Error(`The URL ${url} is not on the API host.`);
+    // An assertion with the resource's origin gate: nothing after the base URL's `/v2/` can change
+    // the host that gets the token.
+    if (!isApifyApiUri(url)) throw new Error(`The URL ${url} is not on the API host.`);
     let response: AxiosResponse<unknown>;
     try {
         response = await client.httpClient.axios.request<unknown>({

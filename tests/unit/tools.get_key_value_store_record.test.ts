@@ -14,6 +14,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    mockApifyClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -33,7 +34,7 @@ function stubApifyClient(opts: {
     onGetRecordPublicUrl?: () => void;
 }): InternalToolArgs['apifyClient'] {
     const { record, store, onGetRecordPublicUrl } = opts;
-    return {
+    return mockApifyClient({
         keyValueStore: (id: string) => ({
             url: `https://api.apify.com/v2/key-value-stores/${id}`,
             getRecord: async (_key: string) => record,
@@ -43,7 +44,7 @@ function stubApifyClient(opts: {
                 return `https://api.apify.com/v2/key-value-stores/${id}/records/${key}?signature=signed`;
             },
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-key-value-store-record', () => {
@@ -362,7 +363,7 @@ describe('get-key-value-store-record', () => {
     it('passes wrapper-stripped keyValueStoreId and recordKey to the SDK', async () => {
         const getRecordSpy = vi.fn().mockResolvedValue(MOCK_RECORD);
         const kvStoreSpy = vi.fn().mockReturnValue({ getRecord: getRecordSpy, get: async () => MOCK_STORE });
-        const client = { keyValueStore: kvStoreSpy } as unknown as InternalToolArgs['apifyClient'];
+        const client = mockApifyClient({ keyValueStore: kvStoreSpy });
 
         await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: '`user~my-store`', recordKey: '`INPUT`' }, client),
