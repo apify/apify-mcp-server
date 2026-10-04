@@ -61,8 +61,8 @@ and CI runs at the runner default of 8.
   with `apify-api-details` first, so search, details, and the call are all defensible first moves. So is a read before a
   write (`get-dataset`, `fetch-actor-details`, `apify-api-read`), and so is looking up an Actor that the query names
   without its username. `resurrect-run` and `sign-json` also accept the direct call: details on the exact path needs the
-  same knowledge as the call. The positive cases catch the agent leaving the API family, refusing, or answering from
-  memory.
+  same knowledge as the call. The positive cases catch refusing or answering from memory; the 7 that accept a dedicated
+  lookup do not catch a first call outside the API family.
 - **Lookups on the routing cases.** `defer-build` accepts `fetch-actor-details` and `get-actor-build-list` next to
   `build-actor`, whose `actor` argument needs an ID or `username/name` the query does not give.
 - **No `expectedArgs`.** The path is free-form (`webhooks`, `v2/webhooks`, and `/v2/webhooks` are the same), and not
@@ -364,13 +364,17 @@ they are why some hard cases exist.
 CI reads the shared datasets live on every run. Upserted before #1444 is on master, these cases would run against a
 server without the `api` category, and the session would have no API tools:
 
-- **pr tier:** the 11 positive cases fail and the 10 routing cases pass. Against today's live pr dataset (111 of 115
-  passing on a hosted run), that is 121 of 136, a rate of 0.89, under the 0.9 gate. Every PR's eval check would go red.
+- **pr tier:** 7 of the 11 positive cases also accept a first call to a tool already on master (`fetch-actor-details`,
+  `get-dataset`, `get-dataset-list`, `get-actor-run`, or the docs tools), and the 10 routing cases pass trivially. The
+  tier would likely stay above its 0.9 gate while measuring nothing about the API tools: against today's live pr dataset
+  (111 of 115 passing on a hosted run), 2 of those 7 passing give 123 of 136, a rate of 0.904. Only
+  `webhooks-on-account`, `spend-this-billing-cycle`, `monthly-spending-cap`, and `sign-json` would fail.
 - **merge tier:** most of the 15 cases fail. The tier stays above its 0.6 gate, but real regressions would hide behind
   expected failures, and the write cases would run without fixtures.
 
-Accepting `ReadMcpResourceTool` does not lower the risk: the resource is on master already, so a positive read case
-could pass before #1444 through the resource, which would hide the missing `api` category.
+Accepting `ReadMcpResourceTool` adds to the risk: the resource is on master already, so if `mcpToolsOnly` does not
+remove it (probe 22), the three read cases among those four could pass before #1444 through the resource too, which
+would hide the missing `api` category.
 
 Langfuse item ids are unique per project forever and cannot move between datasets, so the cases are calibrated in
 staging datasets under burned ids and promoted under the final ids:
