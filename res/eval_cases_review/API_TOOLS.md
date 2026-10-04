@@ -391,13 +391,21 @@ staging datasets under burned ids and promoted under the final ids:
    before each. Fix cases until Opus passes them all.
 3. Add the README section and the CI step below with #1444, or in an evals PR merged right after it.
 4. **Batch A, after #1444 is on master** and the fixtures have run once on the CI account: the 12 pr cases and 10 merge
-   cases that need only search, details, and read. That is every case except the ones in Batch B.
+   cases that need only search, details, and read. That is every case except the ones in Batch B. If pinned dataset
+   versions (#1395) have landed by then, promotion is the upsert plus a pin bump in #1444 itself, so the cases go live
+   exactly when the tools merge; otherwise the upsert follows the merge.
 5. **Batch B, after #1445 is on master:** the 9 write-dependent pr cases and the merge cases `webhook-lifecycle-medium`,
    `dataset-rename-medium`, `webhook-test-medium`, `secret-env-var-hard`, and `dataset-access-method-hard`. The 9 pr
    cases are the three `pr/apify-api-write/*` cases, `resurrect-run` and `sign-json` (which ask for writes), and the
    four routing cases where `apify-api-write` must lose: `api-loaded-build`, `api-loaded-run-actor`,
    `api-loaded-schedule`, and `api-loaded-task-input`.
-6. Archive the staging items.
+6. Archive the staging items and abandon the two staging datasets.
+
+Why two staging datasets of their own rather than #1411's `-v2` staging datasets: those are still in use for the
+rebuilt set's calibration, and every `-v2` run would then also run these cases, which fail on any branch without the
+`api` category. The two datasets here are temporary in the same way `-v2` is: once the cases are promoted, the live
+datasets stay one per tier, with no new suffix. If you'd rather keep a single staging pair, the commands below work with
+`-v2` too: run these cases with `--id '^stage-api/'`, and the rebuilt set with `--id '^(?!stage-api/)'`.
 
 Only promote calibrated cases. Anything that still fails on Haiku stays in staging until its cause is known; the pr
 tier's 0.9 gate has little room. PR runs check out the merge ref, so once #1444 is on master every PR evaluated builds
@@ -589,3 +597,5 @@ teardown step.
    every pr case. Count it as a lookup, or leave it failing?
 9. Should the resource mask the session's token the way `apify-api-read` does (Found while drafting, 5), or keep
    returning every body as it is?
+10. Calibrate in two staging datasets of their own, as above, or in #1411's `-v2` staging datasets with an `--id`
+    filter on every run?
