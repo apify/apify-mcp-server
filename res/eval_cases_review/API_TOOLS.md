@@ -176,7 +176,7 @@ Spec (`https://docs.apify.com/api/openapi.json`, through the server's own index)
 Platform:
 
 5. `~name` resolves the token's own resources: `GET /v2/actors/~eval-api-actor` and `GET /v2/datasets/~eval-api-shared`
-   return 200.
+   return 200. So does `username~name`: `GET /v2/datasets/{username}~eval-api-shared` returns 200.
 6. The account can create private Actors with a `SOURCE_FILES` version and `envVars` (including `isSecret: true`)
    without a build, and its plan allows two more Actors.
 7. `GET .../versions/0.0/env-vars` returns the plain value of EVAL_REGION and no value for EVAL_API_KEY. The version and
@@ -277,11 +277,13 @@ for (const p of ['users/me/usage', 'actors/~eval-api-actor/versions/0.0/env-vars
     console.log(p, '=>', findClosestApiPaths(index, normalizeApiPath(p)));
 
 // Platform facts 5-21.
+const me = await call('GET', 'users/me', undefined, { preview: false });
 const actor = await call('GET', 'actors/~eval-api-actor');
 show('Actor versions', actor.data?.versions?.map((v: any) => ({ versionNumber: v.versionNumber, envVars: v.envVars })));
 await call('GET', 'acts/~eval-api-actor');
 await call('GET', 'actors/eval-api-actor');
 await call('GET', 'datasets/~eval-api-shared');
+await call('GET', `datasets/${me.data?.username}~eval-api-shared`);
 await call('GET', 'datasets/eval-api-shared');
 show('env-vars list', (await call('GET', 'actors/~eval-api-actor/versions/0.0/env-vars')).data?.items);
 show('version envVars', (await call('GET', 'actors/~eval-api-actor/versions/0.0')).data?.envVars);
@@ -291,7 +293,7 @@ const monthly = await call('GET', 'users/me/usage/monthly');
 show('usage/monthly cycle', monthly.data?.usageCycle);
 show('usage/monthly top-level values', scalars(monthly.data));
 show('limits', (await call('GET', 'users/me/limits')).data);
-show('users/me plan', (await call('GET', 'users/me', undefined, { preview: false })).data?.plan);
+show('users/me plan', me.data?.plan);
 const browserInfo = await call('GET', 'browser-info');
 console.log('  browser-info echoes the token:', token !== '' && JSON.stringify(browserInfo).includes(token));
 
