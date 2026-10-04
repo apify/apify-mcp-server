@@ -59,8 +59,8 @@ are not reachable from natural user language.
 
 ### Apify API tools (not in the datasets yet)
 
-The four opt-in `api` tools from #1444 and #1445 have their own cases, promoted only after those
-PRs merge: `eval_cases_review/api_tools_pr_cases.json` (21) and
+The four opt-in `api` tools from #1444 and #1445 have their own cases, promoted in two batches
+after those PRs merge (see `API_TOOLS.md`): `eval_cases_review/api_tools_pr_cases.json` (21) and
 `eval_cases_review/api_tools_merge_cases.json` (15). They are uncalibrated, and they load `builds`
 and `api` in place of the two Actor tools. Counts as above:
 
