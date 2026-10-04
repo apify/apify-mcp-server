@@ -274,7 +274,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-read/defer-last-run",
+    "id": "pr/get-actor-run-list/api-loaded-last-run",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "did the last run of apify/website-content-crawler on my account finish ok?",
@@ -295,7 +295,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-read/defer-dataset-items",
+    "id": "pr/get-dataset-items/api-loaded-dataset-items",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "show me the first 5 items in dataset WkzbQMuFYuamGv3YF",
@@ -318,7 +318,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-read/defer-dataset-list",
+    "id": "pr/get-dataset-list/api-loaded-dataset-list",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "which datasets are on my account right now?",
@@ -339,7 +339,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-read/defer-run-log",
+    "id": "pr/get-actor-run-log/api-loaded-run-log",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "why did run 3pZ8cQe1RtYuIoP2a fail? show me the end of its log",
@@ -362,7 +362,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-write/defer-build",
+    "id": "pr/build-actor/api-loaded-build",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "start a fresh build of my actor eval-api-actor-scratch",
@@ -385,7 +385,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-write/defer-run-actor",
+    "id": "pr/call-actor/api-loaded-run-actor",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "run apify/rag-web-browser for 'apify mcp server' and give me the top 3 results",
@@ -407,7 +407,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-write/defer-schedule",
+    "id": "pr/create-schedule/api-loaded-schedule",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "every monday at 9am prague time, run my task eval-sum-nightly",
@@ -429,7 +429,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-write/defer-task-input",
+    "id": "pr/update-actor-task/api-loaded-task-input",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "change my task eval-sum-nightly so firstNumber is 5",
@@ -451,7 +451,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-search/defer-store-search",
+    "id": "pr/search-actors/api-loaded-store-search",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "find me an actor that can scrape google maps reviews",
@@ -472,7 +472,7 @@
     "mcpToolsOnly": true
   },
   {
-    "id": "pr/apify-api-search/defer-docs-concept",
+    "id": "pr/search-apify-docs/api-loaded-docs-concept",
     "category": "apify-api-routing",
     "kind": "tool-call",
     "query": "how do webhook payload templates work on apify, and which variables can i put in them?",
