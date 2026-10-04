@@ -11,6 +11,9 @@ Review material for #1411. Delete once the cases are migrated into the live data
 | `retired_pr_cases.json` | the 125 live PR cases being retired, for reference |
 | `retired_merge_cases.json` | the 70 live merge cases being retired, for reference |
 | `current_status.json` | per case: passes everywhere, or which models it fails on |
+| `api_tools_pr_cases.json` | 21 `tool-call` cases for the Apify API tools, promoted only after #1444 and #1445 merge |
+| `api_tools_merge_cases.json` | 15 `agent` cases for the Apify API tools, on the same schedule |
+| [`API_TOOLS.md`](./API_TOOLS.md) | the API tool cases: design, coverage, fixtures, probes, and staging. Uncalibrated, and not compared below: no v1 case covers these tools |
 
 To change a case, edit the JSON and say so. The files upsert straight back into the staging
 datasets by `id`, so an edit is a one-command re-push and re-run. Do not edit an `id`: Langfuse

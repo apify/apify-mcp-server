@@ -1,0 +1,496 @@
+[
+  {
+    "id": "pr/apify-api-read/webhooks-on-account",
+    "category": "apify-api-read",
+    "kind": "tool-call",
+    "query": "are there any webhooks set up on my apify account? i want to know where they send their calls",
+    "expectedTools": [
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "apify-api-search",
+      "apify-api-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-read/spend-this-billing-cycle",
+    "category": "apify-api-read",
+    "kind": "tool-call",
+    "query": "how much have i spent on apify so far in this billing cycle?",
+    "expectedTools": [
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "apify-api-search",
+      "apify-api-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-read/monthly-spending-cap",
+    "category": "apify-api-read",
+    "kind": "tool-call",
+    "query": "what's the monthly spending cap on my account, and how close am i to hitting it?",
+    "expectedTools": [
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "apify-api-search",
+      "apify-api-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-read/env-var-value",
+    "category": "apify-api-read",
+    "kind": "tool-call",
+    "query": "what is EVAL_REGION set to on my actor eval-api-actor?",
+    "expectedTools": [
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "apify-api-search",
+      "apify-api-details",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-read/env-var-names",
+    "category": "apify-api-read",
+    "kind": "tool-call",
+    "query": "which environment variables does my actor eval-api-actor have?",
+    "expectedTools": [
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "apify-api-search",
+      "apify-api-details",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-write/rename-dataset",
+    "category": "apify-api-write",
+    "kind": "tool-call",
+    "query": "my dataset eval-api-contacts needs to be called eval-api-contacts-q4 from now on, can you change that?",
+    "expectedTools": [
+      "apify-api-write",
+      "apify-api-search",
+      "apify-api-details",
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "get-dataset",
+      "get-dataset-list"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-write/alert-on-crash",
+    "category": "apify-api-write",
+    "kind": "tool-call",
+    "query": "if a run of my actor eval-api-actor-scratch ever crashes, i want https://example.com/eval-api/alerts to get a POST about it. set that up",
+    "expectedTools": [
+      "apify-api-write",
+      "apify-api-search",
+      "apify-api-details",
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-write/secret-env-var",
+    "category": "apify-api-write",
+    "kind": "tool-call",
+    "query": "add an environment variable SIGNING_SECRET with the value eval-only-9f3c to my actor eval-api-actor-scratch. it's a secret, so keep it hidden",
+    "expectedTools": [
+      "apify-api-write",
+      "apify-api-search",
+      "apify-api-details",
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-search/resurrect-run",
+    "category": "apify-api-search",
+    "kind": "tool-call",
+    "query": "run 7f8Kq2LmN3pRsTuVw finished, but i want it to carry on where it stopped instead of starting a new one. can you bring it back?",
+    "expectedTools": [
+      "apify-api-search",
+      "apify-api-details",
+      "apify-api-write",
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "get-actor-run"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-search/sign-json",
+    "category": "apify-api-search",
+    "kind": "tool-call",
+    "query": "i need apify to sign this json so i can check later that nobody tampered with it: {\"plan\": \"pro\", \"seats\": 3}",
+    "expectedTools": [
+      "apify-api-search",
+      "apify-api-details",
+      "apify-api-write"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-details/webhook-create-fields",
+    "category": "apify-api-details",
+    "kind": "tool-call",
+    "query": "before i set anything up: what fields does apify expect when you create a webhook through the api, and which ones are required? don't create anything",
+    "expectedTools": [
+      "apify-api-details",
+      "apify-api-search",
+      "search-apify-docs",
+      "fetch-apify-docs"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-read/defer-last-run",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "did the last run of apify/website-content-crawler on my account finish ok?",
+    "expectedTools": [
+      "get-actor-run-list"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-read/defer-dataset-items",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "show me the first 5 items in dataset WkzbQMuFYuamGv3YF",
+    "expectedTools": [
+      "get-dataset-items",
+      "get-dataset",
+      "ReadMcpResourceTool"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-read/defer-dataset-list",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "which datasets are on my account right now?",
+    "expectedTools": [
+      "get-dataset-list"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-read/defer-run-log",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "why did run 3pZ8cQe1RtYuIoP2a fail? show me the end of its log",
+    "expectedTools": [
+      "get-actor-run-log",
+      "get-actor-run",
+      "ReadMcpResourceTool"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-write/defer-build",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "start a fresh build of my actor eval-api-actor-scratch",
+    "expectedTools": [
+      "build-actor",
+      "fetch-actor-details",
+      "get-actor-build-list"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-write/defer-run-actor",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "run apify/rag-web-browser for 'apify mcp server' and give me the top 3 results",
+    "expectedTools": [
+      "call-actor",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-write/defer-schedule",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "every monday at 9am prague time, run my task eval-sum-nightly",
+    "expectedTools": [
+      "create-schedule",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-write/defer-task-input",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "change my task eval-sum-nightly so firstNumber is 5",
+    "expectedTools": [
+      "update-actor-task",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-search/defer-store-search",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "find me an actor that can scrape google maps reviews",
+    "expectedTools": [
+      "search-actors"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-search/defer-docs-concept",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "how do webhook payload templates work on apify, and which variables can i put in them?",
+    "expectedTools": [
+      "search-apify-docs",
+      "fetch-apify-docs"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  }
+]

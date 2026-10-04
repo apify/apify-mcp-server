@@ -140,7 +140,8 @@
     "evals:mcp-agent": "pnpm run build && tsx evals/runner/run.ts",
     "evals:mcp-agent:export-dataset": "tsx evals/scripts/export_dataset.ts",
     "evals:mcp-agent:tasks-fixtures": "tsx evals/scripts/tasks_fixtures.ts",
-    "evals:mcp-agent:schedules-fixtures": "tsx evals/scripts/schedules_fixtures.ts"
+    "evals:mcp-agent:schedules-fixtures": "tsx evals/scripts/schedules_fixtures.ts",
+    "evals:mcp-agent:api-fixtures": "tsx evals/scripts/api_fixtures.ts"
   },
   "author": "Apify",
   "license": "MIT"
