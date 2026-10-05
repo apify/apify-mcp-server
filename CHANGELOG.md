@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.17.2 - **not yet released**
+## [0.17.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.2) (2026-10-05)
 
 ### 🚀 Features
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - **actors:** Limit and validate the RAG Web Browser TIP pilot ([#1468](https://github.com/apify/apify-mcp-server/pull/1468)) ([fb731c5](https://github.com/apify/apify-mcp-server/commit/fb731c549fc837e67f0f4b04dd8d243e74f59b56)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.17.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.1) (2026-09-30)
 
 ### 🐛 Bug Fixes
