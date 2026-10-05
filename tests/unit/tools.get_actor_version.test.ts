@@ -828,6 +828,17 @@ describe('get-actor-version', () => {
             expect(structuredContent.files.map(({ path }) => path)).toEqual(['src/main.js']);
         });
 
+        it.each(['actor-1', 'john~my-actor'])(
+            'names the Actor by the full name in its document when given as %s',
+            async (actor) => {
+                const result = await callTool({ actor });
+
+                expect(actorMock.mock.calls).toEqual([[actor]]);
+                expect(result.structuredContent.fullName).toBe('john/my-actor');
+                expect(result.content[1].text).toBe('Read version 0.1 of john/my-actor.');
+            },
+        );
+
         it('refuses a version the Actor does not have', async () => {
             const text = await callToolExpectingUserError({ versionNumber: '9.9' });
 
