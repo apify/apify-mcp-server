@@ -460,6 +460,23 @@ describe('create-actor', () => {
         expect(actorsCreateMock).not.toHaveBeenCalled();
     });
 
+    it.each([
+        ['a.js', './a.js', 'a.js'],
+        ['.actor/actor.json', '.actor//actor.json', '.actor/actor.json'],
+        ['src/main.js', 'src/main.js', 'src/main.js'],
+    ])('refuses %s and %s, two files at the same path, and creates nothing', async (first, second, path) => {
+        const result = await callTool({
+            files: [
+                { path: first, content: '1' },
+                { path: second, content: '2' },
+            ],
+        });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`files[1] (${second}) repeats the path ${path}; send each file once.`);
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+    });
+
     it('warns about empty files, which the build skips', async () => {
         const result = await callTool({ files: [ACTOR_JSON, { path: 'src/__init__.py', content: '' }] });
 

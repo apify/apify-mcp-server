@@ -4,6 +4,7 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
+import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
@@ -40,13 +41,19 @@ const createActorArgs = z.object({
         .describe('Start a build of the version after creating the Actor, and return without waiting. Default: false.'),
 });
 
-/** The entries to send, one per file; throws `UserInputError` for a path no file can be written at. */
+/**
+ * The entries to send, one per file; throws `UserInputError` for a path no file can be written at, and for a path
+ * given twice, since the platform puts the Actor name in the first .actor/actor.json and the build uses the last.
+ */
 function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
     const entries: ActorVersionSourceFile[] = [];
     for (const [index, file] of files.entries()) {
         const entry = buildSourceFileEntry(file);
         const label = `files[${index}] (${file.path})`;
         validateFilePath(entry.name, label);
+        if (entries.some(({ name }) => name === entry.name)) {
+            throw new UserInputError(`${label} repeats the path ${entry.name}; send each file once.`);
+        }
         validateNewFilePath(entry.name, { filePaths: entries.map(({ name }) => name), folderPaths: [] }, label);
         entries.push(entry);
     }
