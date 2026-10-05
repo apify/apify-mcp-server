@@ -1511,17 +1511,26 @@ describe('update-actor-version', () => {
             );
         });
 
-        it('refuses a write to a folder stored with a trailing slash, and to a parent of a nested folder', async () => {
-            mockFiles({ name: 'cache/', folder: true }, { name: 'data/raw', folder: true }, MAIN_JS);
+        it('refuses a write to a folder stored with a trailing slash or an unnormalized name, and to a parent of a nested folder', async () => {
+            mockFiles(
+                { name: 'cache/', folder: true },
+                { name: 'data/raw', folder: true },
+                { name: './storage', folder: true },
+                MAIN_JS,
+            );
 
             const cache = await callToolExpectingUserError({ operations: [write('cache', 'x')] });
             const data = await callToolExpectingUserError({ operations: [write('data', 'x')] });
+            const storage = await callToolExpectingUserError({ operations: [write('storage', 'x')] });
 
             expect(cache).toBe(
                 'operations[0] (write cache) collides with cache/; one path cannot be both a file and a folder.',
             );
             expect(data).toBe(
                 'operations[0] (write data) collides with data/raw; one path cannot be both a file and a folder.',
+            );
+            expect(storage).toBe(
+                'operations[0] (write storage) collides with storage; one path cannot be both a file and a folder.',
             );
         });
 
