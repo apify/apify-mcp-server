@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { expect } from 'vitest';
 
 import { actorNameToToolName, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
@@ -17,12 +19,47 @@ import {
     validateStructuredOutputForTool,
     withClient,
 } from '../helpers.js';
-import type { Case } from '../types.js';
+import type { Case, SuiteClient } from '../types.js';
 
 // call-actor calls Actors by name — this tool name must never appear in the tool list.
 const NORMAL_MODE_TOOL_NAME = actorNameToToolName(ACTOR_NORMAL_MODE);
 
-/** Actor tools: search, details, call-actor, get-actor-run. */
+/** A 1x1 PNG. */
+const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+type ToolCallResult = { isError?: boolean; content?: { type: string; text?: string }[]; structuredContent?: unknown };
+
+type SourceVersionRead = {
+    actorId: string;
+    fullName: string;
+    versionNumber: string;
+    revision: string;
+    files: { path: string; sizeBytes: number; hash: string }[];
+    contents: { path: string; content: string; encoding: string }[];
+    warnings?: string[];
+};
+
+type SourceWriteResult = {
+    revision: string;
+    changed: boolean;
+    changes: { path: string; action: string; hash?: string }[];
+    build?: { id: string; actorId: string };
+    buildError?: string;
+};
+
+/** Calls a source tool, fails the case on a tool error, and returns the structured content. */
+async function callSourceTool<T>(client: SuiteClient, name: string, args: Record<string, unknown>): Promise<T> {
+    const result = (await client.callTool({ name, arguments: args })) as ToolCallResult;
+    expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
+    return result.structuredContent as T;
+}
+
+/** The hash the source tools list: the first 16 hex characters of the SHA-256 of the bytes. */
+function sha256Prefix(data: Buffer | string): string {
+    return createHash('sha256').update(data).digest('hex').slice(0, 16);
+}
+
+/** Actor tools: search, details, call-actor, get-actor-run, and the source tools that create and change an Actor. */
 export const actorsCases: Case[] = [
     {
         name: 'calls an Actor directly via call-actor without a separate add step',
@@ -1058,6 +1095,162 @@ export const actorsCases: Case[] = [
                     arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
                 }),
             ).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
+        }),
+    },
+    {
+        name: 'creates an Actor, then reads and changes its files with the hashes and revisions the platform stores',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+            const api = ctx.createApifyClient();
+            // Unique per call: the transports run this case at the same time, in one account.
+            const name = `mcp-source-test-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+            const mainJs = 'console.log("one");\n';
+            const iconBase64 = Buffer.from([0, 1, 2, 253, 254, 255]).toString('base64');
+            let actorId: string | undefined;
+            let buildId: string | undefined;
+            try {
+                const created = await callSourceTool<SourceVersionRead>(client, HELPER_TOOLS.ACTOR_CREATE, {
+                    name,
+                    files: [
+                        // Without a name, which the platform sets to the Actor name.
+                        {
+                            path: '.actor/actor.json',
+                            content: '{\n    "actorSpecification": 1,\n    "version": "0.0"\n}\n',
+                        },
+                        {
+                            path: 'Dockerfile',
+                            content: 'FROM apify/actor-node:20\nCOPY . ./\nCMD ["node", "src/main.js"]\n',
+                        },
+                        { path: 'src/main.js', content: mainJs },
+                        // A binary extension defaults to base64.
+                        { path: 'assets/logo.png', content: PNG_BASE64 },
+                        { path: 'src/empty.js', content: '' },
+                    ],
+                });
+                actorId = created.actorId;
+
+                expect(created.fullName.endsWith(`/${name}`)).toBe(true);
+                expect(created.versionNumber).toBe('0.0');
+                expect(created.warnings).toEqual([
+                    'These files are empty, and the build skips empty files, so they will not exist in the build: src/empty.js.',
+                ]);
+
+                // What create-actor reported is what the platform stored, the name in actor.json included.
+                const read = await callSourceTool<SourceVersionRead>(client, HELPER_TOOLS.ACTOR_VERSION_GET, {
+                    actor: actorId,
+                    paths: ['.actor/actor.json', 'assets/logo.png', 'src/main.js'],
+                });
+                const hashes = new Map(read.files.map(({ path, hash }) => [path, hash]));
+
+                expect(read.fullName).toBe(created.fullName);
+                expect(read.revision).toBe(created.revision);
+                expect(read.files).toEqual(created.files);
+                expect([...hashes.keys()]).toEqual([
+                    '.actor/actor.json',
+                    'Dockerfile',
+                    'assets/logo.png',
+                    'src/empty.js',
+                    'src/main.js',
+                ]);
+                expect(hashes.get('assets/logo.png')).toBe(sha256Prefix(Buffer.from(PNG_BASE64, 'base64')));
+                expect(hashes.get('src/main.js')).toBe(sha256Prefix(mainJs));
+                expect(hashes.get('src/empty.js')).toBe(sha256Prefix(''));
+                expect(JSON.parse(read.contents[0].content)).toEqual({ actorSpecification: 1, version: '0.0', name });
+                expect(read.contents.slice(1)).toEqual([
+                    { path: 'assets/logo.png', content: PNG_BASE64, encoding: 'base64' },
+                    { path: 'src/main.js', content: mainJs, encoding: 'utf8' },
+                ]);
+
+                const updated = await callSourceTool<SourceWriteResult>(client, HELPER_TOOLS.ACTOR_VERSION_UPDATE, {
+                    actor: actorId,
+                    expectedRevision: read.revision,
+                    operations: [
+                        { type: 'edit', path: 'src/main.js', edits: [{ oldText: '"one"', newText: '"two"' }] },
+                        { type: 'write', path: 'assets/icon.png', content: iconBase64 },
+                        { type: 'delete', path: 'src/empty.js', expectedHash: hashes.get('src/empty.js') },
+                    ],
+                });
+                const reread = await callSourceTool<SourceVersionRead>(client, HELPER_TOOLS.ACTOR_VERSION_GET, {
+                    actor: actorId,
+                    paths: ['src/main.js', 'assets/icon.png'],
+                });
+                const newHashes = new Map(reread.files.map(({ path, hash }) => [path, hash]));
+
+                // The revision and hashes update-actor-version reported are the ones the platform now lists.
+                expect(updated).toEqual({
+                    revision: reread.revision,
+                    changed: true,
+                    changes: [
+                        { path: 'assets/icon.png', action: 'created', hash: newHashes.get('assets/icon.png') },
+                        { path: 'src/empty.js', action: 'deleted' },
+                        { path: 'src/main.js', action: 'updated', hash: newHashes.get('src/main.js') },
+                    ],
+                });
+                expect([...newHashes.keys()]).toEqual([
+                    '.actor/actor.json',
+                    'Dockerfile',
+                    'assets/icon.png',
+                    'assets/logo.png',
+                    'src/main.js',
+                ]);
+                expect(newHashes.get('assets/icon.png')).toBe(sha256Prefix(Buffer.from(iconBase64, 'base64')));
+                expect(newHashes.get('src/main.js')).toBe(sha256Prefix('console.log("two");\n'));
+                for (const path of ['.actor/actor.json', 'Dockerfile', 'assets/logo.png']) {
+                    expect(newHashes.get(path), path).toBe(hashes.get(path));
+                }
+                expect(reread.contents).toEqual([
+                    { path: 'src/main.js', content: 'console.log("two");\n', encoding: 'utf8' },
+                    { path: 'assets/icon.png', content: iconBase64, encoding: 'base64' },
+                ]);
+
+                // A retry with the revision read before the write fails and writes nothing.
+                const stale = (await client.callTool({
+                    name: HELPER_TOOLS.ACTOR_VERSION_UPDATE,
+                    arguments: {
+                        actor: actorId,
+                        expectedRevision: read.revision,
+                        operations: [
+                            { type: 'edit', path: 'src/main.js', edits: [{ oldText: '"two"', newText: '"three"' }] },
+                        ],
+                    },
+                })) as ToolCallResult;
+                const afterStale = await callSourceTool<SourceVersionRead>(client, HELPER_TOOLS.ACTOR_VERSION_GET, {
+                    actor: actorId,
+                });
+
+                expect(stale.isError).toBe(true);
+                expect(stale.content?.[0]?.text).toBe(
+                    'Nothing was written: expectedRevision failed with REVISION_MISMATCH. ' +
+                        `The version's revision is ${reread.revision}, not ${read.revision}.`,
+                );
+                expect(afterStale.revision).toBe(reread.revision);
+
+                const built = await callSourceTool<SourceWriteResult>(client, HELPER_TOOLS.ACTOR_VERSION_UPDATE, {
+                    actor: actorId,
+                    autoBuild: true,
+                    operations: [],
+                });
+                buildId = built.build?.id;
+
+                expect(built).toEqual({
+                    revision: reread.revision,
+                    changed: false,
+                    changes: [],
+                    build: expect.objectContaining({ id: expect.any(String), actorId }),
+                });
+            } finally {
+                if (buildId) {
+                    // The build may have finished already, and then it cannot be aborted.
+                    await api
+                        .build(buildId)
+                        .abort()
+                        .catch(() => undefined);
+                }
+                // create-actor can fail after the platform created the Actor, so it is also found by its unique name.
+                const { items } = await api.actors().list({ my: true, desc: true, limit: 50 });
+                const idToDelete = actorId ?? items.find((item) => item.name === name)?.id;
+                if (idToDelete) await api.actor(idToDelete).delete();
+            }
         }),
     },
 ];
