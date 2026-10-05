@@ -580,7 +580,7 @@ describe('get-actor-run default response', () => {
         expect(listKeysCalls()).toHaveLength(1);
     });
 
-    // Non-prod platforms assign a different Actor ID; tip pilot must still match on full name.
+    // Tip pilot keys off full name so non-prod Actor IDs still match.
     it('fetches TIP for apify/rag-web-browser when the Actor ID is not the production one', async () => {
         const { client, getRecordCalls } = makeKvStoreClient({
             displayedKeys: [{ key: 'TIP' }],
