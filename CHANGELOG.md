@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.17.3 - **not yet released**
+
+### 🚀 Features
+
+- Add delete-actor tool ([#1439](https://github.com/apify/apify-mcp-server/pull/1439)) ([0387245](https://github.com/apify/apify-mcp-server/commit/0387245ef46954f4ae8cc3e61edfea1f65e0046b)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1417](https://github.com/apify/apify-mcp-server/issues/1417)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.17.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.2) (2026-10-05)
 
 ### 🚀 Features
