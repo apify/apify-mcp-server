@@ -27,6 +27,7 @@ import {
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
+    validateFilePath,
 } from './source_helpers.js';
 
 /** Why an operation or the revision check failed; the caller reads the code to decide how to recover. */
@@ -175,6 +176,8 @@ function applyOperation(files: Map<string, SourceFile>, operation: OperationArgs
     const path = posix.normalize(operation.path);
     if (type === 'write') {
         if (content === undefined) throw new UserInputError(`${label} needs content.`);
+        // Only a write is checked, so a stored file at such a path can still be edited or deleted.
+        validateFilePath(path, label);
         const existing = files.get(path);
         if (existing && expectedHash === undefined) {
             const detail = `${path} exists with hash ${existing.hash}; pass that as expectedHash to replace it.`;

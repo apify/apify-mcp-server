@@ -151,6 +151,21 @@ export function buildSourceFileEntry({
     return { name: posix.normalize(path), format: isBase64 ? 'BASE64' : 'TEXT', content };
 }
 
+/**
+ * Throws `UserInputError` for a normalized path no file can be written at. The build worker refuses a version with a
+ * path outside the Actor root, so every build of it would fail; `.` and a path ending in a slash name a folder.
+ */
+export function validateFilePath(path: string, label: string): void {
+    if (path.startsWith('/') || path === '..' || path.startsWith('../')) {
+        throw new UserInputError(
+            `${label} has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+        );
+    }
+    if (path === '.' || path.endsWith('/')) {
+        throw new UserInputError(`${label} has a path that names a folder, not a file.`);
+    }
+}
+
 /** The build worker skips a file whose content is empty, so the caller hears of such files. */
 export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: string[] } {
     if (paths.length === 0) return {};

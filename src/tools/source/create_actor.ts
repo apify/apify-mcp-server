@@ -18,6 +18,7 @@ import {
     respondAfterWrite,
     respondToSourceToolError,
     sourceFileArgs,
+    validateFilePath,
 } from './source_helpers.js';
 
 const createActorArgs = z.object({
@@ -87,7 +88,11 @@ export const createActor: ToolEntry = Object.freeze({
                         versionNumber: parsed.versionNumber,
                         ...(parsed.buildTag !== undefined && { buildTag: parsed.buildTag }),
                         sourceType: ActorSourceType.SourceFiles,
-                        sourceFiles: parsed.files.map(buildSourceFileEntry),
+                        sourceFiles: parsed.files.map((file, index) => {
+                            const entry = buildSourceFileEntry(file);
+                            validateFilePath(entry.name, `files[${index}] (${file.path})`);
+                            return entry;
+                        }),
                     },
                 ],
             } satisfies ActorCollectionCreateOptions);

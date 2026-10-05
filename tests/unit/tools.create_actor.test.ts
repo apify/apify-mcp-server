@@ -14,9 +14,11 @@ import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
+    type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/userid_cache.js', () => ({
@@ -52,7 +54,7 @@ type CreateOutput = {
     buildError?: string;
 };
 
-type CreateResult = TextToolResult & { structuredContent: CreateOutput };
+type CreateResult = TextToolResult & { structuredContent: CreateOutput; toolTelemetry?: ToolTelemetrySnapshot };
 
 type SentVersion = {
     versionNumber?: string;
@@ -413,6 +415,31 @@ describe('create-actor', () => {
             'src/main.js',
         ]);
     });
+
+    it.each(['/src/main.js', '..', '../x.js', 'src/../../x.js'])(
+        'refuses a file at %s, outside the Actor root, which the build refuses, and creates nothing',
+        async (path) => {
+            const result = await callTool({ autoBuild: true, files: [MAIN_JS, { path, content: 'x' }] });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                `files[1] (${path}) has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+            );
+            expect(actorsCreateMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(['.', 'src/', 'src/..'])(
+        'refuses a file at %s, which names a folder, and creates nothing',
+        async (path) => {
+            const result = await callTool({ files: [{ path, content: 'x' }] });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(`files[0] (${path}) has a path that names a folder, not a file.`);
+            expect(actorsCreateMock).not.toHaveBeenCalled();
+        },
+    );
 
     it('warns about empty files, which the build skips', async () => {
         const result = await callTool({ files: [ACTOR_JSON, { path: 'src/__init__.py', content: '' }] });

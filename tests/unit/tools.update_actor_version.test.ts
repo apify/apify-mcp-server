@@ -1338,6 +1338,45 @@ describe('update-actor-version', () => {
     });
 
     describe('input', () => {
+        it.each(['/src/main.js', '..', '../x.js', 'src/../../x.js', 'a/../..'])(
+            'refuses a write to %s, outside the Actor root, which the build refuses',
+            async (path) => {
+                const text = await callToolExpectingUserError({ autoBuild: true, operations: [write(path, 'x')] });
+
+                expect(text).toBe(
+                    `operations[0] (write ${path}) has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+                );
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each(['.', './', 'src/', 'src//', 'src/..'])('refuses a write to %s, which names a folder', async (path) => {
+            const text = await callToolExpectingUserError({ autoBuild: true, operations: [write(path, 'x')] });
+
+            expect(text).toBe(`operations[0] (write ${path}) has a path that names a folder, not a file.`);
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            ['an edit', edit('/src/main.js', { oldText: 'const a = 1;', newText: 'const a = 2;' })],
+            ['a delete', remove('/src/main.js', MAIN_JS_HASH)],
+        ])('takes the path of %s with a leading slash as written, so it finds no file', async (_, operation) => {
+            const text = await callToolExpectingUserError({ operations: [operation] });
+
+            expect(text).toBe(
+                `${failedWith(0, operation.type, '/src/main.js', 'FILE_NOT_FOUND')} There is no file at /src/main.js.`,
+            );
+        });
+
+        it('deletes a stored file outside the Actor root, so such a file can be removed', async () => {
+            const outside = { name: '/src/main.js', format: 'TEXT', content: 'x' };
+            mockFiles(outside, MAIN_JS);
+
+            await callTool({ operations: [remove('/src/main.js', sha256Prefix('x'))] });
+
+            expect(getPutFiles()).toStrictEqual([MAIN_JS]);
+        });
+
         it('matches a path the way get-actor-version lists it', async () => {
             const result = await callTool({
                 operations: [{ type: 'delete', path: './src//main.js', expectedHash: MAIN_JS_HASH }],
