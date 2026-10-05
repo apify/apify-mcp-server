@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import { actorRunListOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { HelperTool } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    mockApifyClient,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -15,10 +16,10 @@ const listMock = vi.fn();
 const actorListMock = vi.fn();
 const actorMock = vi.fn(() => ({ runs: () => ({ list: actorListMock }) }));
 
-const stubClient = {
+const stubClient = mockApifyClient({
     runs: () => ({ list: listMock }),
     actor: actorMock,
-} as unknown as InternalToolArgs['apifyClient'];
+});
 
 const MOCK_RUNS = {
     total: 1,

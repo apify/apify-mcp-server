@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 import {
     AUTO_INJECTED_TOOLS,
     getToolsForServerMode,
     isReportProblemExplicitlySelected,
     loadToolsFromInput,
+    resolveActorsToLoad,
     resolveToolNamesFromInput,
     toolNamesToInput,
 } from '../../src/utils/tools_loader.js';
@@ -107,6 +109,12 @@ describe('toolNamesToInput', () => {
     it('classifies widget tool names as internal tools, not actor IDs', () => {
         expect(toolNamesToInput([HELPER_TOOLS.STORE_SEARCH_WIDGET])).toEqual({
             tools: [HELPER_TOOLS.STORE_SEARCH_WIDGET],
+        });
+    });
+
+    it('classifies get-actor-list (in no category) as an internal tool, not an actor ID', () => {
+        expect(toolNamesToInput([HELPER_TOOLS.ACTOR_LIST_GET])).toEqual({
+            tools: [HELPER_TOOLS.ACTOR_LIST_GET],
         });
     });
 });
@@ -218,6 +226,36 @@ describe('getToolsForServerMode report-problem default injection', () => {
         const toolNames = getToolsForServerMode({ tools: ['dev'] }, [], 'default').map((t) => t.name);
         expect(toolNames).toContain(HELPER_TOOLS.PROBLEM_REPORT);
     });
+});
+
+describe('get-actor-list selection (in no category)', () => {
+    it('does not treat tools=get-actor-list as an Actor name', () => {
+        expect(resolveActorsToLoad({ tools: [HELPER_TOOLS.ACTOR_LIST_GET] })).toEqual([]);
+    });
+
+    it.each(['default', 'apps'] as const)('serves only get-actor-list for tools=get-actor-list in %s mode', (mode) => {
+        const toolNames = getToolsForServerMode({ tools: [HELPER_TOOLS.ACTOR_LIST_GET] }, [], mode).map((t) => t.name);
+        expect(toolNames).toEqual([HELPER_TOOLS.ACTOR_LIST_GET]);
+    });
+
+    it.each(['default', 'apps'] as const)('excludes get-actor-list from the default set in %s mode', (mode) => {
+        const toolNames = getToolsForServerMode({}, [], mode).map((t) => t.name);
+        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_LIST_GET);
+    });
+
+    it.each(['default', 'apps'] as const)(
+        'serves the actors tools and get-actor-list for tools=actors,get-actor-list in %s mode',
+        (mode) => {
+            const tools = getToolsForServerMode({ tools: ['actors', HELPER_TOOLS.ACTOR_LIST_GET] }, [], mode);
+            const toolNames = tools.map((t) => t.name);
+            const actorsToolNames = getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name);
+            expect(toolNames).toEqual(expect.arrayContaining([...actorsToolNames, HELPER_TOOLS.ACTOR_LIST_GET]));
+
+            const searchActorsTool = tools.find((t) => t.name === HELPER_TOOLS.STORE_SEARCH);
+            const { description } = getToolPublicFieldOnly(searchActorsTool!, { presentTools: new Set(toolNames) });
+            expect(description).toContain(`Use ${HELPER_TOOLS.ACTOR_LIST_GET} for those.`);
+        },
+    );
 });
 
 describe('loadToolsFromInput explicit widget selection', () => {

@@ -10,7 +10,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 ## Files
 
-- `registry.ts` — tool categories and the tools in each (`index.ts` re-exports them).
+- `registry.ts` — tool categories and the tools in each (`index.ts` re-exports them), plus tools in no
+  category (`ALL_WIDGET_TOOLS`, `UNCATEGORIZED_TOOLS`).
 - `structured_output_schemas.ts` — shared JSON-schema definitions for structured
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
@@ -20,7 +21,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     prunes an Actor's definition, `getActorDefinition`), and `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
-    action) pair, never inline dataset items or KV bodies.
+    action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
+    inlined as `tip` on terminal RAG Web Browser runs only.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
