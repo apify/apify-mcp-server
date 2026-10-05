@@ -590,6 +590,22 @@ describe('create-actor', () => {
             );
         });
 
+        it('reports a build start that failed on the network as buildError, with the Actor still created', async () => {
+            buildMock.mockRejectedValue(
+                Object.assign(new Error('socket hang up'), { request: {}, config: {}, code: 'ECONNRESET' }),
+            );
+
+            const result = await callTool({ autoBuild: true, files: [ACTOR_JSON, DOCKERFILE] });
+
+            expectSchemaConformingStructuredContent(result, createActorToolOutputSchema);
+            expect(actorsCreateMock).toHaveBeenCalledTimes(1);
+            expect(result.structuredContent.actorId).toBe('actor-9');
+            expect(result.structuredContent.buildError).toBe('socket hang up');
+            expect(result.content[1].text).toBe(
+                'Created the private Actor john/my-actor.\nThe build could not be started; start it again to run these files.',
+            );
+        });
+
         it('reports a build that failed to start with the Actor still created', async () => {
             buildMock.mockRejectedValue(apiError(403, 'Build limit reached'));
 

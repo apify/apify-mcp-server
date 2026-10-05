@@ -2079,11 +2079,41 @@ describe('update-actor-version', () => {
             );
         });
 
-        it('rethrows an error from the build start that is not an API error', async () => {
-            buildMock.mockRejectedValue(new TypeError('Cannot read properties of undefined'));
+        it.each([
+            [
+                'a network failure after the retries',
+                Object.assign(new Error('socket hang up'), { request: {}, config: {}, code: 'ECONNRESET' }),
+            ],
+            ['a failure that is not an API error', new TypeError('Cannot read properties of undefined')],
+        ])('reports %s of the build start as buildError, with the write still done', async (_, error) => {
+            buildMock.mockRejectedValue(error);
 
-            await expect(callTool({ autoBuild: true, operations: [write('b.js', 'b')] })).rejects.toThrow(TypeError);
+            const result = await callTool({ autoBuild: true, operations: [write('b.js', 'b')] });
+
+            expectSchemaConformingStructuredContent(result, updateActorVersionToolOutputSchema);
             expect(versionUpdateMock).toHaveBeenCalledTimes(1);
+            expect(result.structuredContent).toEqual({
+                revision: expect.stringMatching(/^[0-9a-f]{16}$/),
+                changed: true,
+                changes: [{ path: 'b.js', action: 'created', hash: sha256Prefix('b') }],
+                buildError: error.message,
+            });
+            expect(result.content[1].text).toBe(
+                'Updated version 0.1 of john/my-actor.\nThe build could not be started; start it again to run these files.',
+            );
+        });
+
+        it('reports a failed Console link lookup as buildError before any build starts, with the write still done', async () => {
+            vi.mocked(getUserInfoCached).mockRejectedValue(new Error('users/me failed'));
+
+            const result = await callToolInConsole({ autoBuild: true, operations: [write('b.js', 'b')] });
+
+            expect(versionUpdateMock).toHaveBeenCalledTimes(1);
+            expect(buildMock).not.toHaveBeenCalled();
+            expect(result.structuredContent.buildError).toBe('users/me failed');
+            expect(result.structuredContent.changes).toEqual([
+                { path: 'b.js', action: 'created', hash: sha256Prefix('b') },
+            ]);
         });
     });
 });

@@ -6,8 +6,9 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { UserInputError } from '../../errors.js';
-import type { InternalToolArgs } from '../../types.js';
+import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
+import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { ABORT } from '../actors/actor_run_response.js';
@@ -218,8 +219,8 @@ export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: 
 
 /**
  * The response to a committed write. With autoBuild, a build of the version starts first, with no tag so the version's
- * buildTag applies, and is not waited for. The write stands either way, so an API error from the start goes to
- * `buildError` rather than being thrown.
+ * buildTag applies, and is not waited for. The write stands either way, so a failed start goes to `buildError` rather
+ * than being thrown: a caller told the call failed would retry writes that were saved.
  */
 export async function respondAfterWrite(params: {
     toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames'>;
@@ -237,22 +238,28 @@ export async function respondAfterWrite(params: {
             nextStep: 'Runs use these files once the version is built.',
         });
     }
+    let linkContext: ConsoleLinkContext | undefined;
     let build: Build | typeof ABORT;
     try {
+        // Resolved before the start, so a failed lookup leaves no build behind.
+        linkContext = await getConsoleLinkContext(apifyToken, client);
         // No signal is passed: a committed write never aborts the build it started.
         build = await startBuild(client, target.actorId, target.versionNumber, { useCache: true, waitSecs: 0 });
     } catch (error) {
-        // Only the API's refusal is a failed start; anything else is a bug and goes to the tool-call engine.
-        if (!(error instanceof ApifyApiError)) throw error;
+        // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.
+        if (!(error instanceof ApifyApiError))
+            logHttpError(error, 'Failed to start a build after a source write', target);
         return respondWithBuild({
-            structuredContent: { ...structuredContent, buildError: error.message },
+            structuredContent: {
+                ...structuredContent,
+                buildError: error instanceof Error ? error.message : String(error),
+            },
             summary,
             nextStep: 'The build could not be started; start it again to run these files.',
         });
     }
     // startBuild returns ABORT only for a passed signal; the check narrows the type.
     if (build === ABORT) return respondAborted();
-    const linkContext = await getConsoleLinkContext(apifyToken, client);
     return respondWithBuild({
         structuredContent: { ...structuredContent, build: toBuildResult(build, linkContext) },
         summary,
