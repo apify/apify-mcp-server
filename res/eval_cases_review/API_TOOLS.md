@@ -37,8 +37,9 @@ Checked offline:
   Claude Code's built-in `ReadMcpResourceTool`. Every `tools` selector is a category on #1445.
 - Every name a merge case creates carries `{{uniq}}` in the query and in the reference; the only unmarked names are the
   permanent fixtures'. Resolved as the runner of #1423 (`04ab3138`) resolves it, with a CI run id, each name matches
-  its `isNameFromRun`, each dataset name fits the platform's 63 characters of `[a-z0-9-]`, and each static part is 35
-  characters or fewer.
+  its `isNameFromRun`, each dataset name fits the platform's 63 characters of `[a-z0-9-]` with a static part of 35
+  characters or fewer, and the variable name fits the 100-character limit. The 63-character cap does not apply to the
+  webhook URL, whose static part is 44 characters.
 - `evals/scripts/api_fixtures.ts` passes type-check, lint, and format on this branch. Its copies of #1423's helpers
   match `evals/run_id.ts` and `evals/scripts/schedules_sweep.ts` there verbatim. It has not run.
 - Search ranking, methods per path, and closest-path suggestions were checked by running the server's own
@@ -537,9 +538,10 @@ A Claude judge scoring a Claude agent can be lenient on itself. Before quoting f
 `--claude-judge`, which uses OpenRouter.
 
 Turn budgets: easy cases get 8 (one read, or a lookup then a read). Medium cases get 10 to 12 for read chains and 14 for
-create, verify, and clean up; `webhook-deliveries-medium` budgets the per-webhook route. Hard cases get 10, budgeted
-for the recovery path, or 14 for `secret-env-var-hard` and `dataset-access-method-hard`, which also create, verify, and
-clean up.
+the write cases: create, verify, and clean up, or, for `webhook-test-medium`, find the webhook, send the test delivery,
+and optionally read the dispatch. `webhook-deliveries-medium` budgets the per-webhook route. Hard cases get 10,
+budgeted for the recovery path, or 14 for `secret-env-var-hard` and `dataset-access-method-hard`, which also create,
+verify, and clean up.
 
 ## Proposed text for promotion
 
@@ -599,9 +601,12 @@ failed and still gives a total. On `merge/api/env-var-missing-hard`, a read that
 `username~` prefix looks like a missing variable to the judge.
 
 The `merge/api/*` items name what they create with `{{uniq}}` (see "Unique resource names" below),
-so their trials and any concurrent run never share a resource, and `--iterations N` is safe. Four
-items create something and delete it again: the datasets `eval-api-contacts-{{uniq}}` (renamed to
-`eval-api-contacts-q4-{{uniq}}`) and `eval-api-shared-{{uniq}}`, a webhook that calls
+so their trials and any concurrent run never create the same resource, and `--iterations N` is safe.
+One collision is left: two variable writes on `eval-api-actor-scratch` within milliseconds of each
+other, from two trials or runs, or from a run and another run's seed or teardown, can fail one of
+them with a concurrent update error. Four items create something and delete it again: the datasets
+`eval-api-contacts-{{uniq}}` (renamed to `eval-api-contacts-q4-{{uniq}}`) and
+`eval-api-shared-{{uniq}}`, a webhook that calls
 `https://example.com/eval-api/scratch-failed-{{uniq}}`, and the secret variable
 `EVAL_SIGNING_SECRET-{{uniq}}`. The rest read two permanent fixtures, which no item may modify. The
 Actor `eval-api-actor` has only version 0.0, with `EVAL_REGION=eu-central-1` and the secret
