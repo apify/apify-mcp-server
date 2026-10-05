@@ -15,6 +15,7 @@ import type { ALLOWED_TASK_TOOL_EXECUTION_MODES } from '../../../src/const.js';
 import { APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED } from '../../../src/const.js';
 import { ActorsMcpServer } from '../../../src/mcp/server.js';
 import { createStatelessServer } from '../../../src/mcp/stateless_server.js';
+import type { PaymentProvider, PaymentProviderId } from '../../../src/payments/types.js';
 import { RESOURCE_MIME_TYPE } from '../../../src/resources/widgets.js';
 import type { ActorsMcpServerOptions, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../../src/types.js';
 import { TOOL_TYPE } from '../../../src/types.js';
@@ -327,4 +328,25 @@ export function makeRecorderTool(
         },
     } as ToolEntry;
     return { tool, received };
+}
+
+// x402 payload the payment provider returns; asserted intact in the stored structuredContent.
+export const X402_PAYLOAD = { x402Version: 1, accepts: [{ scheme: 'exact', resource: 'test' }] };
+
+/** Provider (Skyfire-like by default) whose getPaymentRequiredData populates the x402 structuredContent. */
+export function makePaymentProvider(id: PaymentProviderId = 'skyfire'): PaymentProvider {
+    return {
+        id,
+        allowsUnauthenticated: true,
+        decorateToolSchema: (tool) => tool,
+        validatePayment: (args) => (args['skyfire-pay-id'] ? null : 'Missing skyfire-pay-id'),
+        getPaymentRequiredData: () => X402_PAYLOAD,
+        getPaymentHeaders: (args): Record<string, string> =>
+            args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {},
+        removePaymentFields: (args) => {
+            const { 'skyfire-pay-id': _removed, ...rest } = args;
+            return rest;
+        },
+        redactForLogging: (args) => ({ ...(args as Record<string, unknown>), 'skyfire-pay-id': '[REDACTED]' }),
+    };
 }
