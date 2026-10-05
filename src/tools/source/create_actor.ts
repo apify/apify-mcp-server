@@ -19,6 +19,7 @@ import {
     respondAfterWrite,
     respondToSourceToolError,
     sourceFileArgs,
+    validateFileContent,
     validateFilePath,
     validateNewFilePath,
 } from './source_helpers.js';
@@ -51,6 +52,7 @@ function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]
         const entry = buildSourceFileEntry(file);
         const label = `files[${index}] (${file.path})`;
         validateFilePath(entry.name, label);
+        validateFileContent(entry, label);
         if (entries.some(({ name }) => name === entry.name)) {
             throw new UserInputError(`${label} repeats the path ${entry.name}; send each file once.`);
         }

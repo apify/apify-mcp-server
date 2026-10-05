@@ -673,6 +673,47 @@ describe('update-actor-version', () => {
             expect(getPutFiles().at(-1)).toStrictEqual({ name: path, format, content });
         });
 
+        it.each([
+            ['a data URI', 'assets/a.png', 'data:image/png;base64,iVBORw0KGgo=', {}],
+            ['text sent to a binary extension', 'assets/a.png', 'hello world', {}],
+            ['text sent with encoding base64', 'README.md', '# Title\n', { encoding: 'base64' }],
+            ['base64 with stray characters', 'assets/a.png', 'iVBORw0KGgo!!', {}],
+            ['two base64 strings joined', 'assets/a.png', 'aGk=aGk=', {}],
+        ])('refuses %s as base64 content, which would be stored corrupted', async (_, path, content, extra) => {
+            const text = await callToolExpectingUserError({
+                autoBuild: true,
+                operations: [write(path, content, extra)],
+            });
+
+            expect(text).toBe(
+                `operations[0] (write ${path}) has content that is not valid base64; ` +
+                    'send binary content as base64, or text with encoding utf8.',
+            );
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            ['without padding', 'aGk', [104, 105]],
+            ['split into lines', 'aGVs\nbG8=\n', [104, 101, 108, 108, 111]],
+            ['in the URL-safe alphabet', '-_8', [251, 255]],
+            ['empty', '', []],
+        ])('takes base64 %s, stored as sent and hashed by its bytes', async (_, content, bytes) => {
+            const result = await callTool({ operations: [write('assets/a.png', content)] });
+
+            expect(getPutFiles().at(-1)).toStrictEqual({ name: 'assets/a.png', format: 'BASE64', content });
+            expect(result.structuredContent.changes).toEqual([
+                { path: 'assets/a.png', action: 'created', hash: sha256Prefix(Buffer.from(bytes)) },
+            ]);
+        });
+
+        it('refuses text with a lone UTF-16 surrogate, which UTF-8 cannot store', async () => {
+            const text = await callToolExpectingUserError({ operations: [write('src/a.js', 'smile \uD83D')] });
+
+            expect(text).toBe(
+                'operations[0] (write src/a.js) has text with a lone UTF-16 surrogate, which UTF-8 cannot store.',
+            );
+        });
+
         it('sends no PUT when the content is the same', async () => {
             const result = await callTool({
                 operations: [write('assets/logo.png', LOGO.content, { expectedHash: sha256Prefix(LOGO_BYTES) })],
@@ -1030,6 +1071,21 @@ describe('update-actor-version', () => {
                 LOGO,
                 { name: 'src/main.js', format: 'TEXT', content: 'const a = 2;\nconsole.log(a);\nexport {};\n' },
             ]);
+        });
+
+        it.each([
+            ['an oldText that is half of an emoji', { oldText: '\uD83D', newText: 'x' }],
+            ['a newText that is half of an emoji', { oldText: 'smile', newText: '\uDE42' }],
+        ])('refuses %s, which would store U+FFFD', async (_, textEdit) => {
+            mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'smile 🙂\n' });
+
+            const text = await callToolExpectingUserError({
+                operations: [edit('src/main.js', { oldText: 'smile', newText: 'smile' }, textEdit)],
+            });
+
+            expect(text).toBe(
+                'operations[0] (edit src/main.js) has a lone UTF-16 surrogate in edits[1], which UTF-8 cannot store.',
+            );
         });
 
         it('reports an oldText that is not in the file (NO_MATCH)', async () => {

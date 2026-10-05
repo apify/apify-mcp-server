@@ -477,6 +477,30 @@ describe('create-actor', () => {
         expect(actorsCreateMock).not.toHaveBeenCalled();
     });
 
+    it.each([
+        ['base64 that is a data URI', { path: 'assets/a.png', content: 'data:image/png;base64,iVBORw0KGgo=' }],
+        ['text sent to a binary extension', { path: 'assets/a.png', content: 'hello world' }],
+        ['text sent with encoding base64', { path: 'README.md', content: '# Title\n', encoding: 'base64' }],
+    ])('refuses %s, which would be stored corrupted, and creates nothing', async (_, file) => {
+        const result = await callTool({ files: [MAIN_JS, file] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            `files[1] (${file.path}) has content that is not valid base64; send binary content as base64, or text with encoding utf8.`,
+        );
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses text with a lone UTF-16 surrogate, and creates nothing', async () => {
+        const result = await callTool({ files: [{ path: 'src/a.js', content: 'smile \uD83D' }] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            'files[0] (src/a.js) has text with a lone UTF-16 surrogate, which UTF-8 cannot store.',
+        );
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+    });
+
     it('warns about empty files, which the build skips', async () => {
         const result = await callTool({ files: [ACTOR_JSON, { path: 'src/__init__.py', content: '' }] });
 

@@ -27,6 +27,7 @@ import {
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
+    validateFileContent,
     validateFilePath,
     validateNewFilePath,
 } from './source_helpers.js';
@@ -147,6 +148,12 @@ function convertToCrlf(text: string): string {
 function applyTextEdits(originalText: string, edits: readonly TextEdit[], label: string): string {
     let text = originalText;
     for (const [editIndex, edit] of edits.entries()) {
+        // A lone surrogate can match half of a character, and UTF-8 stores it as U+FFFD.
+        if (!edit.oldText.isWellFormed() || !edit.newText.isWellFormed()) {
+            throw new UserInputError(
+                `${label} has a lone UTF-16 surrogate in edits[${editIndex}], which UTF-8 cannot store.`,
+            );
+        }
         const isCrlfRetry =
             !text.includes(edit.oldText) &&
             edit.oldText.includes('\n') &&
@@ -191,7 +198,9 @@ function applyOperation(
         }
         if (expectedHash !== undefined) validateHash(findFile(files, path, label), expectedHash, label);
         if (!existing) validateNewFilePath(path, { filePaths: files.keys(), folderPaths }, label);
-        files.set(path, buildInlineSourceFile(buildSourceFileEntry({ path, content, encoding: operation.encoding })));
+        const entry = buildSourceFileEntry({ path, content, encoding: operation.encoding });
+        validateFileContent(entry, label);
+        files.set(path, buildInlineSourceFile(entry));
         return;
     }
     if (type === 'delete') {

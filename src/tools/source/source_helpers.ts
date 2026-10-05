@@ -152,6 +152,31 @@ export function buildSourceFileEntry({
 }
 
 /**
+ * Base64 that decodes to its bytes without loss: Node and the build worker skip characters they cannot decode and stop
+ * at padding, so text sent as base64 would be stored as other bytes. Line breaks, missing padding, and the URL-safe
+ * alphabet decode without loss.
+ */
+function isBase64(content: string): boolean {
+    const compact = content.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+    return Buffer.from(compact, 'base64').toString('base64').replace(/=+$/, '') === compact.replace(/=+$/, '');
+}
+
+/**
+ * Throws `UserInputError` for content the stored file would not hold as sent: base64 that does not decode without
+ * loss, and text with a lone UTF-16 surrogate, which UTF-8 stores as U+FFFD.
+ */
+export function validateFileContent({ format, content }: ActorVersionSourceFile, label: string): void {
+    if (format === 'BASE64' && !isBase64(content)) {
+        throw new UserInputError(
+            `${label} has content that is not valid base64; send binary content as base64, or text with encoding utf8.`,
+        );
+    }
+    if (format === 'TEXT' && !content.isWellFormed()) {
+        throw new UserInputError(`${label} has text with a lone UTF-16 surrogate, which UTF-8 cannot store.`);
+    }
+}
+
+/**
  * Throws `UserInputError` for a normalized path no file can be written at. The build worker refuses a version with a
  * path outside the Actor root, so every build of it would fail; `.` and a path ending in a slash name a folder.
  */
