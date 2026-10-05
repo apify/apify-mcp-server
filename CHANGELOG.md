@@ -10,6 +10,11 @@ All notable changes to this project will be documented in this file.
 - Add delete-actor tool ([#1439](https://github.com/apify/apify-mcp-server/pull/1439)) ([0387245](https://github.com/apify/apify-mcp-server/commit/0387245ef46954f4ae8cc3e61edfea1f65e0046b)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1417](https://github.com/apify/apify-mcp-server/issues/1417)
 - **telemetry:** Add payment_provider to the tool-call Segment event ([#1473](https://github.com/apify/apify-mcp-server/pull/1473)) ([c0d48f0](https://github.com/apify/apify-mcp-server/commit/c0d48f00b18773bc03ac78f3bd6eb7761d823d60)) by [@MQ37](https://github.com/MQ37)
 
+### 🐛 Bug Fixes
+
+- **ci:** Wait until npm serves the version before finishing publish ([#1474](https://github.com/apify/apify-mcp-server/pull/1474)) ([88cbc3e](https://github.com/apify/apify-mcp-server/commit/88cbc3e135a78a602f51eb4822449a4392f2eb43)) by [@jirispilka](https://github.com/jirispilka)
+- **actors:** Match TIP pilot by Actor full name across environments ([#1476](https://github.com/apify/apify-mcp-server/pull/1476)) ([143b1bc](https://github.com/apify/apify-mcp-server/commit/143b1bca6f92739d842162ffb8e4c9583cae5983)) by [@jirispilka](https://github.com/jirispilka)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.17.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.2) (2026-10-05)
