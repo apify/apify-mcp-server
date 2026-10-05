@@ -1,4 +1,4 @@
-import type { ActorCollectionCreateOptions } from 'apify-client';
+import type { ActorCollectionCreateOptions, ActorVersionSourceFile } from 'apify-client';
 import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
@@ -19,6 +19,7 @@ import {
     respondToSourceToolError,
     sourceFileArgs,
     validateFilePath,
+    validateNewFilePath,
 } from './source_helpers.js';
 
 const createActorArgs = z.object({
@@ -38,6 +39,19 @@ const createActorArgs = z.object({
         .default(false)
         .describe('Start a build of the version after creating the Actor, and return without waiting. Default: false.'),
 });
+
+/** The entries to send, one per file; throws `UserInputError` for a path no file can be written at. */
+function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
+    const entries: ActorVersionSourceFile[] = [];
+    for (const [index, file] of files.entries()) {
+        const entry = buildSourceFileEntry(file);
+        const label = `files[${index}] (${file.path})`;
+        validateFilePath(entry.name, label);
+        validateNewFilePath(entry.name, { filePaths: entries.map(({ name }) => name), folderPaths: [] }, label);
+        entries.push(entry);
+    }
+    return entries;
+}
 
 /**
  * https://docs.apify.com/api/v2/actors-post
@@ -88,11 +102,7 @@ export const createActor: ToolEntry = Object.freeze({
                         versionNumber: parsed.versionNumber,
                         ...(parsed.buildTag !== undefined && { buildTag: parsed.buildTag }),
                         sourceType: ActorSourceType.SourceFiles,
-                        sourceFiles: parsed.files.map((file, index) => {
-                            const entry = buildSourceFileEntry(file);
-                            validateFilePath(entry.name, `files[${index}] (${file.path})`);
-                            return entry;
-                        }),
+                        sourceFiles: buildSourceFileEntries(parsed.files),
                     },
                 ],
             } satisfies ActorCollectionCreateOptions);

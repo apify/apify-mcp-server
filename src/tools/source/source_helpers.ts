@@ -166,6 +166,24 @@ export function validateFilePath(path: string, label: string): void {
     }
 }
 
+/**
+ * Throws `UserInputError` when a new file at `path` collides with another file or folder, since one path cannot be
+ * both: a file at a folder of `path`, or a file or folder at or under `path`. The build worker fails to write such a
+ * file. A file at `path` itself is for the caller to check.
+ */
+export function validateNewFilePath(
+    path: string,
+    takenPaths: { filePaths: Iterable<string>; folderPaths: Iterable<string> },
+    label: string,
+): void {
+    const collision =
+        [...takenPaths.filePaths].find(
+            (filePath) => path.startsWith(`${filePath}/`) || filePath.startsWith(`${path}/`),
+        ) ?? [...takenPaths.folderPaths].find((folderPath) => folderPath === path || folderPath.startsWith(`${path}/`));
+    if (collision === undefined) return;
+    throw new UserInputError(`${label} collides with ${collision}; one path cannot be both a file and a folder.`);
+}
+
 /** The build worker skips a file whose content is empty, so the caller hears of such files. */
 export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: string[] } {
     if (paths.length === 0) return {};

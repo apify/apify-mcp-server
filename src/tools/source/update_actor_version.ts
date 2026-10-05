@@ -28,6 +28,7 @@ import {
     respondAfterWrite,
     respondToSourceToolError,
     validateFilePath,
+    validateNewFilePath,
 } from './source_helpers.js';
 
 /** Why an operation or the revision check failed; the caller reads the code to decide how to recover. */
@@ -168,8 +169,13 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
     return text;
 }
 
-/** Applies one operation to `files`; throws `UserInputError` when it cannot, before anything is written. */
-function applyOperation(files: Map<string, SourceFile>, operation: OperationArgs, index: number): void {
+/** Applies one operation to `version.files`; throws `UserInputError` when it cannot, before anything is written. */
+function applyOperation(
+    version: { files: Map<string, SourceFile>; folderPaths: readonly string[] },
+    operation: OperationArgs,
+    index: number,
+): void {
+    const { files, folderPaths } = version;
     const { type, content, expectedHash, edits } = operation;
     const label = `operations[${index}] (${type} ${operation.path})`;
     // Normalized the way get-actor-version lists paths, so a listed path always matches.
@@ -184,6 +190,7 @@ function applyOperation(files: Map<string, SourceFile>, operation: OperationArgs
             throw buildPreconditionError(label, PRECONDITION_REASON.FILE_EXISTS, detail);
         }
         if (expectedHash !== undefined) validateHash(findFile(files, path, label), expectedHash, label);
+        if (!existing) validateNewFilePath(path, { filePaths: files.keys(), folderPaths }, label);
         files.set(path, buildInlineSourceFile(buildSourceFileEntry({ path, content, encoding: operation.encoding })));
         return;
     }
@@ -286,7 +293,10 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                 throw buildPreconditionError('expectedRevision', PRECONDITION_REASON.REVISION_MISMATCH, detail);
             }
             const after = new Map(before);
-            for (const [index, operation] of parsed.operations.entries()) applyOperation(after, operation, index);
+            const folderPaths = storedEntries.filter(isFolderEntry).map(({ name }) => posix.normalize(name));
+            for (const [index, operation] of parsed.operations.entries()) {
+                applyOperation({ files: after, folderPaths }, operation, index);
+            }
             const revision = buildFilesRevision([...after.values()]);
             const changed = revision !== previousRevision;
             // A cancel during the read writes nothing; per the MCP spec the cancelled request gets no response.

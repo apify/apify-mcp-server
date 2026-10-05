@@ -441,6 +441,25 @@ describe('create-actor', () => {
         },
     );
 
+    it.each([
+        [
+            'a file under another file',
+            [{ path: 'src', content: 'x' }, MAIN_JS],
+            'files[1] (src/main.js) collides with src',
+        ],
+        [
+            'a file at the folder of another file',
+            [MAIN_JS, { path: 'src', content: 'x' }],
+            'files[1] (src) collides with src/main.js',
+        ],
+    ])('refuses %s, since a path cannot be both a file and a folder, and creates nothing', async (_, files, prefix) => {
+        const result = await callTool({ files });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`${prefix}; one path cannot be both a file and a folder.`);
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+    });
+
     it('warns about empty files, which the build skips', async () => {
         const result = await callTool({ files: [ACTOR_JSON, { path: 'src/__init__.py', content: '' }] });
 

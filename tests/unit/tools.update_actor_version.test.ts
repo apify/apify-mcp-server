@@ -1358,6 +1358,79 @@ describe('update-actor-version', () => {
         });
 
         it.each([
+            ['storage', 'storage'],
+            ['src', 'src/main.js'],
+            ['src/main.js/inner.js', 'src/main.js'],
+            ['assets/logo.png/x', 'assets/logo.png'],
+        ])(
+            'refuses a write to %s, which collides with %s, since a path cannot be both a file and a folder',
+            async (path, collision) => {
+                const text = await callToolExpectingUserError({ autoBuild: true, operations: [write(path, 'x')] });
+
+                expect(text).toBe(
+                    `operations[0] (write ${path}) collides with ${collision}; one path cannot be both a file and a folder.`,
+                );
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it('refuses a write under a file an earlier write created', async () => {
+            const text = await callToolExpectingUserError({
+                operations: [write('lib', 'x'), write('lib/util.js', 'y')],
+            });
+
+            expect(text).toBe(
+                'operations[1] (write lib/util.js) collides with lib; one path cannot be both a file and a folder.',
+            );
+        });
+
+        it('refuses a write to a folder stored with a trailing slash, and to a parent of a nested folder', async () => {
+            mockFiles({ name: 'cache/', folder: true }, { name: 'data/raw', folder: true }, MAIN_JS);
+
+            const cache = await callToolExpectingUserError({ operations: [write('cache', 'x')] });
+            const data = await callToolExpectingUserError({ operations: [write('data', 'x')] });
+
+            expect(cache).toBe(
+                'operations[0] (write cache) collides with cache/; one path cannot be both a file and a folder.',
+            );
+            expect(data).toBe(
+                'operations[0] (write data) collides with data/raw; one path cannot be both a file and a folder.',
+            );
+        });
+
+        it('writes a file into a folder entry, and where a file deleted in the same call held a folder', async () => {
+            await callTool({
+                operations: [
+                    write('storage/input.json', '{}'),
+                    remove('src/main.js', MAIN_JS_HASH),
+                    write('src', 'x'),
+                    remove('assets/logo.png', sha256Prefix(LOGO_BYTES)),
+                    write('assets/logo.png/readme.txt', 'y'),
+                ],
+            });
+
+            expect(getPutFiles()).toStrictEqual([
+                FOLDER,
+                ACTOR_JSON,
+                { name: 'storage/input.json', format: 'TEXT', content: '{}' },
+                { name: 'src', format: 'TEXT', content: 'x' },
+                { name: 'assets/logo.png/readme.txt', format: 'TEXT', content: 'y' },
+            ]);
+        });
+
+        it('refuses to delete or edit a folder (FILE_NOT_FOUND)', async () => {
+            const deleted = await callToolExpectingUserError({ operations: [remove('storage', MAIN_JS_HASH)] });
+            const edited = await callToolExpectingUserError({
+                operations: [edit('storage', { oldText: 'a', newText: 'b' })],
+            });
+
+            expect(deleted).toBe(
+                `${failedWith(0, 'delete', 'storage', 'FILE_NOT_FOUND')} There is no file at storage.`,
+            );
+            expect(edited).toBe(`${failedWith(0, 'edit', 'storage', 'FILE_NOT_FOUND')} There is no file at storage.`);
+        });
+
+        it.each([
             ['an edit', edit('/src/main.js', { oldText: 'const a = 1;', newText: 'const a = 2;' })],
             ['a delete', remove('/src/main.js', MAIN_JS_HASH)],
         ])('takes the path of %s with a leading slash as written, so it finds no file', async (_, operation) => {
