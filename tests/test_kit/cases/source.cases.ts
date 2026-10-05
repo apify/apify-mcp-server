@@ -253,6 +253,7 @@ export const sourceCases: Case[] = [
             const utilJs = 'export const double = (value) => value * 2;\n';
             const mainTs = 'export const greeting = "one";\n';
             const oldJs = 'export const removed = true;\n';
+            const zJs = 'z();\n';
             const newJs = 'export const added = true;\n';
             const newReadme = '# Source tools test\n\nReplaced by update-actor-version.\n';
             const editedMainTs = 'export const greeting = "two";\n';
@@ -279,6 +280,10 @@ export const sourceCases: Case[] = [
                                     content: Buffer.from(mainTs).toString('base64'),
                                 },
                                 { name: 'src/old.js', format: 'TEXT', content: oldJs },
+                                // No format, which the build worker reads as TEXT, and no content, which it reads as
+                                // empty; the casts drop what apify-client's type requires.
+                                { name: 'src/z.js', content: zJs } as ActorVersionSourceFile,
+                                { name: 'src/blank.js', format: 'TEXT' } as ActorVersionSourceFile,
                                 // An empty folder as Console keeps it; the cast adds what apify-client's type leaves out.
                                 { name: 'storage', folder: true } as unknown as ActorVersionSourceFile,
                             ],
@@ -296,9 +301,11 @@ export const sourceCases: Case[] = [
                 expect(before.files).toEqual([
                     buildFileListing('README.md', readme),
                     buildFileListing('assets/logo.png', Buffer.from(PNG_BASE64, 'base64')),
+                    buildFileListing('src/blank.js', ''),
                     buildFileListing('src/lib/util.js', utilJs),
                     buildFileListing('src/main.ts', mainTs),
                     buildFileListing('src/old.js', oldJs),
+                    buildFileListing('src/z.js', zJs),
                 ]);
                 expect(before.contents).toEqual([{ path: 'src/main.ts', content: mainTs, encoding: 'utf8' }]);
                 const storedBefore = await fetchStoredActor(api, seeded.id);
@@ -351,24 +358,30 @@ export const sourceCases: Case[] = [
                 expect(after.files).toEqual([
                     buildFileListing('README.md', newReadme),
                     buildFileListing('assets/logo.png', Buffer.from(PNG_BASE64, 'base64')),
+                    buildFileListing('src/blank.js', ''),
                     buildFileListing('src/lib/util.js', utilJs),
                     buildFileListing('src/main.ts', editedMainTs),
                     buildFileListing('src/new.js', newJs),
+                    buildFileListing('src/z.js', zJs),
                 ]);
                 expect(after.contents).toEqual([
                     { path: 'src/main.ts', content: editedMainTs, encoding: 'utf8' },
                     { path: 'src/new.js', content: newJs, encoding: 'utf8' },
                 ]);
 
-                // Untouched entries, the folder included, are stored as they were; the edited file stays BASE64.
+                // Untouched entries, the folder and the ones without format or content included, are stored as they
+                // were; the edited file stays BASE64.
                 const storedAfter = await fetchStoredActor(api, seeded.id);
                 const entriesBefore = new Map(
                     extractSortedSourceFiles(storedBefore.versions[0]).map((entry) => [entry.name, entry]),
                 );
                 expect(entriesBefore.get('storage')).toMatchObject({ name: 'storage', folder: true });
+                expect(entriesBefore.get('src/z.js')).toEqual({ name: 'src/z.js', content: zJs });
+                expect(entriesBefore.get('src/blank.js')).toEqual({ name: 'src/blank.js', format: 'TEXT' });
                 expect(extractSortedSourceFiles(storedAfter.versions[0])).toEqual([
                     expect.objectContaining({ name: 'README.md', format: 'TEXT', content: newReadme }),
                     entriesBefore.get('assets/logo.png'),
+                    entriesBefore.get('src/blank.js'),
                     entriesBefore.get('src/lib/util.js'),
                     expect.objectContaining({
                         name: 'src/main.ts',
@@ -376,6 +389,7 @@ export const sourceCases: Case[] = [
                         content: Buffer.from(editedMainTs).toString('base64'),
                     }),
                     expect.objectContaining({ name: 'src/new.js', format: 'TEXT', content: newJs }),
+                    entriesBefore.get('src/z.js'),
                     entriesBefore.get('storage'),
                 ]);
                 // Every other field of the version, env vars and build tag included, is unchanged.
