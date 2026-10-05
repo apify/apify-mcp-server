@@ -159,6 +159,7 @@ export async function executeToolAndUpdateTask(params: {
         transportType,
         clientContext,
         clientParam,
+        paymentProvider,
     });
 
     const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, result?: unknown) => {
