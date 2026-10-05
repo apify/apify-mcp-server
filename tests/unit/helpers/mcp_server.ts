@@ -330,17 +330,14 @@ export function makeRecorderTool(
     return { tool, received };
 }
 
-// x402 payload the payment provider returns; asserted intact in the stored structuredContent.
-export const X402_PAYLOAD = { x402Version: 1, accepts: [{ scheme: 'exact', resource: 'test' }] };
-
-/** Provider (Skyfire-like by default) whose getPaymentRequiredData populates the x402 structuredContent. */
+/** Provider that reads `skyfire-pay-id` whatever its `id`; only `id` varies. Its 402 data is `X402_PAYMENT_DATA`. */
 export function makePaymentProvider(id: PaymentProviderId = 'skyfire'): PaymentProvider {
     return {
         id,
         allowsUnauthenticated: true,
         decorateToolSchema: (tool) => tool,
         validatePayment: (args) => (args['skyfire-pay-id'] ? null : 'Missing skyfire-pay-id'),
-        getPaymentRequiredData: () => X402_PAYLOAD,
+        getPaymentRequiredData: () => X402_PAYMENT_DATA,
         getPaymentHeaders: (args): Record<string, string> =>
             args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {},
         removePaymentFields: (args) => {

@@ -32,7 +32,6 @@ import {
     makeThrowingTool,
     PERMISSION_HTTP_STATUS,
     withServer,
-    X402_PAYLOAD,
     X402_PAYMENT_DATA,
 } from './helpers/mcp_server.js';
 
@@ -986,7 +985,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 // Stored result carries the x402 payload intact.
                 const stored = (await getTaskStore(server).getTaskResult(res.task.taskId)) as Record<string, unknown>;
                 expect(stored.isError).toBe(true);
-                expect(stored.structuredContent).toEqual(X402_PAYLOAD);
+                expect(stored.structuredContent).toEqual(X402_PAYMENT_DATA);
                 // Exactly one status notification, `completed`, emitted after the response.
                 expect(statusNotificationStatuses(notifySpy)).toEqual([]);
                 await flushDeferredNotification();
