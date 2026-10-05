@@ -10,11 +10,18 @@ import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
 import { buildFilesRevision } from '../../src/tools/source/source_files.js';
 import { createActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
+    mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
+
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
 
 const actorsCreateMock = vi.fn();
 const buildMock = vi.fn();
@@ -85,6 +92,21 @@ async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Pr
     return (await (createActor as HelperTool).call(withSignal)) as CreateResult;
 }
 
+/** The listing get-actor-version returns for the version the platform stored from the POST. */
+async function readCreatedVersion(): Promise<{ revision: string; files: unknown[] }> {
+    const [body] = actorsCreateMock.mock.calls[0] as [{ name: string; versions: SentVersion[] }];
+    actorGetMock.mockResolvedValue({
+        id: 'actor-9',
+        name: 'my-actor',
+        username: 'john',
+        versions: buildStoredVersions(body),
+    });
+    const read = (await (getActorVersion as HelperTool).call(
+        stubToolCallContext({ actor: 'john/my-actor' }, stubClient),
+    )) as { structuredContent: { revision: string; files: unknown[] } };
+    return read.structuredContent;
+}
+
 function getSentVersion(): SentVersion & Record<string, unknown> {
     const [body] = actorsCreateMock.mock.calls[0] as [{ versions: (SentVersion & Record<string, unknown>)[] }];
     return body.versions[0];
@@ -105,6 +127,58 @@ describe('create-actor', () => {
             buildNumber: '0.0.1',
             status: 'READY',
             startedAt: new Date('2026-09-01T10:00:00.000Z'),
+        });
+    });
+
+    describe('input schema', () => {
+        const validate = (args: Record<string, unknown>) => (createActor as HelperTool).ajvValidate(args);
+        const file = { path: 'src/main.js', content: 'x' };
+
+        it('requires only name and files', () => {
+            expect((createActor as HelperTool).inputSchema.required).toEqual(['name', 'files']);
+        });
+
+        it('keeps every field it declares and strips unknown keys', () => {
+            const args = {
+                name: 'my-actor',
+                title: 'My Actor',
+                description: '',
+                files: [{ ...file, encoding: 'base64', extra: 1 }],
+                versionNumber: '1.0',
+                buildTag: 'beta',
+                autoBuild: true,
+                unknown: 'x',
+            };
+
+            expect(validate(args)).toBe(true);
+            expect(args).toStrictEqual({
+                name: 'my-actor',
+                title: 'My Actor',
+                description: '',
+                files: [{ ...file, encoding: 'base64' }],
+                versionNumber: '1.0',
+                buildTag: 'beta',
+                autoBuild: true,
+            });
+        });
+
+        it.each<[string, Record<string, unknown>]>([
+            ['no name', { files: [file] }],
+            ['an empty name', { name: '', files: [file] }],
+            ['no files', { name: 'x' }],
+            ['empty files', { name: 'x', files: [] }],
+            ['an empty title', { name: 'x', title: '', files: [file] }],
+            ['an empty buildTag', { name: 'x', buildTag: '', files: [file] }],
+            ['an empty path', { name: 'x', files: [{ path: '', content: 'x' }] }],
+            ['a file without a path', { name: 'x', files: [{ content: 'x' }] }],
+            ['a file without content', { name: 'x', files: [{ path: 'a.js' }] }],
+            ['an unknown encoding', { name: 'x', files: [{ ...file, encoding: 'hex' }] }],
+        ])('rejects %s', (_, args) => {
+            expect(validate(args)).toBe(false);
+        });
+
+        it('accepts one empty file', () => {
+            expect(validate({ name: 'x', files: [{ path: 'a.js', content: '' }] })).toBe(true);
         });
     });
 
@@ -157,6 +231,8 @@ describe('create-actor', () => {
             revision: buildFilesRevision(files),
             files,
         });
+        expect(result.content).toHaveLength(2);
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
             'Created the private Actor john/my-actor.\nRuns use these files once the version is built.',
         );
@@ -172,6 +248,26 @@ describe('create-actor', () => {
             [
                 {
                     name: 'my-actor',
+                    versions: [
+                        {
+                            versionNumber: '0.0',
+                            sourceType: 'SOURCE_FILES',
+                            sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: MAIN_JS.content }],
+                        },
+                    ],
+                },
+            ],
+        ]);
+    });
+
+    it('sends an empty description as given', async () => {
+        await callTool({ description: '', files: [MAIN_JS] });
+
+        expect(actorsCreateMock.mock.calls).toStrictEqual([
+            [
+                {
+                    name: 'my-actor',
+                    description: '',
                     versions: [
                         {
                             versionNumber: '0.0',
@@ -275,6 +371,28 @@ describe('create-actor', () => {
         expect(getSentVersion().sourceFiles).toStrictEqual([{ name: 'src/main.js', format: 'TEXT', content }]);
     });
 
+    it('sends non-ASCII paths as given, NFC and NFD forms as two files, with the hashes and revision a later read returns', async () => {
+        const nfcPath = 'src/n\u00e1zev.js';
+        const nfdPath = 'src/na\u0301zev.js';
+
+        const result = await callTool({
+            files: [
+                { path: nfcPath, content: 'x' },
+                { path: nfdPath, content: 'y' },
+            ],
+        });
+
+        expect(getSentVersion().sourceFiles).toStrictEqual([
+            { name: nfcPath, format: 'TEXT', content: 'x' },
+            { name: nfdPath, format: 'TEXT', content: 'y' },
+        ]);
+        const read = await readCreatedVersion();
+        expect(result.structuredContent.files).toEqual(read.files);
+        expect(result.structuredContent.revision).toBe(read.revision);
+        // NFD sorts first: its 'a' comes before the NFC 'á'.
+        expect(result.structuredContent.files.map(({ path }) => path)).toEqual([nfdPath, nfcPath]);
+    });
+
     it('normalizes paths the way get-actor-version lists them', async () => {
         const result = await callTool({
             files: [
@@ -351,6 +469,25 @@ describe('create-actor', () => {
             expect(result.structuredContent.build).toEqual(
                 expect.objectContaining({ id: 'build-1', buildNumber: '0.0.1', status: 'READY' }),
             );
+            expect(result.content).toHaveLength(2);
+            expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+        });
+
+        it('adds the build Console link for an Apify Console session', async () => {
+            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+            const result = (await (createActor as HelperTool).call({
+                ...stubToolCallContext({ name: 'my-actor', autoBuild: true, files: [ACTOR_JSON] }, stubClient),
+                apifyToken: 'apify_ui_test',
+            })) as CreateResult;
+
+            const consoleUrl = 'https://console.apify.com/actors/actor-9/builds/0.0.1';
+            expectSchemaConformingStructuredContent(result, createActorToolOutputSchema);
+            expect(getUserInfoCached).toHaveBeenCalledWith('apify_ui_test', stubClient);
+            expect(result.structuredContent.build?.apifyConsoleUrl).toBe(consoleUrl);
+            expect(result.content).toHaveLength(3);
+            expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+            expect(result.content[2].text).toBe(`Apify Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}`);
         });
 
         it('builds the version it created without waiting for the build', async () => {
