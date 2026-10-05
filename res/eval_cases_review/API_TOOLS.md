@@ -172,8 +172,15 @@ The cases need #1423's runner. Without it, `{{uniq}}` reaches the agent as typed
 braces, and every trial shares one webhook URL and one variable name. With it, `--iterations` above 1 is safe too.
 
 One collision is left. When two variable writes land on one Actor at the same moment, the platform rejects one of
-them with a concurrent update error. `secret-env-var-hard` in two runs, or the case and another run's teardown, can
-meet this way on `eval-api-actor-scratch`, but only within milliseconds of each other.
+them with a concurrent update error. `secret-env-var-hard` in two trials or two runs, or the case and another run's
+seed or teardown, can meet this way on `eval-api-actor-scratch`, but only within milliseconds of each other. If the
+rejected write is a seed's, its step fails and GitHub skips that run's evals, unless another seed created the same part
+(below).
+
+Two overlapping seeds that both find a fixture part missing are not a collision. Both create the part, and the second
+create of an Actor, a version, or a variable fails on the duplicate. `api_fixtures.ts` then reads the part again and,
+since it exists now, goes on with a warning. A webhook has no unique name, so the script creates the fixture webhook
+with a fixed `idempotencyKey`, and the second create returns the first webhook (probe 11).
 
 ## Fixtures
 
@@ -241,7 +248,9 @@ Platform:
     the name.
 11. `POST /v2/webhooks` needs `condition.actorId` to be an ID. If it also takes `~eval-api-actor-scratch` or
     `username~name`, widen `webhook-lifecycle-medium`; if it refuses a name, settle Open questions, 7 before
-    calibrating. `description` is stored, and the list returns it and `condition`.
+    calibrating. `description` is stored, and the list returns it and `condition`. A second create with the same
+    `idempotencyKey` returns the first webhook, and once that webhook is deleted, the key creates a new one. If a
+    deleted webhook keeps its key, `api_fixtures.ts` cannot recreate a deleted fixture webhook: drop its key.
 12. `POST /v2/webhooks/{id}/test` returns a dispatch (record its status), sends one POST to the example.com URL, and
     works for a webhook whose Actor never ran.
 13. `GET /v2/webhook-dispatches?limit=3&desc=1` honors both parameters.
@@ -385,6 +394,14 @@ show('dispatches', dispatches.data?.items?.map((d: any) => ({
 const [newest] = dispatches.data?.items ?? [];
 if (newest) show('newest dispatch calls', (await call('GET', `webhook-dispatches/${newest.id}`)).data?.calls);
 await call('DELETE', `webhooks/${created.data.id}`);
+const keyed = { ...hook, condition: { actorId: scratch.data.id }, idempotencyKey: 'eval-api-key-probe-t1' };
+const first = await call('POST', 'webhooks', keyed, { preview: false });
+const second = await call('POST', 'webhooks', keyed, { preview: false });
+console.log('  same key, same webhook:', first.data?.id !== undefined && second.data?.id === first.data.id);
+await call('DELETE', `webhooks/${first.data.id}`);
+const third = await call('POST', 'webhooks', keyed, { preview: false });
+console.log('  same key after the delete, a new webhook:', third.data?.id !== undefined && third.data.id !== first.data.id);
+if (third.data?.id) await call('DELETE', `webhooks/${third.data.id}`);
 
 const envVars = `actors/${scratch.data.id}/versions/0.0/env-vars`;
 const modifiedAt = async () => (await call('GET', `actors/${scratch.data.id}`, undefined, { preview: false })).data?.modifiedAt;

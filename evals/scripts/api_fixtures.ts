@@ -118,12 +118,54 @@ const EVAL_WEBHOOK_URL_PREFIX = 'https://example.com/eval-api/';
 /** Watches failed runs of the read-only Actor, which never runs. The list and test cases find it by this URL. */
 const FIXTURE_WEBHOOK_URL = `${EVAL_WEBHOOK_URL_PREFIX}run-failed`;
 
+/**
+ * A webhook has no unique name, so two seeds that both find the fixture webhook missing would each
+ * create one. With a fixed key, the second create returns the first webhook.
+ */
+const FIXTURE_WEBHOOK_IDEMPOTENCY_KEY = 'eval-api-fixture-webhook';
+
 /** `--dry-run` prints what the run would change and writes nothing. */
 const IS_DRY_RUN = process.argv.includes('--dry-run');
 /** Marks every line of a dry run, so its output cannot be read as changes that happened. */
 const DRY = IS_DRY_RUN ? '[dry run] ' : '';
 
 type FixtureActorIds = Partial<Record<FixtureActorKey, string>>;
+
+/**
+ * Creates a missing fixture part. CI seeds at the start of every merge run and runs overlap, so two
+ * seeds can both find a part missing, and the second create fails on the duplicate. After a failed
+ * create, the part is read again: if it exists now, another seed made it, so this warns and goes on
+ * instead of failing the seed step and with it that run's evals. Returns undefined on a dry run.
+ */
+async function createFixturePart<T>(
+    label: string,
+    create: () => Promise<T>,
+    readAgain: () => Promise<T | undefined>,
+): Promise<T | undefined> {
+    if (IS_DRY_RUN) {
+        console.log(`🌱 ${DRY}Created ${label}`);
+        return undefined;
+    }
+    try {
+        const created = await create();
+        console.log(`🌱 Created ${label}`);
+        return created;
+    } catch (error) {
+        const existing = await readAgain();
+        if (existing === undefined) throw error;
+        const reason = error instanceof Error ? error.message : String(error);
+        console.warn(`⚠️  Creating ${label} failed (${reason}), but it exists now, so another seed created it`);
+        return existing;
+    }
+}
+
+/** The ID of the account's own Actor with this name, from a fresh list. */
+async function findOwnActorId(client: ApifyClient, name: string): Promise<string | undefined> {
+    for await (const actor of client.actors().list({ my: true })) {
+        if (actor.name === name) return actor.id;
+    }
+    return undefined;
+}
 
 /** A minimal Node.js Actor. Only the source has to be valid, since nothing builds it. */
 function buildFixtureVersion(fixture: FixtureActor): ActorVersion {
@@ -168,20 +210,22 @@ async function prepareFixtureActors(
             ids[key] = existing.id;
             continue;
         }
-        if (IS_DRY_RUN) {
-            console.log(`🌱 ${DRY}Created fixture Actor "${fixture.name}"`);
-            continue;
-        }
-        const actor = await client.actors().create({
-            name: fixture.name,
-            title: `Eval fixture (${key === 'readOnly' ? 'read-only' : 'write target'})`,
-            description:
-                'Permanent fixture for Apify API tool MCP agent evals. Never built or run. Do not delete or modify.',
-            isPublic: false,
-            versions: [buildFixtureVersion(fixture)],
-        });
-        console.log(`🌱 Created fixture Actor "${actor.name}" (${actor.id})`);
-        ids[key] = actor.id;
+        const actorId = await createFixturePart(
+            `fixture Actor "${fixture.name}"`,
+            async () => {
+                const actor = await client.actors().create({
+                    name: fixture.name,
+                    title: `Eval fixture (${key === 'readOnly' ? 'read-only' : 'write target'})`,
+                    description:
+                        'Permanent fixture for Apify API tool MCP agent evals. Never built or run. Do not delete or modify.',
+                    isPublic: false,
+                    versions: [buildFixtureVersion(fixture)],
+                });
+                return actor.id;
+            },
+            async () => findOwnActorId(client, fixture.name),
+        );
+        if (actorId) ids[key] = actorId;
     }
     return ids;
 }
@@ -210,8 +254,11 @@ async function prepareFixtureVersion(
     const actorClient = client.actor(actorId);
     const { items: versions } = await actorClient.versions().list();
     if (!versions.some((version) => version.versionNumber === FIXTURE_VERSION_NUMBER)) {
-        if (!IS_DRY_RUN) await actorClient.versions().create(buildFixtureVersion(fixture));
-        console.log(`🌱 ${DRY}Created version ${FIXTURE_VERSION_NUMBER} of fixture Actor "${fixture.name}"`);
+        await createFixturePart(
+            `version ${FIXTURE_VERSION_NUMBER} of fixture Actor "${fixture.name}"`,
+            async () => actorClient.versions().create(buildFixtureVersion(fixture)),
+            async () => actorClient.version(FIXTURE_VERSION_NUMBER).get(),
+        );
         return;
     }
     const otherVersionNumbers = versions
@@ -242,8 +289,11 @@ async function prepareFixtureVersion(
             }
             continue;
         }
-        if (!IS_DRY_RUN) await versionClient.envVars().create(wanted);
-        console.log(`🌱 ${DRY}Set variable ${wanted.name} of fixture Actor "${fixture.name}"`);
+        await createFixturePart(
+            `variable ${wanted.name} of fixture Actor "${fixture.name}"`,
+            async () => versionClient.envVars().create(wanted),
+            async () => versionClient.envVar(wanted.name).get(),
+        );
     }
 
     const fixtureNames = fixture.envVars.map((wanted) => wanted.name);
@@ -298,6 +348,7 @@ async function prepareWebhooks(client: ApifyClient, actorIds: FixtureActorIds, r
         condition: { actorId: actorIds.readOnly },
         requestUrl: FIXTURE_WEBHOOK_URL,
         description: 'Permanent fixture for Apify API tool MCP agent evals. Do not delete or modify.',
+        idempotencyKey: FIXTURE_WEBHOOK_IDEMPOTENCY_KEY,
     });
     console.log(`🌱 Created fixture webhook ${webhook.id}`);
 }
