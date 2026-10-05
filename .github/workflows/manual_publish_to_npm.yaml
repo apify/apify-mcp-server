@@ -64,7 +64,7 @@ jobs:
                 # the version right away, so don't finish until the registry serves it.
                 run: |
                     version=$(jq -r '.version' package.json)
-                    for i in $(seq 1 80); do
+                    for _ in $(seq 1 80); do
                         curl -sf -o /dev/null "https://registry.npmjs.org/@apify%2factors-mcp-server/$version" && exit 0
                         sleep 15
                     done
