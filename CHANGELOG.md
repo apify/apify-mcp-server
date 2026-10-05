@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add delete-actor tool ([#1439](https://github.com/apify/apify-mcp-server/pull/1439)) ([0387245](https://github.com/apify/apify-mcp-server/commit/0387245ef46954f4ae8cc3e61edfea1f65e0046b)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1417](https://github.com/apify/apify-mcp-server/issues/1417)
+- **telemetry:** Add payment_provider to the tool-call Segment event ([#1473](https://github.com/apify/apify-mcp-server/pull/1473)) ([c0d48f0](https://github.com/apify/apify-mcp-server/commit/c0d48f00b18773bc03ac78f3bd6eb7761d823d60)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
