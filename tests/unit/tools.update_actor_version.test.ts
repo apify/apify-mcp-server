@@ -10,13 +10,20 @@ import { buildFilesRevision } from '../../src/tools/source/source_files.js';
 import { updateActorVersion } from '../../src/tools/source/update_actor_version.js';
 import { updateActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
+
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
 
 const actorGetMock = vi.fn();
 const versionUpdateMock = vi.fn();
@@ -88,6 +95,12 @@ async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Pr
     const context = stubToolCallContext({ actor: 'john/my-actor', ...args }, stubClient);
     const withSignal = signal === undefined ? context : { ...context, signal };
     return (await (updateActorVersion as HelperTool).call(withSignal)) as UpdateResult;
+}
+
+/** A call from an Apify Console session, whose UI token gets Console links. */
+async function callToolInConsole(args: Record<string, unknown>): Promise<UpdateResult> {
+    const context = stubToolCallContext({ actor: 'john/my-actor', ...args }, stubClient);
+    return (await (updateActorVersion as HelperTool).call({ ...context, apifyToken: 'apify_ui_test' })) as UpdateResult;
 }
 
 async function callToolExpectingUserError(args: Record<string, unknown>) {
@@ -185,10 +198,84 @@ describe('update-actor-version', () => {
             changed: true,
             changes: [{ path: 'src/util.js', action: 'created', hash: sha256Prefix('export const b = 2;\n') }],
         });
+        expect(result.content).toHaveLength(2);
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
             'Updated version 0.1 of john/my-actor.\nRuns use these files once the version is built.',
         );
         expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    describe('input schema', () => {
+        const validate = (args: Record<string, unknown>) => (updateActorVersion as HelperTool).ajvValidate(args);
+        const fullOperation = {
+            type: 'edit',
+            path: 'a.js',
+            content: 'x',
+            encoding: 'utf8',
+            expectedHash: MAIN_JS_HASH,
+            edits: [{ oldText: 'a', newText: 'b' }],
+        };
+
+        it('requires only actor and operations', () => {
+            expect((updateActorVersion as HelperTool).inputSchema.required).toEqual(['actor', 'operations']);
+        });
+
+        it.each(['write', 'edit', 'delete'])(
+            'keeps every field of an operation of type %s, the fields of the other types included, and strips unknown keys',
+            (type) => {
+                const args = {
+                    actor: 'john/my-actor',
+                    operations: [{ ...fullOperation, type, extra: 1 }],
+                    expectedRevision: 'abc',
+                    autoBuild: true,
+                    unknown: 'x',
+                };
+
+                expect(validate(args)).toBe(true);
+                expect(args).toStrictEqual({
+                    actor: 'john/my-actor',
+                    operations: [{ ...fullOperation, type }],
+                    expectedRevision: 'abc',
+                    autoBuild: true,
+                });
+            },
+        );
+
+        it.each<[string, Record<string, unknown>]>([
+            ['no actor', { operations: [] }],
+            ['an empty actor', { actor: '', operations: [] }],
+            ['no operations', { actor: 'john/my-actor' }],
+            ['an unknown operation type', { actor: 'a', operations: [{ type: 'rename', path: 'a.js' }] }],
+            ['an operation without a type', { actor: 'a', operations: [{ path: 'a.js', content: 'x' }] }],
+            ['an empty path', { actor: 'a', operations: [{ type: 'write', path: '', content: 'x' }] }],
+            ['an operation without a path', { actor: 'a', operations: [{ type: 'write', content: 'x' }] }],
+            [
+                'an unknown encoding',
+                { actor: 'a', operations: [{ type: 'write', path: 'a', content: 'x', encoding: 'hex' }] },
+            ],
+            ['empty edits', { actor: 'a', operations: [{ type: 'edit', path: 'a.js', edits: [] }] }],
+            [
+                'an empty oldText',
+                { actor: 'a', operations: [{ type: 'edit', path: 'a.js', edits: [{ oldText: '', newText: 'b' }] }] },
+            ],
+            [
+                'an edit without newText',
+                { actor: 'a', operations: [{ type: 'edit', path: 'a.js', edits: [{ oldText: 'a' }] }] },
+            ],
+        ])('rejects %s', (_, args) => {
+            expect(validate(args)).toBe(false);
+        });
+
+        it('accepts no operations and an empty newText', () => {
+            expect(validate({ actor: 'a', operations: [] })).toBe(true);
+            expect(
+                validate({
+                    actor: 'a',
+                    operations: [{ type: 'edit', path: 'a.js', edits: [{ oldText: 'a', newText: '' }] }],
+                }),
+            ).toBe(true);
+        });
     });
 
     it('reports the revision get-actor-version returns after the write', async () => {
@@ -309,6 +396,117 @@ describe('update-actor-version', () => {
         });
     });
 
+    describe('files stored under an unnormalized name or twice', () => {
+        const UNNORMALIZED = { name: './src//util.js', format: 'TEXT', content: 'util();\n' };
+        const UNNORMALIZED_HASH = sha256Prefix(UNNORMALIZED.content);
+        const FIRST = { name: 'src/a.js', format: 'TEXT', content: 'first();\n' };
+        const LAST = { name: './src/a.js', format: 'TEXT', content: 'last();\n' };
+        const LAST_HASH = sha256Prefix(LAST.content);
+
+        it('refuses a write without expectedHash to the path an unnormalized name stands for (FILE_EXISTS)', async () => {
+            mockFiles(UNNORMALIZED, MAIN_JS);
+
+            const text = await callToolExpectingUserError({ operations: [write('src/util.js', 'x')] });
+
+            expect(text).toBe(
+                `${failedWith(0, 'write', 'src/util.js', 'FILE_EXISTS')} ` +
+                    `src/util.js exists with hash ${UNNORMALIZED_HASH}; pass that as expectedHash to replace it.`,
+            );
+        });
+
+        it.each([
+            [
+                'replaces',
+                write('src/util.js', 'x', { expectedHash: UNNORMALIZED_HASH }),
+                [MAIN_JS, { name: 'src/util.js', format: 'TEXT', content: 'x' }],
+            ],
+            [
+                'edits',
+                edit('src/util.js', { oldText: 'util', newText: 'tool' }),
+                [MAIN_JS, { name: 'src/util.js', format: 'TEXT', content: 'tool();\n' }],
+            ],
+            ['deletes', remove('src/util.js', UNNORMALIZED_HASH), [MAIN_JS]],
+        ])(
+            '%s a file stored under an unnormalized name, with no entry left under that name',
+            async (_, operation, sourceFiles) => {
+                mockFiles(UNNORMALIZED, MAIN_JS);
+
+                await callTool({ operations: [operation] });
+
+                expect(versionUpdateMock.mock.calls).toStrictEqual([[{ sourceType: 'SOURCE_FILES', sourceFiles }]]);
+            },
+        );
+
+        it.each([
+            [
+                'replaces',
+                write('src/a.js', 'x', { expectedHash: LAST_HASH }),
+                [ACTOR_JSON, { name: 'src/a.js', format: 'TEXT', content: 'x' }],
+            ],
+            [
+                'edits',
+                edit('src/a.js', { oldText: 'last', newText: 'new' }),
+                [ACTOR_JSON, { name: 'src/a.js', format: 'TEXT', content: 'new();\n' }],
+            ],
+            ['deletes', remove('src/a.js', LAST_HASH), [ACTOR_JSON]],
+        ])(
+            '%s a file stored twice by its last entry, with neither stored entry left',
+            async (_, operation, sourceFiles) => {
+                mockFiles(FIRST, ACTOR_JSON, LAST);
+
+                await callTool({ operations: [operation] });
+
+                expect(versionUpdateMock.mock.calls).toStrictEqual([[{ sourceType: 'SOURCE_FILES', sourceFiles }]]);
+            },
+        );
+
+        it('compares expectedHash of a file stored twice with its last entry (HASH_MISMATCH)', async () => {
+            mockFiles(FIRST, ACTOR_JSON, LAST);
+
+            const text = await callToolExpectingUserError({
+                operations: [remove('src/a.js', sha256Prefix(FIRST.content))],
+            });
+
+            expect(text).toBe(
+                `${failedWith(0, 'delete', 'src/a.js', 'HASH_MISMATCH')} ` +
+                    `src/a.js has hash ${LAST_HASH}, not ${sha256Prefix(FIRST.content)}.`,
+            );
+        });
+
+        it('takes the revision get-actor-version returns for such a version, and sends no PUT when nothing changes', async () => {
+            mockFiles(UNNORMALIZED, FIRST, ACTOR_JSON, LAST, EMPTY_INIT, NO_CONTENT, FOLDER);
+            const revision = await readRevision();
+
+            const unchanged = await callTool({ expectedRevision: revision, operations: [] });
+            const rewritten = await callTool({
+                expectedRevision: revision,
+                operations: [write('src/util.js', UNNORMALIZED.content, { expectedHash: UNNORMALIZED_HASH })],
+            });
+
+            expect(unchanged.structuredContent).toEqual({ revision, changed: false, changes: [] });
+            expect(rewritten.structuredContent).toEqual({ revision, changed: false, changes: [] });
+            expect(versionUpdateMock).not.toHaveBeenCalled();
+
+            const written = await callTool({ expectedRevision: revision, operations: [write('src/b.js', 'b')] });
+
+            expect(written.structuredContent.changes).toEqual([
+                { path: 'src/b.js', action: 'created', hash: sha256Prefix('b') },
+            ]);
+            expect(versionUpdateMock).toHaveBeenCalledTimes(1);
+        });
+
+        it('treats an entry with folder false as a file', async () => {
+            mockFiles({ name: 'src/x.js', folder: false, format: 'TEXT', content: 'x();\n' });
+
+            const result = await callTool({ operations: [edit('src/x.js', { oldText: 'x()', newText: 'y()' })] });
+
+            expect(getPutFiles()).toStrictEqual([{ name: 'src/x.js', format: 'TEXT', content: 'y();\n' }]);
+            expect(result.structuredContent.changes).toEqual([
+                { path: 'src/x.js', action: 'updated', hash: sha256Prefix('y();\n') },
+            ]);
+        });
+    });
+
     describe('PUT body', () => {
         it.each([
             ['write', write('src/new.js', 'x')],
@@ -366,6 +564,31 @@ describe('update-actor-version', () => {
                 ],
             ]);
             expect(buildMock.mock.calls).toEqual([['0.2', { useCache: true }]]);
+        });
+
+        it('matches the version number as a string, so 0.10 is not 0.1', async () => {
+            const mainV10 = { name: 'src/main.js', format: 'TEXT', content: 'console.log("v10");\n' };
+            actorGetMock.mockResolvedValue({
+                id: 'actor-1',
+                name: 'my-actor',
+                username: 'john',
+                versions: [mockVersion(), mockVersion({ versionNumber: '0.10', sourceFiles: [mainV10] })],
+            });
+
+            await callTool({
+                versionNumber: '0.10',
+                operations: [edit('src/main.js', { oldText: 'v10', newText: 'v11' })],
+            });
+
+            expect(versionMock.mock.calls).toEqual([['0.10']]);
+            expect(versionUpdateMock.mock.calls).toStrictEqual([
+                [
+                    {
+                        sourceType: 'SOURCE_FILES',
+                        sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: 'console.log("v11");\n' }],
+                    },
+                ],
+            ]);
         });
     });
 
@@ -486,6 +709,68 @@ describe('update-actor-version', () => {
                 action: 'created',
                 hash: sha256Prefix(Buffer.from([1, 2, 3])),
             });
+        });
+
+        it('stores a write with no encoding over a UTF-8 file stored as BASE64 as TEXT, with the content as sent', async () => {
+            const readme = { name: 'README.md', format: 'BASE64', content: Buffer.from('# Hi\n').toString('base64') };
+            mockFiles(readme, MAIN_JS);
+
+            const result = await callTool({
+                operations: [write('README.md', '# Bye\n', { expectedHash: sha256Prefix('# Hi\n') })],
+            });
+
+            expect(getPutFiles()).toStrictEqual([{ name: 'README.md', format: 'TEXT', content: '# Bye\n' }, MAIN_JS]);
+            expect(result.structuredContent.changes).toEqual([
+                { path: 'README.md', action: 'updated', hash: sha256Prefix('# Bye\n') },
+            ]);
+        });
+
+        it.each([
+            ['no encoding', {}],
+            ['encoding utf8', { encoding: 'utf8' }],
+        ])('stores text sent with %s byte for byte', async (_, extra) => {
+            const content = '\uFEFFline one  \r\nn\u00e1zev = "🙂"\n\tend\r';
+
+            const result = await callTool({ operations: [write('src/win.js', content, extra)] });
+
+            expect(getPutFiles().at(-1)).toStrictEqual({ name: 'src/win.js', format: 'TEXT', content });
+            expect(result.structuredContent.changes).toEqual([
+                { path: 'src/win.js', action: 'created', hash: sha256Prefix(Buffer.from(content)) },
+            ]);
+        });
+
+        it('stores a non-ASCII path as sent, with the revision get-actor-version reads, and takes its NFD form as another file', async () => {
+            const nfcPath = 'src/název.js';
+            const nfdPath = 'src/název.js';
+            mockFiles(MAIN_JS);
+
+            const result = await callTool({ operations: [write(nfcPath, 'x')] });
+            const putFiles = getPutFiles();
+            mockFiles(...putFiles);
+
+            expect(putFiles).toStrictEqual([MAIN_JS, { name: nfcPath, format: 'TEXT', content: 'x' }]);
+            expect(result.structuredContent.revision).toBe(await readRevision());
+
+            versionUpdateMock.mockClear();
+            const nfd = await callTool({ operations: [write(nfdPath, 'y')] });
+
+            expect(getPutFiles()).toStrictEqual([...putFiles, { name: nfdPath, format: 'TEXT', content: 'y' }]);
+            expect(nfd.structuredContent.changes).toEqual([
+                { path: nfdPath, action: 'created', hash: sha256Prefix('y') },
+            ]);
+        });
+
+        it('writes the first file of a version with no files', async () => {
+            mockFiles();
+
+            const result = await callTool({ operations: [write('a.js', 'a')] });
+
+            expect(versionUpdateMock.mock.calls).toStrictEqual([
+                [{ sourceType: 'SOURCE_FILES', sourceFiles: [{ name: 'a.js', format: 'TEXT', content: 'a' }] }],
+            ]);
+            expect(result.structuredContent.changes).toEqual([
+                { path: 'a.js', action: 'created', hash: sha256Prefix('a') },
+            ]);
         });
 
         it('saves an empty file and warns that the build skips it', async () => {
@@ -625,6 +910,61 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'edit', 'src/main.js', 'NO_MATCH')} oldText of edits[1] is not in the file.`,
+            );
+        });
+
+        it('reports an oldText that the edits before it made match twice (MULTIPLE_MATCHES)', async () => {
+            const text = await callToolExpectingUserError({
+                operations: [
+                    edit(
+                        'src/main.js',
+                        { oldText: 'export {};', newText: 'console.log(a);\nexport {};' },
+                        { oldText: 'console.log(a);', newText: 'console.log(b);' },
+                    ),
+                ],
+            });
+
+            expect(text).toBe(
+                `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
+                    'oldText of edits[1] matches more than once; add surrounding lines so it matches once.',
+            );
+        });
+
+        it('applies an oldText that matched twice before the edits before it removed one match', async () => {
+            mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'a();\nx();\nb();\nx();\n' });
+
+            await callTool({
+                operations: [
+                    edit(
+                        'src/main.js',
+                        { oldText: 'b();\nx();\n', newText: 'b();\n' },
+                        { oldText: 'x();', newText: 'y();' },
+                    ),
+                ],
+            });
+
+            expect(getPutFiles()).toStrictEqual([
+                { name: 'src/main.js', format: 'TEXT', content: 'a();\ny();\nb();\n' },
+            ]);
+        });
+
+        it('edits a file with a binary extension stored as TEXT', async () => {
+            mockFiles({ name: 'data/notes.dat', format: 'TEXT', content: 'a=1\n' });
+
+            await callTool({ operations: [edit('data/notes.dat', { oldText: 'a=1', newText: 'a=2' })] });
+
+            expect(getPutFiles()).toStrictEqual([{ name: 'data/notes.dat', format: 'TEXT', content: 'a=2\n' }]);
+        });
+
+        it('refuses to edit a BASE64 file with a binary extension even when its bytes are UTF-8 (NOT_TEXT)', async () => {
+            mockFiles({ name: 'assets/x.png', format: 'BASE64', content: Buffer.from('hello').toString('base64') });
+
+            const text = await callToolExpectingUserError({
+                operations: [edit('assets/x.png', { oldText: 'hello', newText: 'bye' })],
+            });
+
+            expect(text).toBe(
+                `${failedWith(0, 'edit', 'assets/x.png', 'NOT_TEXT')} assets/x.png is not UTF-8 text; replace it with a write.`,
             );
         });
 
@@ -796,9 +1136,31 @@ describe('update-actor-version', () => {
                 operations: [{ type: 'delete', path: 'src/main.js', expectedHash: MAIN_JS_HASH }],
             });
 
-            expect(getPutFiles()).toEqual([FOLDER, ACTOR_JSON, LOGO]);
-            expect(result.structuredContent.changes).toEqual([{ path: 'src/main.js', action: 'deleted' }]);
+            expect(getPutFiles()).toStrictEqual([FOLDER, ACTOR_JSON, LOGO]);
+            // No other key: a deleted file is not named as an empty one.
+            expect(result.structuredContent).toStrictEqual({
+                revision: expect.stringMatching(/^[0-9a-f]{16}$/),
+                changed: true,
+                changes: [{ path: 'src/main.js', action: 'deleted' }],
+            });
             expectSchemaConformingStructuredContent(result, updateActorVersionToolOutputSchema);
+        });
+
+        it('deletes the last file, leaving no files and the folder entries', async () => {
+            mockFiles(MAIN_JS, FOLDER);
+
+            const result = await callTool({ operations: [remove('src/main.js', MAIN_JS_HASH)] });
+
+            expect(versionUpdateMock.mock.calls).toStrictEqual([
+                [{ sourceType: 'SOURCE_FILES', sourceFiles: [FOLDER] }],
+            ]);
+            expect(result.structuredContent.changes).toEqual([{ path: 'src/main.js', action: 'deleted' }]);
+
+            mockFiles(MAIN_JS);
+            versionUpdateMock.mockClear();
+            await callTool({ operations: [remove('src/main.js', MAIN_JS_HASH)] });
+
+            expect(versionUpdateMock.mock.calls).toStrictEqual([[{ sourceType: 'SOURCE_FILES', sourceFiles: [] }]]);
         });
 
         it('refuses a stale hash (HASH_MISMATCH) and a missing file (FILE_NOT_FOUND)', async () => {
@@ -1038,6 +1400,20 @@ describe('update-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
         });
 
+        it('reports REVISION_MISMATCH before an operation that would fail', async () => {
+            const revision = await readRevision();
+
+            const text = await callToolExpectingUserError({
+                expectedRevision: 'aaaaaaaaaaaaaaaa',
+                operations: [write('src/main.js', 'x'), remove('src/none.js', MAIN_JS_HASH)],
+            });
+
+            expect(text).toBe(
+                'Nothing was written: expectedRevision failed with REVISION_MISMATCH. ' +
+                    `The version's revision is ${revision}, not aaaaaaaaaaaaaaaa.`,
+            );
+        });
+
         it('sends no PUT for no operations', async () => {
             const result = await callTool({ operations: [] });
 
@@ -1187,6 +1563,18 @@ describe('update-actor-version', () => {
             expect(versionMock).not.toHaveBeenCalled();
             expect(buildMock).not.toHaveBeenCalled();
         });
+
+        it.each(['actor-1', 'john~my-actor'])(
+            'names the Actor by the full name in its document when given as %s',
+            async (actor) => {
+                const result = await callTool({ actor, operations: [write('a.js', 'a')] });
+
+                expect(actorMock.mock.calls).toEqual([[actor], ['actor-1']]);
+                expect(result.content[1].text).toBe(
+                    'Updated version 0.1 of john/my-actor.\nRuns use these files once the version is built.',
+                );
+            },
+        );
 
         it('refuses a version the Actor does not have', async () => {
             const text = await callToolExpectingUserError({ versionNumber: '0.2', operations: [write('a.js', 'a')] });
@@ -1407,6 +1795,22 @@ describe('update-actor-version', () => {
                 finishedAt: null,
             });
             expect(result.content[1].text).toContain(`Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET}`);
+            expect(result.content).toHaveLength(2);
+            expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+        });
+
+        it('adds the build Console link for an Apify Console session', async () => {
+            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+            const result = await callToolInConsole({ autoBuild: true, operations: [write('b.js', 'b')] });
+
+            const consoleUrl = 'https://console.apify.com/actors/actor-1/builds/0.1.5';
+            expectSchemaConformingStructuredContent(result, updateActorVersionToolOutputSchema);
+            expect(getUserInfoCached).toHaveBeenCalledWith('apify_ui_test', stubClient);
+            expect(result.structuredContent.build?.apifyConsoleUrl).toBe(consoleUrl);
+            expect(result.content).toHaveLength(3);
+            expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+            expect(result.content[2].text).toBe(`Apify Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}`);
         });
 
         it('starts a build when nothing changed', async () => {
