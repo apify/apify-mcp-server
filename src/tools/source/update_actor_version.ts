@@ -61,7 +61,7 @@ const operationArgs = z.object({
         .string()
         .optional()
         .describe(
-            "write over an existing file, and delete: the file's hash from the version listing. Leave it out to create a new file.",
+            "write over an existing file, and delete: the file's hash from the version listing. Leave it out to create a new file. An edit checks it when given.",
         ),
     edits: z
         .array(
@@ -202,6 +202,7 @@ function applyOperation(
     }
     if (edits === undefined) throw new UserInputError(`${label} needs edits.`);
     const existing = findFile(files, path, label);
+    if (expectedHash !== undefined) validateHash(existing, expectedHash, label);
     // The same rule get-actor-version returns text by, so a file it returned as utf8 can be edited.
     if (existing.encoding !== 'utf8') {
         const detail = `${path} is not UTF-8 text; replace it with a write.`;
@@ -249,7 +250,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
         Change files of an Actor version in one call: write, edit, or delete them. Files the call does not mention stay as they are.
         The operations apply in order to a fresh read of the version and are saved together; when any of them fails, nothing is saved.
         - write {path, content, encoding?}: creates a file, or replaces one given its expectedHash.
-        - edit {path, edits: [{oldText, newText}]}: replaces text in a UTF-8 file. Each oldText must match exactly once, byte for byte.
+        - edit {path, edits: [{oldText, newText}], expectedHash?}: replaces text in a UTF-8 file. Each oldText must match exactly once, byte for byte.
         - delete {path, expectedHash}: removes a file. To rename a file, delete it and write it at the new path.
         expectedHash and expectedRevision take the hash and revision from the version listing. A failed check names the operation, the file, and one of FILE_EXISTS, FILE_NOT_FOUND, HASH_MISMATCH, NO_MATCH, MULTIPLE_MATCHES, NOT_TEXT, or REVISION_MISMATCH; read the file again and retry.
         Binary files take base64 content with encoding base64; files with a binary extension such as .png default to it.

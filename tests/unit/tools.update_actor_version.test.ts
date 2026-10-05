@@ -997,6 +997,41 @@ describe('update-actor-version', () => {
             ]);
         });
 
+        it('refuses an edit given a stale expectedHash (HASH_MISMATCH)', async () => {
+            const text = await callToolExpectingUserError({
+                autoBuild: true,
+                operations: [
+                    {
+                        ...edit('src/main.js', { oldText: 'const a = 1;', newText: 'const a = 2;' }),
+                        expectedHash: '0000000000000000',
+                    },
+                ],
+            });
+
+            expect(text).toBe(
+                `${failedWith(0, 'edit', 'src/main.js', 'HASH_MISMATCH')} src/main.js has hash ${MAIN_JS_HASH}, not 0000000000000000.`,
+            );
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            ['lower', MAIN_JS_HASH],
+            ['upper', MAIN_JS_HASH.toUpperCase()],
+        ])('edits a file given its current hash in %s case', async (_, expectedHash) => {
+            await callTool({
+                operations: [
+                    { ...edit('src/main.js', { oldText: 'const a = 1;', newText: 'const a = 2;' }), expectedHash },
+                ],
+            });
+
+            expect(getPutFiles()).toStrictEqual([
+                FOLDER,
+                ACTOR_JSON,
+                LOGO,
+                { name: 'src/main.js', format: 'TEXT', content: 'const a = 2;\nconsole.log(a);\nexport {};\n' },
+            ]);
+        });
+
         it('reports an oldText that is not in the file (NO_MATCH)', async () => {
             const text = await callToolExpectingUserError({
                 operations: [edit('src/main.js', { oldText: 'zzz', newText: 'y' })],
