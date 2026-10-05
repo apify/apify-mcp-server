@@ -1109,7 +1109,7 @@ describe('update-actor-version', () => {
             );
         });
 
-        it('retries an LF oldText as CRLF in a file with only CRLF line breaks', async () => {
+        it('takes LF in oldText and newText as CRLF in a file with only CRLF line breaks', async () => {
             mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'one\r\ntwo\r\nthree\r\n' });
 
             await callTool({ operations: [edit('src/main.js', { oldText: 'one\ntwo\n', newText: '1\n2\n' })] });
@@ -1117,7 +1117,7 @@ describe('update-actor-version', () => {
             expect(getPutFiles()).toEqual([{ name: 'src/main.js', format: 'TEXT', content: '1\r\n2\r\nthree\r\n' }]);
         });
 
-        it('converts LF in newText to CRLF on the retry, and keeps the CRLF already in it', async () => {
+        it('converts LF in newText to CRLF, and keeps the CRLF already in it', async () => {
             mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'one\r\ntwo\r\nthree\r\n' });
 
             await callTool({ operations: [edit('src/main.js', { oldText: 'two\nthree', newText: 'a\r\nb\nc' })] });
@@ -1125,7 +1125,7 @@ describe('update-actor-version', () => {
             expect(getPutFiles()).toEqual([{ name: 'src/main.js', format: 'TEXT', content: 'one\r\na\r\nb\r\nc\r\n' }]);
         });
 
-        it('requires a retried oldText to match once', async () => {
+        it('requires an oldText taken as CRLF to match once', async () => {
             mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'a\r\nb\r\na\r\nb\r\n' });
 
             const text = await callToolExpectingUserError({
@@ -1135,33 +1135,51 @@ describe('update-actor-version', () => {
             expect(text).toContain(failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES'));
         });
 
-        it('does not retry an oldText that matches as given in a file with only CRLF line breaks', async () => {
+        it('takes an oldText that starts with LF as CRLF, so the edit leaves no lone CR', async () => {
             mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'one\r\ntwo\r\n' });
 
             await callTool({ operations: [edit('src/main.js', { oldText: '\ntwo', newText: 'X' })] });
 
-            // Byte for byte: the CR before the matched LF stays.
-            expect(getPutFiles()).toEqual([{ name: 'src/main.js', format: 'TEXT', content: 'one\rX\r\n' }]);
+            expect(getPutFiles()).toEqual([{ name: 'src/main.js', format: 'TEXT', content: 'oneX\r\n' }]);
         });
 
-        it('does not retry an oldText without a line break, so LF in its newText stays LF', async () => {
+        it('converts LF in newText to CRLF when oldText has no line break, so line endings stay CRLF', async () => {
             mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'one\r\ntwo\r\n' });
 
             await callTool({ operations: [edit('src/main.js', { oldText: 'two', newText: 'two\nmore' })] });
 
-            expect(getPutFiles()).toEqual([{ name: 'src/main.js', format: 'TEXT', content: 'one\r\ntwo\nmore\r\n' }]);
+            expect(getPutFiles()).toEqual([{ name: 'src/main.js', format: 'TEXT', content: 'one\r\ntwo\r\nmore\r\n' }]);
         });
 
-        it('does not retry an oldText that has a CR', async () => {
+        it('takes the LF in an oldText that also has CRLF as CRLF', async () => {
             mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'one\r\ntwo\r\n' });
 
-            const text = await callToolExpectingUserError({
-                operations: [edit('src/main.js', { oldText: 'one\r\ntwo\n', newText: 'x' })],
+            await callTool({ operations: [edit('src/main.js', { oldText: 'one\r\ntwo\n', newText: 'x' })] });
+
+            expect(getPutFiles()).toEqual([{ name: 'src/main.js', format: 'TEXT', content: 'x' }]);
+        });
+
+        it('keeps taking LF as CRLF after an earlier edit of the operation removed every line break', async () => {
+            mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'a\r\nb\r\n' });
+
+            await callTool({
+                operations: [
+                    edit('src/main.js', { oldText: 'a\nb\n', newText: 'ab' }, { oldText: 'ab', newText: 'a\nc\n' }),
+                ],
             });
 
-            expect(text).toBe(
-                `${failedWith(0, 'edit', 'src/main.js', 'NO_MATCH')} oldText of edits[0] is not in the file.`,
-            );
+            expect(getPutFiles()).toEqual([{ name: 'src/main.js', format: 'TEXT', content: 'a\r\nc\r\n' }]);
+        });
+
+        it.each([
+            ['no line break', 'one two', 'one two\nthree'],
+            ['mixed line endings', 'one\r\ntwo\n', 'one\r\ntwo\nthree\n'],
+        ])('keeps LF in newText as LF in a file with %s', async (_, content, edited) => {
+            mockFiles({ name: 'src/main.js', format: 'TEXT', content });
+
+            await callTool({ operations: [edit('src/main.js', { oldText: 'two', newText: 'two\nthree' })] });
+
+            expect(getPutFiles()).toEqual([{ name: 'src/main.js', format: 'TEXT', content: edited }]);
         });
 
         it('does not convert line endings in a file with mixed line endings', async () => {

@@ -142,10 +142,11 @@ function convertToCrlf(text: string): string {
 
 /**
  * The text after the edits, each applied to the text the previous ones left. Each oldText must match exactly once,
- * byte for byte. The one exception: in a file with only CRLF line breaks, an LF oldText that misses is retried with
- * oldText and newText converted to CRLF, since models write LF.
+ * byte for byte. The one exception: in a file with only CRLF line breaks, LF in oldText and newText is taken as CRLF,
+ * since models write LF. Matched as given, such an LF could split a CRLF, and inserted, it would mix line endings.
  */
 function applyTextEdits(originalText: string, edits: readonly TextEdit[], label: string): string {
+    const isCrlfFile = hasOnlyCrlfLineBreaks(originalText);
     let text = originalText;
     for (const [editIndex, edit] of edits.entries()) {
         // A lone surrogate can match half of a character, and UTF-8 stores it as U+FFFD.
@@ -154,13 +155,8 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
                 `${label} has a lone UTF-16 surrogate in edits[${editIndex}], which UTF-8 cannot store.`,
             );
         }
-        const isCrlfRetry =
-            !text.includes(edit.oldText) &&
-            edit.oldText.includes('\n') &&
-            !edit.oldText.includes('\r') &&
-            hasOnlyCrlfLineBreaks(text);
-        const oldText = isCrlfRetry ? convertToCrlf(edit.oldText) : edit.oldText;
-        const newText = isCrlfRetry ? convertToCrlf(edit.newText) : edit.newText;
+        const oldText = isCrlfFile ? convertToCrlf(edit.oldText) : edit.oldText;
+        const newText = isCrlfFile ? convertToCrlf(edit.newText) : edit.newText;
         const offset = text.indexOf(oldText);
         if (offset === -1) {
             const detail = `oldText of edits[${editIndex}] is not in the file.`;
