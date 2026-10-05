@@ -580,6 +580,22 @@ describe('get-actor-run default response', () => {
         expect(listKeysCalls()).toHaveLength(1);
     });
 
+    // Non-prod platforms assign a different Actor ID; tip pilot must still match on full name.
+    it('fetches TIP for apify/rag-web-browser when the Actor ID is not the production one', async () => {
+        const { client, getRecordCalls } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'Use a specialized Actor.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client, 'fK8Y6xzrWBKyFbbLY')),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({ message: 'Use a specialized Actor.', level: 'info' });
+        expect(getRecordCalls()).toBe(1);
+    });
+
     it.each([false, true])(
         'skips TIP reads for another Actor when the key page is truncated=%s',
         async (isTruncated) => {

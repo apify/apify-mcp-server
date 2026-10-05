@@ -8,6 +8,7 @@ import {
     HELPER_TOOLS,
     KV_KEYS_LIMIT,
     NARROW_OUTPUT_HINT,
+    RAG_WEB_BROWSER,
     TIP_MESSAGE_LIMIT,
 } from '../../const.js';
 import { buildActorRunWidgetMeta } from '../../resources/widgets.js';
@@ -27,8 +28,11 @@ import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 /** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
 const TIP_KVS_KEY = 'TIP';
 
-/** Limit the TIP pilot to RAG Web Browser, including calls made by Actor ID. */
-const RAG_WEB_BROWSER_ID = '3ox4R101TgZz67sLr';
+/**
+ * Production Actor ID for {@link RAG_WEB_BROWSER}. Non-prod platforms assign a different ID to
+ * the same Actor, so the tip pilot also matches on the env-stable full name.
+ */
+const RAG_WEB_BROWSER_PROD_ID = '3ox4R101TgZz67sLr';
 
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
 export const WIDGET_NO_POLL_NEXT_STEP =
@@ -974,7 +978,7 @@ export async function fetchActorRunData(params: {
 
     const defaultKv = keyValueStores?.default;
     const tip =
-        isTerminal && run.actId === RAG_WEB_BROWSER_ID && defaultKv
+        isTerminal && defaultKv && (run.actId === RAG_WEB_BROWSER_PROD_ID || actorName === RAG_WEB_BROWSER)
             ? await fetchRunTip(client, defaultKv, mcpSessionId)
             : undefined;
 
