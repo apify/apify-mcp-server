@@ -913,6 +913,22 @@ describe('update-actor-version', () => {
             );
         });
 
+        it.each([
+            ['});\n});\n});\n', '});\n});'],
+            ['aaa\n', 'aa'],
+        ])('reports an oldText whose matches overlap in %j (MULTIPLE_MATCHES)', async (content, oldText) => {
+            mockFiles({ name: 'src/main.js', format: 'TEXT', content });
+
+            const text = await callToolExpectingUserError({
+                operations: [edit('src/main.js', { oldText, newText: '' })],
+            });
+
+            expect(text).toBe(
+                `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
+                    'oldText of edits[0] matches more than once; add surrounding lines so it matches once.',
+            );
+        });
+
         it('reports an oldText that the edits before it made match twice (MULTIPLE_MATCHES)', async () => {
             const text = await callToolExpectingUserError({
                 operations: [

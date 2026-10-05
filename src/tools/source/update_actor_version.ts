@@ -157,7 +157,8 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
             const detail = `oldText of edits[${editIndex}] is not in the file.`;
             throw buildPreconditionError(label, PRECONDITION_REASON.NO_MATCH, detail);
         }
-        if (text.includes(oldText, offset + oldText.length)) {
+        // From the next character, so two matches that overlap count as two.
+        if (text.includes(oldText, offset + 1)) {
             const detail = `oldText of edits[${editIndex}] matches more than once; add surrounding lines so it matches once.`;
             throw buildPreconditionError(label, PRECONDITION_REASON.MULTIPLE_MATCHES, detail);
         }
