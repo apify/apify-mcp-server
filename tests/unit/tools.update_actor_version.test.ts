@@ -1271,6 +1271,24 @@ describe('update-actor-version', () => {
             expectSchemaConformingStructuredContent(result, updateActorVersionToolOutputSchema);
         });
 
+        it('names no deleted empty file as empty', async () => {
+            mockFiles(MAIN_JS, EMPTY_INIT, NO_CONTENT);
+
+            const result = await callTool({
+                operations: [remove('src/__init__.py', sha256Prefix('')), remove('src/blank.js', sha256Prefix(''))],
+            });
+
+            expect(getPutFiles()).toStrictEqual([MAIN_JS]);
+            expect(result.structuredContent).toStrictEqual({
+                revision: buildFilesRevision([{ path: 'src/main.js', hash: MAIN_JS_HASH }]),
+                changed: true,
+                changes: [
+                    { path: 'src/__init__.py', action: 'deleted' },
+                    { path: 'src/blank.js', action: 'deleted' },
+                ],
+            });
+        });
+
         it('deletes the last file, leaving no files and the folder entries', async () => {
             mockFiles(MAIN_JS, FOLDER);
 
