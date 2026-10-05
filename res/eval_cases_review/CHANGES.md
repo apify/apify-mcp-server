@@ -11,7 +11,7 @@ Review material for #1411. Delete once the cases are migrated into the live data
 | `retired_pr_cases.json` | the 125 live PR cases being retired, for reference |
 | `retired_merge_cases.json` | the 70 live merge cases being retired, for reference |
 | `current_status.json` | per case: passes everywhere, or which models it fails on |
-| `api_tools_pr_cases.json` | 21 `tool-call` cases for the Apify API tools, promoted in two batches: after #1444 merges, and the write cases after #1445 |
+| `api_tools_pr_cases.json` | 21 `tool-call` cases for the Apify API tools, promoted in two batches once #1423 is on master: after #1444 merges, and the write cases after #1445 |
 | `api_tools_merge_cases.json` | 15 `agent` cases for the Apify API tools, on the same schedule |
 | [`API_TOOLS.md`](./API_TOOLS.md) | the API tool cases: design, coverage, fixtures, probes, and staging. Uncalibrated, and not compared below: no v1 case covers these tools |
 
