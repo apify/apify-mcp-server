@@ -33,6 +33,12 @@ export const DATASET_SIZE_HINT_BYTES = 50000;
 /** Shared steer appended to large-output hints so the model narrows instead of refetching everything. */
 export const NARROW_OUTPUT_HINT = 'narrow with fields= or page with offset';
 
+/** Cap on `storages.keyValueStores.default.keys` array length. */
+export const KV_KEYS_LIMIT = 50;
+
+/** Cap on a TIP record's `message` length. */
+export const TIP_MESSAGE_LIMIT = 300;
+
 // MCP Server
 /** When `false`, `resolveServerMode('auto', ...)` forces {@link SERVER_MODE.DEFAULT} regardless of client capabilities. */
 export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;

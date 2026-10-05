@@ -18,6 +18,7 @@ import {
     CATEGORY_NAMES,
     getCategoryTools,
     toolCategoriesEnabledByDefault,
+    UNCATEGORIZED_TOOLS,
     WIDGET_BY_BASE_TOOL,
 } from '../tools/registry.js';
 import { abortActorRun } from '../tools/runs/abort_actor_run.js';
@@ -48,6 +49,7 @@ const ALL_INTERNAL_TOOL_NAMES: Set<string> = (() => {
     for (const name of CATEGORY_NAMES) {
         for (const tool of categories[name]) names.add(tool.name);
     }
+    for (const tool of UNCATEGORIZED_TOOLS) names.add(tool.name);
     // Widgets live in no category — ALL_WIDGET_TOOLS covers every widget, paired or not.
     for (const widget of ALL_WIDGET_TOOLS) names.add(widget.name);
     return names;
@@ -208,6 +210,7 @@ export function getToolsForServerMode(
             toolsByName.set(tool.name, tool);
         }
     }
+    for (const tool of UNCATEGORIZED_TOOLS) toolsByName.set(tool.name, tool);
     // Widgets are apps-only and not in any category; include every widget (paired or not) for
     // direct `?tools=` selection.
     if (mode === SERVER_MODE.APPS) {
