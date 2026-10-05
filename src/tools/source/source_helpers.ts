@@ -58,6 +58,7 @@ export function resolveVersion(
     actorSelector: string,
 ): ActorVersion & { versionNumber: string } {
     const versionNumbers = listVersionNumbers(actor);
+    if (versionNumbers.length === 0) throw new UserInputError(`Actor '${actorSelector}' has no versions.`);
     if (requestedVersionNumber === undefined && versionNumbers.length !== 1) {
         // The source type and build tag tell the caller which version holds the code it is after.
         const versions = actor.versions

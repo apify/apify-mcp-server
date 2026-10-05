@@ -839,6 +839,14 @@ describe('get-actor-version', () => {
             },
         );
 
+        it.each([{}, { versionNumber: '0.1' }])('reports an Actor with no versions, given %j', async (args) => {
+            actorGetMock.mockResolvedValue(mockActor([]));
+
+            const text = await callToolExpectingUserError(args);
+
+            expect(text).toBe("Actor 'john/my-actor' has no versions.");
+        });
+
         it('refuses a version the Actor does not have', async () => {
             const text = await callToolExpectingUserError({ versionNumber: '9.9' });
 

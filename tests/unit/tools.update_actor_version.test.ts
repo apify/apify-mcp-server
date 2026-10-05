@@ -1789,14 +1789,19 @@ describe('update-actor-version', () => {
         });
 
         it.each([
-            ['no versions', []],
-            ['only a version without a number', [{ sourceType: 'SOURCE_FILES', sourceFiles: [MAIN_JS] }]],
-        ])('needs versionNumber when the Actor has %s', async (_, versions) => {
+            ['an empty versions list', [], {}],
+            ['an empty versions list and a versionNumber', [], { versionNumber: '0.1' }],
+            ['only a version without a number', [{ sourceType: 'SOURCE_FILES', sourceFiles: [MAIN_JS] }], {}],
+        ])('says the Actor has no versions for %s', async (_, versions, extra) => {
             actorGetMock.mockResolvedValue({ id: 'actor-1', name: 'my-actor', username: 'john', versions });
 
-            const text = await callToolExpectingUserError({ autoBuild: true, operations: [write('a.js', 'a')] });
+            const text = await callToolExpectingUserError({
+                autoBuild: true,
+                operations: [write('a.js', 'a')],
+                ...extra,
+            });
 
-            expect(text).toBe('Specify versionNumber; this Actor has versions: .');
+            expect(text).toBe("Actor 'john/my-actor' has no versions.");
             expect(versionMock).not.toHaveBeenCalled();
             expect(buildMock).not.toHaveBeenCalled();
         });
