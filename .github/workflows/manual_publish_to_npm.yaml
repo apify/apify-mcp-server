@@ -57,3 +57,16 @@ jobs:
                 # `--no-git-checks` skips pnpm's working-tree/branch guards — release
                 # tags & branches are validated upstream by the release workflow.
                 run: pnpm publish --tag ${{ inputs.tag }} --no-git-checks
+            -   name: Wait until the version is on the registry
+                # npm scans each version before it becomes installable: "typically around five
+                # minutes ... up to 15 minutes or more" (https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/).
+                # Jobs that run after this workflow (smoke test, internal repo bump) install
+                # the version right away, so don't finish until the registry serves it.
+                run: |
+                    version=$(jq -r '.version' package.json)
+                    for i in $(seq 1 80); do
+                        curl -sf -o /dev/null "https://registry.npmjs.org/@apify%2factors-mcp-server/$version" && exit 0
+                        sleep 15
+                    done
+                    echo "::error::@apify/actors-mcp-server@$version is not on the registry after 20 minutes"
+                    exit 1
