@@ -84,8 +84,9 @@ function sha256Prefix(data: Buffer | string): string {
     return createHash('sha256').update(data).digest('hex').slice(0, 16);
 }
 
-function apiError(status: number, message: string, type = 'some-error'): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
+/** `attempt` counts apify-client's tries of the request, retries included. */
+function apiError(status: number, message: string, type = 'some-error', attempt = 1): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, attempt);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<CreateResult> {
@@ -544,6 +545,39 @@ describe('create-actor', () => {
         expect(actorsCreateMock).toHaveBeenCalledTimes(1);
         expect(actorMock).not.toHaveBeenCalled();
         expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('says an earlier attempt may have created the Actor when the platform refuses the name on a retried POST', async () => {
+        // apify-client retries a POST that timed out or got a 5xx, and the platform may have saved the attempt.
+        actorsCreateMock.mockRejectedValue(
+            apiError(409, 'Some other Actor already has this name ("my-actor").', 'actor-name-not-unique', 2),
+        );
+
+        const result = await callTool({ autoBuild: true, files: [ACTOR_JSON] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureHttpStatus: 409 }));
+        expect(result.structuredContent).toBeUndefined();
+        expect(result.content).toStrictEqual([
+            {
+                type: 'text',
+                text:
+                    'The platform refused the name my-actor as taken when the request was retried, so an earlier ' +
+                    'attempt of this call may have created the Actor. Read it with get-actor-version, as ' +
+                    'username/my-actor with your username, before calling create-actor again; if it holds the ' +
+                    'files you sent, this call created it.',
+            },
+        ]);
+        expect(actorsCreateMock).toHaveBeenCalledTimes(1);
+        expect(actorMock).not.toHaveBeenCalled();
+        expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('lets any other API error of a retried POST through unchanged', async () => {
+        const error = apiError(400, 'Invalid version number.', 'invalid-input', 2);
+        actorsCreateMock.mockRejectedValue(error);
+
+        await expect(callTool({ files: [ACTOR_JSON] })).rejects.toBe(error);
     });
 
     describe('autoBuild', () => {

@@ -1,14 +1,14 @@
 import type { ActorCollectionCreateOptions, ActorVersionSourceFile } from 'apify-client';
-import { ActorSourceType } from 'apify-client';
+import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE, HELPER_TOOLS } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
-import { respondAborted } from '../../utils/mcp.js';
+import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { createActorToolOutputSchema } from '../structured_output_schemas.js';
 import { buildFilesManifest, buildFilesRevision } from './source_files.js';
 import {
@@ -66,8 +66,9 @@ function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]
  * https://docs.apify.com/api/v2/actors-post
  *  /v2/actors
  *
- * One POST creates the Actor and its version together, so a failed call leaves nothing behind. The platform creates
- * it private and in the token's account.
+ * One POST creates the Actor and its version together, private and in the token's account. apify-client retries the
+ * POST after a network error, a timeout, a 429, or a 5xx, so when the platform saved an attempt it did not answer, the
+ * retry fails on the name that attempt took, and the call says the Actor may exist.
  */
 export const createActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -140,6 +141,19 @@ export const createActor: ToolEntry = Object.freeze({
                 summary: `Created the private Actor ${fullName}.`,
             });
         } catch (error) {
+            if (
+                error instanceof ApifyApiError &&
+                error.type === APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE &&
+                error.attempt > 1
+            ) {
+                return respondUserError(
+                    `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
+                        `attempt of this call may have created the Actor. Read it with ${HELPER_TOOLS.ACTOR_VERSION_GET}, ` +
+                        `as username/${parsed.name} with your username, before calling ${HELPER_TOOLS.ACTOR_CREATE} ` +
+                        'again; if it holds the files you sent, this call created it.',
+                    { httpStatus: error.statusCode },
+                );
+            }
             return respondToSourceToolError(error);
         }
     },
