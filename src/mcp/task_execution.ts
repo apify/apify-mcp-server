@@ -192,8 +192,12 @@ export async function executeToolAndUpdateTask(params: {
     };
 
     // Once a task is cancelled the spec forbids writing a result; every storage path
-    // must short-circuit here. `logSuffix` is concatenated after "Task was cancelled"
-    // so we keep the existing log format and the existing telemetry status per path.
+    // must short-circuit here. `status` says what the tool did, not that the client
+    // cancelled, matching the sync path: a tool that finished keeps SUCCEEDED (the work
+    // ran) and an error keeps its classified status (ABORTED only when the cancel caused it).
+    // The 402 and permission-approval paths pass ABORTED because no work ran; the sync path
+    // reports SOFT_FAIL for those.
+    // `logSuffix` is concatenated after "Task was cancelled".
     const skipIfTaskCancelled = async (
         logSuffix: string,
         status: ToolStatus,
