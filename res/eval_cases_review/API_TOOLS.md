@@ -13,7 +13,7 @@ calibration.
 | File | What |
 |---|---|
 | `api_tools_pr_cases.json` | 21 `tool-call` cases for `mcp-server-evals-pr`: 11 positive, 10 routing |
-| `api_tools_merge_cases.json` | 15 `agent` cases for `mcp-server-evals-merge`: 4 easy, 6 medium, 5 hard. 3 set `expectedErrors` |
+| `api_tools_merge_cases.json` | 15 `agent` cases for `mcp-server-evals-merge`: 4 easy, 6 medium, 5 hard. 6 set `expectedErrors` |
 | `evals/scripts/api_fixtures.ts` | Deletes leftovers, seeds the merge fixtures, and resets their state (`pnpm run evals:mcp-agent:api-fixtures`) |
 
 The JSON uses the flat shape and field order of `new_pr_cases.json` and `new_merge_cases.json`. `expectedErrors` goes
@@ -62,7 +62,8 @@ and above, and CI runs at the runner default of 8.
   with `apify-api-details` first, so search, details, and the call are all defensible first moves. So is a read before a
   write (`get-dataset`, `fetch-actor-details`, `apify-api-read`), and so is looking up an Actor that the query names
   without its username. `resurrect-run` and `sign-json` also accept the direct call: details on the exact path needs the
-  same knowledge as the call. The positive cases catch refusing or answering from memory; the 7 that accept a dedicated
+  same knowledge as the call. `sign-json` also accepts the docs tools, as `webhook-create-fields` does, since a docs
+  search finds the endpoint. The positive cases catch refusing or answering from memory; the 8 that accept a dedicated
   lookup do not catch a first call outside the API family.
 - **Lookups on the routing cases.** `api-loaded-build` accepts `fetch-actor-details` and `get-actor-build-list` next
   to `build-actor`, whose `actor` argument needs an ID or `username/name` the query does not give.
@@ -87,6 +88,11 @@ and above, and CI runs at the runner default of 8.
   read of `/v2/users/me/usage/monthly`; the reference narrows that by failing an answer that says the read failed and
   still gives a total. On `merge/api/env-var-missing-hard`, a read that 404s on a wrong `username~` prefix looks like a
   missing variable to the judge.
+- **Recovered lookups do not fail an item.** `webhooks-list-easy`, `env-vars-list-medium`, `webhook-test-medium`, and
+  `env-var-missing-hard` list `fetch-actor-details` in `expectedErrors`, so a failed Actor lookup the agent recovers
+  from does not fail an item the judge passes. `old-path-404-hard` lists `fetch-apify-docs`: on master it appends `.md`
+  to a docs link that already ends in `.md`, so it 404s on such links. Neither failure is what the cases measure. Drop
+  `fetch-apify-docs` once master fixes that.
 
 ## Coverage
 
@@ -94,7 +100,7 @@ and above, and CI runs at the runner default of 8.
 
 | Tool | Argument group or behavior | Cases |
 |---|---|---|
-| `apify-api-search` | `query`: finds an operation whose path the agent may not know | Exercised, not required: `pr/apify-api-search/resurrect-run`, `pr/apify-api-search/sign-json` (both also accept the direct call), `merge/api/webhook-test-medium`, `merge/api/browser-info-medium` |
+| `apify-api-search` | `query`: finds an operation whose path the agent may not know | Exercised, not required: `pr/apify-api-search/resurrect-run`, `pr/apify-api-search/sign-json` (both also accept the direct call, and `sign-json` the docs tools), `merge/api/webhook-test-medium`, `merge/api/browser-info-medium` |
 | | `query` from vague language | Exercised, not required: `merge/api/budget-vague-hard` |
 | | Recovery after a 404 | Exercised, not required: `merge/api/old-path-404-hard` (following the 404's closest paths is an equal route) |
 | | `limit` | Not covered. No user intent maps to a result count, and the default of 10 serves every case. Unit tests cover it. |
@@ -372,17 +378,17 @@ they are why some hard cases exist.
 CI reads the shared datasets live on every run. Upserted before #1444 is on master, these cases would run against a
 server without the `api` category, and the session would have no API tools:
 
-- **pr tier:** 7 of the 11 positive cases also accept a first call to a tool already on master (`fetch-actor-details`,
+- **pr tier:** 8 of the 11 positive cases also accept a first call to a tool already on master (`fetch-actor-details`,
   `get-dataset`, `get-dataset-list`, `get-actor-run`, or the docs tools), and the 10 routing cases pass trivially. The
   tier would likely stay above its 0.9 gate while measuring nothing about the API tools: against today's live pr dataset
-  (111 of 115 passing on a hosted run), 2 of those 7 passing give 123 of 136, a rate of 0.904. Only
-  `webhooks-on-account`, `spend-this-billing-cycle`, `monthly-spending-cap`, and `sign-json` would fail.
+  (111 of 115 passing on a hosted run), 2 of those 8 passing give 123 of 136, a rate of 0.904. Only
+  `webhooks-on-account`, `spend-this-billing-cycle`, and `monthly-spending-cap` would fail.
 - **merge tier:** most of the 15 cases fail. The tier stays above its 0.6 gate, but real regressions would hide behind
   expected failures, and the write cases would run without fixtures.
 
 Accepting `ReadMcpResourceTool` adds to the risk: the resource is on master already, so if `mcpToolsOnly` does not
-remove it (probe 22), the three read cases among those four could pass before #1444 through the resource too, which
-would hide the missing `api` category.
+remove it (probe 22), those three read cases could pass before #1444 through the resource too, which would hide the
+missing `api` category.
 
 Langfuse item ids are unique per project forever and cannot move between datasets, so the cases are calibrated in
 staging datasets under burned ids and promoted under the final ids:
@@ -489,7 +495,7 @@ and correct any fact the probes disprove:
 
 ```markdown
 The API family (21 `pr` items: 11 `pr/apify-api-*/*` and 10 routing items `pr/*/api-loaded-*` in
-category `apify-api-routing`; and `merge/api/*`, 15 items: 12 proper + 3 with `expectedErrors`)
+category `apify-api-routing`; and `merge/api/*`, 15 items: 9 proper + 6 with `expectedErrors`)
 covers the opt-in `api` tools: `apify-api-search`, `apify-api-details`, `apify-api-read`, and
 `apify-api-write`. A routing item's id names the dedicated tool that must win, as the rest of the
 `pr` ids name the tool they assert. Every item loads the same wide tool set,
@@ -501,7 +507,7 @@ renaming a dataset) must go to the API tools, and a task a dedicated tool does (
 dataset items, starting a build, creating a schedule) must not. The positive `pr` items accept an
 API lookup (`apify-api-search` or `apify-api-details`), the API call that does the task, or an API
 read before a write as the first call, since the read and write descriptions tell the agent to look
-an operation up first. Seven also accept a dedicated lookup (`fetch-actor-details` where the query
+an operation up first. Eight also accept a dedicated lookup (`fetch-actor-details` where the query
 names an Actor without its username, `get-dataset`, `get-dataset-list`, `get-actor-run`, or the docs
 tools), so they do not catch a first call outside the API family. Even `resurrect-run` and
 `sign-json` accept the direct call, so no item requires `apify-api-search` or `apify-api-details`.
@@ -509,7 +515,9 @@ The `expectedErrors` exemption is per tool, not per call, which leaves a known b
 `merge/api/old-path-404-hard` it also covers a failure of the follow-up read of
 `/v2/users/me/usage/monthly`, and its reference narrows that by failing an answer that says the read
 failed and still gives a total. On `merge/api/env-var-missing-hard`, a read that 404s on a wrong
-`username~` prefix looks like a missing variable to the judge.
+`username~` prefix looks like a missing variable to the judge. Four items exempt
+`fetch-actor-details`, so a failed Actor lookup the agent recovers from does not fail an item the
+judge passes.
 
 The `merge/api/*` items use fixed `eval-api-*` names and three permanent fixtures. The Actor
 `eval-api-actor` has only version 0.0, with `EVAL_REGION=eu-central-1` and the secret `EVAL_API_KEY`,

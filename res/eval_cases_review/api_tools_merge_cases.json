@@ -17,6 +17,9 @@
       "dev",
       "api"
     ],
+    "expectedErrors": [
+      "fetch-actor-details"
+    ],
     "mcpToolsOnly": true
   },
   {
@@ -96,6 +99,9 @@
       "dev",
       "api"
     ],
+    "expectedErrors": [
+      "fetch-actor-details"
+    ],
     "mcpToolsOnly": true
   },
   {
@@ -156,6 +162,9 @@
       "dev",
       "api"
     ],
+    "expectedErrors": [
+      "fetch-actor-details"
+    ],
     "mcpToolsOnly": true
   },
   {
@@ -163,7 +172,7 @@
     "category": "apify-api-read",
     "kind": "agent",
     "query": "did apify manage to deliver my last few webhook calls? just the three most recent ones",
-    "reference": "Delivery results are webhook dispatches. A read counts when it is a GET of an accepted path below, in any form (with or without a v2/ or /v2/ prefix, with or without query parameters), through apify-api-read or through the server's API resource (ReadMcpResourceTool with the https://api.apify.com/v2/... URI of that path) when the client offers it. PASS only if the agent read the account's webhook dispatches (GET /v2/webhook-dispatches, or the dispatches of each webhook at /v2/webhooks/{id}/dispatches, plus GET /v2/webhook-dispatches/{id} for a dispatch's calls when a list leaves them out) and the final answer reports the status of each of the three newest dispatches, with the HTTP response code where the dispatch has one, or says there are none. Asking for them newest first with limit 3 and desc, as query parameters or in the path's query string, is the expected call; reading more and reporting only the newest three is acceptable. FAIL if the agent builds its answer only from the webhook list's lastDispatch, which is at most one delivery per webhook, not the three newest; if it invents dispatches; or if it answers without a successful read.",
+    "reference": "Delivery results are webhook dispatches. The fixtures create no deliveries, though test deliveries from other items or earlier runs may exist, so any count is correct, zero included. A read counts when it is a GET of an accepted path below, in any form (with or without a v2/ or /v2/ prefix, with or without query parameters), through apify-api-read or through the server's API resource (ReadMcpResourceTool with the https://api.apify.com/v2/... URI of that path) when the client offers it. PASS only if the agent read the account's webhook dispatches (GET /v2/webhook-dispatches, or the dispatches of each webhook at /v2/webhooks/{id}/dispatches, plus GET /v2/webhook-dispatches/{id} for a dispatch's calls when a list leaves them out) and the final answer states how many it found, counting at most the three newest (zero, one, two, or three), and reports the status of each of those, with the HTTP response code where the dispatch has one. The judge cannot see the response, so do not fail a count or a status as unverifiable. Asking for them newest first with limit 3 and desc, as query parameters or in the path's query string, is the expected call; reading more and reporting only the newest three is acceptable. FAIL if the agent builds its answer only from the webhook list's lastDispatch, which is at most one delivery per webhook, not the three newest; if it answers without a successful read; if it invents deliveries, listing more than the count it states; or if it skips one it read, listing fewer than the count it states, or reporting fewer than three while leaving out a dispatch it fetched by ID (GET /v2/webhook-dispatches/{id}).",
     "maxTurns": 12,
     "tools": [
       "actors",
@@ -238,7 +247,8 @@
     ],
     "expectedErrors": [
       "apify-api-read",
-      "apify-api-details"
+      "apify-api-details",
+      "fetch-apify-docs"
     ],
     "mcpToolsOnly": true
   },
@@ -261,7 +271,8 @@
       "api"
     ],
     "expectedErrors": [
-      "apify-api-read"
+      "apify-api-read",
+      "fetch-actor-details"
     ],
     "mcpToolsOnly": true
   },

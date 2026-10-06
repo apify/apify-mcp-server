@@ -234,7 +234,9 @@
     "expectedTools": [
       "apify-api-search",
       "apify-api-details",
-      "apify-api-write"
+      "apify-api-write",
+      "search-apify-docs",
+      "fetch-apify-docs"
     ],
     "tools": [
       "actors",
