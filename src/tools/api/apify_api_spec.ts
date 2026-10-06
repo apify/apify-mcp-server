@@ -198,7 +198,7 @@ async function downloadApiOperationIndex(): Promise<Map<string, ApiOperation>> {
 }
 
 /**
- * The operation index, from the published spec, cached for an hour. Concurrent calls share one
+ * The operation index, from the published spec, cached for a day. Concurrent calls share one
  * download. A failed download throws and is not cached, and the next call tries again.
  */
 export async function fetchApiOperationIndex(): Promise<Map<string, ApiOperation>> {

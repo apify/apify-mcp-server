@@ -6,8 +6,9 @@ import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
+import { sendApifyApiRequest } from '../../apify_client.js';
 import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import { isApifyApiUri, isMaxContentLengthAbort, sendApifyApiRequest } from '../../resources/api_resources.js';
+import { isApifyApiUri, isMaxContentLengthAbort } from '../../resources/api_resources.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';

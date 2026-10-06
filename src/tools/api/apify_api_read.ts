@@ -15,13 +15,15 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const getParameters = hasTool(HELPER_TOOLS.API_DETAILS)
         ? `\nGet the operation's query parameters first with ${HELPER_TOOLS.API_DETAILS} and method GET.`
         : '';
+    const runActor = hasTool(HELPER_TOOLS.ACTOR_CALL) ? ` Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.` : '';
     return dedent`
         Send a GET request to the Apify API at a path, such as /v2/actor-runs/abc.
+        A GET can start a paid Actor run, as the synchronous run endpoints do.${runActor}
         ${API_CALL_DESCRIPTION}${findPath}${getParameters}
         Returns the response body as the API sends it, JSON with its data wrapper included; a body over
         ${MAX_INLINE_BYTES} bytes is not returned.
 
-        Example call: {"path": "/v2/datasets/abc/items", "query": {"format": "json", "limit": 10}}
+        Example call: {"path": "/v2/webhook-dispatches", "query": {"limit": 10, "desc": true}}
 
         USAGE:
         - Use for data no dedicated tool returns, such as webhooks, usage, and limits.

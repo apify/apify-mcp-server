@@ -3,11 +3,10 @@ import type {
     ReadResourceResult,
     TextResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { isAxiosError } from 'axios';
 
 import type { ApifyClient } from '../apify_client.js';
-import { getApifyAPIBaseUrl } from '../apify_client.js';
+import { getApifyAPIBaseUrl, sendApifyApiRequest } from '../apify_client.js';
 import { MAX_INLINE_BYTES } from '../const.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import { parseBaseMimeType } from '../tools/storage/storage_helpers.js';
@@ -143,21 +142,6 @@ export function isMaxContentLengthAbort(err: unknown): boolean {
     return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
 }
 
-/**
- * Sends one request, with no retries, through apify-client's axios instance, which adds the token and the
- * request-origin and payment headers. Check the URL with `isApifyApiUri` first and the status after: a
- * non-2xx response resolves. It skips `httpClient.call()`, which retries (a write could apply twice, and a
- * body over the size cap is downloaded again) and turns a streamed error body into a junk message; that
- * also skips its `HTTPS_PROXY` support and User-Agent. axios aborts a body over `MAX_INLINE_BYTES`
- * mid-stream (checked in axios 1.16.1), so it is never buffered whole.
- */
-export async function sendApifyApiRequest(
-    apifyClient: ApifyClient,
-    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal'>,
-): Promise<AxiosResponse<unknown>> {
-    return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
-}
-
 /** `charset` parameter of a Content-Type header, lowercased; `undefined` when absent. */
 function parseCharset(contentType: string | undefined): string | undefined {
     const match = /;\s*charset\s*=\s*"?([^";]+)"?/i.exec(contentType ?? '');
@@ -198,7 +182,8 @@ function parseApiErrorMessage(body: Buffer | undefined): string | undefined {
  * resource (see SEP-2164). A body over `MAX_INLINE_BYTES` is NOT a failure — it is a
  * successful read returning a download pointer.
  *
- * It makes one attempt through `sendApifyApiRequest`, which says why it skips `httpClient.call()`.
+ * It makes one attempt through `sendApifyApiRequest` (`../apify_client.ts`), which says why it skips
+ * `httpClient.call()`.
  */
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
     if (!isApifyApiUri(uri)) {
