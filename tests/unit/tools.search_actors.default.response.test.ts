@@ -205,12 +205,11 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
         const taggedApifyClient = mockApifyClient({ marker: 'tagged-client' });
 
-        await (searchActors as HelperTool).call({
-            ...stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+        await (searchActors as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, taggedApifyClient, {
                 loadedToolNames: [],
             }),
-            apifyClient: taggedApifyClient,
-        });
+        );
 
         expect(searchAgentSafeActors).toHaveBeenCalledWith(expect.objectContaining({ apifyClient: taggedApifyClient }));
     });
