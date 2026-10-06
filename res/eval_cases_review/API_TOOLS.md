@@ -13,7 +13,7 @@ calibration.
 | File | What |
 |---|---|
 | `api_tools_pr_cases.json` | 21 `tool-call` cases for `mcp-server-evals-pr`: 11 positive, 10 routing |
-| `api_tools_merge_cases.json` | 15 `agent` cases for `mcp-server-evals-merge`: 4 easy, 6 medium, 5 hard. 6 set `expectedErrors` |
+| `api_tools_merge_cases.json` | 15 `agent` cases for `mcp-server-evals-merge`: 4 easy, 6 medium, 5 hard. 9 set `expectedErrors` |
 | `evals/scripts/api_fixtures.ts` | Deletes leftovers, seeds the merge fixtures, and resets their state (`pnpm run evals:mcp-agent:api-fixtures`) |
 
 The JSON uses the flat shape and field order of `new_pr_cases.json` and `new_merge_cases.json`. `expectedErrors` goes
@@ -88,11 +88,15 @@ and above, and CI runs at the runner default of 8.
   read of `/v2/users/me/usage/monthly`; the reference narrows that by failing an answer that says the read failed and
   still gives a total. On `merge/api/env-var-missing-hard`, a read that 404s on a wrong `username~` prefix looks like a
   missing variable to the judge.
-- **Recovered lookups do not fail an item.** `webhooks-list-easy`, `env-vars-list-medium`, `webhook-test-medium`, and
-  `env-var-missing-hard` list `fetch-actor-details` in `expectedErrors`, so a failed Actor lookup the agent recovers
-  from does not fail an item the judge passes. `old-path-404-hard` lists `fetch-apify-docs`: on master it appends `.md`
-  to a docs link that already ends in `.md`, so it 404s on such links. Neither failure is what the cases measure. Drop
-  `fetch-apify-docs` once master fixes that.
+- **Recovered lookups do not fail an item.** `webhooks-list-easy`, `env-vars-list-medium`, `webhook-test-medium`,
+  `webhook-lifecycle-medium`, `env-var-missing-hard`, and `secret-env-var-hard` list `fetch-actor-details` in
+  `expectedErrors`, so a failed Actor lookup the agent recovers from does not fail an item the judge passes. On
+  `webhook-lifecycle-medium` and `secret-env-var-hard` the lookup fails on `eval-api-actor-scratch`, which is never
+  built. `old-path-404-hard` lists `fetch-apify-docs`: on master it appends `.md` to a docs link that already ends in
+  `.md`, so it 404s on such links. Neither failure is what the cases measure. Drop `fetch-apify-docs` once master fixes
+  that.
+- **A 404 that confirms a delete does not fail an item.** `dataset-rename-medium` lists `apify-api-read`: a read of the
+  dataset after the delete answers 404, which confirms the delete.
 
 ## Coverage
 
@@ -495,7 +499,7 @@ and correct any fact the probes disprove:
 
 ```markdown
 The API family (21 `pr` items: 11 `pr/apify-api-*/*` and 10 routing items `pr/*/api-loaded-*` in
-category `apify-api-routing`; and `merge/api/*`, 15 items: 9 proper + 6 with `expectedErrors`)
+category `apify-api-routing`; and `merge/api/*`, 15 items: 6 proper + 9 with `expectedErrors`)
 covers the opt-in `api` tools: `apify-api-search`, `apify-api-details`, `apify-api-read`, and
 `apify-api-write`. A routing item's id names the dedicated tool that must win, as the rest of the
 `pr` ids name the tool they assert. Every item loads the same wide tool set,
@@ -515,7 +519,7 @@ The `expectedErrors` exemption is per tool, not per call, which leaves a known b
 `merge/api/old-path-404-hard` it also covers a failure of the follow-up read of
 `/v2/users/me/usage/monthly`, and its reference narrows that by failing an answer that says the read
 failed and still gives a total. On `merge/api/env-var-missing-hard`, a read that 404s on a wrong
-`username~` prefix looks like a missing variable to the judge. Four items exempt
+`username~` prefix looks like a missing variable to the judge. Six items exempt
 `fetch-actor-details`, so a failed Actor lookup the agent recovers from does not fail an item the
 judge passes.
 
