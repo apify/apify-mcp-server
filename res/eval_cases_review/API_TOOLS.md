@@ -12,7 +12,7 @@ calibration.
 
 | File | What |
 |---|---|
-| `api_tools_pr_cases.json` | 21 `tool-call` cases for `mcp-server-evals-pr`: 11 positive, 10 routing |
+| `api_tools_pr_cases.json` | 26 `tool-call` cases for `mcp-server-evals-pr`: 13 positive, 13 routing |
 | `api_tools_merge_cases.json` | 15 `agent` cases for `mcp-server-evals-merge`: 4 easy, 6 medium, 5 hard. 9 set `expectedErrors` |
 | `evals/scripts/api_fixtures.ts` | Deletes leftovers, seeds the merge fixtures, and resets their state (`pnpm run evals:mcp-agent:api-fixtures`) |
 
@@ -32,7 +32,7 @@ jq -c --arg ds mcp-server-evals-pr '.[] | {datasetName: $ds, id, input: {query}}
 Checked offline:
 
 - Every case converts with `toMcpAgentTestCase()` (`evals/langfuse/dataset.ts`) and converts back to the same flat case.
-- The 36 ids are unique and none matches an id in #1421's case files.
+- The 41 ids are unique and none matches an id in #1421's case files.
 - Every tool in `expectedTools` and `expectedErrors` exists on master, #1444 (`5c1a53c8`), or #1445 (`330c8bca`), except
   Claude Code's built-in `ReadMcpResourceTool`. Every `tools` selector is a category on #1445.
 - `evals/scripts/api_fixtures.ts` passes type-check, lint, and format on this branch. It has not run.
@@ -42,9 +42,16 @@ Checked offline:
 
 ## What the cases measure
 
-Routing. A task no dedicated tool does (webhooks, billing usage and limits, an Actor's environment variables, renaming a
-dataset) must go to the API tools. A task a dedicated tool does (an Actor's last run, dataset items, starting a build,
-creating a schedule) must not.
+Routing. A task no dedicated tool does (webhooks, billing usage and limits, an Actor's environment variables and default
+memory, renaming a dataset) must go to the API tools. A task a dedicated tool does (running an Actor, an Actor's last
+run, dataset items, starting a build, creating or changing a schedule) must not.
+
+`apify-api-read` and `apify-api-write` refuse no path, and four GET operations start a paid run: `run-sync` and
+`run-sync-get-dataset-items`, for Actors and for tasks. So routing is what keeps an agent off them. The pr cases check
+the choice between an API tool and the tools next to it: a run goes to `call-actor`, never to either API tool
+(`api-loaded-run-actor`, `api-loaded-hello-world`, `api-loaded-run-and-wait`); a read stays a read when a write is close
+(`webhook-ever-fired`, where a test delivery is the write); a setting change goes to `apify-api-write`, not to a run
+(`default-memory`); and a change a dedicated tool makes goes to that tool (`api-loaded-schedule-time`).
 
 Every case loads `actors, docs, runs, storage, tasks, schedules, builds, dev, api`. That is #1421's set with `builds`
 (for the build routing case) and `api` added, and with `apify/rag-web-browser` and `apify/web-fetch` left out. The
@@ -63,7 +70,7 @@ and above, and CI runs at the runner default of 8.
   write (`get-dataset`, `fetch-actor-details`, `apify-api-read`), and so is looking up an Actor that the query names
   without its username. `resurrect-run` and `sign-json` also accept the direct call: details on the exact path needs the
   same knowledge as the call. `sign-json` also accepts the docs tools, as `webhook-create-fields` does, since a docs
-  search finds the endpoint. The positive cases catch refusing or answering from memory; the 8 that accept a dedicated
+  search finds the endpoint. The positive cases catch refusing or answering from memory; the 9 that accept a dedicated
   lookup do not catch a first call outside the API family.
 - **Lookups on the routing cases.** `api-loaded-build` accepts `fetch-actor-details` and `get-actor-build-list` next
   to `build-actor`, whose `actor` argument needs an ID or `username/name` the query does not give.
@@ -95,8 +102,9 @@ and above, and CI runs at the runner default of 8.
   built. `old-path-404-hard` lists `fetch-apify-docs`: on master it appends `.md` to a docs link that already ends in
   `.md`, so it 404s on such links. Neither failure is what the cases measure. Drop `fetch-apify-docs` once master fixes
   that.
-- **A 404 that confirms a delete does not fail an item.** `dataset-rename-medium` lists `apify-api-read`: a read of the
-  dataset after the delete answers 404, which confirms the delete.
+- **A 404 that confirms a delete does not fail an item.** `dataset-rename-medium` lists `apify-api-read` and
+  `get-dataset`, and `webhook-lifecycle-medium` lists `apify-api-read`: a read after the delete answers 404, which
+  confirms the delete.
 
 ## Coverage
 
@@ -118,15 +126,17 @@ and above, and CI runs at the runner default of 8.
 | | `~name` and `username~name` paths, chained reads | `pr/apify-api-read/env-var-value`, `env-var-names`, `merge/api/env-vars-list-medium`, `merge/api/env-var-missing-hard` (a bare name fails it) |
 | | `query` (`limit`, `desc`) | `merge/api/webhook-deliveries-medium` (the expected call, not required) |
 | | 404 on an unknown path, with suggested paths | `merge/api/old-path-404-hard` |
-| | 404 on a missing record, with misleading suggestions | `merge/api/env-var-missing-hard` |
+| | 404 on a missing record | `merge/api/env-var-missing-hard` |
 | | Token masking (`/v2/browser-info`) | `merge/api/browser-info-medium` |
 | | Resource or tool | `merge/api/webhooks-raw-json-easy`. Every pr case that accepts a read also accepts `ReadMcpResourceTool`. |
 | | Response over 256 KB, binary body | Not covered. No endpoint without a dedicated tool returns that much on the eval account reliably. Unit tests cover both. |
 | | Routing: a dedicated tool must win | `pr/get-actor-run-list/api-loaded-last-run`, `pr/get-dataset-items/api-loaded-dataset-items`, `pr/get-dataset-list/api-loaded-dataset-list`, `pr/get-actor-run-log/api-loaded-run-log` |
+| | Routing: a run goes to `call-actor`, not to a `run-sync` GET | `pr/call-actor/api-loaded-run-actor`, `api-loaded-hello-world`, `api-loaded-run-and-wait` |
+| | Routing: a read must win over a write (a test delivery) | `pr/apify-api-read/webhook-ever-fired` |
 | `apify-api-write` | POST with `body` | `pr/apify-api-write/alert-on-crash`, `secret-env-var`, `merge/api/webhook-lifecycle-medium`, `merge/api/secret-env-var-hard` |
 | | POST with `query` | `merge/api/dataset-rename-medium` (`name` query parameter) |
 | | POST with neither | `merge/api/webhook-test-medium` |
-| | PUT with `body` | `pr/apify-api-write/rename-dataset`, `merge/api/dataset-rename-medium`, `merge/api/dataset-access-method-hard`. `merge/api/secret-env-var-hard` accepts a version PUT but does not require it. |
+| | PUT with `body` | `pr/apify-api-write/rename-dataset`, `default-memory`, `merge/api/dataset-rename-medium`, `merge/api/dataset-access-method-hard`. `merge/api/secret-env-var-hard` accepts a version PUT but does not require it. |
 | | DELETE | `merge/api/webhook-lifecycle-medium`, `dataset-rename-medium`, `secret-env-var-hard` |
 | | `method` omitted, several methods (refused) | Not covered; unit tests cover it. `merge/api/dataset-access-method-hard` does not exempt it: the method parameter says to omit the method only when the path has one, so the error gate fails a write without a method there. |
 | | `method` omitted, one method (inferred) | Exercised, not pinned: `merge/api/webhook-test-medium` (`/test` has only POST) |
@@ -135,7 +145,8 @@ and above, and CI runs at the runner default of 8.
 | | Write whose response is over 256 KB | Not covered. Unit tests cover it. |
 | | Secret semantics (`isSecret`) | `pr/apify-api-write/secret-env-var`, `merge/api/secret-env-var-hard` |
 | | Change only what was asked | `merge/api/secret-env-var-hard` (EVAL_MODE must survive), `merge/api/dataset-access-method-hard` (no rename) |
-| | Routing: a dedicated tool must win | `pr/build-actor/api-loaded-build`, `pr/call-actor/api-loaded-run-actor`, `pr/create-schedule/api-loaded-schedule`, `pr/update-actor-task/api-loaded-task-input` |
+| | Routing: a setting change must not become a run (`call-actor` must lose) | `pr/apify-api-write/default-memory` |
+| | Routing: a dedicated tool must win | `pr/build-actor/api-loaded-build`, `pr/call-actor/api-loaded-run-actor`, `api-loaded-hello-world`, `api-loaded-run-and-wait`, `pr/create-schedule/api-loaded-schedule`, `pr/update-actor-task/api-loaded-task-input`, `pr/update-schedule/api-loaded-schedule-time` |
 
 No case requires `apify-api-search` or `apify-api-details`. A strong model knows most paths, every pr case that accepts
 a lookup also accepts the call, and the docs tools answer every question `apify-api-details` answers, since
@@ -365,10 +376,11 @@ they are why some hard cases exist.
 1. **Search misses natural words.** "ip address", "budget", and "resume run" find nothing useful, and "request headers"
    returns request queues. `browser-info-medium` and `budget-vague-hard` depend on the agent retrying with other words.
    If Haiku fails there, the fix is on the search side, for example matching descriptions as well as summaries.
-2. **Closest-path suggestions mislead on a missing record.** Every 404 from the call tools lists "the closest paths in
-   the API spec", even when the path is right and only the record is missing, and for a missing env var the list starts
-   with `/v2/actors`, ahead of the env-var template the path matches. Possible fixes: suggest only when the path matches
-   no template, and rank a matching template first. `env-var-missing-hard` measures whether agents misread it.
+2. **Closest-path suggestions misled on a missing record.** Every 404 from the call tools listed "the closest paths in
+   the API spec", even when the path was right and only the record was missing, and for a missing env var the list
+   started with `/v2/actors`, ahead of the env-var template the path matches. #1444 now lists them only for a
+   `page-not-found` 404, a path the API does not have. `env-var-missing-hard` measures whether agents blame the path for
+   a missing record, and its reference passes with or without the list.
 3. **The server instructions send model reads to the resource.** They tell the agent to pass any `/v2/...` GET URL to
    `resources/read`, even when `apify-api-read` is loaded. If `webhooks-raw-json-easy` shows agents taking the resource
    when the tool is there, gate that guidance on the tool being loaded.
@@ -382,16 +394,16 @@ they are why some hard cases exist.
 CI reads the shared datasets live on every run. Upserted before #1444 is on master, these cases would run against a
 server without the `api` category, and the session would have no API tools:
 
-- **pr tier:** 8 of the 11 positive cases also accept a first call to a tool already on master (`fetch-actor-details`,
-  `get-dataset`, `get-dataset-list`, `get-actor-run`, or the docs tools), and the 10 routing cases pass trivially. The
+- **pr tier:** 9 of the 13 positive cases also accept a first call to a tool already on master (`fetch-actor-details`,
+  `get-dataset`, `get-dataset-list`, `get-actor-run`, or the docs tools), and the 13 routing cases pass trivially. The
   tier would likely stay above its 0.9 gate while measuring nothing about the API tools: against today's live pr dataset
-  (111 of 115 passing on a hosted run), 2 of those 8 passing give 123 of 136, a rate of 0.904. Only
-  `webhooks-on-account`, `spend-this-billing-cycle`, and `monthly-spending-cap` would fail.
+  (111 of 115 passing on a hosted run), 3 of those 9 passing give 127 of 141, a rate of 0.901. Only
+  `webhooks-on-account`, `spend-this-billing-cycle`, `monthly-spending-cap`, and `webhook-ever-fired` would fail.
 - **merge tier:** most of the 15 cases fail. The tier stays above its 0.6 gate, but real regressions would hide behind
   expected failures, and the write cases would run without fixtures.
 
 Accepting `ReadMcpResourceTool` adds to the risk: the resource is on master already, so if `mcpToolsOnly` does not
-remove it (probe 22), those three read cases could pass before #1444 through the resource too, which would hide the
+remove it (probe 22), those four read cases could pass before #1444 through the resource too, which would hide the
 missing `api` category.
 
 Langfuse item ids are unique per project forever and cannot move between datasets, so the cases are calibrated in
@@ -403,15 +415,16 @@ staging datasets under burned ids and promoted under the final ids:
    `--concurrency 1`, reading every transcript. Run the merge waves in order (easy, medium, hard) and re-seed the fixtures
    before each. Fix cases until Opus passes them all.
 3. Add the README section and the CI step below with #1444, or in an evals PR merged right after it.
-4. **Batch A, after #1444 is on master** and the fixtures have run once on the CI account: the 12 pr cases and 10 merge
-   cases that need only search, details, and read. That is every case except the ones in Batch B. If pinned dataset
-   versions (#1395) have landed by then, promotion is the upsert plus a pin bump in #1444 itself, so the cases go live
-   exactly when the tools merge; otherwise the upsert follows the merge.
-5. **Batch B, after #1445 is on master:** the 9 write-dependent pr cases and the merge cases `webhook-lifecycle-medium`,
-   `dataset-rename-medium`, `webhook-test-medium`, `secret-env-var-hard`, and `dataset-access-method-hard`. The 9 pr
-   cases are the three `pr/apify-api-write/*` cases, `resurrect-run` and `sign-json` (which ask for writes), and the
-   four routing cases where `apify-api-write` must lose: `api-loaded-build`, `api-loaded-run-actor`,
-   `api-loaded-schedule`, and `api-loaded-task-input`.
+4. **Batch A, after #1444 is on master** and the fixtures have run once on the CI account: the 16 pr cases and 10 merge
+   cases that need only search, details, and read. That is every case except the ones in Batch B. The three
+   `pr/call-actor/api-loaded-*` cases are here because a `run-sync` GET through `apify-api-read` already starts a run.
+   If pinned dataset versions (#1395) have landed by then, promotion is the upsert plus a pin bump in #1444 itself, so
+   the cases go live exactly when the tools merge; otherwise the upsert follows the merge.
+5. **Batch B, after #1445 is on master:** the 10 write-dependent pr cases and the merge cases `webhook-lifecycle-medium`,
+   `dataset-rename-medium`, `webhook-test-medium`, `secret-env-var-hard`, and `dataset-access-method-hard`. The 10 pr
+   cases are the four `pr/apify-api-write/*` cases, `resurrect-run` and `sign-json` (which ask for writes), and the
+   four routing cases where only `apify-api-write` competes: `api-loaded-build`, `api-loaded-schedule`,
+   `api-loaded-task-input`, and `api-loaded-schedule-time`.
 6. Archive the staging items and abandon the two staging datasets.
 
 Why two staging datasets of their own rather than #1411's `-v2` staging datasets: those are still in use for the
@@ -431,9 +444,10 @@ directory. Langfuse CLI flags other than `dataset-items create --body-file -` ar
 C="$PWD"   # this branch's checkout, with a .env like the #1445 checkout's
 R="$C/res/eval_cases_review"
 W=/path/to/a/checkout/of/feat/apify-api-write
-B_PR='^pr/(apify-api-write/(rename-dataset|alert-on-crash|secret-env-var)|apify-api-search/(resurrect-run|sign-json)'
-B_PR+='|build-actor/api-loaded-build|call-actor/api-loaded-run-actor|create-schedule/api-loaded-schedule'
-B_PR+='|update-actor-task/api-loaded-task-input)$'
+B_PR='^pr/(apify-api-write/(rename-dataset|alert-on-crash|secret-env-var|default-memory)'
+B_PR+='|apify-api-search/(resurrect-run|sign-json)'
+B_PR+='|build-actor/api-loaded-build|create-schedule/api-loaded-schedule'
+B_PR+='|update-actor-task/api-loaded-task-input|update-schedule/api-loaded-schedule-time)$'
 B_MERGE='^merge/api/(webhook-lifecycle-medium|dataset-rename-medium|webhook-test-medium|secret-env-var-hard|dataset-access-method-hard)$'
 to_items() { jq -c --arg ds "$1" '.[] | {datasetName: $ds, id, input: {query}}
     + (if has("reference") then {expectedOutput: .reference} else {} end)
@@ -498,7 +512,7 @@ For `evals/README.md`, after the web-selection family paragraph in "Two datasets
 and correct any fact the probes disprove:
 
 ```markdown
-The API family (21 `pr` items: 11 `pr/apify-api-*/*` and 10 routing items `pr/*/api-loaded-*` in
+The API family (26 `pr` items: 13 `pr/apify-api-*/*` and 13 routing items `pr/*/api-loaded-*` in
 category `apify-api-routing`; and `merge/api/*`, 15 items: 6 proper + 9 with `expectedErrors`)
 covers the opt-in `api` tools: `apify-api-search`, `apify-api-details`, `apify-api-read`, and
 `apify-api-write`. A routing item's id names the dedicated tool that must win, as the rest of the
@@ -506,13 +520,16 @@ covers the opt-in `api` tools: `apify-api-search`, `apify-api-details`, `apify-a
 `actors,docs,runs,storage,tasks,schedules,builds,dev,api`, and all but one set `mcpToolsOnly: true`.
 The two default Actor tools are left out: the server fetches their input schemas at startup, which
 races the agent at CI's concurrency. The set is wide because what the family measures is routing: a
-task no dedicated tool does (webhooks, billing usage and limits, an Actor's environment variables,
-renaming a dataset) must go to the API tools, and a task a dedicated tool does (an Actor's last run,
-dataset items, starting a build, creating a schedule) must not. The positive `pr` items accept an
-API lookup (`apify-api-search` or `apify-api-details`), the API call that does the task, or an API
-read before a write as the first call, since the read and write descriptions tell the agent to look
-an operation up first. Eight also accept a dedicated lookup (`fetch-actor-details` where the query
-names an Actor without its username, `get-dataset`, `get-dataset-list`, `get-actor-run`, or the docs
+task no dedicated tool does (webhooks, billing usage and limits, an Actor's environment variables
+and default memory, renaming a dataset) must go to the API tools, and a task a dedicated tool does
+(running an Actor, an Actor's last run, dataset items, starting a build, creating or changing a
+schedule) must not. `apify-api-read` refuses no path, and a GET of `run-sync` or
+`run-sync-get-dataset-items` starts a paid run, so the three `pr/call-actor/api-loaded-*` items
+check that a run goes to `call-actor`. The positive `pr` items accept an API lookup
+(`apify-api-search` or `apify-api-details`), the API call that does the task, or an API read before
+a write as the first call, since the read and write descriptions tell the agent to look an
+operation up first. Nine also accept a dedicated lookup (`fetch-actor-details` where the query names
+an Actor without its username, `get-dataset`, `get-dataset-list`, `get-actor-run`, or the docs
 tools), so they do not catch a first call outside the API family. Even `resurrect-run` and
 `sign-json` accept the direct call, so no item requires `apify-api-search` or `apify-api-details`.
 The `expectedErrors` exemption is per tool, not per call, which leaves a known blind spot: on
@@ -556,10 +573,11 @@ refused there, and `merge/api/dataset-access-method-hard` does not exempt that r
 addresses the token's own Actors and datasets, while a bare name is read as an ID and returns 404.
 The legacy `acts/` prefix reaches the same endpoints as `actors/`. `POST /v2/datasets` takes the
 name only as the `name` query parameter. Plain environment variable values are returned, secret
-ones never are. A 404 from `apify-api-read` lists the closest paths in the spec even when the path is
-right and only the record is missing, which `merge/api/env-var-missing-hard` checks the agent does
-not misread. `POST /v2/webhooks/{webhookId}/test` sends one delivery to the webhook's URL, which
-for the fixture is IANA's reserved example.com. `GET /v2/browser-info` echoes the request headers:
+ones never are. A 404 from `apify-api-read` lists the closest paths in the spec only when the API
+does not have the path (error type `page-not-found`), not when only the record is missing;
+`merge/api/env-var-missing-hard` checks that the agent does not blame the path.
+`POST /v2/webhooks/{webhookId}/test` sends one delivery to the webhook's URL, which for the fixture
+is IANA's reserved example.com. `GET /v2/browser-info` echoes the request headers:
 `apify-api-read` masks the token in them, and the resource returns them as they are.
 
 `merge/api/dataset-rename-medium`, `merge/api/webhook-lifecycle-medium`, and
@@ -591,6 +609,10 @@ teardown step.
   likeliest.
 - **The input validation tool (#1432)** collides with no case here. Once it lands, it is a candidate for another
   routing case.
+- **The update-actor tool (#1436)** sets an Actor's default run options and joins the `actors` category every case
+  loads. Once it lands, `pr/apify-api-write/default-memory` has a dedicated tool: replace that case with a routing case
+  where `update-actor` must win. `get-actor-settings` (#1435) and `update-actor-env-vars` (#1437) overlap the
+  environment variable cases the same way.
 
 ## Open questions
 

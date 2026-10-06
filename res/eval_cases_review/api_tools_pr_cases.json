@@ -122,6 +122,30 @@
     "mcpToolsOnly": true
   },
   {
+    "id": "pr/apify-api-read/webhook-ever-fired",
+    "category": "apify-api-read",
+    "kind": "tool-call",
+    "query": "has the webhook that posts to https://example.com/eval-api/run-failed ever fired? just look, don't trigger it",
+    "expectedTools": [
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "apify-api-search",
+      "apify-api-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
     "id": "pr/apify-api-write/rename-dataset",
     "category": "apify-api-write",
     "kind": "tool-call",
@@ -179,6 +203,32 @@
     "category": "apify-api-write",
     "kind": "tool-call",
     "query": "add an environment variable SIGNING_SECRET with the value eval-only-9f3c to my actor eval-api-actor-scratch. it's a secret, so keep it hidden",
+    "expectedTools": [
+      "apify-api-write",
+      "apify-api-search",
+      "apify-api-details",
+      "apify-api-read",
+      "ReadMcpResourceTool",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/apify-api-write/default-memory",
+    "category": "apify-api-write",
+    "kind": "tool-call",
+    "query": "from now on, runs of my actor eval-api-actor-scratch should get 1 gb of memory by default",
     "expectedTools": [
       "apify-api-write",
       "apify-api-search",
@@ -409,6 +459,50 @@
     "mcpToolsOnly": true
   },
   {
+    "id": "pr/call-actor/api-loaded-hello-world",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "can you run apify/hello-world for me?",
+    "expectedTools": [
+      "call-actor",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/call-actor/api-loaded-run-and-wait",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "run apify/rag-web-browser for 'prague coffee roasters' and wait for it, i just want the dataset items back in one go",
+    "expectedTools": [
+      "call-actor",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
     "id": "pr/create-schedule/api-loaded-schedule",
     "category": "apify-api-routing",
     "kind": "tool-call",
@@ -438,6 +532,28 @@
     "expectedTools": [
       "update-actor-task",
       "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/update-schedule/api-loaded-schedule-time",
+    "category": "apify-api-routing",
+    "kind": "tool-call",
+    "query": "my schedule eval-sched-target should fire at 5am utc from now on instead of 3am",
+    "expectedTools": [
+      "update-schedule",
+      "get-schedule"
     ],
     "tools": [
       "actors",
