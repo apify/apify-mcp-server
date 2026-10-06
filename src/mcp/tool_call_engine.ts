@@ -177,7 +177,7 @@ export async function prepareToolCall(params: {
     const actorId = extractActorId(tool);
     // fetch-actor-details only describes Actors, and only helps if this session serves it.
     const schemaHint =
-        tool.type === TOOL_TYPE.ACTOR && resolveToolEntry(HELPER_TOOLS.ACTOR_GET_DETAILS, tools)
+        tool.type === TOOL_TYPE.ACTOR && tools.has(HELPER_TOOLS.ACTOR_GET_DETAILS)
             ? `using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool`
             : 'in tools/list';
 

@@ -130,73 +130,73 @@ describe('prepareToolCall()', () => {
             expect(telemetryData.tool_name).toBe('recorder-tool');
         });
     });
-});
 
-describe('prepareToolCall() argument failure hint', () => {
-    const STRICT_SCHEMA = {
-        type: 'object',
-        properties: { query: { type: 'string', minLength: 1 } },
-        required: ['query'],
-    };
-
-    function makeStrictTool(type: typeof TOOL_TYPE.INTERNAL | typeof TOOL_TYPE.ACTOR): ToolEntry {
-        const base = {
-            name: 'strict-tool',
-            description: 'requires a non-empty query',
-            inputSchema: STRICT_SCHEMA as ToolInputSchema,
-            ajvValidate: compileSchema(STRICT_SCHEMA),
+    describe('argument failure hint', () => {
+        const STRICT_SCHEMA = {
+            type: 'object',
+            properties: { query: { type: 'string', minLength: 1 } },
+            required: ['query'],
         };
-        return type === TOOL_TYPE.ACTOR
-            ? { ...base, type, actorId: 'actor-id-1', actorFullName: 'apify/strict-actor' }
-            : { ...base, type, call: async () => respondRaw({ content: [] }) };
-    }
 
-    // The map is built per case, so each one controls exactly whether fetch-actor-details is served.
-    async function failureMessage(
-        tool: ToolEntry,
-        fetchActorDetailsServed: boolean,
-        args: Record<string, unknown> | undefined,
-    ): Promise<string> {
-        const tools = new Map<string, ToolEntry>([[tool.name, tool]]);
-        if (fetchActorDetailsServed) tools.set(HELPER_TOOLS.ACTOR_GET_DETAILS, fetchActorDetails);
-        const result = await prepareToolCall({
-            tools,
-            apifyToken: 'fake-token',
-            name: tool.name,
-            args,
-            meta: undefined,
-            requestHeaders: undefined,
-            isTaskRequest: false,
-            mcpSessionId: 's1',
-            telemetryData: null,
-            clientContext: undefined,
-        });
-        expect('message' in result).toBe(true);
-        return (result as InvalidToolCall).message;
-    }
+        function makeStrictTool(type: typeof TOOL_TYPE.INTERNAL | typeof TOOL_TYPE.ACTOR): ToolEntry {
+            const base = {
+                name: 'strict-tool',
+                description: 'requires a non-empty query',
+                inputSchema: STRICT_SCHEMA as ToolInputSchema,
+                ajvValidate: compileSchema(STRICT_SCHEMA),
+            };
+            return type === TOOL_TYPE.ACTOR
+                ? { ...base, type, actorId: 'actor-id-1', actorFullName: 'apify/strict-actor' }
+                : { ...base, type, call: async () => respondRaw({ content: [] }) };
+        }
 
-    describe.each([
-        ['invalid', { query: '' }],
-        ['missing', undefined],
-    ])('%s arguments', (_label, args) => {
-        it('points a non-Actor tool at its tools/list schema, not fetch-actor-details', async () => {
-            const message = await failureMessage(makeStrictTool(TOOL_TYPE.INTERNAL), true, args);
+        // The map is built per case, so each one controls exactly whether fetch-actor-details is served.
+        async function failureMessage(
+            tool: ToolEntry,
+            fetchActorDetailsServed: boolean,
+            args: Record<string, unknown> | undefined,
+        ): Promise<string> {
+            const tools = new Map<string, ToolEntry>([[tool.name, tool]]);
+            if (fetchActorDetailsServed) tools.set(HELPER_TOOLS.ACTOR_GET_DETAILS, fetchActorDetails);
+            const result = await prepareToolCall({
+                tools,
+                apifyToken: 'fake-token',
+                name: tool.name,
+                args,
+                meta: undefined,
+                requestHeaders: undefined,
+                isTaskRequest: false,
+                mcpSessionId: 's1',
+                telemetryData: null,
+                clientContext: undefined,
+            });
+            expect('message' in result).toBe(true);
+            return (result as InvalidToolCall).message;
+        }
 
-            expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-            expect(message).toContain('tools/list');
-        });
+        describe.each([
+            ['invalid', { query: '' }],
+            ['missing', undefined],
+        ])('%s arguments', (_label, args) => {
+            it('points a non-Actor tool at its tools/list schema, not fetch-actor-details', async () => {
+                const message = await failureMessage(makeStrictTool(TOOL_TYPE.INTERNAL), true, args);
 
-        it('points an Actor tool at fetch-actor-details when the session serves it', async () => {
-            const message = await failureMessage(makeStrictTool(TOOL_TYPE.ACTOR), true, args);
+                expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+                expect(message).toContain('tools/list');
+            });
 
-            expect(message).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-        });
+            it('points an Actor tool at fetch-actor-details when the session serves it', async () => {
+                const message = await failureMessage(makeStrictTool(TOOL_TYPE.ACTOR), true, args);
 
-        it('points an Actor tool at tools/list when fetch-actor-details is not served', async () => {
-            const message = await failureMessage(makeStrictTool(TOOL_TYPE.ACTOR), false, args);
+                expect(message).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+            });
 
-            expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-            expect(message).toContain('tools/list');
+            it('points an Actor tool at tools/list when fetch-actor-details is not served', async () => {
+                const message = await failureMessage(makeStrictTool(TOOL_TYPE.ACTOR), false, args);
+
+                expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+                expect(message).toContain('tools/list');
+            });
         });
     });
 });
