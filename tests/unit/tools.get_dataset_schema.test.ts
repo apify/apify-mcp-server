@@ -81,7 +81,7 @@ describe('get-dataset-schema', () => {
 
     it('returns a schema-conforming structured response when the dataset has no items', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
+            stubToolCallContext({ datasetId: 'ds-1', clean: false }, stubApifyClient({ items: [], total: 0 })),
         );
         const { content, isError, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
@@ -94,6 +94,23 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
         // The required `schema` is still present (empty object) and the emit conforms to the schema.
+        expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
+    });
+
+    // clean=true skips empty items and #-prefixed fields, so a dataset of hidden-field items comes
+    // back as items=[] and must not be reported as empty.
+    it('suggests clean=false instead of reporting empty when clean filtering returned no items', async () => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
+        );
+        const { isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(isError).not.toBe(true);
+        expect(structuredContent.schema).toEqual({});
+        expect(structuredContent.summary).not.toContain('is empty');
+        expect(structuredContent.nextStep).toContain('clean=false');
         expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
     });
 
