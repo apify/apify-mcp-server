@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.17.3 - **not yet released**
+## [0.17.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.3) (2026-10-06)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - **actors:** Match TIP pilot by Actor full name across environments ([#1476](https://github.com/apify/apify-mcp-server/pull/1476)) ([143b1bc](https://github.com/apify/apify-mcp-server/commit/143b1bca6f92739d842162ffb8e4c9583cae5983)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.17.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.2) (2026-10-05)
 
 ### 🚀 Features
