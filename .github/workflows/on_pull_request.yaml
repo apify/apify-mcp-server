@@ -24,6 +24,7 @@ jobs:
                         code:
                             - 'src/**'
                             - 'tests/integration/**'
+                            - 'tests/helpers.ts'
                             - 'scripts/**'
                             - 'package.json'
                             - 'pnpm-lock.yaml'
