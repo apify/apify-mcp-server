@@ -39,7 +39,8 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         Search the Apify API reference for operations by keywords. Returns each operation's method, path
         template, summary, and link to the API reference.${nextStepsSentence}
         To call an operation, fill its path template with real values: /v2/datasets/{datasetId}/items
-        becomes /v2/datasets/abc/items, and a name is written username~name.
+        becomes /v2/datasets/abc/items. A name is written username~name, or ~name for one you own, as in
+        /v2/actors/~my-actor.
         Prefer a dedicated Apify tool when one does what the user asks.
 
         USAGE:

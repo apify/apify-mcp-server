@@ -246,8 +246,8 @@ describe('apify-api-details', () => {
         ]);
 
         const message =
-            'The path /v2/acts/john/my-actor is not in the API spec. A name is written username~name, as in ' +
-            '/v2/actors/john~my-actor.';
+            'The path /v2/acts/john/my-actor is not in the API spec. A name is written username~name, or ~name ' +
+            'for one you own, as in /v2/actors/~my-actor.';
         expectSoftFailInvalidInput(withSearch);
         expect(withSearch.content[0].text).toBe(`${message} Find the path with ${HELPER_TOOLS.API_SEARCH}.`);
         expect(withoutSearch.content[0].text).toBe(message);
