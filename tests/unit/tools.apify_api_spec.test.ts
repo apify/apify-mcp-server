@@ -15,7 +15,7 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(37);
+        expect(index.size).toBe(38);
     });
 
     it('indexes a PATCH operation, which the published spec does not have yet', () => {
@@ -102,6 +102,30 @@ describe('searchApiOperations()', () => {
 
     it("keeps a run's copy first when the query is about runs", () => {
         expect(searchIds("store items in last run's dataset")[0]).toBe('actor_runs_last_dataset_items_post');
+    });
+
+    it('finds an operation by keywords only its description has, and leaves a keyword a name has to the names', () => {
+        // No name has client, ip, address, or headers; the request queue summaries have request.
+        expect(searchIds('client ip address request headers')[0]).toBe('tools_browser_info_get');
+        // The description of browser info says request too, but there it does not count.
+        expect(searchIds('request')).toEqual([
+            'requestQueue_requests_batch_post',
+            'requestQueue_requests_batch_delete',
+            'requestQueue_request_get',
+            'requestQueue_request_put',
+            'requestQueue_request_delete',
+        ]);
+    });
+
+    it('needs two description keywords, each a whole word', () => {
+        expect(searchIds('client')).toEqual([]);
+        // The description has endpoint, which starts with end.
+        expect(searchIds('ip end')).toEqual([]);
+    });
+
+    it('ignores question words, which no name has but most descriptions do', () => {
+        // The description of browser info has both is and this.
+        expect(searchIds('what is this')).toEqual([]);
     });
 
     it('caps the results at the limit', () => {
