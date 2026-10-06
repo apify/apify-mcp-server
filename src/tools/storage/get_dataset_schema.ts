@@ -78,10 +78,16 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         const datasetItems = datasetResponse.items;
 
         if (datasetItems.length === 0) {
-            // Empty dataset: no items to infer from, but still emit a schema-conforming
-            // response (empty schema = "any") rather than bare text.
-            const summary = `Dataset '${datasetId}' is empty; no schema to infer.`;
-            const nextStep = `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to check itemCount and stats.`;
+            // No items to infer from, but still emit a schema-conforming response (empty schema =
+            // "any") rather than bare text. Under clean=true, items=[] does not mean empty: a dataset
+            // whose items hold only #-prefixed or empty fields is filtered out entirely.
+            const checkStats = `use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to check itemCount and stats.`;
+            const summary = parsed.clean
+                ? `Dataset '${datasetId}' returned no items with clean=true, which skips empty items and hidden (#) fields; no schema to infer.`
+                : `Dataset '${datasetId}' is empty; no schema to infer.`;
+            const nextStep = parsed.clean
+                ? `Retry with clean=false to include those items, or ${checkStats}`
+                : `Use ${checkStats}`;
             return buildStorageResponse({ structuredContent: { datasetId, schema: {} }, summary, nextStep });
         }
 
