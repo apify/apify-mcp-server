@@ -216,20 +216,41 @@ export async function fetchApiOperationIndex(): Promise<Map<string, ApiOperation
     return pendingIndex;
 }
 
+/** Words that tell no operation apart, such as the question words and pronouns that fill the descriptions. */
 const SEARCH_STOP_WORDS: ReadonlySet<string> = new Set([
     'a',
     'all',
     'an',
     'and',
+    'apify',
+    'are',
+    'be',
+    'can',
+    'did',
+    'does',
     'for',
+    'has',
+    'have',
+    'how',
     'in',
+    'is',
+    'its',
     'my',
     'of',
     'on',
     'or',
+    'that',
     'the',
+    'this',
     'to',
+    'what',
+    'where',
+    'which',
+    'who',
+    'why',
     'with',
+    'you',
+    'your',
 ]);
 
 /** Verbs for what each method does, so a verb the summary does not use, such as rename, still counts. */
@@ -246,6 +267,11 @@ function hasMatchingWord(term: string, words: string[]): boolean {
     return words.some((word) => word.startsWith(term) || term === `${word}s`);
 }
 
+/** The same word, or its plural or singular: a prefix match finds too many words in prose, such as endpoint for end. */
+function hasWholeWord(term: string, words: string[]): boolean {
+    return words.some((word) => word === term || word === `${term}s` || term === `${word}s`);
+}
+
 /**
  * Paths that reach a run's own copy of a resource: the default storages and actions of a run or of the
  * last run, and the synchronous runs. A plain ask such as "add items to a dataset" means the storage
@@ -258,28 +284,40 @@ const RUN_SCOPED_PENALTY = 2;
 /**
  * Operations matching the query's keywords, best first. A keyword scores 3 in the summary, else 2 in the
  * operation ID or path, else 1 in the tags, else 2 when it is a verb for the operation's method. A verb
- * alone does not match an operation. A run-scoped path loses 2 when no keyword is about runs or tasks.
- * Ties go to the shorter path, so `/v2/datasets/{datasetId}` comes before the same operation on a
- * run's default dataset.
+ * alone does not match an operation. A keyword that no operation has in its summary, ID, path, or tags,
+ * such as ip, scores 2 as a whole word of the description instead, but only in a description with two or
+ * more such keywords, since one word alone is in too many descriptions. A run-scoped path loses 2 when no
+ * keyword is about runs or tasks. Ties go to the shorter path, so `/v2/datasets/{datasetId}` comes before
+ * the same operation on a run's default dataset.
  */
 export function searchApiOperations(index: Map<string, ApiOperation>, query: string, limit: number): ApiOperation[] {
     // One-letter terms, such as the s of "run's", match too many words.
     const terms = [...new Set(splitWords(query))].filter((term) => term.length > 1 && !SEARCH_STOP_WORDS.has(term));
     const isAboutRuns = terms.some((term) => RUN_SCOPE_TERMS.has(term));
+    const nameWords = [...index.values()].flatMap((operation) =>
+        splitWords(`${operation.summary} ${operation.operationId} ${operation.path} ${operation.tags.join(' ')}`),
+    );
+    // A keyword a name has is left to the names: a description also lists fields, such as the
+    // maxMonthlyUsageUsd of Update limits, which would rank that operation above Get limits.
+    const descriptionTerms = terms.filter((term) => !hasMatchingWord(term, nameWords));
     const scored: { operation: ApiOperation; score: number }[] = [];
     for (const operation of index.values()) {
         const summaryWords = splitWords(operation.summary);
         const idWords = splitWords(`${operation.operationId} ${operation.path}`);
         const tagWords = splitWords(operation.tags.join(' '));
+        const descriptionWords = splitWords(operation.description);
         const verbs = METHOD_VERBS[operation.method];
         let score = 0;
         let verbScore = 0;
+        let descriptionHits = 0;
         for (const term of terms) {
             if (hasMatchingWord(term, summaryWords)) score += 3;
             else if (hasMatchingWord(term, idWords)) score += 2;
             else if (hasMatchingWord(term, tagWords)) score += 1;
             else if (verbs.includes(term)) verbScore += 2;
+            else if (descriptionTerms.includes(term) && hasWholeWord(term, descriptionWords)) descriptionHits += 1;
         }
+        if (descriptionHits >= 2) score += 2 * descriptionHits;
         if (score === 0) continue;
         const penalty = !isAboutRuns && RUN_SCOPED_PATH_REGEX.test(operation.path) ? RUN_SCOPED_PENALTY : 0;
         scored.push({ operation, score: score + verbScore - penalty });

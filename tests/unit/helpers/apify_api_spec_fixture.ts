@@ -331,6 +331,16 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ name: 'queueId', in: 'path', required: true, schema: { type: 'string' } }],
             },
         },
+        // A vague summary: only the description says what the operation is for.
+        '/v2/browser-info': {
+            get: {
+                operationId: 'tools_browser_info_get',
+                summary: 'Get browser info',
+                description:
+                    'Returns information about the HTTP request, including the client IP address, country code, request headers, and body length. This endpoint is designed for proxy testing.',
+                tags: ['Tools'],
+            },
+        },
         '/outside/v2': { get: { operationId: 'outside_get', summary: 'Outside the API' } },
         '/v2/broken': { get: { summary: 'No operation ID' } },
     },
