@@ -274,6 +274,43 @@ export function makeThrowingTool(
     };
 }
 
+/**
+ * A task-capable tool that parks inside `call()` until the test releases it. The park is the only
+ * way to reach the cancel-during-execution guards: every other synthetic tool here settles before
+ * `tasks/cancel` could land.
+ */
+export function makeBlockingTool(): {
+    tool: ToolEntry;
+    /** Resolves once the server has entered `call()`, so the task is provably past `working`. */
+    started: Promise<void>;
+    /** Releases the parked call: throws `error` when given one, otherwise returns a success result. */
+    release: (outcome?: { error: unknown }) => void;
+} {
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+        markStarted = resolve;
+    });
+    let release!: (outcome?: { error: unknown }) => void;
+    const released = new Promise<{ error: unknown } | undefined>((resolve) => {
+        release = resolve;
+    });
+    const tool: ToolEntry = {
+        type: TOOL_TYPE.INTERNAL,
+        name: 'test-blocking-tool',
+        description: 'blocks until the test releases it',
+        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
+        ajvValidate: compileSchema({ type: 'object', properties: {} }),
+        execution: { taskSupport: 'optional' },
+        call: async () => {
+            markStarted();
+            const outcome = await released;
+            if (outcome) throw outcome.error;
+            return respondRaw({ content: [{ type: 'text', text: 'ok' }] });
+        },
+    };
+    return { tool, started, release };
+}
+
 /** A synthetic internal tool that records the plain values the server threaded into it. */
 export function makeArgsRecorderTool(name = 'recorder-tool'): {
     tool: ToolEntry;
