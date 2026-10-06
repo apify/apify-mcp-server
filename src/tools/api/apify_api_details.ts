@@ -65,7 +65,7 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
         idempotentHint: true,
         openWorldHint: false,
     },
-    // Only path and method are declared; a query written into a pasted path, such as ?token=, is cut.
+    // A pasted path can hold a query such as ?token=.
     redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiDetailsArgs.parse(toolArgs.args);

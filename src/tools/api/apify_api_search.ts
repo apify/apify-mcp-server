@@ -43,8 +43,8 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         - Use when no dedicated tool does what the user asks and the Apify API might.
 
         USAGE EXAMPLES:
-        - user_input: List the webhooks on my account
-        - user_input: How much of my monthly usage have I spent?
+        - user_input: Did my webhooks deliver their last calls?
+        - user_input: What is my monthly spending limit?
     `;
 }
 

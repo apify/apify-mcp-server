@@ -235,6 +235,12 @@ describe('apify-api-details', () => {
             method: 'GET',
             query: undefined,
         });
+        for (const path of ['/v2/datasets/abc/items?signature=sig-secret', '/v2/datasets/abc?token=token-secret#x']) {
+            const logged = redactApiCallArgs({ path });
+
+            expect(logged.path).toBe(`${path.slice(0, path.indexOf('?'))}?[REDACTED]`);
+            expect(JSON.stringify(logged)).not.toContain('secret');
+        }
     });
 
     it('names the search tool on a path not in the spec only when the session has it', async () => {
@@ -253,8 +259,12 @@ describe('apify-api-details', () => {
 });
 
 describe('apify-api-read', () => {
-    it('is annotated as read-only', () => {
-        expect(apifyApiRead.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    it('is annotated as not read-only, since a GET can start a run', () => {
+        expect(apifyApiRead.annotations).toMatchObject({
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+        });
     });
 
     it('sends one GET to the path and returns the body as the API sends it', async () => {
@@ -417,7 +427,7 @@ describe('apify-api-read', () => {
         expect((error as Error).stack).not.toContain('sig-secret');
     });
 
-    it('adds the closest paths of the spec to a 404', async () => {
+    it('adds the closest paths of the spec to a page-not-found 404', async () => {
         requestMock.mockResolvedValue(
             mockResponse(404, { error: { type: 'page-not-found', message: 'Page not found.' } }),
         );
@@ -430,6 +440,19 @@ describe('apify-api-read', () => {
             type: 'page-not-found',
             message: `Page not found. The closest paths in the API spec: ${findClosestApiPaths(INDEX, 'datasets/abc/itemz').join(', ')}`,
         });
+    });
+
+    it.each([
+        ['record-not-found', 'actor-runs/abc', 'Actor run was not found.'],
+        ['record-or-token-not-found', 'actors/abc', 'Actor was not found.'],
+    ])('returns a %s 404 as the API sends it, without loading the spec', async (type, path, message) => {
+        requestMock.mockResolvedValue(mockResponse(404, { error: { type, message } }));
+
+        const call = callTool(apifyApiRead, { path });
+
+        await expect(call).rejects.toBeInstanceOf(ApifyApiError);
+        await expect(call).rejects.toMatchObject({ statusCode: 404, type, message });
+        expect(fetchApiOperationIndex).not.toHaveBeenCalled();
     });
 
     it('returns the plain 404 when the spec cannot be loaded', async () => {
@@ -551,15 +574,6 @@ describe('apify-api-read', () => {
         });
         // The tool itself still gets the real values.
         expect(args.query.signature).toBe('sig-secret');
-    });
-
-    it('logs a query written into the path only as redacted', () => {
-        for (const path of ['/v2/datasets/abc/items?signature=sig-secret', '/v2/datasets/abc?token=token-secret#x']) {
-            const logged = redactApiCallArgs({ path });
-
-            expect(logged.path).toBe(`${path.slice(0, path.indexOf('?'))}?[REDACTED]`);
-            expect(JSON.stringify(logged)).not.toContain('secret');
-        }
     });
 
     it('logs only the declared arguments and a body only as redacted', () => {

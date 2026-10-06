@@ -48,7 +48,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     are the same), sends it as written with the query added after any query string in it, and
     looks up a legacy `acts` path as `actors`, the prefix the spec lists. It asserts that the URL stays
     on the API origin, sends one request with no retries, masks the session token in the response,
-    keeps a query in the path out of the error it throws, and adds the closest spec paths to a 404.
+    keeps a query in the path out of the error it throws, and adds the closest spec paths to a
+    `page-not-found` 404 (a wrong path), not to a missing record.
     The origin check (`isApifyApiUri`), the one capped request (`sendApifyApiRequest`), and the
     detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`) are the API resource's own,
     imported from `../resources/api_resources.ts`

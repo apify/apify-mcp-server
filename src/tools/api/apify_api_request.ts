@@ -5,7 +5,7 @@ import type { AxiosResponse } from 'axios';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import { isApifyApiUri, isMaxContentLengthAbort, sendApifyApiRequest } from '../../resources/api_resources.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
@@ -36,18 +36,16 @@ A name is written username~name, or ~name for one you own, as in /v2/actors/~my-
 Synchronous runs, and waitForFinish above ${WAIT_SECS_MAX} seconds, outlast the usual 60-second tool-call timeout,
 so prefer asynchronous runs.`;
 
-/** Query parameters whose values grant access or carry secrets: a token, a storage signature, and webhooks with headers. */
+/** Query parameters whose values grant access or carry secrets; `webhooks` can hold webhook headers. */
 const SECRET_QUERY_PARAMS: readonly string[] = ['token', 'signature', 'webhooks'];
 
 /** Stands in for a logged or returned value that may carry a secret. */
 const REDACTED = '[REDACTED]';
 
 /**
- * The logged copy of an API tool call's arguments (`redactArgs`). An allowlist: it keeps the path and
- * method, the query with the values of secret parameters redacted, and only a marker for the body,
- * which can carry environment variable values, webhook headers, or stored records. A query written
- * into the path, such as a public URL's `?signature=`, is logged only as a marker. A path or query of
- * the wrong type, which AJV refuses after the arguments are logged, is logged only as a marker.
+ * The logged copy of an API tool call's arguments (`redactArgs`), built as an allowlist. Secret query
+ * values, a query written into the path, the body, and a path or query of the wrong type are logged
+ * only as a marker. The body can carry environment variable values, webhook headers, or stored records.
  */
 export function redactApiCallArgs({ path, method, query, body }: Record<string, unknown>) {
     let loggedQuery: unknown;
@@ -69,10 +67,7 @@ export function redactApiCallArgs({ path, method, query, body }: Record<string, 
     };
 }
 
-/**
- * A path as the Apify CLI's `apify api` takes it, without its `v2/` prefix: `actors`, `v2/actors`, and
- * `/v2/actors` all become `actors`. One leading slash is removed, then the prefix, in any case.
- */
+/** A path without its leading slash and `v2/` prefix, as `apify api` takes it: `/v2/actors` becomes `actors`. */
 export function normalizeApiPath(path: string): string {
     return path.replace(/^\//, '').replace(/^v2\//i, '');
 }
@@ -114,10 +109,9 @@ function countMatchingLiterals(template: string, segments: string[]): number | u
 }
 
 /**
- * The operations on the one path template a normalized path matches, in index order (GET, POST, PUT,
- * DELETE). The path can have values in it or be a template. When several templates match, the one
- * with more literal segments wins, so `request-queues/x/requests/batch` is the batch operation, not a
- * request with the ID `batch`. The published spec has no tie; the first template wins one.
+ * The operations on the one path template a normalized path, with values or as a template, matches. When
+ * several match, the one with more literal segments wins, so `request-queues/x/requests/batch` is the
+ * batch operation, not a request with the ID `batch`.
  */
 export function findPathOperations(index: Map<string, ApiOperation>, normalizedPath: string): ApiOperation[] {
     const segments = toSpecPath(normalizedPath).split('/');
@@ -195,12 +189,17 @@ function findLogToolName(path: string, loadedToolNames: readonly string[]): stri
  * The message of a response over the inline limit. It names the parameters that narrow the response
  * when the path matches an operation of the spec that declares them.
  */
-async function formatOversizeMessage(
-    method: ApiMethod,
-    normalizedPath: string,
-    loadedToolNames: readonly string[],
-    signal?: AbortSignal,
-): Promise<string> {
+async function formatOversizeMessage({
+    method,
+    normalizedPath,
+    loadedToolNames,
+    signal,
+}: {
+    method: ApiMethod;
+    normalizedPath: string;
+    loadedToolNames: readonly string[];
+    signal?: AbortSignal;
+}): Promise<string> {
     const path = formatApiPath(normalizedPath);
     const message = `The response of ${method} ${path} is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned.`;
     const index = await fetchApiOperationIndexIfAvailable(signal);
@@ -215,7 +214,7 @@ async function formatOversizeMessage(
     return logToolName ? `${message} Get the end of the log with ${logToolName} instead.` : message;
 }
 
-/** Adds the closest paths of the spec to a 404 error, when the spec is available. */
+/** Adds the spec's closest paths to the message of a page-not-found error, when the spec is available. */
 async function addClosestPaths(error: ApifyApiError, normalizedPath: string, signal?: AbortSignal): Promise<void> {
     const index = await fetchApiOperationIndexIfAvailable(signal);
     const paths = index ? findClosestApiPaths(index, normalizedPath) : [];
@@ -224,9 +223,9 @@ async function addClosestPaths(error: ApifyApiError, normalizedPath: string, sig
 }
 
 /**
- * A copy of a response body with the session's token replaced, for example in `GET /v2/browser-info`,
- * which echoes the request headers. A binary body is masked too, since apify-client reads an error
- * body that stays a Buffer into the error message.
+ * A copy of a response body with the session's token replaced, since a response can echo it, as
+ * `GET /v2/browser-info` echoes the request headers. A binary body is masked too: apify-client copies a
+ * Buffer error body into the message.
  */
 function maskToken(data: unknown, token: string | undefined): unknown {
     if (!token || data === undefined) return data;
@@ -242,9 +241,8 @@ function maskToken(data: unknown, token: string | undefined): unknown {
 }
 
 /**
- * The request failure as a plain error with its message and code. The axios error keeps the request
- * config, which holds the Authorization header and the request body, and the tool error log prints
- * the whole error.
+ * The request failure as a plain error with only its message and code: the axios error holds the
+ * Authorization header and the request body, and the tool error log prints the whole error.
  */
 function toPlainRequestError(error: unknown): Error {
     if (!(error instanceof Error)) return new Error(String(error));
@@ -254,18 +252,9 @@ function toPlainRequestError(error: unknown): Error {
 
 /**
  * Sends one request to an API path and returns the response body, like `apify api` in the Apify CLI.
- *
- * The URL is the client's base URL and the normalized path, with a query string in the path kept
- * and the query parameters added after it. The path is not checked or encoded again: the agent
- * encodes values. The URL starts with the base URL's `/v2/`, so no path can lead to another host;
- * the API resource's origin gate, `isApifyApiUri`, asserts it.
- *
- * It sends the request with the API resource's `sendApifyApiRequest`, which says why that is one
- * attempt with no retries and the body capped at `MAX_INLINE_BYTES`, and the resource's
- * `isMaxContentLengthAbort` detects the abort of a larger body. Unlike the resource, it does not
- * stream the body, so the instance parses JSON and text bodies. Like the resource, the instance adds
- * the token and the request-origin and payment headers. A non-2xx response is thrown as the
- * `ApifyApiError` apify-client itself builds, so it gets the usual tool error text and telemetry.
+ * The URL is the client's base URL and the normalized path, not encoded again, with `query` added.
+ * It sends with `sendApifyApiRequest` (one attempt, body capped at `MAX_INLINE_BYTES`) and throws a
+ * non-2xx response as apify-client's `ApifyApiError`, so it gets the usual tool error text and telemetry.
  */
 export async function callApi(params: {
     client: ApifyClient;
@@ -284,28 +273,31 @@ export async function callApi(params: {
     const path = formatApiPath(normalizedPath);
     // `client.baseUrl` already ends with /v2.
     const url = `${client.baseUrl}/${normalizedPath}`;
-    // An assertion with the resource's origin gate: nothing after the base URL's `/v2/` can change
-    // the host that gets the token.
+    // An assertion: nothing after the base URL can change the host that gets the token.
     if (!isApifyApiUri(url)) throw new Error(`The URL ${url} is not on the API host.`);
     let response: AxiosResponse<unknown>;
     try {
         response = await sendApifyApiRequest(client, { url, method, params: params.query, signal: params.signal });
     } catch (error) {
-        // A cancelled call is not a tool error; like the run and build tools, it gets the empty response.
+        // A cancelled call is not a tool error.
         if (params.signal?.aborted) return respondAborted();
         if (isMaxContentLengthAbort(error)) {
             return respondUserError(
-                await formatOversizeMessage(method, normalizedPath, params.loadedToolNames, params.signal),
+                await formatOversizeMessage({
+                    method,
+                    normalizedPath,
+                    loadedToolNames: params.loadedToolNames,
+                    signal: params.signal,
+                }),
             );
         }
         throw toPlainRequestError(error);
     }
     const data = maskToken(response.data, params.token);
     if (response.status >= 300) {
-        // Without the query written into the path: apify-client puts the URL into the error's path and
-        // stack, and a 5xx error is logged, so a signature or token there would reach the log.
+        // Without the query in the path: apify-client puts the URL into the error, and a 5xx error is logged.
         const error = new ApifyApiError({ ...response, data, config: { ...response.config, url: stripQuery(url) } }, 1);
-        if (response.status === 404) await addClosestPaths(error, normalizedPath, params.signal);
+        if (error.type === APIFY_ERROR_TYPE_PAGE_NOT_FOUND) await addClosestPaths(error, normalizedPath, params.signal);
         throw error;
     }
 

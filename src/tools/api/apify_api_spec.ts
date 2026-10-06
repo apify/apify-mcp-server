@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import { apifyApiOperationsCache } from '../../state.js';
 
-/** The published Apify API spec, for search, details, and choosing a write's method. */
 export const APIFY_API_OPENAPI_URL = 'https://docs.apify.com/api/openapi.json';
 
 /** HEAD is left out: it returns no body, and each HEAD operation has a GET twin. */
@@ -282,13 +281,9 @@ const RUN_SCOPE_TERMS: ReadonlySet<string> = new Set(['run', 'runs', 'last', 'ta
 const RUN_SCOPED_PENALTY = 2;
 
 /**
- * Operations matching the query's keywords, best first. A keyword scores 3 in the summary, else 2 in the
- * operation ID or path, else 1 in the tags, else 2 when it is a verb for the operation's method. A verb
- * alone does not match an operation. A keyword that no operation has in its summary, ID, path, or tags,
- * such as ip, scores 2 as a whole word of the description instead, but only in a description with two or
- * more such keywords, since one word alone is in too many descriptions. A run-scoped path loses 2 when no
- * keyword is about runs or tasks. Ties go to the shorter path, so `/v2/datasets/{datasetId}` comes before
- * the same operation on a run's default dataset.
+ * Operations matching the query's keywords, best first, scored by where each keyword is found. A verb for
+ * the method alone does not match. The description counts only for keywords no operation's name has, and
+ * only with two or more of them, since one word alone is in too many descriptions. Ties go to the shorter path.
  */
 export function searchApiOperations(index: Map<string, ApiOperation>, query: string, limit: number): ApiOperation[] {
     // One-letter terms, such as the s of "run's", match too many words.
