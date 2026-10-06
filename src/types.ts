@@ -206,10 +206,9 @@ export type HelperTool = ToolBase & {
      */
     call: (toolArgs: InternalToolArgs) => Promise<ToolResponse>;
     /**
-     * Returns the copy of the call's arguments that is logged, for a tool whose arguments carry
-     * secrets. Applied in `prepareToolCallContext`, so every log of the arguments sees it. It runs
-     * before AJV validation: it must accept arguments of any shape and must not mutate them, and it
-     * still sees the undeclared keys AJV strips later, so build the logged copy as an allowlist.
+     * Returns the copy of the arguments that is logged, for a tool whose arguments carry secrets. It runs in
+     * `prepareToolCallContext`, before AJV validation, so it must accept any shape and not mutate the
+     * arguments; it also sees undeclared keys, so build the copy as an allowlist.
      */
     redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
 };

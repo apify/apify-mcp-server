@@ -46,9 +46,10 @@ export const apifyApiRead: ToolEntry = Object.freeze({
     ajvValidate: compileSchema(z.toJSONSchema(apifyApiReadArgs)),
     annotations: {
         title: 'Read Apify API',
-        readOnlyHint: true,
+        // A GET can start a run, such as a synchronous run of an Actor or task.
+        readOnlyHint: false,
         destructiveHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
         openWorldHint: false,
     },
     // A storage signature, or the webhooks of a synchronous run, would otherwise be logged.

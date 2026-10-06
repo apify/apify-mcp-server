@@ -33,7 +33,6 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
             `get its parameters with ${HELPER_TOOLS.API_DETAILS} by its method and path`,
         callTools.length > 0 && `call it with ${callTools.join(' or ')}`,
     ].filter(Boolean);
-    const renameExample = hasTool(HELPER_TOOLS.API_WRITE) ? '\n- user_input: Rename my dataset to leads-2026' : '';
     const nextStepsSentence = nextSteps.length > 0 ? `\nAfter finding an operation, ${nextSteps.join(', then ')}.` : '';
     return dedent`
         Search the Apify API reference for operations by keywords. Returns each operation's method, path
@@ -47,8 +46,8 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         - Use when no dedicated tool does what the user asks and the Apify API might.
 
         USAGE EXAMPLES:
-        - user_input: List the webhooks on my account${renameExample}
-        - user_input: How much of my monthly usage have I spent?
+        - user_input: Did my webhooks deliver their last calls?
+        - user_input: What is my monthly spending limit?
     `;
 }
 
