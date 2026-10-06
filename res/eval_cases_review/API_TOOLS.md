@@ -206,8 +206,8 @@ Platform:
    return 200. So does `username~name`: `GET /v2/datasets/{username}~eval-api-shared` returns 200.
 6. The account can create private Actors with a `SOURCE_FILES` version and `envVars` (including `isSecret: true`)
    without a build, and its plan allows two more Actors.
-7. `GET .../versions/0.0/env-vars` returns the plain value of EVAL_REGION and no value for EVAL_API_KEY. The version and
-   Actor objects carry `envVars` the same way.
+7. `GET .../versions/0.0/env-vars` returns the plain value of EVAL_REGION and no value for EVAL_API_KEY. The version
+   list, the version, and the Actor object carry `envVars` the same way.
 8. `GET .../env-vars/EVAL_TIMEZONE` returns 404, and so does `GET /v2/users/me/usage`. Record both error types.
 9. `POST /v2/datasets` reads the name only from the `name` query parameter, so a body-only `name` creates an unnamed
    dataset. A second POST with an existing name returns the existing dataset. Renaming onto a taken name fails; record
