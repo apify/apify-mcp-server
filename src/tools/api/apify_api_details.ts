@@ -78,8 +78,8 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
                 ? ` Find the path with ${HELPER_TOOLS.API_SEARCH}.`
                 : '';
             return respondUserError(
-                `The path ${path} is not in the API spec. A name is written username~name, or ~name for your ` +
-                    `own Actor or storage, as in /v2/actors/~my-actor.${next}`,
+                `The path ${path} is not in the API spec. A name is written username~name, or ~name for one ` +
+                    `you own, as in /v2/actors/~my-actor.${next}`,
             );
         }
         const operations = parsed.method ? matched.filter((operation) => operation.method === parsed.method) : matched;
