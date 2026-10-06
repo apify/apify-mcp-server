@@ -104,7 +104,9 @@ describe('executeToolAndUpdateTask()', () => {
     it('stores no result when the tool succeeds after the task was cancelled', async () => {
         const properties = await runCancelledTask();
 
-        expect(properties.tool_status).toBe(TOOL_STATUS.ABORTED);
+        // Not ABORTED: this guard forwards the dispatch's own status, unlike the 402 and
+        // permission-approval guards, which pass ABORTED explicitly.
+        expect(properties.tool_status).toBe(TOOL_STATUS.SUCCEEDED);
     });
 
     it('stores no result when a 402 lands after the task was cancelled', async () => {
@@ -116,14 +118,18 @@ describe('executeToolAndUpdateTask()', () => {
     it('stores no result when a permission-approval error lands after the task was cancelled', async () => {
         const properties = await runCancelledTask({ error: makePermissionApprovalError() });
 
+        // Hardcoded ABORTED again: the mapper's own status for this class is SOFT_FAIL.
         expect(properties.tool_status).toBe(TOOL_STATUS.ABORTED);
     });
 
     it('stores no result when the tool throws after the task was cancelled', async () => {
         const properties = await runCancelledTask({ error: new Error('boom') });
 
-        // The failure category still pins the execution-error arm.
+        // Classified from the error alone, so it pins the execution arm whatever the race below does.
         expect(properties.failure_category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
-        expect(properties.tool_status).toBe(TOOL_STATUS.ABORTED);
+        // This guard forwards the classified status rather than hardcoding ABORTED, but the status
+        // is abort-aware: the cancel watcher polls every 500 ms and flips it to ABORTED once it
+        // ticks. Both outcomes are correct here, so pin the pair rather than one side of a race.
+        expect([TOOL_STATUS.FAILED, TOOL_STATUS.ABORTED]).toContain(properties.tool_status);
     });
 });

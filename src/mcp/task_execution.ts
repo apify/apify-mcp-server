@@ -191,12 +191,19 @@ export async function executeToolAndUpdateTask(params: {
     };
 
     // Once a task is cancelled the spec forbids writing a result; every storage path
-    // must short-circuit here. Every path reports ABORTED, whatever the tool did, so a
-    // cancel counts the same in telemetry. `logSuffix` is concatenated after "Task was cancelled".
-    const skipIfTaskCancelled = async (logSuffix: string, diagnostics?: CallDiagnostics): Promise<boolean> => {
+    // must short-circuit here. `status` says what the tool did, not that the client
+    // cancelled, matching the sync path: a tool that finished keeps SUCCEEDED (the work
+    // ran), an error keeps its classified status (ABORTED only when the cancel caused it),
+    // and the 402 and permission-approval paths pass ABORTED because no work ran.
+    // `logSuffix` is concatenated after "Task was cancelled".
+    const skipIfTaskCancelled = async (
+        logSuffix: string,
+        status: ToolStatus,
+        diagnostics?: CallDiagnostics,
+    ): Promise<boolean> => {
         if (!(await isTaskCancelled(taskId, mcpSessionId, taskStore))) return false;
         log.debug(`[executeToolAndUpdateTask] Task was cancelled${logSuffix}`, { taskId, mcpSessionId });
-        finishTaskTracking(TOOL_STATUS.ABORTED, diagnostics);
+        finishTaskTracking(status, diagnostics);
         return true;
     };
 
@@ -226,7 +233,7 @@ export async function executeToolAndUpdateTask(params: {
             await taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
         } catch (err) {
             if (
-                await skipIfTaskCancelled(' before execution started, skipping', {
+                await skipIfTaskCancelled(' before execution started, skipping', TOOL_STATUS.ABORTED, {
                     ...buildActorFields(actorName, actorId),
                 })
             )
@@ -279,7 +286,7 @@ export async function executeToolAndUpdateTask(params: {
         callDiagnostics = dispatchResult.callDiagnostics;
 
         // Check if task was cancelled before storing result
-        if (await skipIfTaskCancelled(', skipping result storage')) return;
+        if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
 
         // On a failed result, nudge the agent to report the blocker via report-problem (mirrors the
         // synchronous CallTool path, which task-mode calls like call-actor bypass).
@@ -330,7 +337,7 @@ export async function executeToolAndUpdateTask(params: {
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this 402.
                 if (
-                    await skipIfTaskCancelled(', skipping 402 result storage', {
+                    await skipIfTaskCancelled(', skipping 402 result storage', TOOL_STATUS.ABORTED, {
                         ...buildActorFields(actorName, actorId),
                     })
                 )
@@ -350,7 +357,7 @@ export async function executeToolAndUpdateTask(params: {
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this approval error.
                 if (
-                    await skipIfTaskCancelled(', skipping permission-approval result storage', {
+                    await skipIfTaskCancelled(', skipping permission-approval result storage', TOOL_STATUS.ABORTED, {
                         ...buildActorFields(actorName, actorId),
                     })
                 )
@@ -397,7 +404,7 @@ export async function executeToolAndUpdateTask(params: {
                 const { userText } = errorResult;
 
                 // Check if task was cancelled before storing result
-                if (await skipIfTaskCancelled(', skipping result storage', callDiagnostics)) return;
+                if (await skipIfTaskCancelled(', skipping result storage', toolStatus, callDiagnostics)) return;
 
                 log.debug('[executeToolAndUpdateTask] Storing failed result', {
                     taskId,
