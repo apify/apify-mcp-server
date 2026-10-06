@@ -28,7 +28,7 @@ const apifyApiWriteArgs = z.object({
             'HTTP method: POST, PUT, PATCH, or DELETE. Omit it only when the path has one method in the API spec.',
         ),
     query: apiCallArgsShape.query,
-    body: z.unknown().optional().describe('The request body: any JSON value, usually an object, sent as JSON.'),
+    body: z.unknown().optional().describe('The request body: a JSON object or array, sent as JSON.'),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -84,6 +84,19 @@ async function inferMethod(
 }
 
 /**
+ * The body to send. A client may send the untyped body as a string of JSON, so a string is parsed to
+ * the value it holds; sent as is, it would reach the API as a JSON string.
+ */
+function parseBody(body: unknown): { value: unknown } | { error: string } {
+    if (typeof body !== 'string') return { value: body };
+    try {
+        return { value: JSON.parse(body) };
+    } catch {
+        return { error: 'The body is a string that is not valid JSON; give it as a JSON object or array.' };
+    }
+}
+
+/**
  * Sends a POST, PUT, PATCH, or DELETE to a path of the Apify API, https://docs.apify.com/api/v2, as a proxy.
  */
 export const apifyApiWrite: ToolEntry = Object.freeze({
@@ -108,6 +121,8 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
     redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiWriteArgs.parse(toolArgs.args);
+        const body = parseBody(parsed.body);
+        if ('error' in body) return respondUserError(body.error);
         const resolved = parsed.method
             ? { method: parsed.method }
             : await inferMethod(parsed.path, toolArgs.loadedToolNames);
@@ -118,7 +133,7 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
             method: resolved.method,
             path: parsed.path,
             query: parsed.query,
-            body: parsed.body,
+            body: body.value,
             signal: toolArgs.signal,
             loadedToolNames: toolArgs.loadedToolNames,
         });

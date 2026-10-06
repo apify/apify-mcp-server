@@ -724,7 +724,7 @@ describe('apify-api-write', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
-    it('sends the body as application/json through the real apify-client axios instance', async () => {
+    it('sends the body as application/json through the real apify-client axios instance, a string as the value it holds', async () => {
         const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com' });
         const sent: { url?: string; data?: unknown; contentType?: unknown }[] = [];
         client.httpClient.axios.defaults.adapter = async (config) => {
@@ -746,18 +746,39 @@ describe('apify-api-write', () => {
             return (await (apifyApiWrite as HelperTool).call(context)) as TextToolResult;
         };
 
-        const results = [await call({ name: 'x' }), await call(42), await call('text')];
+        const results = [
+            await call({ name: 'x' }),
+            await call(42),
+            await call('{"name":"x"}'),
+            await call(' [{"key":"a"}] '),
+            await call('"text"'),
+        ];
 
         expect(results.map((result) => result.structuredContent)).toEqual(
-            Array(3).fill(expect.objectContaining({ statusCode: 201, data: { data: {} } })),
+            Array(5).fill(expect.objectContaining({ statusCode: 201, data: { data: {} } })),
         );
         const url = 'https://api.apify.com/v2/key-value-stores/s/records/a%2FK';
         expect(sent).toEqual([
             { url, data: '{"name":"x"}', contentType: 'application/json' },
             { url, data: '42', contentType: 'application/json' },
+            { url, data: '{"name":"x"}', contentType: 'application/json' },
+            { url, data: '[{"key":"a"}]', contentType: 'application/json' },
             { url, data: '"text"', contentType: 'application/json' },
         ]);
     });
+
+    it.each(['text', '', '{"name":'])(
+        'refuses the string body %j, which is not JSON, without a request',
+        async (body) => {
+            const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                'The body is a string that is not valid JSON; give it as a JSON object or array.',
+            );
+            expect(requestMock).not.toHaveBeenCalled();
+        },
+    );
 
     /** The abort axios throws for a body over `maxContentLength`, with the status Node's request keeps. */
     function buildOversizeError(statusCode?: number) {
@@ -827,6 +848,12 @@ describe('apify-api-write', () => {
 
             expect(redactArgs?.(args)).toEqual({ path, method: 'PUT', body: '[REDACTED]' });
             expect(args.body).toEqual({ value: 'secret' });
+        });
+
+        it('redacts a body given as a JSON string', () => {
+            const args = { path: '/v2/datasets/abc', method: 'PUT', body: '{"value":"secret"}' };
+
+            expect(redactArgs?.(args)).toEqual({ path: '/v2/datasets/abc', method: 'PUT', body: '[REDACTED]' });
         });
 
         it('logs only the declared arguments, so a body under another key is left out', () => {
