@@ -20,8 +20,8 @@ export const apiCallArgsShape = {
         .min(1)
         .describe(
             'The API path with its values in it: actors, v2/actors, and /v2/actors are the same. A name is ' +
-                'written username~name, as in /v2/actors/john~my-actor. A query string written into the path is ' +
-                'sent too.',
+                'written username~name, or ~name for your own Actor or storage, as in /v2/actors/~my-actor. ' +
+                'A query string written into the path is sent too.',
         ),
     query: z
         .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
@@ -31,7 +31,8 @@ export const apiCallArgsShape = {
 
 /** The shared description lines of the read and write tools. */
 export const API_CALL_DESCRIPTION = `A proxy to the Apify API, like apify api in the Apify CLI; the server adds the host and the API token.
-Write the path as actors, v2/actors, or /v2/actors, with its values in it; a name is written username~name.
+Write the path as actors, v2/actors, or /v2/actors, with its values in it.
+A name is written username~name, or ~name for your own Actor or storage, as in /v2/actors/~my-actor.
 Synchronous runs, and waitForFinish above ${WAIT_SECS_MAX} seconds, outlast the usual 60-second tool-call timeout,
 so prefer asynchronous runs.`;
 
