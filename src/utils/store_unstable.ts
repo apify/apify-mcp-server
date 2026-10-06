@@ -24,8 +24,8 @@ export function isUnstableStoreSearchEnabled(): boolean {
 
 export type EnrichedStoreActorStats = {
     totalUsers?: number;
-    monthlyUsers?: number;
-    bookmarks?: number;
+    totalUsers30Days?: number;
+    bookmarkCount?: number;
 };
 
 /** One item of `GET /unstable/store/search` → `data.items[]`, per store-backend-unstable/POC.md. */
@@ -73,11 +73,11 @@ export function mapEnrichedStoreActorToStoreList(item: EnrichedStoreActor): Acto
         inputSchema: item.inputSchema,
         currentPricingInfo: item.currentPricingInfo,
         actorReviewRating: item.rating,
-        bookmarkCount: item.stats?.bookmarks,
+        bookmarkCount: item.stats?.bookmarkCount,
         stats: {
             totalUsers: item.stats?.totalUsers ?? 0,
-            totalUsers30Days: item.stats?.monthlyUsers ?? 0,
-            bookmarkCount: item.stats?.bookmarks,
+            totalUsers30Days: item.stats?.totalUsers30Days ?? 0,
+            bookmarkCount: item.stats?.bookmarkCount,
             actorReviewRating: item.rating,
         },
     };
