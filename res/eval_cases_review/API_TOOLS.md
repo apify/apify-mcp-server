@@ -33,8 +33,8 @@ Checked offline:
 
 - Every case converts with `toMcpAgentTestCase()` (`evals/langfuse/dataset.ts`) and converts back to the same flat case.
 - The 41 ids are unique and none matches an id in #1421's case files.
-- Every tool in `expectedTools` and `expectedErrors` exists on master, #1444 (`5c1a53c8`), or #1445 (`330c8bca`), except
-  Claude Code's built-in `ReadMcpResourceTool`. Every `tools` selector is a category on #1445.
+- Every tool in `expectedTools` and `expectedErrors` exists on master, #1444 (`5c1a53c8`), or #1445 (`330c8bca`). Every
+  `tools` selector is a category on #1445.
 - `evals/scripts/api_fixtures.ts` passes type-check, lint, and format on this branch. It has not run.
 - Search ranking, methods per path, and closest-path suggestions were checked by running the server's own
   `searchApiOperations`, `findPathOperations`, and `findClosestApiPaths` on the apify-docs OpenAPI source from
@@ -76,13 +76,10 @@ and above, and CI runs at the runner default of 8.
   to `build-actor`, whose `actor` argument needs an ID or `username/name` the query does not give.
 - **No `expectedArgs`.** The path is free-form (`webhooks`, `v2/webhooks`, and `/v2/webhooks` are the same), and not
   every accepted tool has a `method` key. The merge references check paths and bodies instead.
-- **The resource counts as a read.** Every merge read reference accepts `ReadMcpResourceTool` with the same
-  `https://api.apify.com/v2/...` URI, since it reaches the same endpoint with the same token. Every pr case that accepts
-  a read lists it too: the server instructions tell the agent to pass any `/v2` GET URL to `resources/read`, and the entry
-  costs nothing when `mcpToolsOnly` removes the tool. Two routing cases list it as well: `api-loaded-dataset-items`,
-  because the instructions name dataset items, and `api-loaded-run-log`, because the resource templates advertise run
-  logs. `webhooks-raw-json-easy` is the one case that measures the choice. This is open for discussion (Open
-  questions, 1).
+- **The resource counts as a read in the merge cases only.** Every merge read reference accepts `ReadMcpResourceTool`
+  with the same `https://api.apify.com/v2/...` URI, since it reaches the same endpoint with the same token. The pr cases
+  do not list it in `expectedTools` (agreed with the maintainer): a tool-call case expects the tool that does the job,
+  or a lookup before it. `webhooks-raw-json-easy` is the one case that measures the choice.
 - **Queries do not reuse the descriptions' examples.** The tool descriptions quote the acceptance tasks almost verbatim,
   so the queries word the same tasks differently and test the descriptions rather than repeat them.
 - **Routing categories differ from #1421.** As in #1421, a pr id names the asserted tool: a positive case's id and
@@ -128,7 +125,7 @@ and above, and CI runs at the runner default of 8.
 | | 404 on an unknown path, with suggested paths | `merge/api/old-path-404-hard` |
 | | 404 on a missing record | `merge/api/env-var-missing-hard` |
 | | Token masking (`/v2/browser-info`) | `merge/api/browser-info-medium` |
-| | Resource or tool | `merge/api/webhooks-raw-json-easy`. Every pr case that accepts a read also accepts `ReadMcpResourceTool`. |
+| | Resource or tool | `merge/api/webhooks-raw-json-easy`. The pr cases do not accept `ReadMcpResourceTool`. |
 | | Response over 256 KB, binary body | Not covered. No endpoint without a dedicated tool returns that much on the eval account reliably. Unit tests cover both. |
 | | Routing: a dedicated tool must win | `pr/get-actor-run-list/api-loaded-last-run`, `pr/get-dataset-items/api-loaded-dataset-items`, `pr/get-dataset-list/api-loaded-dataset-list`, `pr/get-actor-run-log/api-loaded-run-log` |
 | | Routing: a run goes to `call-actor`, not to a `run-sync` GET | `pr/call-actor/api-loaded-run-actor`, `api-loaded-hello-world`, `api-loaded-run-and-wait` |
@@ -402,9 +399,8 @@ server without the `api` category, and the session would have no API tools:
 - **merge tier:** most of the 15 cases fail. The tier stays above its 0.6 gate, but real regressions would hide behind
   expected failures, and the write cases would run without fixtures.
 
-Accepting `ReadMcpResourceTool` adds to the risk: the resource is on master already, so if `mcpToolsOnly` does not
-remove it (probe 22), those four read cases could pass before #1444 through the resource too, which would hide the
-missing `api` category.
+The pr cases do not accept `ReadMcpResourceTool`, so a read case cannot pass through the resource, which is on master
+already, before #1444 merges.
 
 Langfuse item ids are unique per project forever and cannot move between datasets, so the cases are calibrated in
 staging datasets under burned ids and promoted under the final ids:
@@ -558,10 +554,7 @@ teardown is needed after a run: a leftover webhook watches an Actor that never r
 
 The judge accepts a read through the server's API resource (`ReadMcpResourceTool`) wherever it
 accepts `apify-api-read`, since both reach the same URL with the session's token. The `pr` items
-that accept a read list `ReadMcpResourceTool` in `expectedTools` for the same reason, as do
-`pr/get-dataset-items/api-loaded-dataset-items` and `pr/get-actor-run-log/api-loaded-run-log`, where
-the server's instructions and resource templates point at the resource; the entry costs nothing if
-`mcpToolsOnly` removes the tool.
+do not list it in `expectedTools`: a tool-call item expects the tool that does the job.
 `merge/api/webhooks-raw-json-easy` is the one item without `mcpToolsOnly`, so the client's resource
 tool is offered next to `apify-api-read`. It passes either way, and its transcript records which
 route the agent took. Its Claude Code subprocess inherits the harness's environment, `APIFY_TOKEN`
@@ -616,9 +609,9 @@ teardown step.
 
 ## Open questions
 
-1. Should a read through the resource satisfy the acceptance criterion of #1443 ("succeed with the API tools")? The cases
-   say yes: the merge references accept it, the pr cases that accept a read list it, and `webhooks-raw-json-easy`
-   measures the choice with the built-ins on.
+1. Should a read through the resource satisfy the acceptance criterion of #1443 ("succeed with the API tools")? The merge
+   references accept it, and `webhooks-raw-json-easy` measures the choice with the built-ins on. The pr cases do not
+   accept it (agreed with the maintainer).
 2. Is it fine to keep two private Actors, one webhook, and one dataset on the CI test account for good, and does its plan
    allow two more Actors?
 3. Do the README section and the CI step go into #1444 itself, or into an evals PR merged right after it?

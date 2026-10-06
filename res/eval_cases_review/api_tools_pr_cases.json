@@ -6,7 +6,6 @@
     "query": "are there any webhooks set up on my apify account? i want to know where they send their calls",
     "expectedTools": [
       "apify-api-read",
-      "ReadMcpResourceTool",
       "apify-api-search",
       "apify-api-details"
     ],
@@ -30,7 +29,6 @@
     "query": "how much have i spent on apify so far in this billing cycle?",
     "expectedTools": [
       "apify-api-read",
-      "ReadMcpResourceTool",
       "apify-api-search",
       "apify-api-details"
     ],
@@ -54,7 +52,6 @@
     "query": "what's the monthly spending cap on my account, and how close am i to hitting it?",
     "expectedTools": [
       "apify-api-read",
-      "ReadMcpResourceTool",
       "apify-api-search",
       "apify-api-details"
     ],
@@ -78,7 +75,6 @@
     "query": "what is EVAL_REGION set to on my actor eval-api-actor?",
     "expectedTools": [
       "apify-api-read",
-      "ReadMcpResourceTool",
       "apify-api-search",
       "apify-api-details",
       "fetch-actor-details"
@@ -103,7 +99,6 @@
     "query": "which environment variables does my actor eval-api-actor have?",
     "expectedTools": [
       "apify-api-read",
-      "ReadMcpResourceTool",
       "apify-api-search",
       "apify-api-details",
       "fetch-actor-details"
@@ -128,7 +123,6 @@
     "query": "has the webhook that posts to https://example.com/eval-api/run-failed ever fired? just look, don't trigger it",
     "expectedTools": [
       "apify-api-read",
-      "ReadMcpResourceTool",
       "apify-api-search",
       "apify-api-details"
     ],
@@ -155,7 +149,6 @@
       "apify-api-search",
       "apify-api-details",
       "apify-api-read",
-      "ReadMcpResourceTool",
       "get-dataset",
       "get-dataset-list"
     ],
@@ -182,7 +175,6 @@
       "apify-api-search",
       "apify-api-details",
       "apify-api-read",
-      "ReadMcpResourceTool",
       "fetch-actor-details"
     ],
     "tools": [
@@ -208,7 +200,6 @@
       "apify-api-search",
       "apify-api-details",
       "apify-api-read",
-      "ReadMcpResourceTool",
       "fetch-actor-details"
     ],
     "tools": [
@@ -234,7 +225,6 @@
       "apify-api-search",
       "apify-api-details",
       "apify-api-read",
-      "ReadMcpResourceTool",
       "fetch-actor-details"
     ],
     "tools": [
@@ -260,7 +250,6 @@
       "apify-api-details",
       "apify-api-write",
       "apify-api-read",
-      "ReadMcpResourceTool",
       "get-actor-run"
     ],
     "tools": [
@@ -353,8 +342,7 @@
     "query": "show me the first 5 items in dataset WkzbQMuFYuamGv3YF",
     "expectedTools": [
       "get-dataset-items",
-      "get-dataset",
-      "ReadMcpResourceTool"
+      "get-dataset"
     ],
     "tools": [
       "actors",
@@ -397,8 +385,7 @@
     "query": "why did run 3pZ8cQe1RtYuIoP2a fail? show me the end of its log",
     "expectedTools": [
       "get-actor-run-log",
-      "get-actor-run",
-      "ReadMcpResourceTool"
+      "get-actor-run"
     ],
     "tools": [
       "actors",
