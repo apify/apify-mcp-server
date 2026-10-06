@@ -175,12 +175,17 @@ export async function prepareToolCall(params: {
 
     const actorName = extractActorName(tool, args as Record<string, unknown>);
     const actorId = extractActorId(tool);
+    // fetch-actor-details only describes Actors, and only helps if this session serves it.
+    const schemaHint =
+        tool.type === TOOL_TYPE.ACTOR && resolveToolEntry(HELPER_TOOLS.ACTOR_GET_DETAILS, tools)
+            ? `using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool`
+            : 'in tools/list';
 
     if (!args) {
         return {
             message: dedent`
                 Missing arguments for tool "${name}".
-                Please provide the required arguments for this tool. Check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool to see what parameters are required.
+                Please provide the required arguments for this tool. Check the tool's input schema ${schemaHint} to see what parameters are required.
             `,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: {
@@ -233,7 +238,7 @@ export async function prepareToolCall(params: {
                 message: dedent`
                     Invalid arguments for tool "${tool.name}".
                     Validation errors: ${errorMessages}.
-                    Please check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.
+                    Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.
                 `,
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
