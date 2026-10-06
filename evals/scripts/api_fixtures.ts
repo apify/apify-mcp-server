@@ -3,26 +3,25 @@
 /**
  * Fixtures for the `merge/api/*` items in the `mcp-server-evals-merge` dataset (Apify API tool evals).
  *
- * Seeds the permanent fixtures when they are missing, deletes what a run created, and sweeps what runs
- * left behind. It never resets or deletes a fixture: several runs share the eval account, and another
- * run may be reading it.
+ * Deletes what previous runs left behind: datasets and Actors named `eval-api-*`, and webhooks that
+ * call an `https://example.com/eval-api/` URL or watch a fixture Actor, the fixture webhook among
+ * them. Then it creates the permanent fixtures if they are missing and resets their mutable state,
+ * since an eval agent may have changed them, and creates the fixture webhook afresh. Dataset names
+ * are unique per account, so the fixed-name create cases collide with leftovers on the next run
+ * without this.
  *
- * The fixtures, which no case may modify:
- * - `eval-api-actor`: version 0.0 with EVAL_REGION (plain) and EVAL_API_KEY (secret), and one webhook
- *   on its failed runs. The read cases assert on these.
- * - `eval-api-actor-scratch`: version 0.0 with EVAL_MODE (plain). The write cases add their own
- *   variables and webhooks to it and remove them again.
+ * The fixtures:
+ * - `eval-api-actor`, read-only: version 0.0 alone, with EVAL_REGION (plain) and EVAL_API_KEY
+ *   (secret), and one webhook on its failed runs. The read cases assert on these, so no case may
+ *   modify them.
+ * - `eval-api-actor-scratch`, edited by the write cases: version 0.0 alone, with only EVAL_MODE (plain).
+ * - `eval-api-shared`, a dataset the access case opens to anyone with the link; reset to RESTRICTED.
  *
- * The two are separate so that a variable a write case adds never shows up in a read case's answer.
- * Neither is ever built or run, so the fixture webhook never fires on its own and nothing here costs
- * compute.
+ * The two Actors are separate because items run concurrently against one account: a case that edits
+ * an Actor must not edit the one a read case asserts on. Neither is ever built or run, so the fixture
+ * webhook never fires on its own and nothing here costs compute.
  *
- * Every name a case creates ends in `-<runId>-t<trial>`, which the runner writes in place of the item's
- * `{{uniq}}`: datasets, webhook URLs, and variables on the fixture Actors. `--run-id <id>` deletes that
- * run's names at any age. Anything else under the eval names survives until it is older than 6 hours,
- * so a run in flight never loses a resource it is using.
- *
- * Usage: pnpm run evals:mcp-agent:api-fixtures [--run-id <id>] [--dry-run]
+ * Usage: pnpm run evals:mcp-agent:api-fixtures [--dry-run]
  */
 
 import 'dotenv/config';
@@ -34,56 +33,7 @@ import { findMissingEnvVars, sanitizeProcessEnv } from '../environment.js';
 
 sanitizeProcessEnv();
 
-// TODO(#1423): import isNameFromRun and parseRunIdArg from evals/run_id.ts, and LEFTOVER_MAX_AGE_MS
-// from evals/scripts/schedules_sweep.ts, once it merges. Copied verbatim until then, so the names the
-// runner builds match here exactly.
-
-const RUN_ID_PATTERN = /^[a-z0-9-]+$/;
-
-const RUN_ID_FLAG = '--run-id';
-
-/**
- * Matched as a delimited token, because a bare `includes('35014680476-1')` also matches attempt
- * 12's `…-35014680476-12-t1`.
- */
-function isNameFromRun(name: string, runId: string): boolean {
-    return name.includes(`-${runId}-t`);
-}
-
-/** Throws when a `--run-id` would build a name the platform rejects. */
-function validateRunId(value: string): void {
-    if (!RUN_ID_PATTERN.test(value)) {
-        throw new Error(`--run-id must be lowercase letters, digits and dashes, got "${value}"`);
-    }
-}
-
-/**
- * A value starting with `--` is an error, not an id: `--run-id --dry-run` would otherwise swallow
- * the next flag, and `--dry-run` matches the id pattern.
- */
-function parseRunIdArg(argv: string[]): string | undefined {
-    const index = argv.findIndex((arg) => arg === RUN_ID_FLAG || arg.startsWith(`${RUN_ID_FLAG}=`));
-    if (index === -1) return undefined;
-    const arg = argv[index];
-    const value = arg === RUN_ID_FLAG ? argv[index + 1] : arg.slice(`${RUN_ID_FLAG}=`.length);
-    if (!value || value.startsWith('--')) throw new Error(`${RUN_ID_FLAG} needs a value`);
-    validateRunId(value);
-    return value;
-}
-
-/**
- * How old an unmatched leftover must be before the sweep deletes it. Four times the workflow's
- * 90-minute timeout, so a run in flight never loses a resource it is using.
- */
-const LEFTOVER_MAX_AGE_MS = 6 * 60 * 60 * 1000;
-
-/** A run's own name goes at any age; anything else only once it is older than the age limit. */
-function isSweepable(name: string, createdAt: Date | string, runId: string | undefined, now: number): boolean {
-    if (runId && isNameFromRun(name, runId)) return true;
-    return now - new Date(createdAt).getTime() >= LEFTOVER_MAX_AGE_MS;
-}
-
-/** Only datasets with this prefix are ever deleted. None is a fixture. */
+/** Only datasets and Actors with this prefix are ever deleted. */
 const EVAL_API_PREFIX = 'eval-api-';
 
 /** The only version of both fixture Actors. */
@@ -93,7 +43,7 @@ type FixtureEnvVar = { name: string; value: string; isSecret: boolean };
 type FixtureActor = { name: string; envVars: FixtureEnvVar[] };
 type FixtureActorKey = 'readOnly' | 'scratch';
 
-/** Never deleted, never reset. */
+/** Never deleted. `readOnly` is what the read cases assert on; `scratch` is what the write cases edit. */
 const FIXTURE_ACTORS: Record<FixtureActorKey, FixtureActor> = {
     readOnly: {
         name: 'eval-api-actor',
@@ -104,7 +54,7 @@ const FIXTURE_ACTORS: Record<FixtureActorKey, FixtureActor> = {
     },
     scratch: {
         name: 'eval-api-actor-scratch',
-        // The secret case adds its own variable next to this one and must leave this one alone.
+        // The secret case must leave this one alone, which is how a version-wide envVars replace shows up.
         envVars: [{ name: 'EVAL_MODE', value: 'scratch', isSecret: false }],
     },
 };
@@ -118,54 +68,13 @@ const EVAL_WEBHOOK_URL_PREFIX = 'https://example.com/eval-api/';
 /** Watches failed runs of the read-only Actor, which never runs. The list and test cases find it by this URL. */
 const FIXTURE_WEBHOOK_URL = `${EVAL_WEBHOOK_URL_PREFIX}run-failed`;
 
-/**
- * A webhook has no unique name, so two seeds that both find the fixture webhook missing would each
- * create one. With a fixed key, the second create returns the first webhook.
- */
-const FIXTURE_WEBHOOK_IDEMPOTENCY_KEY = 'eval-api-fixture-webhook';
+/** Opened to anyone with the link by the access case, reset to RESTRICTED every run. */
+const FIXTURE_DATASET_NAME = 'eval-api-shared';
 
 /** `--dry-run` prints what the run would change and writes nothing. */
 const IS_DRY_RUN = process.argv.includes('--dry-run');
 /** Marks every line of a dry run, so its output cannot be read as changes that happened. */
 const DRY = IS_DRY_RUN ? '[dry run] ' : '';
-
-type FixtureActorIds = Partial<Record<FixtureActorKey, string>>;
-
-/**
- * Creates a missing fixture part. CI seeds at the start of every merge run and runs overlap, so two
- * seeds can both find a part missing, and the second create fails on the duplicate. After a failed
- * create, the part is read again: if it exists now, another seed made it, so this warns and goes on
- * instead of failing the seed step and with it that run's evals. Returns undefined on a dry run.
- */
-async function createFixturePart<T>(
-    label: string,
-    create: () => Promise<T>,
-    readAgain: () => Promise<T | undefined>,
-): Promise<T | undefined> {
-    if (IS_DRY_RUN) {
-        console.log(`🌱 ${DRY}Created ${label}`);
-        return undefined;
-    }
-    try {
-        const created = await create();
-        console.log(`🌱 Created ${label}`);
-        return created;
-    } catch (error) {
-        const existing = await readAgain();
-        if (existing === undefined) throw error;
-        const reason = error instanceof Error ? error.message : String(error);
-        console.warn(`⚠️  Creating ${label} failed (${reason}), but it exists now, so another seed created it`);
-        return existing;
-    }
-}
-
-/** The ID of the account's own Actor with this name, from a fresh list. */
-async function findOwnActorId(client: ApifyClient, name: string): Promise<string | undefined> {
-    for await (const actor of client.actors().list({ my: true })) {
-        if (actor.name === name) return actor.id;
-    }
-    return undefined;
-}
 
 /** A minimal Node.js Actor. Only the source has to be valid, since nothing builds it. */
 function buildFixtureVersion(fixture: FixtureActor): ActorVersion {
@@ -191,41 +100,43 @@ function buildFixtureVersion(fixture: FixtureActor): ActorVersion {
 }
 
 /**
- * Creates a missing fixture Actor and prepares the version of an existing one. Returns the fixture
- * Actor IDs; one is missing only on a dry run that would create it.
+ * Deletes leftover `eval-api-*` Actors, creates a missing fixture Actor, and resets the variables of
+ * an existing one. Returns the fixture Actor IDs; one is missing only on a dry run that would create it.
  */
-async function prepareFixtureActors(
-    client: ApifyClient,
-    runId: string | undefined,
-    now: number,
-): Promise<FixtureActorIds> {
+async function prepareFixtureActors(client: ApifyClient): Promise<Partial<Record<FixtureActorKey, string>>> {
+    // Read every page before deleting anything: offset paging skips entries when the
+    // collection shrinks underneath it, and a missed leftover fails the next run.
     const actors = [];
     for await (const actor of client.actors().list({ my: true })) actors.push(actor);
 
-    const ids: FixtureActorIds = {};
+    const fixtureNames = Object.values(FIXTURE_ACTORS).map((fixture) => fixture.name);
+    for (const actor of actors) {
+        if (fixtureNames.includes(actor.name) || !actor.name.startsWith(EVAL_API_PREFIX)) continue;
+        if (!IS_DRY_RUN) await client.actor(actor.id).delete();
+        console.log(`🗑️  ${DRY}Deleted leftover Actor "${actor.name}" (${actor.id})`);
+    }
+
+    const ids: Partial<Record<FixtureActorKey, string>> = {};
     for (const [key, fixture] of Object.entries(FIXTURE_ACTORS) as [FixtureActorKey, FixtureActor][]) {
         const existing = actors.find((actor) => actor.name === fixture.name);
         if (existing) {
-            await prepareFixtureVersion(client, existing.id, fixture, runId, now);
+            await resetFixtureVersion(client, existing.id, fixture);
             ids[key] = existing.id;
-            continue;
+        } else if (IS_DRY_RUN) {
+            console.log(`🌱 ${DRY}Created fixture Actor "${fixture.name}"`);
+        } else {
+            const actor = await client.actors().create({
+                name: fixture.name,
+                title: `Eval fixture (${key === 'readOnly' ? 'read-only' : 'editable'})`,
+                description: `Permanent fixture for Apify API tool MCP agent evals. Never built or run. Do not delete; ${
+                    key === 'readOnly' ? 'do not modify' : 'reset every run'
+                }.`,
+                isPublic: false,
+                versions: [buildFixtureVersion(fixture)],
+            });
+            console.log(`🌱 Created fixture Actor "${actor.name}" (${actor.id})`);
+            ids[key] = actor.id;
         }
-        const actorId = await createFixturePart(
-            `fixture Actor "${fixture.name}"`,
-            async () => {
-                const actor = await client.actors().create({
-                    name: fixture.name,
-                    title: `Eval fixture (${key === 'readOnly' ? 'read-only' : 'write target'})`,
-                    description:
-                        'Permanent fixture for Apify API tool MCP agent evals. Never built or run. Do not delete or modify.',
-                    isPublic: false,
-                    versions: [buildFixtureVersion(fixture)],
-                });
-                return actor.id;
-            },
-            async () => findOwnActorId(client, fixture.name),
-        );
-        if (actorId) ids[key] = actorId;
     }
     return ids;
 }
@@ -240,141 +151,111 @@ function matchesFixtureEnvVar(envVar: ActorEnvironmentVariable, wanted: FixtureE
 }
 
 /**
- * Creates a missing version 0.0 or fixture variable, and deletes the variables runs added. Something
- * that drifted from the fixture only gets a warning: changing it back would change what another run
- * is reading.
+ * Leaves version 0.0 as the only version, with exactly the fixture's variables: an eval agent may have
+ * added, removed, or changed a variable, deleted the version, or added another one. The read cases
+ * assert that the Actor has one version.
  */
-async function prepareFixtureVersion(
-    client: ApifyClient,
-    actorId: string,
-    fixture: FixtureActor,
-    runId: string | undefined,
-    now: number,
-): Promise<void> {
+async function resetFixtureVersion(client: ApifyClient, actorId: string, fixture: FixtureActor): Promise<void> {
     const actorClient = client.actor(actorId);
     const { items: versions } = await actorClient.versions().list();
-    if (!versions.some((version) => version.versionNumber === FIXTURE_VERSION_NUMBER)) {
-        await createFixturePart(
-            `version ${FIXTURE_VERSION_NUMBER} of fixture Actor "${fixture.name}"`,
-            async () => actorClient.versions().create(buildFixtureVersion(fixture)),
-            async () => actorClient.version(FIXTURE_VERSION_NUMBER).get(),
-        );
-        return;
+    const hasFixtureVersion = versions.some((version) => version.versionNumber === FIXTURE_VERSION_NUMBER);
+    // Created before the others are deleted, so the Actor always keeps at least one version.
+    if (!hasFixtureVersion) {
+        if (!IS_DRY_RUN) await actorClient.versions().create(buildFixtureVersion(fixture));
+        console.log(`♻️  ${DRY}Recreated version ${FIXTURE_VERSION_NUMBER} of fixture Actor "${fixture.name}"`);
     }
-    const otherVersionNumbers = versions
-        .map((version) => version.versionNumber)
-        .filter((versionNumber) => versionNumber !== FIXTURE_VERSION_NUMBER);
-    if (otherVersionNumbers.length > 0) {
-        console.warn(
-            `⚠️  Fixture Actor "${fixture.name}" also has version ${otherVersionNumbers.join(', ')}, ` +
-                `and the read cases expect ${FIXTURE_VERSION_NUMBER} alone. Delete it by hand while no run is in flight.`,
-        );
+    for (const { versionNumber } of versions) {
+        if (versionNumber === FIXTURE_VERSION_NUMBER) continue;
+        if (!IS_DRY_RUN) await actorClient.version(versionNumber).delete();
+        console.log(`🗑️  ${DRY}Deleted version ${versionNumber} of fixture Actor "${fixture.name}"`);
     }
+    // A recreated version already has exactly the fixture's variables.
+    if (!hasFixtureVersion) return;
 
     const versionClient = actorClient.version(FIXTURE_VERSION_NUMBER);
-    const { items: envVars } = await versionClient.envVars().list();
-    // A variable has no timestamp. Every variable write updates the Actor's modifiedAt, read here
-    // after the list, so no listed variable is newer than it.
-    const actor = await actorClient.get();
-    if (!actor) return;
-
+    const { items: current } = await versionClient.envVars().list();
+    const keptNames = new Set(
+        fixture.envVars
+            .filter((wanted) => current.some((envVar) => matchesFixtureEnvVar(envVar, wanted)))
+            .map((wanted) => wanted.name),
+    );
+    for (const envVar of current) {
+        if (!envVar.name || keptNames.has(envVar.name)) continue;
+        // Deleted and recreated rather than updated: the platform may refuse to turn a secret plain.
+        if (!IS_DRY_RUN) await versionClient.envVar(envVar.name).delete();
+        console.log(`🗑️  ${DRY}Deleted variable ${envVar.name} of fixture Actor "${fixture.name}"`);
+    }
     for (const wanted of fixture.envVars) {
-        const envVar = envVars.find((candidate) => candidate.name === wanted.name);
-        if (envVar) {
-            if (!matchesFixtureEnvVar(envVar, wanted)) {
-                console.warn(
-                    `⚠️  Variable ${wanted.name} of fixture Actor "${fixture.name}" differs from the fixture. ` +
-                        'Fix it by hand while no run is in flight.',
-                );
-            }
-            continue;
-        }
-        await createFixturePart(
-            `variable ${wanted.name} of fixture Actor "${fixture.name}"`,
-            async () => versionClient.envVars().create(wanted),
-            async () => versionClient.envVar(wanted.name).get(),
-        );
+        if (keptNames.has(wanted.name)) continue;
+        if (!IS_DRY_RUN) await versionClient.envVars().create(wanted);
+        console.log(`🌱 ${DRY}Set variable ${wanted.name} of fixture Actor "${fixture.name}"`);
     }
-
-    const fixtureNames = fixture.envVars.map((wanted) => wanted.name);
-    for (const { name } of envVars) {
-        if (!name || fixtureNames.includes(name) || !isSweepable(name, actor.modifiedAt, runId, now)) continue;
-        if (!IS_DRY_RUN) await versionClient.envVar(name).delete();
-        console.log(`🗑️  ${DRY}Deleted variable ${name} of fixture Actor "${fixture.name}"`);
-    }
+    console.log(`♻️  ${DRY}Reset fixture Actor "${fixture.name}" (${actorId})`);
 }
 
 /**
- * Deletes the webhooks runs created, and creates the fixture webhook on the read-only Actor if it is
- * missing. A webhook has no name, so the run token is matched in its URL.
+ * Deletes every webhook the cases may have created or changed, the fixture webhook among them, and
+ * creates the fixture webhook on the read-only Actor afresh. Recreating it, rather than updating it,
+ * also undoes an edit to a field an update would leave alone (payloadTemplate, headersTemplate,
+ * doNotRetry, ignoreSslErrors), which would change the test case's delivery. No case depends on its ID.
  */
-async function prepareWebhooks(client: ApifyClient, actorIds: FixtureActorIds, runId: string | undefined, now: number) {
-    // Read every page before deleting anything: offset paging skips entries when the
-    // collection shrinks underneath it.
+async function prepareWebhooks(client: ApifyClient, readOnlyActorId: string | undefined, actorIds: string[]) {
     const webhooks = [];
     for await (const webhook of client.webhooks().list()) webhooks.push(webhook);
 
-    const fixtureActorIds = Object.values(actorIds);
-    let fixtureWebhookCount = 0;
     for (const webhook of webhooks) {
         const actorId = webhook.condition && 'actorId' in webhook.condition ? webhook.condition.actorId : undefined;
-        if (webhook.requestUrl === FIXTURE_WEBHOOK_URL && actorId === actorIds.readOnly) {
-            fixtureWebhookCount += 1;
-            continue;
-        }
-        // A webhook on a fixture Actor with another URL can only come from an agent that went wrong.
         const isEvalWebhook =
             webhook.requestUrl.startsWith(EVAL_WEBHOOK_URL_PREFIX) ||
-            (actorId !== undefined && fixtureActorIds.includes(actorId));
-        if (!isEvalWebhook || !isSweepable(webhook.requestUrl, webhook.createdAt, runId, now)) continue;
+            (actorId !== undefined && actorIds.includes(actorId));
+        if (!isEvalWebhook) continue;
         if (!IS_DRY_RUN) await client.webhook(webhook.id).delete();
         console.log(`🗑️  ${DRY}Deleted webhook ${webhook.id} (${webhook.requestUrl})`);
     }
 
-    if (fixtureWebhookCount > 1) {
-        console.warn(
-            `⚠️  ${fixtureWebhookCount} webhooks call ${FIXTURE_WEBHOOK_URL}, and the test case expects one. ` +
-                'Delete the extra ones by hand while no run is in flight.',
-        );
-    }
-    if (fixtureWebhookCount > 0) return;
     // The Actor ID is missing only on a dry run that would create the Actor.
-    if (IS_DRY_RUN || !actorIds.readOnly) {
+    if (IS_DRY_RUN || !readOnlyActorId) {
         console.log(`🌱 ${DRY}Created fixture webhook ${FIXTURE_WEBHOOK_URL}`);
         return;
     }
     const webhook = await client.webhooks().create({
         eventTypes: ['ACTOR.RUN.FAILED'],
-        condition: { actorId: actorIds.readOnly },
+        condition: { actorId: readOnlyActorId },
         requestUrl: FIXTURE_WEBHOOK_URL,
-        description: 'Permanent fixture for Apify API tool MCP agent evals. Do not delete or modify.',
-        idempotencyKey: FIXTURE_WEBHOOK_IDEMPOTENCY_KEY,
+        description: 'Permanent fixture for Apify API tool MCP agent evals, recreated before every run. Do not modify.',
     });
     console.log(`🌱 Created fixture webhook ${webhook.id}`);
 }
 
-/** Deletes the `eval-api-*` datasets runs created. */
-async function sweepDatasets(client: ApifyClient, runId: string | undefined, now: number) {
+/** Deletes leftover `eval-api-*` datasets and resets the fixture dataset's access. */
+async function prepareDatasets(client: ApifyClient) {
     // Owned only: a dataset shared with the account under an eval-api- name is someone else's.
     const datasets = [];
     for await (const dataset of client.datasets().list({ ownership: 'ownedByMe' })) datasets.push(dataset);
 
+    let fixtureId: string | undefined;
     for (const dataset of datasets) {
+        if (dataset.name === FIXTURE_DATASET_NAME) {
+            fixtureId = dataset.id;
+            continue;
+        }
         if (!dataset.name?.startsWith(EVAL_API_PREFIX)) continue;
-        if (!isSweepable(dataset.name, dataset.createdAt, runId, now)) continue;
         if (!IS_DRY_RUN) await client.dataset(dataset.id).delete();
-        console.log(`🗑️  ${DRY}Deleted dataset "${dataset.name}" (${dataset.id})`);
+        console.log(`🗑️  ${DRY}Deleted leftover dataset "${dataset.name}" (${dataset.id})`);
     }
+
+    if (IS_DRY_RUN) {
+        console.log(
+            `${fixtureId ? '♻️  [dry run] Reset' : '🌱 [dry run] Created'} fixture dataset "${FIXTURE_DATASET_NAME}"`,
+        );
+        return;
+    }
+    const id = fixtureId ?? (await client.datasets().getOrCreate(FIXTURE_DATASET_NAME)).id;
+    await client.dataset(id).update({ generalAccess: 'RESTRICTED' });
+    console.log(`${fixtureId ? '♻️  Reset' : '🌱 Created'} fixture dataset "${FIXTURE_DATASET_NAME}" (${id})`);
 }
 
 async function main() {
-    let runId: string | undefined;
-    try {
-        runId = parseRunIdArg(process.argv);
-    } catch (error) {
-        console.error(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
-        process.exit(1);
-    }
     const missing = findMissingEnvVars(['APIFY_TOKEN']);
     if (missing.length > 0) {
         console.error(`❌ Error: missing environment variable(s): ${missing.join(', ')}`);
@@ -384,13 +265,15 @@ async function main() {
 
     // The deletes below hit whatever account APIFY_TOKEN points at, so name it first.
     console.log(`👤 ${DRY}Account: ${(await client.user('me').get()).username ?? 'unknown'}`);
-    if (runId) console.log(`🧹 ${DRY}Tearing down run "${runId}" plus leftovers older than 6h`);
 
-    const now = Date.now();
-    // The Actors first: the webhook sweep matches on their IDs.
-    const actorIds = await prepareFixtureActors(client, runId, now);
-    await prepareWebhooks(client, actorIds, runId, now);
-    await sweepDatasets(client, runId, now);
+    // The Actors first: the webhook cleanup matches on their IDs.
+    const actorIds = await prepareFixtureActors(client);
+    await prepareWebhooks(
+        client,
+        actorIds.readOnly,
+        Object.values(actorIds).filter((id) => id !== undefined),
+    );
+    await prepareDatasets(client);
 
     console.log(IS_DRY_RUN ? '✅ Dry run complete, nothing changed' : '✅ API fixtures ready');
 }

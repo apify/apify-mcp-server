@@ -2,8 +2,8 @@
 
 Review material for the eval cases of the four opt-in `api` tools: `apify-api-search`, `apify-api-details`,
 `apify-api-read` (all three from #1444), and `apify-api-write` (#1445). They sit next to the rebuilt cases of #1421 but
-are promoted on their own schedule, in two batches as those two PRs merge, and only once #1423 (run-scoped names) is on
-master as well. Delete once they are promoted into the live datasets.
+are promoted on their own schedule, in two batches as those two PRs merge. Delete once they are promoted into the
+live datasets.
 
 **The cases are uncalibrated.** Nothing here has run against the live Apify API or Langfuse. Expect case fixes during
 calibration.
@@ -14,7 +14,7 @@ calibration.
 |---|---|
 | `api_tools_pr_cases.json` | 21 `tool-call` cases for `mcp-server-evals-pr`: 11 positive, 10 routing |
 | `api_tools_merge_cases.json` | 15 `agent` cases for `mcp-server-evals-merge`: 4 easy, 6 medium, 5 hard. 3 set `expectedErrors` |
-| `evals/scripts/api_fixtures.ts` | Seeds the permanent merge fixtures when they are missing, deletes a run's resources with `--run-id`, and sweeps leftovers older than 6 hours (`pnpm run evals:mcp-agent:api-fixtures`) |
+| `evals/scripts/api_fixtures.ts` | Deletes leftovers, seeds the merge fixtures, and resets their state (`pnpm run evals:mcp-agent:api-fixtures`) |
 
 The JSON uses the flat shape and field order of `new_pr_cases.json` and `new_merge_cases.json`. `expectedErrors` goes
 after `tools`, where most of #1421's merge cases put it. `merge/api/webhooks-raw-json-easy` has no `mcpToolsOnly` on
@@ -35,13 +35,7 @@ Checked offline:
 - The 36 ids are unique and none matches an id in #1421's case files.
 - Every tool in `expectedTools` and `expectedErrors` exists on master, #1444 (`5c1a53c8`), or #1445 (`330c8bca`), except
   Claude Code's built-in `ReadMcpResourceTool`. Every `tools` selector is a category on #1445.
-- Every name a merge case creates carries `{{uniq}}` in the query and in the reference; the only unmarked names are the
-  permanent fixtures'. Resolved as the runner of #1423 (`04ab3138`) resolves it, with a CI run id, each name matches
-  its `isNameFromRun`, each dataset name fits the platform's 63 characters of `[a-z0-9-]` with a static part of 35
-  characters or fewer, and the variable name fits the 100-character limit. The 63-character cap does not apply to the
-  webhook URL, whose static part is 44 characters.
-- `evals/scripts/api_fixtures.ts` passes type-check, lint, and format on this branch. Its copies of #1423's helpers
-  match `evals/run_id.ts` and `evals/scripts/schedules_sweep.ts` there verbatim. It has not run.
+- `evals/scripts/api_fixtures.ts` passes type-check, lint, and format on this branch. It has not run.
 - Search ranking, methods per path, and closest-path suggestions were checked by running the server's own
   `searchApiOperations`, `findPathOperations`, and `findClosestApiPaths` on the apify-docs OpenAPI source from
   2026-07-13, not the live spec. The probes below repeat them on the live spec.
@@ -120,17 +114,17 @@ and above, and CI runs at the runner default of 8.
 | | Response over 256 KB, binary body | Not covered. No endpoint without a dedicated tool returns that much on the eval account reliably. Unit tests cover both. |
 | | Routing: a dedicated tool must win | `pr/get-actor-run-list/api-loaded-last-run`, `pr/get-dataset-items/api-loaded-dataset-items`, `pr/get-dataset-list/api-loaded-dataset-list`, `pr/get-actor-run-log/api-loaded-run-log` |
 | `apify-api-write` | POST with `body` | `pr/apify-api-write/alert-on-crash`, `secret-env-var`, `merge/api/webhook-lifecycle-medium`, `merge/api/secret-env-var-hard` |
-| | POST with `query` | `merge/api/dataset-rename-medium`, `dataset-access-method-hard` (`name` query parameter) |
+| | POST with `query` | `merge/api/dataset-rename-medium` (`name` query parameter) |
 | | POST with neither | `merge/api/webhook-test-medium` |
-| | PUT with `body` | `pr/apify-api-write/rename-dataset`, `merge/api/dataset-rename-medium`, `merge/api/dataset-access-method-hard`. `merge/api/secret-env-var-hard` fails a version PUT, which replaces every variable on the version. |
-| | DELETE | `merge/api/webhook-lifecycle-medium`, `dataset-rename-medium`, `secret-env-var-hard`, `dataset-access-method-hard` |
+| | PUT with `body` | `pr/apify-api-write/rename-dataset`, `merge/api/dataset-rename-medium`, `merge/api/dataset-access-method-hard`. `merge/api/secret-env-var-hard` accepts a version PUT but does not require it. |
+| | DELETE | `merge/api/webhook-lifecycle-medium`, `dataset-rename-medium`, `secret-env-var-hard` |
 | | `method` omitted, several methods (refused) | Not covered; unit tests cover it. `merge/api/dataset-access-method-hard` does not exempt it: the method parameter says to omit the method only when the path has one, so the error gate fails a write without a method there. |
 | | `method` omitted, one method (inferred) | Exercised, not pinned: `merge/api/webhook-test-medium` (`/test` has only POST) |
 | | `method` omitted on a GET-only path (refused, names the read tool) | Not covered. Unit tests cover it. |
 | | PATCH | Not covered. The July spec has no PATCH operation; probe 1 checks the live spec. |
 | | Write whose response is over 256 KB | Not covered. Unit tests cover it. |
 | | Secret semantics (`isSecret`) | `pr/apify-api-write/secret-env-var`, `merge/api/secret-env-var-hard` |
-| | Change only what was asked | `merge/api/secret-env-var-hard` (only its own variable: no version PUT, and EVAL_MODE survives), `merge/api/dataset-access-method-hard` (no rename) |
+| | Change only what was asked | `merge/api/secret-env-var-hard` (EVAL_MODE must survive), `merge/api/dataset-access-method-hard` (no rename) |
 | | Routing: a dedicated tool must win | `pr/build-actor/api-loaded-build`, `pr/call-actor/api-loaded-run-actor`, `pr/create-schedule/api-loaded-schedule`, `pr/update-actor-task/api-loaded-task-input` |
 
 No case requires `apify-api-search` or `apify-api-details`. A strong model knows most paths, every pr case that accepts
@@ -146,70 +140,26 @@ The acceptance tasks of the API tools issue (#1443):
 | Read monthly usage | `merge/api/monthly-spend-easy`, `merge/api/old-path-404-hard`, `pr/apify-api-read/spend-this-billing-cycle` |
 | List an Actor's environment variables (asked for on top of the issue's three) | `merge/api/env-vars-list-medium`, `pr/apify-api-read/env-var-names` |
 
-## Running in parallel
-
-CI runs 8 items at once on one shared account, and several PRs can run at once, so a fixed name collides and a reset
-can change a fixture under another run. The merge cases follow #1423's model:
-
-- **Run-scoped:** every name a case creates ends in `-{{uniq}}`, in the query and in the reference. #1423's runner
-  replaces the marker with `<runId>-t<trial>` before the agent and the judge see the item. Four cases create
-  something, and each deletes it again:
-  - `dataset-rename-medium`: the dataset `eval-api-contacts-{{uniq}}`, renamed to `eval-api-contacts-q4-{{uniq}}`.
-  - `dataset-access-method-hard`: the dataset `eval-api-shared-{{uniq}}`, opened to anyone with the link.
-  - `webhook-lifecycle-medium`: a webhook on `eval-api-actor-scratch` that calls
-    `https://example.com/eval-api/scratch-failed-{{uniq}}`.
-  - `secret-env-var-hard`: the variable `EVAL_SIGNING_SECRET-{{uniq}}` on version 0.0 of `eval-api-actor-scratch`. A
-    PUT of the whole version would replace another run's variable, so the query says other jobs edit that Actor's
-    variables, and the reference fails a version PUT. An env var name takes any character except `=`, up to 100.
-- **Read-only:** the other 11 cases create no named resource and read the permanent fixtures, unmarked.
-  `webhook-test-medium` sends a test delivery to the fixture webhook, which adds a dispatch but changes nothing a case
-  asserts on.
-- **Teardown:** `api_fixtures.ts --run-id <id>` deletes that run's datasets, webhooks, and variables at any age, by the
-  token `-<id>-t` that #1423's `isNameFromRun` matches. Anything else goes only once it is older than 6 hours, so a run
-  in flight never loses a resource it is using.
-
-The cases need #1423's runner. Without it, `{{uniq}}` reaches the agent as typed: a dataset create fails on the
-braces, and every trial shares one webhook URL and one variable name. With it, `--iterations` above 1 is safe too.
-
-One collision is left. When two variable writes land on one Actor at the same moment, the platform rejects one of
-them with a concurrent update error. `secret-env-var-hard` in two trials or two runs, or the case and another run's
-seed or teardown, can meet this way on `eval-api-actor-scratch`, but only within milliseconds of each other. If the
-rejected write is a seed's, its step fails and GitHub skips that run's evals, unless another seed created the same part
-(below).
-
-Two overlapping seeds that both find a fixture part missing are not a collision. Both create the part, and the second
-create of an Actor, a version, or a variable fails on the duplicate. `api_fixtures.ts` then reads the part again and,
-since it exists now, goes on with a warning. A webhook has no unique name, so the script creates the fixture webhook
-with a fixed `idempotencyKey`, and the second create returns the first webhook (probe 11).
-
 ## Fixtures
 
-`api_fixtures.ts` seeds two permanent fixtures when they are missing. No case may modify them, and the script never
-resets or deletes them, since another run may be reading them:
+The merge cases use fixed `eval-api-*` names and three permanent fixtures, which `api_fixtures.ts` creates and resets:
 
 - `eval-api-actor`, read-only: version 0.0 alone, with `EVAL_REGION=eu-central-1` (plain) and `EVAL_API_KEY` (secret),
   plus one webhook that calls `https://example.com/eval-api/run-failed` when a run fails. The read cases assert on it.
-- `eval-api-actor-scratch`, the write target: version 0.0 alone, with `EVAL_MODE=scratch` (plain). The write cases add
-  their own webhook and variable to it and remove them again; `EVAL_MODE` must survive.
+- `eval-api-actor-scratch`, edited by the write cases: version 0.0 alone, with `EVAL_MODE=scratch` (plain).
+- `eval-api-shared`, a dataset the access case opens to anyone with the link. Reset to `RESTRICTED`.
 
-The two Actors are separate so that a variable a write case adds never shows up in a read case's answer. Neither is
-ever built or run, so the fixture webhook never fires on its own and nothing costs compute.
+The two Actors are separate because cases run concurrently against one account. Neither is ever built or run, so the
+fixture webhook never fires on its own and nothing costs compute. The script deletes leftover `eval-api-*` datasets and
+Actors, and every webhook that watches a fixture Actor or calls an `https://example.com/eval-api/` URL. It deletes on
+whatever account `APIFY_TOKEN` points at and prints that account first; `--dry-run` shows what it would change.
 
-A missing fixture is created, and so is a missing part of one: version 0.0, a fixture variable, or the fixture
-webhook. A fixture that has drifted, for example with a changed variable or an extra version, only gets a warning to
-fix it by hand while no run is in flight.
-
-What the script deletes, on whatever account `APIFY_TOKEN` points at. It prints that account first, and `--dry-run`
-shows what it would delete:
-
-| Resource | With `--run-id <id>`, at any age | Otherwise, once older than 6 hours |
-|---|---|---|
-| Datasets the account owns | `eval-api-*` names that contain `-<id>-t` | any other `eval-api-*` dataset, since none is a fixture |
-| Webhooks | URLs under `https://example.com/eval-api/` that contain `-<id>-t` | any other webhook under that URL or on a fixture Actor, except the fixture webhook |
-| Variables on version 0.0 of both fixture Actors | names that contain `-<id>-t` | any other variable that is not a fixture variable |
-
-A variable has no timestamp of its own, but every variable write updates the Actor's `modifiedAt` (probe 22), so the
-script ages variables by the Actor's `modifiedAt`, read after the variable list.
+`merge/api/dataset-rename-medium`, `webhook-lifecycle-medium`, and `secret-env-var-hard` create fixed names, and
+`dataset-access-method-hard` edits a fixture every trial shares. They are not safe under `--iterations` above 1 without
+`--concurrency 1`, nor when two runs use the account at once. This is the same limit the schedule cases have today.
+Once the run-scoped names from #1423 are on master, these four cases move to them the way the schedule cases do: a
+`-{{uniq}}` suffix on every name they create, and their own resource instead of the shared `eval-api-shared` dataset and
+the scratch Actor's variables.
 
 ## Probes before upserting
 
@@ -231,9 +181,8 @@ Spec (`https://docs.apify.com/api/openapi.json`, through the server's own index)
 
 Platform:
 
-5. `~name` resolves the token's own resources: `GET /v2/actors/~eval-api-actor` and, for a dataset the probe creates,
-   `GET /v2/datasets/~eval-api-named-probe-t1` return 200. So does `username~name`:
-   `GET /v2/datasets/{username}~eval-api-named-probe-t1` returns 200.
+5. `~name` resolves the token's own resources: `GET /v2/actors/~eval-api-actor` and `GET /v2/datasets/~eval-api-shared`
+   return 200. So does `username~name`: `GET /v2/datasets/{username}~eval-api-shared` returns 200.
 6. The account can create private Actors with a `SOURCE_FILES` version and `envVars` (including `isSecret: true`)
    without a build, and its plan allows two more Actors.
 7. `GET .../versions/0.0/env-vars` returns the plain value of EVAL_REGION and no value for EVAL_API_KEY. The version and
@@ -242,57 +191,46 @@ Platform:
 9. `POST /v2/datasets` reads the name only from the `name` query parameter, so a body-only `name` creates an unnamed
    dataset. A second POST with an existing name returns the existing dataset. Renaming onto a taken name fails; record
    the error type.
-10. A dataset created with `POST /v2/datasets` starts `RESTRICTED`. If the account's default access is wider,
-    `dataset-access-method-hard` has nothing to change: set the account default to restricted, or rework the case.
-    `PUT /v2/datasets/{id}` with only `generalAccess: ANYONE_WITH_ID_CAN_READ` works on the account's plan and keeps
-    the name.
+10. `PUT /v2/datasets/{id}` with only `generalAccess: ANYONE_WITH_ID_CAN_READ` works on the account's plan and keeps the
+    name.
 11. `POST /v2/webhooks` needs `condition.actorId` to be an ID. If it also takes `~eval-api-actor-scratch` or
     `username~name`, widen `webhook-lifecycle-medium`; if it refuses a name, settle Open questions, 7 before
-    calibrating. `description` is stored, and the list returns it and `condition`. A second create with the same
-    `idempotencyKey` returns the first webhook, and once that webhook is deleted, the key creates a new one. If a
-    deleted webhook keeps its key, `api_fixtures.ts` cannot recreate a deleted fixture webhook: drop its key.
+    calibrating. `description` is stored, and the list returns it and `condition`.
 12. `POST /v2/webhooks/{id}/test` returns a dispatch (record its status), sends one POST to the example.com URL, and
     works for a webhook whose Actor never ran.
 13. `GET /v2/webhook-dispatches?limit=3&desc=1` honors both parameters.
-14. `POST .../env-vars` with `isSecret: true` returns `isSecret: true` and no value, and DELETE removes it, for a name
-    with dashes like the run-scoped `EVAL_SIGNING_SECRET-<runId>-t1`. If `PUT .../env-vars/{name}` on a missing name
-    creates it, add that PUT to the create routes in `secret-env-var-hard`.
+14. `POST .../env-vars` with `isSecret: true` returns `isSecret: true` and no value, and DELETE removes it. If
+    `PUT .../env-vars/{name}` on a missing name creates it, add that PUT to the create routes in `secret-env-var-hard`.
 15. `GET /v2/users/me/limits` has `limits.maxMonthlyUsageUsd` and `current.monthlyUsageUsd`, the spend of the current
     period. `GET /v2/users/me/usage/monthly` has a USD total and the cycle dates. The references do not assume the two
     totals are equal.
 16. `GET /v2/browser-info` echoes the `Authorization` header raw. Print only whether the body contains the token, never
     the token. Unit tests cover the masking in `apify-api-read`. The resource returns the body as it is (Found while
     drafting, 5).
-17. A bare name without `~` is read as an ID: `GET /v2/actors/eval-api-actor` and
-    `GET /v2/datasets/eval-api-named-probe-t1` return 404. The legacy `acts/` prefix reaches the same endpoint as
-    `actors/`.
+17. A bare name without `~` is read as an ID: `GET /v2/actors/eval-api-actor` and `GET /v2/datasets/eval-api-shared`
+    return 404. The legacy `acts/` prefix reaches the same endpoint as `actors/`.
 18. The webhook list returns `requestUrl` and `lastDispatch`. Record what `lastDispatch` holds:
     `webhook-deliveries-medium` says it is at most one delivery per webhook.
 19. The items of `GET /v2/webhook-dispatches` include `calls[].responseStatus`. If not,
     `GET /v2/webhook-dispatches/{id}` does; record which.
 20. `GET /v2/users/me` has the plan's included monthly usage in USD. If not, drop `/v2/users/me` from
     `budget-vague-hard`.
-21. `PUT /v2/actors/{actorId}/versions/0.0` with only `envVars` replaces the version's whole variable list and keeps its
-    source files. That is why `secret-env-var-hard` fails a version PUT.
-22. Adding a variable and deleting one each update the Actor's `modifiedAt`. `api_fixtures.ts` ages variables by it,
-    since a variable has no timestamp. If not, drop the age sweep of variables and delete them by `--run-id` alone.
+21. `PUT /v2/actors/{actorId}/versions/0.0` with only `envVars` replaces the version's variables, keeps its source files,
+    and stores a variable with `isSecret: true` as a secret.
 
 Harness:
 
-23. Does `tools: []`, which `mcpToolsOnly` sets, remove Claude Code's `ReadMcpResourceTool`? Check the first staging
+22. Does `tools: []`, which `mcpToolsOnly` sets, remove Claude Code's `ReadMcpResourceTool`? Check the first staging
     run's transcripts. No case depends on the answer, but it decides whether `webhooks-raw-json-easy` is the only case
     that can show the resource route (Open questions, 8).
-24. A refusal from `respondUserError` (method missing, path not in the spec) reaches the gate as a failed tool call.
+23. A refusal from `respondUserError` (method missing, path not in the spec) reaches the gate as a failed tool call.
     `old-path-404-hard` and `dataset-access-method-hard` assume it does.
 
 <details><summary>Throwaway probe script</summary>
 
-Write it as `evals/scripts/probe_api_tmp.ts` in a checkout of #1445's branch, run it with `APIFY_TOKEN` set, and delete
-it. Every name it creates is run-scoped to the run id `probe`, so
-`pnpm run evals:mcp-agent:api-fixtures -- --run-id probe` on this branch deletes whatever it left. Run it while no
-calibration run is in flight: its version PUTs replace the variables of `eval-api-actor-scratch`. Every print goes
-through `redact()`, since `GET /v2/browser-info` echoes the token, and `users/me` prints no body, since it holds the
-proxy password.
+Write it as `evals/scripts/probe_api_tmp.ts` in a checkout of #1445's branch, run it with `APIFY_TOKEN` set, delete it,
+and run `api_fixtures.ts` again to sweep what it left. Every print goes through `redact()`, since `GET /v2/browser-info`
+echoes the token, and `users/me` prints no body, since it holds the proxy password.
 
 ```ts
 import 'dotenv/config';
@@ -344,12 +282,15 @@ for (const q of ['list webhooks', 'monthly usage', 'limits', 'rename dataset', '
 for (const p of ['users/me/usage', 'actors/~eval-api-actor/versions/0.0/env-vars/EVAL_TIMEZONE'])
     console.log(p, '=>', findClosestApiPaths(index, normalizeApiPath(p)));
 
-// Platform facts 5-22.
+// Platform facts 5-21.
 const me = await call('GET', 'users/me', undefined, { preview: false });
 const actor = await call('GET', 'actors/~eval-api-actor');
 show('Actor versions', actor.data?.versions?.map((v: any) => ({ versionNumber: v.versionNumber, envVars: v.envVars })));
 await call('GET', 'acts/~eval-api-actor');
 await call('GET', 'actors/eval-api-actor');
+await call('GET', 'datasets/~eval-api-shared');
+await call('GET', `datasets/${me.data?.username}~eval-api-shared`);
+await call('GET', 'datasets/eval-api-shared');
 show('env-vars list', (await call('GET', 'actors/~eval-api-actor/versions/0.0/env-vars')).data?.items);
 show('version envVars', (await call('GET', 'actors/~eval-api-actor/versions/0.0')).data?.envVars);
 await call('GET', 'actors/~eval-api-actor/versions/0.0/env-vars/EVAL_TIMEZONE');
@@ -362,22 +303,16 @@ show('users/me plan', me.data?.plan);
 const browserInfo = await call('GET', 'browser-info');
 console.log('  browser-info echoes the token:', token !== '' && JSON.stringify(browserInfo).includes(token));
 
-const bodyOnly = await call('POST', 'datasets', { name: 'eval-api-body-probe-t1' });
-const named = await call('POST', 'datasets?name=eval-api-named-probe-t1');
-show('new dataset generalAccess', named.data?.generalAccess);
-await call('POST', 'datasets?name=eval-api-named-probe-t1');
-await call('GET', 'datasets/~eval-api-named-probe-t1');
-await call('GET', `datasets/${me.data?.username}~eval-api-named-probe-t1`);
-await call('GET', 'datasets/eval-api-named-probe-t1');
-const other = await call('POST', 'datasets?name=eval-api-other-probe-t1');
-await call('PUT', `datasets/${other.data.id}`, { name: 'eval-api-named-probe-t1' });
+const bodyOnly = await call('POST', 'datasets', { name: 'eval-api-probe-body' });
+const named = await call('POST', 'datasets?name=eval-api-probe');
+await call('POST', 'datasets?name=eval-api-probe');
+await call('PUT', `datasets/${named.data.id}`, { name: 'eval-api-shared' });
 await call('PUT', `datasets/${named.data.id}`, { generalAccess: 'ANYONE_WITH_ID_CAN_READ' });
 await call('DELETE', `datasets/${named.data.id}`);
-await call('DELETE', `datasets/${other.data.id}`);
 await call('DELETE', `datasets/${bodyOnly.data.id}`);
 
 const scratch = await call('GET', 'actors/~eval-api-actor-scratch');
-const hook = { eventTypes: ['ACTOR.RUN.FAILED'], requestUrl: 'https://example.com/eval-api/hook-probe-t1', description: 'probe' };
+const hook = { eventTypes: ['ACTOR.RUN.FAILED'], requestUrl: 'https://example.com/eval-api/probe', description: 'probe' };
 const byName = await call('POST', 'webhooks', { ...hook, condition: { actorId: '~eval-api-actor-scratch' } });
 if (byName.data?.id) await call('DELETE', `webhooks/${byName.data.id}`);
 const created = await call('POST', 'webhooks', { ...hook, condition: { actorId: scratch.data.id } });
@@ -394,29 +329,17 @@ show('dispatches', dispatches.data?.items?.map((d: any) => ({
 const [newest] = dispatches.data?.items ?? [];
 if (newest) show('newest dispatch calls', (await call('GET', `webhook-dispatches/${newest.id}`)).data?.calls);
 await call('DELETE', `webhooks/${created.data.id}`);
-const keyed = { ...hook, condition: { actorId: scratch.data.id }, idempotencyKey: 'eval-api-key-probe-t1' };
-const first = await call('POST', 'webhooks', keyed, { preview: false });
-const second = await call('POST', 'webhooks', keyed, { preview: false });
-console.log('  same key, same webhook:', first.data?.id !== undefined && second.data?.id === first.data.id);
-await call('DELETE', `webhooks/${first.data.id}`);
-const third = await call('POST', 'webhooks', keyed, { preview: false });
-console.log('  same key after the delete, a new webhook:', third.data?.id !== undefined && third.data.id !== first.data.id);
-if (third.data?.id) await call('DELETE', `webhooks/${third.data.id}`);
 
 const envVars = `actors/${scratch.data.id}/versions/0.0/env-vars`;
-const modifiedAt = async () => (await call('GET', `actors/${scratch.data.id}`, undefined, { preview: false })).data?.modifiedAt;
-show('scratch modifiedAt before', scratch.data?.modifiedAt);
-await call('POST', envVars, { name: 'EVAL_SECRET-probe-t1', value: 'probe', isSecret: true });
-show('scratch modifiedAt after the add', await modifiedAt());
+await call('POST', envVars, { name: 'EVAL_PROBE_SECRET', value: 'probe', isSecret: true });
 await call('GET', envVars);
-await call('PUT', `${envVars}/EVAL_MISSING-probe-t1`, { name: 'EVAL_MISSING-probe-t1', value: 'probe' });
-await call('DELETE', `${envVars}/EVAL_SECRET-probe-t1`);
-show('scratch modifiedAt after the delete', await modifiedAt());
-await call('DELETE', `${envVars}/EVAL_MISSING-probe-t1`);
+await call('PUT', `${envVars}/EVAL_PROBE_MISSING`, { name: 'EVAL_PROBE_MISSING', value: 'probe' });
+await call('DELETE', `${envVars}/EVAL_PROBE_SECRET`);
+await call('DELETE', `${envVars}/EVAL_PROBE_MISSING`);
 
 const scratchVersion = `actors/${scratch.data.id}/versions/0.0`;
 const mode = { name: 'EVAL_MODE', value: 'scratch', isSecret: false };
-const secret = { name: 'EVAL_SECRET-probe-t1', value: 'probe', isSecret: true };
+const secret = { name: 'EVAL_PROBE_SECRET', value: 'probe', isSecret: true };
 const withSecret = await call('PUT', scratchVersion, { envVars: [mode, secret] });
 show('version PUT with the secret', { envVars: withSecret.data?.envVars, sourceFiles: withSecret.data?.sourceFiles?.length });
 show('version PUT without it', (await call('PUT', scratchVersion, { envVars: [mode] })).data?.envVars);
@@ -458,7 +381,7 @@ server without the `api` category, and the session would have no API tools:
   expected failures, and the write cases would run without fixtures.
 
 Accepting `ReadMcpResourceTool` adds to the risk: the resource is on master already, so if `mcpToolsOnly` does not
-remove it (probe 23), the three read cases among those four could pass before #1444 through the resource too, which
+remove it (probe 22), the three read cases among those four could pass before #1444 through the resource too, which
 would hide the missing `api` category.
 
 Langfuse item ids are unique per project forever and cannot move between datasets, so the cases are calibrated in
@@ -466,25 +389,20 @@ staging datasets under burned ids and promoted under the final ids:
 
 1. Create `mcp-server-evals-pr-api-staging` and `mcp-server-evals-merge-api-staging`, and upsert every case there with
    its id prefixed `stage-api/`.
-2. Calibrate from a local merge of #1445's branch, which contains #1444, and #1423's branch, whose runner resolves
-   `{{uniq}}`: Opus first, then Sonnet and Haiku, at `--concurrency 1`, reading every transcript. Run the merge waves in
-   order (easy, medium, hard), each with its own `--run-id`, and tear each one down with that id. Fix cases until Opus
-   passes them all.
-3. Add the README section and the CI steps below with #1444, or in an evals PR merged right after it.
-4. **Batch A, after #1444 and #1423 are both on master** and the fixtures have run once on the CI account: the 12 pr
-   cases and 10 merge cases that need only search, details, and read. That is every case except the ones in Batch B.
-   If pinned dataset versions (#1395) have landed by then, promotion is the upsert plus a pin bump in whichever of the
-   two merges last, so the cases go live exactly when both are in; otherwise the upsert follows the later merge.
-5. **Batch B, after #1445 is on master** (and #1423, as for Batch A): the 9 write-dependent pr cases and the merge cases
-   `webhook-lifecycle-medium`, `dataset-rename-medium`, `webhook-test-medium`, `secret-env-var-hard`, and
-   `dataset-access-method-hard`. The 9 pr cases are the three `pr/apify-api-write/*` cases, `resurrect-run` and
-   `sign-json` (which ask for writes), and the four routing cases where `apify-api-write` must lose: `api-loaded-build`,
-   `api-loaded-run-actor`, `api-loaded-schedule`, and `api-loaded-task-input`.
+2. Calibrate from a checkout of #1445's branch, which contains #1444: Opus first, then Sonnet and Haiku, at
+   `--concurrency 1`, reading every transcript. Run the merge waves in order (easy, medium, hard) and re-seed the fixtures
+   before each. Fix cases until Opus passes them all.
+3. Add the README section and the CI step below with #1444, or in an evals PR merged right after it.
+4. **Batch A, after #1444 is on master** and the fixtures have run once on the CI account: the 12 pr cases and 10 merge
+   cases that need only search, details, and read. That is every case except the ones in Batch B. If pinned dataset
+   versions (#1395) have landed by then, promotion is the upsert plus a pin bump in #1444 itself, so the cases go live
+   exactly when the tools merge; otherwise the upsert follows the merge.
+5. **Batch B, after #1445 is on master:** the 9 write-dependent pr cases and the merge cases `webhook-lifecycle-medium`,
+   `dataset-rename-medium`, `webhook-test-medium`, `secret-env-var-hard`, and `dataset-access-method-hard`. The 9 pr
+   cases are the three `pr/apify-api-write/*` cases, `resurrect-run` and `sign-json` (which ask for writes), and the
+   four routing cases where `apify-api-write` must lose: `api-loaded-build`, `api-loaded-run-actor`,
+   `api-loaded-schedule`, and `api-loaded-task-input`.
 6. Archive the staging items and abandon the two staging datasets.
-
-Nothing goes live before #1423 is on master. The four cases that create names are all in Batch B, and only #1423's
-runner resolves their `{{uniq}}`. Batch A creates nothing and would run without it, but waits as well, so that the
-fixtures' CI steps land once, in their final form.
 
 Why two staging datasets of their own rather than #1411's `-v2` staging datasets: those are still in use for the
 rebuilt set's calibration, and every `-v2` run would then also run these cases, which fail on any branch without the
@@ -500,9 +418,9 @@ Commands, once credentials are in place. `npx` refuses to run inside the repo, s
 directory. Langfuse CLI flags other than `dataset-items create --body-file -` are unverified; check them with `--help`.
 
 ```bash
-C="$PWD"   # this branch's checkout, with a .env like the calibration checkout's
+C="$PWD"   # this branch's checkout, with a .env like the #1445 checkout's
 R="$C/res/eval_cases_review"
-W=/path/to/a/second/checkout   # becomes the calibration branch below
+W=/path/to/a/checkout/of/feat/apify-api-write
 B_PR='^pr/(apify-api-write/(rename-dataset|alert-on-crash|secret-env-var)|apify-api-search/(resurrect-run|sign-json)'
 B_PR+='|build-actor/api-loaded-build|call-actor/api-loaded-run-actor|create-schedule/api-loaded-schedule'
 B_PR+='|update-actor-task/api-loaded-task-input)$'
@@ -511,14 +429,9 @@ to_items() { jq -c --arg ds "$1" '.[] | {datasetName: $ds, id, input: {query}}
     + (if has("reference") then {expectedOutput: .reference} else {} end)
     + {metadata: del(.id, .query, .reference)}' "$2"; }
 upsert() { while IFS= read -r item; do printf '%s' "$item" | npx -y langfuse-cli api dataset-items create --body-file -; done; }
-fixtures() { (cd "$C" && pnpm run evals:mcp-agent:api-fixtures -- "$@"); }
+fixtures() { (cd "$C" && pnpm run evals:mcp-agent:api-fixtures "$@"); }
 
-# The calibration branch: #1445, which contains #1444, with #1423 merged in so the runner resolves {{uniq}}.
-git -C "$W" fetch origin feat/apify-api-write claude/kind-lovelace-4sxlmg
-git -C "$W" switch -c calibrate/api-tool-evals origin/feat/apify-api-write
-git -C "$W" merge --no-edit origin/claude/kind-lovelace-4sxlmg
-
-# Fixtures. Safe to repeat: the seed creates what is missing and resets nothing.
+# Fixtures. Re-run before every merge run.
 fixtures --dry-run && fixtures
 
 # Staging datasets and items. Create is an upsert on id, so re-run after any edit.
@@ -530,14 +443,12 @@ done
 to_items mcp-server-evals-pr-api-staging "$R/api_tools_pr_cases.json" | jq -c '.id = "stage-api/" + .id' | upsert
 to_items mcp-server-evals-merge-api-staging "$R/api_tools_merge_cases.json" | jq -c '.id = "stage-api/" + .id' | upsert
 
-# Calibrate, on the calibration branch. Repeat with claude-sonnet-5 and claude-haiku-4-5 once Opus passes.
+# Calibrate, in the #1445 checkout. Repeat with claude-sonnet-5 and claude-haiku-4-5 once Opus passes.
 cd "$W"
 pnpm run evals:mcp-agent -- --dataset mcp-server-evals-pr-api-staging \
     --agent-model claude-opus-5 --subscription --claude-judge --concurrency 1
-RUN="cal-$(date +%s)"   # a fresh id per merge run: lowercase letters, digits, and dashes
-pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge-api-staging --id 'easy$' \
-    --agent-model claude-opus-5 --subscription --claude-judge --concurrency 1 --run-id "$RUN"
-fixtures --run-id "$RUN"   # the teardown; then the same for 'medium$' and 'hard$'
+fixtures && pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge-api-staging --id 'easy$' \
+    --agent-model claude-opus-5 --subscription --claude-judge --concurrency 1   # then 'medium$', then 'hard$'
 
 # Promote Batch A, then Batch B (drop the "| not" from both selects).
 cd /tmp
@@ -555,36 +466,19 @@ A Claude judge scoring a Claude agent can be lenient on itself. Before quoting f
 `--claude-judge`, which uses OpenRouter.
 
 Turn budgets: easy cases get 8 (one read, or a lookup then a read). Medium cases get 10 to 12 for read chains and 14 for
-the write cases: create, verify, and clean up, or, for `webhook-test-medium`, find the webhook, send the test delivery,
-and optionally read the dispatch. `webhook-deliveries-medium` budgets the per-webhook route. Hard cases get 10,
-budgeted for the recovery path, or 14 for `secret-env-var-hard` and `dataset-access-method-hard`, which also create,
-verify, and clean up.
+create, verify, and clean up; `webhook-deliveries-medium` budgets the per-webhook route. Hard cases get 10, or 14 for
+`secret-env-var-hard`, budgeted for the recovery path.
 
 ## Proposed text for promotion
 
-Not part of this PR. Add with #1444, or in the evals PR right after it, once #1423 is on master: the README text
-points at its "Unique resource names" section, and the teardown matches the run id #1423 passes to the run step.
+Not part of this PR. Add with #1444, or in the evals PR right after it.
 
-The CI steps, in `.github/workflows/_evaluations.yaml`. The seed goes after "Seed schedule fixtures":
+The CI step, in `.github/workflows/_evaluations.yaml` after "Seed schedule fixtures":
 
 ```yaml
             -   name: Seed API fixtures (merge tier only)
                 if: inputs.tier == 'merge'
                 run: pnpm run evals:mcp-agent:api-fixtures
-                env:
-                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-```
-
-The teardown goes after "Tear down schedule fixtures":
-
-```yaml
-            # Same run id as the run step, so this deletes only what this run created; `always()` so a
-            # failed or cancelled run still cleans up.
-            -   name: Tear down API fixtures (merge tier only)
-                if: always() && inputs.tier == 'merge'
-                run: >
-                    pnpm run evals:mcp-agent:api-fixtures --
-                    --run-id ${{ github.run_id }}-${{ github.run_attempt }}
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 ```
@@ -617,29 +511,21 @@ The `expectedErrors` exemption is per tool, not per call, which leaves a known b
 failed and still gives a total. On `merge/api/env-var-missing-hard`, a read that 404s on a wrong
 `username~` prefix looks like a missing variable to the judge.
 
-The `merge/api/*` items name what they create with `{{uniq}}` (see "Unique resource names" below),
-so their trials and any concurrent run never create the same resource, and `--iterations N` is safe.
-One collision is left: two variable writes on `eval-api-actor-scratch` within milliseconds of each
-other, from two trials or runs, or from a run and another run's seed or teardown, can fail one of
-them with a concurrent update error. Four items create something and delete it again: the datasets
-`eval-api-contacts-{{uniq}}` (renamed to `eval-api-contacts-q4-{{uniq}}`) and
-`eval-api-shared-{{uniq}}`, a webhook that calls
-`https://example.com/eval-api/scratch-failed-{{uniq}}`, and the secret variable
-`EVAL_SIGNING_SECRET-{{uniq}}`. The rest read two permanent fixtures, which no item may modify. The
-Actor `eval-api-actor` has only version 0.0, with `EVAL_REGION=eu-central-1` and the secret
-`EVAL_API_KEY`, plus one webhook that calls `https://example.com/eval-api/run-failed` when a run
-fails; the read items assert on it. The Actor `eval-api-actor-scratch` has only version 0.0, with
-`EVAL_MODE=scratch`; the write items add their own webhook and variable to it and remove them again.
-`merge/api/secret-env-var-hard` fails a PUT of the whole version, since that replaces every variable
-on it, another run's among them. Neither Actor is ever built or run, so the fixture webhook never
-fires on its own.
-
-Run `pnpm run evals:mcp-agent:api-fixtures` before a run: it creates any missing fixture, never
-resets one, and deletes `eval-api-*` datasets, eval webhooks, and stray variables on the fixture
-Actors once they are older than 6 hours, on whatever account `APIFY_TOKEN` points at. Pass
-`--dry-run` to see what it would delete. After a run, delete what that run created with
-`pnpm run evals:mcp-agent:api-fixtures -- --run-id <id>`, using the run id from the run's summary.
-CI does this in a `Tear down API fixtures` step guarded by `always()`.
+The `merge/api/*` items use fixed `eval-api-*` names and three permanent fixtures. The Actor
+`eval-api-actor` has only version 0.0, with `EVAL_REGION=eu-central-1` and the secret `EVAL_API_KEY`,
+plus one webhook that calls `https://example.com/eval-api/run-failed` when a run fails. The read
+cases assert on it, and no case may modify it. The Actor `eval-api-actor-scratch` has only version
+0.0, with `EVAL_MODE=scratch`, and the write cases edit it. They are separate for the reason the
+schedule fixtures are: items run concurrently against one account. The dataset `eval-api-shared` is
+the one the access case opens to anyone with the link. Neither Actor is ever built or run, so the
+fixture webhook never fires on its own. Run `pnpm run evals:mcp-agent:api-fixtures` before every
+run: it deletes leftover `eval-api-*` datasets and Actors, and every webhook that watches a fixture
+Actor or calls a `https://example.com/eval-api/` URL, the fixture webhook among them. Then it creates
+any missing fixture and resets the rest: each Actor goes back to version 0.0 alone with its fixture
+variables, the fixture webhook is created afresh (so an edit to any of its fields is undone), and
+the dataset's access goes back to `RESTRICTED`. It deletes on whatever account `APIFY_TOKEN` points
+at and prints that account first. Pass `--dry-run` to see what it would delete before it does. No
+teardown is needed after a run: a leftover webhook watches an Actor that never runs.
 
 The judge accepts a read through the server's API resource (`ReadMcpResourceTool`) wherever it
 accepts `apify-api-read`, since both reach the same URL with the session's token. The `pr` items
@@ -662,9 +548,12 @@ ones never are. A 404 from `apify-api-read` lists the closest paths in the spec 
 right and only the record is missing, which `merge/api/env-var-missing-hard` checks the agent does
 not misread. `POST /v2/webhooks/{webhookId}/test` sends one delivery to the webhook's URL, which
 for the fixture is IANA's reserved example.com. `GET /v2/browser-info` echoes the request headers:
-`apify-api-read` masks the token in them, and the resource returns them as they are. A new dataset
-starts `RESTRICTED`. A PUT of an Actor version replaces its whole variable list, and every variable
-write updates the Actor's `modifiedAt`, which the fixtures script ages variables by.
+`apify-api-read` masks the token in them, and the resource returns them as they are.
+
+`merge/api/dataset-rename-medium`, `merge/api/webhook-lifecycle-medium`, and
+`merge/api/secret-env-var-hard` create fixed names. `merge/api/dataset-access-method-hard` edits a
+fixture every trial shares. They are not safe under `--iterations N` above 1 unless you also pass
+`--concurrency 1`.
 ```
 
 Under "Core files", after the schedules fixtures line:
@@ -676,16 +565,15 @@ Under "Core files", after the schedules fixtures line:
 In "CI", after the paragraph on the two tiers:
 
 ```markdown
-The merge tier seeds the task, schedule, and API fixtures before it runs. After it, two steps
-guarded by `always()` delete the schedules and the API resources that run created, matched by its
-run id.
+The merge tier seeds the task, schedule, and API fixtures before it runs. The API fixtures need no
+teardown step.
 ```
 
 ## Follow-ups
 
-- **Once #1423 merges:** import `isNameFromRun`, `parseRunIdArg`, and `LEFTOVER_MAX_AGE_MS` in `api_fixtures.ts` from
-  `evals/run_id.ts` and `evals/scripts/schedules_sweep.ts` (the `TODO(#1423)` there). The runner's teardown hint names
-  only the schedules command, so add the API one next to it.
+- **Run-scoped names for parallel evals (#1423):** when it merges, suffix the names the create cases make with
+  `-{{uniq}}` (`eval-api-contacts` and `eval-api-contacts-q4`, the `scratch-failed` URL, and `EVAL_SIGNING_SECRET`),
+  upsert the same ids with the edited queries and references, and give `api_fixtures.ts` a matching sweep.
 - **The rebuilt cases (#1421):** when they are migrated into the shared datasets, rerun the rebuilt pr cases with `api`
   loaded and watch for steals before `api` joins their tool set. `pr/search-apify-docs/lazy-webhooks-setup` is the
   likeliest.
@@ -697,9 +585,9 @@ run id.
 1. Should a read through the resource satisfy the acceptance criterion of #1443 ("succeed with the API tools")? The cases
    say yes: the merge references accept it, the pr cases that accept a read list it, and `webhooks-raw-json-easy`
    measures the choice with the built-ins on.
-2. Is it fine to keep two private Actors and one webhook on the CI test account for good, and does its plan allow two
-   more Actors?
-3. Do the README section and the CI steps go into #1444 itself, or into an evals PR merged right after it?
+2. Is it fine to keep two private Actors, one webhook, and one dataset on the CI test account for good, and does its plan
+   allow two more Actors?
+3. Do the README section and the CI step go into #1444 itself, or into an evals PR merged right after it?
 4. Promote Batch B the day #1445 merges, or only after Haiku is calibrated on it?
 5. Is example.com fine as the webhook URL? Each merge run sends one test delivery there.
 6. Should the server instructions stop sending model reads to `resources/read` when `apify-api-read` is loaded (Found
