@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.17.4 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Stop pointing non-Actor tools at fetch-actor-details ([#1485](https://github.com/apify/apify-mcp-server/pull/1485)) ([d9768ca](https://github.com/apify/apify-mcp-server/commit/d9768ca1c551b5d1d7f5f3bc86e5321d3505c8a6)) by [@daveomri](https://github.com/daveomri), closes [#1214](https://github.com/apify/apify-mcp-server/issues/1214)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.17.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.3) (2026-10-06)
