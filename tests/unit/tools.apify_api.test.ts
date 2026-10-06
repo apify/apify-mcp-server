@@ -20,10 +20,12 @@ import {
     apifyApiSearchOutputSchema,
 } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { ALL_TOOLS_PRESENT } from '../../src/types.js';
 import { API_SPEC_FIXTURE } from './helpers/apify_api_spec_fixture.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    only,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
@@ -265,6 +267,17 @@ describe('apify-api-read', () => {
             destructiveHint: false,
             idempotentHint: false,
         });
+    });
+
+    it('says a GET can start a paid run and names call-actor only when the session has it', () => {
+        const withCallActor = apifyApiRead.buildDescription!(ALL_TOOLS_PRESENT);
+        const withoutCallActor = apifyApiRead.buildDescription!(only(HELPER_TOOLS.API_READ));
+        const paidRun = 'A GET can start a paid Actor run, as the synchronous run endpoints do.';
+
+        expect(apifyApiRead.description).toBe(withCallActor);
+        expect(withCallActor).toContain(`${paidRun} Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.`);
+        expect(withoutCallActor).toContain(paidRun);
+        expect(withoutCallActor).not.toContain(HELPER_TOOLS.ACTOR_CALL);
     });
 
     it('sends one GET to the path and returns the body as the API sends it', async () => {

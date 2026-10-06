@@ -27,11 +27,11 @@ identity with the platform's own URLs is the feature. Revisit when tools start e
 `resource_link`s, where clients may fetch `https://` URIs directly. `isApifyApiUri()` gates reads
 to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
 header for those, silently degrading to unauthenticated). The API tools' `callApi`
-(`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `sendApifyApiRequest()`, and
-`isMaxContentLengthAbort()`, so a change to any of them changes the tools too.
+(`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()` and `isMaxContentLengthAbort()`, so
+a change to either changes the tools too.
 
-`sendApifyApiRequest()` sends one request through `httpClient.axios.request` with
-`maxContentLength: MAX_INLINE_BYTES`. `readApiResource()` sends
+`sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
+`httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`. `readApiResource()` sends
 `{ method: 'GET', responseType: 'stream' }` through it, streams the body verbatim, and branches
 on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` with the full
 header, decoded with the declared charset (default utf-8; a charset Node cannot decode falls

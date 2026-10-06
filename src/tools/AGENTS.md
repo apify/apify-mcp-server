@@ -42,7 +42,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
     operations on a path, and send a GET to a path. The call tool is a proxy to the API, like
     `apify api` in the Apify CLI: it refuses nothing the API accepts. `apify_api_spec.ts` builds the
-    operation index from the spec (cached for an hour); search and details use it, and a call uses it
+    operation index from the spec (cached for a day); search and details use it, and a call uses it
     only for hints, waiting at most a few seconds, so a failed download does not stop a call.
     `apify_api_request.ts` normalizes the path as the CLI does (`actors`, `v2/actors`, and `/v2/actors`
     are the same), sends it as written with the query added after any query string in it, and
@@ -50,9 +50,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     on the API origin, sends one request with no retries, masks the session token in the response,
     keeps a query in the path out of the error it throws, and adds the closest spec paths to a
     `page-not-found` 404 (a wrong path), not to a missing record.
-    The origin check (`isApifyApiUri`), the one capped request (`sendApifyApiRequest`), and the
-    detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`) are the API resource's own,
-    imported from `../resources/api_resources.ts`
+    The one capped request (`sendApifyApiRequest`) is in `../apify_client.ts`. The origin check
+    (`isApifyApiUri`) and the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`)
+    are the API resource's own, imported from `../resources/api_resources.ts`
     ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).
     The details and call tools log their arguments through `redactApiCallArgs` (`redactArgs`): an
     allowlist of path, method, query, and body, with the body and the `token`, `signature`, and
