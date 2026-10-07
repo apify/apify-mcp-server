@@ -207,6 +207,9 @@ describe('create-actor-version', () => {
                 versionNumber: '0.2',
                 revision: buildFilesRevision(files),
                 files,
+                warnings: [
+                    'These secret environment variables were not copied, so set them on version 0.2 in Apify Console before building or running it: API_KEY.',
+                ],
             });
             expect(result.structuredContent.revision).toBe(read.structuredContent.revision);
             expect(result.structuredContent.files).toEqual(read.structuredContent.files);
@@ -231,8 +234,8 @@ describe('create-actor-version', () => {
                 ],
                 applyEnvVarsToBuild: true,
             });
-            // No env var reaches the output, and neither does the secret's name or hash.
-            expect(JSON.stringify(result)).not.toMatch(/API_KEY|abc123|LOG_LEVEL|REGION/);
+            // No copied env var reaches the output, and neither does the secret's hash.
+            expect(JSON.stringify(result)).not.toMatch(/abc123|LOG_LEVEL|REGION/);
         });
 
         it('never copies a secret env var, even one that comes back with its value', async () => {
@@ -246,7 +249,42 @@ describe('create-actor-version', () => {
             const result = await callTool({ copyFromVersion: '0.1' });
 
             expect(getPostBody().envVars).toStrictEqual([{ name: 'REGION', value: 'eu' }]);
-            expect(JSON.stringify(result)).not.toMatch(/API_KEY|secret-value/);
+            expect(JSON.stringify(result)).not.toContain('secret-value');
+        });
+
+        it('warns about the secret env vars it left out, naming them after the empty files', async () => {
+            mockActorRead({
+                envVars: [
+                    { name: 'API_KEY', isSecret: true, valueHash: 'abc123' },
+                    { name: 'REGION', value: 'eu' },
+                    { name: 'TOKEN', value: 'secret-value', isSecret: true },
+                ],
+                sourceFiles: [
+                    ...structuredClone(STORED_FILES),
+                    { name: 'src/__init__.py', format: 'TEXT', content: '' },
+                ],
+            });
+
+            const result = await callTool({ copyFromVersion: '0.1' });
+
+            expectSchemaConformingStructuredContent(result, createActorVersionToolOutputSchema);
+            expect(result.structuredContent.warnings).toEqual([
+                'These files are empty, and the build skips empty files, so they will not exist in the build: src/__init__.py.',
+                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console before building or running it: API_KEY, TOKEN.',
+            ]);
+            expect(JSON.stringify(result)).not.toMatch(/abc123|secret-value/);
+        });
+
+        it.each([
+            ['only non-secret env vars', [{ name: 'REGION', value: 'eu', isSecret: false }]],
+            ['no env vars', []],
+            ['no envVars field', undefined],
+        ])('adds no warning for a version with %s', async (_, envVars) => {
+            mockActorRead({ envVars });
+
+            const result = await callTool({ copyFromVersion: '0.1' });
+
+            expect(result.structuredContent).not.toHaveProperty('warnings');
         });
 
         it('copies the files and env vars of the version it names, not of another version', async () => {

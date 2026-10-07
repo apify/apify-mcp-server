@@ -122,6 +122,14 @@ export const createActorVersion: ToolEntry = Object.freeze({
             if (signal?.aborted) return respondAborted();
             const files = buildFilesManifest(sourceFiles);
             const emptyPaths = files.filter(({ sizeBytes }) => sizeBytes === 0).map(({ path }) => path);
+            const { warnings = [] } = buildEmptyFilesWarnings(emptyPaths);
+            const secretNames = copied?.envVars?.filter(({ isSecret }) => isSecret).map(({ name }) => name) ?? [];
+            if (secretNames.length > 0) {
+                warnings.push(
+                    `These secret environment variables were not copied, so set them on version ${versionNumber} ` +
+                        `in Apify Console before building or running it: ${secretNames.join(', ')}.`,
+                );
+            }
             return await respondAfterWrite({
                 toolArgs,
                 autoBuild: parsed.autoBuild,
@@ -132,7 +140,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
                     versionNumber,
                     revision: buildFilesRevision(files),
                     files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
-                    ...buildEmptyFilesWarnings(emptyPaths),
+                    ...(warnings.length > 0 && { warnings }),
                 },
                 summary: `Created version ${versionNumber} of ${fullName}.`,
             });

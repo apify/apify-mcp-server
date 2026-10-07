@@ -611,7 +611,7 @@ const sourceWriteBuildProperties = {
     warnings: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Things to know about the written files, such as empty files the build skips',
+        description: 'Things to know about the written version, such as empty files the build skips',
     },
 };
 
