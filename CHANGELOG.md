@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.17.5 - **not yet released**
 
+### 🚀 Features
+
+- Add Apify API search, details, and read tools ([#1444](https://github.com/apify/apify-mcp-server/pull/1444)) ([682a540](https://github.com/apify/apify-mcp-server/commit/682a540b2750b0fda3712f85e5262e9c6bee7155)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1443](https://github.com/apify/apify-mcp-server/issues/1443)
+
 ### 🐛 Bug Fixes
 
 - Hint for 429 and 5xx errors ([#1456](https://github.com/apify/apify-mcp-server/pull/1456)) ([ced3f1d](https://github.com/apify/apify-mcp-server/commit/ced3f1dd0d67e080aa865e320c93777418241b00)) by [@jsimecek](https://github.com/jsimecek), closes [#1115](https://github.com/apify/apify-mcp-server/issues/1115)
