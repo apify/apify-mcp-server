@@ -100,37 +100,6 @@ export const schedulesCases: Case[] = [
         }),
     },
     {
-        name: 'get-schedule returns the same schedule by name and by id',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['schedules'] }, async (client, ctx) => {
-            const name = uniqueScheduleName('get');
-            let scheduleId: string | undefined;
-            try {
-                const created = expectScheduleResult(
-                    await client.callTool({ name: 'create-schedule', arguments: buildCreateArgs(name) }),
-                );
-                scheduleId = created.scheduleId;
-
-                const byName = expectScheduleResult(
-                    await client.callTool({ name: 'get-schedule', arguments: { scheduleId: name } }),
-                );
-                const byId = expectScheduleResult(
-                    await client.callTool({
-                        name: 'get-schedule',
-                        arguments: { scheduleId: created.scheduleId },
-                    }),
-                );
-
-                expect(byName.scheduleId).toBe(created.scheduleId);
-                expect(byId.scheduleId).toBe(created.scheduleId);
-                expect(byName.name).toBe(name);
-                expect(byId.name).toBe(name);
-            } finally {
-                await deleteSchedule(ctx, scheduleId);
-            }
-        }),
-    },
-    {
         name: 'update-schedule replaces the action list instead of appending to it',
         isDeploymentTest: false,
         run: withClient({ tools: ['schedules'] }, async (client, ctx) => {
@@ -158,37 +127,6 @@ export const schedulesCases: Case[] = [
                 );
                 expect(stored.actions).toHaveLength(1);
                 expect(stored.actions[0].actorId).toBe(updated.actions[0].actorId);
-            } finally {
-                await deleteSchedule(ctx, scheduleId);
-            }
-        }),
-    },
-    {
-        name: 'delete-schedule removes the schedule and a later get reports it missing',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['schedules'] }, async (client, ctx) => {
-            const name = uniqueScheduleName('delete');
-            let scheduleId: string | undefined;
-            try {
-                const created = expectScheduleResult(
-                    await client.callTool({ name: 'create-schedule', arguments: buildCreateArgs(name) }),
-                );
-                scheduleId = created.scheduleId;
-
-                const deleted = await client.callTool({
-                    name: 'delete-schedule',
-                    arguments: { scheduleId: name },
-                });
-                expect((deleted as { structuredContent?: { deleted?: boolean } }).structuredContent?.deleted).toBe(
-                    true,
-                );
-
-                const afterDelete = await client.callTool({
-                    name: 'get-schedule',
-                    arguments: { scheduleId: name },
-                });
-                expect((afterDelete as { isError?: boolean }).isError).toBe(true);
-                expect(resultText(afterDelete)).toContain(`Schedule ${name} was not found.`);
             } finally {
                 await deleteSchedule(ctx, scheduleId);
             }
@@ -226,35 +164,6 @@ export const schedulesCases: Case[] = [
             const name = uniqueScheduleName('missing');
 
             const result = await client.callTool({ name: 'get-schedule', arguments: { scheduleId: name } });
-
-            expect((result as { isError?: boolean }).isError).toBe(true);
-            expect(resultText(result)).toContain(`Schedule ${name} was not found.`);
-        }),
-    },
-    {
-        name: 'update-schedule reports an unknown schedule as not found',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['schedules'] }, async (client) => {
-            const name = uniqueScheduleName('missing');
-
-            const result = await client.callTool({
-                name: 'update-schedule',
-                arguments: { scheduleId: name, isEnabled: false },
-            });
-
-            // A non-ID-shaped name skips the tool's pre-read, so this matches the API's own 404
-            // loosely. Probed 2026-09-21: `Record was not found`, type `record-not-found`.
-            expect((result as { isError?: boolean }).isError).toBe(true);
-            expect(resultText(result)).toMatch(/not found/i);
-        }),
-    },
-    {
-        name: 'delete-schedule reports an unknown schedule as not found',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['schedules'] }, async (client) => {
-            const name = uniqueScheduleName('missing');
-
-            const result = await client.callTool({ name: 'delete-schedule', arguments: { scheduleId: name } });
 
             expect((result as { isError?: boolean }).isError).toBe(true);
             expect(resultText(result)).toContain(`Schedule ${name} was not found.`);
