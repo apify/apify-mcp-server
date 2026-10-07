@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.17.5 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Hint for 429 and 5xx errors ([#1456](https://github.com/apify/apify-mcp-server/pull/1456)) ([ced3f1d](https://github.com/apify/apify-mcp-server/commit/ced3f1dd0d67e080aa865e320c93777418241b00)) by [@jsimecek](https://github.com/jsimecek), closes [#1115](https://github.com/apify/apify-mcp-server/issues/1115)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.17.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.4) (2026-10-07)
 
 ### 🐛 Bug Fixes
