@@ -1,9 +1,9 @@
 import type { ActorVersion } from 'apify-client';
-import { ActorSourceType } from 'apify-client';
+import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS, HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
@@ -52,8 +52,10 @@ const createActorVersionArgs = z.object({
  * https://docs.apify.com/api/v2/actor-versions-post
  *  /v2/actors/{actorId}/versions
  *
- * One POST creates the version with its files, so a failed call leaves nothing behind. A copy sends the other
- * version's files as the Actor GET returns them, so their content never passes through the model.
+ * One POST creates the version with its files. apify-client retries the POST after a network error, a timeout, a 429,
+ * or a 5xx, so when the platform saved an attempt it did not answer, the retry fails on the number that attempt took,
+ * and the call says the version may exist. A copy sends the other version's files as the Actor GET returns them, so
+ * their content never passes through the model.
  */
 export const createActorVersion: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -135,6 +137,19 @@ export const createActorVersion: ToolEntry = Object.freeze({
                 summary: `Created version ${versionNumber} of ${fullName}.`,
             });
         } catch (error) {
+            if (
+                error instanceof ApifyApiError &&
+                error.type === APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS &&
+                error.attempt > 1
+            ) {
+                return respondUserError(
+                    `The platform refused version ${versionNumber} as taken when the request was retried, so an ` +
+                        'earlier attempt of this call may have created it. Read it with ' +
+                        `${HELPER_TOOLS.ACTOR_VERSION_GET} before calling ${HELPER_TOOLS.ACTOR_VERSION_CREATE} again; ` +
+                        'if it holds the files this call sent, this call created it.',
+                    { httpStatus: error.statusCode },
+                );
+            }
             return respondToSourceToolError(error);
         }
     },

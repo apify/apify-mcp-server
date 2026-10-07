@@ -94,8 +94,9 @@ function sha256Prefix(data: Buffer | string): string {
     return createHash('sha256').update(data).digest('hex').slice(0, 16);
 }
 
-function apiError(status: number, message: string, type = 'some-error'): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
+/** `attempt` counts apify-client's tries of the request, retries included. */
+function apiError(status: number, message: string, type = 'some-error', attempt = 1): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, attempt);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<CreateVersionResult> {
@@ -521,6 +522,49 @@ describe('create-actor-version', () => {
                 expect(buildMock).not.toHaveBeenCalled();
             },
         );
+
+        it.each([
+            ['files', { files: [ACTOR_JSON] }],
+            ['a copy of that version', { copyFromVersion: '0.1' }],
+        ])(
+            'says an earlier attempt may have created the version when the platform refuses the number on a retried POST, from %s',
+            async (_, args) => {
+                // apify-client retries a POST that timed out or got a 5xx, and the platform may have saved the attempt.
+                versionsCreateMock.mockRejectedValue(
+                    apiError(403, 'Version with this number already exists', 'version-already-exists', 2),
+                );
+
+                const result = await callTool({ autoBuild: true, ...args });
+
+                expectSoftFailInvalidInput(result);
+                expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureHttpStatus: 403 }));
+                expect(result.structuredContent).toBeUndefined();
+                expect(result.content).toStrictEqual([
+                    {
+                        type: 'text',
+                        text:
+                            'The platform refused version 0.2 as taken when the request was retried, so an earlier ' +
+                            'attempt of this call may have created it. Read it with get-actor-version before calling ' +
+                            'create-actor-version again; if it holds the files this call sent, this call created it.',
+                    },
+                ]);
+                expect(getPostBody().versionNumber).toBe('0.2');
+                expectNoOtherWrite();
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it('lets any other API error of a retried POST through unchanged', async () => {
+            const error = apiError(
+                403,
+                'The limit on the combined size of all versions has been exceeded.',
+                'versions-size-exceeded',
+                2,
+            );
+            versionsCreateMock.mockRejectedValue(error);
+
+            await expect(callTool({ files: [ACTOR_JSON] })).rejects.toBe(error);
+        });
     });
 
     describe('cancellation', () => {
