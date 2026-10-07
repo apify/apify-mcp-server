@@ -210,6 +210,27 @@ export function validateNewFilePath(
     throw new UserInputError(`${label} collides with ${collision}; one path cannot be both a file and a folder.`);
 }
 
+/**
+ * The entries to send, one per file; throws `UserInputError` for a path no file can be written at, for content the
+ * stored file would not hold as sent, and for a path given twice, which leaves the version with two entries where the
+ * build uses the last.
+ */
+export function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
+    const entries: ActorVersionSourceFile[] = [];
+    for (const [index, file] of files.entries()) {
+        const entry = buildSourceFileEntry(file);
+        const label = `files[${index}] (${file.path})`;
+        validateFilePath(entry.name, label);
+        validateFileContent(entry, label);
+        if (entries.some(({ name }) => name === entry.name)) {
+            throw new UserInputError(`${label} repeats the path ${entry.name}; send each file once.`);
+        }
+        validateNewFilePath(entry.name, { filePaths: entries.map(({ name }) => name), folderPaths: [] }, label);
+        entries.push(entry);
+    }
+    return entries;
+}
+
 /** The build worker skips a file whose content is empty, so the caller hears of such files. */
 export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: string[] } {
     if (paths.length === 0) return {};

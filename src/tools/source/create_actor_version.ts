@@ -12,7 +12,7 @@ import { createActorVersionToolOutputSchema } from '../structured_output_schemas
 import { buildFilesManifest, buildFilesRevision } from './source_files.js';
 import {
     buildEmptyFilesWarnings,
-    buildSourceFileEntry,
+    buildSourceFileEntries,
     extractSourceFiles,
     fetchActor,
     resolveVersion,
@@ -99,7 +99,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
                 copyFromVersion === undefined ? undefined : resolveVersion(actor, copyFromVersion, parsed.actor);
             const sourceFiles = copied
                 ? extractSourceFiles(copied, `Version ${copied.versionNumber} of ${fullName}`)
-                : parsed.files!.map(buildSourceFileEntry);
+                : buildSourceFileEntries(parsed.files!);
             // A cancel during the read creates nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
             await client

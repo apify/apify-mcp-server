@@ -430,6 +430,47 @@ describe('create-actor-version', () => {
             ]);
         });
 
+        it.each<[string, Record<string, unknown>[], string]>([
+            [
+                'a path outside the Actor root',
+                [MAIN_JS, { path: '../x.js', content: 'x' }],
+                'files[1] (../x.js) has a path outside the Actor root; give one relative to it, such as src/main.js.',
+            ],
+            [
+                'an absolute path',
+                [{ path: '/src/main.js', content: 'x' }],
+                'files[0] (/src/main.js) has a path outside the Actor root; give one relative to it, such as src/main.js.',
+            ],
+            [
+                'a folder path',
+                [{ path: 'src/', content: 'x' }],
+                'files[0] (src/) has a path that names a folder, not a file.',
+            ],
+            [
+                'the same path twice',
+                [MAIN_JS, { path: './src/main.js', content: '2' }],
+                'files[1] (./src/main.js) repeats the path src/main.js; send each file once.',
+            ],
+            [
+                'a file under another file',
+                [{ path: 'src', content: 'x' }, MAIN_JS],
+                'files[1] (src/main.js) collides with src; one path cannot be both a file and a folder.',
+            ],
+            [
+                'text sent to a binary extension',
+                [{ path: 'assets/a.png', content: 'hello world' }],
+                'files[0] (assets/a.png) has content that is not valid base64; send binary content as base64, or text with encoding utf8.',
+            ],
+            [
+                'text with a lone UTF-16 surrogate',
+                [{ path: 'src/a.js', content: 'smile \uD83D' }],
+                'files[0] (src/a.js) has text with a lone UTF-16 surrogate, which UTF-8 cannot store.',
+            ],
+        ])('refuses %s, and creates nothing', async (_, files, text) => {
+            expect(await callToolExpectingUserError({ files, autoBuild: true })).toBe(text);
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
         it('refuses a call with neither files nor copyFromVersion before any request', async () => {
             expect(await callToolExpectingUserError({})).toBe('Give either files or copyFromVersion.');
             expect(actorMock).not.toHaveBeenCalled();
