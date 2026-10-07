@@ -573,6 +573,23 @@ describe('create-actor', () => {
         expect(buildMock).not.toHaveBeenCalled();
     });
 
+    it('names get-actor-version on a retried POST only when the session has it', async () => {
+        actorsCreateMock.mockRejectedValue(
+            apiError(409, 'Some other Actor already has this name ("my-actor").', 'actor-name-not-unique', 2),
+        );
+        const loadedToolNames = Object.values(HELPER_TOOLS).filter((name) => name !== HELPER_TOOLS.ACTOR_VERSION_GET);
+        const context = stubToolCallContext({ name: 'my-actor', files: [ACTOR_JSON] }, stubClient, { loadedToolNames });
+
+        const result = (await (createActor as HelperTool).call(context)) as CreateResult;
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            'The platform refused the name my-actor as taken when the request was retried, so an earlier attempt ' +
+                'of this call may have created the Actor. Read it, as username/my-actor with your username, before ' +
+                'calling create-actor again; if it holds the files you sent, this call created it.',
+        );
+    });
+
     it('lets any other API error of a retried POST through unchanged', async () => {
         const error = apiError(400, 'Invalid version number.', 'invalid-input', 2);
         actorsCreateMock.mockRejectedValue(error);
