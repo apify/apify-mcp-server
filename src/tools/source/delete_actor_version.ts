@@ -33,11 +33,11 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.ACTOR_VERSION_DELETE,
     title: 'Delete Actor version',
     description: dedent`
-        Delete one version of an Actor, with its source and environment variables. The platform refuses to delete an Actor's last version.
+        Delete one version of an Actor, with its source and environment variables; a deleted version cannot be restored. The platform refuses to delete an Actor's last version.
         The version's builds stay, and so do the tags that point to them: a run with such a tag still uses that build.
 
         USAGE:
-        - Use to remove a version that is no longer needed, such as a working copy.
+        - Use only when the user explicitly wants the version removed.
 
         USAGE EXAMPLES:
         - user_input: Delete version 0.2 of my Actor john/my-scraper`,

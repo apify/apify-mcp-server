@@ -92,6 +92,13 @@ describe('delete-actor-version', () => {
         expect((deleteActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
+    it('says in its description that a deleted version cannot be restored, and to delete only on request', () => {
+        expect(deleteActorVersion.description).toContain('a deleted version cannot be restored');
+        expect(deleteActorVersion.description).toContain(
+            '- Use only when the user explicitly wants the version removed.',
+        );
+    });
+
     it('requires the actor and versionNumber, so it never picks a version itself', () => {
         const tool = deleteActorVersion as HelperTool;
 
