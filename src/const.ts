@@ -115,9 +115,8 @@ export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 
 /**
  * `clientInfo.name` values sent by Apify AI during the MCP initialize handshake; runs started by
  * these clients are attributed to the APIFY_AI request origin (exact match).
- * - `apify-console-ai-chat`: the legacy Apify Console AI chat backend.
- * - `apify-ai`: the Apify AI agent service (apify/apify-ai-agent). Kept short because Mastra
- *   prefixes every tool name with it and providers cap tool names at 64 characters.
+ * - `apify-console-ai-chat`: legacy Apify Console AI chat backend.
+ * - `apify-ai`: Apify AI agent service (apify/apify-ai-agent).
  */
 export const APIFY_AI_CLIENT_NAMES: readonly string[] = ['apify-console-ai-chat', 'apify-ai'];
 
