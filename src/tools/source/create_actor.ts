@@ -57,7 +57,7 @@ export const createActor: ToolEntry = Object.freeze({
         autoBuild starts a build after creating the Actor and returns without waiting.
 
         USAGE:
-        - Use to publish new Actor code to the Apify platform for the first time.
+        - Use to upload new Actor code to the Apify platform for the first time.
 
         USAGE EXAMPLES:
         - user_input: Create an Actor called hacker-news-scraper from these files`,
