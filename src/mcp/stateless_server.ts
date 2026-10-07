@@ -166,7 +166,7 @@ class StatelessMcpServer {
             const snapshot = await this.resolveSnapshot(ctx);
             const presentTools = new Set(snapshot.tools.keys());
             const tools = Array.from(snapshot.tools.values()).map((tool) =>
-                getToolPublicFieldOnly(tool, { mode: snapshot.serverMode, filterWidgetMeta: true, presentTools }),
+                getToolPublicFieldOnly(tool, { presentTools }),
             );
             // Tool entries carry the same public fields as the SDK's `Tool`; type-boundary cast only.
             return { tools } as unknown as ListToolsResult;
