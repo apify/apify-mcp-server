@@ -52,17 +52,24 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, signal } = toolArgs;
+        const { args, apifyClient: client, signal, loadedToolNames } = toolArgs;
         const parsed = deleteActorVersionArgs.parse(args);
         try {
             const { actor, fullName } = await fetchActor(client, parsed.actor);
-            const { versionNumber } = resolveVersion(actor, parsed.versionNumber, parsed.actor);
+            const { versionNumber, buildTag } = resolveVersion(actor, parsed.versionNumber, parsed.actor);
             // A cancel before the DELETE deletes nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
             await client.actor(actor.id).version(versionNumber).delete();
             const structuredContent = { actorId: actor.id, fullName, versionNumber, deleted: true };
             const summary = `Deleted version ${versionNumber} of ${fullName}.`;
-            return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
+            const buildTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
+                ? `${HELPER_TOOLS.ACTOR_BUILD} and `
+                : '';
+            const text = buildTag
+                ? `${summary}\nRuns with tag ${buildTag} still use the deleted version's build; to have them run ` +
+                  `another version, build that version with ${buildTool}tag ${buildTag}.`
+                : summary;
+            return respondOk([JSON.stringify(structuredContent), text], { structuredContent });
         } catch (error) {
             return respondToSourceToolError(error);
         }

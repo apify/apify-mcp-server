@@ -108,9 +108,19 @@ describe('delete-actor-version', () => {
         expect(tool.ajvValidate({ actor: 'john/my-actor', versionNumber: '0.2' })).toBe(true);
     });
 
-    it.each(['0.1', '0.2'])(
-        'deletes only version %s of the Actor it resolved, with one DELETE',
-        async (versionNumber) => {
+    it.each([
+        // Version 0.1 has the build tag latest, which still points to its build after the delete.
+        {
+            versionNumber: '0.1',
+            text:
+                'Deleted version 0.1 of john/my-actor.\n' +
+                "Runs with tag latest still use the deleted version's build; to have them run another version, " +
+                'build that version with build-actor and tag latest.',
+        },
+        { versionNumber: '0.2', text: 'Deleted version 0.2 of john/my-actor.' },
+    ])(
+        'deletes only version $versionNumber of the Actor it resolved, with one DELETE',
+        async ({ versionNumber, text }) => {
             const result = await callTool({ versionNumber });
 
             expectSchemaConformingStructuredContent(result, deleteActorVersionToolOutputSchema);
@@ -125,9 +135,24 @@ describe('delete-actor-version', () => {
                 versionNumber,
                 deleted: true,
             });
-            expect(result.content[1].text).toBe(`Deleted version ${versionNumber} of john/my-actor.`);
+            expect(result.content[1].text).toBe(text);
         },
     );
+
+    it('names build-actor in the next step about the build tag only when the session has it', async () => {
+        const loadedToolNames = Object.values(HELPER_TOOLS).filter((name) => name !== HELPER_TOOLS.ACTOR_BUILD);
+        const context = stubToolCallContext({ actor: 'john/my-actor', versionNumber: '0.1' }, stubClient, {
+            loadedToolNames,
+        });
+
+        const result = (await (deleteActorVersion as HelperTool).call(context)) as DeleteResult;
+
+        expect(result.content[1].text).toBe(
+            'Deleted version 0.1 of john/my-actor.\n' +
+                "Runs with tag latest still use the deleted version's build; to have them run another version, " +
+                'build that version with tag latest.',
+        );
+    });
 
     it('refuses a version the Actor does not have, which apify-client would report as deleted', async () => {
         expect(await callToolExpectingUserError({ versionNumber: '0.9' })).toBe(
