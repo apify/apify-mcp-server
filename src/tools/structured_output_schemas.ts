@@ -1,3 +1,5 @@
+import { TIP_MESSAGE_LIMIT } from '../const.js';
+
 /**
  * Shared JSON schema definitions for structured output across tools.
  * These schemas define the format of structured data returned by various tools.
@@ -475,6 +477,130 @@ export const getActorRunLogToolOutputSchema = {
     required: ['log'],
 };
 
+/**
+ * Schema for get-actor-build-log. The log API returns plain text, so the schema wraps it in a single field.
+ */
+export const getActorBuildLogToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        log: { type: 'string', description: 'The last N lines of the build log, as plain text' },
+    },
+    required: ['log'],
+};
+
+/** Schema for one build: the allowlisted build subset (`toBuildItem`), as get-actor-build-list returns it. */
+const actorBuildItemSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Build ID' },
+        actorId: { type: 'string', description: 'ID of the Actor the build belongs to' },
+        buildNumber: { type: 'string', description: 'Build number, e.g. 0.1.12' },
+        status: { type: 'string', description: 'Build status, e.g. RUNNING, SUCCEEDED, FAILED' },
+        startedAt: { type: ['string', 'null'], description: 'ISO timestamp' },
+        finishedAt: { type: ['string', 'null'], description: 'ISO timestamp; null while the build is running' },
+    },
+    required: ['id', 'actorId', 'buildNumber', 'status', 'startedAt', 'finishedAt'],
+};
+
+/** Schema for get-actor-build: one build with its Console link (`toBuildResult`). */
+export const getActorBuildToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        build: {
+            ...actorBuildItemSchema,
+            properties: {
+                ...actorBuildItemSchema.properties,
+                apifyConsoleUrl: {
+                    type: 'string',
+                    description: 'Personalized Apify Console link to the build; present only for Console sessions',
+                },
+            },
+        },
+    },
+    required: ['build'],
+};
+
+/**
+ * Schema for build-actor: the same allowlisted build subset (`toBuildResult`) as get-actor-build.
+ */
+export const buildActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        build: getActorBuildToolOutputSchema.properties.build,
+    },
+    required: ['build'],
+};
+
+/** Schema for delete-actor. */
+export const deleteActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the deleted Actor' },
+        fullName: { type: 'string', description: 'Full name of the deleted Actor, username/name' },
+        deleted: { type: 'boolean', description: 'Always true; the Actor no longer exists' },
+        abortedRunCount: {
+            type: 'integer',
+            description:
+                'Unfinished runs found just before the deletion. The platform aborts them; a run that starts in between is aborted and not included.',
+        },
+    },
+    required: ['actorId', 'fullName', 'deleted', 'abortedRunCount'],
+};
+
+/** Schema for get-actor-version: the version's file manifest, its revision, and the content returned. */
+export const getActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        revision: { type: 'string', description: 'Identifies the whole file set; changes when any file changes' },
+        files: {
+            type: 'array',
+            description: 'Regular files sorted by path, folders excluded',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'Path relative to the Actor root' },
+                    sizeBytes: { type: 'number', description: 'Size of the decoded bytes' },
+                    hash: { type: 'string', description: 'First 16 hex characters of the SHA-256 of the bytes' },
+                },
+                required: ['path', 'sizeBytes', 'hash'],
+            },
+        },
+        contents: {
+            type: 'array',
+            description: 'Content of the returned files, raw with no line numbers',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string' },
+                    content: { type: 'string' },
+                    encoding: { type: 'string', enum: ['utf8', 'base64'] },
+                    startLine: {
+                        type: 'integer',
+                        description: 'First returned line, counting from 1; set for a line range',
+                    },
+                    endLine: { type: 'integer', description: 'Last returned line; set for a line range' },
+                    totalLines: { type: 'integer', description: 'Lines in the whole file; set for a line range' },
+                },
+                required: ['path', 'content', 'encoding'],
+            },
+        },
+        omittedPaths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Requested files left out to stay within the content limit',
+        },
+        notFoundPaths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Requested paths the version has no file at',
+        },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files', 'contents'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
@@ -586,6 +712,27 @@ export const actorRunOutputSchema = {
                 },
             },
         },
+        tip: {
+            type: 'object' as const,
+            description: 'Advisory guidance RAG Web Browser wrote to its key-value store under the reserved "TIP" key',
+            properties: {
+                message: {
+                    type: 'string',
+                    description: `Truncated to ${TIP_MESSAGE_LIMIT} characters, with a trailing ellipsis if the Actor's message was longer`,
+                },
+                level: {
+                    type: 'string',
+                    enum: ['info', 'warning'],
+                    description: 'Omitted when the Actor wrote an unrecognized level',
+                },
+                recommendedActorId: {
+                    type: 'string',
+                    description:
+                        'Apify Actor ID the tip recommends running next, when it names one — pass directly as `actor` to call-actor or fetch-actor-details',
+                },
+            },
+            required: ['message'],
+        },
         summary: { type: 'string', description: 'Past-tense summary of the run state' },
         nextStep: { type: 'string', description: 'One primary follow-up action with identifiers interpolated' },
     },
@@ -685,6 +832,39 @@ const actorRunListItemSchema = {
 
 /** Schema for get-actor-run-list output (paginated list of runs). */
 export const actorRunListOutputSchema = paginatedListOutputSchema(actorRunListItemSchema, 'Actor runs.');
+
+/** Schema for one Actor in get-actor-list: the allowlisted subset of the `GET /v2/acts` item. */
+const actorListItemSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Actor ID.' },
+        name: { type: 'string', description: 'Actor name, unique within the owner account.' },
+        fullName: { type: 'string', description: 'Full Actor name, username/name; the username is the owner.' },
+        title: { type: ['string', 'null'], description: 'Display title; null when the Actor has none.' },
+        createdAt: { type: ['string', 'null'], description: 'ISO timestamp when the Actor was created.' },
+        modifiedAt: { type: ['string', 'null'], description: 'ISO timestamp when the Actor was last modified.' },
+        lastRunStartedAt: {
+            type: ['string', 'null'],
+            description: 'ISO timestamp when the last run of the Actor started; null when it has never run.',
+        },
+    },
+    required: ['id', 'name', 'fullName', 'title', 'createdAt', 'modifiedAt', 'lastRunStartedAt'],
+};
+
+const actorListPageSchema = paginatedListOutputSchema(actorListItemSchema, 'Actors.');
+
+/** Schema for get-actor-list output: a page of the account's Actors, with summary and nextStep like get-dataset-list. */
+export const actorListOutputSchema = {
+    ...actorListPageSchema,
+    properties: { ...actorListPageSchema.properties, summary: summaryProperty, nextStep: nextStepProperty },
+    required: [...actorListPageSchema.required, 'summary', 'nextStep'],
+};
+
+/** Schema for get-actor-build-list output (paginated list of builds). */
+export const getActorBuildListToolOutputSchema = paginatedListOutputSchema(
+    actorBuildItemSchema,
+    'Builds, newest first by default.',
+);
 
 /**
  * Schema for dataset items retrieval tools (get-dataset-items).

@@ -76,8 +76,7 @@ export const paymentsCases: Case[] = [
             try {
                 const toolsList = await client.listTools();
 
-                // Positive: paid tools advertise _meta.x402 with both shapes —
-                // flat preferred-scheme fields (back-compat) and the full accepts[] array.
+                // Positive: paid tools advertise _meta.x402 with the full accepts[] array.
                 for (const toolName of paidToolNames) {
                     const tool = toolsList.tools.find((t) => t.name === toolName);
                     expect(tool, `Tool "${toolName}" should exist in the tools list`).toBeDefined();
@@ -85,10 +84,6 @@ export const paymentsCases: Case[] = [
                     const x402 = tool?._meta?.x402 as Record<string, unknown> | undefined;
                     expect(x402, `Tool "${toolName}" should advertise _meta.x402`).toBeDefined();
                     expect(x402?.paymentRequired, `Tool "${toolName}" x402.paymentRequired should be true`).toBe(true);
-
-                    for (const field of ['scheme', 'network', 'asset', 'payTo', 'amount'] as const) {
-                        expect(x402?.[field], `Tool "${toolName}" should advertise x402.${field}`).toBeDefined();
-                    }
 
                     const accepts = x402?.accepts as Record<string, unknown>[] | undefined;
                     expect(accepts, `Tool "${toolName}" should advertise x402.accepts[]`).toBeInstanceOf(Array);

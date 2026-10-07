@@ -7,8 +7,9 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
 import {
-    expectSoftFailInvalidInput,
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockApifyClient,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
@@ -28,21 +29,21 @@ const MOCK_ITEMS = [
 ];
 
 function stubApifyClient(listItemsResponse: unknown): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         dataset: (_id: string) => ({
             listItems: async () => listItemsResponse,
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         dataset: (_id: string) => ({
             listItems: async () => {
                 throw err;
             },
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-dataset-schema', () => {
@@ -69,9 +70,9 @@ describe('get-dataset-schema', () => {
 
     it('applies defaults (limit=5, clean=true) to listItems when no params given', async () => {
         const listItemsSpy = vi.fn().mockResolvedValue({ items: MOCK_ITEMS, total: 2 });
-        const client = {
+        const client = mockApifyClient({
             dataset: (_id: string) => ({ listItems: listItemsSpy }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         await (getDatasetSchema as HelperTool).call(stubToolCallContext({ datasetId: 'ds-1' }, client));
 
@@ -80,7 +81,7 @@ describe('get-dataset-schema', () => {
 
     it('returns a schema-conforming structured response when the dataset has no items', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
+            stubToolCallContext({ datasetId: 'ds-1', clean: false }, stubApifyClient({ items: [], total: 0 })),
         );
         const { content, isError, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
@@ -90,10 +91,39 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.datasetId).toBe('ds-1');
         expect(structuredContent.schema).toEqual({});
         expect(structuredContent.summary).toBe("Dataset 'ds-1' is empty; no schema to infer.");
-        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
+        expect(structuredContent.nextStep).toBe(
+            `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1 to check itemCount and stats.`,
+        );
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
         // The required `schema` is still present (empty object) and the emit conforms to the schema.
         expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
+    });
+
+    // clean=true skips empty items and #-prefixed fields, so a dataset of hidden-field items comes
+    // back as items=[] and must not be reported as empty.
+    it('suggests clean=false instead of reporting empty when clean filtering returned no items', async () => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 3 })),
+        );
+        const { isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(isError).not.toBe(true);
+        expect(structuredContent.schema).toEqual({});
+        expect(structuredContent.summary).not.toContain('is empty');
+        expect(structuredContent.nextStep).toContain('clean=false');
+        expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
+    });
+
+    it('reports empty without the clean=false hint when the dataset has no items under clean=true', async () => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
+        );
+        const { structuredContent } = result as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toContain('is empty');
+        expect(structuredContent.nextStep).not.toContain('clean=false');
     });
 
     it('returns isError with a not-found message when listItems throws 404', async () => {

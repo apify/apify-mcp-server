@@ -3,7 +3,14 @@ import type { ActorRun, Dataset, KeyValueClientListKeysResult } from 'apify-clie
 import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { DATASET_SIZE_HINT_BYTES, HELPER_TOOLS, NARROW_OUTPUT_HINT } from '../../const.js';
+import {
+    DATASET_SIZE_HINT_BYTES,
+    HELPER_TOOLS,
+    KV_KEYS_LIMIT,
+    NARROW_OUTPUT_HINT,
+    RAG_WEB_BROWSER,
+    TIP_MESSAGE_LIMIT,
+} from '../../const.js';
 import { buildActorRunWidgetMeta } from '../../resources/widgets.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import {
@@ -18,8 +25,8 @@ import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } f
 import { cleanEmptyProperties } from '../../utils/schema_generation.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 
-/** Cap on `storages.keyValueStores.default.keys` array length. */
-const KV_KEYS_LIMIT = 50;
+/** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
+const TIP_KVS_KEY = 'TIP';
 
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
 export const WIDGET_NO_POLL_NEXT_STEP =
@@ -44,13 +51,16 @@ const ITEM_COUNT_PROBE_LIMIT = 1;
 const ITEM_COUNT_PROBE_DELAYS_MS = [0, 1000, 2000, 2000] as const;
 
 /** Sentinel used by `raceAbort` to signal that the abort signal won the race. */
-const ABORT = Symbol('ABORT');
+export const ABORT = Symbol('ABORT');
 
 /**
  * Race a promise against an abort signal. Returns the resolved value, or {@link ABORT} if the
  * signal fires first. Cleans up its abort listener on either branch so callers never leak.
  */
-async function raceAbort<T>(promise: Promise<T>, abortSignal: AbortSignal | undefined): Promise<T | typeof ABORT> {
+export async function raceAbort<T>(
+    promise: Promise<T>,
+    abortSignal: AbortSignal | undefined,
+): Promise<T | typeof ABORT> {
     if (!abortSignal) return promise;
     // Already aborted: `addEventListener('abort', ...)` won't fire (the event has passed), so the
     // listener would never resolve and the race would block on `promise`.
@@ -144,6 +154,8 @@ export type RunResponse = {
         memMaxBytes?: number;
     };
     storages: RunStorages;
+    /** Advisory guidance an Actor wrote under the reserved {@link TIP_KVS_KEY}, if any. */
+    tip?: { message: string; level?: 'info' | 'warning'; recommendedActorId?: string };
     summary: string;
     nextStep: string;
 };
@@ -308,6 +320,70 @@ async function fetchKvKeys(
         });
         return null;
     }
+}
+
+/** Defensive parse of a TIP record's value: any Actor can write it, so shape isn't trusted. */
+function parseActorTip(value: unknown): RunResponse['tip'] {
+    if (!value || typeof value !== 'object') return undefined;
+    const { message, level, recommendedActorId } = value as {
+        message?: unknown;
+        level?: unknown;
+        recommendedActorId?: unknown;
+    };
+    if (typeof message !== 'string' || !message) return undefined;
+    const codePoints = Array.from(message); // avoids splitting a surrogate pair at the cut
+    const truncated =
+        codePoints.length > TIP_MESSAGE_LIMIT ? `${codePoints.slice(0, TIP_MESSAGE_LIMIT).join('')}…` : message;
+    return {
+        message: truncated,
+        ...(level === 'info' || level === 'warning' ? { level } : {}),
+        ...(typeof recommendedActorId === 'string' &&
+        recommendedActorId.length === 17 &&
+        /^[a-zA-Z0-9]{17}$/.test(recommendedActorId)
+            ? { recommendedActorId }
+            : {}),
+    };
+}
+
+/** Check the exact `TIP` key without fetching another page of keys. */
+async function keyValueStoreHasTipKey(client: ApifyClient, id: string, mcpSessionId?: string): Promise<boolean> {
+    try {
+        return await client.keyValueStore(id).recordExists(TIP_KVS_KEY);
+    } catch (error) {
+        log.warning('Failed to look up Actor tip key', {
+            keyValueStoreId: id,
+            mcpSessionId,
+            errMessage: errMessage(error),
+        });
+        return false;
+    }
+}
+
+/** Fetch the run's advisory tip; a transient failure or malformed record logs and yields undefined. */
+async function fetchActorTip(
+    client: ApifyClient,
+    keyValueStoreId: string,
+    mcpSessionId?: string,
+): Promise<RunResponse['tip']> {
+    try {
+        const record = await client.keyValueStore(keyValueStoreId).getRecord(TIP_KVS_KEY);
+        return parseActorTip(record?.value);
+    } catch (error) {
+        log.warning('Failed to fetch Actor tip', { keyValueStoreId, mcpSessionId, errMessage: errMessage(error) });
+        return undefined;
+    }
+}
+
+/** Fetch the run's tip; looks the key up separately only when the listed keys are truncated. */
+async function fetchRunTip(
+    client: ApifyClient,
+    { id, keys = [], keyCount }: RunKeyValueStore,
+    mcpSessionId?: string,
+): Promise<RunResponse['tip']> {
+    const isTruncated = keyCount === undefined && keys.length === KV_KEYS_LIMIT;
+    const hasTipKey =
+        keys.includes(TIP_KVS_KEY) || (isTruncated && (await keyValueStoreHasTipKey(client, id, mcpSessionId)));
+    return hasTipKey ? fetchActorTip(client, id, mcpSessionId) : undefined;
 }
 
 /**
@@ -894,6 +970,12 @@ export async function fetchActorRunData(params: {
         keyValueStore: keyValueStores?.default,
     });
 
+    const defaultKv = keyValueStores?.default;
+    const tip =
+        isTerminal && defaultKv && actorName === RAG_WEB_BROWSER
+            ? await fetchRunTip(client, defaultKv, mcpSessionId)
+            : undefined;
+
     const structuredContent: RunResponse = {
         runId: run.id,
         actorId: run.actId,
@@ -908,6 +990,7 @@ export async function fetchActorRunData(params: {
             ...(datasets && { datasets }),
             ...(keyValueStores && { keyValueStores }),
         },
+        tip,
         summary,
         nextStep,
     };

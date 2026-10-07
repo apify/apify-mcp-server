@@ -2,6 +2,7 @@ import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/typ
 import Ajv from 'ajv';
 import { expect } from 'vitest';
 
+import type { ApifyClient } from '../../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs, ToolDescriptionContext } from '../../../src/types.js';
 import type { CachedUserInfo } from '../../../src/utils/userid_cache.js';
@@ -36,10 +37,19 @@ export type ToolTelemetrySnapshot = {
     failureCategory?: string;
 };
 
-/** Minimal `InternalToolArgs` stub for unit tests. */
+/** The one unsafe `ApifyClient` cast: tests pass whatever client methods they stub. */
+export function mockApifyClient(methods: Record<string, unknown> = {}): ApifyClient {
+    return methods as unknown as ApifyClient;
+}
+
+/** Minimal `InternalToolArgs` stub for unit tests. Defaults to every helper tool loaded, no Actor tools. */
 export function stubToolCallContext(
     args: Record<string, unknown>,
     client: InternalToolArgs['apifyClient'],
+    {
+        loadedToolNames = Object.values(HELPER_TOOLS),
+        loadedActorIds = [],
+    }: { loadedToolNames?: readonly string[]; loadedActorIds?: readonly string[] } = {},
 ): InternalToolArgs {
     return {
         args,
@@ -48,8 +58,9 @@ export function stubToolCallContext(
         signal: new AbortController().signal,
         paymentProvider: undefined,
         actorStore: undefined,
-        loadedToolNames: Object.values(HELPER_TOOLS),
-    } as unknown as InternalToolArgs;
+        loadedToolNames,
+        loadedActorIds: new Set(loadedActorIds),
+    };
 }
 
 /** Assert not-found style soft-fail responses with INVALID_INPUT telemetry. */

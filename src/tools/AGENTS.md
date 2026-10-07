@@ -10,17 +10,20 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 ## Files
 
-- `registry.ts` — tool categories and the tools in each (`index.ts` re-exports them).
+- `registry.ts` — tool categories and the tools in each (`index.ts` re-exports them), plus tools in no
+  category (`ALL_WIDGET_TOOLS`, `UNCATEGORIZED_TOOLS`).
 - `structured_output_schemas.ts` — shared JSON-schema definitions for structured
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
-  - `actors/` — search, details, call, the actor-tools factory, the direct
-    actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
-    prunes an Actor's definition, `getActorDefinition`), and `actor_run_response.ts` —
+  - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
+    (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),
+    `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`), and
+    `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
-    action) pair, never inline dataset items or KV bodies.
+    action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
+    inlined as `tip` on terminal RAG Web Browser runs only.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
@@ -28,6 +31,15 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`
     converts the flat action shape to the API shape and back, and reuses the id helpers from
     `tasks/task_helpers.ts`.
+  - `builds/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail),
+    `get-actor-build-list` (the account's builds, or one Actor's with `actorId`, in every status, newest
+    first, pointing at the newest failed one) and `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
+    allowlisted build result shape, the build start and wait calls (the wait reports progress), the
+    shared `waitSecs` field, the shared build response and the by-status next-step text.
+  - `source/`: `get-actor-version` (an Actor version's file manifest with hashes, revision, and
+    requested content). `source_files.ts` holds the file shape, the manifest builder, the hash and
+    revision rules, and the text-or-base64 detection. Versions not stored as files (Git repository,
+    gist, or zip) are refused.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).

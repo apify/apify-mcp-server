@@ -18,8 +18,14 @@ import { HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { SERVER_MODE } from '../types.js';
 import { callActor } from './actors/call_actor.js';
+import { deleteActor } from './actors/delete_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
+import { getActorList } from './actors/get_actor_list.js';
 import { searchActors } from './actors/search_actors.js';
+import { buildActor } from './builds/build_actor.js';
+import { getActorBuild } from './builds/get_actor_build.js';
+import { getActorBuildList } from './builds/get_actor_build_list.js';
+import { getActorBuildLog } from './builds/get_actor_build_log.js';
 import { reportProblem } from './dev/report_problem.js';
 import { fetchApifyDocs } from './docs/fetch_apify_docs.js';
 import { searchApifyDocs } from './docs/search_apify_docs.js';
@@ -31,6 +37,7 @@ import { createSchedule } from './schedules/create_schedule.js';
 import { deleteSchedule } from './schedules/delete_schedule.js';
 import { getSchedule } from './schedules/get_schedule.js';
 import { updateSchedule } from './schedules/update_schedule.js';
+import { getActorVersion } from './source/get_actor_version.js';
 import { getDataset } from './storage/get_dataset.js';
 import { getDatasetItems } from './storage/get_dataset_items.js';
 import { getDatasetList } from './storage/get_dataset_list.js';
@@ -66,6 +73,8 @@ export const toolCategories = {
     ],
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
+    builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
+    source: [getActorVersion],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 
@@ -94,6 +103,13 @@ export const ALL_WIDGET_TOOLS: readonly ToolEntry[] = [
     callActorWidget,
     getActorRunWidget,
 ];
+
+/**
+ * Non-widget tools in no category: never served by default or by a category, only when named in
+ * `tools=`, in every mode. Temporary: `get-actor-list` returns to a category once evals cover it.
+ * `delete-actor` stays here: it deletes Actors permanently, so a session gets it only by asking for it.
+ */
+export const UNCATEGORIZED_TOOLS: readonly ToolEntry[] = [getActorList, deleteActor];
 
 /**
  * Apps-mode auto-pairing: a widget is added iff its base tool is present — see

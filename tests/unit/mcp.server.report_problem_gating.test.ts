@@ -7,6 +7,7 @@ import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { SERVER_MODE } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getLegacyServer } from './helpers/mcp_server.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 // Stub getActors so default-injection seeding needs no network.
 // Default-resolves to [] so tests that never call loadReportProblemByDefault still get a valid array.
@@ -52,12 +53,12 @@ async function dispatchInitialize(server: ActorsMcpServer, clientName: string): 
 
 // Restoring by name is explicit (toolNamesToInput builds {tools:[...]}) — bypasses the blocklist.
 async function loadReportProblemByName(server: ActorsMcpServer): Promise<void> {
-    await server.loadToolsByName([HELPER_TOOLS.PROBLEM_REPORT], {} as never);
+    await server.loadToolsByName([HELPER_TOOLS.PROBLEM_REPORT], mockApifyClient());
 }
 
 // Default (no tools=) injection — not an explicit opt-in, so the client blocklist still applies.
 async function loadReportProblemByDefault(server: ActorsMcpServer): Promise<void> {
-    await server.loadToolsFromInput({}, {} as never);
+    await server.loadToolsFromInput({}, mockApifyClient());
 }
 
 describe('report-problem client gating', () => {
@@ -66,7 +67,6 @@ describe('report-problem client gating', () => {
     afterEach(async () => {
         while (servers.length > 0) {
             const server = servers.pop();
-            server?.tools.clear();
             await server?.close();
         }
     });
@@ -147,7 +147,7 @@ describe('report-problem client gating', () => {
     it('restores client-agnostic helper tools loaded before any initialize', async () => {
         const server = track(makeServer());
 
-        await server.loadToolsByName([HELPER_TOOLS.ACTOR_RUNS_GET, HELPER_TOOLS.DATASET_GET_ITEMS], {} as never);
+        await server.loadToolsByName([HELPER_TOOLS.ACTOR_RUNS_GET, HELPER_TOOLS.DATASET_GET_ITEMS], mockApifyClient());
 
         expect(server.tools.has(HELPER_TOOLS.ACTOR_RUNS_GET)).toBe(true);
         expect(server.tools.has(HELPER_TOOLS.DATASET_GET_ITEMS)).toBe(true);

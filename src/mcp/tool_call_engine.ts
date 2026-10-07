@@ -30,6 +30,14 @@ import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_erro
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { dispatchToolCall } from './tool_dispatch.js';
 
+/** INTERNAL tools that wait synchronously and emit progress meanwhile: call-actor's start and wait, get-actor-run, get-actor-build and build-actor with waitSecs > 0. */
+const PROGRESS_TRACKER_INTERNAL_TOOLS = new Set<string>([
+    HELPER_TOOLS.ACTOR_CALL,
+    HELPER_TOOLS.ACTOR_RUNS_GET,
+    HELPER_TOOLS.ACTOR_BUILD_GET,
+    HELPER_TOOLS.ACTOR_BUILD,
+]);
+
 /** A pre-dispatch failure that the shell converts to v1's protocol-error sequence. */
 export type InvalidToolCall = {
     message: string;
@@ -167,12 +175,17 @@ export async function prepareToolCall(params: {
 
     const actorName = extractActorName(tool, args as Record<string, unknown>);
     const actorId = extractActorId(tool);
+    // fetch-actor-details only describes Actors, and only helps if this session serves it.
+    const schemaHint =
+        tool.type === TOOL_TYPE.ACTOR && tools.has(HELPER_TOOLS.ACTOR_GET_DETAILS)
+            ? `using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool`
+            : 'in tools/list';
 
     if (!args) {
         return {
             message: dedent`
                 Missing arguments for tool "${name}".
-                Please provide the required arguments for this tool. Check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool to see what parameters are required.
+                Please provide the required arguments for this tool. Check the tool's input schema ${schemaHint} to see what parameters are required.
             `,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: {
@@ -225,7 +238,7 @@ export async function prepareToolCall(params: {
                 message: dedent`
                     Invalid arguments for tool "${tool.name}".
                     Validation errors: ${errorMessages}.
-                    Please check the tool's input schema using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.
+                    Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.
                 `,
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
@@ -346,13 +359,11 @@ export async function executeSyncToolCall(
         };
     }
 
-    // Progress tracker: opt in for the two INTERNAL tools that emit during a sync wait
-    // (call-actor start+waitForFinish, get-actor-run when waitSecs > 0), and unconditionally
-    // for ACTOR tools. ACTOR_MCP forwards notifications directly, not via a tracker.
+    // Progress tracker: opt in for the INTERNAL tools that emit during a sync wait, and
+    // unconditionally for ACTOR tools. ACTOR_MCP forwards notifications directly, not via a tracker.
     const progressTrackerOptIn =
         tool.type === TOOL_TYPE.ACTOR ||
-        (tool.type === TOOL_TYPE.INTERNAL &&
-            (tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_RUNS_GET));
+        (tool.type === TOOL_TYPE.INTERNAL && PROGRESS_TRACKER_INTERNAL_TOOLS.has(tool.name));
     const progressTracker = progressTrackerOptIn ? createProgressTracker(progressToken, sendNotification) : null;
 
     try {

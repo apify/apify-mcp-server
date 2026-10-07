@@ -420,6 +420,7 @@ export class LegacyMcpServer {
                 apifyToken,
                 clientContext,
                 clientParam: this.host.options.clientParam,
+                paymentProvider,
                 telemetryEnabled: this.host.telemetryEnabled,
                 transportType: this.host.options.transportType,
             });

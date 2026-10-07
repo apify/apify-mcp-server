@@ -15,13 +15,16 @@ export const SKYFIRE_README_CONTENT = `The Apify MCP Server allows clients to in
 
 /**
  * Set of internal tool names that require Skyfire PAY token ID in Skyfire mode.
- * These tools interact with Actor runs, datasets, or key-value stores and need billing support.
+ * These tools interact with Actor runs, builds, datasets, or key-value stores and need billing support.
  */
 export const SKYFIRE_ENABLED_TOOLS = new Set<HelperToolName>([
     HELPER_TOOLS.ACTOR_CALL,
     HELPER_TOOLS.ACTOR_RUNS_GET,
     HELPER_TOOLS.ACTOR_RUNS_LOG,
     HELPER_TOOLS.ACTOR_RUNS_ABORT,
+    HELPER_TOOLS.ACTOR_BUILD_GET,
+    HELPER_TOOLS.ACTOR_BUILD_LOG,
+    HELPER_TOOLS.ACTOR_BUILD,
     HELPER_TOOLS.DATASET_GET,
     HELPER_TOOLS.DATASET_GET_ITEMS,
     HELPER_TOOLS.DATASET_SCHEMA_GET,

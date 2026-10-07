@@ -3,8 +3,14 @@ import { CONSOLE_BASE_URL, CONSOLE_BASE_URL_STAGING, STAGING_MCP_HOSTNAME } from
 import type { ConsoleLinkContext } from '../types.js';
 import { getUserInfoCached } from './userid_cache.js';
 
-/** Console origin for the current cluster: staging when on the staging MCP host, production otherwise. */
+/**
+ * Console origin for the current cluster: `APIFY_CONSOLE_BASE_URL` when set, staging when on the
+ * staging MCP host, production otherwise. The override exists because a server pointed at a
+ * non-production API by `APIFY_API_BASE_URL` would otherwise hand out production Console links
+ * for runs and storages that only exist on that other deployment.
+ */
 function getConsoleBaseUrl(): string {
+    if (process.env.APIFY_CONSOLE_BASE_URL) return process.env.APIFY_CONSOLE_BASE_URL;
     return process.env.HOSTNAME === STAGING_MCP_HOSTNAME ? CONSOLE_BASE_URL_STAGING : CONSOLE_BASE_URL;
 }
 
@@ -56,6 +62,18 @@ export function buildConsoleActorUrl(context: ConsoleLinkContext | undefined, ac
 /** Builds the Console run detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/runs/<runId>`. */
 export function buildConsoleRunUrl(context: ConsoleLinkContext | undefined, runId: string): string | undefined {
     return buildConsoleUrl(context, `/actors/runs/${runId}`);
+}
+
+/**
+ * Builds the Console build detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/<actorId>/builds/<buildNumber>`.
+ * Console resolves builds by number, not by ID (the CLI links the same way); a build ID in the path 404s.
+ */
+export function buildConsoleBuildUrl(
+    context: ConsoleLinkContext | undefined,
+    actorId: string,
+    buildNumber: string,
+): string | undefined {
+    return buildConsoleUrl(context, `/actors/${actorId}/builds/${buildNumber}`);
 }
 
 /** Builds the Console dataset URL: `<consoleBaseUrl>[/organization/<orgId>]/storage/datasets/<datasetId>`. */

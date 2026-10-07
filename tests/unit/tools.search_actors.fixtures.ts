@@ -1,5 +1,5 @@
 import { ACTOR_PRICING_MODEL } from '../../src/const.js';
-import type { ActorStoreList, InternalToolArgs } from '../../src/types.js';
+import type { ActorStoreList } from '../../src/types.js';
 
 /** Minimal store-list row for formatActorToStructuredCard / formatActorForWidget. */
 export const MOCK_STORE_ACTOR = {
@@ -25,19 +25,3 @@ export const MOCK_STORE_ACTOR = {
 } as unknown as ActorStoreList;
 
 export const SEARCH_KEYWORDS = 'web scraper';
-
-export function stubInternalToolArgs(
-    args: Record<string, unknown>,
-    loadedToolNames: readonly string[] = [],
-    loadedActorIds: readonly string[] = [],
-): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: {} as InternalToolArgs['apifyClient'],
-        signal: new AbortController().signal,
-        paymentProvider: undefined,
-        loadedToolNames,
-        loadedActorIds: new Set(loadedActorIds),
-    };
-}
