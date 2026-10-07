@@ -33,15 +33,15 @@ describe('isReportProblemBlockedForClient', () => {
 });
 
 describe('getRequestOriginForClient()', () => {
-    it('maps the Apify Console AI chat client to APIFY_AI', () => {
-        expect(getRequestOriginForClient(clientContext('apify-console-ai-chat'))).toBe('APIFY_AI');
+    it.each(['apify-console-ai-chat', 'apify-ai'])('maps the Apify AI client "%s" to APIFY_AI', (clientName) => {
+        expect(getRequestOriginForClient(clientContext(clientName))).toBe('APIFY_AI');
     });
 
     it.each(['cursor', 'claude-ai', 'vscode', ''])('maps the unrelated client "%s" to MCP', (clientName) => {
         expect(getRequestOriginForClient(clientContext(clientName))).toBe('MCP');
     });
 
-    it.each(['apify-console-ai-chat-v2', 'Apify-Console-AI-Chat'])(
+    it.each(['apify-console-ai-chat-v2', 'Apify-Console-AI-Chat', 'apify-ai-v2', 'Apify-AI', 'apify'])(
         'maps the near-miss client "%s" to MCP (exact match only)',
         (clientName) => {
             expect(getRequestOriginForClient(clientContext(clientName))).toBe('MCP');

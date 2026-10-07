@@ -113,10 +113,13 @@ export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
 export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
 
 /**
- * `clientInfo.name` sent by the Apify Console AI chat backend during the MCP initialize handshake.
- * Runs started by this client are attributed to the APIFY_AI request origin.
+ * `clientInfo.name` values sent by Apify AI during the MCP initialize handshake; runs started by
+ * these clients are attributed to the APIFY_AI request origin (exact match).
+ * - `apify-console-ai-chat`: the legacy Apify Console AI chat backend.
+ * - `apify-ai`: the Apify AI agent service (apify/apify-ai-agent). Kept short because Mastra
+ *   prefixes every tool name with it and providers cap tool names at 64 characters.
  */
-export const APIFY_AI_CLIENT_NAME = 'apify-console-ai-chat';
+export const APIFY_AI_CLIENT_NAMES: readonly string[] = ['apify-console-ai-chat', 'apify-ai'];
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
