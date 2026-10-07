@@ -393,6 +393,7 @@ describe('readApiResource()', () => {
 
         expect(error).toBeInstanceOf(InternalError);
         expect(error.message).toContain(`Failed to read ${uri}: HTTP 500: Internal Server Error`);
+        expect(error.message).toContain('Retry later');
     });
 
     it('falls back to statusText when a non-2xx error body itself crosses the limit', async () => {
