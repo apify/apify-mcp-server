@@ -5,6 +5,7 @@ import { ActorSourceType, ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
+import { APIFY_ERROR_TYPE_TOO_FEW_VERSIONS, APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
@@ -288,8 +289,18 @@ export async function respondAfterWrite(params: {
     });
 }
 
-/** A `UserInputError` as a soft failure; anything else is rethrown for the tool-call engine to report. */
+/**
+ * A `UserInputError`, or the platform's refusal of a taken version number or of deleting the last version, as a soft
+ * failure with the platform's own message; anything else is rethrown for the tool-call engine to report. The engine
+ * would add a token-access hint to these two 403s, which contradicts their reason.
+ */
 export function respondToSourceToolError(error: unknown): ToolResponse {
     if (error instanceof UserInputError) return respondUserError(error.message);
+    if (
+        error instanceof ApifyApiError &&
+        (error.type === APIFY_ERROR_TYPE_TOO_FEW_VERSIONS || error.type === APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS)
+    ) {
+        return respondUserError(`${error.message} (API error type: ${error.type})`, { httpStatus: error.statusCode });
+    }
     throw error;
 }

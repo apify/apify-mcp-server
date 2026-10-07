@@ -510,18 +510,30 @@ describe('create-actor-version', () => {
         it.each([
             ['files', { files: [ACTOR_JSON] }],
             ['a copy of that version', { copyFromVersion: '0.1' }],
-        ])(
-            'POSTs a version number the Actor already has, from %s, and lets the API error through unchanged',
-            async (_, args) => {
-                const error = apiError(403, 'Version with this number already exists', 'version-already-exists');
-                versionsCreateMock.mockRejectedValue(error);
+        ])('reports a version number the Actor already has, from %s', async (_, args) => {
+            versionsCreateMock.mockRejectedValue(
+                apiError(403, 'Version with this number already exists', 'version-already-exists'),
+            );
 
-                await expect(callTool({ versionNumber: '0.1', autoBuild: true, ...args })).rejects.toBe(error);
-                expect(getPostBody().versionNumber).toBe('0.1');
-                expectNoOtherWrite();
-                expect(buildMock).not.toHaveBeenCalled();
-            },
-        );
+            const result = await callTool({ versionNumber: '0.1', autoBuild: true, ...args });
+
+            // The platform's reason, without the token-access hint the engine adds to a 403.
+            expectSoftFailInvalidInput(result);
+            expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureHttpStatus: 403 }));
+            expect(result.content[0].text).toBe(
+                'Version with this number already exists (API error type: version-already-exists)',
+            );
+            expect(getPostBody().versionNumber).toBe('0.1');
+            expectNoOtherWrite();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
+        it('lets any other API error of the POST through to the engine', async () => {
+            const error = apiError(403, 'You do not have permission to modify this Actor.', 'insufficient-permissions');
+            versionsCreateMock.mockRejectedValue(error);
+
+            await expect(callTool({ files: [ACTOR_JSON] })).rejects.toBe(error);
+        });
 
         it.each([
             ['files', { files: [ACTOR_JSON] }],

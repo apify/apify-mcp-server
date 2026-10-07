@@ -306,6 +306,7 @@ export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-
 export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
 export const APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE = 'actor-name-not-unique';
 export const APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS = 'version-already-exists';
+export const APIFY_ERROR_TYPE_TOO_FEW_VERSIONS = 'too-few-versions';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

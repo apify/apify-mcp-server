@@ -136,16 +136,31 @@ describe('delete-actor-version', () => {
         expectNoOtherWrite();
     });
 
-    it("lets the platform's refusal to delete the last version through unchanged", async () => {
+    it("reports the platform's refusal to delete the last version", async () => {
         actorGetMock.mockResolvedValue(mockActor({ versions: [{ versionNumber: '0.1', sourceType: 'SOURCE_FILES' }] }));
-        const error = apiError(403, 'The Actor must have at least 1 versions', 'too-few-versions');
-        versionDeleteMock.mockRejectedValue(error);
+        versionDeleteMock.mockRejectedValue(
+            apiError(403, 'The Actor must have at least 1 versions', 'too-few-versions'),
+        );
 
-        await expect(callTool({ versionNumber: '0.1' })).rejects.toBe(error);
+        const result = await callTool({ versionNumber: '0.1' });
+
+        // The platform's reason, without the token-access hint the engine adds to a 403.
+        expectSoftFailInvalidInput(result);
+        expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureHttpStatus: 403 }));
+        expect(result.content[0].text).toBe(
+            'The Actor must have at least 1 versions (API error type: too-few-versions)',
+        );
         // The tool leaves the check to the platform, and does nothing else after the refusal.
         expect(versionMock.mock.calls).toEqual([['0.1']]);
         expect(versionDeleteMock).toHaveBeenCalledTimes(1);
         expectNoOtherWrite();
+    });
+
+    it('lets any other API error of the DELETE through to the engine', async () => {
+        const error = apiError(403, 'You do not have permission to modify this Actor.', 'insufficient-permissions');
+        versionDeleteMock.mockRejectedValue(error);
+
+        await expect(callTool({})).rejects.toBe(error);
     });
 
     it('sends nothing when the request is cancelled before the DELETE', async () => {
