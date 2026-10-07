@@ -516,7 +516,7 @@ export const sourceCases: Case[] = [
         }),
     },
     {
-        name: 'update-actor-version refuses a version stored in a Git repository, names the repository without its credentials, and changes nothing',
+        name: 'update-actor-version and a copy in create-actor-version refuse a version stored in a Git repository, name the repository without its credentials, and change nothing',
         isDeploymentTest: false,
         run: withClient({ tools: ['source'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
@@ -543,9 +543,15 @@ export const sourceCases: Case[] = [
                     operations: [{ type: 'write', path: 'src/main.js', content: 'console.log("one");\n' }],
                 });
                 const readResult = await callTool(client, 'get-actor-version', { actor: seeded.id });
+                const copyResult = await callTool(client, 'create-actor-version', {
+                    actor: seeded.id,
+                    versionNumber: '0.1',
+                    copyFromVersion: '0.0',
+                });
 
                 expect(expectToolFailure(updateResult)).toBe(refusal);
                 expect(expectToolFailure(readResult)).toBe(refusal);
+                expect(expectToolFailure(copyResult)).toBe(refusal);
                 expect(extractWrittenState(await fetchStoredActor(api, seeded.id))).toEqual(
                     extractWrittenState(storedBefore),
                 );
@@ -591,6 +597,85 @@ export const sourceCases: Case[] = [
                 const storedAfter = await fetchStoredActor(api, selector);
                 expect(storedAfter.id).toBe(seeded.id);
                 expect(extractWrittenState(storedAfter)).toEqual(storedBefore);
+            } finally {
+                await api.actor(selector).delete();
+            }
+        }),
+    },
+    {
+        name: 'create-actor-version adds a version from files that get-actor-version reads back with the same hashes and revision, with no build tag, and leaves the other version as it was',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+            const api = ctx.createApifyClient();
+            const name = buildUniqueActorName('add');
+            const selector = await fetchOwnActorSelector(api, name);
+            // No name: unlike the Actor create, the version POST stores actor.json as sent, so the hashes the tool
+            // computes from the files it sent are the stored ones.
+            const actorJson = '{\n    "actorSpecification": 1,\n    "version": "0.1"\n}\n';
+            const mainJs = 'console.log("Grüße 🌍");\n';
+            try {
+                const seeded = await api.actors().create({
+                    name,
+                    versions: [
+                        {
+                            versionNumber: '0.0',
+                            buildTag: 'latest',
+                            sourceType: ActorSourceType.SourceFiles,
+                            sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: 'console.log("0.0");\n' }],
+                        },
+                    ],
+                });
+                const fullName = `${seeded.username}/${name}`;
+                const storedBefore = await fetchStoredActor(api, seeded.id);
+
+                const createResult = await callTool(client, 'create-actor-version', {
+                    actor: selector,
+                    versionNumber: '0.1',
+                    files: [
+                        { path: '.actor/actor.json', content: actorJson },
+                        { path: 'src/main.js', content: mainJs },
+                        // Binary by its extension, so base64 without an encoding.
+                        { path: 'assets/logo.png', content: PNG_BASE64 },
+                        { path: 'assets/raw-bytes', content: NON_UTF8_BYTES.toString('base64'), encoding: 'base64' },
+                    ],
+                });
+                const created = expectToolSuccess<CreateActorResult>(createResult, 'create-actor-version');
+                expect(created).toEqual({
+                    actorId: seeded.id,
+                    fullName,
+                    versionNumber: '0.1',
+                    revision: expect.stringMatching(/^[0-9a-f]{16}$/),
+                    files: [
+                        buildFileListing('.actor/actor.json', actorJson),
+                        buildFileListing('assets/logo.png', Buffer.from(PNG_BASE64, 'base64')),
+                        buildFileListing('assets/raw-bytes', NON_UTF8_BYTES),
+                        buildFileListing('src/main.js', mainJs),
+                    ],
+                });
+                expect(createResult.content?.[1]?.text).toBe(
+                    `Created version 0.1 of ${fullName}.\nBuild the version to run these files.`,
+                );
+
+                const read = expectToolSuccess<GetActorVersionResult>(
+                    await callTool(client, 'get-actor-version', { actor: selector, versionNumber: '0.1' }),
+                    'get-actor-version',
+                );
+                expect(read).toEqual({ ...created, contents: [] });
+
+                const stored = await fetchStoredActor(api, seeded.id);
+                const added = findStoredVersion(stored, '0.1');
+                expect(stored.versions).toHaveLength(2);
+                expect(findStoredVersion(stored, '0.0')).toEqual(findStoredVersion(storedBefore, '0.0'));
+                expect(findStoredVersion(stored, '0.0').buildTag).toBe('latest');
+                expect(added.buildTag).toBeUndefined();
+                expect(extractSortedSourceFiles(added)).toEqual([
+                    { name: '.actor/actor.json', format: 'TEXT', content: actorJson },
+                    { name: 'assets/logo.png', format: 'BASE64', content: PNG_BASE64 },
+                    { name: 'assets/raw-bytes', format: 'BASE64', content: NON_UTF8_BYTES.toString('base64') },
+                    { name: 'src/main.js', format: 'TEXT', content: mainJs },
+                ]);
+                // autoBuild defaults to false.
+                expect(await fetchBuildCount(api, seeded.id)).toBe(0);
             } finally {
                 await api.actor(selector).delete();
             }
