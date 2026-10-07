@@ -74,7 +74,7 @@ export const createActor: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, signal } = toolArgs;
+        const { args, apifyClient: client, signal, loadedToolNames } = toolArgs;
         const parsed = createActorArgs.parse(args);
         // A cancel before the POST creates nothing; per the MCP spec the cancelled request gets no response.
         if (signal?.aborted) return respondAborted();
@@ -122,11 +122,14 @@ export const createActor: ToolEntry = Object.freeze({
                 error.type === APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE &&
                 error.attempt > 1
             ) {
+                const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
+                    ? ` with ${HELPER_TOOLS.ACTOR_VERSION_GET}`
+                    : '';
                 return respondUserError(
                     `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
-                        `attempt of this call may have created the Actor. Read it with ${HELPER_TOOLS.ACTOR_VERSION_GET}, ` +
-                        `as username/${parsed.name} with your username, before calling ${HELPER_TOOLS.ACTOR_CREATE} ` +
-                        'again; if it holds the files you sent, this call created it.',
+                        `attempt of this call may have created the Actor. Read it${readTool}, as username/${parsed.name} ` +
+                        `with your username, before calling ${HELPER_TOOLS.ACTOR_CREATE} again; if it holds the files ` +
+                        'you sent, this call created it.',
                     { httpStatus: error.statusCode },
                 );
             }
