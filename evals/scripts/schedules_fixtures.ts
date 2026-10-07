@@ -55,7 +55,7 @@ async function main() {
 
     // The deletes below hit whatever account APIFY_TOKEN points at, so name it first.
     console.log(`👤 ${DRY}Account: ${(await client.user('me').get()).username ?? 'unknown'}`);
-    if (runId) console.log(`🧹 ${DRY}Tearing down run "${runId}" plus leftovers older than 6h`);
+    if (runId) console.log(`🧹 ${DRY}Tearing down run "${runId}"`);
 
     const fixtureTask = await client.task(`~${FIXTURE_TASK_NAME}`).get();
     if (!fixtureTask) {

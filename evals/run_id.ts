@@ -1,5 +1,5 @@
 /**
- * Name grammar for a run's eval resources: `<static>-<runId>-t<trial>`.
+ * Name grammar for a run's eval resources: `<static>-<runId>-n<runId length>-t<trial>`.
  * The runner builds the suffix and the fixtures scripts match it, so the two cannot drift.
  */
 
@@ -16,15 +16,14 @@ export function createRunId(): string {
 
 /** Name suffix for one trial of one item; `trial` is 1-based. */
 export function buildRunSuffix(runId: string, trial: number): string {
-    return `${runId}-t${trial}`;
+    return `${runId}-n${runId.length}-t${trial}`;
 }
 
 /**
- * Matched as a delimited token, because a bare `includes('35014680476-1')` also matches attempt
- * 12's `…-35014680476-12-t1`.
+ * The length after the id distinguishes `a-1` from `1` as well as attempt 12 from attempt 1.
  */
 export function isNameFromRun(name: string, runId: string): boolean {
-    return name.includes(`-${runId}-t`);
+    return name.includes(`-${runId}-n${runId.length}-t`);
 }
 
 /** Throws when a `--run-id` would build a name the platform rejects. */

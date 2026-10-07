@@ -588,9 +588,9 @@ describe('expandIterations()', () => {
             expectedOutput: string;
         }[];
 
-        expect(data[0].input.query).toBe('Create eval-sched-r3k9f2qa7c-t1');
-        expect(data[0].expectedOutput).toBe('eval-sched-r3k9f2qa7c-t1');
-        expect(data[1].input.query).toBe('Create eval-sched-r3k9f2qa7c-t2');
+        expect(data[0].input.query).toBe('Create eval-sched-r3k9f2qa7c-n10-t1');
+        expect(data[0].expectedOutput).toBe('eval-sched-r3k9f2qa7c-n10-t1');
+        expect(data[1].input.query).toBe('Create eval-sched-r3k9f2qa7c-n10-t2');
         const otherRun = expandIterations(items, 1, 'r8m1p4bz2q') as unknown as { input: { query: string } }[];
         expect(otherRun[0].input.query).not.toBe(data[0].input.query);
     });

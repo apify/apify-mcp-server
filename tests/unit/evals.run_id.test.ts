@@ -19,7 +19,7 @@ describe('createRunId()', () => {
 
 describe('buildRunSuffix()', () => {
     it('joins the run id and the trial into a dash-and-alphanumeric token', () => {
-        expect(buildRunSuffix('r3k9f2qa7c', 2)).toBe('r3k9f2qa7c-t2');
+        expect(buildRunSuffix('r3k9f2qa7c', 2)).toBe('r3k9f2qa7c-n10-t2');
         expect(buildRunSuffix(CI_RUN_ID, 1)).toMatch(/^[a-z0-9-]+$/);
     });
 
@@ -41,11 +41,15 @@ describe('isNameFromRun()', () => {
     });
 
     it('does not match a longer run id that starts with this one', () => {
-        expect(isNameFromRun('eval-sched-add-35014680476-12-t1', CI_RUN_ID)).toBe(false);
+        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix('35014680476-12', 1)}`, CI_RUN_ID)).toBe(false);
+    });
+
+    it('does not match a longer run id that ends with this one', () => {
+        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix('a-1', 1)}`, '1')).toBe(false);
     });
 
     it('does not match another run or an unrelated name', () => {
-        expect(isNameFromRun('eval-sched-add-r8m1p4bz2q-t1', CI_RUN_ID)).toBe(false);
+        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix('r8m1p4bz2q', 1)}`, CI_RUN_ID)).toBe(false);
         expect(isNameFromRun('eval-nightly-sum', CI_RUN_ID)).toBe(false);
     });
 

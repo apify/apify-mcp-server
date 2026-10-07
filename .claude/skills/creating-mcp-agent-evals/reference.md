@@ -39,7 +39,7 @@ pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/
 }
 ```
 
-- `{{uniq}}` in `query` and `expectedOutput` is replaced by the runner with `<runId>-t<trial>`; put it in both or neither, and keep the static part of the name at 35 characters or fewer (63-char platform cap). Not substituted in `expectedArgs`.
+- `{{uniq}}` in `query` and `expectedOutput` is replaced by the runner with `<runId>-n<runId length>-t<trial>`; put it in both or neither, and keep the static part of the name at 35 characters or fewer (63-char platform cap). Not substituted in `expectedArgs`.
 - `datasetName` is one of the two: `mcp-server-evals-merge` for a `kind: "agent"` case, `mcp-server-evals-pr` for a `kind: "tool-call"` one.
 - `metadata` is strict-validated (`langfuse/dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
 - `category` = tool under test (what `--category` filters); difficulty goes in the id's `<slug>` half.
@@ -117,7 +117,7 @@ const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
 One script per stateful family, wired as `evals:mcp-agent:<family>-fixtures` in package.json: create the permanent fixture if missing, **reset its mutable state** every run (an eval agent may have mutated it), and sweep leftovers.
 
-`evals/scripts/schedules_fixtures.ts` is the current template for the sweep: `--run-id <id>` deletes the names that run created (matched as the delimited token `-<id>-t`), and anything unmatched survives until it is older than `LEFTOVER_MAX_AGE_MS` (6 h), so a run still in flight never loses a resource it is asserting on. The rule is a pure function in a side-effect-free sibling module (`evals/scripts/schedules_sweep.ts`), so a unit test imports it without the CLI's `dotenv` load running. `evals/scripts/tasks_fixtures.ts` still sweeps by prefix alone.
+`evals/scripts/schedules_fixtures.ts` is the current template for the sweep: `--run-id <id>` deletes only names with that run's `-<id>-n<id length>-t` token. Without it, the seed sweep deletes `eval-*` schedules older than `LEFTOVER_MAX_AGE_MS` (6 h). The rule is a pure function in a side-effect-free sibling module (`evals/scripts/schedules_sweep.ts`), so a unit test imports it without the CLI's `dotenv` load running. `evals/scripts/tasks_fixtures.ts` still sweeps by prefix alone.
 
 ## Coverage matrix (definition of done for the dataset)
 

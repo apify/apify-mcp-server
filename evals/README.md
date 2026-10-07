@@ -115,8 +115,8 @@ see what it would delete.
 pnpm run evals:mcp-agent:schedules-fixtures -- --run-id <the run id from the summary>
 ```
 
-`--run-id` deletes that run's own names at any age; skip it and the enabled ones keep firing until the
-6-hour sweep. CI does this in a `Tear down schedule fixtures` step guarded by `always()`.
+`--run-id` deletes only that run's names at any age. Without it, the next seed sweep deletes
+`eval-*` schedules older than 6 hours. CI tears down its own run in an `always()` step.
 
 The deterministic platform facts the judge used to score here live in
 `tests/test_kit/cases/schedules.cases.ts` instead, asserted against the live API. Those cases name their
@@ -174,7 +174,7 @@ query:     ... and call it eval-sched-add-{{uniq}}
 reference: PASS only if create-schedule created eval-sched-add-{{uniq}}.
 ```
 
-The runner rewrites every `{{uniq}}` to `<run-id>-t<trial>` before the item reaches the agent and the
+The runner rewrites every `{{uniq}}` to `<run-id>-n<run-id length>-t<trial>` before the item reaches the agent and the
 judge. Keep the static part of the name at 35 characters or fewer: a schedule or task name is capped at
 63 and a CI run id plus the trial takes the rest.
 
@@ -314,7 +314,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 
 - `config.ts` - Models and the MCP tool-name prefix, shared across responsibilities
 - `environment.ts` - Env var sanitization and missing-var reporting
-- `run_id.ts` - The `<static>-<runId>-t<trial>` name grammar and `--run-id` parsing, shared by the runner and the fixtures scripts
+- `run_id.ts` - The `<static>-<runId>-n<runId length>-t<trial>` name grammar and `--run-id` parsing, shared by the runner and the fixtures scripts
 - `runner/run.ts` - Main CLI entry, runner defaults
 - `runner/experiment.ts` - Experiment task (agent + tool-call dispatch), `EVALUATORS`, run summary, exit gate
 - `runner/filters.ts` - Test case filtering by category and id

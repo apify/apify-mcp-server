@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { buildRunSuffix } from '../../evals/run_id.js';
 import { isSweepableSchedule } from '../../evals/scripts/schedules_sweep.js';
 
 const NOW = Date.UTC(2026, 8, 21, 12, 0, 0);
@@ -11,19 +12,31 @@ const RUN_ID = '35014680476-1';
 describe('isSweepableSchedule()', () => {
     it('deletes a schedule this run created, however young', () => {
         expect(
-            isSweepableSchedule({ name: 'eval-sched-add-35014680476-1-t1', createdAt: MINUTES_AGO_12 }, RUN_ID, NOW),
+            isSweepableSchedule(
+                { name: `eval-sched-add-${buildRunSuffix(RUN_ID, 1)}`, createdAt: MINUTES_AGO_12 },
+                RUN_ID,
+                NOW,
+            ),
         ).toBe(true);
     });
 
     it('deletes a schedule this run created that is also past the age limit', () => {
         expect(
-            isSweepableSchedule({ name: 'eval-sched-add-35014680476-1-t2', createdAt: HOURS_AGO_9 }, RUN_ID, NOW),
+            isSweepableSchedule(
+                { name: `eval-sched-add-${buildRunSuffix(RUN_ID, 2)}`, createdAt: HOURS_AGO_9 },
+                RUN_ID,
+                NOW,
+            ),
         ).toBe(true);
     });
 
     it('keeps a young schedule from a run id this one only prefixes', () => {
         expect(
-            isSweepableSchedule({ name: 'eval-sched-add-35014680476-12-t1', createdAt: MINUTES_AGO_12 }, RUN_ID, NOW),
+            isSweepableSchedule(
+                { name: `eval-sched-add-${buildRunSuffix('35014680476-12', 1)}`, createdAt: MINUTES_AGO_12 },
+                RUN_ID,
+                NOW,
+            ),
         ).toBe(false);
     });
 
@@ -33,9 +46,13 @@ describe('isSweepableSchedule()', () => {
         ).toBe(false);
     });
 
+    it('keeps an old schedule from another run during run-specific teardown', () => {
+        expect(isSweepableSchedule({ name: 'eval-sched-target', createdAt: HOURS_AGO_9 }, RUN_ID, NOW)).toBe(false);
+    });
+
     it('deletes a leftover older than the age limit', () => {
         expect(
-            isSweepableSchedule({ name: 'eval-sched-daily-r8m1p4bz2q-t1', createdAt: HOURS_AGO_9 }, RUN_ID, NOW),
+            isSweepableSchedule({ name: 'eval-sched-daily-r8m1p4bz2q-t1', createdAt: HOURS_AGO_9 }, undefined, NOW),
         ).toBe(true);
     });
 
@@ -62,7 +79,7 @@ describe('isSweepableSchedule()', () => {
         expect(
             isSweepableSchedule(
                 { name: 'eval-sched-daily-r8m1p4bz2q-t1', createdAt: HOURS_AGO_9.toISOString() },
-                RUN_ID,
+                undefined,
                 NOW,
             ),
         ).toBe(true);
