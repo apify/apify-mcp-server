@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Stop pointing non-Actor tools at fetch-actor-details ([#1485](https://github.com/apify/apify-mcp-server/pull/1485)) ([d9768ca](https://github.com/apify/apify-mcp-server/commit/d9768ca1c551b5d1d7f5f3bc86e5321d3505c8a6)) by [@daveomri](https://github.com/daveomri), closes [#1214](https://github.com/apify/apify-mcp-server/issues/1214)
+- Stop get-dataset-schema calling clean-filtered datasets empty ([#1486](https://github.com/apify/apify-mcp-server/pull/1486)) ([ee4760d](https://github.com/apify/apify-mcp-server/commit/ee4760dedff701935a54c2fca6cef0ace8a6a09e)) by [@daveomri](https://github.com/daveomri), closes [#900](https://github.com/apify/apify-mcp-server/issues/900)
 
 
 <!-- git-cliff-unreleased-end -->
