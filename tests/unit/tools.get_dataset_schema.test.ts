@@ -91,7 +91,9 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.datasetId).toBe('ds-1');
         expect(structuredContent.schema).toEqual({});
         expect(structuredContent.summary).toBe("Dataset 'ds-1' is empty; no schema to infer.");
-        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
+        expect(structuredContent.nextStep).toBe(
+            `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1 to check itemCount and stats.`,
+        );
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
         // The required `schema` is still present (empty object) and the emit conforms to the schema.
         expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
@@ -101,7 +103,7 @@ describe('get-dataset-schema', () => {
     // back as items=[] and must not be reported as empty.
     it('suggests clean=false instead of reporting empty when clean filtering returned no items', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 3 })),
         );
         const { isError, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
@@ -112,6 +114,16 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.summary).not.toContain('is empty');
         expect(structuredContent.nextStep).toContain('clean=false');
         expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
+    });
+
+    it('reports empty without the clean=false hint when the dataset has no items under clean=true', async () => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
+        );
+        const { structuredContent } = result as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toContain('is empty');
+        expect(structuredContent.nextStep).not.toContain('clean=false');
     });
 
     it('returns isError with a not-found message when listItems throws 404', async () => {
