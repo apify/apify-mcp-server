@@ -601,6 +601,65 @@ export const getActorVersionToolOutputSchema = {
     required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files', 'contents'],
 };
 
+/** The build a source write started with autoBuild: the same allowlisted subset (`toBuildResult`) as get-actor-build. */
+const sourceWriteBuildProperties = {
+    build: getActorBuildToolOutputSchema.properties.build,
+    buildError: {
+        type: 'string',
+        description: 'Why the build did not start; set when autoBuild was true and the write succeeded without a build',
+    },
+    warnings: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Things to know about the written files, such as empty files the build skips',
+    },
+};
+
+/** Schema for create-actor: the new Actor, its one version, and the files as the platform stored them. */
+export const createActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the new Actor' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.0' },
+        revision: {
+            type: 'string',
+            description: 'Identifies the stored file set; the same value a later read of the version returns',
+        },
+        files: {
+            type: 'array',
+            description: 'The files as stored, sorted by path',
+            items: getActorVersionToolOutputSchema.properties.files.items,
+        },
+        ...sourceWriteBuildProperties,
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files'],
+};
+
+/** Schema for update-actor-version: the new revision and what changed. */
+export const updateActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        revision: { type: 'string', description: 'Revision after the update; pass it as expectedRevision next time' },
+        changed: { type: 'boolean', description: 'False when the operations changed nothing, so nothing was written' },
+        changes: {
+            type: 'array',
+            description: 'One entry per file the operations created, updated, or deleted, sorted by path',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'Path relative to the Actor root' },
+                    action: { type: 'string', enum: ['created', 'updated', 'deleted'] },
+                    hash: { type: 'string', description: 'Hash of the file after the update; absent for deleted' },
+                },
+                required: ['path', 'action'],
+            },
+        },
+        ...sourceWriteBuildProperties,
+    },
+    required: ['revision', 'changed', 'changes'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
