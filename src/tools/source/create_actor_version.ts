@@ -127,7 +127,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
             if (secretNames.length > 0) {
                 warnings.push(
                     `These secret environment variables were not copied, so set them on version ${versionNumber} ` +
-                        `in Apify Console before building or running it: ${secretNames.join(', ')}.`,
+                        `in Apify Console, then build the version before running it: ${secretNames.join(', ')}.`,
                 );
             }
             return await respondAfterWrite({

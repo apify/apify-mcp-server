@@ -208,7 +208,7 @@ describe('create-actor-version', () => {
                 revision: buildFilesRevision(files),
                 files,
                 warnings: [
-                    'These secret environment variables were not copied, so set them on version 0.2 in Apify Console before building or running it: API_KEY.',
+                    'These secret environment variables were not copied, so set them on version 0.2 in Apify Console, then build the version before running it: API_KEY.',
                 ],
             });
             expect(result.structuredContent.revision).toBe(read.structuredContent.revision);
@@ -270,7 +270,7 @@ describe('create-actor-version', () => {
             expectSchemaConformingStructuredContent(result, createActorVersionToolOutputSchema);
             expect(result.structuredContent.warnings).toEqual([
                 'These files are empty, and the build skips empty files, so they will not exist in the build: src/__init__.py.',
-                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console before building or running it: API_KEY, TOKEN.',
+                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console, then build the version before running it: API_KEY, TOKEN.',
             ]);
             expect(JSON.stringify(result)).not.toMatch(/abc123|secret-value/);
         });
@@ -692,6 +692,10 @@ describe('create-actor-version', () => {
                 startedAt: '2026-09-01T10:00:00.000Z',
                 finishedAt: null,
             });
+            // The build started without the secret, so the warning says to build again once it is set.
+            expect(result.structuredContent.warnings).toEqual([
+                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console, then build the version before running it: API_KEY.',
+            ]);
         });
 
         it('starts no build without autoBuild', async () => {
