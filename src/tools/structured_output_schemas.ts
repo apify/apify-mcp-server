@@ -531,6 +531,22 @@ export const buildActorToolOutputSchema = {
     required: ['build'],
 };
 
+/** Schema for delete-actor. */
+export const deleteActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the deleted Actor' },
+        fullName: { type: 'string', description: 'Full name of the deleted Actor, username/name' },
+        deleted: { type: 'boolean', description: 'Always true; the Actor no longer exists' },
+        abortedRunCount: {
+            type: 'integer',
+            description:
+                'Unfinished runs found just before the deletion. The platform aborts them; a run that starts in between is aborted and not included.',
+        },
+    },
+    required: ['actorId', 'fullName', 'deleted', 'abortedRunCount'],
+};
+
 /** Schema for get-actor-version: the version's file manifest, its revision, and the content returned. */
 export const getActorVersionToolOutputSchema = {
     type: 'object' as const,

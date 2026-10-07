@@ -12,8 +12,7 @@ import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockUserInfo, textOf } from './helpers/tool_context.js';
-import { stubInternalToolArgs } from './tools.search_actors.fixtures.js';
+import { mockApifyClient, mockUserInfo, stubToolCallContext, textOf } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/actor_details.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../../src/utils/actor_details.js');
@@ -182,9 +181,11 @@ describe('buildFetchActorDetailsResult()', () => {
     // call-actor loaded so these unrelated assertions aren't perturbed by the not-runnable guidance.
     const callWithToken = async (apifyToken: string) => {
         const result = await buildFetchActorDetailsResult({
-            ...stubInternalToolArgs({ actor: 'apify/example-mcp-server', output: { inputSchema: true } }, [
-                HELPER_TOOLS.ACTOR_CALL,
-            ]),
+            ...stubToolCallContext(
+                { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
+                mockApifyClient(),
+                { loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] },
+            ),
             apifyToken,
         });
         return result as { content: { type: string; text: string }[] };
@@ -219,9 +220,11 @@ describe('buildFetchActorDetailsResult()', () => {
         // output narrowed as in callWithToken above: pricing: false skips the users/me lookup.
         const notFoundArgs = { actor: 'jane.doe/typo', output: { inputSchema: true } };
         const served = await buildFetchActorDetailsResult(
-            stubInternalToolArgs(notFoundArgs, [HELPER_TOOLS.STORE_SEARCH]),
+            stubToolCallContext(notFoundArgs, mockApifyClient(), { loadedToolNames: [HELPER_TOOLS.STORE_SEARCH] }),
         );
-        const unserved = await buildFetchActorDetailsResult(stubInternalToolArgs(notFoundArgs));
+        const unserved = await buildFetchActorDetailsResult(
+            stubToolCallContext(notFoundArgs, mockApifyClient(), { loadedToolNames: [] }),
+        );
 
         expect((served.content ?? []).map(textOf).join('\n')).toContain(HELPER_TOOLS.STORE_SEARCH);
         expect((unserved.content ?? []).map(textOf).join('\n')).not.toContain(HELPER_TOOLS.STORE_SEARCH);
@@ -243,7 +246,11 @@ describe('buildFetchActorDetailsResult()', () => {
 
     it('appends not-runnable guidance when neither call-actor nor a dedicated tool is loaded', async () => {
         const result = await buildFetchActorDetailsResult(
-            stubInternalToolArgs({ actor: 'apify/example-mcp-server', output: { inputSchema: true } }),
+            stubToolCallContext(
+                { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
+                mockApifyClient(),
+                { loadedToolNames: [] },
+            ),
         );
         const text = ((result as { content: { text: string }[] }).content ?? []).map((c) => c.text).join('\n');
 
@@ -252,9 +259,11 @@ describe('buildFetchActorDetailsResult()', () => {
 
     it('omits not-runnable guidance when call-actor is loaded', async () => {
         const result = await buildFetchActorDetailsResult(
-            stubInternalToolArgs({ actor: 'apify/example-mcp-server', output: { inputSchema: true } }, [
-                HELPER_TOOLS.ACTOR_CALL,
-            ]),
+            stubToolCallContext(
+                { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
+                mockApifyClient(),
+                { loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] },
+            ),
         );
         const text = ((result as { content: { text: string }[] }).content ?? []).map((c) => c.text).join('\n');
 
@@ -263,10 +272,10 @@ describe('buildFetchActorDetailsResult()', () => {
 
     it('omits not-runnable guidance when the Actor has its own dedicated tool loaded', async () => {
         const result = await buildFetchActorDetailsResult(
-            stubInternalToolArgs(
+            stubToolCallContext(
                 { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
-                [],
-                [MOCK_DETAILS.actorInfo.id],
+                mockApifyClient(),
+                { loadedToolNames: [], loadedActorIds: [MOCK_DETAILS.actorInfo.id] },
             ),
         );
         const text = ((result as { content: { text: string }[] }).content ?? []).map((c) => c.text).join('\n');

@@ -28,7 +28,7 @@ function isTextualMimeType(baseMimeType: string | undefined): boolean {
     );
 }
 
-/** Domain error class the boundary maps to the matching v1 JSON-RPC error code. */
+/** Domain error class the protocol adapters map to the matching JSON-RPC error code. */
 type DomainErrorClass = new (message: string, data?: unknown) => Error;
 
 /**
@@ -177,10 +177,10 @@ function parseApiErrorMessage(body: Buffer | undefined): string | undefined {
  * JSON primitives, formatting, and bytes round-trip exactly.
  *
  * Genuine failures (no token, bad origin, a missing resource, a bad token, a 5xx, a network error)
- * throw a domain error (`InvalidParamsError`/`InternalError`) that the `server.ts` boundary maps to a
- * JSON-RPC error, so the SDK returns an error rather than success-shaped content for an unreadable
- * resource (see SEP-2164). A body over `MAX_INLINE_BYTES` is NOT a failure — it is a
- * successful read returning a download pointer.
+ * throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
+ * (`legacy_server.ts`, `stateless_server.ts`) map to a JSON-RPC error, so the SDK returns an error
+ * rather than success-shaped content for an unreadable resource (see SEP-2164). A body over
+ * `MAX_INLINE_BYTES` is NOT a failure — it is a successful read returning a download pointer.
  *
  * The request goes straight through `apifyClient.httpClient.axios` (the same axios instance
  * apify-client builds internally, so token/origin headers still apply) instead of
