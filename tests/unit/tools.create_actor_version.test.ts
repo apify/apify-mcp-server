@@ -356,6 +356,12 @@ describe('create-actor-version', () => {
 
     describe('files', () => {
         it('creates a version from files in one POST, with no env vars', async () => {
+            // The Actor's other version is stored in Git, and a version from files does not depend on it.
+            mockActorRead({
+                sourceType: 'GIT_REPO',
+                gitRepoUrl: 'https://github.com/john/repo',
+                sourceFiles: undefined,
+            });
             const result = await callTool({
                 files: [MAIN_JS, ACTOR_JSON, { path: 'assets/logo.png', content: 'AA==' }],
             });

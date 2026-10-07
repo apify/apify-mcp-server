@@ -35,8 +35,14 @@ function mockActor(overrides: Record<string, unknown> = {}) {
         id: 'actor-1',
         name: 'my-actor',
         username: 'john',
+        // The tool deletes a version whatever it is stored as, so one is in Git.
         versions: [
-            { versionNumber: '0.1', sourceType: 'SOURCE_FILES', buildTag: 'latest' },
+            {
+                versionNumber: '0.1',
+                sourceType: 'GIT_REPO',
+                gitRepoUrl: 'https://github.com/john/repo',
+                buildTag: 'latest',
+            },
             { versionNumber: '0.2', sourceType: 'SOURCE_FILES' },
         ],
         ...overrides,
