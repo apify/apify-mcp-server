@@ -67,6 +67,8 @@ export const HELPER_TOOLS = {
     ACTOR_TASK_UPDATE: 'update-actor-task',
     ACTOR_TASK_PUBLISH: 'publish-actor-task',
     ACTOR_TASK_UNPUBLISH: 'unpublish-actor-task',
+    ACTOR_VERSION_CREATE: 'create-actor-version',
+    ACTOR_VERSION_DELETE: 'delete-actor-version',
     ACTOR_VERSION_GET: 'get-actor-version',
     ACTOR_VERSION_UPDATE: 'update-actor-version',
     DATASET_GET: 'get-dataset',
@@ -303,6 +305,8 @@ export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs
 export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
 export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
 export const APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE = 'actor-name-not-unique';
+export const APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS = 'version-already-exists';
+export const APIFY_ERROR_TYPE_TOO_FEW_VERSIONS = 'too-few-versions';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

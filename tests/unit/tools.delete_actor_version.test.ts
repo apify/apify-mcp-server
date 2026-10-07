@@ -1,0 +1,247 @@
+import { ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { HELPER_TOOLS } from '../../src/const.js';
+import { deleteActorVersion } from '../../src/tools/source/delete_actor_version.js';
+import { deleteActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import {
+    expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    stubToolCallContext,
+    type TextToolResult,
+    type ToolTelemetrySnapshot,
+} from './helpers/tool_context.js';
+
+const actorGetMock = vi.fn();
+const versionDeleteMock = vi.fn();
+// The version client's other writes, which this tool never calls.
+const versionUpdateMock = vi.fn();
+const versionMock = vi.fn(() => ({ delete: versionDeleteMock, update: versionUpdateMock }));
+// The Actor client's methods that change or delete the Actor, create a version, or build, which this tool never calls.
+const actorWriteMocks = { update: vi.fn(), delete: vi.fn(), versions: vi.fn(), build: vi.fn() };
+const actorMock = vi.fn(() => ({ get: actorGetMock, version: versionMock, ...actorWriteMocks }));
+
+const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyClient'];
+
+type DeleteResult = TextToolResult & {
+    structuredContent: { actorId: string; fullName: string; versionNumber: string; deleted: boolean };
+    toolTelemetry?: ToolTelemetrySnapshot;
+};
+
+function mockActor(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'actor-1',
+        name: 'my-actor',
+        username: 'john',
+        // The tool deletes a version whatever it is stored as, so one is in Git.
+        versions: [
+            {
+                versionNumber: '0.1',
+                sourceType: 'GIT_REPO',
+                gitRepoUrl: 'https://github.com/john/repo',
+                buildTag: 'latest',
+            },
+            { versionNumber: '0.2', sourceType: 'SOURCE_FILES' },
+        ],
+        taggedBuilds: { latest: { buildId: 'build-1', buildNumber: '0.1.3' } },
+        ...overrides,
+    };
+}
+
+function apiError(status: number, message: string, type = 'some-error'): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
+}
+
+async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<DeleteResult> {
+    const context = stubToolCallContext({ actor: 'john/my-actor', versionNumber: '0.2', ...args }, stubClient);
+    const withSignal = signal === undefined ? context : { ...context, signal };
+    return (await (deleteActorVersion as HelperTool).call(withSignal)) as DeleteResult;
+}
+
+async function callToolExpectingUserError(args: Record<string, unknown>) {
+    const result = await callTool(args);
+    expectSoftFailInvalidInput(result);
+    expect(versionDeleteMock).not.toHaveBeenCalled();
+    return result.content[0].text;
+}
+
+function expectNoOtherWrite() {
+    expect(versionUpdateMock).not.toHaveBeenCalled();
+    for (const [name, mock] of Object.entries(actorWriteMocks)) {
+        expect(mock, name).not.toHaveBeenCalled();
+    }
+}
+
+describe('delete-actor-version', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        actorGetMock.mockResolvedValue(mockActor());
+        versionDeleteMock.mockResolvedValue(undefined);
+    });
+
+    it('is a destructive, idempotent, closed-world tool without payment', () => {
+        expect(deleteActorVersion.name).toBe(HELPER_TOOLS.ACTOR_VERSION_DELETE);
+        expect(deleteActorVersion.annotations).toEqual({
+            title: 'Delete Actor version',
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: true,
+            openWorldHint: false,
+        });
+        expect((deleteActorVersion as HelperTool).paymentRequired).toBeUndefined();
+    });
+
+    it('says in its description that a deleted version cannot be restored, and to delete only on request', () => {
+        expect(deleteActorVersion.description).toContain('a deleted version cannot be restored');
+        expect(deleteActorVersion.description).toContain(
+            '- Use only when the user explicitly wants the version removed.',
+        );
+    });
+
+    it('requires the actor and versionNumber, so it never picks a version itself', () => {
+        const tool = deleteActorVersion as HelperTool;
+
+        expect(tool.inputSchema.required).toEqual(['actor', 'versionNumber']);
+        expect(tool.ajvValidate({ actor: 'john/my-actor' })).toBe(false);
+        expect(tool.ajvValidate({ actor: 'john/my-actor', versionNumber: '' })).toBe(false);
+        expect(tool.ajvValidate({ actor: 'john/my-actor', versionNumber: '0.2' })).toBe(true);
+    });
+
+    it.each([
+        // Tag latest points to build 0.1.3, which stays after the delete.
+        {
+            versionNumber: '0.1',
+            text:
+                'Deleted version 0.1 of john/my-actor.\n' +
+                "Runs with tag latest still use the deleted version's build; to have them run another version, " +
+                'build that version with build-actor and tag latest.',
+        },
+        { versionNumber: '0.2', text: 'Deleted version 0.2 of john/my-actor.' },
+    ])(
+        'deletes only version $versionNumber of the Actor it resolved, with one DELETE',
+        async ({ versionNumber, text }) => {
+            const result = await callTool({ versionNumber });
+
+            expectSchemaConformingStructuredContent(result, deleteActorVersionToolOutputSchema);
+            // The Actor GET by the name given, then the DELETE by the Actor ID it returned.
+            expect(actorMock.mock.calls).toEqual([['john/my-actor'], ['actor-1']]);
+            expect(versionMock.mock.calls).toEqual([[versionNumber]]);
+            expect(versionDeleteMock).toHaveBeenCalledTimes(1);
+            expectNoOtherWrite();
+            expect(result.structuredContent).toEqual({
+                actorId: 'actor-1',
+                fullName: 'john/my-actor',
+                versionNumber,
+                deleted: true,
+            });
+            expect(result.content[1].text).toBe(text);
+        },
+    );
+
+    it.each([
+        // Version 0.1 has the build tag latest, but a later build of version 0.2 took the tag.
+        {
+            versionNumber: '0.1',
+            taggedBuilds: { latest: { buildId: 'build-2', buildNumber: '0.2.1' } },
+            text: 'Deleted version 0.1 of john/my-actor.',
+        },
+        // Version 0.1 has the build tag latest, but was never built.
+        { versionNumber: '0.1', taggedBuilds: undefined, text: 'Deleted version 0.1 of john/my-actor.' },
+        // Version 0.2 has no build tag, but build-actor gave one of its builds the tag latest.
+        {
+            versionNumber: '0.2',
+            taggedBuilds: { latest: { buildId: 'build-2', buildNumber: '0.2.1' } },
+            text:
+                'Deleted version 0.2 of john/my-actor.\n' +
+                "Runs with tag latest still use the deleted version's build; to have them run another version, " +
+                'build that version with build-actor and tag latest.',
+        },
+    ])(
+        'takes the next step about a tag from the build it points to, not from the build tag of version $versionNumber',
+        async ({ versionNumber, taggedBuilds, text }) => {
+            actorGetMock.mockResolvedValue(mockActor({ taggedBuilds }));
+
+            const result = await callTool({ versionNumber });
+
+            expect(result.content[1].text).toBe(text);
+        },
+    );
+
+    it('names build-actor in the next step about the build tag only when the session has it', async () => {
+        const loadedToolNames = Object.values(HELPER_TOOLS).filter((name) => name !== HELPER_TOOLS.ACTOR_BUILD);
+        const context = stubToolCallContext({ actor: 'john/my-actor', versionNumber: '0.1' }, stubClient, {
+            loadedToolNames,
+        });
+
+        const result = (await (deleteActorVersion as HelperTool).call(context)) as DeleteResult;
+
+        expect(result.content[1].text).toBe(
+            'Deleted version 0.1 of john/my-actor.\n' +
+                "Runs with tag latest still use the deleted version's build; to have them run another version, " +
+                'build that version with tag latest.',
+        );
+    });
+
+    it('refuses a version the Actor does not have, which apify-client would report as deleted', async () => {
+        expect(await callToolExpectingUserError({ versionNumber: '0.9' })).toBe(
+            "Actor 'john/my-actor' has no version 0.9; available versions: 0.1, 0.2.",
+        );
+        expect(actorMock.mock.calls).toEqual([['john/my-actor']]);
+        expect(versionMock).not.toHaveBeenCalled();
+        expectNoOtherWrite();
+    });
+
+    it('reports a missing Actor', async () => {
+        actorGetMock.mockResolvedValue(undefined);
+
+        expect(await callToolExpectingUserError({ actor: 'my-actor' })).toBe(
+            "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
+        );
+        expect(actorMock.mock.calls).toEqual([['my-actor']]);
+        expect(versionMock).not.toHaveBeenCalled();
+        expectNoOtherWrite();
+    });
+
+    it("reports the platform's refusal to delete the last version", async () => {
+        actorGetMock.mockResolvedValue(mockActor({ versions: [{ versionNumber: '0.1', sourceType: 'SOURCE_FILES' }] }));
+        versionDeleteMock.mockRejectedValue(
+            apiError(403, 'The Actor must have at least 1 versions', 'too-few-versions'),
+        );
+
+        const result = await callTool({ versionNumber: '0.1' });
+
+        // The platform's reason, without the token-access hint the engine adds to a 403.
+        expectSoftFailInvalidInput(result);
+        expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureHttpStatus: 403 }));
+        expect(result.content[0].text).toBe(
+            'The Actor must have at least 1 versions (API error type: too-few-versions)',
+        );
+        // The tool leaves the check to the platform, and does nothing else after the refusal.
+        expect(versionMock.mock.calls).toEqual([['0.1']]);
+        expect(versionDeleteMock).toHaveBeenCalledTimes(1);
+        expectNoOtherWrite();
+    });
+
+    it('lets any other API error of the DELETE through to the engine', async () => {
+        const error = apiError(403, 'You do not have permission to modify this Actor.', 'insufficient-permissions');
+        versionDeleteMock.mockRejectedValue(error);
+
+        await expect(callTool({})).rejects.toBe(error);
+    });
+
+    it('sends nothing when the request is cancelled before the DELETE', async () => {
+        const controller = new AbortController();
+        actorGetMock.mockImplementation(async () => {
+            controller.abort();
+            return mockActor();
+        });
+
+        const result = await callTool({}, controller.signal);
+
+        expect(result).toEqual({});
+        expect(versionDeleteMock).not.toHaveBeenCalled();
+        expectNoOtherWrite();
+    });
+});

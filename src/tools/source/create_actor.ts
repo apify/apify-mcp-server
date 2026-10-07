@@ -1,10 +1,9 @@
-import type { ActorCollectionCreateOptions, ActorVersionSourceFile } from 'apify-client';
+import type { ActorCollectionCreateOptions } from 'apify-client';
 import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
 import { APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE, HELPER_TOOLS } from '../../const.js';
-import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
@@ -13,15 +12,12 @@ import { createActorToolOutputSchema } from '../structured_output_schemas.js';
 import { buildFilesManifest, buildFilesRevision } from './source_files.js';
 import {
     buildEmptyFilesWarnings,
-    buildSourceFileEntry,
+    buildSourceFileEntries,
     extractSourceFiles,
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
     sourceFileArgs,
-    validateFileContent,
-    validateFilePath,
-    validateNewFilePath,
 } from './source_helpers.js';
 
 const createActorArgs = z.object({
@@ -41,26 +37,6 @@ const createActorArgs = z.object({
         .default(false)
         .describe('Start a build of the version after creating the Actor, and return without waiting. Default: false.'),
 });
-
-/**
- * The entries to send, one per file; throws `UserInputError` for a path no file can be written at, and for a path
- * given twice, since the platform puts the Actor name in the first .actor/actor.json and the build uses the last.
- */
-function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
-    const entries: ActorVersionSourceFile[] = [];
-    for (const [index, file] of files.entries()) {
-        const entry = buildSourceFileEntry(file);
-        const label = `files[${index}] (${file.path})`;
-        validateFilePath(entry.name, label);
-        validateFileContent(entry, label);
-        if (entries.some(({ name }) => name === entry.name)) {
-            throw new UserInputError(`${label} repeats the path ${entry.name}; send each file once.`);
-        }
-        validateNewFilePath(entry.name, { filePaths: entries.map(({ name }) => name), folderPaths: [] }, label);
-        entries.push(entry);
-    }
-    return entries;
-}
 
 /**
  * https://docs.apify.com/api/v2/actors-post

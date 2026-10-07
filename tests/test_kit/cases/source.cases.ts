@@ -10,8 +10,8 @@ import { validateStructuredOutputForTool, withClient } from '../helpers.js';
 import type { Case, SuiteClient } from '../types.js';
 
 /**
- * create-actor and update-actor-version against the live API. Each case reads what the platform stored with the raw
- * client, so it checks the stored source, not only what the tool reported.
+ * create-actor, create-actor-version, update-actor-version, and delete-actor-version against the live API. Each case
+ * reads what the platform stored with the raw client, so it checks the stored source, not only what the tool reported.
  *
  * Names are `test-source-<random>-<purpose>`, never `eval-`, so the eval harness's `eval-*` sweep on the same account
  * never deletes an Actor mid-case. No case sets autoBuild, since builds cost time and money. Every case deletes its
@@ -125,6 +125,13 @@ async function fetchStoredActor(api: ApifyClient, actorSelector: string): Promis
 /** What a call that writes nothing leaves as it was: the versions, and modifiedAt, which every version write sets. */
 function extractWrittenState({ modifiedAt, versions }: StoredActorInfo) {
     return { modifiedAt, versions };
+}
+
+/** The stored version with this number; fails the case when there is none. */
+function findStoredVersion(actor: StoredActorInfo, versionNumber: string): StoredVersionInfo {
+    const version = actor.versions.find((candidate) => candidate.versionNumber === versionNumber);
+    expect(version, `version ${versionNumber}`).toBeDefined();
+    return version as StoredVersionInfo;
 }
 
 /** The stored entries sorted by name; the order the platform keeps them in is not part of the contract. */
@@ -509,7 +516,7 @@ export const sourceCases: Case[] = [
         }),
     },
     {
-        name: 'update-actor-version refuses a version stored in a Git repository, names the repository without its credentials, and changes nothing',
+        name: 'update-actor-version and a copy in create-actor-version refuse a version stored in a Git repository, name the repository without its credentials, and change nothing',
         isDeploymentTest: false,
         run: withClient({ tools: ['source'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
@@ -536,9 +543,15 @@ export const sourceCases: Case[] = [
                     operations: [{ type: 'write', path: 'src/main.js', content: 'console.log("one");\n' }],
                 });
                 const readResult = await callTool(client, 'get-actor-version', { actor: seeded.id });
+                const copyResult = await callTool(client, 'create-actor-version', {
+                    actor: seeded.id,
+                    versionNumber: '0.1',
+                    copyFromVersion: '0.0',
+                });
 
                 expect(expectToolFailure(updateResult)).toBe(refusal);
                 expect(expectToolFailure(readResult)).toBe(refusal);
+                expect(expectToolFailure(copyResult)).toBe(refusal);
                 expect(extractWrittenState(await fetchStoredActor(api, seeded.id))).toEqual(
                     extractWrittenState(storedBefore),
                 );
@@ -584,6 +597,248 @@ export const sourceCases: Case[] = [
                 const storedAfter = await fetchStoredActor(api, selector);
                 expect(storedAfter.id).toBe(seeded.id);
                 expect(extractWrittenState(storedAfter)).toEqual(storedBefore);
+            } finally {
+                await api.actor(selector).delete();
+            }
+        }),
+    },
+    {
+        name: 'create-actor-version adds a version from files that get-actor-version reads back with the same hashes and revision, with no build tag, and leaves the other version as it was',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+            const api = ctx.createApifyClient();
+            const name = buildUniqueActorName('add');
+            const selector = await fetchOwnActorSelector(api, name);
+            // No name: unlike the Actor create, the version POST stores actor.json as sent, so the hashes the tool
+            // computes from the files it sent are the stored ones.
+            const actorJson = '{\n    "actorSpecification": 1,\n    "version": "0.1"\n}\n';
+            const mainJs = 'console.log("Grüße 🌍");\n';
+            try {
+                const seeded = await api.actors().create({
+                    name,
+                    versions: [
+                        {
+                            versionNumber: '0.0',
+                            buildTag: 'latest',
+                            sourceType: ActorSourceType.SourceFiles,
+                            sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: 'console.log("0.0");\n' }],
+                        },
+                    ],
+                });
+                const fullName = `${seeded.username}/${name}`;
+                const storedBefore = await fetchStoredActor(api, seeded.id);
+
+                const createResult = await callTool(client, 'create-actor-version', {
+                    actor: selector,
+                    versionNumber: '0.1',
+                    files: [
+                        { path: '.actor/actor.json', content: actorJson },
+                        { path: 'src/main.js', content: mainJs },
+                        // Binary by its extension, so base64 without an encoding.
+                        { path: 'assets/logo.png', content: PNG_BASE64 },
+                        { path: 'assets/raw-bytes', content: NON_UTF8_BYTES.toString('base64'), encoding: 'base64' },
+                    ],
+                });
+                const created = expectToolSuccess<CreateActorResult>(createResult, 'create-actor-version');
+                expect(created).toEqual({
+                    actorId: seeded.id,
+                    fullName,
+                    versionNumber: '0.1',
+                    revision: expect.stringMatching(/^[0-9a-f]{16}$/),
+                    files: [
+                        buildFileListing('.actor/actor.json', actorJson),
+                        buildFileListing('assets/logo.png', Buffer.from(PNG_BASE64, 'base64')),
+                        buildFileListing('assets/raw-bytes', NON_UTF8_BYTES),
+                        buildFileListing('src/main.js', mainJs),
+                    ],
+                });
+                expect(createResult.content?.[1]?.text).toBe(
+                    `Created version 0.1 of ${fullName}.\nBuild the version before running it.`,
+                );
+
+                const read = expectToolSuccess<GetActorVersionResult>(
+                    await callTool(client, 'get-actor-version', { actor: selector, versionNumber: '0.1' }),
+                    'get-actor-version',
+                );
+                expect(read).toEqual({ ...created, contents: [] });
+
+                const stored = await fetchStoredActor(api, seeded.id);
+                const added = findStoredVersion(stored, '0.1');
+                expect(stored.versions).toHaveLength(2);
+                expect(findStoredVersion(stored, '0.0')).toEqual(findStoredVersion(storedBefore, '0.0'));
+                expect(findStoredVersion(stored, '0.0').buildTag).toBe('latest');
+                expect(added.buildTag).toBeUndefined();
+                expect(extractSortedSourceFiles(added)).toEqual([
+                    { name: '.actor/actor.json', format: 'TEXT', content: actorJson },
+                    { name: 'assets/logo.png', format: 'BASE64', content: PNG_BASE64 },
+                    { name: 'assets/raw-bytes', format: 'BASE64', content: NON_UTF8_BYTES.toString('base64') },
+                    { name: 'src/main.js', format: 'TEXT', content: mainJs },
+                ]);
+                // autoBuild defaults to false.
+                expect(await fetchBuildCount(api, seeded.id)).toBe(0);
+            } finally {
+                await api.actor(selector).delete();
+            }
+        }),
+    },
+    {
+        name: "create-actor-version copies a version's stored entries, non-secret env vars, and applyEnvVarsToBuild, never its build tag, names the secret env vars it left out, and returns the platform error for a version number the Actor already has",
+        isDeploymentTest: false,
+        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+            const api = ctx.createApifyClient();
+            const name = buildUniqueActorName('copy');
+            const selector = await fetchOwnActorSelector(api, name);
+            const mainJs = 'console.log("copy");\n';
+            const zJs = 'z();\n';
+            try {
+                const seeded = await api.actors().create({
+                    name,
+                    versions: [
+                        {
+                            versionNumber: '0.0',
+                            buildTag: 'latest',
+                            applyEnvVarsToBuild: true,
+                            sourceType: ActorSourceType.SourceFiles,
+                            envVars: [
+                                { name: 'MODE', value: 'test' },
+                                { name: 'SECRET_MODE', value: 'hidden', isSecret: true },
+                            ],
+                            sourceFiles: [
+                                { name: 'src/main.js', format: 'TEXT', content: mainJs },
+                                { name: 'assets/logo.png', format: 'BASE64', content: PNG_BASE64 },
+                                {
+                                    name: 'assets/raw-bytes',
+                                    format: 'BASE64',
+                                    content: NON_UTF8_BYTES.toString('base64'),
+                                },
+                                // Entries with no format, with no content, and an empty folder, as the update case
+                                // seeds them; a copy sends them back as the Actor GET returns them.
+                                { name: 'src/z.js', content: zJs } as ActorVersionSourceFile,
+                                { name: 'src/blank.js', format: 'TEXT' } as ActorVersionSourceFile,
+                                { name: 'storage', folder: true } as unknown as ActorVersionSourceFile,
+                            ],
+                        },
+                    ],
+                });
+                const storedBefore = await fetchStoredActor(api, seeded.id);
+                const copyArgs = { actor: selector, versionNumber: '0.1', copyFromVersion: '0.0' };
+
+                const createResult = await callTool(client, 'create-actor-version', copyArgs);
+                const created = expectToolSuccess<CreateActorResult & { warnings?: string[] }>(
+                    createResult,
+                    'create-actor-version',
+                );
+                const stored = await fetchStoredActor(api, seeded.id);
+                const original = findStoredVersion(stored, '0.0');
+                const copy = findStoredVersion(stored, '0.1');
+
+                expect(stored.versions).toHaveLength(2);
+                expect(original).toEqual(findStoredVersion(storedBefore, '0.0'));
+                // Every entry, the folder and the ones without format or content included, is stored as it was read.
+                expect(extractSortedSourceFiles(copy)).toEqual(extractSortedSourceFiles(original));
+                expect(copy.envVars).toEqual([expect.objectContaining({ name: 'MODE', value: 'test' })]);
+                expect(copy.applyEnvVarsToBuild).toBe(true);
+                expect(copy.buildTag).toBeUndefined();
+
+                const read = expectToolSuccess<GetActorVersionResult>(
+                    await callTool(client, 'get-actor-version', { actor: selector, versionNumber: '0.1' }),
+                    'get-actor-version',
+                );
+                expect(read.files).toEqual([
+                    buildFileListing('assets/logo.png', Buffer.from(PNG_BASE64, 'base64')),
+                    buildFileListing('assets/raw-bytes', NON_UTF8_BYTES),
+                    buildFileListing('src/blank.js', ''),
+                    buildFileListing('src/main.js', mainJs),
+                    buildFileListing('src/z.js', zJs),
+                ]);
+                expect(created).toEqual({
+                    actorId: seeded.id,
+                    fullName: `${seeded.username}/${name}`,
+                    versionNumber: '0.1',
+                    revision: read.revision,
+                    files: read.files,
+                    warnings: [
+                        'These files are empty, and the build skips empty files, so they will not exist in the build: src/blank.js.',
+                        'These secret environment variables were not copied, so set them on version 0.1 in Apify Console, then build the version before running it: SECRET_MODE.',
+                    ],
+                });
+                // The warning names the secret, never its value.
+                expect(JSON.stringify(createResult)).not.toContain('hidden');
+                expect(await fetchBuildCount(api, seeded.id)).toBe(0);
+
+                // The sentence is the platform's, so only the API error type is exact, and no hint follows it.
+                // In apify-core it reads `Version with this number already exists`, with status 403.
+                const retryText = expectToolFailure(await callTool(client, 'create-actor-version', copyArgs));
+                expect(retryText).toMatch(/^.+ \(API error type: version-already-exists\)$/);
+                expect(extractWrittenState(await fetchStoredActor(api, seeded.id))).toEqual(
+                    extractWrittenState(stored),
+                );
+            } finally {
+                await api.actor(selector).delete();
+            }
+        }),
+    },
+    {
+        name: 'delete-actor-version deletes one version, refuses one the Actor does not have, and returns the platform refusal for the last one',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+            const api = ctx.createApifyClient();
+            const name = buildUniqueActorName('delete');
+            const selector = await fetchOwnActorSelector(api, name);
+            try {
+                const seeded = await api.actors().create({
+                    name,
+                    versions: [
+                        {
+                            versionNumber: '0.0',
+                            buildTag: 'latest',
+                            sourceType: ActorSourceType.SourceFiles,
+                            sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: 'console.log("0.0");\n' }],
+                        },
+                        {
+                            versionNumber: '0.1',
+                            sourceType: ActorSourceType.SourceFiles,
+                            sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: 'console.log("0.1");\n' }],
+                        },
+                    ],
+                });
+                const storedBefore = await fetchStoredActor(api, seeded.id);
+                expect(storedBefore.versions).toHaveLength(2);
+
+                const deleteResult = await callTool(client, 'delete-actor-version', {
+                    actor: selector,
+                    versionNumber: '0.1',
+                });
+                const deleted = expectToolSuccess(deleteResult, 'delete-actor-version');
+                expect(deleted).toEqual({
+                    actorId: seeded.id,
+                    fullName: `${seeded.username}/${name}`,
+                    versionNumber: '0.1',
+                    deleted: true,
+                });
+                // No tag points to a build of version 0.1, so no next step about one follows.
+                expect(deleteResult.content?.[1]?.text).toBe(`Deleted version 0.1 of ${seeded.username}/${name}.`);
+                const storedAfter = await fetchStoredActor(api, seeded.id);
+                expect(storedAfter.versions).toEqual([findStoredVersion(storedBefore, '0.0')]);
+
+                // apify-client reports a DELETE of a missing version as done, so the tool refuses it from its read.
+                const missingText = expectToolFailure(
+                    await callTool(client, 'delete-actor-version', { actor: selector, versionNumber: '0.1' }),
+                );
+                expect(missingText).toBe(`Actor '${selector}' has no version 0.1; available versions: 0.0.`);
+                expect(extractWrittenState(await fetchStoredActor(api, seeded.id))).toEqual(
+                    extractWrittenState(storedAfter),
+                );
+
+                // The sentence is the platform's, so only the API error type is exact, and no hint follows it.
+                // In apify-core it reads `The Actor must have at least 1 versions`, with status 403.
+                const lastText = expectToolFailure(
+                    await callTool(client, 'delete-actor-version', { actor: selector, versionNumber: '0.0' }),
+                );
+                expect(lastText).toMatch(/^.+ \(API error type: too-few-versions\)$/);
+                expect(extractWrittenState(await fetchStoredActor(api, seeded.id))).toEqual(
+                    extractWrittenState(storedAfter),
+                );
             } finally {
                 await api.actor(selector).delete();
             }
