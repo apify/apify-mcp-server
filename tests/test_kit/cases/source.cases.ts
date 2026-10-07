@@ -653,7 +653,7 @@ export const sourceCases: Case[] = [
                     ],
                 });
                 expect(createResult.content?.[1]?.text).toBe(
-                    `Created version 0.1 of ${fullName}.\nBuild the version to run these files.`,
+                    `Created version 0.1 of ${fullName}.\nBuild the version before running it.`,
                 );
 
                 const read = expectToolSuccess<GetActorVersionResult>(
