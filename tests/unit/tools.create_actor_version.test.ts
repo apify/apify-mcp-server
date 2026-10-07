@@ -211,7 +211,7 @@ describe('create-actor-version', () => {
             expect(result.structuredContent.revision).toBe(read.structuredContent.revision);
             expect(result.structuredContent.files).toEqual(read.structuredContent.files);
             expect(result.content[1].text).toBe(
-                'Created version 0.2 of john/my-actor.\nRuns use these files once the version is built.',
+                'Created version 0.2 of john/my-actor.\nBuild the version to run these files.',
             );
             expect(result.content.map(({ text }) => text).join('\n')).not.toContain(LOGO_BYTES.toString('base64'));
         });
@@ -634,7 +634,7 @@ describe('create-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
             expect(result.structuredContent).not.toHaveProperty('build');
             expect(result.content[1].text).toBe(
-                'Created version 0.2 of john/my-actor.\nRuns use these files once the version is built.',
+                'Created version 0.2 of john/my-actor.\nBuild the version to run these files.',
             );
         });
 

@@ -201,7 +201,7 @@ describe('update-actor-version', () => {
         expect(result.content).toHaveLength(2);
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
-            'Updated version 0.1 of john/my-actor.\nRuns use these files once the version is built.',
+            'Updated version 0.1 of john/my-actor.\nBuild the version to run these files.',
         );
         expect(buildMock).not.toHaveBeenCalled();
     });
@@ -1684,7 +1684,7 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).not.toHaveBeenCalled();
             expect(result.structuredContent).toEqual({ revision: await readRevision(), changed: false, changes: [] });
             expect(result.content[1].text).toBe(
-                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nRuns use these files once the version is built.',
+                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nBuild the version to run these files.',
             );
         });
 
@@ -1835,7 +1835,7 @@ describe('update-actor-version', () => {
 
                 expect(actorMock.mock.calls).toEqual([[actor], ['actor-1']]);
                 expect(result.content[1].text).toBe(
-                    'Updated version 0.1 of john/my-actor.\nRuns use these files once the version is built.',
+                    'Updated version 0.1 of john/my-actor.\nBuild the version to run these files.',
                 );
             },
         );

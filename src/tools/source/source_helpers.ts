@@ -257,7 +257,7 @@ export async function respondAfterWrite(params: {
         return respondWithBuild({
             structuredContent,
             summary,
-            nextStep: 'Runs use these files once the version is built.',
+            nextStep: 'Build the version to run these files.',
         });
     }
     let linkContext: ConsoleLinkContext | undefined;

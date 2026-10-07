@@ -237,7 +237,7 @@ describe('create-actor', () => {
         expect(result.content).toHaveLength(2);
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
-            'Created the private Actor john/my-actor.\nRuns use these files once the version is built.',
+            'Created the private Actor john/my-actor.\nBuild the version to run these files.',
         );
         // No other call: nothing reads or updates an existing Actor, and no build starts.
         expect(actorMock).not.toHaveBeenCalled();
