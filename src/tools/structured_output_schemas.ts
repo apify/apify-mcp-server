@@ -1009,3 +1009,92 @@ export const keyValueStoreRecordOutputSchema = {
     },
     required: ['keyValueStoreId', 'key', 'value', 'summary'],
 };
+
+/**
+ * Schema for the operations found by apify-api-search.
+ */
+export const apifyApiSearchOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operations: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    method: { type: 'string', description: 'HTTP method' },
+                    path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
+                    summary: { type: 'string', description: 'What the operation does' },
+                    docsUrl: { type: 'string', description: "The operation's page in the API reference" },
+                },
+                required: ['method', 'path', 'summary', 'docsUrl'],
+            },
+        },
+    },
+    required: ['operations'],
+};
+
+/** One operation in the apify-api-details response. */
+const apiOperationDetailsSchema = {
+    type: 'object' as const,
+    properties: {
+        method: { type: 'string', description: 'HTTP method' },
+        path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
+        summary: { type: 'string', description: 'What the operation does' },
+        description: { type: 'string', description: 'Full description from the API reference' },
+        parameters: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    name: { type: 'string', description: 'Parameter name' },
+                    in: { type: 'string', enum: ['path', 'query'], description: 'Where the parameter goes' },
+                    isRequired: { type: 'boolean', description: 'Whether the parameter is required' },
+                    description: { type: 'string', description: 'What the parameter does' },
+                    schema: { description: 'JSON schema of the value' },
+                },
+                required: ['name', 'in', 'isRequired'],
+            },
+            description: 'Path and query parameters',
+        },
+        requestBody: {
+            type: 'object' as const,
+            properties: {
+                isRequired: { type: 'boolean', description: 'Whether the body is required' },
+                schema: { description: 'JSON schema of the body, sent as JSON' },
+            },
+            required: ['isRequired', 'schema'],
+            description: 'Only when the operation takes a body',
+        },
+    },
+    required: ['method', 'path', 'summary', 'description', 'parameters'],
+};
+
+/**
+ * Schema for the operations on one path (apify-api-details).
+ */
+export const apifyApiDetailsOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operations: {
+            type: 'array' as const,
+            items: apiOperationDetailsSchema,
+            description: 'The operations on the path, or only the one with the given method',
+        },
+    },
+    required: ['operations'],
+};
+
+/**
+ * Schema for the response of an API call (apify-api-read).
+ */
+export const apifyApiCallOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        method: { type: 'string', description: 'HTTP method' },
+        path: { type: 'string', description: 'Request path as it was sent' },
+        statusCode: { type: 'integer', description: 'HTTP status code' },
+        contentType: { type: 'string', description: 'Content-Type of the response' },
+        data: { description: 'Response body: parsed JSON, text, or null for an empty or binary body' },
+    },
+    required: ['method', 'path', 'statusCode', 'data'],
+};

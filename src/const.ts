@@ -83,6 +83,9 @@ export const HELPER_TOOLS = {
     STORE_SEARCH_WIDGET: 'search-actors-widget',
     DOCS_SEARCH: 'search-apify-docs',
     DOCS_FETCH: 'fetch-apify-docs',
+    API_SEARCH: 'apify-api-search',
+    API_DETAILS: 'apify-api-details',
+    API_READ: 'apify-api-read',
     PROBLEM_REPORT: 'report-problem',
 } as const;
 export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
@@ -300,6 +303,7 @@ export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
 export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
 export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
+export const APIFY_ERROR_TYPE_PAGE_NOT_FOUND = 'page-not-found';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

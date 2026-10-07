@@ -22,6 +22,9 @@ import { deleteActor } from './actors/delete_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
 import { getActorList } from './actors/get_actor_list.js';
 import { searchActors } from './actors/search_actors.js';
+import { apifyApiDetails } from './api/apify_api_details.js';
+import { apifyApiRead } from './api/apify_api_read.js';
+import { apifyApiSearch } from './api/apify_api_search.js';
 import { buildActor } from './builds/build_actor.js';
 import { getActorBuild } from './builds/get_actor_build.js';
 import { getActorBuildList } from './builds/get_actor_build_list.js';
@@ -75,6 +78,7 @@ export const toolCategories = {
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
     source: [getActorVersion],
+    api: [apifyApiSearch, apifyApiDetails, apifyApiRead],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 
