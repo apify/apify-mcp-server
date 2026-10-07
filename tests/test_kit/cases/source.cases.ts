@@ -682,7 +682,7 @@ export const sourceCases: Case[] = [
         }),
     },
     {
-        name: "create-actor-version copies a version's stored entries, non-secret env vars, and applyEnvVarsToBuild, never its build tag, and returns the platform error for a version number the Actor already has",
+        name: "create-actor-version copies a version's stored entries, non-secret env vars, and applyEnvVarsToBuild, never its build tag, names the secret env vars it left out, and returns the platform error for a version number the Actor already has",
         isDeploymentTest: false,
         run: withClient({ tools: ['source'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
@@ -723,8 +723,9 @@ export const sourceCases: Case[] = [
                 const storedBefore = await fetchStoredActor(api, seeded.id);
                 const copyArgs = { actor: selector, versionNumber: '0.1', copyFromVersion: '0.0' };
 
+                const createResult = await callTool(client, 'create-actor-version', copyArgs);
                 const created = expectToolSuccess<CreateActorResult & { warnings?: string[] }>(
-                    await callTool(client, 'create-actor-version', copyArgs),
+                    createResult,
                     'create-actor-version',
                 );
                 const stored = await fetchStoredActor(api, seeded.id);
@@ -758,8 +759,11 @@ export const sourceCases: Case[] = [
                     files: read.files,
                     warnings: [
                         'These files are empty, and the build skips empty files, so they will not exist in the build: src/blank.js.',
+                        'These secret environment variables were not copied, so set them on version 0.1 in Apify Console before building or running it: SECRET_MODE.',
                     ],
                 });
+                // The warning names the secret, never its value.
+                expect(JSON.stringify(createResult)).not.toContain('hidden');
                 expect(await fetchBuildCount(api, seeded.id)).toBe(0);
 
                 // The sentence is the platform's, so only the API error type is exact, and no hint follows it.
@@ -801,16 +805,19 @@ export const sourceCases: Case[] = [
                 const storedBefore = await fetchStoredActor(api, seeded.id);
                 expect(storedBefore.versions).toHaveLength(2);
 
-                const deleted = expectToolSuccess(
-                    await callTool(client, 'delete-actor-version', { actor: selector, versionNumber: '0.1' }),
-                    'delete-actor-version',
-                );
+                const deleteResult = await callTool(client, 'delete-actor-version', {
+                    actor: selector,
+                    versionNumber: '0.1',
+                });
+                const deleted = expectToolSuccess(deleteResult, 'delete-actor-version');
                 expect(deleted).toEqual({
                     actorId: seeded.id,
                     fullName: `${seeded.username}/${name}`,
                     versionNumber: '0.1',
                     deleted: true,
                 });
+                // Version 0.1 has no build tag, so no next step about one follows.
+                expect(deleteResult.content?.[1]?.text).toBe(`Deleted version 0.1 of ${seeded.username}/${name}.`);
                 const storedAfter = await fetchStoredActor(api, seeded.id);
                 expect(storedAfter.versions).toEqual([findStoredVersion(storedBefore, '0.0')]);
 
