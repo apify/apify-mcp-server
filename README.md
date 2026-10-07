@@ -249,7 +249,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
 - **Builds**: Build an Actor version, list builds, check the status of a build, and retrieve its build log.
-- **Actor source**: Read an Actor version's files, with a hash for each file and a revision for the whole set, create an Actor from files, and change a version's files with checks that catch changes made since your last read.
+- **Actor source**: Read an Actor version's files with a hash for each file and a revision for the whole set, create an Actor from files, and change a version's files with checks that catch changes made since your last read.
 
 ### Overview of available tools
 
