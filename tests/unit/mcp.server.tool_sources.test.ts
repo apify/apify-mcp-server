@@ -34,7 +34,6 @@ const servers: ActorsMcpServer[] = [];
 afterEach(async () => {
     while (servers.length > 0) {
         const server = servers.pop();
-        server?.tools.clear();
         await server?.close();
     }
 });

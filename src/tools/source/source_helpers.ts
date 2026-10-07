@@ -6,8 +6,9 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { UserInputError } from '../../errors.js';
-import type { InternalToolArgs } from '../../types.js';
+import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
+import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { ABORT } from '../actors/actor_run_response.js';
@@ -151,6 +152,64 @@ export function buildSourceFileEntry({
     return { name: posix.normalize(path), format: isBase64 ? 'BASE64' : 'TEXT', content };
 }
 
+/**
+ * Base64 that decodes to its bytes without loss: Node and the build worker skip characters they cannot decode and stop
+ * at padding, so text sent as base64 would be stored as other bytes. Line breaks, missing padding, and the URL-safe
+ * alphabet decode without loss.
+ */
+function isBase64(content: string): boolean {
+    const compact = content.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+    return Buffer.from(compact, 'base64').toString('base64').replace(/=+$/, '') === compact.replace(/=+$/, '');
+}
+
+/**
+ * Throws `UserInputError` for content the stored file would not hold as sent: base64 that does not decode without
+ * loss, and text with a lone UTF-16 surrogate, which UTF-8 stores as U+FFFD.
+ */
+export function validateFileContent({ format, content }: ActorVersionSourceFile, label: string): void {
+    if (format === 'BASE64' && !isBase64(content)) {
+        throw new UserInputError(
+            `${label} has content that is not valid base64; send binary content as base64, or text with encoding utf8.`,
+        );
+    }
+    if (format === 'TEXT' && !content.isWellFormed()) {
+        throw new UserInputError(`${label} has text with a lone UTF-16 surrogate, which UTF-8 cannot store.`);
+    }
+}
+
+/**
+ * Throws `UserInputError` for a normalized path no file can be written at. The build worker refuses a version with a
+ * path outside the Actor root, so every build of it would fail; `.` and a path ending in a slash name a folder.
+ */
+export function validateFilePath(path: string, label: string): void {
+    if (path.startsWith('/') || path === '..' || path.startsWith('../')) {
+        throw new UserInputError(
+            `${label} has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+        );
+    }
+    if (path === '.' || path.endsWith('/')) {
+        throw new UserInputError(`${label} has a path that names a folder, not a file.`);
+    }
+}
+
+/**
+ * Throws `UserInputError` when a new file at `path` collides with another file or folder, since one path cannot be
+ * both: a file at a folder of `path`, or a file or folder at or under `path`. The build worker fails to write such a
+ * file. A file at `path` itself is for the caller to check.
+ */
+export function validateNewFilePath(
+    path: string,
+    takenPaths: { filePaths: Iterable<string>; folderPaths: Iterable<string> },
+    label: string,
+): void {
+    const collision =
+        [...takenPaths.filePaths].find(
+            (filePath) => path.startsWith(`${filePath}/`) || filePath.startsWith(`${path}/`),
+        ) ?? [...takenPaths.folderPaths].find((folderPath) => folderPath === path || folderPath.startsWith(`${path}/`));
+    if (collision === undefined) return;
+    throw new UserInputError(`${label} collides with ${collision}; one path cannot be both a file and a folder.`);
+}
+
 /** The build worker skips a file whose content is empty, so the caller hears of such files. */
 export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: string[] } {
     if (paths.length === 0) return {};
@@ -160,8 +219,8 @@ export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: 
 
 /**
  * The response to a committed write. With autoBuild, a build of the version starts first, with no tag so the version's
- * buildTag applies, and is not waited for. The write stands either way, so an API error from the start goes to
- * `buildError` rather than being thrown.
+ * buildTag applies, and is not waited for. The write stands either way, so a failed start goes to `buildError` rather
+ * than being thrown: a caller told the call failed would retry writes that were saved.
  */
 export async function respondAfterWrite(params: {
     toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames'>;
@@ -179,22 +238,28 @@ export async function respondAfterWrite(params: {
             nextStep: 'Runs use these files once the version is built.',
         });
     }
+    let linkContext: ConsoleLinkContext | undefined;
     let build: Build | typeof ABORT;
     try {
+        // Resolved before the start, so a failed lookup leaves no build behind.
+        linkContext = await getConsoleLinkContext(apifyToken, client);
         // No signal is passed: a committed write never aborts the build it started.
         build = await startBuild(client, target.actorId, target.versionNumber, { useCache: true, waitSecs: 0 });
     } catch (error) {
-        // Only the API's refusal is a failed start; anything else is a bug and goes to the tool-call engine.
-        if (!(error instanceof ApifyApiError)) throw error;
+        // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.
+        if (!(error instanceof ApifyApiError))
+            logHttpError(error, 'Failed to start a build after a source write', target);
         return respondWithBuild({
-            structuredContent: { ...structuredContent, buildError: error.message },
+            structuredContent: {
+                ...structuredContent,
+                buildError: error instanceof Error ? error.message : String(error),
+            },
             summary,
             nextStep: 'The build could not be started; start it again to run these files.',
         });
     }
     // startBuild returns ABORT only for a passed signal; the check narrows the type.
     if (build === ABORT) return respondAborted();
-    const linkContext = await getConsoleLinkContext(apifyToken, client);
     return respondWithBuild({
         structuredContent: { ...structuredContent, build: toBuildResult(build, linkContext) },
         summary,

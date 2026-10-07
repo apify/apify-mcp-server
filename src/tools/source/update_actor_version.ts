@@ -27,6 +27,9 @@ import {
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
+    validateFileContent,
+    validateFilePath,
+    validateNewFilePath,
 } from './source_helpers.js';
 
 /** Why an operation or the revision check failed; the caller reads the code to decide how to recover. */
@@ -59,7 +62,7 @@ const operationArgs = z.object({
         .string()
         .optional()
         .describe(
-            "write over an existing file, and delete: the file's hash from the version listing. Leave it out to create a new file.",
+            "write over an existing file, and delete: the file's hash from the version listing. Leave it out to create a new file. An edit checks it when given.",
         ),
     edits: z
         .array(
@@ -139,25 +142,28 @@ function convertToCrlf(text: string): string {
 
 /**
  * The text after the edits, each applied to the text the previous ones left. Each oldText must match exactly once,
- * byte for byte. The one exception: in a file with only CRLF line breaks, an LF oldText that misses is retried with
- * oldText and newText converted to CRLF, since models write LF.
+ * byte for byte. The one exception: in a file with only CRLF line breaks, LF in oldText and newText is taken as CRLF,
+ * since models write LF. Matched as given, such an LF could split a CRLF, and inserted, it would mix line endings.
  */
 function applyTextEdits(originalText: string, edits: readonly TextEdit[], label: string): string {
+    const isCrlfFile = hasOnlyCrlfLineBreaks(originalText);
     let text = originalText;
     for (const [editIndex, edit] of edits.entries()) {
-        const isCrlfRetry =
-            !text.includes(edit.oldText) &&
-            edit.oldText.includes('\n') &&
-            !edit.oldText.includes('\r') &&
-            hasOnlyCrlfLineBreaks(text);
-        const oldText = isCrlfRetry ? convertToCrlf(edit.oldText) : edit.oldText;
-        const newText = isCrlfRetry ? convertToCrlf(edit.newText) : edit.newText;
+        // A lone surrogate can match half of a character, and UTF-8 stores it as U+FFFD.
+        if (!edit.oldText.isWellFormed() || !edit.newText.isWellFormed()) {
+            throw new UserInputError(
+                `${label} has a lone UTF-16 surrogate in edits[${editIndex}], which UTF-8 cannot store.`,
+            );
+        }
+        const oldText = isCrlfFile ? convertToCrlf(edit.oldText) : edit.oldText;
+        const newText = isCrlfFile ? convertToCrlf(edit.newText) : edit.newText;
         const offset = text.indexOf(oldText);
         if (offset === -1) {
             const detail = `oldText of edits[${editIndex}] is not in the file.`;
             throw buildPreconditionError(label, PRECONDITION_REASON.NO_MATCH, detail);
         }
-        if (text.includes(oldText, offset + oldText.length)) {
+        // From the next character, so two matches that overlap count as two.
+        if (text.includes(oldText, offset + 1)) {
             const detail = `oldText of edits[${editIndex}] matches more than once; add surrounding lines so it matches once.`;
             throw buildPreconditionError(label, PRECONDITION_REASON.MULTIPLE_MATCHES, detail);
         }
@@ -166,21 +172,31 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
     return text;
 }
 
-/** Applies one operation to `files`; throws `UserInputError` when it cannot, before anything is written. */
-function applyOperation(files: Map<string, SourceFile>, operation: OperationArgs, index: number): void {
+/** Applies one operation to `version.files`; throws `UserInputError` when it cannot, before anything is written. */
+function applyOperation(
+    version: { files: Map<string, SourceFile>; folderPaths: readonly string[] },
+    operation: OperationArgs,
+    index: number,
+): void {
+    const { files, folderPaths } = version;
     const { type, content, expectedHash, edits } = operation;
     const label = `operations[${index}] (${type} ${operation.path})`;
     // Normalized the way get-actor-version lists paths, so a listed path always matches.
     const path = posix.normalize(operation.path);
     if (type === 'write') {
         if (content === undefined) throw new UserInputError(`${label} needs content.`);
+        // Only a write is checked, so a stored file at such a path can still be edited or deleted.
+        validateFilePath(path, label);
         const existing = files.get(path);
         if (existing && expectedHash === undefined) {
             const detail = `${path} exists with hash ${existing.hash}; pass that as expectedHash to replace it.`;
             throw buildPreconditionError(label, PRECONDITION_REASON.FILE_EXISTS, detail);
         }
         if (expectedHash !== undefined) validateHash(findFile(files, path, label), expectedHash, label);
-        files.set(path, buildInlineSourceFile(buildSourceFileEntry({ path, content, encoding: operation.encoding })));
+        if (!existing) validateNewFilePath(path, { filePaths: files.keys(), folderPaths }, label);
+        const entry = buildSourceFileEntry({ path, content, encoding: operation.encoding });
+        validateFileContent(entry, label);
+        files.set(path, buildInlineSourceFile(entry));
         return;
     }
     if (type === 'delete') {
@@ -191,6 +207,7 @@ function applyOperation(files: Map<string, SourceFile>, operation: OperationArgs
     }
     if (edits === undefined) throw new UserInputError(`${label} needs edits.`);
     const existing = findFile(files, path, label);
+    if (expectedHash !== undefined) validateHash(existing, expectedHash, label);
     // The same rule get-actor-version returns text by, so a file it returned as utf8 can be edited.
     if (existing.encoding !== 'utf8') {
         const detail = `${path} is not UTF-8 text; replace it with a write.`;
@@ -238,7 +255,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
         Change files of an Actor version in one call: write, edit, or delete them. Files the call does not mention stay as they are.
         The operations apply in order to a fresh read of the version and are saved together; when any of them fails, nothing is saved.
         - write {path, content, encoding?}: creates a file, or replaces one given its expectedHash.
-        - edit {path, edits: [{oldText, newText}]}: replaces text in a UTF-8 file. Each oldText must match exactly once, byte for byte.
+        - edit {path, edits: [{oldText, newText}], expectedHash?}: replaces text in a UTF-8 file. Each oldText must match exactly once, byte for byte.
         - delete {path, expectedHash}: removes a file. To rename a file, delete it and write it at the new path.
         expectedHash and expectedRevision take the hash and revision from the version listing. A failed check names the operation, the file, and one of FILE_EXISTS, FILE_NOT_FOUND, HASH_MISMATCH, NO_MATCH, MULTIPLE_MATCHES, NOT_TEXT, or REVISION_MISMATCH; read the file again and retry.
         Binary files take base64 content with encoding base64; files with a binary extension such as .png default to it.
@@ -282,7 +299,10 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                 throw buildPreconditionError('expectedRevision', PRECONDITION_REASON.REVISION_MISMATCH, detail);
             }
             const after = new Map(before);
-            for (const [index, operation] of parsed.operations.entries()) applyOperation(after, operation, index);
+            const folderPaths = storedEntries.filter(isFolderEntry).map(({ name }) => posix.normalize(name));
+            for (const [index, operation] of parsed.operations.entries()) {
+                applyOperation({ files: after, folderPaths }, operation, index);
+            }
             const revision = buildFilesRevision([...after.values()]);
             const changed = revision !== previousRevision;
             // A cancel during the read writes nothing; per the MCP spec the cancelled request gets no response.

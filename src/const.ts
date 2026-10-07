@@ -53,6 +53,7 @@ export const HELPER_TOOLS = {
     ACTOR_CALL: 'call-actor',
     ACTOR_CREATE: 'create-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
+    ACTOR_DELETE: 'delete-actor',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
     ACTOR_LIST_GET: 'get-actor-list',
@@ -303,6 +304,7 @@ export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
 export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
 export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
+export const APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE = 'actor-name-not-unique';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

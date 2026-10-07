@@ -1,13 +1,14 @@
-import type { ActorCollectionCreateOptions } from 'apify-client';
-import { ActorSourceType } from 'apify-client';
+import type { ActorCollectionCreateOptions, ActorVersionSourceFile } from 'apify-client';
+import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE, HELPER_TOOLS } from '../../const.js';
+import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
-import { respondAborted } from '../../utils/mcp.js';
+import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { createActorToolOutputSchema } from '../structured_output_schemas.js';
 import { buildFilesManifest, buildFilesRevision } from './source_files.js';
 import {
@@ -18,6 +19,9 @@ import {
     respondAfterWrite,
     respondToSourceToolError,
     sourceFileArgs,
+    validateFileContent,
+    validateFilePath,
+    validateNewFilePath,
 } from './source_helpers.js';
 
 const createActorArgs = z.object({
@@ -39,11 +43,32 @@ const createActorArgs = z.object({
 });
 
 /**
+ * The entries to send, one per file; throws `UserInputError` for a path no file can be written at, and for a path
+ * given twice, since the platform puts the Actor name in the first .actor/actor.json and the build uses the last.
+ */
+function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
+    const entries: ActorVersionSourceFile[] = [];
+    for (const [index, file] of files.entries()) {
+        const entry = buildSourceFileEntry(file);
+        const label = `files[${index}] (${file.path})`;
+        validateFilePath(entry.name, label);
+        validateFileContent(entry, label);
+        if (entries.some(({ name }) => name === entry.name)) {
+            throw new UserInputError(`${label} repeats the path ${entry.name}; send each file once.`);
+        }
+        validateNewFilePath(entry.name, { filePaths: entries.map(({ name }) => name), folderPaths: [] }, label);
+        entries.push(entry);
+    }
+    return entries;
+}
+
+/**
  * https://docs.apify.com/api/v2/actors-post
  *  /v2/actors
  *
- * One POST creates the Actor and its version together, so a failed call leaves nothing behind. The platform creates
- * it private and in the token's account.
+ * One POST creates the Actor and its version together, private and in the token's account. apify-client retries the
+ * POST after a network error, a timeout, a 429, or a 5xx, so when the platform saved an attempt it did not answer, the
+ * retry fails on the name that attempt took, and the call says the Actor may exist.
  */
 export const createActor: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
@@ -87,7 +112,7 @@ export const createActor: ToolEntry = Object.freeze({
                         versionNumber: parsed.versionNumber,
                         ...(parsed.buildTag !== undefined && { buildTag: parsed.buildTag }),
                         sourceType: ActorSourceType.SourceFiles,
-                        sourceFiles: parsed.files.map(buildSourceFileEntry),
+                        sourceFiles: buildSourceFileEntries(parsed.files),
                     },
                 ],
             } satisfies ActorCollectionCreateOptions);
@@ -116,6 +141,19 @@ export const createActor: ToolEntry = Object.freeze({
                 summary: `Created the private Actor ${fullName}.`,
             });
         } catch (error) {
+            if (
+                error instanceof ApifyApiError &&
+                error.type === APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE &&
+                error.attempt > 1
+            ) {
+                return respondUserError(
+                    `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
+                        `attempt of this call may have created the Actor. Read it with ${HELPER_TOOLS.ACTOR_VERSION_GET}, ` +
+                        `as username/${parsed.name} with your username, before calling ${HELPER_TOOLS.ACTOR_CREATE} ` +
+                        'again; if it holds the files you sent, this call created it.',
+                    { httpStatus: error.statusCode },
+                );
+            }
             return respondToSourceToolError(error);
         }
     },

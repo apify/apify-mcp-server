@@ -10,11 +10,20 @@ import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
 import { buildFilesRevision } from '../../src/tools/source/source_files.js';
 import { createActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
+    type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
+
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
 
 const actorsCreateMock = vi.fn();
 const buildMock = vi.fn();
@@ -45,7 +54,7 @@ type CreateOutput = {
     buildError?: string;
 };
 
-type CreateResult = TextToolResult & { structuredContent: CreateOutput };
+type CreateResult = TextToolResult & { structuredContent: CreateOutput; toolTelemetry?: ToolTelemetrySnapshot };
 
 type SentVersion = {
     versionNumber?: string;
@@ -75,14 +84,30 @@ function sha256Prefix(data: Buffer | string): string {
     return createHash('sha256').update(data).digest('hex').slice(0, 16);
 }
 
-function apiError(status: number, message: string, type = 'some-error'): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
+/** `attempt` counts apify-client's tries of the request, retries included. */
+function apiError(status: number, message: string, type = 'some-error', attempt = 1): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, attempt);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<CreateResult> {
     const context = stubToolCallContext({ name: 'my-actor', ...args }, stubClient);
     const withSignal = signal === undefined ? context : { ...context, signal };
     return (await (createActor as HelperTool).call(withSignal)) as CreateResult;
+}
+
+/** The listing get-actor-version returns for the version the platform stored from the POST. */
+async function readCreatedVersion(): Promise<{ revision: string; files: unknown[] }> {
+    const [body] = actorsCreateMock.mock.calls[0] as [{ name: string; versions: SentVersion[] }];
+    actorGetMock.mockResolvedValue({
+        id: 'actor-9',
+        name: 'my-actor',
+        username: 'john',
+        versions: buildStoredVersions(body),
+    });
+    const read = (await (getActorVersion as HelperTool).call(
+        stubToolCallContext({ actor: 'john/my-actor' }, stubClient),
+    )) as { structuredContent: { revision: string; files: unknown[] } };
+    return read.structuredContent;
 }
 
 function getSentVersion(): SentVersion & Record<string, unknown> {
@@ -105,6 +130,58 @@ describe('create-actor', () => {
             buildNumber: '0.0.1',
             status: 'READY',
             startedAt: new Date('2026-09-01T10:00:00.000Z'),
+        });
+    });
+
+    describe('input schema', () => {
+        const validate = (args: Record<string, unknown>) => (createActor as HelperTool).ajvValidate(args);
+        const file = { path: 'src/main.js', content: 'x' };
+
+        it('requires only name and files', () => {
+            expect((createActor as HelperTool).inputSchema.required).toEqual(['name', 'files']);
+        });
+
+        it('keeps every field it declares and strips unknown keys', () => {
+            const args = {
+                name: 'my-actor',
+                title: 'My Actor',
+                description: '',
+                files: [{ ...file, encoding: 'base64', extra: 1 }],
+                versionNumber: '1.0',
+                buildTag: 'beta',
+                autoBuild: true,
+                unknown: 'x',
+            };
+
+            expect(validate(args)).toBe(true);
+            expect(args).toStrictEqual({
+                name: 'my-actor',
+                title: 'My Actor',
+                description: '',
+                files: [{ ...file, encoding: 'base64' }],
+                versionNumber: '1.0',
+                buildTag: 'beta',
+                autoBuild: true,
+            });
+        });
+
+        it.each<[string, Record<string, unknown>]>([
+            ['no name', { files: [file] }],
+            ['an empty name', { name: '', files: [file] }],
+            ['no files', { name: 'x' }],
+            ['empty files', { name: 'x', files: [] }],
+            ['an empty title', { name: 'x', title: '', files: [file] }],
+            ['an empty buildTag', { name: 'x', buildTag: '', files: [file] }],
+            ['an empty path', { name: 'x', files: [{ path: '', content: 'x' }] }],
+            ['a file without a path', { name: 'x', files: [{ content: 'x' }] }],
+            ['a file without content', { name: 'x', files: [{ path: 'a.js' }] }],
+            ['an unknown encoding', { name: 'x', files: [{ ...file, encoding: 'hex' }] }],
+        ])('rejects %s', (_, args) => {
+            expect(validate(args)).toBe(false);
+        });
+
+        it('accepts one empty file', () => {
+            expect(validate({ name: 'x', files: [{ path: 'a.js', content: '' }] })).toBe(true);
         });
     });
 
@@ -157,6 +234,8 @@ describe('create-actor', () => {
             revision: buildFilesRevision(files),
             files,
         });
+        expect(result.content).toHaveLength(2);
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
             'Created the private Actor john/my-actor.\nRuns use these files once the version is built.',
         );
@@ -172,6 +251,26 @@ describe('create-actor', () => {
             [
                 {
                     name: 'my-actor',
+                    versions: [
+                        {
+                            versionNumber: '0.0',
+                            sourceType: 'SOURCE_FILES',
+                            sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: MAIN_JS.content }],
+                        },
+                    ],
+                },
+            ],
+        ]);
+    });
+
+    it('sends an empty description as given', async () => {
+        await callTool({ description: '', files: [MAIN_JS] });
+
+        expect(actorsCreateMock.mock.calls).toStrictEqual([
+            [
+                {
+                    name: 'my-actor',
+                    description: '',
                     versions: [
                         {
                             versionNumber: '0.0',
@@ -275,6 +374,28 @@ describe('create-actor', () => {
         expect(getSentVersion().sourceFiles).toStrictEqual([{ name: 'src/main.js', format: 'TEXT', content }]);
     });
 
+    it('sends non-ASCII paths as given, NFC and NFD forms as two files, with the hashes and revision a later read returns', async () => {
+        const nfcPath = 'src/n\u00e1zev.js';
+        const nfdPath = 'src/na\u0301zev.js';
+
+        const result = await callTool({
+            files: [
+                { path: nfcPath, content: 'x' },
+                { path: nfdPath, content: 'y' },
+            ],
+        });
+
+        expect(getSentVersion().sourceFiles).toStrictEqual([
+            { name: nfcPath, format: 'TEXT', content: 'x' },
+            { name: nfdPath, format: 'TEXT', content: 'y' },
+        ]);
+        const read = await readCreatedVersion();
+        expect(result.structuredContent.files).toEqual(read.files);
+        expect(result.structuredContent.revision).toBe(read.revision);
+        // NFD sorts first: its 'a' comes before the NFC 'á'.
+        expect(result.structuredContent.files.map(({ path }) => path)).toEqual([nfdPath, nfcPath]);
+    });
+
     it('normalizes paths the way get-actor-version lists them', async () => {
         const result = await callTool({
             files: [
@@ -294,6 +415,91 @@ describe('create-actor', () => {
             'src/lib/util.js',
             'src/main.js',
         ]);
+    });
+
+    it.each(['/src/main.js', '..', '../x.js', 'src/../../x.js'])(
+        'refuses a file at %s, outside the Actor root, which the build refuses, and creates nothing',
+        async (path) => {
+            const result = await callTool({ autoBuild: true, files: [MAIN_JS, { path, content: 'x' }] });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                `files[1] (${path}) has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+            );
+            expect(actorsCreateMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(['.', 'src/', 'src/..'])(
+        'refuses a file at %s, which names a folder, and creates nothing',
+        async (path) => {
+            const result = await callTool({ files: [{ path, content: 'x' }] });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(`files[0] (${path}) has a path that names a folder, not a file.`);
+            expect(actorsCreateMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each([
+        [
+            'a file under another file',
+            [{ path: 'src', content: 'x' }, MAIN_JS],
+            'files[1] (src/main.js) collides with src',
+        ],
+        [
+            'a file at the folder of another file',
+            [MAIN_JS, { path: 'src', content: 'x' }],
+            'files[1] (src) collides with src/main.js',
+        ],
+    ])('refuses %s, since a path cannot be both a file and a folder, and creates nothing', async (_, files, prefix) => {
+        const result = await callTool({ files });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`${prefix}; one path cannot be both a file and a folder.`);
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['a.js', './a.js', 'a.js'],
+        ['.actor/actor.json', '.actor//actor.json', '.actor/actor.json'],
+        ['src/main.js', 'src/main.js', 'src/main.js'],
+    ])('refuses %s and %s, two files at the same path, and creates nothing', async (first, second, path) => {
+        const result = await callTool({
+            files: [
+                { path: first, content: '1' },
+                { path: second, content: '2' },
+            ],
+        });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`files[1] (${second}) repeats the path ${path}; send each file once.`);
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['base64 that is a data URI', { path: 'assets/a.png', content: 'data:image/png;base64,iVBORw0KGgo=' }],
+        ['text sent to a binary extension', { path: 'assets/a.png', content: 'hello world' }],
+        ['text sent with encoding base64', { path: 'README.md', content: '# Title\n', encoding: 'base64' }],
+    ])('refuses %s, which would be stored corrupted, and creates nothing', async (_, file) => {
+        const result = await callTool({ files: [MAIN_JS, file] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            `files[1] (${file.path}) has content that is not valid base64; send binary content as base64, or text with encoding utf8.`,
+        );
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses text with a lone UTF-16 surrogate, and creates nothing', async () => {
+        const result = await callTool({ files: [{ path: 'src/a.js', content: 'smile \uD83D' }] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            'files[0] (src/a.js) has text with a lone UTF-16 surrogate, which UTF-8 cannot store.',
+        );
+        expect(actorsCreateMock).not.toHaveBeenCalled();
     });
 
     it('warns about empty files, which the build skips', async () => {
@@ -341,6 +547,39 @@ describe('create-actor', () => {
         expect(buildMock).not.toHaveBeenCalled();
     });
 
+    it('says an earlier attempt may have created the Actor when the platform refuses the name on a retried POST', async () => {
+        // apify-client retries a POST that timed out or got a 5xx, and the platform may have saved the attempt.
+        actorsCreateMock.mockRejectedValue(
+            apiError(409, 'Some other Actor already has this name ("my-actor").', 'actor-name-not-unique', 2),
+        );
+
+        const result = await callTool({ autoBuild: true, files: [ACTOR_JSON] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureHttpStatus: 409 }));
+        expect(result.structuredContent).toBeUndefined();
+        expect(result.content).toStrictEqual([
+            {
+                type: 'text',
+                text:
+                    'The platform refused the name my-actor as taken when the request was retried, so an earlier ' +
+                    'attempt of this call may have created the Actor. Read it with get-actor-version, as ' +
+                    'username/my-actor with your username, before calling create-actor again; if it holds the ' +
+                    'files you sent, this call created it.',
+            },
+        ]);
+        expect(actorsCreateMock).toHaveBeenCalledTimes(1);
+        expect(actorMock).not.toHaveBeenCalled();
+        expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('lets any other API error of a retried POST through unchanged', async () => {
+        const error = apiError(400, 'Invalid version number.', 'invalid-input', 2);
+        actorsCreateMock.mockRejectedValue(error);
+
+        await expect(callTool({ files: [ACTOR_JSON] })).rejects.toBe(error);
+    });
+
     describe('autoBuild', () => {
         it('starts a build without waiting', async () => {
             const result = await callTool({ autoBuild: true, files: [ACTOR_JSON, DOCKERFILE] });
@@ -351,6 +590,25 @@ describe('create-actor', () => {
             expect(result.structuredContent.build).toEqual(
                 expect.objectContaining({ id: 'build-1', buildNumber: '0.0.1', status: 'READY' }),
             );
+            expect(result.content).toHaveLength(2);
+            expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+        });
+
+        it('adds the build Console link for an Apify Console session', async () => {
+            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+            const result = (await (createActor as HelperTool).call({
+                ...stubToolCallContext({ name: 'my-actor', autoBuild: true, files: [ACTOR_JSON] }, stubClient),
+                apifyToken: 'apify_ui_test',
+            })) as CreateResult;
+
+            const consoleUrl = 'https://console.apify.com/actors/actor-9/builds/0.0.1';
+            expectSchemaConformingStructuredContent(result, createActorToolOutputSchema);
+            expect(getUserInfoCached).toHaveBeenCalledWith('apify_ui_test', stubClient);
+            expect(result.structuredContent.build?.apifyConsoleUrl).toBe(consoleUrl);
+            expect(result.content).toHaveLength(3);
+            expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+            expect(result.content[2].text).toBe(`Apify Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}`);
         });
 
         it('builds the version it created without waiting for the build', async () => {
@@ -363,6 +621,22 @@ describe('create-actor', () => {
             expect(buildClientMock).not.toHaveBeenCalled();
             expect(result.structuredContent.build).toEqual(
                 expect.objectContaining({ id: 'build-2', buildNumber: '1.2.1', status: 'RUNNING' }),
+            );
+        });
+
+        it('reports a build start that failed on the network as buildError, with the Actor still created', async () => {
+            buildMock.mockRejectedValue(
+                Object.assign(new Error('socket hang up'), { request: {}, config: {}, code: 'ECONNRESET' }),
+            );
+
+            const result = await callTool({ autoBuild: true, files: [ACTOR_JSON, DOCKERFILE] });
+
+            expectSchemaConformingStructuredContent(result, createActorToolOutputSchema);
+            expect(actorsCreateMock).toHaveBeenCalledTimes(1);
+            expect(result.structuredContent.actorId).toBe('actor-9');
+            expect(result.structuredContent.buildError).toBe('socket hang up');
+            expect(result.content[1].text).toBe(
+                'Created the private Actor john/my-actor.\nThe build could not be started; start it again to run these files.',
             );
         });
 
