@@ -237,7 +237,7 @@ describe('create-actor', () => {
         expect(result.content).toHaveLength(2);
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
-            'Created the private Actor john/my-actor.\nBuild the version to run these files.',
+            'Created the private Actor john/my-actor.\nBuild the version before running it.',
         );
         // No other call: nothing reads or updates an existing Actor, and no build starts.
         expect(actorMock).not.toHaveBeenCalled();
@@ -653,7 +653,7 @@ describe('create-actor', () => {
             expect(result.structuredContent.actorId).toBe('actor-9');
             expect(result.structuredContent.buildError).toBe('socket hang up');
             expect(result.content[1].text).toBe(
-                'Created the private Actor john/my-actor.\nThe build could not be started; start it again to run these files.',
+                'Created the private Actor john/my-actor.\nThe build could not be started; start it again before running the version.',
             );
         });
 

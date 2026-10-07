@@ -201,7 +201,7 @@ describe('update-actor-version', () => {
         expect(result.content).toHaveLength(2);
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
-            'Updated version 0.1 of john/my-actor.\nBuild the version to run these files.',
+            'Updated version 0.1 of john/my-actor.\nBuild the version before running it.',
         );
         expect(buildMock).not.toHaveBeenCalled();
     });
@@ -1684,7 +1684,7 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).not.toHaveBeenCalled();
             expect(result.structuredContent).toEqual({ revision: await readRevision(), changed: false, changes: [] });
             expect(result.content[1].text).toBe(
-                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nBuild the version to run these files.',
+                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nBuild the version before running it.',
             );
         });
 
@@ -1835,7 +1835,7 @@ describe('update-actor-version', () => {
 
                 expect(actorMock.mock.calls).toEqual([[actor], ['actor-1']]);
                 expect(result.content[1].text).toBe(
-                    'Updated version 0.1 of john/my-actor.\nBuild the version to run these files.',
+                    'Updated version 0.1 of john/my-actor.\nBuild the version before running it.',
                 );
             },
         );
@@ -2120,7 +2120,7 @@ describe('update-actor-version', () => {
             expect(result.structuredContent.buildError).toBe('Not enough credit');
             expect(result.structuredContent).not.toHaveProperty('build');
             expect(result.content[1].text).toContain(
-                'The build could not be started; start it again to run these files.',
+                'The build could not be started; start it again before running the version.',
             );
         });
 
@@ -2144,7 +2144,7 @@ describe('update-actor-version', () => {
                 buildError: error.message,
             });
             expect(result.content[1].text).toBe(
-                'Updated version 0.1 of john/my-actor.\nThe build could not be started; start it again to run these files.',
+                'Updated version 0.1 of john/my-actor.\nThe build could not be started; start it again before running the version.',
             );
         });
 

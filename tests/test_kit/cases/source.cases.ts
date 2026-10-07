@@ -217,7 +217,7 @@ export const sourceCases: Case[] = [
                     files: expectedFiles,
                 });
                 expect(createResult.content?.[1]?.text).toBe(
-                    `Created the private Actor ${fullName}.\nBuild the version to run these files.`,
+                    `Created the private Actor ${fullName}.\nBuild the version before running it.`,
                 );
 
                 const read = expectToolSuccess<GetActorVersionResult>(
@@ -360,7 +360,7 @@ export const sourceCases: Case[] = [
                 });
                 expect(updated.revision).not.toBe(before.revision);
                 expect(updateResult.content?.[1]?.text).toBe(
-                    `Updated version 0.0 of ${fullName}.\nBuild the version to run these files.`,
+                    `Updated version 0.0 of ${fullName}.\nBuild the version before running it.`,
                 );
                 expect(after.files).toEqual([
                     buildFileListing('README.md', newReadme),

@@ -257,7 +257,7 @@ export async function respondAfterWrite(params: {
         return respondWithBuild({
             structuredContent,
             summary,
-            nextStep: 'Build the version to run these files.',
+            nextStep: 'Build the version before running it.',
         });
     }
     let linkContext: ConsoleLinkContext | undefined;
@@ -277,7 +277,7 @@ export async function respondAfterWrite(params: {
                 buildError: error instanceof Error ? error.message : String(error),
             },
             summary,
-            nextStep: 'The build could not be started; start it again to run these files.',
+            nextStep: 'The build could not be started; start it again before running the version.',
         });
     }
     // startBuild returns ABORT only for a passed signal; the check narrows the type.
