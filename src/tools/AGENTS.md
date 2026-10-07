@@ -45,8 +45,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     reports a delete of a missing version as done). `source_files.ts` holds the file shape, the
     manifest builder, the hash and revision rules, and the text-or-base64 detection;
     `source_helpers.ts` holds the Actor and version lookup, the file input shape, and the response
-    after a write, which starts the build for autoBuild. Versions not stored as files (Git repository,
-    gist, or zip) are refused.
+    after a write, which starts the build for autoBuild. get-actor-version, update-actor-version, and a
+    copy in create-actor-version refuse a version not stored as files (Git repository, gist, or zip);
+    create-actor-version from files and delete-actor-version work whatever the Actor's versions are
+    stored as.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
