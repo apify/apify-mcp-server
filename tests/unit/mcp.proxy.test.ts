@@ -219,4 +219,81 @@ describe('getMCPServerTools()', () => {
             'longuser--my-mcp-server--a-tool-name-long-enough-to-push-pa-fa1b',
         ]);
     });
+
+    it('loads a tool whose inputSchema declares a 2020-12 $schema without mutating it', async () => {
+        const inputSchema = {
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            properties: { url: { type: 'string' } },
+            required: ['url'],
+        };
+        const client = {
+            listTools: async () => ({
+                tools: [
+                    { name: 'fetch', description: 'Fetches a URL', inputSchema },
+                    { name: 'ping', description: 'Pings', inputSchema: { type: 'object' } },
+                ],
+            }),
+        } as unknown as Client;
+
+        const tools = await getMCPServerTools(
+            'actor-id',
+            client,
+            'https://example-mcp-server.apify.actor/mcp',
+            'apify/example-mcp-server',
+        );
+
+        expect(tools).toHaveLength(2);
+        expect(tools[0].ajvValidate({ url: 'https://example.com' })).toBe(true);
+        expect(tools[0].ajvValidate({})).toBe(false);
+        expect(tools[0].inputSchema).not.toHaveProperty('$schema');
+        expect(inputSchema.$schema).toBe('https://json-schema.org/draft/2020-12/schema');
+    });
+
+    it('enforces required when inputSchema declares a 2019-09 $schema', async () => {
+        const client = {
+            listTools: async () => ({
+                tools: [
+                    {
+                        name: 'fetch',
+                        description: 'Fetches a URL',
+                        inputSchema: {
+                            $schema: 'https://json-schema.org/draft/2019-09/schema',
+                            type: 'object',
+                            properties: { url: { type: 'string' } },
+                            required: ['url'],
+                        },
+                    },
+                ],
+            }),
+        } as unknown as Client;
+
+        const tools = await getMCPServerTools(
+            'actor-id',
+            client,
+            'https://example-mcp-server.apify.actor/mcp',
+            'apify/example-mcp-server',
+        );
+
+        expect(tools[0].ajvValidate({ url: 'https://example.com' })).toBe(true);
+        expect(tools[0].ajvValidate({})).toBe(false);
+    });
+
+    it('rejects a schema AJV cannot compile', async () => {
+        const client = {
+            listTools: async () => ({
+                tools: [
+                    {
+                        name: 'broken',
+                        description: 'Broken schema',
+                        inputSchema: { type: 'object', $ref: '#/definitions/missing' },
+                    },
+                ],
+            }),
+        } as unknown as Client;
+
+        await expect(
+            getMCPServerTools('actor-id', client, 'https://example-mcp-server.apify.actor/mcp', 'apify/example'),
+        ).rejects.toThrow();
+    });
 });
