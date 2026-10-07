@@ -572,6 +572,29 @@ describe('create-actor-version', () => {
             },
         );
 
+        it('names get-actor-version on a retried POST only when the session has it', async () => {
+            versionsCreateMock.mockRejectedValue(
+                apiError(403, 'Version with this number already exists', 'version-already-exists', 2),
+            );
+            const loadedToolNames = Object.values(HELPER_TOOLS).filter(
+                (name) => name !== HELPER_TOOLS.ACTOR_VERSION_GET,
+            );
+            const context = stubToolCallContext(
+                { actor: 'john/my-actor', versionNumber: '0.2', files: [ACTOR_JSON] },
+                stubClient,
+                { loadedToolNames },
+            );
+
+            const result = (await (createActorVersion as HelperTool).call(context)) as CreateVersionResult;
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                'The platform refused version 0.2 as taken when the request was retried, so an earlier attempt of ' +
+                    'this call may have created it. Read it before calling create-actor-version again; if it holds ' +
+                    'the files this call sent, this call created it.',
+            );
+        });
+
         it('lets any other API error of a retried POST through unchanged', async () => {
             const error = apiError(
                 403,

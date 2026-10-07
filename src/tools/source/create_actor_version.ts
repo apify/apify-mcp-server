@@ -86,7 +86,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, signal } = toolArgs;
+        const { args, apifyClient: client, signal, loadedToolNames } = toolArgs;
         const parsed = createActorVersionArgs.parse(args);
         const { versionNumber, copyFromVersion } = parsed;
         if ((copyFromVersion === undefined) === (parsed.files === undefined)) {
@@ -142,11 +142,14 @@ export const createActorVersion: ToolEntry = Object.freeze({
                 error.type === APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS &&
                 error.attempt > 1
             ) {
+                const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
+                    ? ` with ${HELPER_TOOLS.ACTOR_VERSION_GET}`
+                    : '';
                 return respondUserError(
                     `The platform refused version ${versionNumber} as taken when the request was retried, so an ` +
-                        'earlier attempt of this call may have created it. Read it with ' +
-                        `${HELPER_TOOLS.ACTOR_VERSION_GET} before calling ${HELPER_TOOLS.ACTOR_VERSION_CREATE} again; ` +
-                        'if it holds the files this call sent, this call created it.',
+                        `earlier attempt of this call may have created it. Read it${readTool} before calling ` +
+                        `${HELPER_TOOLS.ACTOR_VERSION_CREATE} again; if it holds the files this call sent, this call ` +
+                        'created it.',
                     { httpStatus: error.statusCode },
                 );
             }
