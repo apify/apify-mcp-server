@@ -56,7 +56,7 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
         const parsed = deleteActorVersionArgs.parse(args);
         try {
             const { actor, fullName } = await fetchActor(client, parsed.actor);
-            const { versionNumber, buildTag } = resolveVersion(actor, parsed.versionNumber, parsed.actor);
+            const { versionNumber } = resolveVersion(actor, parsed.versionNumber, parsed.actor);
             // A cancel before the DELETE deletes nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
             await client.actor(actor.id).version(versionNumber).delete();
@@ -65,10 +65,16 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
             const buildTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
                 ? `${HELPER_TOOLS.ACTOR_BUILD} and `
                 : '';
-            const text = buildTag
-                ? `${summary}\nRuns with tag ${buildTag} still use the deleted version's build; to have them run ` +
-                  `another version, build that version with ${buildTool}tag ${buildTag}.`
-                : summary;
+            // A tag points to the build it was last given to, which may be a build of another version than the one with
+            // that buildTag.
+            const tags = Object.entries(actor.taggedBuilds ?? {})
+                .filter(([, { buildNumber }]) => buildNumber?.startsWith(`${versionNumber}.`))
+                .map(([tag]) => tag);
+            const text =
+                tags.length > 0
+                    ? `${summary}\nRuns with tag ${tags.join(', ')} still use the deleted version's build; to have them ` +
+                      `run another version, build that version with ${buildTool}tag ${tags.join(', ')}.`
+                    : summary;
             return respondOk([JSON.stringify(structuredContent), text], { structuredContent });
         } catch (error) {
             return respondToSourceToolError(error);

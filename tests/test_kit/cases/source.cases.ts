@@ -816,7 +816,7 @@ export const sourceCases: Case[] = [
                     versionNumber: '0.1',
                     deleted: true,
                 });
-                // Version 0.1 has no build tag, so no next step about one follows.
+                // No tag points to a build of version 0.1, so no next step about one follows.
                 expect(deleteResult.content?.[1]?.text).toBe(`Deleted version 0.1 of ${seeded.username}/${name}.`);
                 const storedAfter = await fetchStoredActor(api, seeded.id);
                 expect(storedAfter.versions).toEqual([findStoredVersion(storedBefore, '0.0')]);

@@ -45,6 +45,7 @@ function mockActor(overrides: Record<string, unknown> = {}) {
             },
             { versionNumber: '0.2', sourceType: 'SOURCE_FILES' },
         ],
+        taggedBuilds: { latest: { buildId: 'build-1', buildNumber: '0.1.3' } },
         ...overrides,
     };
 }
@@ -109,7 +110,7 @@ describe('delete-actor-version', () => {
     });
 
     it.each([
-        // Version 0.1 has the build tag latest, which still points to its build after the delete.
+        // Tag latest points to build 0.1.3, which stays after the delete.
         {
             versionNumber: '0.1',
             text:
@@ -135,6 +136,35 @@ describe('delete-actor-version', () => {
                 versionNumber,
                 deleted: true,
             });
+            expect(result.content[1].text).toBe(text);
+        },
+    );
+
+    it.each([
+        // Version 0.1 has the build tag latest, but a later build of version 0.2 took the tag.
+        {
+            versionNumber: '0.1',
+            taggedBuilds: { latest: { buildId: 'build-2', buildNumber: '0.2.1' } },
+            text: 'Deleted version 0.1 of john/my-actor.',
+        },
+        // Version 0.1 has the build tag latest, but was never built.
+        { versionNumber: '0.1', taggedBuilds: undefined, text: 'Deleted version 0.1 of john/my-actor.' },
+        // Version 0.2 has no build tag, but build-actor gave one of its builds the tag latest.
+        {
+            versionNumber: '0.2',
+            taggedBuilds: { latest: { buildId: 'build-2', buildNumber: '0.2.1' } },
+            text:
+                'Deleted version 0.2 of john/my-actor.\n' +
+                "Runs with tag latest still use the deleted version's build; to have them run another version, " +
+                'build that version with build-actor and tag latest.',
+        },
+    ])(
+        'takes the next step about a tag from the build it points to, not from the build tag of version $versionNumber',
+        async ({ versionNumber, taggedBuilds, text }) => {
+            actorGetMock.mockResolvedValue(mockActor({ taggedBuilds }));
+
+            const result = await callTool({ versionNumber });
+
             expect(result.content[1].text).toBe(text);
         },
     );
