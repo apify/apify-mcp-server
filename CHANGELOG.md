@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.17.4 - **not yet released**
+## [0.17.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.4) (2026-10-07)
 
 ### 🐛 Bug Fixes
 
@@ -11,7 +10,6 @@ All notable changes to this project will be documented in this file.
 - Stop get-dataset-schema calling clean-filtered datasets empty ([#1486](https://github.com/apify/apify-mcp-server/pull/1486)) ([ee4760d](https://github.com/apify/apify-mcp-server/commit/ee4760dedff701935a54c2fca6cef0ace8a6a09e)) by [@daveomri](https://github.com/daveomri), closes [#900](https://github.com/apify/apify-mcp-server/issues/900)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.17.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.3) (2026-10-06)
 
 ### 🚀 Features
