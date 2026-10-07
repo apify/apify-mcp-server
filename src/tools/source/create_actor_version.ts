@@ -69,7 +69,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
         autoBuild starts a build after creating the version and returns without waiting.
 
         USAGE:
-        - Use to make a working copy of a version to change and test while the tagged build keeps running.
+        - Use to make a working copy of a version to change and test while runs keep using the tagged build.
 
         USAGE EXAMPLES:
         - user_input: Copy version 0.1 of my Actor john/my-scraper to a new version 0.2`,
