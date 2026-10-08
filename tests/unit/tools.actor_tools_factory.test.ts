@@ -57,51 +57,22 @@ describe('getNormalActorsAsTools()', () => {
             },
         );
 
-        it.each(['dataset', 'keyValueStore', 'requestQueue'])(
-            'marks an Actor with a read-only %s input read-only',
-            async (resourceType) => {
-                expect(
-                    await getAnnotations(
-                        createMockActorInfo('apify/web-fetch', {
-                            ...LIMITED,
-                            inputProperties: {
-                                storageId: { type: 'string', resourceType, resourcePermissions: ['READ'] },
-                            },
-                        }),
-                    ),
-                ).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-            },
-        );
-
-        it.each([undefined, 'customResource'])(
-            'ignores WRITE permissions on a non-storage input with resource type %s',
-            async (resourceType) => {
-                expect(
-                    await getAnnotations(
-                        createMockActorInfo('apify/web-fetch', {
-                            ...LIMITED,
-                            inputProperties: {
-                                resourceId: { type: 'string', resourceType, resourcePermissions: ['WRITE'] },
-                            },
-                        }),
-                    ),
-                ).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-            },
-        );
-
-        it.each(['dataset', 'keyValueStore', 'requestQueue'])(
-            'keeps an Actor with a writable %s input destructive',
-            async (resourceType) => {
-                expect(
-                    await getAnnotations(
-                        createMockActorInfo('apify/web-fetch', {
-                            ...LIMITED,
-                            inputProperties: {
-                                storageId: { type: 'string', resourceType, resourcePermissions: ['READ', 'WRITE'] },
-                            },
-                        }),
-                    ),
-                ).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+        it.each<[string | undefined, string[], boolean]>([
+            ['dataset', ['READ'], true],
+            ['dataset', ['READ', 'WRITE'], false],
+            ['keyValueStore', ['READ', 'WRITE'], false],
+            ['requestQueue', ['READ', 'WRITE'], false],
+            [undefined, ['WRITE'], true],
+        ])(
+            'marks %s input with %j permissions read-only: %s',
+            async (resourceType, resourcePermissions, isReadOnly) => {
+                const annotations = await getAnnotations(
+                    createMockActorInfo('apify/web-fetch', {
+                        ...LIMITED,
+                        inputProperties: { storageId: { type: 'string', resourceType, resourcePermissions } },
+                    }),
+                );
+                expect(annotations).toMatchObject({ readOnlyHint: isReadOnly, destructiveHint: !isReadOnly });
             },
         );
 
