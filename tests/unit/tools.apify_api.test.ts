@@ -66,6 +66,17 @@ async function callTool(tool: unknown, args: Record<string, unknown>, loadedTool
     return (await (tool as HelperTool).call(context)) as TextToolResult & { toolTelemetry?: ToolTelemetrySnapshot };
 }
 
+/** Calls a tool while a test-only rule is in the published list, so the tool and the index it loads apply it. */
+async function callToolWithRule(tool: unknown, rule: ApiBlockRule, args: Record<string, unknown>) {
+    const rules = API_BLOCK_RULES as ApiBlockRule[];
+    rules.push(rule);
+    try {
+        return await callTool(tool, args);
+    } finally {
+        rules.pop();
+    }
+}
+
 beforeEach(() => {
     // The tools check every URL against the configured API origin; pin it so the shell's
     // APIFY_API_BASE_URL does not fail the tests.
@@ -253,21 +264,10 @@ describe('apify-api-details', () => {
     });
 
     describe('with a test-only rule in the published list', () => {
-        /** Calls the tool while the rule is in the list, so the index the tool loads leaves out what it names. */
-        async function callDetailsWithRule(rule: ApiBlockRule, args: Record<string, unknown>) {
-            const rules = API_BLOCK_RULES as ApiBlockRule[];
-            rules.push(rule);
-            try {
-                return await callTool(apifyApiDetails, args);
-            } finally {
-                rules.pop();
-            }
-        }
-
         it('refuses a literal path a rule names, not the parameter path next to it', async () => {
             const rule: ApiBlockRule = { operation: { methods: ['GET'], path: '/v2/users/me' }, reason: 'No.' };
 
-            const result = await callDetailsWithRule(rule, { path: 'users/me' });
+            const result = await callToolWithRule(apifyApiDetails, rule, { path: 'users/me' });
 
             expectSoftFailInvalidInput(result);
             expect(result.content[0].text).toBe('No.');
@@ -279,8 +279,8 @@ describe('apify-api-details', () => {
                 reason: 'No.',
             };
 
-            const refused = await callDetailsWithRule(rule, { path: 'datasets/abc', method: 'GET' });
-            const allowed = await callDetailsWithRule(rule, { path: 'datasets/abc', method: 'PUT' });
+            const refused = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc', method: 'GET' });
+            const allowed = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc', method: 'PUT' });
 
             expectSoftFailInvalidInput(refused);
             expect(refused.content[0].text).toBe('No.');
@@ -354,6 +354,16 @@ describe('apify-api-read', () => {
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(METHOD_PARAM_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a path a test-only operation rule names, written with the /v2 prefix, without a request', async () => {
+        const rule: ApiBlockRule = { operation: { methods: ['GET'], path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
+
+        const result = await callToolWithRule(apifyApiRead, rule, { path: '/v2/datasets/abc' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe('No.');
         expect(requestMock).not.toHaveBeenCalled();
     });
 
@@ -787,6 +797,20 @@ describe('apify-api-write', () => {
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(METHOD_PARAM_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+        expect(fetchApiOperationIndex).not.toHaveBeenCalled();
+    });
+
+    it('refuses a path a test-only operation rule names before it chooses a method, without a request or the spec', async () => {
+        const rule: ApiBlockRule = {
+            operation: { methods: ['DELETE'], path: '/v2/datasets/{datasetId}' },
+            reason: 'No.',
+        };
+
+        const result = await callToolWithRule(apifyApiWrite, rule, { path: '/v2/datasets/abc' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe('No.');
         expect(requestMock).not.toHaveBeenCalled();
         expect(fetchApiOperationIndex).not.toHaveBeenCalled();
     });
