@@ -25,8 +25,7 @@ export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
             'of the request.',
         suggestedToolNames: [HELPER_TOOLS.API_WRITE],
     },
-    // A GET to a synchronous run endpoint starts a paid run, so the read tool would not be read-only; the write
-    // tool sends the POST. See apify/apify-mcp-server#1502.
+    // A GET here starts a paid run, so the read tool would not be read-only; see apify/apify-mcp-server#1502.
     {
         match: { method: 'GET', path: '/v2/actors/{actorId}/run-sync' },
         reason: SYNC_RUN_GET_REASON,
