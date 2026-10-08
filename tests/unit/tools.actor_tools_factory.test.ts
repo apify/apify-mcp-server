@@ -57,6 +57,54 @@ describe('getNormalActorsAsTools()', () => {
             },
         );
 
+        it.each(['dataset', 'keyValueStore', 'requestQueue'])(
+            'marks an Actor with a read-only %s input read-only',
+            async (resourceType) => {
+                expect(
+                    await getAnnotations(
+                        createMockActorInfo('apify/web-fetch', {
+                            ...LIMITED,
+                            inputProperties: {
+                                storageId: { type: 'string', resourceType, resourcePermissions: ['READ'] },
+                            },
+                        }),
+                    ),
+                ).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+            },
+        );
+
+        it.each([undefined, 'customResource'])(
+            'ignores WRITE permissions on a non-storage input with resource type %s',
+            async (resourceType) => {
+                expect(
+                    await getAnnotations(
+                        createMockActorInfo('apify/web-fetch', {
+                            ...LIMITED,
+                            inputProperties: {
+                                resourceId: { type: 'string', resourceType, resourcePermissions: ['WRITE'] },
+                            },
+                        }),
+                    ),
+                ).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+            },
+        );
+
+        it.each(['dataset', 'keyValueStore', 'requestQueue'])(
+            'keeps an Actor with a writable %s input destructive',
+            async (resourceType) => {
+                expect(
+                    await getAnnotations(
+                        createMockActorInfo('apify/web-fetch', {
+                            ...LIMITED,
+                            inputProperties: {
+                                storageId: { type: 'string', resourceType, resourcePermissions: ['READ', 'WRITE'] },
+                            },
+                        }),
+                    ),
+                ).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+            },
+        );
+
         it.each([
             ['a community Actor', createMockActorInfo('someone/web-fetch', LIMITED)],
             [
@@ -69,15 +117,6 @@ describe('getNormalActorsAsTools()', () => {
                 createMockActorInfo('apify/web-fetch', {
                     ...LIMITED,
                     inputProperties: { cookies: { type: 'array', isSecret: true } },
-                }),
-            ],
-            [
-                'an Actor with a writable storage input',
-                createMockActorInfo('apify/web-fetch', {
-                    ...LIMITED,
-                    inputProperties: {
-                        datasetId: { type: 'string', resourceType: 'dataset', resourcePermissions: ['READ', 'WRITE'] },
-                    },
                 }),
             ],
             [

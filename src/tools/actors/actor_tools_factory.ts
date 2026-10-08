@@ -107,7 +107,8 @@ function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
     return !inputProperties.some(
         (property) =>
             property.isSecret ||
-            property.resourcePermissions?.includes('WRITE') ||
+            (['dataset', 'keyValueStore', 'requestQueue'].includes(property.resourceType ?? '') &&
+                property.resourcePermissions?.includes('WRITE')) ||
             property.resourceType === 'mcpConnector' ||
             property.editor === 'javascript' ||
             property.editor === 'python',
