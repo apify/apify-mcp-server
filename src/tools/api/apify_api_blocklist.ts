@@ -1,114 +1,73 @@
 import type { HelperToolName } from '../../const.js';
 import { HELPER_TOOLS } from '../../const.js';
-import type { ApiMethod, ApiParameter } from './apify_api_spec.js';
+import type { ApiMethod } from './apify_api_spec.js';
 
-/** The API tools that send requests, the ones a rule refuses calls in. */
-export type ApiCallToolName = typeof HELPER_TOOLS.API_READ | typeof HELPER_TOOLS.API_WRITE;
-
-type ApiBlockRuleBase = {
+/** A request the API tools refuse to send. */
+export type ApiBlockRule = {
+    /** A query parameter, refused in every call, or one operation: a method and a spec path template. */
+    match: { queryParam: string } | { method: ApiMethod; path: `/v2/${string}` };
     /** Why the call is refused, shown to the agent. */
     reason: string;
-    /** Tools to call instead, each named only when the session has it and it is not the refusing tool. */
+    /** Tools to use instead, each named only when the session has it and it is not the refusing tool. */
     suggestedToolNames?: readonly HelperToolName[];
 };
-
-/** Matches a query parameter, in `query` or in a query string written into the path, by name. */
-export type ApiQueryParamBlockRule = ApiBlockRuleBase & {
-    queryParam: string;
-    /** The tools that refuse a call the rule matches. */
-    toolNames: readonly ApiCallToolName[];
-};
-
-/**
- * Matches operations: HTTP methods and a path template as the spec writes it, such as `/v2/actors/{actorId}`.
- * Each method is refused in the tool that sends it (`getApiCallToolName`).
- */
-export type ApiOperationBlockRule = ApiBlockRuleBase & {
-    operation: { methods: readonly ApiMethod[]; path: `/v2/${string}` };
-};
-
-export type ApiBlockRule = ApiQueryParamBlockRule | ApiOperationBlockRule;
-
-/** The synchronous run endpoints of an Actor, also under the legacy `acts` prefix. */
-const ACTOR_SYNC_RUN_PATHS = [
-    '/v2/actors/{actorId}/run-sync',
-    '/v2/actors/{actorId}/run-sync-get-dataset-items',
-] as const;
-
-/** The synchronous run endpoints of a task. */
-const TASK_SYNC_RUN_PATHS = [
-    '/v2/actor-tasks/{actorTaskId}/run-sync',
-    '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
-] as const;
 
 const SYNC_RUN_GET_REASON =
     'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';
 
-/** What the API tools refuse to send. The operation index leaves the same out, so search and details never offer it. */
+/** What the API tools refuse to send. The operation index leaves out each operation a rule matches. */
 export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
     {
         // A GET with method=DELETE deletes, so the read tool could write; see apify/apify-mcp-server#1501.
-        queryParam: 'method',
-        toolNames: [HELPER_TOOLS.API_READ, HELPER_TOOLS.API_WRITE],
+        match: { queryParam: 'method' },
         reason:
             'The API tools do not send the method query parameter: the API would take it as the HTTP method ' +
             'of the request.',
         suggestedToolNames: [HELPER_TOOLS.API_WRITE],
     },
-    // A GET there starts a paid run, as a POST does, so the read tool refuses it to stay read-only. The POST stays
-    // with the write tool, which a session gets only by naming it. See apify/apify-mcp-server#1502.
-    ...ACTOR_SYNC_RUN_PATHS.map(
-        (path): ApiOperationBlockRule => ({
-            operation: { methods: ['GET'], path },
-            reason: SYNC_RUN_GET_REASON,
-            suggestedToolNames: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
-        }),
-    ),
-    // call-actor runs an Actor, not a saved task, so these suggest only the write tool, for the POST.
-    ...TASK_SYNC_RUN_PATHS.map(
-        (path): ApiOperationBlockRule => ({
-            operation: { methods: ['GET'], path },
-            reason: SYNC_RUN_GET_REASON,
-            suggestedToolNames: [HELPER_TOOLS.API_WRITE],
-        }),
-    ),
+    // A GET to a synchronous run endpoint starts a paid run, so the read tool would not be read-only; the write
+    // tool sends the POST. See apify/apify-mcp-server#1502.
+    {
+        match: { method: 'GET', path: '/v2/actors/{actorId}/run-sync' },
+        reason: SYNC_RUN_GET_REASON,
+        suggestedToolNames: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
+    },
+    {
+        match: { method: 'GET', path: '/v2/actors/{actorId}/run-sync-get-dataset-items' },
+        reason: SYNC_RUN_GET_REASON,
+        suggestedToolNames: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
+    },
+    // call-actor runs an Actor, not a saved task.
+    {
+        match: { method: 'GET', path: '/v2/actor-tasks/{actorTaskId}/run-sync' },
+        reason: SYNC_RUN_GET_REASON,
+        suggestedToolNames: [HELPER_TOOLS.API_WRITE],
+    },
+    {
+        match: { method: 'GET', path: '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items' },
+        reason: SYNC_RUN_GET_REASON,
+        suggestedToolNames: [HELPER_TOOLS.API_WRITE],
+    },
 ];
 
-/** The tool that sends a method: the read tool sends only a GET, and the write tool every other method. */
-export function getApiCallToolName(method: ApiMethod): ApiCallToolName {
-    return method === 'GET' ? HELPER_TOOLS.API_READ : HELPER_TOOLS.API_WRITE;
-}
-
-/**
- * A text with each `%XX` escape decoded to that byte as a character. Unlike `decodeURIComponent`, it never
- * throws, so a malformed escape elsewhere in the text cannot hide a name.
- */
+/** Decodes each `%XX` escape. Unlike `decodeURIComponent`, it never throws, so a malformed escape hides nothing. */
 function decodeEscapes(text: string): string {
     return text.replace(/%([0-9a-f]{2})/gi, (_escape, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
 }
 
 /**
- * The top-level name the API's query parser (qs, as Express runs it) reads from a query parameter name, or a
- * broader one: decoded, in lowercase, and without brackets, since `method[]`, `method[0]`, and `[method]` all
- * reach the API as `method`.
+ * A query parameter name as the API's query parser (qs, run by Express) reads it, decoded and in lowercase:
+ * qs reads `method[]`, `method[0]`, and `[method]` all as `method`.
  */
-function extractQueryParamRoot(name: string): string {
+function extractQueryParamName(name: string): string {
     const decodedName = decodeEscapes(name).toLowerCase();
     return /^\[([^[\]]*)\]/.exec(decodedName)?.[1] ?? decodedName.split('[')[0];
 }
 
-function isBlockedQueryParam(name: string, rule: ApiQueryParamBlockRule): boolean {
-    return extractQueryParamRoot(name) === rule.queryParam.toLowerCase();
-}
-
-/** A path template segment that is a parameter, such as `{actorId}`. */
-export const PATH_PARAMETER_SEGMENT_REGEX = /^\{[^{}]+\}$/;
-
 /**
- * The segments of a path as the API routes it: split first and then decoded one by one, so an escaped slash
- * stays in its segment; in lowercase; without the empty segments of a trailing slash, or of a doubled one in
- * case anything before the router merges it; and with the legacy `acts` prefix read as `actors`, the one the
- * spec lists.
+ * A path's segments as the API's router compares them: in lowercase, without the empty segments of a trailing
+ * or doubled slash, and with the legacy `acts` prefix read as `actors`. Split before decoding, as the router
+ * does, so the escaped slash in `apify%2Fhello-world` stays in its segment.
  */
 function splitRoutePath(path: string): string[] {
     const segments = path
@@ -119,118 +78,51 @@ function splitRoutePath(path: string): string[] {
     return segments;
 }
 
-/**
- * Whether the API routes a path, with values or as a spec template, to the operation of the rule. Without a
- * method, the path alone decides.
- */
-function isBlockedOperation(method: ApiMethod | undefined, path: string, rule: ApiOperationBlockRule): boolean {
-    if (method !== undefined && !rule.operation.methods.includes(method)) return false;
-    const templateSegments = splitRoutePath(rule.operation.path);
+/** Whether an operation rule matches a method and a path, with values or a spec template. */
+function isOperationMatch(match: ApiBlockRule['match'], method: ApiMethod, path: string): boolean {
+    if (!('path' in match) || match.method !== method) return false;
     const segments = splitRoutePath(path);
-    if (segments.length !== templateSegments.length) return false;
-    // A parameter matches one segment, never an empty one: the split drops those.
-    return templateSegments.every(
-        (templateSegment, position) =>
-            PATH_PARAMETER_SEGMENT_REGEX.test(templateSegment) || segments[position] === templateSegment,
+    const templateSegments = splitRoutePath(match.path);
+    return (
+        segments.length === templateSegments.length &&
+        templateSegments.every((segment, position) => segment.startsWith('{') || segment === segments[position])
     );
 }
 
-/** A normalized path parsed as the request URL is. Any origin will do; only the path and the query are checked. */
-function parseRequestUrl(normalizedPath: string): URL {
-    return new URL(`https://api.invalid/v2/${normalizedPath}`);
-}
-
-/** The reason of a rule, with each tool it suggests that the session has and that is not the refusing tool. */
-function formatRefusal(
-    { reason, suggestedToolNames = [] }: ApiBlockRule,
-    toolName: ApiCallToolName | undefined,
-    loadedToolNames: readonly string[],
-): string {
-    const suggested = suggestedToolNames.filter((name) => name !== toolName && loadedToolNames.includes(name));
-    return suggested.length > 0 ? `${reason} Use ${suggested.join(' or ')} instead.` : reason;
-}
-
 /**
- * Why a rule refuses a call, or `undefined` when none does. The path is parsed as the request URL is: dot
- * segments resolved, a backslash read as a slash, tabs and newlines dropped. The match is fail-closed: a
- * path matches in any letter case and with a trailing or doubled slash, and a query name matches decoded, in
- * any letter case, and with brackets. Without a method (the write tool checks before it chooses one), an
- * operation rule with a method the tool sends refuses the path; `callApi` checks again with the method.
+ * Why a rule refuses a request, or `undefined` when none does. It matches fail-closed: a path in any letter
+ * case, decoded segment by segment, and with trailing or doubled slashes; a query parameter name decoded, in
+ * any letter case, and with brackets.
  */
 export function validateApiBlocklist(
-    {
-        toolName,
-        method,
-        normalizedPath,
-        query,
-        loadedToolNames,
-    }: {
-        toolName: ApiCallToolName;
-        method: ApiMethod | undefined;
+    request: {
+        method: ApiMethod;
         /** The path as `normalizeApiPath` returns it, with any query string written into it. */
         normalizedPath: string;
         query?: Record<string, unknown>;
         loadedToolNames: readonly string[];
     },
-    rules: readonly ApiBlockRule[] = API_BLOCK_RULES,
+    rules = API_BLOCK_RULES,
 ): string | undefined {
-    const { pathname, searchParams } = parseRequestUrl(normalizedPath);
-    const queryNames = [...searchParams.keys(), ...Object.keys(query ?? {})];
-    const rule = rules.find((candidate) =>
-        'queryParam' in candidate
-            ? candidate.toolNames.includes(toolName) && queryNames.some((name) => isBlockedQueryParam(name, candidate))
-            : candidate.operation.methods.some((ruleMethod) => getApiCallToolName(ruleMethod) === toolName) &&
-              isBlockedOperation(method, pathname, candidate),
+    const { method, normalizedPath, query = {}, loadedToolNames } = request;
+    // Parsed as the request URL is: dot segments resolved, a backslash read as a slash, tabs and newlines dropped.
+    const { pathname, searchParams } = new URL(`https://api.invalid/v2/${normalizedPath}`);
+    const queryNames = [...searchParams.keys(), ...Object.keys(query)].map(extractQueryParamName);
+    const rule = rules.find(({ match }) =>
+        'queryParam' in match
+            ? queryNames.includes(match.queryParam.toLowerCase())
+            : isOperationMatch(match, method, pathname),
     );
-    return rule && formatRefusal(rule, toolName, loadedToolNames);
+    if (!rule) return undefined;
+    // The read tool sends a GET, and the write tool every other method.
+    const refusingToolName = method === 'GET' ? HELPER_TOOLS.API_READ : HELPER_TOOLS.API_WRITE;
+    const toolNames = (rule.suggestedToolNames ?? []).filter(
+        (name) => name !== refusingToolName && loadedToolNames.includes(name),
+    );
+    return toolNames.length > 0 ? `${rule.reason} Use ${toolNames.join(' or ')} instead.` : rule.reason;
 }
 
-/**
- * Why the API tools refuse calls to a path in a method, or `undefined` when no operation rule matches it;
- * without a method, the path alone decides. For a tool that reads the index instead of calling, such as
- * apify-api-details: the index leaves out what a rule refuses, so a lookup there could match a path next
- * to it or say the method is missing. The path is parsed as in `validateApiBlocklist`.
- */
-export function validateApiPathBlocklist(
-    {
-        normalizedPath,
-        method,
-        loadedToolNames,
-    }: {
-        /** The path as `normalizeApiPath` returns it. */
-        normalizedPath: string;
-        method?: ApiMethod;
-        loadedToolNames: readonly string[];
-    },
-    rules: readonly ApiBlockRule[] = API_BLOCK_RULES,
-): string | undefined {
-    const { pathname } = parseRequestUrl(normalizedPath);
-    const rule = rules.find((candidate) => 'operation' in candidate && isBlockedOperation(method, pathname, candidate));
-    return rule && formatRefusal(rule, undefined, loadedToolNames);
-}
-
-/**
- * An operation of the spec as the API tools offer it: `undefined` when a rule refuses it to the tool that sends
- * its method, and otherwise without the query parameters a rule refuses to that tool.
- */
-export function applyApiBlocklist<TOperation extends { method: ApiMethod; path: string; parameters: ApiParameter[] }>(
-    operation: TOperation,
-    rules: readonly ApiBlockRule[] = API_BLOCK_RULES,
-): TOperation | undefined {
-    const isBlocked = rules.some(
-        (rule) => 'operation' in rule && isBlockedOperation(operation.method, operation.path, rule),
-    );
-    if (isBlocked) return undefined;
-    const toolName = getApiCallToolName(operation.method);
-    const parameters = operation.parameters.filter(
-        (parameter) =>
-            parameter.in !== 'query' ||
-            !rules.some(
-                (rule) =>
-                    'queryParam' in rule &&
-                    rule.toolNames.includes(toolName) &&
-                    isBlockedQueryParam(parameter.name, rule),
-            ),
-    );
-    return { ...operation, parameters };
+/** Whether a rule matches an operation of the spec, given by its method and path template. */
+export function isApiOperationBlocked(method: ApiMethod, path: string, rules = API_BLOCK_RULES): boolean {
+    return rules.some(({ match }) => isOperationMatch(match, method, path));
 }

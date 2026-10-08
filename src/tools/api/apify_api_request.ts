@@ -12,7 +12,7 @@ import { isApifyApiUri, isMaxContentLengthAbort } from '../../resources/api_reso
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
-import { getApiCallToolName, PATH_PARAMETER_SEGMENT_REGEX, validateApiBlocklist } from './apify_api_blocklist.js';
+import { validateApiBlocklist } from './apify_api_blocklist.js';
 import type { ApiMethod, ApiOperation } from './apify_api_spec.js';
 import { fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
 
@@ -92,6 +92,8 @@ function stripQuery(path: string): string {
 function toSpecPath(normalizedPath: string): string {
     return stripQuery(normalizedPath).replace(/^acts(?=\/|$)/, 'actors');
 }
+
+const PATH_PARAMETER_SEGMENT_REGEX = /^\{[^{}]+\}$/;
 
 /** How many literal segments of the template match the path segments, or `undefined` when it does not match. */
 function countMatchingLiterals(template: string, segments: string[]): number | undefined {
@@ -277,13 +279,12 @@ export async function callApi(params: {
     body?: unknown;
     /** Aborts the request when the client cancels the tool call. */
     signal?: AbortSignal;
-    /** The session's tools, to name a dedicated log tool when a log is too large. */
+    /** The session's tools, so a refusal or a too-large log names only tools the session has. */
     loadedToolNames: readonly string[];
 }): Promise<ToolResponse> {
     const { client, method } = params;
     const normalizedPath = normalizeApiPath(params.path);
     const refusal = validateApiBlocklist({
-        toolName: getApiCallToolName(method),
         method,
         normalizedPath,
         query: params.query,

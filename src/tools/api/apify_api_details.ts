@@ -7,7 +7,6 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { apifyApiDetailsOutputSchema } from '../structured_output_schemas.js';
-import { validateApiPathBlocklist } from './apify_api_blocklist.js';
 import {
     findPathOperations,
     formatApiPath,
@@ -15,7 +14,6 @@ import {
     normalizeApiPath,
     redactApiCallArgs,
 } from './apify_api_request.js';
-import type { ApiMethod } from './apify_api_spec.js';
 import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiDetailsArgs = z.object({
@@ -71,21 +69,11 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
     redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiDetailsArgs.parse(toolArgs.args);
-        const normalizedPath = normalizeApiPath(parsed.path);
-        const findRefusal = (method?: ApiMethod) =>
-            validateApiPathBlocklist({ normalizedPath, method, loadedToolNames: toolArgs.loadedToolNames });
-        // Before the lookup: the index leaves out the operations the call tools refuse, so the lookup would say
-        // a refused method is missing.
-        const refusal = parsed.method && findRefusal(parsed.method);
-        if (refusal) return respondUserError(refusal);
         const index = await fetchApiOperationIndex();
+        const normalizedPath = normalizeApiPath(parsed.path);
         const path = formatApiPath(normalizedPath);
-        // Without the methods refused on the path: with a refused operation left out, the lookup can match the
-        // path next to it.
-        const matched = findPathOperations(index, normalizedPath).filter((operation) => !findRefusal(operation.method));
+        const matched = findPathOperations(index, normalizedPath);
         if (matched.length === 0) {
-            const pathRefusal = findRefusal(parsed.method);
-            if (pathRefusal) return respondUserError(pathRefusal);
             const next = toolArgs.loadedToolNames.includes(HELPER_TOOLS.API_SEARCH)
                 ? ` Find the path with ${HELPER_TOOLS.API_SEARCH}.`
                 : '';

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import {
     APIFY_API_OPENAPI_URL,
@@ -45,12 +44,13 @@ describe('buildApiOperationIndex()', () => {
         expect(buildApiOperationIndex(syncRunSpec, []).size).toBe(8);
     });
 
-    it('leaves out the operations a rule names', () => {
+    it('leaves out the operations a rule matches', () => {
         const rules: ApiBlockRule[] = [
-            { operation: { methods: ['GET'], path: '/v2/datasets/{datasetId}' }, reason: 'No.' },
-            { operation: { methods: ['DELETE'], path: '/v2/actors/{actorId}' }, reason: 'No.' },
+            { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' },
+            { match: { method: 'DELETE', path: '/v2/actors/{actorId}' }, reason: 'No.' },
             // A literal segment matches only itself, not a parameter of the spec.
-            { operation: { methods: ['GET'], path: '/v2/users/me' }, reason: 'No.' },
+            { match: { method: 'GET', path: '/v2/users/me' }, reason: 'No.' },
+            { match: { queryParam: 'limit' }, reason: 'No.' },
         ];
 
         const blockedIndex = buildApiOperationIndex(API_SPEC_FIXTURE, rules);
@@ -60,49 +60,6 @@ describe('buildApiOperationIndex()', () => {
             'actor_delete',
             'users_me_get',
         ]);
-    });
-
-    it('drops the method query parameter, which the API takes as the HTTP method, from every operation', () => {
-        const spec = {
-            paths: {
-                '/v2/things/{thingId}': {
-                    get: {
-                        operationId: 'thing_get',
-                        parameters: [
-                            { name: 'thingId', in: 'path', required: true },
-                            { name: 'method', in: 'query' },
-                            { name: 'limit', in: 'query' },
-                        ],
-                    },
-                    post: { operationId: 'thing_post', parameters: [{ name: 'Method[]', in: 'query' }] },
-                },
-            },
-        };
-
-        const thingIndex = buildApiOperationIndex(spec);
-
-        expect(thingIndex.get('thing_get')?.parameters.map(({ name }) => name)).toEqual(['thingId', 'limit']);
-        expect(thingIndex.get('thing_post')?.parameters).toEqual([]);
-    });
-
-    it('drops a query parameter only from the operations of the tools its rule names', () => {
-        const rules: ApiBlockRule[] = [
-            { queryParam: 'limit', toolNames: [HELPER_TOOLS.API_WRITE], reason: 'Refused.' },
-        ];
-        const parameters = [{ name: 'limit', in: 'query' }];
-        const spec = {
-            paths: {
-                '/v2/things': {
-                    get: { operationId: 'things_get', parameters },
-                    post: { operationId: 'things_post', parameters },
-                },
-            },
-        };
-
-        const thingIndex = buildApiOperationIndex(spec, rules);
-
-        expect(thingIndex.get('things_get')?.parameters.map(({ name }) => name)).toEqual(['limit']);
-        expect(thingIndex.get('things_post')?.parameters).toEqual([]);
     });
 
     it('indexes a PATCH operation, which the published spec does not have yet', () => {
