@@ -60,8 +60,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     operation's method. So search, details, the closest-path hints, and the write tool's method choice
     never offer them. Details checks the method, when given, before it looks the path up, and drops from
     the lookup each method refused on the path (`validateApiPathBlocklist`), so it refuses with the rule's
-    reason, lists only the POST of a synchronous run endpoint, and never answers with a path next to a
-    refused one.
+    reason, lists only the POST of a synchronous run endpoint, and, without a method, refuses the path
+    when the lookup has no method left.
     `apify_api_spec.ts` builds the operation index from the spec (cached for a day); search and
     details use it, the write tool uses it to choose a method that was not given, and a call uses it
     otherwise only for hints, waiting at most a few seconds, so a failed download does not stop a
