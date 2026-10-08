@@ -40,8 +40,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     revision rules, and the text-or-base64 detection. Versions not stored as files (Git repository,
     gist, or zip) are refused.
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
-    operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. The call tools are
-    proxies to the API, like `apify api` in the Apify CLI: they refuse nothing the API accepts.
+    operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. The write tool is in
+    no category (`UNCATEGORIZED_TOOLS`): `tools=api` serves the other three, and a session gets the write
+    tool only by naming it. The call tools are proxies to the API, like `apify api` in the Apify CLI:
+    they refuse nothing the API accepts.
     `apify_api_spec.ts` builds the operation index from the spec (cached for a day); search and
     details use it, the write tool uses it to choose a method that was not given, and a call uses it
     otherwise only for hints, waiting at most a few seconds, so a failed download does not stop a
