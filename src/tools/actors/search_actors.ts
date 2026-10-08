@@ -230,8 +230,8 @@ export const searchActors: ToolEntry = Object.freeze({
         };
 
         // The header is built with `dedent`; `actorCardText` is joined after it, not interpolated.
-        // Card lines are flush-left or indented (two spaces for pay-per-event pricing), which would
-        // corrupt `dedent`'s indent detection if interpolated into the template.
+        // Card lines can be indented (two spaces for pay-per-event pricing), which would corrupt
+        // `dedent`'s indent detection if interpolated into the template.
         const header = dedent`
             # Search results:
             - **Search query:** ${parsed.keywords}
