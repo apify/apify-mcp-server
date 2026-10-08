@@ -12,6 +12,7 @@ import {
     logHttpError,
     redactSkyfirePayId,
     sanitizeMezmoMessage,
+    toPlainError,
 } from '../../src/utils/logging.js';
 
 describe('isMcpClientFaultMessage', () => {
@@ -184,7 +185,7 @@ describe('logHttpError', () => {
         code: 'ECONNREFUSED',
     };
 
-    // The text format prints only the stack, `type` and cause of a logged error; JSON prints every field.
+    // The text format prints an exception's stack, `type` and cause, but not its `name` or `code`.
     function logHttpErrorAsJson(error: unknown): Record<string, unknown> {
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const { logger } = log.getOptions();
@@ -205,7 +206,7 @@ describe('logHttpError', () => {
             logged: loggedAxiosFailure,
         },
         {
-            input: 'an HTTP 5xx API error',
+            input: 'an HTTP 5xx API error, keeping its type',
             error: Object.assign(new Error('API said no'), { statusCode: 500, type: 'some-type' }),
             field: 'exception',
             logged: { name: 'Error', message: 'API said no', stack: expect.any(String), type: 'some-type' },
@@ -222,7 +223,7 @@ describe('logHttpError', () => {
             },
         },
         {
-            input: 'an HTTP 5xx error with a non-Error cause',
+            input: 'an HTTP 5xx error with an object cause',
             error: Object.assign(new Error('outer', { cause: { config: requestConfig } }), { statusCode: 500 }),
             field: 'exception',
             logged: { name: 'Error', message: 'outer', stack: expect.any(String) },
@@ -239,6 +240,16 @@ describe('logHttpError', () => {
 
         expect(JSON.stringify(line)).not.toContain('test-token');
         expect(line[field]).toEqual(logged);
+    });
+
+    it.each([
+        { cause: 'a string cause', logged: 'a string cause' },
+        { cause: 42, logged: '42' },
+        { cause: false, logged: 'false' },
+    ])('logs the primitive cause $cause as text', ({ cause, logged }) => {
+        const line = logHttpErrorAsJson(Object.assign(new Error('outer', { cause }), { statusCode: 500 }));
+
+        expect(line.exception).toEqual({ name: 'Error', message: 'outer', stack: expect.any(String), cause: logged });
     });
 
     it.each([
@@ -266,6 +277,22 @@ describe('logHttpError', () => {
 
         expect(() => logHttpError(buildError(), 'Failed to get Actor run')).not.toThrow();
         expect(consoleError).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('toPlainError', () => {
+    it('copies at most three causes of an error', () => {
+        let error = new Error('level 4');
+        for (let level = 3; level >= 0; level--) {
+            error = new Error(`level ${level}`, { cause: error });
+        }
+
+        const messages: string[] = [];
+        for (let copy: unknown = toPlainError(error); copy instanceof Error; copy = copy.cause) {
+            messages.push(copy.message);
+        }
+
+        expect(messages).toEqual(['level 0', 'level 1', 'level 2', 'level 3']);
     });
 });
 

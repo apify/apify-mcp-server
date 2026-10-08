@@ -131,17 +131,13 @@ function getMcpErrorCode(error: unknown): number | undefined {
 /**
  * The error with only fields that hold no request data: an axios error holds the request config, with the
  * Authorization header, and the request body (see apify/ai-team#330). The stack holds neither, so it stays: an
- * `ApifyApiError` stack lists the API call, and the text log shows its `type`. A cause is kept only when it is an
- * `Error`, down to `causeDepth` levels: any other cause can hold a config, a chain can be cyclic, and `@apify/log`
- * prints no deeper.
- * A non-Error value becomes an Error without a stack: a primitive keeps its text, an object only its tag.
+ * `ApifyApiError` stack lists the API call, and the text log shows its `type`. An `Error` cause is copied down to
+ * `causeDepth` levels: a chain can be cyclic, and `@apify/log` prints no deeper. A string, number or boolean cause is
+ * kept as text; any other cause is dropped, since an object can hold a config.
+ * A non-Error value gets no stack: one made here would point at this function, not at the throw.
  */
 export function toPlainError(error: unknown, causeDepth = 3): Error {
-    if (!(error instanceof Error)) {
-        const message =
-            typeof error === 'object' && error !== null ? Object.prototype.toString.call(error) : String(error);
-        return Object.assign(new Error(message), { stack: undefined });
-    }
+    if (!(error instanceof Error)) return Object.assign(new Error(String(error)), { stack: undefined });
     const { code, type } = error as { code?: unknown; type?: unknown };
     return Object.assign(new Error(error.message), {
         name: error.name,
@@ -149,6 +145,7 @@ export function toPlainError(error: unknown, causeDepth = 3): Error {
         ...(typeof code === 'string' && { code }),
         ...(typeof type === 'string' && { type }),
         ...(error.cause instanceof Error && causeDepth > 0 && { cause: toPlainError(error.cause, causeDepth - 1) }),
+        ...(['string', 'number', 'boolean'].includes(typeof error.cause) && { cause: String(error.cause) }),
     });
 }
 
